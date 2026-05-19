@@ -198,7 +198,6 @@ function PublishedList() {
   }
 
   const onCopy = async (it: PublishedShareCacheItem) => {
-    const url = `https://spool.share/s/${it.id}`
     try {
       await navigator.clipboard.writeText(sharePublicUrl(it.id))
       toast.success('Link copied')
@@ -208,7 +207,7 @@ function PublishedList() {
   }
 
   const onView = (it: PublishedShareCacheItem) => {
-    window.open(`https://spool.share/s/${it.id}`, '_blank', 'noopener,noreferrer')
+    window.open(sharePublicUrl(it.id), '_blank', 'noopener,noreferrer')
   }
 
   const onUnpublish = async (it: PublishedShareCacheItem) => {
@@ -292,7 +291,7 @@ function PublishedRow({
           )}
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
-          <span className="font-mono">spool.share/s/{item.id}</span>
+          <span className="font-mono">{sharePublicOrigin().replace(/^https?:\/\//, '')}/s/{item.id}</span>
           <span aria-hidden>·</span>
           <span>Published {publishedLabel}</span>
         </div>

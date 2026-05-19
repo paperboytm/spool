@@ -18,8 +18,8 @@ function seedProjectAndSession(db: Database.Database, sessionUuid: string): numb
 }
 
 describe('migration v12 — security scan schema', () => {
-  it('LATEST_SCHEMA_VERSION is 14', () => {
-    expect(LATEST_SCHEMA_VERSION).toBe(14)
+  it('LATEST_SCHEMA_VERSION is 15', () => {
+    expect(LATEST_SCHEMA_VERSION).toBe(15)
   })
 
   it('adds 5 scan_* columns to sessions (profile / completed_at / finding_count / high_count / purged_count)', () => {

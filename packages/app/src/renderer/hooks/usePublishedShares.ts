@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublishedShareCacheItem } from '@spool-lab/core'
 import type { MyShare } from '../../shared/share-publish.js'
 
@@ -21,14 +21,10 @@ export function toCacheItem(remote: MyShare, now: number = Date.now()): Publishe
   }
 }
 
-/**
- * Merge a fresh remote response over the existing local cache: any row
- * present in `remote` wins; rows that are absent from `remote` are
- * dropped. Kept as a pure function so its semantics are testable
- * without a live electron / sqlite environment.
- */
-export function mergeRemoteIntoCache(
-  _local: ReadonlyArray<PublishedShareCacheItem>,
+/** Remote is the source of truth: any row absent from the response is
+ *  dropped from the cache on next refresh. Kept as a pure function so
+ *  the semantics are testable without electron / sqlite. */
+export function remoteToCacheItems(
   remote: ReadonlyArray<MyShare>,
   now: number = Date.now(),
 ): PublishedShareCacheItem[] {
@@ -50,6 +46,7 @@ export interface UsePublishedSharesResult {
 export function usePublishedShares(): UsePublishedSharesResult {
   const [items, setItems] = useState<PublishedShareCacheItem[]>([])
   const [loading, setLoading] = useState(true)
+  const aliveRef = useRef(true)
   // Mutation generation — bumped by `noteLocalMutation()` and read by
   // `refresh()`. The Published tab triggers a refresh on focus events;
   // if the user just clicked Unpublish (which optimistically wrote
@@ -67,7 +64,8 @@ export function usePublishedShares(): UsePublishedSharesResult {
     const fetchGen = mutationGen.current
     try {
       const remote = await window.spoolShare.myShares()
-      const merged = mergeRemoteIntoCache(items, remote.items)
+      const merged = remoteToCacheItems(remote.items)
+      if (!aliveRef.current) return
       if (mutationGen.current !== fetchGen) {
         // A local mutation landed during the fetch — skip both the
         // in-memory swap AND the cache replaceAll. A subsequent
@@ -77,29 +75,27 @@ export function usePublishedShares(): UsePublishedSharesResult {
       setItems(merged)
       await window.spoolShare.cachePublished(merged)
     } catch (err) {
-      // Network / auth failure leaves the cached view intact. Logging
-      // only — the Published tab will keep showing stale rows rather
-      // than blanking out when the user is offline.
+      // Network / auth failure leaves the cached view intact — the
+      // Published tab keeps showing stale rows rather than blanking out
+      // when the user is offline.
       console.warn('[usePublishedShares] refresh failed:', err)
     }
-    // intentionally exclude items from deps — refresh always reads the latest remote
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    let alive = true
+    aliveRef.current = true
     void (async () => {
       try {
         const cached = await window.spoolShare.cachedPublished()
-        if (alive) setItems(cached)
+        if (aliveRef.current) setItems(cached)
       } catch (err) {
         console.warn('[usePublishedShares] cache read failed:', err)
       }
       await refresh()
-      if (alive) setLoading(false)
+      if (aliveRef.current) setLoading(false)
     })()
     return () => {
-      alive = false
+      aliveRef.current = false
     }
   }, [refresh])
 

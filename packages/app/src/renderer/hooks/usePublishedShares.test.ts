@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeRemoteIntoCache, toCacheItem } from './usePublishedShares.js'
+import { remoteToCacheItems, toCacheItem } from './usePublishedShares.js'
 import type { MyShare } from '../../shared/share-publish.js'
 
 const remote = (over: Partial<MyShare> = {}): MyShare => ({
@@ -50,22 +50,19 @@ describe('toCacheItem', () => {
   })
 })
 
-describe('mergeRemoteIntoCache', () => {
+describe('remoteToCacheItems', () => {
   it('returns one cache row per remote item', () => {
-    const merged = mergeRemoteIntoCache([], [remote({ id: 'a' }), remote({ id: 'b' })], 1)
+    const merged = remoteToCacheItems([remote({ id: 'a' }), remote({ id: 'b' })], 1)
     expect(merged.map((m) => m.id)).toEqual(['a', 'b'])
   })
 
-  it('drops local rows that the remote no longer returns', () => {
-    const local = [
-      { id: 'stale', title: '', visibility: 'unlisted', version: 1, published_at: 0, revoked_at: null, expires_at: null, updated_at: 0 },
-    ]
-    const merged = mergeRemoteIntoCache(local, [remote({ id: 'fresh' })], 1)
+  it('drops rows absent from remote (remote is the source of truth)', () => {
+    const merged = remoteToCacheItems([remote({ id: 'fresh' })], 1)
     expect(merged.map((m) => m.id)).toEqual(['fresh'])
   })
 
   it('reflects revoked_at updates from the remote', () => {
-    const merged = mergeRemoteIntoCache([], [remote({ id: 'r', revoked_at: 42 })], 100)
+    const merged = remoteToCacheItems([remote({ id: 'r', revoked_at: 42 })], 100)
     expect(merged[0]?.revoked_at).toBe(42)
     expect(merged[0]?.updated_at).toBe(100)
   })

@@ -52,9 +52,8 @@ export function getByDraftId(
   )
 }
 
-/** Replaces the cache wholesale with the given items. Run inside a
- *  single transaction so the table is never observable in a partially
- *  filled state by a concurrent reader. */
+/** Per-row upsert. Useful for partial updates (e.g., a single revoke);
+ *  the renderer typically uses {@link replaceAll} for full syncs. */
 export function upsertMany(
   db: Database.Database,
   items: ReadonlyArray<PublishedShareCacheItem>,

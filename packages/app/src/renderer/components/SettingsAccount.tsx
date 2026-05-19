@@ -9,7 +9,7 @@ type DeletionStatus =
   | { kind: 'pending'; executeAt: number }
 
 export default function SettingsAccount() {
-  const { user, loading, signIn, signOut } = useShareAuth()
+  const { user, loading, signIn, signOut, refresh } = useShareAuth()
   const [handleDraft, setHandleDraft] = useState('')
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
   const [claiming, setClaiming] = useState(false)
@@ -82,9 +82,7 @@ export default function SettingsAccount() {
     try {
       await window.spoolShare.claimHandle(handleDraft)
       toast.success(`Handle @${handleDraft} claimed`)
-      // Force re-fetch via signOut/signIn dance? Simpler: refresh page-level user via the hook's signIn() doesn't apply here.
-      // The handle is only needed for /me display; a window reload picks up the new value cleanly.
-      window.location.reload()
+      await refresh()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Couldn\'t claim handle'
       toast.error(msg)
@@ -149,7 +147,7 @@ export default function SettingsAccount() {
           </div>
           {user.handle && (
             <div className="text-[11px] text-warm-muted dark:text-dark-muted mt-0.5">
-              @{user.handle} · <span className="font-mono">spool.share/@{user.handle}</span>
+              @{user.handle} · <span className="font-mono">spool.pro/@{user.handle}</span>
             </div>
           )}
         </div>
@@ -162,7 +160,7 @@ export default function SettingsAccount() {
             Handle
           </h4>
           <p className="text-[12px] text-warm-muted dark:text-dark-muted mb-2">
-            Claim a handle to get a public profile at <span className="font-mono">spool.share/@your-handle</span>.
+            Claim a handle to get a public profile at <span className="font-mono">spool.pro/@your-handle</span>.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex-1 inline-flex items-center h-9 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface focus-within:border-accent dark:focus-within:border-accent-dark transition-colors">

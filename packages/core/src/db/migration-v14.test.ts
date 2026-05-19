@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { runMigrations } from './db.js'
+import { runMigrations, LATEST_SCHEMA_VERSION } from './db.js'
 
 function seedV13(): Database.Database {
   const db = new Database(':memory:')
@@ -68,7 +68,7 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
       { id: 10, msg_uuid: 'a' },
       { id: 12, msg_uuid: 'b' },
     ])
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(14)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(LATEST_SCHEMA_VERSION)
   })
 
   it('cascade-deletes findings on dropped duplicate rows', () => {
@@ -164,7 +164,7 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
     insertMsg(db, { id: 80, sessionId: 1, uuid: 'r', seq: 0 })
     insertMsg(db, { id: 81, sessionId: 1, uuid: 'r', seq: 1 })
     bumpToV14(db)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(14)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(LATEST_SCHEMA_VERSION)
 
     // Second pass — no-op.
     runMigrations(db)

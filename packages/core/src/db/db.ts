@@ -688,7 +688,7 @@ export function runMigrations(db: Database.Database): void {
     // v15: published_shares_cache — local mirror of /api/me/shares so the
     // Published tab in SharesPage renders instantly on cold start and
     // remains readable when the user is offline. This is NOT the source
-    // of truth — the canonical published index lives in spool.share's
+    // of truth — the canonical published index lives in the share backend's
     // D1. Rows are upserted whenever myShares() succeeds; entries that
     // disappear from the remote response are cleared via clearAll +
     // upsertMany on each successful fetch.
