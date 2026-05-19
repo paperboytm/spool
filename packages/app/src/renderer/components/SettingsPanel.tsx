@@ -193,22 +193,19 @@ export default function SettingsPanel({
             <h2 className="text-[22px] font-bold text-warm-text dark:text-dark-text leading-none">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-[2px]">
-            {TAB_DEFS
-              .filter(def => def.id !== 'security' || securityEnabled)
-              .filter(def => def.id !== 'account' || publishEnabled)
-              .map(def => (
+            {visibleTabs.map(def => (
               <button
                 key={def.id}
                 type="button"
-                aria-pressed={tab === def.id}
+                aria-pressed={activeTab === def.id}
                 onClick={() => setTab(def.id)}
                 className={`flex w-full items-center gap-[11px] rounded-lg h-9 px-3 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
-                  tab === def.id
+                  activeTab === def.id
                     ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
                     : 'text-warm-text dark:text-dark-text hover:bg-warm-bg dark:hover:bg-dark-bg'
                 }`}
               >
-                <span className={tab === def.id ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'}>
+                <span className={activeTab === def.id ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'}>
                   {def.icon}
                 </span>
                 {tabLabel(t, def.labelKey, def.fallbackLabel)}
@@ -224,7 +221,7 @@ export default function SettingsPanel({
           <div className="flex items-center justify-between px-16 pt-8 pb-2">
             <h3 className="text-xl font-semibold text-warm-text dark:text-dark-text">
               {(() => {
-                const def = TAB_DEFS.find(d => d.id === tab) ?? TAB_DEFS[0]!
+                const def = TAB_DEFS.find(d => d.id === activeTab) ?? TAB_DEFS[0]!
                 return tabLabel(t, def.labelKey, def.fallbackLabel)
               })()}
             </h3>
@@ -250,16 +247,16 @@ export default function SettingsPanel({
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-16 pb-8 pt-4">
-            {tab === 'general' && <GeneralTab language={language} onLanguageChange={onLanguageChange} />}
-            {tab === 'appearance' && (
+            {activeTab === 'general' && <GeneralTab language={language} onLanguageChange={onLanguageChange} />}
+            {activeTab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
-            {tab === 'shortcuts' && <ShortcutsTab />}
-            {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
-            {tab === 'agent' && <AgentTab />}
-            {tab === 'account' && <SettingsAccount />}
-            {tab === 'labs' && <LabsTab />}
-            {tab === 'security' && securityEnabled && <SecurityPane />}
+            {activeTab === 'shortcuts' && <ShortcutsTab />}
+            {activeTab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
+            {activeTab === 'agent' && <AgentTab />}
+            {activeTab === 'account' && <SettingsAccount />}
+            {activeTab === 'labs' && <LabsTab />}
+            {activeTab === 'security' && securityEnabled && <SecurityPane />}
           </div>
         </div>
       </div>

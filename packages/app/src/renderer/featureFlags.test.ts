@@ -57,6 +57,22 @@ describe('resolveFeatureRuntime', () => {
     resolveFeatureRuntime('share', { ...off, envEnabled: (k) => { seen.push(k); return false } })
     expect(seen).toEqual(['SHARE'])
   })
+
+  it('resolves sharePublish independently from share', () => {
+    // share on (DEV) but no env / labs opinion on sharePublish → publish off
+    expect(resolveFeatureRuntime('sharePublish', { ...off, dev: true })).toBe(true)
+    // env opts in only sharePublish
+    expect(resolveFeatureRuntime('sharePublish', {
+      ...off,
+      envEnabled: (k) => k === 'SHAREPUBLISH',
+    })).toBe(true)
+    // labs explicit OFF wins even when DEV is on
+    expect(resolveFeatureRuntime('sharePublish', {
+      ...off,
+      dev: true,
+      labsValue: (f) => (f === 'sharePublish' ? false : null),
+    })).toBe(false)
+  })
 })
 
 describe('securityBuildCapable', () => {

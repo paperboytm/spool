@@ -12,6 +12,7 @@ const FEEDBACK_URL = 'https://discord.gg/aqeDxQUs5E'
 export default function LabsTab() {
   const { t } = useTranslation()
   const shareOn = useFeature('share')
+  const sharePublishOn = useFeature('sharePublish')
   const securityOn = useSecurityEnabled()
 
   // The Security toggle is backed by the general `agents.json` config
@@ -43,6 +44,15 @@ export default function LabsTab() {
         feedbackHref={FEEDBACK_URL}
         checked={shareOn}
         onToggle={(next) => setLabsFlag('share', next)}
+      />
+      <LabsFlagRow
+        flag="sharePublish"
+        title="Spool Share — Publish"
+        description="Publish snapshots to spool.share (alpha). Pairs with Share."
+        feedbackLabel={t('labs.share.feedback')}
+        feedbackHref={FEEDBACK_URL}
+        checked={sharePublishOn}
+        onToggle={(next) => setLabsFlag('sharePublish', next)}
       />
       {/* Only offer the Security opt-in in builds that actually ship the
        *  code (dev + VITE_FEATURE_SECURITY builds). Elsewhere the whole
