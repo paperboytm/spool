@@ -66,6 +66,22 @@ pnpm run rebuild:native:node      # before @spool/core / Node-based tests
 pnpm run rebuild:native:electron  # before launching the Electron app or e2e tests
 ```
 
+### Dev DB isolation
+
+`pnpm dev` points Spool at `~/.spool-dev/` instead of your real `~/.spool/`,
+so iterating on schema migrations or destructive maintenance never touches the
+database you actually use. The dev DB starts empty; seed it from your real one
+only when you want realistic data:
+
+```bash
+pnpm --filter @spool/app dev:seed-from-prod   # copies ~/.spool/ → ~/.spool-dev/
+pnpm --filter @spool/app dev:reset-db         # wipes ~/.spool-dev/
+```
+
+Override the dev location with `SPOOL_DATA_DIR=/some/path pnpm dev`. The
+isolation kicks in automatically in dev mode; production builds always use the
+real `~/.spool/`.
+
 ## Release
 
 ```bash
