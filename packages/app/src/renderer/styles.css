@@ -52,6 +52,7 @@
   --color-warm-faint: #ADADAA;
   --color-accent: #C85A00;
   --color-accent-bg: #FFF3E8;
+  --color-accent-bg-strong: #FFE5CC;
 
   /* Warm palette — dark */
   --color-dark-bg: #141410;
@@ -65,6 +66,7 @@
   --color-accent-dark: #F07020;
   /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
   --color-accent-bg-dark: #2a1800;
+  --color-accent-bg-strong-dark: #3d2400;
 
   /* Status — warm-tuned, never Tailwind defaults (see DESIGN.md) */
   --color-status-success: #6BAF6B;
