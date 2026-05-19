@@ -78,6 +78,8 @@ export interface RiskByCategoryRow {
   kind: SensitiveKind
   severity: Severity
   count: number
+  /** Distinct sessions containing ≥ 1 active finding of this kind. */
+  sessions: number
 }
 
 /** Scope of a Dismiss action.

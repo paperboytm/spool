@@ -381,16 +381,19 @@ export function listSessionsWithFindings(
  *  Drives the Watchtower-style panel on the Security page. */
 export function riskByCategory(db: Database.Database): RiskByCategoryRow[] {
   const rows = db.prepare(
-    `SELECT kind, COUNT(*) AS count
+    `SELECT kind,
+            COUNT(*) AS count,
+            COUNT(DISTINCT session_id) AS sessions
        FROM findings
       WHERE state = 'active'
       GROUP BY kind
       ORDER BY count DESC`,
-  ).all() as Array<{ kind: string; count: number }>
+  ).all() as Array<{ kind: string; count: number; sessions: number }>
   return rows.map(r => ({
     kind: r.kind as SensitiveKind,
     severity: severityOf(r.kind as SensitiveKind),
     count: r.count,
+    sessions: r.sessions,
   }))
 }
 

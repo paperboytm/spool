@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, AlertTriangle, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
@@ -29,6 +29,10 @@ type Props = {
   isSharesActive?: boolean
   onSelectSecurity?: () => void
   isSecurityActive?: boolean
+  /** Total active high-severity findings across all sessions. When > 0
+   *  the Security row gets a small AlertTriangle + count trailing badge
+   *  so the user can see there's work to do without opening the page. */
+  securityHighCount?: number
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
   status?: StatusInfo | null
@@ -43,7 +47,7 @@ type Props = {
   onShareSession?: (uuid: string) => void
 }
 
-export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
+export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, securityHighCount = 0, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
   const { t } = useTranslation()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
     switch (value) {
@@ -129,6 +133,20 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             label={t('sidebar.security')}
             active={isSecurityActive}
             onClick={onSelectSecurity}
+            {...(securityHighCount > 0
+              ? {
+                  trailing: (
+                    <span
+                      data-testid="sidebar-security-badge"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-accent dark:text-accent-dark"
+                      title={`${securityHighCount} high-risk finding${securityHighCount === 1 ? '' : 's'}`}
+                    >
+                      <AlertTriangle size={11} strokeWidth={1.6} aria-hidden />
+                      {securityHighCount > 99 ? '99+' : securityHighCount}
+                    </span>
+                  ),
+                }
+              : {})}
           />
         )}
         {onOpenSearch && (
