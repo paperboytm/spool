@@ -41,6 +41,7 @@
     "better-sqlite3": "^11.10.0",
     "bindings": "^1.5.0",
     "effect": "^3.21.2",
+    "electron-store": "^10.0.0",
     "electron-updater": "^6.8.3",
     "fast-check": "^3.23.2",
     "file-uri-to-path": "^2.0.0",

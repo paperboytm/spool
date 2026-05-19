@@ -61,6 +61,7 @@ import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
 import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
+import { registerShareAuthIpc } from './ipc/share-auth.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -711,6 +712,9 @@ app.whenReady().then(async () => {
   } else {
     console.log('[security.lifecycle] opt-in off at boot → scanner not started')
   }
+
+  // Share-auth IPC (PKCE loopback OAuth + safeStorage session)
+  registerShareAuthIpc()
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)

@@ -365,8 +365,32 @@ const api = {
 
 contextBridge.exposeInMainWorld('spool', api)
 
+export interface ShareAuthUser {
+  id: string
+  email: string
+  name: string | null
+  avatar_url: string | null
+  handle: string | null
+}
+
+const spoolShare = {
+  authAvailable: (): Promise<boolean> =>
+    ipcRenderer.invoke('share-auth:available'),
+  signIn: (): Promise<ShareAuthUser> =>
+    ipcRenderer.invoke('share-auth:signin'),
+  me: (): Promise<ShareAuthUser | null> =>
+    ipcRenderer.invoke('share-auth:me'),
+  signOut: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('share-auth:signout'),
+}
+
+export type SpoolShareAPI = typeof spoolShare
+
+contextBridge.exposeInMainWorld('spoolShare', spoolShare)
+
 declare global {
   interface Window {
     spool: SpoolAPI
+    spoolShare: SpoolShareAPI
   }
 }
