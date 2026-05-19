@@ -8,9 +8,28 @@ import {
 } from './lib/labsFlags.js'
 import { useSecurityEnabledConfig } from './api/securityEnabledCache.js'
 
-// Resolution order: explicit user choice (Labs) wins over DEV / env.
-// This is what makes Labs feel consistent — a user can turn a feature
-// off even when DEV or VITE_FEATURE_<NAME> would otherwise pin it on.
+// Resolution order: explicit user choice (Labs) > explicit env var > DEV
+// default per-flag. Labs explicit "0" can always turn a feature OFF —
+// this is the user's escape hatch from a DEV / env that would otherwise
+// pin it on.
+//
+// `DEV_DEFAULT_ON` is per-flag because not every feature should be
+// ergonomic in DEV:
+//
+//   share         — Phase 0 editor, already shipped on main; DEV on by
+//                   default so contributors don't have to opt in just to
+//                   see existing UI.
+//   sharePublish  — Remote publish + accounts. Pre-launch and not in
+//                   the Labs UI on purpose. Even on DEV, the feature stays
+//                   invisible until VITE_FEATURE_SHAREPUBLISH=1 is set
+//                   (or localStorage `spool.labs.sharePublish=1` for the
+//                   power-user escape hatch). Keeps the published surface
+//                   from intruding on other contributors' dev sessions
+//                   between merge and GA.
+const DEV_DEFAULT_ON: Record<LabsFlag, boolean> = {
+  share: true,
+  sharePublish: false,
+}
 
 export interface FeatureRuntimeDeps {
   dev: boolean
@@ -31,7 +50,8 @@ export function resolveFeatureRuntime(
 ): boolean {
   const labs = deps.labsValue(flag)
   if (labs !== null) return labs
-  return deps.dev || deps.envEnabled(flag.toUpperCase())
+  if (deps.envEnabled(flag.toUpperCase())) return true
+  return deps.dev && DEV_DEFAULT_ON[flag]
 }
 
 /**
