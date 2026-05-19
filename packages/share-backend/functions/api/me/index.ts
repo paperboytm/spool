@@ -16,14 +16,17 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       .prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
       .bind(user.id)
       .first<{ handle: string }>()
-    return jsonOk({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-      handle: handle?.handle ?? null,
-      deletion_pending_until: user.deletion_pending_until,
-    })
+    return jsonOk(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        avatar_url: user.avatar_url,
+        handle: handle?.handle ?? null,
+        deletion_pending_until: user.deletion_pending_until,
+      },
+      { headers: { 'cache-control': 'private, no-cache' } },
+    )
   } catch (e) {
     return jsonError(e)
   }

@@ -84,7 +84,7 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     // compliant and workerd stops emitting non-ASCII warnings. encodeURI
     // preserves the path/query delimiters (`/`, `?`, `&`, `=`), so it's
     // an idempotent no-op on the common ASCII paths.
-    const headers = new Headers({ Location: encodeURI(next) })
+    const headers = new Headers({ Location: encodeURI(next), 'Cache-Control': 'no-store' })
     headers.append('Set-Cookie', buildSessionCookie(sess.token, MAX_TTL_SEC))
     headers.append('Set-Cookie', clearCookie(OAUTH_STATE_COOKIE))
     headers.append('Set-Cookie', clearCookie(OAUTH_VERIFIER_COOKIE))

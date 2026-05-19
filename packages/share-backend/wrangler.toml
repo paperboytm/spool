@@ -66,6 +66,7 @@ crons = ["0 */6 * * *"]
 #   wrangler pages secret put GOOGLE_CLIENT_SECRET_WEB --project-name spool-share-backend
 #   wrangler pages secret put SESSION_SIGNING_KEY      --project-name spool-share-backend
 #   wrangler pages secret put ADMIN_USER_IDS           --project-name spool-share-backend
+#       (comma-separated user ids allowed to hit /api/admin/*)
 #
 # CF stores secret values encrypted at rest. Never echoed back through
 # wrangler, never available to local dev (use .dev.vars for that —

@@ -15,7 +15,10 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       )
       .bind(user.id)
       .all()
-    return jsonOk({ items: rows.results })
+    return jsonOk(
+      { items: rows.results },
+      { headers: { 'cache-control': 'private, no-cache' } },
+    )
   } catch (e) {
     return jsonError(e)
   }
