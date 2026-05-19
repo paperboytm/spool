@@ -14,7 +14,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 11
+export const LATEST_SCHEMA_VERSION = 12
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -467,6 +467,71 @@ export function runMigrations(db: Database.Database): void {
         ON share_drafts(source_origin);
     `)
     db.pragma('user_version = 11')
+  }
+
+  if (version < 12) {
+    // v12: Security Scan — sidecar findings + allowlists. The five
+    // scan_* columns on sessions are denormalised counters
+    // maintained by the scan worker; findings stores (kind,
+    // value_hash, offsets) only — never the raw value. Purge mutates
+    // messages.content_text and flips the row to state='purged'; the
+    // row remains as an audit record. scan_purged_count is the
+    // lifetime tally of purged findings per session, used by the
+    // Library row's "all-resolved ✓" badge to distinguish "never
+    // had findings" from "was clean after I cleaned it up". See
+    // ~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md.
+    //
+    // Wrapped in a transaction so a mid-migration failure (process
+    // killed, disk full, etc.) doesn't leave the DB half-altered.
+    // Without this, a partial v12 — say two ALTER TABLEs landed
+    // but the third failed — would auto-commit the first two and
+    // leave user_version at 11; the next launch would retry from
+    // the first ALTER and trip a "duplicate column" error,
+    // bricking the app on every subsequent startup.
+    db.transaction(() => {
+      db.exec(`
+        ALTER TABLE sessions ADD COLUMN scan_profile        TEXT;
+        ALTER TABLE sessions ADD COLUMN scan_completed_at   TEXT;
+        ALTER TABLE sessions ADD COLUMN scan_finding_count  INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE sessions ADD COLUMN scan_high_count     INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE sessions ADD COLUMN scan_purged_count   INTEGER NOT NULL DEFAULT 0;
+
+        CREATE TABLE IF NOT EXISTS findings (
+          id                INTEGER PRIMARY KEY,
+          session_id        INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          message_id        INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+          kind              TEXT NOT NULL,
+          value_hash        TEXT NOT NULL,
+          confidence        REAL NOT NULL,
+          provider          TEXT NOT NULL,
+          start_offset      INTEGER NOT NULL,
+          end_offset        INTEGER NOT NULL,
+          state             TEXT NOT NULL DEFAULT 'active'
+                            CHECK (state IN ('active','dismissed','purged')),
+          detected_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          state_changed_at  TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_findings_session    ON findings(session_id);
+        CREATE INDEX IF NOT EXISTS idx_findings_state      ON findings(state);
+        CREATE INDEX IF NOT EXISTS idx_findings_kind_hash  ON findings(kind, value_hash);
+
+        CREATE TABLE IF NOT EXISTS allowlist_session (
+          session_id   INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          kind         TEXT NOT NULL,
+          value_hash   TEXT NOT NULL,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (session_id, kind, value_hash)
+        );
+
+        CREATE TABLE IF NOT EXISTS allowlist_global (
+          kind         TEXT NOT NULL,
+          value_hash   TEXT NOT NULL,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (kind, value_hash)
+        );
+      `)
+      db.pragma('user_version = 12')
+    })()
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')

@@ -27,6 +27,7 @@
     "prepack": "pnpm run build"
   },
   "dependencies": {
+    "@spool-lab/redact": "workspace:*",
     "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {

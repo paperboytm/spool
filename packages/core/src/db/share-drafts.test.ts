@@ -79,10 +79,10 @@ describe('share_drafts schema (v11)', () => {
     expect(row.updated_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
   })
 
-  it('user_version reaches 11 after migration', async () => {
+  it('share_drafts table exists after migration (user_version ≥ 11)', async () => {
     const { db } = await load()
     const v = (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version
-    expect(v).toBe(11)
+    expect(v ?? 0).toBeGreaterThanOrEqual(11)
   })
 
   it('upsertShareDraft inserts a new row with timestamps', async () => {
