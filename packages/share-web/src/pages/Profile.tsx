@@ -33,9 +33,9 @@ export function Profile({ handle }: { handle: string }) {
       setState(next)
       if (next.kind === 'ok') {
         const display = next.profile.name ?? `@${next.profile.handle}`
-        document.title = `${display} · spool.share`
+        document.title = `${display} · spool.pro`
       } else {
-        document.title = 'Profile not found · spool.share'
+        document.title = 'Profile not found · spool.pro'
       }
     })
     return () => {

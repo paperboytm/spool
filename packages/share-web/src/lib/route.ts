@@ -57,7 +57,12 @@ export function routeFor(pathname: string, search: string = ''): Route {
  *  - rejects absolute URLs (`http://evil.com`)
  *  - rejects protocol-relative URLs (`//evil.com`)
  *  - rejects backslash sneakers (`/\evil.com`)
- *  - rejects path-traversal (`/..`) */
+ *  - rejects path-traversal (`/..`)
+ *
+ *  Keep AT LEAST as strict as the server's `safeNext` in
+ *  `packages/share-backend/src/auth/next.ts` — the server runs first on
+ *  the OAuth callback, but defense-in-depth means this guard catches a
+ *  drifted backend. */
 export function nextSafe(raw: string | null | undefined): string {
   if (!raw) return '/'
   if (typeof raw !== 'string') return '/'

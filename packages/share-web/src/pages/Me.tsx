@@ -209,14 +209,12 @@ export function Me() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 
   const load = useCallback(async () => {
-    const meResult = await fetchMe()
-    if (meResult.kind === 'unauthenticated') {
-      window.location.replace('/sign-in?next=/me')
-      return
-    }
-    if (meResult.kind === 'forbidden') {
-      // Account is pending deletion. The /me API will 403; route them
-      // to sign-in so they can recover via a fresh session.
+    // Parallel — shares is owned by /me's session cookie too, so the
+    // request still flies in flight even before /me resolves.
+    const [meResult, shares] = await Promise.all([fetchMe(), fetchMyShares()])
+    if (meResult.kind === 'unauthenticated' || meResult.kind === 'forbidden') {
+      // forbidden = account pending deletion; either way send them to
+      // sign-in to recover via a fresh session.
       window.location.replace('/sign-in?next=/me')
       return
     }
@@ -224,12 +222,11 @@ export function Me() {
       setState({ kind: 'error' })
       return
     }
-    const shares = await fetchMyShares()
     setState({ kind: 'ok', me: meResult.me, shares })
   }, [])
 
   useEffect(() => {
-    document.title = 'Your account · spool.share'
+    document.title = 'Your account · spool.pro'
     load()
   }, [load])
 

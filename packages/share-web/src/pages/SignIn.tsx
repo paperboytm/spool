@@ -17,7 +17,7 @@ export function SignIn({ next }: Props) {
   return (
     <main className="signin-page">
       <div className="signin-card">
-        <div className="signin-eyebrow">spool.share</div>
+        <div className="signin-eyebrow">spool.pro</div>
         <h1 className="signin-title">Sign in</h1>
         <p className="signin-body">
           Sign in to publish, manage, and unpublish your shares.
