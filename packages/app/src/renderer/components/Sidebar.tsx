@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { securityFeatureEnabled } from '../featureFlags.js'
 import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
@@ -26,6 +27,8 @@ type Props = {
   isLibraryActive?: boolean
   onSelectShares?: () => void
   isSharesActive?: boolean
+  onSelectSecurity?: () => void
+  isSecurityActive?: boolean
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
   status?: StatusInfo | null
@@ -40,7 +43,7 @@ type Props = {
   onShareSession?: (uuid: string) => void
 }
 
-export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
+export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
   const { t } = useTranslation()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
     switch (value) {
@@ -117,6 +120,15 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             label={t('sidebar.shares')}
             active={isSharesActive}
             onClick={onSelectShares}
+          />
+        )}
+        {onSelectSecurity && securityFeatureEnabled() && (
+          <NavRow
+            testId="sidebar-security"
+            icon={<SecurityIcon size={14} strokeWidth={1.75} />}
+            label={t('sidebar.security')}
+            active={isSecurityActive}
+            onClick={onSelectSecurity}
           />
         )}
         {onOpenSearch && (

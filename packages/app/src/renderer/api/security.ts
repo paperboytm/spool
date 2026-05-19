@@ -30,6 +30,13 @@ export const securityApi = {
   getScanStatus: (): Promise<ScanStatus> =>
     window.spool.security.getScanStatus(),
 
+  dismissFinding: (findingId: number, scope: 'session' | 'global') =>
+    window.spool.security.dismissFinding(findingId, scope),
+  undismissFinding: (findingId: number) =>
+    window.spool.security.undismissFinding(findingId),
+  rescanAll: () => window.spool.security.rescanAll(),
+  rescanSession: (sessionId: number) => window.spool.security.rescanSession(sessionId),
+
   onChange: (handler: (c: FindingsChange) => void): (() => void) =>
     window.spool.security.onFindingsChanged(handler),
   onScanStatus: (handler: (s: ScanStatus) => void): (() => void) =>

@@ -209,8 +209,7 @@ const api = {
   printToPdf: (html: string, widthPx: number, heightPx: number): Promise<Uint8Array> =>
     ipcRenderer.invoke('spool:print-to-pdf', { html, widthPx, heightPx }),
 
-  // Security Scan — query surface. Mutations (dismiss, purge, rescan)
-  // arrive in later PRs.
+  // Security Scan — query + dismiss + rescan surface. Purge arrives in PR 4.
   security: {
     listFindings: (filter: FindingFilter): Promise<FindingRow[]> =>
       ipcRenderer.invoke('security:list-findings', filter),
@@ -222,6 +221,14 @@ const api = {
       ipcRenderer.invoke('security:get-finding-value', findingId),
     getScanStatus: (): Promise<ScanStatus> =>
       ipcRenderer.invoke('security:get-scan-status'),
+    dismissFinding: (findingId: number, scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:dismiss-finding', { findingId, scope }),
+    undismissFinding: (findingId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:undismiss-finding', { findingId }),
+    rescanAll: (): Promise<{ count: number }> =>
+      ipcRenderer.invoke('security:rescan-all'),
+    rescanSession: (sessionId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:rescan-session', sessionId),
     onFindingsChanged: (cb: (change: FindingsChange) => void) => {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as FindingsChange)
       ipcRenderer.on('security:evt-findings-changed', handler)

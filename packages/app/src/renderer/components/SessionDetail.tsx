@@ -5,6 +5,7 @@ import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
+import FindingsStrip from './security/FindingsStrip.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -345,6 +346,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         onPrevious={findPrevious}
         onClose={closeFindBar}
       />
+
+      <FindingsStrip session={session} />
 
       {/* Messages */}
       <MessageList

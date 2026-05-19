@@ -16,6 +16,7 @@ import AppTopBar from './components/AppTopBar.js'
 import SidebarRail from './components/SidebarRail.js'
 import AppToaster from './components/AppToaster.js'
 import SharesPage from './components/SharesPage.js'
+import SecurityPage from './components/SecurityPage.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
 import { composeFromSession, sessionDraftId } from './lib/compose-from-session.js'
 import { draftIdForImport } from './lib/import-spool.js'
@@ -35,7 +36,7 @@ import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
 import { useFeature } from './featureFlags.js'
 
-type View = 'search' | 'session' | 'shares' | 'share-editor'
+type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
@@ -305,6 +306,7 @@ export default function App() {
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
   const isSharesView = shareEnabled && view === 'shares'
+  const isSecurityView = view === 'security'
   const isShareEditorView = shareEnabled && view === 'share-editor'
 
   // Bounce out of share-only views when the user disables the flag from
@@ -761,6 +763,16 @@ export default function App() {
         },
       } : {})}
       isSharesActive={isSharesView}
+      onSelectSecurity={() => {
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setActiveProjectKey(null)
+        setActiveProjectName(null)
+        setHomeMode(false)
+        setView('security')
+        setQuery('')
+      }}
+      isSecurityActive={isSecurityView}
       onOpenSearch={handleSearchOpen}
       syncStatus={syncStatus}
       status={status}
@@ -899,6 +911,8 @@ export default function App() {
             {...(shareEnabled ? { onImportSpool: handleImportSpoolFile } : {})}
             {...(shareEnabled ? { onStartNewDraft: handleStartShareFromUuid } : {})}
           />
+        ) : isSecurityView ? (
+          <SecurityPage onOpenSession={handleOpenSession} />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {
