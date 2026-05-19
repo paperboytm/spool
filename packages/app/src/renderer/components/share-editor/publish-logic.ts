@@ -2,12 +2,16 @@
 // exercise the PII gate without standing up React. The modal is the
 // only consumer.
 
-import { detectSensitiveSpans, SENSITIVE_KIND_LABEL } from '@spool-lab/redact'
-import type { SensitiveKind } from '@spool-lab/redact'
-import type { Snapshot } from '../../../shared/share-publish.js'
+import {
+  detectSensitiveSpans,
+  hashValueForRedactExclude,
+  SENSITIVE_KIND_LABEL,
+  type SensitiveKind,
+} from '@spool-lab/redact'
+import type { Conversation, EditorOpts } from '@spool/share-kit'
 
 export interface UnredactedMatch {
-  turn_id: string
+  turn_index: number
   kind: SensitiveKind
   /** Display label for the kind, sourced from `@spool-lab/redact`. */
   label: string
@@ -17,6 +21,36 @@ export interface UnredactedMatch {
   end: number
 }
 
+export interface TieredMatches {
+  high: UnredactedMatch[]
+  medium: UnredactedMatch[]
+}
+
+/** Kinds that block publish — leaking any of these is potentially
+ *  catastrophic (live credentials, financial / identity numbers).
+ *  Defined as a string set so this file stays decoupled from
+ *  `@spool-lab/redact`'s internal kind enum ordering.
+ *  `env-var` is in this list because env-var values are routinely
+ *  live credentials (STRIPE_KEY=sk_live_..., DATABASE_URL=postgres://...)
+ *  — the `NAME=` prefix is what's detected, the value is what leaks. */
+const HIGH_RISK_KINDS = new Set<SensitiveKind>([
+  'api-key',
+  'jwt',
+  'private-key',
+  'ssh-key',
+  'cloud-cred-ini',
+  'bearer',
+  'basic-auth',
+  'generic-secret',
+  'connection-string',
+  'url-creds',
+  'credit-card',
+  'ssn',
+  'kubeconfig-token',
+  'netrc',
+  'env-var',
+])
+
 const PREVIEW_MAX = 16
 
 export function truncatePreview(value: string): string {
@@ -25,43 +59,54 @@ export function truncatePreview(value: string): string {
 }
 
 /**
- * Re-detect sensitive spans across every non-hidden turn and subtract
- * anything fully covered by an existing redaction span. Returned
- * matches are what the user still needs to redact before they can
- * publish.
+ * Run the sensitive-span detector across every visible turn of the
+ * RAW conversation, filter out anything the current redact policy
+ * would cover, then split the survivors into high-risk (blocks
+ * publish) and medium-risk (warn only) tiers.
  *
- * Mirrors `rescanForPii` in share-backend's publish handler so the
- * client-side gate doesn't surface different matches than the server's
- * fail-closed rescan would.
+ * Runs on the raw conversation, not the post-redact snapshot — that's
+ * the only way the modal can tell which matches are about to slip
+ * through (because the user disabled redact entirely, opted a kind
+ * out via `redactExclude.kinds`, or kept a specific literal via
+ * `redactExclude.valueHashes`).
  */
-export function computeUnredactedMatches(snapshot: Snapshot): UnredactedMatch[] {
-  const hidden = new Set(snapshot.conversation.hidden_turns)
-  const covered = new Map<string, Array<[number, number]>>()
-  for (const r of snapshot.redactions) {
-    const arr = covered.get(r.turn_id) ?? []
-    arr.push(r.span)
-    covered.set(r.turn_id, arr)
+export function computeUnredactedMatches(
+  conversation: Conversation,
+  opts: EditorOpts,
+): TieredMatches {
+  const exclude = opts.redactExclude
+  const excludeKinds = new Set(exclude?.kinds ?? [])
+  const excludeHashes = new Set(exclude?.valueHashes ?? [])
+  const excludeValues = new Set(exclude?.values ?? [])
+  const policyCovers = (m: { kind: SensitiveKind; value: string }): boolean => {
+    if (!opts.redact) return false
+    if (excludeKinds.has(m.kind)) return false
+    if (excludeValues.has(m.value)) return false
+    if (excludeHashes.size > 0 && excludeHashes.has(hashValueForRedactExclude(m.value))) {
+      return false
+    }
+    return true
   }
-  const out: UnredactedMatch[] = []
-  for (const turn of snapshot.conversation.turns) {
-    if (hidden.has(turn.id)) continue
-    const matches = detectSensitiveSpans(turn.content)
-    if (matches.length === 0) continue
-    const ranges = covered.get(turn.id) ?? []
+  const high: UnredactedMatch[] = []
+  const medium: UnredactedMatch[] = []
+  conversation.turns.forEach((turn, idx) => {
+    const matches = detectSensitiveSpans(turn.body)
+    if (matches.length === 0) return
     for (const m of matches) {
-      const isCovered = ranges.some(([a, b]) => a <= m.start && m.end <= b)
-      if (isCovered) continue
-      out.push({
-        turn_id: turn.id,
+      if (policyCovers(m)) continue
+      const entry: UnredactedMatch = {
+        turn_index: idx,
         kind: m.kind,
         label: SENSITIVE_KIND_LABEL[m.kind],
-        preview: truncatePreview(turn.content.slice(m.start, m.end)),
+        preview: truncatePreview(turn.body.slice(m.start, m.end)),
         start: m.start,
         end: m.end,
-      })
+      }
+      if (HIGH_RISK_KINDS.has(m.kind)) high.push(entry)
+      else medium.push(entry)
     }
-  }
-  return out
+  })
+  return { high, medium }
 }
 
 export type ExpiryOption = 'never' | '7d' | '30d' | '90d'

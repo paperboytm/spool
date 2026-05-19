@@ -7,7 +7,6 @@ import type {
   MySharesResponse,
   HandleCheckResponse,
   HandleClaimResponse,
-  ServerPiiHit,
 } from '../../shared/share-publish.js'
 
 async function readBody(res: Response): Promise<Record<string, unknown>> {
@@ -30,7 +29,6 @@ export function registerSharePublishIpc(): void {
         error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
       }
       if (typeof json['detail'] === 'string') error.detail = json['detail'] as string
-      if (Array.isArray(json['pii'])) error.pii = json['pii'] as ServerPiiHit[]
       if (json['issues'] !== undefined) error.issues = json['issues']
       return { ok: false, status: r.status, error }
     }

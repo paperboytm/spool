@@ -1,16 +1,22 @@
 import { useCallback, useState } from 'react'
 import { ChevronDown, LogIn, Send } from 'lucide-react'
 import { toast } from 'sonner'
+import type { Conversation, EditorOpts } from '@spool/share-kit'
 import { PublishModal } from './PublishModal.js'
 import { PublishedBadge, type PublishedBadgeAction } from './PublishedBadge.js'
 import { useShareAuth } from '../../hooks/useShareAuth.js'
 import { usePublishShare } from '../../hooks/usePublishShare.js'
-import type { PublishSuccess, Snapshot } from '../../../shared/share-publish.js'
+import type { PublishSuccess } from '../../../shared/share-publish.js'
 
 type Props = {
-  /** Lazy snapshot builder — called only when the user opens the modal
-   *  or republishes, so we don't pay the build cost on every render. */
-  getSnapshot: () => Snapshot | null
+  /** Lazy editor-state getter — called only when the user opens the
+   *  modal or republishes, so we don't pay for a Conversation clone
+   *  on every render. Returns null while the editor is still loading. */
+  getEditorState: () => { conversation: Conversation; opts: EditorOpts } | null
+  /** Called when the user clicks "Redact all" in the modal's high-risk
+   *  warning. Should flip `opts.redact` to true in the editor's state
+   *  so the live PII gate clears. */
+  onRedactAll?: () => void
   /** Initial published state, e.g. when reopening a draft that's
    *  already live. `null` means "draft only". */
   initialPublished?: PublishSuccess | null
@@ -26,24 +32,26 @@ type Props = {
  *  3. Already published (current snapshot has a slug) → `PublishedBadge`
  *     with the View / Copy / Republish / Unpublish menu.
  */
-export function PublishButton({ getSnapshot, initialPublished = null }: Props) {
+export function PublishButton({ getEditorState, onRedactAll, initialPublished = null }: Props) {
   const { user, loading, signIn } = useShareAuth()
   const { open, openModal, closeModal, published, handlePublished, clearPublished } =
     usePublishShare(initialPublished)
   const [signingIn, setSigningIn] = useState(false)
-  const [pendingSnapshot, setPendingSnapshot] = useState<Snapshot | null>(null)
+  const [pending, setPending] = useState<{ conversation: Conversation; opts: EditorOpts } | null>(
+    null,
+  )
 
   const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
 
   const openPublishModal = useCallback(() => {
-    const snap = getSnapshot()
-    if (!snap) {
+    const state = getEditorState()
+    if (!state) {
       toast.error('Nothing to publish yet — the editor is still loading.')
       return
     }
-    setPendingSnapshot(snap)
+    setPending(state)
     openModal()
-  }, [getSnapshot, openModal])
+  }, [getEditorState, openModal])
 
   const onSignIn = useCallback(async () => {
     if (signingIn) return
@@ -106,11 +114,13 @@ export function PublishButton({ getSnapshot, initialPublished = null }: Props) {
     return (
       <>
         <PublishedBadge url={published.url} onAction={(a) => { void onBadgeAction(a) }} />
-        {open && pendingSnapshot && user && (
+        {open && pending && user && (
           <PublishModal
-            snapshot={pendingSnapshot}
+            conversation={pending.conversation}
+            opts={pending.opts}
             hasHandle={!!user.handle}
             existingSlug={published.id}
+            {...(onRedactAll && { onRedactAll })}
             onClose={closeModal}
             onPublished={(r) => {
               handlePublished(r)
@@ -151,10 +161,12 @@ export function PublishButton({ getSnapshot, initialPublished = null }: Props) {
         <span>Publish</span>
         <ChevronDown size={11} strokeWidth={1.8} aria-hidden />
       </button>
-      {open && pendingSnapshot && (
+      {open && pending && (
         <PublishModal
-          snapshot={pendingSnapshot}
+          conversation={pending.conversation}
+          opts={pending.opts}
           hasHandle={!!user.handle}
+          {...(onRedactAll && { onRedactAll })}
           onClose={closeModal}
           onPublished={(r) => {
             handlePublished(r)

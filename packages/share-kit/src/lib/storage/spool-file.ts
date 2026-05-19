@@ -31,7 +31,9 @@ export function buildSpoolDocument(
   options: BuildSpoolOptions = {},
 ): SpoolDocument {
   const willSanitize = options.sanitize && opts.redact
-  const conv = willSanitize ? sanitizeConversation(conversation, opts) : conversation
+  const conv = willSanitize
+    ? redactConversation(conversation, opts).conversation
+    : conversation
   // When sanitising for download, drop `redactExclude` from the
   // embedded opts. The recipient already sees `[redacted]` markers
   // in the body — they don't need to know which categories or
@@ -44,7 +46,7 @@ export function buildSpoolDocument(
       })()
     : opts
   return {
-    version: 1,
+    version: 2,
     conversation: conv,
     opts: exportedOpts,
     exportedAt: new Date().toISOString(),
@@ -53,15 +55,35 @@ export function buildSpoolDocument(
 
 /** Walk every turn and replace each detected sensitive literal with
  *  its per-kind mask. Operates on a structural clone — the source
- *  object is never mutated, so callers can re-use the conversation. */
-function sanitizeConversation(conversation: Conversation, opts: EditorOpts): Conversation {
+ *  object is never mutated, so callers can re-use the conversation.
+ *
+ *  Returns the redacted conversation and the set of turn ids whose
+ *  body actually changed (used by the publish path to mark
+ *  `Snapshot.turns[].redacted: true`). Turns without a stable id are
+ *  skipped from `perTurnRedacted` — callers that care should run
+ *  `ensureTurnIds` first. */
+export function redactConversation(
+  conversation: Conversation,
+  opts: EditorOpts,
+): { conversation: Conversation; perTurnRedacted: Set<string> } {
+  if (!opts.redact) {
+    return { conversation, perTurnRedacted: new Set() }
+  }
   const redactList = collectRedactList(conversation.turns, opts)
-  if (redactList.length === 0) return conversation
+  if (redactList.length === 0) {
+    return { conversation, perTurnRedacted: new Set() }
+  }
   const replaceMap = new Map(redactList.map((r) => [r.value, r.replacement]))
   const rx = new RegExp(redactList.map((r) => escapeRx(r.value)).join('|'), 'g')
+  const perTurnRedacted = new Set<string>()
+  const turns = conversation.turns.map((t) => {
+    const next = sanitizeTurn(t, rx, replaceMap)
+    if (next.body !== t.body && t.id) perTurnRedacted.add(t.id)
+    return next
+  })
   return {
-    ...conversation,
-    turns: conversation.turns.map((t) => sanitizeTurn(t, rx, replaceMap)),
+    conversation: { ...conversation, turns },
+    perTurnRedacted,
   }
 }
 
@@ -84,6 +106,28 @@ function sanitizeTurn(turn: Turn, rx: RegExp, replaceMap: Map<string, string>): 
 
 function escapeRx(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** FNV-1a 32-bit hash for deterministic legacy-turn id backfill. We
+ *  intentionally use FNV (not the redact-detect content hash) — it's
+ *  the cheapest stable function that's portable across the renderer
+ *  and the future spool.pro web reader. */
+function fnv1a32(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = (h * 0x01000193) >>> 0
+  }
+  return h >>> 0
+}
+
+/** Backfill stable ids on any turns that lack one. Idempotent: turns
+ *  with an existing `id` pass through untouched, so it's safe to call
+ *  on every load path (`readSpoolFile`, draft open, session import). */
+export function ensureTurnIds(turns: Turn[]): Turn[] {
+  return turns.map((t, idx) =>
+    t.id ? t : { ...t, id: `legacy-${idx}-${fnv1a32(t.body).toString(16)}` },
+  )
 }
 
 export async function downloadSpoolFile(
@@ -114,13 +158,25 @@ export async function readSpoolFile(file: File): Promise<SpoolDocument> {
   if (!isSpoolDocument(parsed)) {
     throw new Error('Not a valid .spool file (unrecognized shape).')
   }
-  return parsed
+  // Backfill stable turn ids for v1 files (and any v2 that somehow
+  // landed without ids). `ensureTurnIds` is idempotent.
+  return {
+    ...parsed,
+    conversation: {
+      ...parsed.conversation,
+      turns: ensureTurnIds(parsed.conversation.turns),
+    },
+  }
 }
 
 function isSpoolDocument(v: unknown): v is SpoolDocument {
   if (!v || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return o.version === 1 && typeof o.conversation === 'object' && typeof o.opts === 'object'
+  return (
+    (o.version === 1 || o.version === 2) &&
+    typeof o.conversation === 'object' &&
+    typeof o.opts === 'object'
+  )
 }
 
 function filenameFor(c: Conversation): string {

@@ -1,50 +1,61 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
-import { SENSITIVE_KIND_LABEL } from '@spool-lab/redact'
+import { AlertTriangle, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import type { Conversation, EditorOpts } from '@spool/share-kit'
 import {
   computeExpiresAt,
   computeUnredactedMatches,
-  truncatePreview,
   type ExpiryOption,
-  type UnredactedMatch,
 } from './publish-logic.js'
-import type {
-  PublishSuccess,
-  ServerPiiHit,
-  Snapshot,
-  Visibility,
-} from '../../../shared/share-publish.js'
+import { buildSnapshotFromEditor } from './snapshot-adapter.js'
+import type { PublishSuccess, Visibility } from '../../../shared/share-publish.js'
 
 type Props = {
-  snapshot: Snapshot
+  /** Raw conversation + opts — the modal runs the PII gate against
+   *  these (pre-redact) so it can warn about anything the policy is
+   *  about to let through. The submit path runs them through
+   *  `buildSnapshotFromEditor`, which applies the same redact
+   *  pipeline before sending. */
+  conversation: Conversation
+  opts: EditorOpts
   hasHandle: boolean
   /** Present when republishing an already-live share. */
   existingSlug?: string
+  /** Invoked when the user clicks "Redact all" in the high-risk
+   *  warning — flips the editor's opts.redact to true so the
+   *  blocking matches get covered by the policy. */
+  onRedactAll?: () => void
   onClose: () => void
   onPublished: (r: PublishSuccess) => void
 }
 
-const PREVIEW_LIMIT = 6
+const HIGH_ROW_LIMIT = 6
 
 /**
- * Publish-confirmation modal. Two gates run here:
+ * Publish-confirmation modal. Client-side PII gate splits matches into
+ * two tiers:
  *
- *  1. Client-side PII rescan — `computeUnredactedMatches` runs the same
- *     detector the backend uses; if it finds anything not covered by a
- *     redaction span, the Publish button is disabled. Match content is
- *     never shown in full — only the kind label and a truncated
- *     preview, so we don't re-leak the very thing the user is about to
- *     redact.
+ *  - High risk (credentials, financial / identity IDs) blocks publish
+ *    behind a two-click "Publish anyway" confirmation. The user is
+ *    encouraged to either "Redact all" (flips `opts.redact: true`) or
+ *    head back to the editor.
  *
- *  2. Server-side rescan (authoritative). If `share-publish:publish`
- *     returns `error.error === 'UNPROCESSABLE'` with an `error.pii`
- *     array, we surface the server's matches in the same panel so the
- *     user can go back and redact them.
+ *  - Medium risk (email, phone, person name, paths, hosts) is
+ *    surfaced in a fold-out hint but never blocks publish. The user
+ *    has already seen the privacy panel; this is a "did you mean to
+ *    keep these?" reminder.
+ *
+ * The actual snapshot sent to the backend is produced by
+ * `buildSnapshotFromEditor`, which applies the same `redactConversation`
+ * pipeline — so `turns[].content` on the wire is the already-masked
+ * literal. The backend does NOT rescan; the client gate is the sole
+ * boundary for what reaches R2.
  */
 export function PublishModal({
-  snapshot,
+  conversation,
+  opts,
   hasHandle,
   existingSlug,
+  onRedactAll,
   onClose,
   onPublished,
 }: Props) {
@@ -53,31 +64,14 @@ export function PublishModal({
   const [customExpiry, setCustomExpiry] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [serverPii, setServerPii] = useState<ServerPiiHit[] | null>(null)
+  const [highOverride, setHighOverride] = useState(false)
+  const [mediumOpen, setMediumOpen] = useState(false)
 
-  const clientMatches = useMemo(() => computeUnredactedMatches(snapshot), [snapshot])
-  const serverMatches: UnredactedMatch[] = useMemo(() => {
-    if (!serverPii) return []
-    // Reconstruct truncated previews from the snapshot using the
-    // server's offsets. We never trust the server to ship raw content.
-    const byId = new Map(snapshot.conversation.turns.map((t) => [t.id, t.content] as const))
-    return serverPii.map((h) => {
-      const content = byId.get(h.turn_id) ?? ''
-      return {
-        turn_id: h.turn_id,
-        kind: h.kind,
-        label: SENSITIVE_KIND_LABEL[h.kind] ?? h.kind,
-        preview: truncatePreview(content.slice(h.start, h.end)),
-        start: h.start,
-        end: h.end,
-      }
-    })
-  }, [serverPii, snapshot])
-
-  // Server matches take precedence — when they exist they reflect the
-  // authoritative rejection. Otherwise show the client rescan.
-  const surfaced = serverMatches.length > 0 ? serverMatches : clientMatches
-  const piiBlocked = surfaced.length > 0
+  const { high, medium } = useMemo(
+    () => computeUnredactedMatches(conversation, opts),
+    [conversation, opts],
+  )
+  const highBlocked = high.length > 0 && !highOverride
 
   // Esc closes — same convention as the rename/delete modals.
   useEffect(() => {
@@ -100,12 +94,19 @@ export function PublishModal({
     }
   }, [hasHandle, visibility])
 
+  // If the user redacts (via the "Redact all" CTA or by going back to
+  // the editor) and the high tier clears, drop the override flag so
+  // the Publish button returns to its normal style.
+  useEffect(() => {
+    if (high.length === 0 && highOverride) setHighOverride(false)
+  }, [high.length, highOverride])
+
   async function handlePublish() {
-    if (piiBlocked || publishing) return
+    if (highBlocked || publishing) return
     setPublishing(true)
     setError(null)
-    setServerPii(null)
     try {
+      const snapshot = buildSnapshotFromEditor({ conversation, opts })
       const expires_at = computeExpiresAt({ kind: expires, custom: customExpiry })
       const res = await window.spoolShare.publish({
         snapshot,
@@ -114,10 +115,7 @@ export function PublishModal({
         ...(existingSlug !== undefined && { override_slug: existingSlug }),
       })
       if (!res.ok) {
-        if (res.error.error === 'UNPROCESSABLE' && Array.isArray(res.error.pii)) {
-          setServerPii(res.error.pii)
-          setError('The server found unredacted matches your editor missed. Please redact and retry.')
-        } else if (res.status === 401) {
+        if (res.status === 401) {
           setError('You need to sign in again.')
         } else if (res.status === 429) {
           setError('Too many publishes — try again in a few minutes.')
@@ -151,35 +149,35 @@ export function PublishModal({
       >
         <div className="px-5 pt-5 pb-3">
           <h2 id="publish-modal-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
-            {isRepublish ? 'Republish to spool.share' : 'Publish to spool.share'}
+            {isRepublish ? 'Republish to spool.pro' : 'Publish to spool.pro'}
           </h2>
           <p className="mt-1 text-[12px] leading-snug text-warm-faint dark:text-dark-muted">
             {isRepublish
               ? 'A new version replaces the existing snapshot. The URL stays the same.'
-              : 'A snapshot is uploaded to spool.share. You can revoke it any time.'}
+              : 'A snapshot is uploaded to spool.pro. You can revoke it any time.'}
           </p>
         </div>
 
-        {piiBlocked && (
+        {high.length > 0 && (
           <section
-            data-testid="publish-modal-pii"
-            className="mx-5 mb-3 rounded-md border border-[color:var(--color-status-warn)]/40 bg-[color:var(--color-status-warn)]/10 px-3 py-2.5"
+            data-testid="publish-modal-pii-high"
+            className="mx-5 mb-3 rounded-md border border-[color:var(--color-status-error)]/40 bg-[color:var(--color-status-error)]/10 px-3 py-2.5"
           >
             <div className="flex items-start gap-2">
               <AlertTriangle
                 size={14}
                 strokeWidth={1.8}
                 aria-hidden
-                className="mt-0.5 flex-none text-[color:var(--color-status-warn)]"
+                className="mt-0.5 flex-none text-[color:var(--color-status-error)]"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-[12.5px] font-medium text-warm-text dark:text-dark-text">
-                  {surfaced.length} unredacted match{surfaced.length === 1 ? '' : 'es'} detected
+                  {high.length} credential-like value{high.length === 1 ? '' : 's'} would publish unredacted
                 </p>
                 <ul className="mt-1.5 space-y-1">
-                  {surfaced.slice(0, PREVIEW_LIMIT).map((m, i) => (
+                  {high.slice(0, HIGH_ROW_LIMIT).map((m, i) => (
                     <li
-                      key={`${m.turn_id}-${m.start}-${i}`}
+                      key={`${m.turn_index}-${m.start}-${i}`}
                       className="text-[11.5px] text-warm-muted dark:text-dark-muted flex items-center gap-2"
                     >
                       <span className="font-medium">{m.label}</span>
@@ -188,25 +186,84 @@ export function PublishModal({
                       </code>
                     </li>
                   ))}
-                  {surfaced.length > PREVIEW_LIMIT && (
+                  {high.length > HIGH_ROW_LIMIT && (
                     <li className="text-[11px] italic text-warm-faint dark:text-dark-muted">
-                      +{surfaced.length - PREVIEW_LIMIT} more
+                      +{high.length - HIGH_ROW_LIMIT} more
                     </li>
                   )}
                 </ul>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="mt-2 text-[11.5px] font-medium underline text-warm-text dark:text-dark-text hover:opacity-80"
-                >
-                  Back to editor to redact
-                </button>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  {onRedactAll && (
+                    <button
+                      type="button"
+                      onClick={onRedactAll}
+                      data-testid="publish-modal-redact-all"
+                      className="text-[11.5px] font-medium underline text-warm-text dark:text-dark-text hover:opacity-80"
+                    >
+                      Redact all
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="text-[11.5px] font-medium underline text-warm-text dark:text-dark-text hover:opacity-80"
+                  >
+                    Back to editor
+                  </button>
+                </div>
+                {highBlocked && (
+                  <p className="mt-2 text-[11.5px] text-warm-muted dark:text-dark-muted">
+                    Click <span className="font-medium">Publish anyway</span> below to
+                    confirm you intend to publish these values as-is.
+                  </p>
+                )}
               </div>
             </div>
           </section>
         )}
 
-        <fieldset disabled={piiBlocked || publishing} className="px-5 pb-3">
+        {medium.length > 0 && (
+          <section
+            data-testid="publish-modal-pii-medium"
+            className="mx-5 mb-3 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3 py-2"
+          >
+            <button
+              type="button"
+              onClick={() => setMediumOpen((v) => !v)}
+              aria-expanded={mediumOpen}
+              className="w-full flex items-center gap-1.5 text-[12px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text"
+            >
+              {mediumOpen
+                ? <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
+                : <ChevronRight size={12} strokeWidth={1.8} aria-hidden />}
+              <span>
+                {medium.length} identity / location signal{medium.length === 1 ? '' : 's'} (email, phone, name, path)
+              </span>
+            </button>
+            {mediumOpen && (
+              <ul className="mt-1.5 space-y-1 pl-4">
+                {medium.slice(0, 12).map((m, i) => (
+                  <li
+                    key={`${m.turn_index}-${m.start}-${i}`}
+                    className="text-[11.5px] text-warm-muted dark:text-dark-muted flex items-center gap-2"
+                  >
+                    <span className="font-medium">{m.label}</span>
+                    <code className="font-mono text-[11px] px-1 rounded bg-warm-bg dark:bg-dark-bg">
+                      {m.preview}
+                    </code>
+                  </li>
+                ))}
+                {medium.length > 12 && (
+                  <li className="text-[11px] italic text-warm-faint dark:text-dark-muted">
+                    +{medium.length - 12} more
+                  </li>
+                )}
+              </ul>
+            )}
+          </section>
+        )}
+
+        <fieldset disabled={publishing} className="px-5 pb-3">
           <legend className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted">
             Visibility
           </legend>
@@ -242,7 +299,7 @@ export function PublishModal({
           </div>
         </fieldset>
 
-        <fieldset disabled={piiBlocked || publishing} className="px-5 pb-3">
+        <fieldset disabled={publishing} className="px-5 pb-3">
           <legend className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted">
             Expires
           </legend>
@@ -291,16 +348,36 @@ export function PublishModal({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            data-testid="publish-modal-submit"
-            onClick={() => { void handlePublish() }}
-            disabled={publishing || piiBlocked}
-            className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {publishing && <Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />}
-            {publishing ? 'Publishing…' : isRepublish ? 'Republish' : 'Publish'}
-          </button>
+          {highBlocked ? (
+            <button
+              type="button"
+              data-testid="publish-modal-confirm-anyway"
+              onClick={() => setHighOverride(true)}
+              disabled={publishing}
+              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Publish anyway
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-testid="publish-modal-submit"
+              onClick={() => { void handlePublish() }}
+              disabled={publishing}
+              className={`inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed ${
+                high.length > 0
+                  ? 'bg-[color:var(--color-status-error)] hover:opacity-90'
+                  : 'bg-accent dark:bg-accent-dark hover:opacity-90'
+              }`}
+            >
+              {publishing && <Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />}
+              {publishing
+                ? 'Publishing…'
+                : high.length > 0
+                  ? (isRepublish ? 'Republish anyway' : 'Publish anyway')
+                  : (isRepublish ? 'Republish' : 'Publish')}
+            </button>
+          )}
         </div>
       </div>
     </div>

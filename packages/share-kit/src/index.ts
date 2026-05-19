@@ -73,6 +73,8 @@ export {
   buildSpoolDocument,
   downloadSpoolFile,
   readSpoolFile,
+  ensureTurnIds,
+  redactConversation,
 } from './lib/storage/spool-file'
 
 // Markdown export ─────────────────────────────────────────────────

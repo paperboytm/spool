@@ -1,54 +1,88 @@
 // Bridge between the editor's in-memory `Conversation` / `EditorOpts`
-// pair and the wire-format `Snapshot` the backend accepts. The full
-// snapshot machinery (stable turn ids in the .spool persistence layer,
-// hidden-turn tracking, redaction span set) lands in later PRs; this
-// keeps the publish modal end-to-end while those land.
-//
-// When the canonical Snapshot lives on the draft row, replace callers
-// of this with that source and delete the file.
+// pair and the wire-format `Snapshot` the backend accepts. Applies the
+// share-kit redact pipeline (same code path as `.spool` download +
+// Security purge) so the bytes that leave the device are already
+// redacted — the server never sees raw PII.
 
-import type { Conversation, EditorOpts } from '@spool/share-kit'
+import {
+  ensureTurnIds,
+  redactConversation,
+  type Conversation,
+  type EditorOpts,
+} from '@spool/share-kit'
 import type { Snapshot } from '../../../shared/share-publish.js'
 
-function turnId(idx: number): string {
-  return `t${idx + 1}`
+/** Normalise a possibly-human-formatted date string to ISO 8601.
+ *  Accepts ISO inputs untouched and falls back to the current
+ *  timestamp on unparseable input so publish never blocks on a stale
+ *  upstream date format. */
+function toIsoOrNow(input: string | undefined): string {
+  if (!input) return new Date().toISOString()
+  const t = Date.parse(input)
+  if (Number.isNaN(t)) return new Date().toISOString()
+  return new Date(t).toISOString()
 }
 
 /**
  * Build a `Snapshot` from the editor's current Conversation + opts.
- * Turn ids are derived from the array index (`t1`, `t2`, …) — stable
- * across renders within a single session but NOT durable across draft
- * reloads.
+ * Runs the shared redact pipeline first, so `turns[].content` is the
+ * already-masked literal and `turns[].redacted` is set for turns the
+ * pass actually changed.
  */
 export function buildSnapshotFromEditor(args: {
   conversation: Conversation
   opts: EditorOpts
 }): Snapshot {
-  const { conversation, opts } = args
-  const turns = conversation.turns.map((turn, idx) => ({
-    id: turnId(idx),
-    role: turn.role as 'user' | 'assistant',
-    content: turn.body,
+  const { conversation: rawConv, opts } = args
+  // Defensive: editor entry points should have already backfilled
+  // ids on load (`readSpoolFile`, draft open, session import), but
+  // guarantee it here so `perTurnRedacted` is meaningful.
+  const convWithIds: Conversation = {
+    ...rawConv,
+    turns: ensureTurnIds(rawConv.turns),
+  }
+  const { conversation: redactedConv, perTurnRedacted } = redactConversation(
+    convWithIds,
+    opts,
+  )
+
+  const selected = opts.selected
+  const hiddenTurnIds =
+    !selected
+      ? []
+      : redactedConv.turns
+          .map((t, idx) => ({ id: t.id!, idx }))
+          .filter(({ idx }) => !selected.includes(idx))
+          .map((t) => t.id)
+
+  const snapshotTurns = redactedConv.turns.map((t) => ({
+    id: t.id!,
+    role: (t.role === 'user' || t.role === 'assistant'
+      ? t.role
+      : 'assistant') as 'user' | 'assistant',
+    content: t.body,
+    ...(perTurnRedacted.has(t.id!) ? { redacted: true as const } : {}),
   }))
+
   return {
     schema_version: 1,
     source: {
-      kind:
-        conversation.origin.kind === 'file'
-          ? 'imported-file'
-          : conversation.origin.kind === 'agent-session'
-            ? 'spool-session'
-            : 'imported-file',
-      captured_at: conversation.createdAt || new Date().toISOString(),
+      kind: rawConv.origin.kind === 'agent-session' ? 'spool-session' : 'imported-file',
+      // Backend schema is `z.iso.datetime()` — must be an ISO 8601
+      // string. `Conversation.createdAt` upstream is a human-readable
+      // date ("June 2, 2026") produced by `formatCreatedAt` in
+      // compose-from-session.ts; parse-and-reformat to ISO before
+      // sending. Falls back to "now" if the upstream string isn't
+      // recognisable — the server's only consumer is the reader's
+      // masthead caption so a soft fallback beats blowing up publish.
+      captured_at: toIsoOrNow(rawConv.createdAt),
     },
     conversation: {
-      title: conversation.title || 'Untitled',
-      turns,
-      turn_order: turns.map((t) => t.id),
-      hidden_turns: [],
+      title: rawConv.title || 'Untitled',
+      turns: snapshotTurns,
+      turn_order: snapshotTurns.map((t) => t.id),
+      hidden_turns: hiddenTurnIds,
     },
-    edits: [],
-    redactions: [],
     editor_opts: {
       template: opts.template,
       paper: opts.paper,

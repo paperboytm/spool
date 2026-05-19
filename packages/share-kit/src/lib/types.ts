@@ -31,6 +31,12 @@ export type Origin =
 export type TurnRole = 'user' | 'assistant'
 
 export interface Turn {
+  /** Stable id within the editor; backfilled deterministically on load
+   *  by `ensureTurnIds` for older drafts/`.spool v1` files. Optional
+   *  in source-of-truth Conversation objects so importers (chat
+   *  parsers) don't need to invent ids — every load path runs through
+   *  `ensureTurnIds` before the data reaches the editor. */
+  id?: string | undefined
   role: TurnRole
   /** Display name for user turns, e.g. "[Maya]" or "[you]". Omitted for assistant. */
   author?: string | undefined
@@ -259,9 +265,14 @@ export interface EditorOpts {
   hideEmptyTurns: boolean
 }
 
-/** The on-disk .spool file format. Version-stamped for forward compat. */
+/** The on-disk .spool file format. Version-stamped for forward compat.
+ *
+ *  - v1 files have no `Turn.id`; `readSpoolFile` backfills via
+ *    `ensureTurnIds` so downstream code always sees ids.
+ *  - v2 files are written by the current `buildSpoolDocument`; turn
+ *    ids are stable across reloads (see `ensureTurnIds`). */
 export interface SpoolDocument {
-  version: 1
+  version: 1 | 2
   conversation: Conversation
   opts: EditorOpts
   exportedAt: string

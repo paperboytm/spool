@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { buildSpoolDocument } from './spool-file'
+import { buildSpoolDocument, ensureTurnIds, redactConversation } from './spool-file'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
-import { DEFAULT_OPTS, type Conversation, type EditorOpts } from '../types'
+import { DEFAULT_OPTS, type Conversation, type EditorOpts, type Turn } from '../types'
 
 // Built at runtime so GitHub's push-protection secret scanner
 // doesn't flag the literal Stripe-shaped prefix in source.
@@ -13,9 +13,13 @@ const EMAIL_MASK = 'm***@hogwarts.edu'
 function makeConvo(): Conversation {
   return {
     title: 'leak demo',
+    source: 'claude',
     sourceLabel: 'Claude',
-    sourcePlatform: 'Claude',
+    origin: { kind: 'file', filename: 'fx.spool' },
+    shareUrl: null,
     createdAt: '2026-05-15T00:00:00Z',
+    wordCount: 0,
+    readMin: 1,
     turns: [
       {
         role: 'user',
@@ -95,5 +99,58 @@ describe('buildSpoolDocument', () => {
     const doc = buildSpoolDocument(convo, opts, { sanitize: true })
     expect(doc.conversation.turns[1]!.body).toContain(EMAIL_FIXTURE)
     expect(doc.conversation.turns[0]!.body).not.toContain(STRIPE_FIXTURE)
+  })
+
+  it('writes version: 2', () => {
+    const doc = buildSpoolDocument(makeConvo(), { ...DEFAULT_OPTS, redact: false })
+    expect(doc.version).toBe(2)
+  })
+})
+
+describe('ensureTurnIds', () => {
+  it('backfills ids for turns without one', () => {
+    const turns: Turn[] = [
+      { role: 'user', body: 'first' },
+      { role: 'assistant', body: 'second' },
+    ]
+    const out = ensureTurnIds(turns)
+    expect(out[0]!.id).toMatch(/^legacy-0-/)
+    expect(out[1]!.id).toMatch(/^legacy-1-/)
+  })
+
+  it('is idempotent — preserves existing ids', () => {
+    const turns: Turn[] = [{ role: 'user', body: 'first', id: 'kept' }]
+    const out = ensureTurnIds(turns)
+    expect(out[0]!.id).toBe('kept')
+  })
+
+  it('is deterministic across calls', () => {
+    const turns: Turn[] = [{ role: 'user', body: 'same body' }]
+    const a = ensureTurnIds(turns)
+    const b = ensureTurnIds(turns)
+    expect(a[0]!.id).toBe(b[0]!.id)
+  })
+})
+
+describe('redactConversation', () => {
+  it('reports per-turn-redacted set when turns have ids', () => {
+    const convo = makeConvo()
+    convo.turns = ensureTurnIds(convo.turns)
+    const opts: EditorOpts = { ...DEFAULT_OPTS, redact: true }
+    const { conversation, perTurnRedacted } = redactConversation(convo, opts)
+    expect(conversation.turns[0]!.body).not.toContain(STRIPE_FIXTURE)
+    expect(perTurnRedacted.has(convo.turns[0]!.id!)).toBe(true)
+    expect(perTurnRedacted.has(convo.turns[1]!.id!)).toBe(true)
+  })
+
+  it('returns an empty set when redact is off', () => {
+    const convo = makeConvo()
+    convo.turns = ensureTurnIds(convo.turns)
+    const { conversation, perTurnRedacted } = redactConversation(convo, {
+      ...DEFAULT_OPTS,
+      redact: false,
+    })
+    expect(conversation).toBe(convo) // no clone necessary
+    expect(perTurnRedacted.size).toBe(0)
   })
 })

@@ -1,43 +1,47 @@
 import { describe, expect, it } from 'vitest'
+import { hashValueForRedactExclude } from '@spool-lab/redact'
+import type { Conversation, EditorOpts } from '@spool/share-kit'
+
 import {
   computeExpiresAt,
   computeUnredactedMatches,
   truncatePreview,
 } from './publish-logic.js'
-import type { Snapshot } from '../../../shared/share-publish.js'
 
-function snap(overrides: Partial<Snapshot['conversation']> & {
-  redactions?: Snapshot['redactions']
-}): Snapshot {
-  const turns = overrides.turns ?? []
-  const turn_order = overrides.turn_order ?? turns.map((t) => t.id)
-  const hidden_turns = overrides.hidden_turns ?? []
+const API_KEY = 'sk_live_abcdef1234567890ABCDEF'
+
+function convo(
+  turns: Array<{ id?: string; role: 'user' | 'assistant'; body: string; author?: string }>,
+): Conversation {
   return {
-    schema_version: 1,
-    source: { kind: 'spool-session', captured_at: '2026-05-19T00:00:00.000Z' },
-    conversation: {
-      title: 'fixture',
-      turns,
-      turn_order,
-      hidden_turns,
-    },
-    edits: [],
-    redactions: overrides.redactions ?? [],
-    editor_opts: {
-      template: 'chat',
-      paper: 'snow',
-      typeface: 'inter',
-      colorway: 'amber',
-      density: 'compact',
-      masthead: true,
-      colophon: true,
-      avatars: true,
-      show_byline: false,
-    },
+    source: 'claude',
+    sourceLabel: 'Claude',
+    origin: { kind: 'file', filename: 'fx.spool' },
+    title: 'fixture',
+    shareUrl: null,
+    createdAt: '2026-05-19T00:00:00.000Z',
+    wordCount: 0,
+    readMin: 1,
+    turns,
   }
 }
 
-const API_KEY = 'sk_live_abcdef1234567890ABCDEF'
+function opts(override: Partial<EditorOpts> = {}): EditorOpts {
+  return {
+    template: 'chat',
+    paper: 'snow',
+    typeface: 'inter',
+    colorway: 'amber',
+    accentHex: '#C85A00',
+    density: 'compact',
+    redact: true,
+    showGaps: true,
+    showMasthead: true,
+    showColophon: true,
+    hideEmptyTurns: true,
+    ...override,
+  }
+}
 
 describe('truncatePreview', () => {
   it('returns the value untouched when ≤ 16 chars', () => {
@@ -51,76 +55,83 @@ describe('truncatePreview', () => {
 })
 
 describe('computeUnredactedMatches', () => {
-  it('returns an empty list for a turn with no sensitive content', () => {
-    const s = snap({
-      turns: [{ id: 't1', role: 'user', content: 'just a friendly hello' }],
-    })
-    expect(computeUnredactedMatches(s)).toEqual([])
+  it('returns empty high+medium for a clean conversation', () => {
+    const c = convo([{ role: 'user', body: 'just a friendly hello' }])
+    const r = computeUnredactedMatches(c, opts())
+    expect(r.high).toEqual([])
+    expect(r.medium).toEqual([])
   })
 
-  it('does NOT surface a match whose span is fully covered by a redaction', () => {
-    const text = `here is my secret ${API_KEY} please ignore`
-    const start = text.indexOf(API_KEY)
-    const end = start + API_KEY.length
-    const s = snap({
-      turns: [{ id: 't1', role: 'user', content: text }],
-      redactions: [{ turn_id: 't1', span: [start, end], label: 'api-key' }],
-    })
-    expect(computeUnredactedMatches(s)).toEqual([])
+  it('puts an API key into the high tier and an email into the medium tier', () => {
+    const c = convo([
+      { role: 'user', body: `key is ${API_KEY}` },
+      { role: 'assistant', body: 'reach me at alice@acme.io' },
+    ])
+    // redact: false so the policy doesn't cover anything — both matches surface.
+    const r = computeUnredactedMatches(c, opts({ redact: false }))
+    expect(r.high.map((m) => m.kind)).toContain('api-key')
+    expect(r.medium.map((m) => m.kind)).toContain('email')
+    // preview truncation is applied
+    const apiKeyMatch = r.high.find((m) => m.kind === 'api-key')!
+    expect(apiKeyMatch.preview.length).toBeLessThanOrEqual(17)
+    expect(apiKeyMatch.preview).not.toBe(API_KEY)
   })
 
-  it('surfaces an uncovered match and truncates the preview', () => {
-    const text = `key is ${API_KEY}`
-    const s = snap({
-      turns: [{ id: 't1', role: 'user', content: text }],
-    })
-    const out = computeUnredactedMatches(s)
-    expect(out.length).toBeGreaterThan(0)
-    const m = out[0]!
-    expect(m.turn_id).toBe('t1')
-    expect(m.kind).toBe('api-key')
-    expect(m.label).toBe('API key')
-    // preview is truncated when the literal exceeds 16 chars
-    expect(m.preview.length).toBeLessThanOrEqual(17) // 16 + ellipsis
-    expect(m.preview.endsWith('…')).toBe(true)
-    // never the full secret
-    expect(m.preview).not.toBe(API_KEY)
+  it('drops matches the current redact policy would mask', () => {
+    const c = convo([
+      { role: 'user', body: `key is ${API_KEY}` },
+      { role: 'assistant', body: 'reach me at alice@acme.io' },
+    ])
+    // redact: true with no exclusions → both kinds get masked at
+    // publish time, so neither tier surfaces anything.
+    const r = computeUnredactedMatches(c, opts({ redact: true }))
+    expect(r.high).toEqual([])
+    expect(r.medium).toEqual([])
   })
 
-  it('skips hidden turns entirely', () => {
-    const s = snap({
-      turns: [
-        { id: 'visible', role: 'user', content: 'hi' },
-        { id: 'hidden', role: 'user', content: `oops ${API_KEY}` },
-      ],
-      hidden_turns: ['hidden'],
-    })
-    expect(computeUnredactedMatches(s)).toEqual([])
+  it('respects redactExclude.kinds — excluded kind still appears in matches', () => {
+    const c = convo([
+      { role: 'user', body: `key is ${API_KEY}` },
+      { role: 'assistant', body: 'reach me at alice@acme.io' },
+    ])
+    // User said "don't redact emails" → email surfaces as medium;
+    // API key still gets redacted by policy so it stays hidden.
+    const r = computeUnredactedMatches(
+      c,
+      opts({ redact: true, redactExclude: { kinds: ['email'] } }),
+    )
+    expect(r.high).toEqual([])
+    expect(r.medium.map((m) => m.kind)).toContain('email')
   })
 
-  it('preserves kind for multiple matches and turns', () => {
-    const s = snap({
-      turns: [
-        { id: 't1', role: 'user', content: `first ${API_KEY}` },
-        { id: 't2', role: 'assistant', content: 'reach me at alice@acme.io' },
-      ],
-    })
-    const out = computeUnredactedMatches(s)
-    const kinds = out.map((m) => m.kind)
-    expect(kinds).toContain('api-key')
-    expect(kinds).toContain('email')
+  it('respects redactExclude.valueHashes for a specific literal', () => {
+    const c = convo([
+      { role: 'user', body: `key is ${API_KEY}` },
+      { role: 'assistant', body: 'reach me at alice@acme.io' },
+    ])
+    const r = computeUnredactedMatches(
+      c,
+      opts({
+        redact: true,
+        redactExclude: {
+          valueHashes: [hashValueForRedactExclude(API_KEY)],
+        },
+      }),
+    )
+    // The literal API_KEY was excluded by hash → it surfaces (high).
+    expect(r.high.some((m) => m.kind === 'api-key')).toBe(true)
+    // The email is still policy-covered.
+    expect(r.medium).toEqual([])
   })
 
-  it('treats partial overlap as uncovered (range must fully contain the match)', () => {
-    const text = `key is ${API_KEY}`
-    const start = text.indexOf(API_KEY)
-    // Redact only the first 3 chars of the match — should still surface.
-    const s = snap({
-      turns: [{ id: 't1', role: 'user', content: text }],
-      redactions: [{ turn_id: 't1', span: [start, start + 3], label: 'partial' }],
-    })
-    const out = computeUnredactedMatches(s)
-    expect(out.length).toBeGreaterThan(0)
+  it('reports turn_index for matches in later turns', () => {
+    const c = convo([
+      { role: 'user', body: 'plain' },
+      { role: 'assistant', body: `oh and ${API_KEY}` },
+    ])
+    const r = computeUnredactedMatches(c, opts({ redact: false }))
+    const m = r.high.find((x) => x.kind === 'api-key')!
+    expect(m.turn_index).toBe(1)
   })
 })
 

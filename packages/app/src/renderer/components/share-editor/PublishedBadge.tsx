@@ -81,7 +81,7 @@ export function PublishedBadge({ url, onAction }: Props) {
                   : 'text-warm-text dark:text-dark-text'
               }`}
             >
-              {k === 'view' ? 'View on spool.share'
+              {k === 'view' ? 'View on spool.pro'
                 : k === 'copy' ? 'Copy link'
                 : k === 'republish' ? 'Republish'
                 : 'Unpublish'}

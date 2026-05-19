@@ -7,26 +7,17 @@
 // authoritative source of truth and adding required fields here without
 // the server side first would reject every publish.
 
-import type { SensitiveKind } from '@spool-lab/redact'
-
 export type SnapshotTurnRole = 'user' | 'assistant' | 'system' | 'tool'
 
 export interface SnapshotTurn {
   id: string
   role: SnapshotTurnRole
   content: string
-}
-
-export interface SnapshotRedaction {
-  turn_id: string
-  span: [number, number]
-  label: string
-}
-
-export interface SnapshotTurnEdit {
-  turn_id: string
-  original_content: string
-  edited_content: string
+  /** Informational only — true when the publish-time redact pass
+   *  rewrote this turn's body. The Reader doesn't render anything for
+   *  it today; reserved for a forward-compat "[content was edited by
+   *  author]" badge. */
+  redacted?: boolean
 }
 
 export interface SnapshotEditorOpts {
@@ -54,8 +45,6 @@ export interface Snapshot {
     turn_order: string[]
     hidden_turns: string[]
   }
-  edits: SnapshotTurnEdit[]
-  redactions: SnapshotRedaction[]
   editor_opts: SnapshotEditorOpts
 }
 
@@ -88,18 +77,9 @@ export interface PublishSuccess {
   version: number
 }
 
-/** Server PII hit payload returned inside `error.pii` on 422 UNPROCESSABLE. */
-export interface ServerPiiHit {
-  turn_id: string
-  start: number
-  end: number
-  kind: SensitiveKind
-}
-
 export interface PublishErrorBody {
   error: string
   detail?: string
-  pii?: ServerPiiHit[]
   // Validation issue list when the request shape itself failed zod.
   issues?: unknown
 }
