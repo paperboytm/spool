@@ -1,0 +1,32 @@
+{
+  "name": "@spool/share-web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3002",
+    "build": "vite build",
+    "preview": "vite preview --port 3002",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist node_modules/.vite"
+  },
+  "dependencies": {
+    "@spool/share-kit": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "lucide-react": "^0.460.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.3",
+    "vitest": "^3.2.4"
+  }
+}

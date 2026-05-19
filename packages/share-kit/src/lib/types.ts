@@ -278,6 +278,62 @@ export interface SpoolDocument {
   exportedAt: string
 }
 
+/** Wire-format snapshot served by the share-backend reader endpoint.
+ *  Mirrors `packages/app/src/shared/share-publish.ts` — kept here so the
+ *  `spool.share` web reader can depend on share-kit alone. The desktop
+ *  publish IPC owns the editor-side authoritative copy; if the two ever
+ *  drift, the backend's zod validator in
+ *  `packages/share-backend/src/publish/validators.ts` is canonical. */
+export type SnapshotTurnRole = 'user' | 'assistant' | 'system' | 'tool'
+
+export interface SnapshotTurn {
+  id: string
+  role: SnapshotTurnRole
+  content: string
+}
+
+export interface SnapshotRedaction {
+  turn_id: string
+  span: [number, number]
+  label: string
+}
+
+export interface SnapshotTurnEdit {
+  turn_id: string
+  original_content: string
+  edited_content: string
+}
+
+export interface SnapshotEditorOpts {
+  template: string
+  paper: string
+  typeface: string
+  colorway: string
+  density: 'compact' | 'relaxed'
+  masthead: boolean
+  colophon: boolean
+  avatars: boolean
+  show_byline: boolean
+}
+
+export interface Snapshot {
+  schema_version: 1
+  source: {
+    kind: 'spool-session' | 'imported-file' | 'imported-jsonl'
+    origin_hint?: string
+    captured_at: string
+  }
+  conversation: {
+    title: string
+    turns: SnapshotTurn[]
+    turn_order: string[]
+    hidden_turns: string[]
+  }
+  edits: SnapshotTurnEdit[]
+  redactions: SnapshotRedaction[]
+  editor_opts: SnapshotEditorOpts
+}
+
 /** Source-color dot palette, used by the SourceChip component. */
 export const SOURCE_DOTS: Record<Platform, { light: string; dark: string }> = {
   ChatGPT: { light: '#10A37F', dark: '#20C38F' },

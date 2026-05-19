@@ -21,6 +21,12 @@ export type {
   EditorOpts,
   RedactExclude,
   SpoolDocument,
+  Snapshot,
+  SnapshotTurn,
+  SnapshotTurnRole,
+  SnapshotRedaction,
+  SnapshotTurnEdit,
+  SnapshotEditorOpts,
 } from './lib/types'
 
 export {
@@ -45,6 +51,12 @@ export { Forum } from './templates/forum'
 export { Letter } from './templates/letter'
 export { Timeline } from './templates/timeline'
 export { Chat } from './templates/chat'
+
+// ─── Snapshot reader (used by spool.share web) ──────────────────
+export { SnapshotReader } from './reader/SnapshotReader'
+export type { SnapshotReaderProps } from './reader/SnapshotReader'
+export { decodeSnapshot } from './reader/snapshot-to-conversation'
+export type { DecodedSnapshot } from './reader/snapshot-to-conversation'
 
 // ─── Template primitives (for hosts assembling custom layouts) ──
 export { Body } from './templates/body'
