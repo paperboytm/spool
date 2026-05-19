@@ -212,6 +212,23 @@
     "shortcuts_action_zoomFit": "Ajuster à l'écran",
     "shortcuts_action_pan": "Déplacer l'aperçu (maintenir)"
   },
+  "security": {
+    "summary": "{{findings}} actifs · {{sessions}} sessions",
+    "rescanAll": "Tout rescanner",
+    "severity_high": "Élevé",
+    "severity_low": "Faible",
+    "info_toggle": "Signaux informationnels · {{items}} (chemins, IPs, hôtes internes — taux élevé de faux positifs)",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · texte libre",
+    "empty": "Aucun résultat. Votre archive est saine.",
+    "empty_sessions": "Aucune session ne correspond à ce filtre.",
+    "no_matching_findings": "Aucun résultat avec le filtre actuel.",
+    "value_unavailable": "(valeur indisponible)",
+    "dismiss": "Ignorer",
+    "dismiss_session": "Ignorer dans cette session",
+    "dismiss_global": "Ignorer partout",
+    "everywhere": "Partout",
+    "purge": "Purger"
+  },
   "shares": {
     "title": "Brouillons",
     "newDraft": "Créer un brouillon",

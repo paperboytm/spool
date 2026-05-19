@@ -7,7 +7,7 @@
 //   2. Promoting them to `Schema.Struct` later (for a Scope-B Effect
 //      RPC migration) is a local refactor, not a consumer rewrite.
 
-import type { SensitiveKind } from '@spool-lab/redact'
+import type { SensitiveKind, Severity } from '@spool-lab/redact'
 
 /** A finding's lifecycle state.
  *
@@ -76,7 +76,7 @@ export interface SessionWithFindingCounts {
  *  emitted. */
 export interface RiskByCategoryRow {
   kind: SensitiveKind
-  severity: 'high' | 'low'
+  severity: Severity
   count: number
 }
 

@@ -206,6 +206,23 @@
     "shortcuts_action_zoomFit": "适应屏幕",
     "shortcuts_action_pan": "平移预览（按住）"
   },
+  "security": {
+    "summary": "{{findings}} 项 · 涉及 {{sessions}} 个会话",
+    "rescanAll": "全部重扫",
+    "severity_high": "高风险",
+    "severity_low": "低风险",
+    "info_toggle": "提示信号 · {{items}}（路径 / IP / 内网域名，误报率高）",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · 关键词",
+    "empty": "暂无发现，存档干净。",
+    "empty_sessions": "没有会话匹配当前过滤。",
+    "no_matching_findings": "当前过滤下无匹配项。",
+    "value_unavailable": "（值不可用）",
+    "dismiss": "忽略",
+    "dismiss_session": "在此会话忽略",
+    "dismiss_global": "全局忽略",
+    "everywhere": "全局",
+    "purge": "清除"
+  },
   "shares": {
     "title": "草稿",
     "newDraft": "新建分享",
