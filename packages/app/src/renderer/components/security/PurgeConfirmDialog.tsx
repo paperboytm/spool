@@ -1,14 +1,22 @@
-// Purge confirmation modal — the only destructive action in the
-// Security Scan feature gets explicit friction, distinct from the
-// inline Dismiss buttons.
+// Purge confirmation modal — one-way door, NOT a fearmonger.
+//
+// Friction is a literal before/after preview of the substitution that's
+// about to happen, not a red banner. The modal shows the exact mask
+// rewrite in monospace.
 
-import { Trash2, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useRef } from 'react'
 
 interface Props {
   open: boolean
   count: number
-  /** Optional one-line preview ("API keys", "API key + email", etc.) */
-  summary?: string
+  /** SensitiveKind being purged — drives the friendly mask label. */
+  kind: string
+  /** Real raw value preview, for single-finding mode. Optional. */
+  before?: string
+  /** True for the bulk variant — different copy + samples. */
+  bulk?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -16,62 +24,184 @@ interface Props {
 export default function PurgeConfirmDialog({
   open,
   count,
-  summary,
+  kind,
+  before,
+  bulk,
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useTranslation()
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    cancelRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onCancel])
+
   if (!open) return null
+
+  const friendly = friendlyMaskName(kind)
+  const afterValue = `[redacted: ${friendly}]`
+  const beforePreview = before && before.length > 56 ? before.slice(0, 54) + '…' : before
+  const showBeforeRow = Boolean(beforePreview && !bulk)
+
   return (
     <div
       data-testid="purge-confirm"
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-warm-text/30 dark:bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="bg-warm-bg dark:bg-dark-bg rounded-lg shadow-xl w-[420px] max-w-[90vw] p-5 border border-warm-border dark:border-dark-border">
-        <div className="flex items-start gap-3">
-          <AlertTriangle
-            size={22}
-            strokeWidth={1.5}
-            className="text-warm-accent dark:text-dark-accent flex-none mt-0.5"
-            aria-hidden
-          />
-          <div className="flex-1">
-            <h2 className="text-base font-medium text-warm-text dark:text-dark-text">
-              Purge {count} finding{count === 1 ? '' : 's'}{summary ? ` (${summary})` : ''}?
-            </h2>
-            <p className="mt-2 text-sm text-warm-muted dark:text-dark-muted">
-              This rewrites the raw value with a mask in your local archive.
-              The originals in the source transcript files
-              (<code className="font-mono text-xs">~/.claude/sessions/</code>…)
-              are not changed.
-            </p>
-            <p className="mt-2 text-sm text-warm-muted dark:text-dark-muted">
-              You will not be able to recover the original values from Spool.
-            </p>
+      <div
+        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[460px] max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border"
+        style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
+      >
+        <div className="px-6 pt-5 pb-4">
+          <div className="flex items-center gap-1.5 text-[12px] font-medium text-accent dark:text-accent-dark">
+            <AlertTriangle size={13} strokeWidth={1.7} aria-hidden />
+            <span>
+              {bulk
+                ? t('security.purge_pretitle_bulk', { defaultValue: 'One-way action · bulk' })
+                : t('security.purge_pretitle', { defaultValue: 'One-way action' })}
+            </span>
+          </div>
+          <h2 className="mt-2 text-[16px] leading-[22px] font-semibold tracking-[-0.005em] text-warm-text dark:text-dark-text">
+            {bulk ? (
+              <>
+                {t('security.purge_title_bulk_a', { defaultValue: 'Rewrite' })}{' '}
+                <span className="font-mono tabular-nums">{count}</span>{' '}
+                <span className="font-mono text-[15px] text-accent dark:text-accent-dark">{kind}</span>{' '}
+                {t('security.purge_title_bulk_b', { defaultValue: 'findings?' })}
+              </>
+            ) : (
+              t('security.purge_title_single', { defaultValue: 'Rewrite this finding inside Spool?' })
+            )}
+          </h2>
+
+          <div className="mt-4 rounded-lg border border-warm-border dark:border-dark-border overflow-hidden bg-warm-surface dark:bg-dark-surface">
+            {showBeforeRow ? (
+              <DiffRow label={t('security.diff_before', { defaultValue: 'before' })} value={beforePreview!} variant="before" />
+            ) : bulk ? (
+              <DiffRow
+                label={t('security.diff_pattern', { defaultValue: 'pattern' })}
+                value={t('security.purge_bulk_pattern', { defaultValue: '{{count}} values across the active set', count })}
+                variant="before"
+              />
+            ) : (
+              <DiffRow
+                label={t('security.diff_before', { defaultValue: 'before' })}
+                value={t('security.purge_unknown_value', { defaultValue: 'the matched value' })}
+                variant="before"
+              />
+            )}
+            <DiffRow
+              label={bulk
+                ? t('security.diff_becomes', { defaultValue: 'becomes' })
+                : t('security.diff_after', { defaultValue: 'after' })}
+              value={afterValue}
+              variant="after"
+            />
+          </div>
+
+          <div className="mt-3.5 flex flex-col gap-1.5">
+            <Fact>
+              {t('security.purge_fact_originals', {
+                defaultValue: 'Originals in ~/.claude/sessions/ are untouched — the session stays resumable.',
+              })}
+            </Fact>
+            <Fact>
+              {t('security.purge_fact_permanent', {
+                defaultValue: "The mask is permanent inside Spool — you won't be able to recover the value from here.",
+              })}
+            </Fact>
+            {bulk && (
+              <Fact>
+                {t('security.purge_fact_fts', {
+                  defaultValue: 'FTS index updates automatically; pinned and shared sessions keep their references.',
+                })}
+              </Fact>
+            )}
           </div>
         </div>
-        <div className="mt-5 flex justify-end gap-2">
+
+        <div className="flex justify-end gap-2 px-6 pb-5 pt-3">
           <button
+            ref={cancelRef}
             type="button"
             data-testid="purge-cancel"
             onClick={onCancel}
-            className="px-3 py-1.5 rounded text-sm border border-warm-border dark:border-dark-border hover:bg-warm-surface dark:hover:bg-dark-surface"
+            className="inline-flex items-center h-7 px-2.5 rounded-md bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border text-[12px] font-medium text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:border-warm-border2 dark:hover:border-dark-border2 transition-colors"
           >
-            Cancel
+            {t('common.cancel', { defaultValue: 'Cancel' })}
           </button>
           <button
             type="button"
             data-testid="purge-confirm-button"
             onClick={onConfirm}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm bg-warm-accent dark:bg-dark-accent text-white hover:opacity-90"
+            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-accent dark:bg-accent-dark border border-accent dark:border-accent-dark text-[12px] font-medium text-white hover:bg-accent/90 dark:hover:bg-accent-dark/90 transition-colors"
           >
-            <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-            Purge
+            <Trash2 size={12} strokeWidth={1.7} aria-hidden />
+            {bulk
+              ? t('security.purge_confirm_bulk', { defaultValue: 'Purge {{count}} findings', count })
+              : t('security.purge_confirm_single', { defaultValue: 'Purge finding' })}
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+function DiffRow({
+  label,
+  value,
+  variant,
+}: {
+  label: string
+  value: string
+  variant: 'before' | 'after'
+}) {
+  const valueClass =
+    variant === 'before'
+      ? 'text-warm-text dark:text-dark-text'
+      : 'text-accent dark:text-accent-dark'
+  return (
+    <div className="grid font-mono text-[12px] leading-[18px] border-t border-dashed border-warm-border dark:border-dark-border first:border-t-0" style={{ gridTemplateColumns: '60px 1fr' }}>
+      <span className="px-2.5 py-2 text-[11px] text-warm-faint dark:text-dark-muted text-right border-r border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface">
+        {label}
+      </span>
+      <span className={`px-3 py-2 truncate ${valueClass}`}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function Fact({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid gap-2 text-[12px] leading-4 text-warm-muted dark:text-dark-muted" style={{ gridTemplateColumns: '12px 1fr' }}>
+      <span className="text-accent dark:text-accent-dark font-bold leading-4">·</span>
+      <span>{children}</span>
+    </div>
+  )
+}
+
+function friendlyMaskName(kind: string): string {
+  const map: Record<string, string> = {
+    'api-key': 'API key', 'private-key': 'private key', 'jwt': 'JWT',
+    'bearer': 'bearer token', 'kubeconfig-token': 'kubeconfig token',
+    'env-var': 'env var', 'url-creds': 'URL credentials',
+    'connection-string': 'connection string', 'ssh-key': 'SSH key',
+    'cloud-cred-ini': 'cloud creds', 'netrc': 'netrc',
+    'basic-auth': 'basic auth', 'generic-secret': 'secret',
+    'email': 'email', 'person-name': 'name', 'phone': 'phone',
+    'street-address': 'address', 'credit-card': 'credit card',
+    'ssn': 'SSN', 'date-of-birth': 'DOB',
+  }
+  return map[kind] ?? kind
 }
