@@ -36,44 +36,46 @@ export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<v
         .bind(row.user_id)
         .all<{ id: string }>()
 
-      for (const s of shares.results) {
-        await env.META.put(
-          `meta/${s.id}`,
-          JSON.stringify({
-            owner: row.user_id,
-            revoked_at: now,
-            expires_at: null,
-            visibility: 'unlisted',
-            version: 0,
-          }),
+      await Promise.all(
+        shares.results.flatMap((s) => [
+          env.META.put(
+            `meta/${s.id}`,
+            JSON.stringify({
+              owner: row.user_id,
+              revoked_at: now,
+              expires_at: null,
+              visibility: 'unlisted',
+              version: 0,
+            }),
+          ),
+          env.SNAPSHOTS.delete(`${s.id}.json`),
+          env.OG.delete(`${s.id}.png`),
+        ]),
+      )
+
+      await Promise.all([
+        env.DB.prepare(
+          'UPDATE published_shares SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL',
         )
-        await env.SNAPSHOTS.delete(`${s.id}.json`)
-        await env.OG.delete(`${s.id}.png`)
-      }
-
-      await env.DB.prepare(
-        'UPDATE published_shares SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL',
-      )
-        .bind(now, row.user_id)
-        .run()
-
-      await env.DB.prepare(
-        'UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL',
-      )
-        .bind(now, row.user_id)
-        .run()
-
-      await env.DB.prepare(
-        "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, deleted_at=? WHERE id=?",
-      )
-        .bind(now, row.user_id)
-        .run()
-
-      await env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
-        .bind(row.user_id)
-        .run()
-    } catch {
-      // log + continue; one bad user shouldn't block the rest.
+          .bind(now, row.user_id)
+          .run(),
+        env.DB.prepare(
+          'UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL',
+        )
+          .bind(now, row.user_id)
+          .run(),
+        env.DB.prepare(
+          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, deleted_at=? WHERE id=?",
+        )
+          .bind(now, row.user_id)
+          .run(),
+        env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
+          .bind(row.user_id)
+          .run(),
+      ])
+    } catch (e) {
+      // One bad user shouldn't block the rest of the sweep.
+      console.error('deletion sweep failed for', row.user_id, e)
     }
   }
 }

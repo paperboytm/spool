@@ -296,8 +296,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         await ctx.env.OG.put(`${slug}.png`, png, {
           httpMetadata: { contentType: 'image/png' },
         })
-      } catch {
-        // OG is non-critical; swallow.
+      } catch (e) {
+        // OG is non-critical; log so a broken renderer is visible without
+        // failing the publish response.
+        console.error('og render failed for', slug, e)
       }
     })())
 

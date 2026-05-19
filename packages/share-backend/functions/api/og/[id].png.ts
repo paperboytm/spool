@@ -15,6 +15,9 @@ type Meta = {
 
 export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
   try {
+    // CF Pages strips the `.png` suffix from `[id].png.ts` routes at runtime,
+    // but our unit tests construct ctx.params directly with the raw slug,
+    // so strip defensively to keep both paths working.
     const raw = ctx.params.id as string
     const id = raw.replace(/\.png$/, '')
     if (!isValidSlug(id)) throw new ApiError('NOT_FOUND')
