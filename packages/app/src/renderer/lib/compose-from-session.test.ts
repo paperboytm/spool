@@ -43,8 +43,8 @@ describe('composeFromSession', () => {
       msg(1, 'assistant', 'hello'),
     ])
     expect(convo.turns).toEqual([
-      { role: 'user', body: 'hi' },
-      { role: 'assistant', body: 'hello' },
+      { role: 'user', body: 'hi', timestamp: '2026-04-18T10:00:00Z' },
+      { role: 'assistant', body: 'hello', timestamp: '2026-04-18T10:00:00Z' },
     ])
   })
 
@@ -96,16 +96,15 @@ describe('composeFromSession', () => {
     expect(convo.title).toBe('Manual title')
   })
 
-  it('maps each Spool source to share-kit Platform', () => {
+  it('emits an agent-session origin tagged with source and uuid', () => {
     expect(composeFromSession(baseSession, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'pasted', platform: 'Claude' })
+      .toEqual({ kind: 'agent-session', agent: 'claude', sessionUuid: 'sess-1' })
 
     expect(composeFromSession({ ...baseSession, source: 'gemini' }, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'pasted', platform: 'Gemini' })
+      .toEqual({ kind: 'agent-session', agent: 'gemini', sessionUuid: 'sess-1' })
 
-    // Codex collapses onto ChatGPT until share-kit grows its own Platform value.
     expect(composeFromSession({ ...baseSession, source: 'codex' }, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'pasted', platform: 'ChatGPT' })
+      .toEqual({ kind: 'agent-session', agent: 'codex', sessionUuid: 'sess-1' })
   })
 
   it('computes word count and read time', () => {
