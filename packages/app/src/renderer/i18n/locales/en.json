@@ -147,6 +147,7 @@
     "tab_sources": "Sources",
     "tab_agent": "Agent",
     "tab_labs": "Labs",
+    "tab_security": "Security",
     "language_label": "Language",
     "language_help": "Choose the language used across Spool's interface.",
     "language_system": "System",

@@ -141,6 +141,7 @@
     "tab_sources": "資料來源",
     "tab_agent": "Agent",
     "tab_labs": "實驗中",
+    "tab_security": "安全掃描",
     "language_label": "語言",
     "language_help": "選擇 Spool 介面所使用的語言。",
     "language_system": "系統",
