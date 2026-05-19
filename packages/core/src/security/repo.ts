@@ -12,7 +12,7 @@
 
 import type Database from 'better-sqlite3'
 import type { SensitiveKind } from '@spool-lab/redact'
-import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from '@spool-lab/redact'
+import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from '@spool-lab/redact'
 import type {
   FindingRow,
   FindingState,
@@ -389,7 +389,7 @@ export function riskByCategory(db: Database.Database): RiskByCategoryRow[] {
   ).all() as Array<{ kind: string; count: number }>
   return rows.map(r => ({
     kind: r.kind as SensitiveKind,
-    severity: HIGH_SEVERITY_KINDS.has(r.kind as SensitiveKind) ? 'high' : 'low',
+    severity: severityOf(r.kind as SensitiveKind),
     count: r.count,
   }))
 }

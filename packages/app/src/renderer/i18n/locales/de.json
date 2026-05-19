@@ -212,6 +212,23 @@
     "shortcuts_action_zoomFit": "An Fenster anpassen",
     "shortcuts_action_pan": "Vorschau verschieben (halten)"
   },
+  "security": {
+    "summary": "{{findings}} aktiv · {{sessions}} Sitzungen",
+    "rescanAll": "Alle neu prüfen",
+    "severity_high": "Hoch",
+    "severity_low": "Niedrig",
+    "info_toggle": "Hinweissignale · {{items}} (Pfade, IPs, interne Hosts — hohe Falsch-positiv-Rate)",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · Freitext",
+    "empty": "Noch keine Funde. Dein Archiv ist sauber.",
+    "empty_sessions": "Keine Sitzungen passen zum Filter.",
+    "no_matching_findings": "Keine Funde mit dem aktuellen Filter.",
+    "value_unavailable": "(Wert nicht verfügbar)",
+    "dismiss": "Verwerfen",
+    "dismiss_session": "In dieser Sitzung verwerfen",
+    "dismiss_global": "Überall verwerfen",
+    "everywhere": "Überall",
+    "purge": "Löschen"
+  },
   "shares": {
     "title": "Entwürfe",
     "newDraft": "Entwurf erstellen",

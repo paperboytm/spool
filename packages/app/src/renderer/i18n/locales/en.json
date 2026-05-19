@@ -212,6 +212,23 @@
     "shortcuts_action_zoomFit": "Fit to screen",
     "shortcuts_action_pan": "Pan preview (hold)"
   },
+  "security": {
+    "summary": "{{findings}} active · {{sessions}} sessions",
+    "rescanAll": "Rescan all",
+    "severity_high": "High",
+    "severity_low": "Low",
+    "info_toggle": "Informational signals · {{items}} (paths, IPs, internal hosts — high false-positive rate)",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · free text",
+    "empty": "No findings yet. Your archive is clean.",
+    "empty_sessions": "No sessions match this filter.",
+    "no_matching_findings": "No findings match the current filter.",
+    "value_unavailable": "(value unavailable)",
+    "dismiss": "Dismiss",
+    "dismiss_session": "Dismiss in this session",
+    "dismiss_global": "Dismiss everywhere",
+    "everywhere": "Everywhere",
+    "purge": "Purge"
+  },
   "shares": {
     "title": "Drafts",
     "newDraft": "Start a draft",

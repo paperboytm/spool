@@ -206,6 +206,23 @@
     "shortcuts_action_zoomFit": "符合畫面",
     "shortcuts_action_pan": "平移預覽（按住）"
   },
+  "security": {
+    "summary": "{{findings}} 項 · 涉及 {{sessions}} 個會話",
+    "rescanAll": "全部重掃",
+    "severity_high": "高風險",
+    "severity_low": "低風險",
+    "info_toggle": "提示訊號 · {{items}}（路徑 / IP / 內網網域，誤報率高）",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · 關鍵字",
+    "empty": "暫無發現，存檔乾淨。",
+    "empty_sessions": "沒有會話符合目前篩選。",
+    "no_matching_findings": "目前篩選下無相符項目。",
+    "value_unavailable": "（值不可用）",
+    "dismiss": "忽略",
+    "dismiss_session": "在此會話忽略",
+    "dismiss_global": "全域忽略",
+    "everywhere": "全域",
+    "purge": "清除"
+  },
   "shares": {
     "title": "草稿",
     "newDraft": "建立分享",

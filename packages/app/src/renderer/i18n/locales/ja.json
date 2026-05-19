@@ -206,6 +206,23 @@
     "shortcuts_action_zoomFit": "画面に合わせる",
     "shortcuts_action_pan": "プレビューを移動（長押し）"
   },
+  "security": {
+    "summary": "{{findings}} 件 · {{sessions}} セッション",
+    "rescanAll": "すべて再スキャン",
+    "severity_high": "高",
+    "severity_low": "低",
+    "info_toggle": "参考信号 · {{items}}（パス / IP / 内部ホスト — 誤検出が多め）",
+    "filter_placeholder": "kind:api-key · is:active · severity:high · キーワード",
+    "empty": "見つかったものはありません。アーカイブはクリーンです。",
+    "empty_sessions": "このフィルターに合うセッションはありません。",
+    "no_matching_findings": "現在のフィルターでは該当なし。",
+    "value_unavailable": "（値を取得できません）",
+    "dismiss": "無視",
+    "dismiss_session": "このセッションで無視",
+    "dismiss_global": "全体で無視",
+    "everywhere": "全体",
+    "purge": "完全削除"
+  },
   "shares": {
     "title": "下書き",
     "newDraft": "下書きを作成",
