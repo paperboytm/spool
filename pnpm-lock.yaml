@@ -94,6 +94,9 @@ importers:
       mdast-util-to-string:
         specifier: ^4
         version: 4.0.0
+      pure-rand:
+        specifier: ^6.1.0
+        version: 6.1.0
       react:
         specifier: ^19.2.5
         version: 19.2.5
@@ -109,9 +112,6 @@ importers:
       react-virtuoso:
         specifier: ^4.18.6
         version: 4.18.6(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      pure-rand:
-        specifier: ^6.1.0
-        version: 6.1.0
       rehype-sanitize:
         specifier: ^6
         version: 6.0.0
@@ -305,6 +305,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
 
   packages/share-backend:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260415.1

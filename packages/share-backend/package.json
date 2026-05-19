@@ -13,6 +13,9 @@
     "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db --env staging",
     "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --env production"
   },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260415.1",
     "typescript": "^5.7.3",

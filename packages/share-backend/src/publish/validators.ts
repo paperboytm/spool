@@ -1,0 +1,67 @@
+import { z } from 'zod'
+
+export const Snapshot = z.object({
+  schema_version: z.literal(1),
+  source: z.object({
+    kind: z.enum(['spool-session', 'imported-file', 'imported-jsonl']),
+    origin_hint: z.string().optional(),
+    captured_at: z.iso.datetime(),
+  }),
+  conversation: z.object({
+    title: z.string().min(1).max(200),
+    turns: z
+      .array(
+        z.object({
+          id: z.string(),
+          role: z.enum(['user', 'assistant', 'system', 'tool']),
+          content: z.string().max(200_000),
+          redacted: z.boolean().optional(),
+        }),
+      )
+      .max(500),
+    turn_order: z.array(z.string()).max(500),
+    hidden_turns: z.array(z.string()),
+  }),
+  // editor_opts.template/paper/typeface/colorway are intentionally
+  // z.string() (not enums): share-kit ships built-in values but also
+  // allows custom ones; the server is the wrong place to gate that.
+  editor_opts: z.object({
+    template: z.string(),
+    paper: z.string(),
+    typeface: z.string(),
+    colorway: z.string(),
+    density: z.enum(['compact', 'relaxed']),
+    masthead: z.boolean(),
+    colophon: z.boolean(),
+    avatars: z.boolean(),
+    show_byline: z.boolean(),
+  }),
+})
+
+export const PublishRequest = z.object({
+  snapshot: Snapshot,
+  visibility: z.enum(['unlisted', 'profile-listed']),
+  // Renderer's local share_drafts.draft_id. Persisted on the share row
+  // so the editor can later look up "is this draft published?" without
+  // title heuristics. nanoid(21) is the format the renderer emits, but
+  // the server stays format-agnostic and only bounds the length so a
+  // pathological client can't bloat the column.
+  draft_id: z.string().min(1).max(128),
+  // Idempotency token for at-most-once publish on retry. The renderer
+  // derives it deterministically from the request payload (snapshot +
+  // visibility + expires_at), so retries of the same intent re-use the
+  // same token and the backend short-circuits to the prior result; a
+  // re-edited intent generates a fresh token and creates a new share.
+  // 64-char sha256 hex is the canonical value; we bound generously to
+  // accommodate future hash bumps without a schema change.
+  idempotency_key: z.string().min(8).max(256),
+  expires_at: z.iso.datetime().optional(),
+  // Mirror `isValidSlug` (slug.ts): 21 chars, URL-safe alphabet. The
+  // handler re-runs `isValidSlug()` after this, but enforcing at the
+  // schema boundary lets us reject malformed slugs before any DB
+  // round-trips fire (idempotency SELECT, ownership SELECT).
+  override_slug: z.string().regex(/^[\w-]{21}$/).optional(),
+})
+
+export type PublishRequestT = z.infer<typeof PublishRequest>
+export type SnapshotT = z.infer<typeof Snapshot>
