@@ -141,6 +141,7 @@
     "tab_sources": "데이터 소스",
     "tab_agent": "Agent",
     "tab_labs": "실험실",
+    "tab_security": "보안",
     "language_label": "언어",
     "language_help": "Spool 인터페이스에서 사용할 언어를 선택하세요.",
     "language_system": "시스템",
