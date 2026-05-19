@@ -1,5 +1,5 @@
 // @spool/share-kit — building blocks for the Spool Share editor surface.
-// Consumers (Spool app, spool.share web) assemble these into their own
+// Consumers (Spool app, spool.pro web) assemble these into their own
 // editor pages; the kit itself is host-agnostic (no routing, no global
 // state, no IPC).
 
@@ -24,8 +24,6 @@ export type {
   Snapshot,
   SnapshotTurn,
   SnapshotTurnRole,
-  SnapshotRedaction,
-  SnapshotTurnEdit,
   SnapshotEditorOpts,
 } from './lib/types'
 
@@ -52,7 +50,7 @@ export { Letter } from './templates/letter'
 export { Timeline } from './templates/timeline'
 export { Chat } from './templates/chat'
 
-// ─── Snapshot reader (used by spool.share web) ──────────────────
+// ─── Snapshot reader (used by spool.pro web) ──────────────────
 export { SnapshotReader } from './reader/SnapshotReader'
 export type { SnapshotReaderProps } from './reader/SnapshotReader'
 export { decodeSnapshot } from './reader/snapshot-to-conversation'
@@ -108,7 +106,7 @@ export type { ParseErrorReason } from './lib/parsers'
 export { fetchContent, FetchError } from './lib/parsers/fetcher'
 export type { FetchedContent } from './lib/parsers/fetcher'
 
-// ─── Local draft storage (IndexedDB; for spool.share web) ───────
+// ─── Local draft storage (IndexedDB; for spool.pro web) ───────
 export {
   saveDraft,
   loadDraft,

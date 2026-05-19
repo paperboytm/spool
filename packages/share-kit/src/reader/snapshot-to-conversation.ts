@@ -4,9 +4,9 @@
 // React, no DOM access — so the renderer side stays the only place
 // React touches Snapshot data.
 //
-// SAFETY: this never emits HTML or runs eval. The `applied_content`
-// of each turn is just the redacted/edited plain string the templates
-// will render through React's text escaping.
+// SAFETY: this never emits HTML or runs eval. `turn.content` is
+// already the redacted literal the publisher chose to send — the
+// templates render it through React's text escaping.
 
 import type {
   Conversation,
@@ -32,36 +32,6 @@ const ROLE_MAP: Record<Snapshot['conversation']['turns'][number]['role'], 'user'
   // slipped through.
   system: 'assistant',
   tool: 'assistant',
-}
-
-function applyEditsAndRedactions(
-  rawContent: string,
-  turnId: string,
-  snapshot: Snapshot,
-): string {
-  const edit = snapshot.edits.find((e) => e.turn_id === turnId)
-  let content = edit ? edit.edited_content : rawContent
-
-  const redactions = snapshot.redactions
-    .filter((r) => r.turn_id === turnId)
-    // Apply right-to-left so earlier offsets stay valid as we splice.
-    .sort((a, b) => b.span[0] - a.span[0])
-
-  for (const r of redactions) {
-    const [start, end] = r.span
-    if (
-      typeof start !== 'number' ||
-      typeof end !== 'number' ||
-      start < 0 ||
-      end > content.length ||
-      start >= end
-    ) {
-      continue
-    }
-    const label = r.label || '[redacted]'
-    content = content.slice(0, start) + label + content.slice(end)
-  }
-  return content
 }
 
 function safeTemplate(raw: string): Template {
@@ -101,9 +71,13 @@ export function decodeSnapshot(snapshot: Snapshot): DecodedSnapshot {
       const bi = orderIdx.get(b.id) ?? Number.MAX_SAFE_INTEGER
       return ai - bi
     })
+    // The `redacted` flag is intentionally dropped here — Reader Phase
+    // A doesn't surface a per-turn badge, and the in-memory Turn shape
+    // has no `isRedacted` field. Future Reader work can read it
+    // straight off the Snapshot wire object.
     .map((t) => ({
       role: ROLE_MAP[t.role] ?? 'assistant',
-      body: applyEditsAndRedactions(t.content, t.id, snapshot),
+      body: t.content,
     }))
 
   const colorway = safeColorway(snapshot.editor_opts.colorway)

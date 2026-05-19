@@ -1,5 +1,5 @@
 // Renders an immutable Snapshot in read-only mode using the appropriate
-// template. This is the single entry point used by the spool.share web
+// template. This is the single entry point used by the spool.pro web
 // reader at `/s/<id>`.
 //
 // SAFETY: never uses dangerouslySetInnerHTML on user content. All turn

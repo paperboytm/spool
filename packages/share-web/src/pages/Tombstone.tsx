@@ -39,7 +39,7 @@ export function Tombstone({ reason, at }: Props) {
   return (
     <main className="tombstone">
       <div className="tombstone-card">
-        <div className="tombstone-eyebrow">spool.share</div>
+        <div className="tombstone-eyebrow">spool.pro</div>
         <h1 className="tombstone-title">{title}</h1>
         <p className="tombstone-body">{body}</p>
         {when && (

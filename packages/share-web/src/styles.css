@@ -1,13 +1,13 @@
-/* Minimal chrome for the spool.share web reader.
+/* Minimal chrome for the spool.pro web reader.
  * Templates render their own paper/typography via inline styles, so
  * this file only covers the surrounding shell — body reset, the loading
- * card, tombstone, report form, and reader footer.
+ * card, tombstone, and reader footer.
  *
  * CSP note: no @font-face / @import rules pointing at external origins.
  * Geist / system stacks are referenced by name only; if the user lacks
  * Geist installed the stack falls back to system-ui which is fine for
- * tombstone / report copy. The template content surface owns its own
- * fonts via the share-kit components and Vite-bundled CSS variables. */
+ * tombstone copy. The template content surface owns its own fonts via
+ * the share-kit components and Vite-bundled CSS variables. */
 
 :root {
   --shell-bg: #f4efe6;
@@ -135,115 +135,3 @@ a:hover {
   margin: 0;
 }
 
-/* ── Report form ────────────────────────────────────────────── */
-.report-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 16px;
-}
-
-.report-card {
-  width: 100%;
-  max-width: 520px;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  border-radius: 12px;
-  padding: 32px;
-}
-
-.report-card h1 {
-  font-size: 20px;
-  margin: 0 0 8px;
-  font-weight: 600;
-}
-
-.report-lede {
-  margin: 0 0 24px;
-  color: var(--shell-muted);
-  line-height: 1.5;
-}
-
-.report-field {
-  display: block;
-  margin-bottom: 20px;
-}
-
-.report-field > span,
-.report-field > legend {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: var(--shell-text);
-}
-
-.report-field small {
-  display: block;
-  margin-top: 4px;
-  color: var(--shell-muted);
-  font-size: 12px;
-}
-
-.report-field input[type='text'],
-.report-field input[type='email'],
-.report-field textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--shell-bg);
-  border: 1px solid var(--shell-border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: inherit;
-  color: inherit;
-}
-
-.report-field textarea {
-  resize: vertical;
-  min-height: 96px;
-}
-
-.report-reason {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-  font-size: 14px;
-}
-
-.report-error {
-  background: rgba(183, 58, 31, 0.08);
-  border: 1px solid rgba(183, 58, 31, 0.4);
-  color: var(--shell-error);
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin: 0 0 16px;
-  font-size: 13px;
-}
-
-.report-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.report-actions button {
-  background: var(--shell-accent);
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.report-actions button:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.report-cancel {
-  font-size: 13px;
-  color: var(--shell-muted);
-}

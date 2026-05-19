@@ -6,8 +6,6 @@ const SNAPSHOT_FIXTURE = {
   schema_version: 1,
   source: { kind: 'imported-file', captured_at: '2026-05-19T00:00:00Z' },
   conversation: { title: 'T', turns: [], turn_order: [], hidden_turns: [] },
-  edits: [],
-  redactions: [],
   editor_opts: {
     template: 'forum',
     paper: 'snow',
@@ -56,3 +54,4 @@ describe('decideSnapshotState', () => {
     expect(decideSnapshotState(403, null)).toEqual({ kind: 'error' })
   })
 })
+

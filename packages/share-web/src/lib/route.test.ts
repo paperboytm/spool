@@ -23,25 +23,11 @@ describe('routeFor', () => {
     expect(r.kind).toBe('tombstone')
   })
 
-  it('matches /report?id=<slug> with id', () => {
-    const r = routeFor('/report', '?id=K7s4F3pQz1mB9XnLrV8aE')
-    expect(r).toEqual({ kind: 'report', id: 'K7s4F3pQz1mB9XnLrV8aE' })
-  })
-
-  it('matches /report without id', () => {
-    const r = routeFor('/report')
-    expect(r).toEqual({ kind: 'report', id: null })
-  })
-
-  it('matches /report with malformed id (drops the bad id)', () => {
-    const r = routeFor('/report', '?id=hax')
-    expect(r).toEqual({ kind: 'report', id: null })
-  })
-
   it('falls through to tombstone for unknown paths', () => {
     expect(routeFor('/').kind).toBe('tombstone')
     expect(routeFor('/me').kind).toBe('tombstone')
     expect(routeFor('/@someone').kind).toBe('tombstone')
+    expect(routeFor('/report').kind).toBe('tombstone')
   })
 })
 

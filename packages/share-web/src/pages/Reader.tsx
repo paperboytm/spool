@@ -3,6 +3,7 @@ import { SnapshotReader } from '@spool/share-kit'
 import type { Snapshot } from '@spool/share-kit'
 
 import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
+import { reportMailto } from '../lib/mailto'
 import { Tombstone } from './Tombstone'
 
 type State =
@@ -27,9 +28,9 @@ export function Reader({ id }: { id: string }) {
       const next = fromFetch(result)
       setState(next)
       if (next.kind === 'ok') {
-        document.title = `${next.snapshot.conversation.title} · spool.share`
+        document.title = `${next.snapshot.conversation.title} · spool.pro`
       } else if (next.kind === 'gone' || next.kind === 'not-found') {
-        document.title = 'Unavailable · spool.share'
+        document.title = 'Unavailable · spool.pro'
       }
     })
     return () => {
@@ -53,7 +54,7 @@ export function Reader({ id }: { id: string }) {
       <SnapshotReader snapshot={state.snapshot} />
       <footer className="reader-footer">
         <span>
-          <a href={`/report?id=${encodeURIComponent(id)}`} rel="nofollow">
+          <a href={reportMailto(id)} rel="nofollow">
             Report this share
           </a>
         </span>

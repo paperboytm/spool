@@ -1,13 +1,12 @@
 // Bare-bones path matcher. We intentionally avoid react-router for an
-// SPA this small — three real routes (`/s/<id>`, `/report`, `/`) and
-// one catch-all tombstone is not worth a dependency.
+// SPA this small — `/s/<id>` and a catch-all tombstone is not worth a
+// dependency.
 //
 // `nextSafe` defends `?next=` query params against open-redirect abuse:
 // only same-origin, single-slash, no-protocol paths pass through.
 
 export type Route =
   | { kind: 'reader'; id: string }
-  | { kind: 'report'; id: string | null }
   | { kind: 'tombstone'; reason: 'not-found' }
 
 // Slugs are nanoid(21) — URL-safe base64 alphabet
@@ -15,7 +14,7 @@ export type Route =
 // `/s/foo` returns a clean 404 tombstone instead of a 30-second fetch.
 const SLUG_RE = /^[A-Za-z0-9_-]{21}$/
 
-export function routeFor(pathname: string, search: string = ''): Route {
+export function routeFor(pathname: string, _search: string = ''): Route {
   const path = pathname.replace(/\/+$/, '') || '/'
 
   // Reader: /s/<slug>
@@ -23,14 +22,6 @@ export function routeFor(pathname: string, search: string = ''): Route {
     const id = decodeURIComponent(path.slice(3))
     if (!SLUG_RE.test(id)) return { kind: 'tombstone', reason: 'not-found' }
     return { kind: 'reader', id }
-  }
-
-  // Report flow: /report?id=<slug>
-  if (path === '/report') {
-    const params = new URLSearchParams(search)
-    const raw = params.get('id') ?? ''
-    const id = SLUG_RE.test(raw) ? raw : null
-    return { kind: 'report', id }
   }
 
   return { kind: 'tombstone', reason: 'not-found' }
