@@ -5,15 +5,10 @@ import {
   OAUTH_VERIFIER_COOKIE,
   buildOauthCookie,
 } from '../../../../src/auth/cookie'
+import { safeNext } from '../../../../src/auth/next'
 import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
 
 type Env = { GOOGLE_CLIENT_ID_WEB: string }
-
-function safeNext(raw: string | null): string {
-  if (!raw) return '/'
-  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/'
-  return raw
-}
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const url = new URL(ctx.request.url)

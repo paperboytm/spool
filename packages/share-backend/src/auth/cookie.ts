@@ -1,6 +1,6 @@
-const COOKIE_NAME = 'spool_session'
-const OAUTH_STATE_COOKIE = '__spool_oauth_state'
-const OAUTH_VERIFIER_COOKIE = '__spool_oauth_verifier'
+export const COOKIE_NAME = 'spool_session'
+export const OAUTH_STATE_COOKIE = '__spool_oauth_state'
+export const OAUTH_VERIFIER_COOKIE = '__spool_oauth_verifier'
 
 export function buildSessionCookie(token: string, maxAgeSec: number): string {
   return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAgeSec}`
@@ -22,5 +22,3 @@ export function readCookie(req: Request, name: string): string | null {
   }
   return null
 }
-
-export { COOKIE_NAME, OAUTH_STATE_COOKIE, OAUTH_VERIFIER_COOKIE }

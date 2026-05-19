@@ -1,9 +1,13 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types'
 
 import { base64urlFromBuffer, sha256 } from './auth/pkce'
+import { clientIp } from './request'
+
+let saltCache: { date: string; salt: string } | null = null
 
 async function dailySalt(kv: KVNamespace): Promise<string> {
   const date = new Date().toISOString().slice(0, 10)
+  if (saltCache && saltCache.date === date) return saltCache.salt
   const k = `audit-salt/${date}`
   let salt = await kv.get(k)
   if (!salt) {
@@ -12,7 +16,12 @@ async function dailySalt(kv: KVNamespace): Promise<string> {
     salt = base64urlFromBuffer(arr.buffer)
     await kv.put(k, salt, { expirationTtl: 86400 * 2 })
   }
+  saltCache = { date, salt }
   return salt
+}
+
+export function _resetSaltCacheForTests(): void {
+  saltCache = null
 }
 
 export async function hashWithDailySalt(kv: KVNamespace, value: string): Promise<string> {
@@ -31,10 +40,9 @@ export async function audit(
     details?: object
   },
 ): Promise<void> {
-  const ip = req.headers.get('CF-Connecting-IP') ?? '0.0.0.0'
-  const ua = req.headers.get('User-Agent') ?? ''
+  const ua = req.headers.get('User-Agent') ?? '-'
   const [ip_hash, ua_hash] = await Promise.all([
-    hashWithDailySalt(kv, ip),
+    hashWithDailySalt(kv, clientIp(req)),
     hashWithDailySalt(kv, ua),
   ])
   await db

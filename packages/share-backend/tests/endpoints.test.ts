@@ -78,7 +78,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       iat: past(0),
       nonce: 'n1',
     })
-    const req = new Request('https://spool.share/api/auth/sign-in-with-id-token', {
+    const req = new Request('https://spool.pro/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
       body: JSON.stringify({ id_token, nonce: 'n1' }),
@@ -214,7 +214,7 @@ describe('GET /api/auth/google/callback', () => {
     const { onRequestGet } = await import('../functions/api/auth/google/callback')
     const env = envFor()
     const req = new Request(
-      'https://spool.share/api/auth/google/callback?code=abc&state=xyz',
+      'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await (onRequestGet as any)(ctxFor(req, env))
@@ -225,7 +225,7 @@ describe('GET /api/auth/google/callback', () => {
     const { onRequestGet } = await import('../functions/api/auth/google/callback')
     const env = envFor()
     const req = new Request(
-      'https://spool.share/api/auth/google/callback?code=abc&state=fromUrl',
+      'https://spool.pro/api/auth/google/callback?code=abc&state=fromUrl',
       {
         headers: {
           cookie: '__spool_oauth_state=otherState|/; __spool_oauth_verifier=v',
@@ -255,7 +255,7 @@ describe('GET /api/auth/google/callback', () => {
       .mockResolvedValue(tokenExchangeOk(id_token))
     try {
       const req = new Request(
-        'https://spool.share/api/auth/google/callback?code=goodcode&state=S',
+        'https://spool.pro/api/auth/google/callback?code=goodcode&state=S',
         {
           headers: {
             cookie:
@@ -319,7 +319,7 @@ describe('start endpoint', () => {
   it('redirects to Google with PKCE challenge and sets both oauth cookies', async () => {
     const { onRequestGet } = await import('../functions/api/auth/google/start')
     const env = envFor()
-    const req = new Request('https://spool.share/api/auth/google/start?next=/me')
+    const req = new Request('https://spool.pro/api/auth/google/start?next=/me')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await (onRequestGet as any)(ctxFor(req, env))
     expect(res.status).toBe(302)
@@ -338,7 +338,7 @@ describe('start endpoint', () => {
     const { onRequestGet } = await import('../functions/api/auth/google/start')
     const env = envFor()
     const req = new Request(
-      'https://spool.share/api/auth/google/start?next=//evil.example.com',
+      'https://spool.pro/api/auth/google/start?next=//evil.example.com',
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await (onRequestGet as any)(ctxFor(req, env))

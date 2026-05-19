@@ -75,12 +75,6 @@ export type IdTokenClaims = {
 
 export type VerifyOpts = { audience: string; nonce?: string; now?: number }
 
-/**
- * Lower-level verify entry point that accepts a JWKS directly. The
- * production wrapper `verifyIdToken` fetches Google's JWKS and delegates
- * here; tests use this directly with a locally generated keypair so we
- * never have to mock `fetch`.
- */
 export async function verifyIdTokenWithKeys(
   idToken: string,
   keys: Jwk[],

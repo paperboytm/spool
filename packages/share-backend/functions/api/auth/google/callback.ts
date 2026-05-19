@@ -8,6 +8,7 @@ import {
   readCookie,
 } from '../../../../src/auth/cookie'
 import { verifyIdToken } from '../../../../src/auth/jwks'
+import { safeNext } from '../../../../src/auth/next'
 import { createSession } from '../../../../src/auth/session'
 import { audit } from '../../../../src/audit'
 import { ApiError, jsonError } from '../../../../src/errors'
@@ -19,12 +20,6 @@ type Env = {
   RATE: KVNamespace
   GOOGLE_CLIENT_ID_WEB: string
   GOOGLE_CLIENT_SECRET_WEB: string
-}
-
-function safeNext(raw: string | undefined): string {
-  if (!raw) return '/'
-  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return '/'
-  return raw
 }
 
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {

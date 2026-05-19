@@ -1,5 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types'
 
+import { ApiError } from '../errors'
+
 export type UserRow = {
   id: string
   google_sub: string
@@ -25,7 +27,7 @@ export async function upsertUserByGoogleSub(
     .first<UserRow>()
   const now = Date.now()
   if (existing) {
-    if (existing.deleted_at !== null) throw new Error('account deleted')
+    if (existing.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
     await db
       .prepare('UPDATE users SET email=?, name=?, avatar_url=?, last_signin_at=? WHERE id=?')
       .bind(email, name, avatar, now, existing.id)

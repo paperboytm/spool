@@ -5,6 +5,7 @@ import { createSession } from '../../../src/auth/session'
 import { audit } from '../../../src/audit'
 import { ApiError, jsonError } from '../../../src/errors'
 import { checkRate } from '../../../src/rate-limit'
+import { clientIp } from '../../../src/request'
 import { upsertUserByGoogleSub } from '../../../src/store/d1'
 
 type Env = {
@@ -19,10 +20,9 @@ type Body = { id_token: string; nonce: string }
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
-    const ip = ctx.request.headers.get('CF-Connecting-IP') ?? '0.0.0.0'
     const rate = await checkRate(ctx.env.RATE, {
       bucket: 'signin',
-      key: ip,
+      key: clientIp(ctx.request),
       windowSec: 60,
       max: 10,
     })
@@ -38,8 +38,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       throw new ApiError('BAD_REQUEST', 'missing fields')
     }
 
-    // Nonce single-use: check BEFORE verifying so a replayed valid token
-    // still gets a clean FORBIDDEN. The verify itself also binds to nonce.
+    // Pre-check so a replayed token still 403s; verify also binds nonce.
     const usedKey = `nonce/${body.nonce}`
     const seen = await ctx.env.NONCE.get(usedKey)
     if (seen) throw new ApiError('FORBIDDEN', 'nonce replay')
