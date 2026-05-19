@@ -101,6 +101,13 @@ export function maskValueByKind(value: string, kind: SensitiveKind | string): st
     case 'phone':
       return '[redacted phone]'
 
+    case 'person-name':
+      return '[redacted name]'
+    case 'street-address':
+      return '[redacted address]'
+    case 'date-of-birth':
+      return '[redacted DOB]'
+
     case 'ip':
       // Preserve shape so readers know it was a network address; the
       // four-octet pattern matters more than the digits.

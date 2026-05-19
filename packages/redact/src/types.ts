@@ -24,6 +24,9 @@ export type SensitiveKind =
   // ── Identity ─────────────────────────────────────────────────────
   | 'email'
   | 'phone'
+  | 'person-name'        // ML-only (Privacy Filter `person` class)
+  | 'street-address'     // ML-only (Privacy Filter `address` class)
+  | 'date-of-birth'      // ML-only, context-gated to DOB-like dates
   | 'credit-card'        // Luhn-validated
   | 'ssn'                // US SSN, format-only
   | 'ip'                 // IPv4 / shortened IPv6
@@ -104,6 +107,9 @@ export const SENSITIVE_KIND_ORDER: SensitiveKind[] = [
   'ssn',
   'email',
   'phone',
+  'person-name',
+  'street-address',
+  'date-of-birth',
   'ip',
   'absolute-path',
   'internal-host',
@@ -127,6 +133,9 @@ export const SENSITIVE_KIND_LABEL: Record<SensitiveKind, string> = {
   'ssn': 'SSN',
   'email': 'Email',
   'phone': 'Phone',
+  'person-name': 'Person name',
+  'street-address': 'Street address',
+  'date-of-birth': 'Date of birth',
   'ip': 'IP address',
   'absolute-path': 'Absolute path',
   'internal-host': 'Internal hostname',

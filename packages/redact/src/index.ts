@@ -34,6 +34,9 @@ export { luhnOk, shannon, hashValueForRedactExclude } from './validators'
 
 export { maskValueByKind } from './mask'
 
+export { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from './severity'
+export type { Severity } from './severity'
+
 import { detectWithRegex } from './detectors'
 import type { SensitiveGroup, SensitiveKind, SensitiveMatch } from './types'
 import { SENSITIVE_KIND_ORDER } from './types'

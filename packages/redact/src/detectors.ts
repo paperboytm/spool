@@ -136,16 +136,38 @@ const SSN_RX = /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g
 const EMAIL_RX = /\b[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}\b/g
 const PHONE_RX = /(?:\+\d[\d .\-()]{7,16}\d|\(\d{2,4}\)[\d .\-]{6,14}\d)/g
 const IPV4_RX = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b/g
+// Permissive match; `validIPv6` below rejects look-alikes (timestamps,
+// short colon-separated number strings). Real IPv6 either uses the
+// compressed `::` marker or contains the full 8 groups.
 const IPV6_RX = /\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b|\b(?:[0-9a-fA-F]{1,4}:){1,7}:|\b(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}\b/g
+
+/** Distinguishes real IPv6 addresses from look-alikes the broad
+ *  regex above also accepts. Timestamps like `12:22:57` and other
+ *  short colon-separated decimal sequences must be rejected:
+ *
+ *   - A canonical IPv6 has 8 groups (`2001:0db8:…:7334`).
+ *   - The `::` compression marker is unambiguous when present.
+ *
+ *  Anything else (e.g. 3-group decimal time-of-day) we drop. */
+function validIPv6(value: string): boolean {
+  if (value.includes('::')) return true
+  return value.split(':').length === 8
+}
 
 // ── Location & infra ─────────────────────────────────────────────
 
 const ABSOLUTE_PATH_RX = /(?:\/Users\/|\/home\/|\/var\/|\/etc\/|\/opt\/|[A-Z]:\\Users\\)[A-Za-z0-9._\-/\\À-￿]+/g
 
 // Internal-only hostnames that aren't routable on the public DNS
-// but reveal an org's network shape — useful signal for the future
-// security-scan report.
-const INTERNAL_HOST_RX = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:internal|corp|lan|local|intra|home|prod\.[a-z0-9]+|stg\.[a-z0-9]+)\b/gi
+// but reveal an org's network shape.
+//
+// Note `.local` is intentionally OMITTED: while it's the mDNS TLD,
+// it's also the dominant filename suffix (`.env.local`,
+// `settings.local`, `next.config.local`, …) — and we saw ~50%
+// false-positive rate from a real-world scan with `.local` enabled.
+// The remaining TLDs (`.internal`, `.corp`, `.lan`, `.intra`,
+// `.home`, `.prod.*`, `.stg.*`) are unambiguous internal-DNS markers.
+const INTERNAL_HOST_RX = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:internal|corp|lan|intra|home|prod\.[a-z0-9]+|stg\.[a-z0-9]+)\b/gi
 
 const RULES: Rule[] = [
   { kind: 'private-key', rx: PEM_RX, confidence: 1.0 },
@@ -167,7 +189,7 @@ const RULES: Rule[] = [
   { kind: 'email', rx: EMAIL_RX, confidence: 0.85 },
   { kind: 'phone', rx: PHONE_RX, confidence: 0.7 },
   { kind: 'ip', rx: IPV4_RX, confidence: 0.55 },
-  { kind: 'ip', rx: IPV6_RX, confidence: 0.6 },
+  { kind: 'ip', rx: IPV6_RX, confidence: 0.6, validate: validIPv6 },
   { kind: 'internal-host', rx: INTERNAL_HOST_RX, confidence: 0.55 },
   { kind: 'absolute-path', rx: ABSOLUTE_PATH_RX, confidence: 0.75 },
 ]

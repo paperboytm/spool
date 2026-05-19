@@ -3,6 +3,7 @@ import {
   detectSensitiveSpans,
   groupBySensitiveKind,
   SENSITIVE_KIND_LABEL,
+  SENSITIVE_KIND_ORDER,
   regexProvider,
   analyzeWith,
   luhnOk,
@@ -43,6 +44,15 @@ describe('identity', () => {
   it('finds IPv4 and IPv6', () => {
     expect(kindsOf('server at 192.168.1.42')).toContain('ip')
     expect(kindsOf('addr 2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toContain('ip')
+  })
+  it('accepts compressed IPv6 forms with ::', () => {
+    expect(kindsOf('loopback ::1 plus 2001:db8::1 thanks')).toContain('ip')
+  })
+  it('rejects HH:MM:SS time strings that the broad IPv6 regex superficially matches', () => {
+    // `12:22:57` is 3 colon-separated decimal groups — looks like
+    // IPv6 to a naive regex, but isn't one (no `::`, only 3 groups).
+    expect(kindsOf('logged at 12:22:57 today')).not.toContain('ip')
+    expect(kindsOf('took 00:12:35 to run')).not.toContain('ip')
   })
 })
 
@@ -176,9 +186,18 @@ describe('location / infra', () => {
   it('finds a Windows user path', () => {
     expect(kindsOf('open C:\\Users\\chen\\Documents\\notes.md')).toContain('absolute-path')
   })
-  it('finds *.internal/.corp/.local hostnames', () => {
+  it('finds *.internal / *.corp hostnames', () => {
     expect(kindsOf('reach api.eng.corp on port 8080')).toContain('internal-host')
     expect(kindsOf('curl http://db.prod.internal/health')).toContain('internal-host')
+  })
+  it('does not flag `.env.local` and other `.local` filename refs as internal-host', () => {
+    // `.local` is mDNS BUT also a dominant filename suffix
+    // (`.env.local`, `settings.local`, `next.config.local`). We dropped
+    // it from the TLD list to eliminate the false positives — real
+    // mDNS hosts are rare in Spool's data.
+    expect(kindsOf('cat .env.local')).not.toContain('internal-host')
+    expect(kindsOf('open next.config.local then env.dev.local')).not.toContain('internal-host')
+    expect(kindsOf('see settings.local for prefs')).not.toContain('internal-host')
   })
 })
 
@@ -277,5 +296,16 @@ describe('validators (sanity)', () => {
   })
   it('shannon entropy is monotone', () => {
     expect(shannon('aaaaaaaa')).toBeLessThan(shannon('abcdefgh'))
+  })
+})
+
+describe('ML-only kinds (consumed by Privacy Filter)', () => {
+  it('person-name / street-address / date-of-birth are present in ORDER and LABEL maps', () => {
+    expect(SENSITIVE_KIND_ORDER).toContain('person-name')
+    expect(SENSITIVE_KIND_ORDER).toContain('street-address')
+    expect(SENSITIVE_KIND_ORDER).toContain('date-of-birth')
+    expect(SENSITIVE_KIND_LABEL['person-name']).toBe('Person name')
+    expect(SENSITIVE_KIND_LABEL['street-address']).toBe('Street address')
+    expect(SENSITIVE_KIND_LABEL['date-of-birth']).toBe('Date of birth')
   })
 })

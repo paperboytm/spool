@@ -66,4 +66,13 @@ describe('maskValueByKind', () => {
     expect(maskValueByKind('Maya', 'synthetic:author')).toBe('[redacted name]')
     expect(maskValueByKind('custom-blob', 'synthetic:manual')).toBe('[redacted]')
   })
+  it('person-name uses generic name mask', () => {
+    expect(maskValueByKind('John Smith', 'person-name')).toBe('[redacted name]')
+  })
+  it('street-address uses generic address mask', () => {
+    expect(maskValueByKind('123 Main St', 'street-address')).toBe('[redacted address]')
+  })
+  it('date-of-birth uses generic DOB mask', () => {
+    expect(maskValueByKind('1990-05-15', 'date-of-birth')).toBe('[redacted DOB]')
+  })
 })
