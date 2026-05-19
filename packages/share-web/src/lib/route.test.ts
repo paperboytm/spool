@@ -25,9 +25,44 @@ describe('routeFor', () => {
 
   it('falls through to tombstone for unknown paths', () => {
     expect(routeFor('/').kind).toBe('tombstone')
-    expect(routeFor('/me').kind).toBe('tombstone')
-    expect(routeFor('/@someone').kind).toBe('tombstone')
+    expect(routeFor('/random').kind).toBe('tombstone')
     expect(routeFor('/report').kind).toBe('tombstone')
+  })
+
+  it('matches /me as me', () => {
+    expect(routeFor('/me')).toEqual({ kind: 'me' })
+  })
+
+  it('matches /@<handle> as profile', () => {
+    expect(routeFor('/@alice')).toEqual({ kind: 'profile', handle: 'alice' })
+  })
+
+  it('lowercases the handle in /@<handle>', () => {
+    expect(routeFor('/@Alice')).toEqual({ kind: 'profile', handle: 'alice' })
+  })
+
+  it('rejects invalid handles (too short)', () => {
+    expect(routeFor('/@ab').kind).toBe('tombstone')
+  })
+
+  it('rejects invalid handles (illegal chars)', () => {
+    expect(routeFor('/@bad!!').kind).toBe('tombstone')
+  })
+
+  it('rejects handles that start with a digit', () => {
+    expect(routeFor('/@2bad').kind).toBe('tombstone')
+  })
+
+  it('matches /sign-in with sanitized next', () => {
+    expect(routeFor('/sign-in', '?next=/me')).toEqual({ kind: 'sign-in', next: '/me' })
+  })
+
+  it('matches /sign-in without next (default /)', () => {
+    expect(routeFor('/sign-in')).toEqual({ kind: 'sign-in', next: '/' })
+  })
+
+  it('sanitizes evil next on /sign-in', () => {
+    expect(routeFor('/sign-in', '?next=//evil.com')).toEqual({ kind: 'sign-in', next: '/' })
   })
 })
 

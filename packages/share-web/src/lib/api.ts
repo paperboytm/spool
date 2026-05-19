@@ -50,3 +50,173 @@ export async function fetchSnapshot(id: string): Promise<SnapshotFetchResult> {
   }
 }
 
+export interface ProfileShareSummary {
+  id: string
+  title: string
+  published_at: number
+  version: number
+}
+
+export interface ProfileResponse {
+  handle: string
+  name: string | null
+  avatar_url: string | null
+  shares: ProfileShareSummary[]
+}
+
+export type ProfileFetchResult =
+  | { kind: 'ok'; profile: ProfileResponse }
+  | { kind: 'not-found' }
+  | { kind: 'error' }
+
+export async function fetchProfile(handle: string): Promise<ProfileFetchResult> {
+  try {
+    const r = await fetch(`/api/profiles/${encodeURIComponent(handle)}`, {
+      headers: { accept: 'application/json' },
+    })
+    if (r.status === 200) {
+      const body = (await r.json()) as ProfileResponse
+      return { kind: 'ok', profile: body }
+    }
+    if (r.status === 404) return { kind: 'not-found' }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
+export interface MeResponse {
+  id: string
+  email: string
+  name: string | null
+  avatar_url: string | null
+  handle: string | null
+}
+
+export interface MeShareRow {
+  id: string
+  title: string
+  visibility: 'unlisted' | 'profile-listed'
+  expires_at: number | null
+  version: number
+  published_at: number
+  republished_at: number | null
+  revoked_at: number | null
+}
+
+export type MeFetchResult =
+  | { kind: 'ok'; me: MeResponse }
+  | { kind: 'unauthenticated' }
+  | { kind: 'forbidden' }
+  | { kind: 'error' }
+
+export async function fetchMe(): Promise<MeFetchResult> {
+  try {
+    const r = await fetch('/api/me', {
+      headers: { accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+    if (r.status === 200) return { kind: 'ok', me: (await r.json()) as MeResponse }
+    if (r.status === 401) return { kind: 'unauthenticated' }
+    if (r.status === 403) return { kind: 'forbidden' }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
+export async function fetchMyShares(): Promise<MeShareRow[]> {
+  const r = await fetch('/api/me/shares', {
+    headers: { accept: 'application/json' },
+    credentials: 'same-origin',
+  })
+  if (r.status !== 200) return []
+  const body = (await r.json()) as { items: MeShareRow[] }
+  return body.items ?? []
+}
+
+export async function revokeShare(id: string): Promise<boolean> {
+  try {
+    const r = await fetch(`/api/revoke/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export async function claimHandle(handle: string): Promise<
+  | { kind: 'ok'; handle: string }
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'taken' }
+  | { kind: 'rate-limited' }
+  | { kind: 'error' }
+> {
+  try {
+    const r = await fetch('/api/handles/claim', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ handle }),
+    })
+    if (r.status === 200) {
+      const body = (await r.json()) as { handle: string }
+      return { kind: 'ok', handle: body.handle }
+    }
+    if (r.status === 409) return { kind: 'taken' }
+    if (r.status === 422) {
+      const body = (await r.json().catch(() => null)) as { detail?: string } | null
+      return { kind: 'invalid', reason: body?.detail ?? 'Invalid handle.' }
+    }
+    if (r.status === 429) return { kind: 'rate-limited' }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
+export async function signOut(): Promise<boolean> {
+  try {
+    const r = await fetch('/api/auth/sign-out', {
+      method: 'POST',
+      credentials: 'same-origin',
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+export type DeleteAccountResult =
+  | { kind: 'ok'; scheduled_at: number }
+  | { kind: 'error' }
+
+export async function scheduleAccountDeletion(): Promise<DeleteAccountResult> {
+  try {
+    const r = await fetch('/api/me/delete', {
+      method: 'POST',
+      credentials: 'same-origin',
+    })
+    if (r.status === 200) {
+      const body = (await r.json()) as { scheduled_at: number }
+      return { kind: 'ok', scheduled_at: body.scheduled_at }
+    }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
+export async function cancelAccountDeletion(): Promise<boolean> {
+  try {
+    const r = await fetch('/api/me/delete', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
