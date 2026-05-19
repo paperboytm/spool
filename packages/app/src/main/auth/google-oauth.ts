@@ -1,6 +1,13 @@
 import { shell } from 'electron'
 import crypto from 'node:crypto'
+
+import { backendUrl } from '../share/backend-url.js'
+
 import { startLoopback } from './loopback-server.js'
+
+const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
+const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+const SCOPES = 'openid email profile'
 
 export interface SignInResult {
   session_token: string
@@ -21,8 +28,13 @@ function clientId(): string {
   return process.env['SPOOL_GOOGLE_CLIENT_ID_DESKTOP'] ?? ''
 }
 
-function backend(): string {
-  return process.env['SPOOL_SHARE_BACKEND'] ?? 'https://spool.share'
+async function readShortBody(res: Response): Promise<string> {
+  try {
+    const text = await res.text()
+    return text.length > 200 ? `${text.slice(0, 200)}…` : text
+  } catch {
+    return ''
+  }
 }
 
 export async function signInWithGoogle(): Promise<SignInResult> {
@@ -43,11 +55,11 @@ export async function signInWithGoogle(): Promise<SignInResult> {
 
   const loop = await startLoopback(state)
 
-  const auth = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+  const auth = new URL(AUTH_ENDPOINT)
   auth.searchParams.set('client_id', cid)
   auth.searchParams.set('redirect_uri', loop.redirectUri)
   auth.searchParams.set('response_type', 'code')
-  auth.searchParams.set('scope', 'openid email profile')
+  auth.searchParams.set('scope', SCOPES)
   auth.searchParams.set('code_challenge', challenge)
   auth.searchParams.set('code_challenge_method', 'S256')
   auth.searchParams.set('state', state)
@@ -65,19 +77,23 @@ export async function signInWithGoogle(): Promise<SignInResult> {
     code_verifier: verifier,
   })
   if (csecret) tokenBody.set('client_secret', csecret)
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+  const tokenRes = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: tokenBody,
   })
-  if (!tokenRes.ok) throw new Error(`token exchange ${tokenRes.status}`)
+  if (!tokenRes.ok) {
+    throw new Error(`token exchange ${tokenRes.status}: ${await readShortBody(tokenRes)}`)
+  }
   const tokens = (await tokenRes.json()) as { id_token: string }
 
-  const backendRes = await fetch(`${backend()}/api/auth/sign-in-with-id-token`, {
+  const backendRes = await fetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ id_token: tokens.id_token, nonce }),
   })
-  if (!backendRes.ok) throw new Error(`backend sign-in ${backendRes.status}`)
+  if (!backendRes.ok) {
+    throw new Error(`backend sign-in ${backendRes.status}: ${await readShortBody(backendRes)}`)
+  }
   return (await backendRes.json()) as SignInResult
 }

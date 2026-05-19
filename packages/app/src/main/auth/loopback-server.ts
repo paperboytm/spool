@@ -10,6 +10,8 @@ export interface LoopbackHandle {
   close: () => void
 }
 
+const DEFAULT_TIMEOUT_MS = 5 * 60_000
+
 // Browser landing after the OAuth redirect. Single self-contained HTML
 // (no network deps — the page sits at 127.0.0.1; remote stylesheets or
 // fonts would slow the page paint for zero benefit). Echoes the
@@ -136,7 +138,7 @@ const SUCCESS_PAGE = `<!doctype html>
 
 export async function startLoopback(
   expectedState: string,
-  timeoutMs = 5 * 60_000,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<LoopbackHandle> {
   let resolveFn!: (v: LoopbackResult) => void
   let rejectFn!: (e: Error) => void
@@ -180,7 +182,13 @@ export async function startLoopback(
     resolveFn({ code, state })
   })
 
-  await new Promise<void>((res) => server.listen(0, '127.0.0.1', () => res()))
+  await new Promise<void>((res, rej) => {
+    server.once('error', rej)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', rej)
+      res()
+    })
+  })
   const port = (server.address() as AddressInfo).port
 
   const timer = setTimeout(() => rejectFn(new Error('timeout')), timeoutMs)
