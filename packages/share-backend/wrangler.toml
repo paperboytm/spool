@@ -3,36 +3,44 @@ pages_build_output_dir = "public"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# NOTE: all `id` / `database_id` values below are placeholders.
-# Replace each one with the real ID from `wrangler d1/kv create` before
-# the first staging deploy. Do NOT deploy with these placeholders.
+# This file contains NO production resource IDs by design.
+#
+# For a Cloudflare Pages project, the runtime D1 / KV / R2 bindings
+# are configured per-project in the Cloudflare dashboard:
+#   Cloudflare → Workers & Pages → spool-share-backend → Settings →
+#   Functions → Bindings → add D1 / KV / R2 binding by name.
+#
+# Source of truth for production bindings is the dashboard, not this
+# file. Keep prod resource IDs out of the public repo — see
+# docs/runbooks/spool-share-launch.md §1 for the one-time setup.
+#
+# What this file controls:
+#   - Binding names that `functions/` reads via `ctx.env.*`
+#   - Migrations directory for `wrangler d1 migrations apply`
+#   - Bucket names (R2 — resource labels, not secrets)
+#
+# Local dev: `wrangler pages dev` ignores any id field below — it
+# emulates each binding with a throwaway file under `.wrangler/state/`.
+# No CF account required.
 
 [[d1_databases]]
 binding = "DB"
 database_name = "spool-share-db"
-# REPLACE before staging deploy: `wrangler d1 create spool-share-db`
-database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
+# database_id deliberately omitted; configured in Pages dashboard.
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-# REPLACE before staging deploy: `wrangler kv namespace create SESSIONS`
-id = "00000000000000000000000000000000"
+# id deliberately omitted; configured in Pages dashboard.
 
 [[kv_namespaces]]
 binding = "META"
-# REPLACE before staging deploy: `wrangler kv namespace create META`
-id = "00000000000000000000000000000000"
 
 [[kv_namespaces]]
 binding = "RATE"
-# REPLACE before staging deploy: `wrangler kv namespace create RATE`
-id = "00000000000000000000000000000000"
 
 [[kv_namespaces]]
 binding = "NONCE"
-# REPLACE before staging deploy: `wrangler kv namespace create NONCE`
-id = "00000000000000000000000000000000"
 
 [[r2_buckets]]
 binding = "SNAPSHOTS"
@@ -45,9 +53,13 @@ bucket_name = "spool-og"
 [vars]
 ENV = "development"
 
-# Secrets (set via `wrangler pages secret put` before staging deploy):
-#   GOOGLE_CLIENT_ID_DESKTOP
-#   GOOGLE_CLIENT_ID_WEB
-#   GOOGLE_CLIENT_SECRET_WEB
-#   SESSION_SIGNING_KEY
-#   ABUSE_NOTIFY_EMAIL
+# Secrets (set ONCE per environment via wrangler — never commit):
+#   wrangler pages secret put GOOGLE_CLIENT_ID_DESKTOP --project-name spool-share-backend
+#   wrangler pages secret put GOOGLE_CLIENT_ID_WEB     --project-name spool-share-backend
+#   wrangler pages secret put GOOGLE_CLIENT_SECRET_WEB --project-name spool-share-backend
+#   wrangler pages secret put SESSION_SIGNING_KEY      --project-name spool-share-backend
+#   wrangler pages secret put ADMIN_USER_IDS           --project-name spool-share-backend
+#
+# CF stores secret values encrypted at rest. Never echoed back through
+# wrangler, never available to local dev (use .dev.vars for that —
+# also gitignored).

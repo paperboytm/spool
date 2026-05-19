@@ -2,7 +2,7 @@
 -- Initial schema for spool-share-db. Mirrors §7 of the design spec
 -- (~/Documents/dev-docs/spool/2026-05-19-spool-share-publish-spec-update.md).
 --
--- Tables: users, handles, published_shares, audit_log, reports, deletion_queue.
+-- Tables: users, handles, published_shares, audit_log, deletion_queue.
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,                        -- nanoid(16)
@@ -15,7 +15,7 @@ CREATE TABLE users (
   deletion_pending_until INTEGER,             -- null when not pending
   deleted_at INTEGER                          -- soft delete marker
 );
-CREATE INDEX users_google_sub ON users(google_sub);
+-- google_sub already has an implicit unique index from the UNIQUE constraint above.
 
 CREATE TABLE handles (
   handle TEXT PRIMARY KEY,                    -- lowercase
@@ -76,18 +76,6 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX audit_user_ts ON audit_log(user_id, ts);
 CREATE INDEX audit_action_ts ON audit_log(action, ts);
-
-CREATE TABLE reports (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  share_id TEXT NOT NULL,
-  reporter_email TEXT,
-  reason TEXT NOT NULL,
-  details TEXT,
-  ip_hash TEXT NOT NULL,
-  ts INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'open',
-  resolved_at INTEGER
-);
 
 CREATE TABLE deletion_queue (
   user_id TEXT PRIMARY KEY REFERENCES users(id),
