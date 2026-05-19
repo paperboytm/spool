@@ -62,6 +62,7 @@ import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollaps
 import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import { registerShareAuthIpc } from './ipc/share-auth.js'
+import { registerSharePublishIpc } from './ipc/share-publish.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -715,6 +716,8 @@ app.whenReady().then(async () => {
 
   // Share-auth IPC (PKCE loopback OAuth + safeStorage session)
   registerShareAuthIpc()
+  // Share-publish IPC (publish / revoke / republish + handles)
+  registerSharePublishIpc()
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)

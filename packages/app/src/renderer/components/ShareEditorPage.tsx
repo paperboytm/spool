@@ -21,6 +21,8 @@ import PageLayout from './PageLayout.js'
 import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
 import { DownloadButton } from './share-editor/DownloadButton.js'
+import { PublishButton } from './share-editor/PublishButton.js'
+import { buildSnapshotFromEditor } from './share-editor/snapshot-adapter.js'
 import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
 import { useUndoableState } from '../hooks/useUndoableState.js'
@@ -459,6 +461,13 @@ export default function ShareEditorPage({
         />
       </div>
       <div className="flex-1" />
+      <PublishButton
+        draftId={draftId}
+        getSnapshot={() => buildSnapshotFromEditor({ conversation: liveConversation, opts })}
+        published={published}
+        hasUnpublishedEdits={hasUnpublishedEdits}
+        onPublishedChange={handlePublishedChange}
+      />
       <DownloadButton
         saving={saveState === 'saving'}
         onExport={(fmt) => {

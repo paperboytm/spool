@@ -405,16 +405,6 @@ const spoolShare = {
     ipcRenderer.invoke('share-publish:claim-handle', handle),
   checkHandle: (handle: string): Promise<HandleCheckResponse> =>
     ipcRenderer.invoke('share-publish:check-handle', handle),
-
-  cachedPublished: (): Promise<PublishedShareCacheItem[]> =>
-    ipcRenderer.invoke('share-publish:cached-published'),
-  cachePublished: (items: PublishedShareCacheItem[]): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('share-publish:cache-published', items),
-
-  scheduleDelete: (): Promise<ScheduleDeleteResponse> =>
-    ipcRenderer.invoke('share-publish:schedule-delete'),
-  cancelDelete: (): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('share-publish:cancel-delete'),
 }
 
 export type SpoolShareAPI = typeof spoolShare
