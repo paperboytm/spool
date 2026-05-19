@@ -36,6 +36,10 @@ export const securityApi = {
     window.spool.security.dismissFinding(findingId, scope),
   undismissFinding: (findingId: number) =>
     window.spool.security.undismissFinding(findingId),
+  purgeFinding: (findingId: number) =>
+    window.spool.security.purgeFinding(findingId),
+  purgeFindings: (findingIds: number[]) =>
+    window.spool.security.purgeFindings(findingIds),
   rescanAll: () => window.spool.security.rescanAll(),
   rescanSession: (sessionId: number) => window.spool.security.rescanSession(sessionId),
 

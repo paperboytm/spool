@@ -18,6 +18,7 @@ import { Trash2, X } from 'lucide-react'
 import type { Session, FindingRow } from '@spool-lab/core'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import { securityApi } from '../../api/security.js'
+import PurgeConfirmDialog from './PurgeConfirmDialog.js'
 
 // Info-tier kinds — high false-positive rate (paths, IPs, internal
 // hostnames). Excluded from the strip so the count + rows match the
@@ -36,6 +37,7 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0
   const low = Math.max(0, total - high)
+  const [purgePending, setPurgePending] = useState(false)
 
   const refresh = useCallback(async () => {
     const rows = await securityApi.listFindings({ sessionId: session.id, state: 'active' })
@@ -92,14 +94,10 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   if (!open) return null
 
   async function purgeAll() {
-    // TODO: swap for `securityApi.purgeFindings(ids)` when the purge
-    // PR lands. For now the bulk action removes the findings from the
-    // active list via a global dismiss — visually equivalent for the
-    // strip (rows drop out + counts update), but the raw values still
-    // sit in messages.content_text until #260 wires the real purge.
-    for (const f of visibleFindings) {
-      try { await securityApi.dismissFinding(f.id, 'global') } catch { /* keep going */ }
-    }
+    if (visibleFindings.length === 0) return
+    try {
+      await securityApi.purgeFindings(visibleFindings.map(f => f.id))
+    } catch { /* failure surfaces via onChange / refresh */ }
     await refresh()
   }
 
@@ -124,15 +122,24 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
           )}
           <span className="flex-1" />
           {visibleFindings.length > 0 && (
-            <button
-              type="button"
-              data-testid="strip-purge-all"
-              onClick={() => { void purgeAll() }}
-              className="text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded text-warm-text dark:text-dark-text hover:bg-accent/10 dark:hover:bg-accent-dark/15 transition-colors"
-            >
-              <Trash2 size={12} strokeWidth={1.75} aria-hidden />
-              Purge all
-            </button>
+            <>
+              <button
+                type="button"
+                data-testid="strip-purge-all"
+                onClick={() => setPurgePending(true)}
+                className="text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded text-warm-text dark:text-dark-text hover:bg-accent/10 dark:hover:bg-accent-dark/15 transition-colors"
+              >
+                <Trash2 size={12} strokeWidth={1.75} aria-hidden />
+                Purge all
+              </button>
+              <PurgeConfirmDialog
+                open={purgePending}
+                count={visibleFindings.length}
+                summary={summary.join(' · ')}
+                onConfirm={() => { setPurgePending(false); void purgeAll() }}
+                onCancel={() => setPurgePending(false)}
+              />
+            </>
           )}
           <button
             type="button"

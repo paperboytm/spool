@@ -227,6 +227,10 @@ const api = {
       ipcRenderer.invoke('security:dismiss-finding', { findingId, scope }),
     undismissFinding: (findingId: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:undismiss-finding', { findingId }),
+    purgeFinding: (findingId: number): Promise<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }> =>
+      ipcRenderer.invoke('security:purge-finding', findingId),
+    purgeFindings: (findingIds: number[]): Promise<Array<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }>> =>
+      ipcRenderer.invoke('security:purge-findings', findingIds),
     rescanAll: (): Promise<{ count: number }> =>
       ipcRenderer.invoke('security:rescan-all'),
     rescanSession: (sessionId: number): Promise<{ ok: boolean }> =>

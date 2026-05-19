@@ -5,15 +5,16 @@
 // per-finding Dismiss actions; bulk Purge ships when the purge PR
 // merges.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ChevronDown, ChevronRight, ShieldAlert, RotateCw } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, ShieldAlert, RotateCw, Trash2 } from 'lucide-react'
 import type {
   FindingRow,
   RiskByCategoryRow,
   SessionWithFindingCounts,
 } from '@spool-lab/core'
 import { securityApi } from '../api/security.js'
+import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 
 interface Props {
   onOpenSession: (sessionUuid: string) => void
@@ -364,11 +365,21 @@ function FindingRowView({
   onDismiss: (findingId: number, scope: 'session' | 'global') => void
 }) {
   const { t } = useTranslation()
+  const [purgePending, setPurgePending] = useState(false)
+
+  async function purge() {
+    setPurgePending(false)
+    try {
+      await securityApi.purgeFinding(finding.id)
+    } catch { /* surfaced via parent's debounced refresh on next event */ }
+  }
+
   return (
     <div
       data-testid="finding-row"
       data-finding-id={finding.id}
       data-kind={finding.kind}
+      data-state={finding.state}
       className="flex items-center gap-2 text-sm py-1"
     >
       <span className="font-mono text-xs text-warm-muted dark:text-dark-muted w-32 truncate">
@@ -400,6 +411,23 @@ function FindingRowView({
           >
             {t('security.dismissEverywhere', { defaultValue: 'Everywhere' })}
           </button>
+          <button
+            type="button"
+            data-testid="purge-button"
+            onClick={() => setPurgePending(true)}
+            className="text-xs px-2 py-0.5 rounded text-warm-accent dark:text-dark-accent hover:bg-warm-surface dark:hover:bg-dark-surface inline-flex items-center gap-1"
+            title="Purge from local archive"
+          >
+            <Trash2 size={11} strokeWidth={1.75} aria-hidden />
+            Purge
+          </button>
+          <PurgeConfirmDialog
+            open={purgePending}
+            count={1}
+            summary={finding.kind}
+            onConfirm={() => { void purge() }}
+            onCancel={() => setPurgePending(false)}
+          />
         </>
       ) : (
         <span className="inline-flex items-center gap-1 text-xs text-warm-muted dark:text-dark-muted">

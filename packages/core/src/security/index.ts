@@ -49,5 +49,8 @@ export type {
 export { scanSession, ScanError } from './scan.js'
 export type { ScanResult, ScanSessionDeps } from './scan.js'
 
+export { purgeFinding, purgeFindings, PurgeError } from './purge.js'
+export type { PurgeResult, PurgeDeps } from './purge.js'
+
 export { makeScanWorker, waitForIdle } from './worker.js'
 export type { ScanWorker, WorkerConfig } from './worker.js'

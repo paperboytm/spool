@@ -15,9 +15,12 @@ import {
   getFindingValues,
   dismissFinding,
   undismissFinding,
+  purgeFinding,
+  purgeFindings,
   type FindingFilter,
   type SessionFindingFilter,
   type ScanWorker,
+  type PurgeResult,
 } from '@spool-lab/core'
 import type Database from 'better-sqlite3'
 
@@ -35,6 +38,8 @@ export const SECURITY_IPC_CHANNELS = {
   // mutations
   DISMISS_FINDING:             'security:dismiss-finding',
   UNDISMISS_FINDING:           'security:undismiss-finding',
+  PURGE_FINDING:               'security:purge-finding',
+  PURGE_FINDINGS:              'security:purge-findings',
   RESCAN_ALL:                  'security:rescan-all',
   RESCAN_SESSION:              'security:rescan-session',
 
@@ -92,6 +97,22 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
       return { ok: true }
     },
   )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDING, async (_e, findingId: number) => {
+    const publish = (change: Parameters<NonNullable<typeof getMainWindow extends () => infer R ? R : never>['webContents']['send']>[1]) =>
+      Effect.sync(() => {
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
+      })
+    const result = await runPromise(purgeFinding(findingId, { db, publish: publish as never })) as PurgeResult
+    return result
+  })
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDINGS, async (_e, findingIds: number[]) => {
+    const publish = (change: unknown) =>
+      Effect.sync(() => {
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
+      })
+    const results = await runPromise(purgeFindings(findingIds, { db, publish: publish as never })) as PurgeResult[]
+    return results
+  })
   ipcMain.handle(SECURITY_IPC_CHANNELS.RESCAN_ALL, () =>
     runPromise(worker.rescanAll()).then((count) => ({ count })),
   )

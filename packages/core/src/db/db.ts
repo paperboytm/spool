@@ -181,6 +181,7 @@ export function runMigrations(db: Database.Database): void {
 
   db.exec(`
     DROP TRIGGER IF EXISTS messages_fts_insert;
+    DROP TRIGGER IF EXISTS messages_fts_update;
     DROP TRIGGER IF EXISTS messages_fts_delete;
     DROP TRIGGER IF EXISTS session_search_fts_insert;
     DROP TRIGGER IF EXISTS session_search_fts_update;
@@ -190,6 +191,23 @@ export function runMigrations(db: Database.Database): void {
     AFTER INSERT ON messages BEGIN
       INSERT INTO messages_fts(rowid, content_text)
         VALUES(NEW.id, NEW.content_text);
+      INSERT INTO messages_fts_trigram(rowid, content_text)
+        VALUES(NEW.id, NEW.content_text);
+    END;
+
+    -- Security Scan's Purge action UPDATEs messages.content_text in
+    -- place. FTS external-content tables don't auto-sync on UPDATE —
+    -- we issue the 'delete' command for the old text and re-insert
+    -- the new. Without this trigger the FTS index keeps matching the
+    -- raw value after Purge, defeating the threat-model goal.
+    CREATE TRIGGER messages_fts_update
+    AFTER UPDATE OF content_text ON messages BEGIN
+      INSERT INTO messages_fts(messages_fts, rowid, content_text)
+        VALUES('delete', OLD.id, OLD.content_text);
+      INSERT INTO messages_fts(rowid, content_text)
+        VALUES(NEW.id, NEW.content_text);
+      INSERT INTO messages_fts_trigram(messages_fts_trigram, rowid, content_text)
+        VALUES('delete', OLD.id, OLD.content_text);
       INSERT INTO messages_fts_trigram(rowid, content_text)
         VALUES(NEW.id, NEW.content_text);
     END;
