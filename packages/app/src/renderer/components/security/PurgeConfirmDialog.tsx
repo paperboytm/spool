@@ -8,6 +8,13 @@ import { AlertTriangle, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef } from 'react'
 
+interface BulkSample {
+  /** Raw value being rewritten (may be truncated by caller). */
+  value: string
+  /** Session title for the sample row's right-hand label. */
+  sessionTitle: string
+}
+
 interface Props {
   open: boolean
   count: number
@@ -17,6 +24,9 @@ interface Props {
   before?: string
   /** True for the bulk variant — different copy + samples. */
   bulk?: boolean
+  /** Up to 4 sample rows shown in the bulk variant; the rest collapse into
+   *  a "+ N more" footer. Optional — the modal still renders without them. */
+  bulkSamples?: BulkSample[]
   onConfirm: () => void
   onCancel: () => void
 }
@@ -27,6 +37,7 @@ export default function PurgeConfirmDialog({
   kind,
   before,
   bulk,
+  bulkSamples,
   onConfirm,
   onCancel,
 }: Props) {
@@ -59,7 +70,7 @@ export default function PurgeConfirmDialog({
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div
-        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[460px] max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border"
+        className={`bg-warm-bg dark:bg-dark-bg rounded-[10px] ${bulk ? 'w-[520px]' : 'w-[460px]'} max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border`}
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
         <div className="px-6 pt-5 pb-4">
@@ -108,6 +119,31 @@ export default function PurgeConfirmDialog({
               variant="after"
             />
           </div>
+
+          {bulk && bulkSamples && bulkSamples.length > 0 && (
+            <div className="mt-4">
+              <div className="text-[11px] font-semibold leading-[14px] text-warm-muted dark:text-dark-muted mb-2">
+                {t('security.purge_bulk_samples_label', { defaultValue: 'Sample of values that will be rewritten' })}
+              </div>
+              <ul className="list-none m-0 p-0 grid gap-1">
+                {bulkSamples.slice(0, 4).map((s, i) => (
+                  <li
+                    key={i}
+                    className="grid gap-3 font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted"
+                    style={{ gridTemplateColumns: '1fr auto' }}
+                  >
+                    <span className="truncate text-warm-text dark:text-dark-text">{s.value}</span>
+                    <span className="truncate text-warm-faint dark:text-dark-muted max-w-[200px]">{s.sessionTitle}</span>
+                  </li>
+                ))}
+                {count > 4 && (
+                  <li className="font-mono text-[11px] tabular-nums text-warm-faint dark:text-dark-muted mt-0.5">
+                    {t('security.purge_bulk_samples_more', { count: count - 4, defaultValue: '+ {{count}} more' })}
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
 
           <div className="mt-3.5 flex flex-col gap-1.5">
             <Fact>

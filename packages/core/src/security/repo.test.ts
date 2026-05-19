@@ -112,11 +112,11 @@ describe('repo: list + filter', () => {
       .toEqual(['email'])
   })
 
-  it('riskByCategory excludes dismissed and orders by count', () => {
+  it('riskByCategory excludes dismissed, orders by count, and reports distinct sessions', () => {
     const cats = riskByCategory(db)
     expect(cats).toEqual([
-      { kind: 'api-key', severity: 'high', count: 2 },
-      { kind: 'email',   severity: 'low',  count: 1 },
+      { kind: 'api-key', severity: 'high', count: 2, sessions: 2 },
+      { kind: 'email',   severity: 'low',  count: 1, sessions: 1 },
     ])
   })
 
