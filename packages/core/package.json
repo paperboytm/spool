@@ -28,9 +28,11 @@
   },
   "dependencies": {
     "@spool-lab/redact": "workspace:*",
-    "better-sqlite3": "^11.10.0"
+    "better-sqlite3": "^11.10.0",
+    "effect": "^3.21.2"
   },
   "devDependencies": {
+    "@effect/vitest": "^0.29.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.17",
     "vitest": "^3.2.4"

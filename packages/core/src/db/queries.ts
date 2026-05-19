@@ -224,6 +224,8 @@ export const SESSION_SELECT = `
     s.title, s.started_at AS startedAt, s.ended_at AS endedAt,
     s.message_count AS messageCount, s.has_tool_use AS hasToolUse,
     s.cwd, s.model,
+    s.scan_finding_count AS scanFindingCount,
+    s.scan_high_count    AS scanHighCount,
     src.name AS source,
     p.display_path AS projectDisplayPath,
     p.display_name AS projectDisplayName
@@ -993,6 +995,8 @@ export function rowToSession(r: Record<string, unknown>): Session {
     source: r['source'] as SessionSource,
     projectDisplayPath: r['projectDisplayPath'] as string,
     projectDisplayName: r['projectDisplayName'] as string,
+    scanFindingCount: (r['scanFindingCount'] as number | null) ?? 0,
+    scanHighCount: (r['scanHighCount'] as number | null) ?? 0,
   }
 }
 

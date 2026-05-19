@@ -4,6 +4,8 @@ import type {
   ListSessionsByIdentityOptions, ProjectSessionSortOrder, SessionsCursor, SessionsPage, DirectoryCount,
   ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
   SessionSource,
+  FindingRow, SessionWithFindingCounts, RiskByCategoryRow,
+  FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
 } from '@spool-lab/core'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
@@ -206,6 +208,31 @@ const api = {
 
   printToPdf: (html: string, widthPx: number, heightPx: number): Promise<Uint8Array> =>
     ipcRenderer.invoke('spool:print-to-pdf', { html, widthPx, heightPx }),
+
+  // Security Scan — query surface. Mutations (dismiss, purge, rescan)
+  // arrive in later PRs.
+  security: {
+    listFindings: (filter: FindingFilter): Promise<FindingRow[]> =>
+      ipcRenderer.invoke('security:list-findings', filter),
+    listSessionsWithFindings: (filter: SessionFindingFilter): Promise<SessionWithFindingCounts[]> =>
+      ipcRenderer.invoke('security:list-sessions-with-findings', filter),
+    riskByCategory: (): Promise<RiskByCategoryRow[]> =>
+      ipcRenderer.invoke('security:risk-by-category'),
+    getFindingValue: (findingId: number): Promise<string | null> =>
+      ipcRenderer.invoke('security:get-finding-value', findingId),
+    getScanStatus: (): Promise<ScanStatus> =>
+      ipcRenderer.invoke('security:get-scan-status'),
+    onFindingsChanged: (cb: (change: FindingsChange) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as FindingsChange)
+      ipcRenderer.on('security:evt-findings-changed', handler)
+      return () => ipcRenderer.removeListener('security:evt-findings-changed', handler)
+    },
+    onScanStatus: (cb: (status: ScanStatus) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as ScanStatus)
+      ipcRenderer.on('security:evt-scan-status', handler)
+      return () => ipcRenderer.removeListener('security:evt-scan-status', handler)
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('spool', api)

@@ -40,3 +40,11 @@ export function useFeature(flag: LabsFlag): boolean {
     () => resolveFeatureRuntime(flag),
   )
 }
+
+// Security Scan is intentionally NOT in the LabsFlag union — we don't
+// want users opting into it manually until the worker + UI surfaces
+// ship. Resolution: dev → true; prod → true only when release.sh sets
+// VITE_FEATURE_SECURITY. No Labs override.
+export function securityFeatureEnabled(deps: Pick<FeatureRuntimeDeps, 'dev' | 'envEnabled'> = defaultDeps): boolean {
+  return deps.dev || deps.envEnabled('SECURITY')
+}

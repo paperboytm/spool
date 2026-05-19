@@ -29,14 +29,27 @@ export interface SyncProgressEvent {
 
 export type SyncEventCallback = (event: SyncProgressEvent) => void
 
+/** Fired after `syncFile` commits a session's messages. Consumers
+ *  (the scan worker hookup in main process) invalidate the session's
+ *  scan_profile and re-enqueue it — necessary because offsets in
+ *  the findings table point into the now-mutated `messages.content_text`.
+ *  Receives the sessions.id, NOT the session_uuid. */
+export type SessionChangedCallback = (sessionId: number) => void
+
 export class Syncer {
   private db: Database.Database
   private onProgress: SyncEventCallback | undefined
+  private onSessionChanged: SessionChangedCallback | undefined
   private codexTitleIndex: Map<string, string> = new Map()
 
-  constructor(db: Database.Database, onProgress?: SyncEventCallback) {
+  constructor(
+    db: Database.Database,
+    onProgress?: SyncEventCallback,
+    onSessionChanged?: SessionChangedCallback,
+  ) {
     this.db = db
     this.onProgress = onProgress
+    this.onSessionChanged = onSessionChanged
   }
 
   syncAll(): SyncResult {
@@ -187,6 +200,7 @@ export class Syncer {
       const isNew = existingMtime === null
       const hasToolUse = parsed.messages.some(m => m.toolNames.length > 0)
 
+      let committedSessionId: number | null = null
       this.db.transaction(() => {
         const sessionId = upsertSession(this.db, {
           projectId,
@@ -211,11 +225,24 @@ export class Syncer {
           assistantText: buildSessionSearchText(parsed.messages, 'assistant'),
         })
 
+        // Security Scan cascade: messages.content_text changed, so any
+        // existing findings now have stale offsets. Drop scan_profile
+        // inside the same transaction so a crash between here and the
+        // worker re-enqueue still leaves the session in "needs scan".
+        this.db.prepare(
+          `UPDATE sessions SET scan_profile = NULL, scan_completed_at = NULL WHERE id = ?`,
+        ).run(sessionId)
+
         this.db.prepare(`
           INSERT INTO sync_log (source_id, file_path, status)
           VALUES (?, ?, 'ok')
         `).run(sourceId, filePath)
+        committedSessionId = sessionId
       })()
+
+      if (committedSessionId !== null && this.onSessionChanged) {
+        try { this.onSessionChanged(committedSessionId) } catch { /* swallow callback errors */ }
+      }
       return isNew ? 'added' : 'updated'
     } catch (err) {
       try {

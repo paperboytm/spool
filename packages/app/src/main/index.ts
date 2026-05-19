@@ -33,7 +33,12 @@ import {
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
+  makeScanWorker, currentProfileString, invalidateSessionScanProfile,
+  type ScanWorker,
 } from '@spool-lab/core'
+import { Effect, Scope, Exit } from 'effect'
+import { regexProvider } from '@spool-lab/redact'
+import { registerSecurityIpc } from './ipc/security.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
@@ -86,6 +91,9 @@ let syncer: Syncer
 let watcher: SpoolWatcher
 let acpManager: AcpManager
 let isSyncActive = false
+let scanWorker: ScanWorker | null = null
+let scanWorkerScope: Scope.CloseableScope | null = null
+let disposeSecurityIpc: (() => void) | null = null
 
 type CachedSearchValue = FragmentResult[]
 
@@ -123,6 +131,43 @@ class SearchCache {
 }
 
 const searchCache = new SearchCache()
+
+async function bootScanWorker(): Promise<void> {
+  try {
+    const scope = await Effect.runPromise(Scope.make())
+    scanWorkerScope = scope
+    const worker = await Effect.runPromise(
+      Effect.provideService(
+        makeScanWorker({
+          db,
+          providers: [regexProvider],
+          currentProfile: currentProfileString(),
+          providerNames: ['regex'],
+        }),
+        Scope.Scope,
+        scope,
+      ),
+    )
+    scanWorker = worker
+  } catch (err) {
+    console.error('[security] scan worker failed to boot:', err)
+    scanWorker = null
+  }
+}
+
+async function shutdownScanWorker(): Promise<void> {
+  if (disposeSecurityIpc) {
+    try { disposeSecurityIpc() } catch { /* best effort */ }
+    disposeSecurityIpc = null
+  }
+  if (scanWorkerScope) {
+    try {
+      await Effect.runPromise(Scope.close(scanWorkerScope, Exit.void))
+    } catch { /* best effort */ }
+    scanWorkerScope = null
+    scanWorker = null
+  }
+}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -245,7 +290,18 @@ app.whenReady().then(async () => {
 
   db = getDB()
   acpManager = new AcpManager()
-  syncer = new Syncer(db)
+
+  // Bring up the Security Scan worker before the syncer so the syncer
+  // cascade callback already has somewhere to send invalidations.
+  await bootScanWorker()
+
+  syncer = new Syncer(db, undefined, (sessionId) => {
+    // Sync mutated this session's messages; existing findings now have
+    // stale offsets. The Syncer already nulled scan_profile inside the
+    // commit txn; here we just re-enqueue so the worker picks it up.
+    invalidateSessionScanProfile(db, sessionId)
+    if (scanWorker) Effect.runFork(scanWorker.enqueue(sessionId))
+  })
   watcher = new SpoolWatcher(syncer)
   watcher.on('new-sessions', (_event, data) => {
     searchCache.clear()
@@ -263,6 +319,19 @@ app.whenReady().then(async () => {
   })
 
   mainWindow = createWindow()
+
+  // Register Security Scan IPC + start the first backfill in the
+  // background. Both are no-ops until `scanWorker` is set above; if
+  // the worker boot above failed we silently skip wiring.
+  if (scanWorker) {
+    disposeSecurityIpc = registerSecurityIpc({
+      db,
+      worker: scanWorker,
+      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+      getMainWindow: () => mainWindow,
+    })
+    Effect.runFork(scanWorker.backfill())
+  }
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)
@@ -303,6 +372,17 @@ app.on('window-all-closed', () => {
   }
   // On macOS, keep app running in tray
   app.dock?.hide()
+})
+
+app.on('before-quit', (event) => {
+  // Tear down the scan worker scope (interrupts the drain fiber) before
+  // Electron releases the database.
+  if (scanWorkerScope) {
+    event.preventDefault()
+    shutdownScanWorker()
+      .catch((err) => { console.error('[security] shutdown failed:', err) })
+      .finally(() => { app.exit(0) })
+  }
 })
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────

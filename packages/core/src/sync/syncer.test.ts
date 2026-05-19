@@ -212,6 +212,57 @@ describe('Syncer', () => {
     ).get(rows[0]!.id) as { n: number }
     expect(sessionCount.n).toBe(2)
   })
+
+  it('Security Scan cascade: a message-mutating sync clears scan_profile and fires onSessionChanged', async () => {
+    const baseDir = makeTempDir('spool-syncer-scan-cascade-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'cascade.jsonl')
+    const writeJsonl = (suffix: string) =>
+      writeFileSync(filePath, [
+        JSON.stringify({
+          type: 'user',
+          sessionId: 'cascade-session-1',
+          cwd: '/tmp/test-project',
+          uuid: 'u1',
+          timestamp: '2026-05-01T00:00:00Z',
+          message: { role: 'user', content: `hello ${suffix}` },
+        }),
+      ].join('\n'))
+    writeJsonl('first')
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+
+    // First sync — session inserted with default scan_profile = NULL.
+    let firstSyncer = new Syncer(db)
+    expect(firstSyncer.syncFile(filePath, 'claude')).toBe('added')
+
+    // Pretend the scan worker has finished a scan, so scan_profile is set.
+    db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE session_uuid = ?")
+      .run('cascade-session-1')
+
+    // Mutate the source file's mtime so syncFile re-processes.
+    touchFile(filePath)
+    writeJsonl('second-with-new-content')
+    touchFile(filePath)
+
+    const changed: number[] = []
+    const cascadingSyncer = new Syncer(db, undefined, (id) => { changed.push(id) })
+    expect(cascadingSyncer.syncFile(filePath, 'claude')).toBe('updated')
+
+    const row = db.prepare(
+      'SELECT id, scan_profile, scan_completed_at FROM sessions WHERE session_uuid = ?',
+    ).get('cascade-session-1') as { id: number; scan_profile: string | null; scan_completed_at: string | null }
+    expect(row.scan_profile).toBeNull()
+    expect(row.scan_completed_at).toBeNull()
+    expect(changed).toEqual([row.id])
+  })
 })
 
 async function loadCoreModules() {

@@ -46,6 +46,12 @@ export interface Session {
   source: SessionSource
   projectDisplayPath: string
   projectDisplayName: string
+  /** Denormalised count of active findings (any severity) for this
+   *  session. 0 when the session has been scanned and is clean, or
+   *  when scan has not yet run on it. Drives the Library row badge. */
+  scanFindingCount: number
+  /** Subset of scanFindingCount limited to HIGH_SEVERITY_KINDS. */
+  scanHighCount: number
 }
 
 export type ProjectIdentityKind =

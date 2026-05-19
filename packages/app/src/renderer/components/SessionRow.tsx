@@ -1,12 +1,14 @@
+import type React from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, AlertTriangle } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
 import { formatRelativeDate, type BucketKey } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
+import { securityFeatureEnabled } from '../featureFlags.js'
 
 type Props = {
   session: Session
@@ -74,6 +76,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
           <span className="text-sm font-medium text-warm-text dark:text-dark-text truncate">
             {title}
           </span>
+          <SecurityBadge session={session} />
         </div>
         <p className="pl-1.5 text-xs text-warm-faint dark:text-dark-muted truncate">
           {showProject && (
@@ -146,6 +149,49 @@ export default function SessionRow({ session, pinned = false, showProject = fals
         </span>
       </div>
     </div>
+  )
+}
+
+function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
+  if (!securityFeatureEnabled()) return null
+  const high = session.scanHighCount ?? 0
+  const total = session.scanFindingCount ?? 0
+  if (total === 0) return null
+  const low = Math.max(0, total - high)
+  const tooltip = high > 0
+    ? `${high} high-risk · ${low} low`
+    : `${total} low-risk finding${total === 1 ? '' : 's'}`
+  if (high > 0) {
+    return (
+      <span
+        data-testid="security-badge"
+        data-severity="high"
+        title={tooltip}
+        aria-label={tooltip}
+        className="flex-none inline-flex items-center justify-center"
+      >
+        <AlertTriangle
+          size={16}
+          strokeWidth={1.6}
+          className="text-warm-accent dark:text-dark-accent"
+          aria-hidden
+        />
+      </span>
+    )
+  }
+  return (
+    <span
+      data-testid="security-badge"
+      data-severity="low"
+      title={tooltip}
+      aria-label={tooltip}
+      className="flex-none inline-flex items-center justify-center"
+    >
+      <span
+        className="block w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted"
+        aria-hidden
+      />
+    </span>
   )
 }
 
