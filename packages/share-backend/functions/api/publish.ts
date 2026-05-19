@@ -8,6 +8,7 @@ import type {
 import { audit } from '../../src/audit'
 import { requireUser } from '../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../src/errors'
+import { renderOgPng } from '../../src/publish/og'
 import { isValidSlug, nanoidSlug } from '../../src/publish/slug'
 import { PublishRequest } from '../../src/publish/validators'
 import { publicBaseUrl } from '../../src/public-url'
@@ -19,6 +20,7 @@ type Env = {
   META: KVNamespace
   RATE: KVNamespace
   SNAPSHOTS: R2Bucket
+  OG: R2Bucket
   // Origin returned in the published share URL. Dev points this at the
   // local share-web vite server; prod defaults to spool.pro.
   PUBLIC_BASE_URL?: string
@@ -287,6 +289,17 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     await ctx.env.SNAPSHOTS.put(`${slug}.json`, JSON.stringify(fullSnap), {
       httpMetadata: { contentType: 'application/json' },
     })
+
+    ctx.waitUntil((async () => {
+      try {
+        const png = await renderOgPng(fullSnap)
+        await ctx.env.OG.put(`${slug}.png`, png, {
+          httpMetadata: { contentType: 'image/png' },
+        })
+      } catch {
+        // OG is non-critical; swallow.
+      }
+    })())
 
     return jsonOk({
       id: slug,

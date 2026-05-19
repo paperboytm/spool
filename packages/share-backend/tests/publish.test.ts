@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
 
 import { onRequestPost as publishPost } from '../functions/api/publish'
@@ -9,6 +9,16 @@ import { isValidSlug, nanoidSlug } from '../src/publish/slug'
 
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
+
+// Mock workers-og so publish.ts (which imports renderOgPng → workers-og)
+// can be exercised in node without loading Satori/wasm.
+vi.mock('workers-og', () => ({
+  ImageResponse: vi.fn().mockImplementation(() => ({
+    async arrayBuffer() {
+      return new Uint8Array([137, 80, 78, 71]).buffer
+    },
+  })),
+}))
 
 const TOKEN = 'p'.repeat(40)
 

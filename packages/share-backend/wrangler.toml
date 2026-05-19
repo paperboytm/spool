@@ -53,6 +53,13 @@ bucket_name = "spool-og"
 [vars]
 ENV = "development"
 
+# Cron trigger for the deletion sweep. Pages Functions ignore this in
+# the Pages runtime — the deletion worker is intended to run as a
+# companion Worker (functions/_scheduled/deletion-worker.ts) sharing the
+# same D1/KV/R2 bindings. Kept here for documentation.
+[triggers]
+crons = ["0 */6 * * *"]
+
 # Secrets (set ONCE per environment via wrangler — never commit):
 #   wrangler pages secret put GOOGLE_CLIENT_ID_DESKTOP --project-name spool-share-backend
 #   wrangler pages secret put GOOGLE_CLIENT_ID_WEB     --project-name spool-share-backend

@@ -14,6 +14,7 @@
     "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --env production"
   },
   "dependencies": {
+    "workers-og": "^0.0.27",
     "zod": "^4.3.6"
   },
   "devDependencies": {
