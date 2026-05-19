@@ -448,16 +448,15 @@ describe('POST /api/me/delete', () => {
 })
 
 describe('DELETE /api/me/delete', () => {
-  it('clears pending and marks queue row cancelled', async () => {
+  it('clears pending and marks queue row cancelled even while deletion is pending', async () => {
     const { onRequestDelete } = await import('../functions/api/me/delete')
     const env = envFor()
-    // requireUser blocks users with deletion_pending_until set, so we test
-    // the cancel path with a user whose flag was already cleared elsewhere
-    // (this mirrors the documented limitation of the helper).
     seedUser(env.state)
+    const pendingUntil = Date.now() + 12 * 3600 * 1000
+    env.state.users[0]!.deletion_pending_until = pendingUntil
     env.state.deletion_queue.push({
       user_id: 'user-1',
-      scheduled_at: Date.now() + 1000,
+      scheduled_at: pendingUntil,
       cancelled: 0,
     })
     await seedSession(env.SESSIONS, TOKEN, 'user-1')

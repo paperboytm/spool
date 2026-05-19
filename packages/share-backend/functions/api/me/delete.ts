@@ -35,7 +35,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
 export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   try {
-    const user = await requireUser(ctx.request, ctx.env)
+    const user = await requireUser(ctx.request, ctx.env, { allowPendingDeletion: true })
     await ctx.env.DB
       .prepare('UPDATE users SET deletion_pending_until=NULL WHERE id=?')
       .bind(user.id)
