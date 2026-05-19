@@ -2,7 +2,7 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 
 import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
-import { ApiError, jsonError } from '../../../src/errors'
+import { ApiError, jsonError, jsonOk } from '../../../src/errors'
 import { validateHandle } from '../../../src/handles'
 import { checkRate } from '../../../src/rate-limit'
 
@@ -23,18 +23,19 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const v = validateHandle(body?.handle ?? '')
     if (!v.ok) throw new ApiError('UNPROCESSABLE', v.reason)
 
-    const existing = await ctx.env.DB
-      .prepare('SELECT user_id FROM handles WHERE handle=? AND released_at IS NULL')
-      .bind(v.handle)
-      .first<{ user_id: string }>()
+    const [existing, prior] = await Promise.all([
+      ctx.env.DB
+        .prepare('SELECT user_id FROM handles WHERE handle=? AND released_at IS NULL')
+        .bind(v.handle)
+        .first<{ user_id: string }>(),
+      ctx.env.DB
+        .prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
+        .bind(user.id)
+        .first<{ handle: string }>(),
+    ])
     if (existing && existing.user_id !== user.id) {
       throw new ApiError('CONFLICT', 'handle taken')
     }
-
-    const prior = await ctx.env.DB
-      .prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
-      .bind(user.id)
-      .first<{ handle: string }>()
     if (prior && prior.handle !== v.handle) {
       throw new ApiError('CONFLICT', 'user already has a handle')
     }
@@ -51,10 +52,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       action: 'handle.claim',
       target_id: v.handle,
     })
-    return new Response(
-      JSON.stringify({ handle: v.handle }),
-      { headers: { 'content-type': 'application/json' } },
-    )
+    return jsonOk({ handle: v.handle })
   } catch (e) {
     return jsonError(e)
   }

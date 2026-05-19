@@ -1,7 +1,7 @@
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
 import { requireUser } from '../../../src/auth/require'
-import { jsonError } from '../../../src/errors'
+import { jsonError, jsonOk } from '../../../src/errors'
 
 type Env = { DB: D1Database; SESSIONS: KVNamespace }
 
@@ -15,10 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       )
       .bind(user.id)
       .all()
-    return new Response(
-      JSON.stringify({ items: rows.results }),
-      { headers: { 'content-type': 'application/json' } },
-    )
+    return jsonOk({ items: rows.results })
   } catch (e) {
     return jsonError(e)
   }

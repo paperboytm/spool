@@ -19,6 +19,12 @@ export class ApiError extends Error {
   }
 }
 
+export function jsonOk(body: unknown, init?: ResponseInit): Response {
+  const headers = new Headers(init?.headers)
+  headers.set('content-type', 'application/json')
+  return new Response(JSON.stringify(body), { ...init, headers })
+}
+
 export function jsonError(e: unknown): Response {
   const err = e instanceof ApiError ? e : new ApiError('INTERNAL', 'unexpected')
   return new Response(

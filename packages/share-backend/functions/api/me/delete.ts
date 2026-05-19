@@ -2,7 +2,7 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 
 import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
-import { jsonError } from '../../../src/errors'
+import { jsonError, jsonOk } from '../../../src/errors'
 
 type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace }
 
@@ -24,10 +24,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       user_id: user.id,
       action: 'account.delete.scheduled',
     })
-    return new Response(
-      JSON.stringify({ scheduled_at: until }),
-      { headers: { 'content-type': 'application/json' } },
-    )
+    return jsonOk({ scheduled_at: until })
   } catch (e) {
     return jsonError(e)
   }
@@ -48,9 +45,7 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
       user_id: user.id,
       action: 'account.delete.cancel',
     })
-    return new Response('{"cancelled":true}', {
-      headers: { 'content-type': 'application/json' },
-    })
+    return jsonOk({ cancelled: true })
   } catch (e) {
     return jsonError(e)
   }
