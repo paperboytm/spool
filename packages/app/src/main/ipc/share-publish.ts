@@ -1,4 +1,13 @@
 import { ipcMain } from 'electron'
+import {
+  getDB,
+  getByDraftId as getCachedByDraftId,
+  listAll as listCachedPublished,
+  markRevoked as markCachedRevoked,
+  replaceAll as replaceCachedPublished,
+  upsertMany as upsertCachedPublished,
+  type PublishedShareCacheItem,
+} from '@spool-lab/core'
 import { authedFetch } from '../share/api-client.js'
 import type {
   PublishRequestBody,
@@ -7,6 +16,7 @@ import type {
   MySharesResponse,
   HandleCheckResponse,
   HandleClaimResponse,
+  ScheduleDeleteResponse,
 } from '../../shared/share-publish.js'
 
 async function readBody(res: Response): Promise<Record<string, unknown>> {
@@ -118,5 +128,29 @@ export function registerSharePublishIpc(): void {
     const r = await authedFetch(`/api/handles/check?h=${encodeURIComponent(handle)}`)
     if (!r.ok) throw new Error(`check ${r.status}`)
     return (await r.json()) as HandleCheckResponse
+  })
+
+  ipcMain.handle('share-publish:cached-published', (): PublishedShareCacheItem[] => {
+    return listCachedPublished(getDB())
+  })
+
+  ipcMain.handle(
+    'share-publish:cache-published',
+    (_e, items: PublishedShareCacheItem[]): { ok: true } => {
+      replaceCachedPublished(getDB(), items)
+      return { ok: true }
+    },
+  )
+
+  ipcMain.handle('share-publish:schedule-delete', async (): Promise<ScheduleDeleteResponse> => {
+    const r = await authedFetch('/api/me/delete', { method: 'POST' })
+    if (!r.ok) throw new Error(`schedule-delete ${r.status}`)
+    return (await r.json()) as ScheduleDeleteResponse
+  })
+
+  ipcMain.handle('share-publish:cancel-delete', async (): Promise<{ ok: true }> => {
+    const r = await authedFetch('/api/me/delete', { method: 'DELETE' })
+    if (!r.ok) throw new Error(`cancel-delete ${r.status}`)
+    return { ok: true }
   })
 }

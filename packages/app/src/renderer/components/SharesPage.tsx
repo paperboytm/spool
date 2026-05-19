@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Newspaper, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, EyeOff, Link as LinkIcon, Loader2, Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getMonthDayFormatter } from '../../shared/formatDate.js'
 import { useShareDrafts } from '../hooks/useShareDrafts'
+import { useShareAuth } from '../hooks/useShareAuth.js'
+import { usePublishedShares } from '../hooks/usePublishedShares.js'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { sharePublicOrigin, sharePublicUrl } from '../lib/sharePublicUrl.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
 import NewDraftPicker from './NewDraftPicker.js'
-import type { ShareDraftListItem } from '@spool-lab/core'
+import type { PublishedShareCacheItem, ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
   TEMPLATE_RATIO,
@@ -24,17 +26,14 @@ type Props = {
   onStartNewDraft?: ((sessionUuid: string) => void | Promise<void>) | undefined
 }
 
-/**
- * The Drafts / Published tab strip is intentionally not rendered yet:
- * Phase 0 only has Drafts, and showing a Published tab that maps to a
- * "Coming in a future update" placeholder reads as a broken promise.
- * The tab strip lands in Phase 2 alongside the actual publish flow.
- */
+type SharesTab = 'drafts' | 'published'
+
 export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft }: Props) {
   const { t } = useTranslation()
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [tab, setTab] = useState<SharesTab>('drafts')
 
   const handleOpenPicker = useCallback(() => setPickerOpen(true), [])
   const handleClosePicker = useCallback(() => setPickerOpen(false), [])
@@ -84,39 +83,261 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
   return (
     <div data-testid="shares-page" className="relative flex flex-col flex-1 min-h-0" {...dragHandlers}>
       {isDragActive && <SpoolDropOverlay />}
-      {hasDrafts && (
-        <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
-          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-            {hasDrafts ? <>{t('shares.title')} · {drafts.length}</> : null}
-          </span>
-          {onStartNewDraft && (
-            <button
-              type="button"
-              data-testid="shares-new-draft"
-              onClick={handleOpenPicker}
-              title={t('shares.newDraft')}
-              aria-label={t('shares.newDraft')}
-              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-            >
-              <Plus size={13} strokeWidth={1.6} aria-hidden />
-            </button>
-          )}
-        </div>
-      )}
+      <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
+        <SharesTabStrip tab={tab} onTab={setTab} draftsCount={drafts.length} />
+        {tab === 'drafts' && onStartNewDraft && (
+          <button
+            type="button"
+            data-testid="shares-new-draft"
+            onClick={handleOpenPicker}
+            title={t('shares.newDraft')}
+            aria-label={t('shares.newDraft')}
+            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          >
+            <Plus size={13} strokeWidth={1.6} aria-hidden />
+          </button>
+        )}
+      </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <DraftsList
-          drafts={drafts}
-          loading={loading}
-          error={error}
-          onOpenDraft={onOpenDraft}
-          onDeleteDraft={handleDelete}
-          {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
-        />
+        {tab === 'drafts' ? (
+          <DraftsList
+            drafts={drafts}
+            loading={loading}
+            error={error}
+            onOpenDraft={onOpenDraft}
+            onDeleteDraft={handleDelete}
+            {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
+          />
+        ) : (
+          <PublishedList />
+        )}
       </div>
       {pickerOpen && onStartNewDraft && (
         <NewDraftPicker onSelect={handlePickSession} onClose={handleClosePicker} />
       )}
     </div>
+  )
+}
+
+function SharesTabStrip({
+  tab,
+  onTab,
+  draftsCount,
+}: {
+  tab: SharesTab
+  onTab: (next: SharesTab) => void
+  draftsCount: number
+}) {
+  const items: Array<{ id: SharesTab; label: string; count?: number }> = [
+    { id: 'drafts', label: 'Drafts', count: draftsCount },
+    { id: 'published', label: 'Published' },
+  ]
+  return (
+    <div role="tablist" aria-label="Shares" className="inline-flex items-center gap-1">
+      {items.map((it) => {
+        const active = it.id === tab
+        return (
+          <button
+            key={it.id}
+            role="tab"
+            aria-selected={active}
+            data-testid={`shares-tab-${it.id}`}
+            onClick={() => onTab(it.id)}
+            className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-[4px] font-mono text-[11px] tabular-nums transition-colors ${
+              active
+                ? 'text-warm-text dark:text-dark-text bg-warm-surface2 dark:bg-dark-surface2'
+                : 'text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+            }`}
+          >
+            <span>{it.label}</span>
+            {typeof it.count === 'number' && it.count > 0 && <span>· {it.count}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PublishedList() {
+  const { user, loading: authLoading, signIn } = useShareAuth()
+  const { items, loading, refresh, noteLocalMutation } = usePublishedShares()
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  if (!user) {
+    return (
+      <FeaturedEmptyState
+        icon={<Newspaper size={22} strokeWidth={1.5} />}
+        title="Sign in to see your published shares"
+        hint="Spool only uploads snapshots you explicitly publish. Drafts and your library stay on this machine."
+        action={(
+          <button
+            type="button"
+            data-testid="published-signin"
+            onClick={() => { void signIn() }}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+          >
+            Sign in with Google
+          </button>
+        )}
+      />
+    )
+  }
+
+  if (loading && items.length === 0) {
+    return null
+  }
+
+  if (items.length === 0) {
+    return (
+      <FeaturedEmptyState
+        icon={<Newspaper size={22} strokeWidth={1.5} />}
+        title="No published shares yet"
+        hint="When you publish a draft, it shows up here so you can manage it from any signed-in Spool."
+      />
+    )
+  }
+
+  const onCopy = async (it: PublishedShareCacheItem) => {
+    const url = `https://spool.share/s/${it.id}`
+    try {
+      await navigator.clipboard.writeText(sharePublicUrl(it.id))
+      toast.success('Link copied')
+    } catch {
+      toast.error("Couldn't copy link")
+    }
+  }
+
+  const onView = (it: PublishedShareCacheItem) => {
+    window.open(`https://spool.share/s/${it.id}`, '_blank', 'noopener,noreferrer')
+  }
+
+  const onUnpublish = async (it: PublishedShareCacheItem) => {
+    if (busyId) return
+    setBusyId(it.id)
+    // Tell the hook a local mutation is starting so any focus-triggered
+    // refresh whose myShares response is in flight skips its cache
+    // replaceAll — otherwise it would stomp the optimistic revoke
+    // that main writes via markRevoked between here and the final
+    // post-revoke refresh below.
+    noteLocalMutation()
+    try {
+      await window.spoolShare.revoke(it.id)
+      toast.success('Share unpublished')
+      await refresh()
+    } catch (err) {
+      console.error('Unpublish failed:', err)
+      toast.error("Couldn't unpublish")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <ul data-testid="published-list" className="flex flex-col gap-1 px-3 pb-6">
+      {items.map((it) => (
+        <PublishedRow
+          key={it.id}
+          item={it}
+          busy={busyId === it.id}
+          onCopy={() => void onCopy(it)}
+          onView={() => onView(it)}
+          onUnpublish={() => void onUnpublish(it)}
+        />
+      ))}
+    </ul>
+  )
+}
+
+function PublishedRow({
+  item,
+  busy,
+  onCopy,
+  onView,
+  onUnpublish,
+}: {
+  item: PublishedShareCacheItem
+  busy: boolean
+  onCopy: () => void
+  onView: () => void
+  onUnpublish: () => void
+}) {
+  const revoked = item.revoked_at !== null
+  const expiresSoon = item.expires_at !== null && item.expires_at > Date.now()
+  const publishedLabel = new Date(item.published_at).toLocaleDateString()
+  return (
+    <li
+      data-testid="published-row"
+      data-revoked={revoked ? '' : undefined}
+      className="group flex items-center gap-3 rounded-[6px] px-3 py-2.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-warm-text dark:text-dark-text truncate">
+            {item.title || 'Untitled'}
+          </span>
+          {revoked && (
+            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-faint dark:text-dark-muted">
+              Revoked
+            </span>
+          )}
+          {item.visibility === 'profile-listed' && !revoked && (
+            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-accent-bg dark:bg-[#2A1800] text-accent dark:text-accent-dark">
+              Listed
+            </span>
+          )}
+          {expiresSoon && !revoked && (
+            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-muted dark:text-dark-muted">
+              Expires {new Date(item.expires_at as number).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
+          <span className="font-mono">spool.share/s/{item.id}</span>
+          <span aria-hidden>·</span>
+          <span>Published {publishedLabel}</span>
+        </div>
+      </div>
+      {/* Action icons always visible — matches the share-web Me page
+       *  Published-row design. Hover-to-reveal was strictly tidier
+       *  but produced a "what can I do here?" gap that the web list
+       *  doesn't have. */}
+      <div className="flex-none flex items-center gap-0.5">
+        <RowAction label="View" onClick={onView}><ExternalLink size={13} strokeWidth={1.6} /></RowAction>
+        <RowAction label="Copy link" onClick={onCopy}><LinkIcon size={13} strokeWidth={1.6} /></RowAction>
+        {!revoked && (
+          <RowAction label={busy ? 'Unpublishing' : 'Unpublish'} onClick={onUnpublish} disabled={busy}>
+            {busy
+              ? <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
+              : <EyeOff size={13} strokeWidth={1.6} />}
+          </RowAction>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function RowAction({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+    >
+      {children}
+    </button>
   )
 }
 

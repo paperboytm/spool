@@ -147,3 +147,12 @@ export interface HandleCheckResponse {
 export interface HandleClaimResponse {
   handle: string
 }
+
+/** Response from `POST /api/me/delete` — backend confirms the cool-off
+ *  schedule and returns the epoch-millis at which the deletion executes
+ *  unless the user calls `DELETE /api/me/delete` first. */
+export interface ScheduleDeleteResponse {
+  scheduled_at: number
+  /** Defaults to 24h after `scheduled_at` when omitted by the server. */
+  execute_at?: number
+}

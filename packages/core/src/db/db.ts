@@ -14,7 +14,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 14
+export const LATEST_SCHEMA_VERSION = 15
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -682,6 +682,49 @@ export function runMigrations(db: Database.Database): void {
 
       db.pragma('user_version = 14')
     })()
+  }
+
+  if (version < 15) {
+    // v15: published_shares_cache — local mirror of /api/me/shares so the
+    // Published tab in SharesPage renders instantly on cold start and
+    // remains readable when the user is offline. This is NOT the source
+    // of truth — the canonical published index lives in spool.share's
+    // D1. Rows are upserted whenever myShares() succeeds; entries that
+    // disappear from the remote response are cleared via clearAll +
+    // upsertMany on each successful fetch.
+    //
+    // `draft_id` mirrors the same column on the backend's published_shares
+    // and is the link from a share back to its editable source in
+    // share_drafts. The Share popover queries this index to decide
+    // between the publish form and the manage view when an editor mounts
+    // for a given draft. Nullable only to accommodate pre-v0.5.0 rows
+    // published before the column existed; every new publish writes a
+    // non-null value.
+    // `client_request_id` mirrors the backend's `published_shares
+    // .client_request_id` — the content hash that drove the publish.
+    // The editor recomputes the same hash on the live draft and
+    // compares; a mismatch surfaces the "Unpublished edits" badge in
+    // the manage view so the user knows their next Republish click
+    // will actually change something on spool.pro.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS published_shares_cache (
+        id                 TEXT PRIMARY KEY,
+        title              TEXT NOT NULL DEFAULT '',
+        visibility         TEXT NOT NULL,
+        version            INTEGER NOT NULL DEFAULT 1,
+        published_at       INTEGER NOT NULL,
+        revoked_at         INTEGER,
+        expires_at         INTEGER,
+        draft_id           TEXT,
+        client_request_id  TEXT,
+        updated_at         INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_published_shares_cache_published_at
+        ON published_shares_cache(published_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_published_shares_cache_draft_id
+        ON published_shares_cache(draft_id) WHERE draft_id IS NOT NULL;
+    `)
+    db.pragma('user_version = 15')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
