@@ -3,6 +3,7 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../../src/errors'
+import { CC_PRIVATE_NO_CACHE } from '../../../src/security/cache-control'
 
 type Env = {
   DB: D1Database
@@ -37,7 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     })
     return jsonOk(
       { items: rows.results },
-      { headers: { 'cache-control': 'private, no-cache' } },
+      { headers: { 'cache-control': CC_PRIVATE_NO_CACHE } },
     )
   } catch (e) {
     return jsonError(e)

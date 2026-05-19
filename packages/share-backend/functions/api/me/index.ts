@@ -2,6 +2,7 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 
 import { requireUser } from '../../../src/auth/require'
 import { jsonError, jsonOk } from '../../../src/errors'
+import { CC_PRIVATE_NO_CACHE } from '../../../src/security/cache-control'
 
 type Env = { DB: D1Database; SESSIONS: KVNamespace }
 
@@ -25,7 +26,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
         handle: handle?.handle ?? null,
         deletion_pending_until: user.deletion_pending_until,
       },
-      { headers: { 'cache-control': 'private, no-cache' } },
+      { headers: { 'cache-control': CC_PRIVATE_NO_CACHE } },
     )
   } catch (e) {
     return jsonError(e)

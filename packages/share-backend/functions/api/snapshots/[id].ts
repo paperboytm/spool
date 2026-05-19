@@ -2,12 +2,13 @@ import type { KVNamespace, PagesFunction, R2Bucket } from '@cloudflare/workers-t
 
 import { ApiError, jsonError } from '../../../src/errors'
 import { isValidSlug } from '../../../src/publish/slug'
+import { CC_NO_STORE } from '../../../src/security/cache-control'
 
 type Env = { META: KVNamespace; SNAPSHOTS: R2Bucket; RATE: KVNamespace }
 
 const TOMBSTONE_HEADERS = {
   'content-type': 'application/json',
-  'cache-control': 'no-store',
+  'cache-control': CC_NO_STORE,
 }
 
 // 30s window keeps CDN cost manageable for viral shares while bounding the

@@ -1,0 +1,33 @@
+# Local dev secrets for `wrangler pages dev`. Copy to `.dev.vars` (gitignored)
+# and fill in real values. Do NOT commit `.dev.vars`.
+#
+# How to obtain each:
+#
+# GOOGLE_CLIENT_ID_DESKTOP / GOOGLE_CLIENT_ID_WEB / GOOGLE_CLIENT_SECRET_WEB
+#   Create a "Spool Dev" project in https://console.cloud.google.com/apis/credentials
+#   • Desktop client — accepts loopback URIs without registration (RFC 8252)
+#   • Web client — register http://localhost:3002/api/auth/google/callback
+#     as an authorised redirect URI
+#   Use a SEPARATE dev OAuth client from prod — never share client ids.
+#
+# SESSION_SIGNING_KEY
+#   Any 32-byte random string. Reserved for future HMAC of state cookies.
+#   `openssl rand -base64 32` works.
+#
+# ABUSE_NOTIFY_EMAIL
+#   In dev anything is fine (e.g. dev@localhost). Production points at
+#   abuse@spool.pro and gets the manual D1 polling treatment until v1.1
+#   wires Mailchannels.
+#
+# ADMIN_USER_IDS
+#   Comma-separated list of user ids allowed to hit /api/admin/audit.
+#   In dev you'll discover your own user id by signing in once and
+#   reading the `users` row from the local D1 sqlite file; paste it back
+#   here and restart wrangler dev to admin yourself.
+
+GOOGLE_CLIENT_ID_DESKTOP=
+GOOGLE_CLIENT_ID_WEB=
+GOOGLE_CLIENT_SECRET_WEB=
+SESSION_SIGNING_KEY=
+ABUSE_NOTIFY_EMAIL=dev@localhost
+ADMIN_USER_IDS=

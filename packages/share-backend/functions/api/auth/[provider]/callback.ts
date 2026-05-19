@@ -20,6 +20,7 @@ import { ApiError, jsonError } from '../../../../src/errors'
 import { publicBaseUrl } from '../../../../src/public-url'
 import { checkRate } from '../../../../src/rate-limit'
 import { clientIp } from '../../../../src/request'
+import { CC_NO_STORE } from '../../../../src/security/cache-control'
 import { upsertUserByIdentity } from '../../../../src/store/d1'
 
 type Env = {
@@ -84,7 +85,7 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     // compliant and workerd stops emitting non-ASCII warnings. encodeURI
     // preserves the path/query delimiters (`/`, `?`, `&`, `=`), so it's
     // an idempotent no-op on the common ASCII paths.
-    const headers = new Headers({ Location: encodeURI(next), 'Cache-Control': 'no-store' })
+    const headers = new Headers({ Location: encodeURI(next), 'Cache-Control': CC_NO_STORE })
     headers.append('Set-Cookie', buildSessionCookie(sess.token, MAX_TTL_SEC))
     headers.append('Set-Cookie', clearCookie(OAUTH_STATE_COOKIE))
     headers.append('Set-Cookie', clearCookie(OAUTH_VERIFIER_COOKIE))
