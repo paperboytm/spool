@@ -6,6 +6,7 @@ import type { Plugin } from 'vite'
 
 const coreAlias = {
   '@spool-lab/core': resolve(__dirname, '../core/dist/index.js'),
+  '@spool-lab/redact': resolve(__dirname, '../redact/dist/index.js'),
 }
 
 // better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
@@ -27,7 +28,7 @@ export default defineConfig({
   main: {
     // Exclude @spool-lab/core from externalization so it gets bundled (it's ESM
     // and can't be require()'d directly). Only better-sqlite3 stays external.
-    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core'] }), nativeExternalPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] }), nativeExternalPlugin()],
     build: {
       rollupOptions: {
         input: {
@@ -39,7 +40,7 @@ export default defineConfig({
     resolve: { alias: coreAlias },
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },

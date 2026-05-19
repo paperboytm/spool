@@ -49,20 +49,22 @@ test('Library row shows a high-severity Security Scan badge for a session with a
 
   // Navigate into the project so the seeded session is visible.
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
-  const row = window.locator('[data-testid="session-row"]').filter({
-    has: window.locator('text=AKIAIOSFODNN7EXAMPLE'),
-  }).first()
-  // The above filter relies on title being non-empty; fall back to
-  // session_uuid match if the project view doesn't surface the AWS
-  // text in the row preview.
-  const fallback = window.locator(
+  const target = window.locator(
     '[data-testid="session-row"][data-session-uuid="security-fixture-session"]',
   )
-  const target = (await fallback.count()) > 0 ? fallback : row
   await expect(target).toBeVisible({ timeout: 5000 })
 
-  // Wait for the scan worker to finish — backfill runs asynchronously
-  // after sync, so the badge may appear a few hundred ms later.
+  // Wait for the scan worker to fully drain — backfill runs async
+  // after sync, so we poll status until idle, then expect the badge.
+  await window.waitForFunction(async () => {
+    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
+    if (!api?.security) return false
+    const s = await api.security.getScanStatus()
+    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+  }, { timeout: 30_000, polling: 250 })
+
+  // The polling fallback in ProjectView refetches every 750ms while
+  // the worker is busy, so by now the badge should be in the DOM.
   const badge = target.locator('[data-testid="security-badge"][data-severity="high"]')
-  await expect(badge).toBeVisible({ timeout: 10_000 })
+  await expect(badge).toBeVisible({ timeout: 5_000 })
 })

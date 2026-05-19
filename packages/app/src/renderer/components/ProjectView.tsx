@@ -45,7 +45,52 @@ export default function ProjectView({
   const [loadingMore, setLoadingMore] = useState(false)
   const [activeSources, setActiveSources] = useState<Set<SessionSource>>(new Set())
   const [isolatedCwd, setIsolatedCwd] = useState<string | null>(null)
+  const [scanRefreshKey, setScanRefreshKey] = useState(0)
   const fetchTokenRef = useRef(0)
+
+  // Re-fetch the session list when scan worker updates findings — the
+  // scan_finding_count denormalised counters on Session rows drive the
+  // Library row badge, and without a refetch the badge never appears
+  // after the initial backfill.
+  //
+  // Two complementary triggers:
+  //   1. Subscribe to securityApi.onChange so future scan events
+  //      invalidate immediately.
+  //   2. Poll scan status while the worker is busy — covers the cold-
+  //      start race where the first scan can complete before this
+  //      effect's IPC subscription is registered.
+  useEffect(() => {
+    let active = true
+    let off: (() => void) | null = null
+    let pollHandle: ReturnType<typeof setInterval> | null = null
+
+    void import('../api/security.js').then(({ securityApi }) => {
+      if (!active) return
+      off = securityApi.onChange(() => { setScanRefreshKey(k => k + 1) })
+      // Always bump once on next tick to catch cold-start races where
+      // a scan completed before this effect's onChange subscription.
+      setTimeout(() => { if (active) setScanRefreshKey(k => k + 1) }, 800)
+      pollHandle = setInterval(async () => {
+        try {
+          const s = await securityApi.getScanStatus()
+          // Bump every tick — cheap (one IPC roundtrip + one refetch)
+          // and ensures we converge on the final state even if
+          // findings-changed events were missed.
+          setScanRefreshKey(k => k + 1)
+          if (s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && pollHandle) {
+            clearInterval(pollHandle)
+            pollHandle = null
+          }
+        } catch { /* feature off */ }
+      }, 750)
+    }).catch(() => { /* security api unavailable — feature off */ })
+
+    return () => {
+      active = false
+      if (off) off()
+      if (pollHandle) clearInterval(pollHandle)
+    }
+  }, [])
 
   useEffect(() => {
     setActiveSources(new Set())
@@ -96,7 +141,7 @@ export default function ProjectView({
         setSessions([])
         setDirectoryCounts([])
       })
-  }, [identityKey, sortOrder, activeSources])
+  }, [identityKey, sortOrder, activeSources, scanRefreshKey])
 
   const cursorRef = useRef(cursor)
   cursorRef.current = cursor

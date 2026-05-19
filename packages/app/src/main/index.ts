@@ -314,6 +314,10 @@ app.whenReady().then(async () => {
   // Initial sync in worker thread (non-blocking)
   runSyncWorker().then(() => {
     watcher.start()
+    // Sessions were inserted by the worker thread which has its own DB
+    // handle — no onSessionChanged callbacks reached this process. Kick
+    // off a backfill round now that the sessions table is populated.
+    if (scanWorker) Effect.runFork(scanWorker.backfill())
   }).catch((err) => {
     console.error('[sync-worker] failed:', err)
   })
