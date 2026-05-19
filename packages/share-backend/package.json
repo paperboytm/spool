@@ -1,0 +1,22 @@
+{
+  "name": "@spool/share-backend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev ./public --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG",
+    "deploy:staging": "wrangler pages deploy public --project-name spool-share-staging",
+    "deploy:prod": "wrangler pages deploy public --project-name spool-share",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local",
+    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db --env staging",
+    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --env production"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260415.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.0.0"
+  }
+}
