@@ -76,7 +76,6 @@ export default function SessionRow({ session, pinned = false, showProject = fals
           <span className="text-sm font-medium text-warm-text dark:text-dark-text truncate">
             {title}
           </span>
-          <SecurityBadge session={session} />
         </div>
         <p className="pl-1.5 text-xs text-warm-faint dark:text-dark-muted truncate">
           {showProject && (
@@ -216,7 +215,7 @@ function SecurityBadge({ session }: { session: Session }): React.ReactElement | 
   return (
     <span
       data-testid="security-badge"
-      data-severity="low"
+      data-severity={isHigh ? 'high' : 'low'}
       title={tooltip}
       aria-label={tooltip}
       className={`inline-flex items-center justify-center w-5 h-5 ${tone}`}

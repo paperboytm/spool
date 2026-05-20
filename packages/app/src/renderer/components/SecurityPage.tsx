@@ -424,7 +424,7 @@ function FindingRowView({
           <PurgeConfirmDialog
             open={purgePending}
             count={1}
-            kind={finding.kind}
+            summary={finding.kind}
             onConfirm={() => { void purge() }}
             onCancel={() => setPurgePending(false)}
           />
