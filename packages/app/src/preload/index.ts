@@ -6,7 +6,17 @@ import type {
   SessionSource,
   FindingRow, SessionWithFindingCounts, RiskByCategoryRow,
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
+  AllowlistEntryRow,
 } from '@spool-lab/core'
+import type { SensitiveKind } from '@spool-lab/redact'
+
+export interface SecurityPreferences {
+  kindAllowlist: SensitiveKind[]
+  infoDefaultVisible: boolean
+  rescanAfterSync: 'auto' | 'manual'
+  revealValuesOnHoverOnly: boolean
+  pfEnabled: boolean
+}
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
@@ -245,6 +255,26 @@ const api = {
       ipcRenderer.on('security:evt-scan-status', handler)
       return () => ipcRenderer.removeListener('security:evt-scan-status', handler)
     },
+
+    getPrefs: (): Promise<SecurityPreferences> =>
+      ipcRenderer.invoke('security:get-prefs'),
+    setPrefs: (next: Partial<SecurityPreferences>): Promise<SecurityPreferences> =>
+      ipcRenderer.invoke('security:set-prefs', next),
+    onPrefsChanged: (cb: (prefs: SecurityPreferences) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as SecurityPreferences)
+      ipcRenderer.on('security:evt-prefs-changed', handler)
+      return () => ipcRenderer.removeListener('security:evt-prefs-changed', handler)
+    },
+
+    listAllowlistEntries: (): Promise<AllowlistEntryRow[]> =>
+      ipcRenderer.invoke('security:list-allowlist-entries'),
+    removeAllowlistEntry: (args: {
+      scope: 'session' | 'global'
+      kind: SensitiveKind
+      valueHash: string
+      sessionUuid?: string
+    }): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:remove-allowlist-entry', args),
   },
 }
 

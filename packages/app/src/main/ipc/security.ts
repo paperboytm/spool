@@ -17,12 +17,21 @@ import {
   undismissFinding,
   purgeFinding,
   purgeFindings,
+  listAllowlistEntries,
+  removeAllowlistSession,
+  removeAllowlistGlobal,
   type FindingFilter,
   type SessionFindingFilter,
   type ScanWorker,
   type PurgeResult,
 } from '@spool-lab/core'
+import type { SensitiveKind } from '@spool-lab/redact'
 import type Database from 'better-sqlite3'
+import {
+  loadSecurityPreferences,
+  saveSecurityPreferences,
+  type SecurityPreferences,
+} from '../securityPreferences.js'
 
 /** Channel name table. Shared via type only with the renderer adapter
  *  (no runtime import — preload uses the strings literally). */
@@ -43,9 +52,18 @@ export const SECURITY_IPC_CHANNELS = {
   RESCAN_ALL:                  'security:rescan-all',
   RESCAN_SESSION:              'security:rescan-session',
 
+  // preferences
+  GET_PREFS:                   'security:get-prefs',
+  SET_PREFS:                   'security:set-prefs',
+
+  // allowlist management
+  LIST_ALLOWLIST_ENTRIES:      'security:list-allowlist-entries',
+  REMOVE_ALLOWLIST_ENTRY:      'security:remove-allowlist-entry',
+
   // events (push: main → renderer via webContents.send)
   EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
   EVT_SCAN_STATUS:             'security:evt-scan-status',
+  EVT_PREFS_CHANGED:           'security:evt-prefs-changed',
 } as const
 
 export interface SecurityIpcDeps {
@@ -118,6 +136,52 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.RESCAN_SESSION, (_e, sessionId: number) =>
     runPromise(worker.enqueue(sessionId)).then(() => ({ ok: true })),
+  )
+
+  ipcMain.handle(SECURITY_IPC_CHANNELS.GET_PREFS, () => loadSecurityPreferences())
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.SET_PREFS,
+    async (_e, next: Partial<SecurityPreferences>) => {
+      const prev = loadSecurityPreferences()
+      const saved = saveSecurityPreferences(next)
+      // When kindAllowlist changes, the new value is folded into
+      // `currentProfileString()` via the worker's lazy `() => ...`
+      // callback. We can simply kick `worker.backfill()`, which
+      // re-resolves the profile, lists sessions whose `scan_profile`
+      // no longer matches the new hash, and enqueues them. No need
+      // to NULL out every scan_profile any more — the hash drift
+      // handles it cleanly without an extra UPDATE pass over the
+      // sessions table.
+      const prevKinds = new Set(prev.kindAllowlist)
+      const nextKinds = new Set(saved.kindAllowlist)
+      const changed = prevKinds.size !== nextKinds.size ||
+        [...prevKinds].some(k => !nextKinds.has(k)) ||
+        [...nextKinds].some(k => !prevKinds.has(k))
+      if (changed) {
+        await runPromise(worker.backfill())
+      }
+      getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, saved)
+      return saved
+    },
+  )
+
+  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES, () => listAllowlistEntries(db))
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.REMOVE_ALLOWLIST_ENTRY,
+    (_e, args: { scope: 'session' | 'global'; kind: SensitiveKind; valueHash: string; sessionUuid?: string }) => {
+      if (args.scope === 'global') {
+        removeAllowlistGlobal(db, args.kind, args.valueHash)
+      } else if (args.sessionUuid) {
+        const row = db.prepare('SELECT id FROM sessions WHERE session_uuid = ?')
+          .get(args.sessionUuid) as { id: number } | undefined
+        if (row) removeAllowlistSession(db, row.id, args.kind, args.valueHash)
+      }
+      // Removing an allowlist entry doesn't reactivate the already-
+      // dismissed finding rows — that's intentional: a user who said
+      // "ignore" once shouldn't have it bounce back on every rescan.
+      // The Security page lists `state='dismissed'` separately.
+      return { ok: true }
+    },
   )
 
   // Forward worker change events to the renderer. The subscriber runs

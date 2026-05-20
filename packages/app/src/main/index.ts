@@ -39,6 +39,7 @@ import {
 import { Effect, Scope, Exit } from 'effect'
 import { regexProvider } from '@spool-lab/redact'
 import { registerSecurityIpc } from './ipc/security.js'
+import { loadSecurityPreferences } from './securityPreferences.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
@@ -165,8 +166,18 @@ async function bootScanWorker(): Promise<void> {
         makeScanWorker({
           db,
           providers: [regexProvider],
-          currentProfile: currentProfileString(),
+          // Recompute the profile string on every read so a pref save
+          // (kindAllowlist change) immediately marks every session
+          // whose `scan_profile` no longer matches as stale —
+          // `worker.backfill()` then enqueues them on its next call.
+          currentProfile: () => currentProfileString({
+            kindAllowlist: loadSecurityPreferences().kindAllowlist,
+          }),
           providerNames: ['regex'],
+          // Read the persisted kind allowlist on every scan so the
+          // Settings → Security pane's multi-select takes effect on
+          // the next session without a worker restart.
+          getKindAllowlist: () => new Set(loadSecurityPreferences().kindAllowlist),
         }),
         Scope.Scope,
         scope,
@@ -318,9 +329,14 @@ app.whenReady().then(async () => {
   syncer = new Syncer(db, undefined, (sessionId) => {
     // Sync mutated this session's messages; existing findings now have
     // stale offsets. The Syncer already nulled scan_profile inside the
-    // commit txn; here we just re-enqueue so the worker picks it up.
+    // commit txn; here we just re-enqueue so the worker picks it up —
+    // unless the user opted out of auto-rescan in Settings → Security,
+    // in which case we leave scan_profile dirty for the next manual
+    // Rescan all click.
     invalidateSessionScanProfile(db, sessionId)
-    if (scanWorker) Effect.runFork(scanWorker.enqueue(sessionId))
+    if (scanWorker && loadSecurityPreferences().rescanAfterSync === 'auto') {
+      Effect.runFork(scanWorker.enqueue(sessionId))
+    }
   })
   watcher = new SpoolWatcher(syncer)
   watcher.on('new-sessions', (_event, data) => {
