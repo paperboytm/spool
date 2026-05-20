@@ -315,24 +315,6 @@ app.whenReady().then(async () => {
   db = getDB()
   acpManager = new AcpManager()
 
-  // Boot the Security Scan worker in parallel with the syncer + window
-  // creation rather than awaiting it. Worker setup takes 100-500ms;
-  // awaiting it pushes the renderer mount out by that much, which on
-  // CI Ubuntu was enough to tip the race between the initial sync
-  // inserts and the renderer's first listSessions call, leaving home
-  // and project views empty.
-  //
-  // The downstream syncer cascade callback already guards on
-  // `if (scanWorker)`, so any session changes that fire before the
-  // worker is ready are no-ops; `scanWorker.backfill()` (kicked once
-  // the sync worker resolves) picks them up.
-  //
-  // Gated by VITE_FEATURE_SECURITY so production builds (where the
-  // env var stays unset) never start the scanner.
-  if (securityFeatureEnabled()) {
-    void bootScanWorker()
-  }
-
   syncer = new Syncer(db, undefined, (sessionId) => {
     // Sync mutated this session's messages; existing findings now have
     // stale offsets. The Syncer already nulled scan_profile inside the
@@ -350,8 +332,18 @@ app.whenReady().then(async () => {
   })
 
   // Initial sync in worker thread (non-blocking)
-  runSyncWorker().then(() => {
+  runSyncWorker().then((result) => {
     watcher.start()
+    // Sessions were inserted by the worker thread which has its own
+    // DB handle, so the renderer never got an onNewSessions push for
+    // them. Without an explicit signal here, any view that listed
+    // sessions BEFORE sync finished would stay empty until the next
+    // file-watcher event. Emit new-sessions so LibraryLanding /
+    // ProjectView refetch — same code path that already handles
+    // post-startup inserts.
+    if (result.added > 0) {
+      mainWindow?.webContents.send('spool:new-sessions', { count: result.added })
+    }
     // Sessions were inserted by the worker thread which has its own DB
     // handle — no onSessionChanged callbacks reached this process. Kick
     // off a backfill round now that the sessions table is populated.
@@ -362,17 +354,26 @@ app.whenReady().then(async () => {
 
   mainWindow = createWindow()
 
-  // Register Security Scan IPC + start the first backfill in the
-  // background. Both are no-ops until `scanWorker` is set above; if
-  // the worker boot above failed we silently skip wiring.
-  if (scanWorker) {
-    disposeSecurityIpc = registerSecurityIpc({
-      db,
-      worker: scanWorker,
-      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
-      getMainWindow: () => mainWindow,
+  // Boot the Security Scan worker AFTER createWindow so the renderer
+  // mount + initial sync don't wait on it. The Syncer's
+  // onSessionChanged callback and the post-sync backfill are both
+  // guarded by `if (scanWorker)`, so any session changes that fire
+  // before the worker is ready are no-ops — `scanWorker.backfill()`
+  // below catches up once boot completes.
+  //
+  // Gated by VITE_FEATURE_SECURITY so production builds (where the
+  // env var stays unset) never start the scanner.
+  if (securityFeatureEnabled()) {
+    void bootScanWorker().then(() => {
+      if (!scanWorker) return
+      disposeSecurityIpc = registerSecurityIpc({
+        db,
+        worker: scanWorker,
+        runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+        getMainWindow: () => mainWindow,
+      })
+      Effect.runFork(scanWorker.backfill())
     })
-    Effect.runFork(scanWorker.backfill())
   }
 
   // Auto-updater (only runs in packaged builds)
