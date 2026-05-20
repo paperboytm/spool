@@ -163,6 +163,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   riskRef.current = risk
   const sessionsLenRef = useRef(0)
   sessionsLenRef.current = sessions.length
+  // Latest refresh callback held by ref so the onScanStatus effect can
+  // pull a refetch on the busy→idle edge WITHOUT re-subscribing every
+  // time `filter` changes (which is what would happen if `refresh`
+  // were listed as a dep).
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
 
   // Three-tier scan feedback model:
   //
@@ -234,6 +240,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
           setDisplayBusy(false)
           setRescanInFlight(false)
           wasManualRescanRef.current = false
+          // Pull a refetch so `lastScanCompletedAt` updates even when
+          // the scan didn't mutate any findings (re-scan that found
+          // nothing new still touches `scan_completed_at`, but emits
+          // no onChange event — without this the meta row would keep
+          // reading "scanned 5 minutes ago" forever).
+          void refreshRef.current()
           const currentHigh = riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
           const currentLow = riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0)
           const delta = currentHigh - highCountAtScanStartRef.current
@@ -359,26 +371,32 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
               {t('security.summary_info', { count: infoCount, defaultValue: '{{count}} info' })}
             </span>
           )}
-          {/* Ambient busy state — a tiny pulse dot + "scanning…"
-           *  takes over the "scanned X ago" slot whenever a background
-           *  scan is in flight (only path that surfaces ANY UI for
-           *  auto scans). Manual rescan keeps the dedicated banner
-           *  below, so this slot stays calm for them too. */}
-          {displayBusy && !rescanInFlight ? (
+          {/* Always show "scanned X ago" — the text is stable, only a
+           *  tiny pulse dot fades in/out next to it when work is
+           *  happening in the background. Previously the slot flipped
+           *  between the dot-+-text and the timestamp, which read as a
+           *  flicker even after the underlying state was debounced.
+           *  Stable text + a small inline indicator is the standard
+           *  ambient pattern (Gmail's "saved", VS Code's status-bar
+           *  spinner — none of them swap text for the active state). */}
+          {lastScanCompletedAt && !rescanInFlight && (
             <>
               {' · '}
-              <span data-testid="security-ambient-scan" className="inline-flex items-center gap-1 align-baseline">
-                <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted animate-pulse" />
-                <span>{t('security.scanning_ambient', { defaultValue: 'scanning…' })}</span>
+              <span data-testid="security-scan-state" className="inline-flex items-center gap-1 align-baseline">
+                {displayBusy && (
+                  <span
+                    data-testid="security-ambient-dot"
+                    aria-hidden
+                    className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted animate-pulse"
+                  />
+                )}
+                <span>
+                  {t('security.scanned_ago', {
+                    ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
+                    defaultValue: 'scanned {{ago}}',
+                  })}
+                </span>
               </span>
-            </>
-          ) : lastScanCompletedAt && !isScanning && (
-            <>
-              {' · '}
-              {t('security.scanned_ago', {
-                ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
-                defaultValue: 'scanned {{ago}}',
-              })}
             </>
           )}
           {activeKinds.length > 0 && (
