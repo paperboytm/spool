@@ -353,7 +353,10 @@
     "diff_before": "avant",
     "diff_after": "après",
     "diff_becomes": "devient",
-    "diff_pattern": "motif"
+    "diff_pattern": "motif",
+    "scanning_ambient": "analyse…",
+    "scan_toast_new_findings_one": "{{count}} nouvelle découverte à haut risque",
+    "scan_toast_new_findings_other": "{{count}} nouvelles découvertes à haut risque"
   },
   "shares": {
     "title": "Brouillons",

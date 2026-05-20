@@ -353,7 +353,10 @@
     "diff_before": "before",
     "diff_after": "after",
     "diff_becomes": "becomes",
-    "diff_pattern": "pattern"
+    "diff_pattern": "pattern",
+    "scanning_ambient": "scanning…",
+    "scan_toast_new_findings_one": "Found {{count}} new high-risk finding",
+    "scan_toast_new_findings_other": "Found {{count}} new high-risk findings"
   },
   "shares": {
     "title": "Drafts",

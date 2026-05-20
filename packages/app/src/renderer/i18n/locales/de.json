@@ -353,7 +353,10 @@
     "diff_before": "vorher",
     "diff_after": "nachher",
     "diff_becomes": "wird zu",
-    "diff_pattern": "Muster"
+    "diff_pattern": "Muster",
+    "scanning_ambient": "Scan läuft…",
+    "scan_toast_new_findings_one": "{{count}} neuer Hochrisiko-Fund",
+    "scan_toast_new_findings_other": "{{count}} neue Hochrisiko-Funde"
   },
   "shares": {
     "title": "Entwürfe",

@@ -327,7 +327,9 @@
     "diff_before": "이전",
     "diff_after": "이후",
     "diff_becomes": "결과",
-    "diff_pattern": "패턴"
+    "diff_pattern": "패턴",
+    "scanning_ambient": "스캔 중…",
+    "scan_toast_new_findings_other": "높은 위험 항목 {{count}}건 새로 발견"
   },
   "shares": {
     "title": "초안",

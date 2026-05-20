@@ -327,7 +327,9 @@
     "diff_before": "前",
     "diff_after": "後",
     "diff_becomes": "結果",
-    "diff_pattern": "パターン"
+    "diff_pattern": "パターン",
+    "scanning_ambient": "スキャン中…",
+    "scan_toast_new_findings_other": "新たに {{count}} 件の高リスクを検出"
   },
   "shares": {
     "title": "下書き",

@@ -327,7 +327,9 @@
     "diff_before": "前",
     "diff_after": "後",
     "diff_becomes": "變為",
-    "diff_pattern": "模式"
+    "diff_pattern": "模式",
+    "scanning_ambient": "掃描中…",
+    "scan_toast_new_findings_other": "發現 {{count}} 項新的高風險"
   },
   "shares": {
     "title": "草稿",

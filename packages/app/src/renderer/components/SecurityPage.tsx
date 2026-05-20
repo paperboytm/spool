@@ -137,8 +137,21 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
 
   useEffect(() => {
     void refresh()
-    const off = securityApi.onChange(() => { void refresh() })
-    return () => { off() }
+    // Trailing 300ms debounce — a scanning burst publishes dozens of
+    // finding-change events per second. Without coalescing, every
+    // event fires three IPC round-trips (`riskByCategory` +
+    // `listSessionsWithFindings` + `getScanStatus`), saturating the
+    // renderer queue on a large archive. Matches the same pattern
+    // FindingsStrip / ProjectView use.
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = securityApi.onChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { timer = null; void refresh() }, 300)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
   }, [refresh])
 
   // Refs for the snapshot the result-banner reads on the busy→idle
@@ -151,55 +164,108 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const sessionsLenRef = useRef(0)
   sessionsLenRef.current = sessions.length
 
-  // Subscribe to scan-status pushes from the worker. One getStatus()
-  // call seeds the first render; everything after lands via the
-  // event channel — zero polling latency on the busy→idle edge that
-  // drives the result banner.
+  // Three-tier scan feedback model:
+  //
+  //   1. Manual rescan (user clicked "Rescan all") → banner with
+  //      progress + result, like before. They asked, they get an
+  //      explicit ACK.
+  //
+  //   2. Background scan that discovers NEW high-risk findings →
+  //      sonner toast ("Found N new high-risk findings"). Carries
+  //      actual information value; auto-dismisses; doesn't block the
+  //      page.
+  //
+  //   3. Background scan that finds nothing new → silent. The ambient
+  //      pulse dot in the meta row + the sidebar badge already carry
+  //      "worker is alive and counts are current"; a banner here is
+  //      banner fatigue with no payload.
+  //
+  // `displayBusy` is a sticky-off mirror of the raw worker state —
+  // flips ON immediately on busy, OFF only after 1500ms of continuous
+  // idle. A live archive can oscillate busy/idle several times a
+  // second (file mtime ticks from an active Claude session). Tying
+  // banners to the raw status caused strobing; tying them to
+  // displayBusy plus the discovery rule above eliminates it.
+  const [displayBusy, setDisplayBusy] = useState(false)
+  const wasManualRescanRef = useRef(false)
+  // High-risk count snapshot captured at idle→busy. Compared against
+  // post-scan total to decide whether to surface a discovery toast.
+  const highCountAtScanStartRef = useRef(0)
   useEffect(() => {
     let active = true
-    void securityApi.getScanStatus().then((s) => { if (active) setScanStatus(s) }).catch(() => {})
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    void securityApi.getScanStatus().then((s) => {
+      if (!active) return
+      setScanStatus(s)
+      const seedBusy = s.queued > 0 || s.scanning !== null || s.backfillRemaining > 0
+      if (seedBusy) setDisplayBusy(true)
+    }).catch(() => {})
     const off = securityApi.onScanStatus((next) => {
       setScanStatus(next)
       const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
       const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
       if (nowBusy) {
+        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
+        setDisplayBusy(true)
         if (!wasScanningRef.current) {
-          // Just transitioned idle → busy. New scan started, so the
-          // captured start represents THIS scan's max in-flight, not
-          // a stale value from a prior burst. Clear any lingering
-          // result banner at the same time. Bump burst key so the
-          // progress bar remounts and doesn't CSS-transition from
-          // the prior 100% back to 0%.
+          // Idle → busy edge. Capture initial in-flight + the
+          // pre-scan high-risk total so the busy→idle edge can decide
+          // whether anything *new* was found. Bump burst key so the
+          // progress bar (manual-rescan only) remounts cleanly.
+          highCountAtScanStartRef.current = riskRef.current
+            .filter(r => r.severity === 'high')
+            .reduce((a, c) => a + c.count, 0)
           setBackfillStart(inFlight)
           setScanResult(null)
           setScanBurstKey((k) => k + 1)
         } else {
-          // Mid-scan — grow if a new high-water mark appears (e.g.
-          // backfill kicked in mid-scan stacking on top of queued).
           setBackfillStart((prev) => (prev === null || inFlight > prev) ? inFlight : prev)
         }
         wasScanningRef.current = true
       } else if (wasScanningRef.current) {
-        // Busy → idle edge. KEEP backfillStart so the result banner
-        // reads the true max-in-flight from this scan; it gets reset
-        // on the next idle → busy transition above.
+        // Busy → idle edge. Schedule the trailing transition; the
+        // 1500ms gate keeps brief idle windows from re-firing this
+        // for every queue-empty moment between two backfill waves.
         wasScanningRef.current = false
-        setRescanInFlight(false)
-        setScanResult({
-          scanned: backfillStartRef.current ?? sessionsLenRef.current,
-          high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
-          low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
-        })
+        const wasManual = wasManualRescanRef.current
+        if (idleTimer) clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => {
+          idleTimer = null
+          setDisplayBusy(false)
+          setRescanInFlight(false)
+          wasManualRescanRef.current = false
+          const currentHigh = riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
+          const currentLow = riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0)
+          const delta = currentHigh - highCountAtScanStartRef.current
+          if (wasManual) {
+            // Manual rescan → always banner. User asked, user gets ACK.
+            setScanResult({
+              scanned: backfillStartRef.current ?? sessionsLenRef.current,
+              high: currentHigh,
+              low: currentLow,
+            })
+          } else if (delta > 0) {
+            // Background discovery — show a non-blocking toast.
+            toast.warning(
+              t('security.scan_toast_new_findings', {
+                count: delta,
+                defaultValue: 'Found {{count}} new high-risk findings',
+              }),
+            )
+          }
+          // delta <= 0 and !wasManual → silent. Ambient dot + sidebar
+          // badge already tell the story.
+        }, 1500)
       }
     })
     return () => {
       active = false
+      if (idleTimer) clearTimeout(idleTimer)
       off()
     }
-  }, [])
+  }, [t])
 
-  const isScanning = rescanInFlight || (scanStatus !== null &&
-    (scanStatus.queued > 0 || scanStatus.scanning !== null || scanStatus.backfillRemaining > 0))
+  const isScanning = rescanInFlight || displayBusy
 
   async function handleRescanAll() {
     if (rescanInFlight) return
@@ -210,8 +276,15 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
     setBackfillStart(null)
     setScanResult(null)
     setScanBurstKey((k) => k + 1)
+    // Mark this burst as user-initiated so the busy→idle edge
+    // surfaces the result banner. Auto scans leave this false and go
+    // through the discovery/toast path instead.
+    wasManualRescanRef.current = true
     setRescanInFlight(true)
-    await securityApi.rescanAll().catch(() => { setRescanInFlight(false) })
+    await securityApi.rescanAll().catch(() => {
+      setRescanInFlight(false)
+      wasManualRescanRef.current = false
+    })
   }
 
   function toggleKindFilter(kind: string) {
@@ -286,7 +359,20 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
               {t('security.summary_info', { count: infoCount, defaultValue: '{{count}} info' })}
             </span>
           )}
-          {lastScanCompletedAt && !isScanning && (
+          {/* Ambient busy state — a tiny pulse dot + "scanning…"
+           *  takes over the "scanned X ago" slot whenever a background
+           *  scan is in flight (only path that surfaces ANY UI for
+           *  auto scans). Manual rescan keeps the dedicated banner
+           *  below, so this slot stays calm for them too. */}
+          {displayBusy && !rescanInFlight ? (
+            <>
+              {' · '}
+              <span data-testid="security-ambient-scan" className="inline-flex items-center gap-1 align-baseline">
+                <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted animate-pulse" />
+                <span>{t('security.scanning_ambient', { defaultValue: 'scanning…' })}</span>
+              </span>
+            </>
+          ) : lastScanCompletedAt && !isScanning && (
             <>
               {' · '}
               {t('security.scanned_ago', {
@@ -346,7 +432,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
             <EmptyState onRescan={handleRescanAll} lastScan={lastScanCompletedAt} currentProfile={scanStatus?.currentProfile ?? null} />
           ) : (
             <>
-              {isScanning && scanStatus && (
+              {rescanInFlight && scanStatus && (
                 <ScanBanner key={scanBurstKey} status={scanStatus} backfillStart={backfillStart} />
               )}
               {!isScanning && scanResult && (
