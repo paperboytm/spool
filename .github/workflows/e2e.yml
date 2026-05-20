@@ -21,12 +21,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @spool-lab/redact build
+      - run: pnpm --filter @spool-lab/redact test
       - run: pnpm --filter @spool-lab/core build
       - run: pnpm --filter @spool-lab/core test
       - run: pnpm --filter @spool-lab/cli build
       - run: pnpm --filter @spool-lab/cli test
-      - run: pnpm --filter @spool-lab/redact build
-      - run: pnpm --filter @spool-lab/redact test
       - run: pnpm --filter @spool/share-kit test
       - run: pnpm --filter @spool/app test
 
@@ -49,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build redact (core depends on it)
+        run: pnpm --filter @spool-lab/redact build
 
       - name: Build core
         run: pnpm --filter @spool-lab/core build
