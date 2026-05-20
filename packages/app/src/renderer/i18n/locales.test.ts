@@ -88,6 +88,11 @@ describe('locale key parity vs en.json', () => {
     'shareEditorPanel.section_template_count',
     'shareEditorPanel.redact_willBeVisible',
     'shareEditorPanel.redact_visible',
+    // `{{count}} info` — short noun, never inflects in any locale
+    // we ship; pluralising would just add noise. Lives next to the
+    // pluralised `summary` ("X risk · Y sessions") that DOES have
+    // separate one/other forms in some languages.
+    'security.summary_info',
   ]
 
   it('every {{count}} interpolation in en.json either has _other or is in the allow-list snapshot', () => {
