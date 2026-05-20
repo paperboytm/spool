@@ -138,11 +138,11 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                   trailing: (
                     <span
                       data-testid="sidebar-security-badge"
-                      className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-accent dark:text-accent-dark"
+                      className="inline-flex items-center text-accent dark:text-accent-dark"
                       title={`${securityHighCount} high-risk finding${securityHighCount === 1 ? '' : 's'}`}
+                      aria-label={`${securityHighCount} high-risk finding${securityHighCount === 1 ? '' : 's'}`}
                     >
                       <AlertTriangle size={11} strokeWidth={1.6} aria-hidden />
-                      {securityHighCount > 99 ? '99+' : securityHighCount}
                     </span>
                   ),
                 }

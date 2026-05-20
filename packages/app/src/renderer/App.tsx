@@ -659,17 +659,24 @@ export default function App() {
     setView('session')
   }, [])
 
+  // Captures whichever surface launched the session view, so the
+  // detail header's Back button returns to it (Security / Shares /
+  // Search results) instead of always dumping into the empty
+  // search-results state.
+  const [sessionReturnView, setSessionReturnView] = useState<View>('search')
+
   const handleOpenSession = useCallback((uuid: string, messageId?: number) => {
+    setSessionReturnView(view === 'session' ? sessionReturnView : view)
     setSelectedSession(uuid)
     setTargetMessageId(messageId ?? null)
     setView('session')
-  }, [])
+  }, [view, sessionReturnView])
 
   const handleBack = useCallback(() => {
-    setView('search')
+    setView(sessionReturnView)
     setSelectedSession(null)
     setTargetMessageId(null)
-  }, [])
+  }, [sessionReturnView])
 
   const handleClearResults = useCallback(() => {
     setQuery('')
@@ -962,7 +969,10 @@ export default function App() {
             {...(shareEnabled ? { onStartNewDraft: handleStartShareFromUuid } : {})}
           />
         ) : isSecurityView ? (
-          <SecurityPage onOpenSession={handleOpenSession} />
+          <SecurityPage
+            onOpenSession={handleOpenSession}
+            {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+          />
         ) : isHomeMode ? (
           <LibraryLanding
             onSelectProject={(key) => {

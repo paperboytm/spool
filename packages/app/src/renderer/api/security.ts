@@ -13,7 +13,12 @@ import type {
   RiskByCategoryRow,
   FindingsChange,
   ScanStatus,
+  AllowlistEntryRow,
 } from '@spool-lab/core'
+import type { SensitiveKind } from '@spool-lab/redact'
+import type { SecurityPreferences } from '../../preload/index.js'
+
+export type { SecurityPreferences, AllowlistEntryRow }
 
 /** Single source of truth for the renderer-side adapter. Components
  *  hold this object, not `window.spool.security` — keeps replaceability
@@ -47,6 +52,22 @@ export const securityApi = {
     window.spool.security.onFindingsChanged(handler),
   onScanStatus: (handler: (s: ScanStatus) => void): (() => void) =>
     window.spool.security.onScanStatus(handler),
+
+  getPrefs: (): Promise<SecurityPreferences> =>
+    window.spool.security.getPrefs(),
+  setPrefs: (next: Partial<SecurityPreferences>): Promise<SecurityPreferences> =>
+    window.spool.security.setPrefs(next),
+  onPrefsChanged: (handler: (p: SecurityPreferences) => void): (() => void) =>
+    window.spool.security.onPrefsChanged(handler),
+
+  listAllowlistEntries: (): Promise<AllowlistEntryRow[]> =>
+    window.spool.security.listAllowlistEntries(),
+  removeAllowlistEntry: (args: {
+    scope: 'session' | 'global'
+    kind: SensitiveKind
+    valueHash: string
+    sessionUuid?: string
+  }) => window.spool.security.removeAllowlistEntry(args),
 }
 
 export type SecurityApi = typeof securityApi
