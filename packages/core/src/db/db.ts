@@ -20,8 +20,20 @@ let _db: Database.Database | null = null
 let _wasNewDb = false
 let _initialUserVersion: number | null = null
 
-export function getDB(_readonly = false): Database.Database {
+export interface OpenOptions {
+  /** Worker-thread callers should pass `false` — the main process has
+   *  already run migrations on the shared DB file before spawning, and
+   *  two threads racing through the migration script trip over each
+   *  other on the `CREATE TRIGGER` / index steps (DROP IF EXISTS +
+   *  CREATE is not atomic across connections). Default `true`. */
+  runMigrations?: boolean
+}
+
+export function getDB(arg?: boolean | OpenOptions): Database.Database {
   if (_db) return _db
+  const opts: OpenOptions =
+    typeof arg === 'object' && arg !== null ? arg : {}
+  const shouldRunMigrations = opts.runMigrations !== false
   mkdirSync(SPOOL_DIR, { recursive: true })
   // Capture pre-open state before better-sqlite3 creates the file. These two
   // signals together let callers tell apart "fresh install" from "upgrade":
@@ -33,7 +45,9 @@ export function getDB(_readonly = false): Database.Database {
   db.pragma('foreign_keys = ON')
   db.pragma('busy_timeout = 5000')
   _initialUserVersion = (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version ?? 0
-  runMigrations(db)
+  if (shouldRunMigrations) {
+    runMigrations(db)
+  }
   _db = db
   return db
 }

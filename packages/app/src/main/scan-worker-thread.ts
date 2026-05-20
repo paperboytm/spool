@@ -23,7 +23,7 @@
 //
 // Protocol — see ScanWorkerThreadMessage union below.
 
-import { parentPort } from 'node:worker_threads'
+import { parentPort, threadId } from 'node:worker_threads'
 import { Effect, Exit, Fiber, Scope, Stream } from 'effect'
 import {
   currentProfileString,
@@ -73,7 +73,12 @@ process.on('unhandledRejection', reportFatal)
 process.on('uncaughtException', reportFatal)
 
 void (async () => {
-  const db = getDB()
+  console.log('[scan-worker-thread] booting; threadId =', threadId)
+  // Main process already migrated the file before spawning this
+  // thread; skipping here avoids a race with sync-worker (whose
+  // getDB() also opens with migrations skipped now) over the
+  // FTS-trigger DROP/CREATE steps.
+  const db = getDB({ runMigrations: false })
   const scope = await Effect.runPromise(Scope.make())
 
   const worker = await Effect.runPromise(

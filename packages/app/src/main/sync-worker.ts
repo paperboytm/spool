@@ -26,7 +26,10 @@ process.on('unhandledRejection', reportAndExit)
 process.on('uncaughtException', reportAndExit)
 
 try {
-  const db = getDB()
+  // Main process already migrated the file before this worker
+  // spawns; skipping here keeps two threads from racing through
+  // the same CREATE-TRIGGER migration step.
+  const db = getDB({ runMigrations: false })
   const syncer = new Syncer(db, (event) => {
     parentPort?.postMessage({ type: 'progress', data: event } satisfies SyncWorkerMessage)
   })
