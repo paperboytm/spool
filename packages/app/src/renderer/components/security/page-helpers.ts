@@ -1,0 +1,97 @@
+// Pure formatting helpers used across the Security page surface.
+//
+// Extracted from the large SecurityPage.tsx so each function can be
+// unit-tested independently of the React tree.
+
+import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+
+/** Drop the long Claude model id (`claude-sonnet-4-5-20251022`) to
+ *  the compact `sonnet 4.5` form used in session meta rows.
+ *
+ *  - Strips the `claude-` prefix and the trailing date suffix.
+ *  - Joins major/minor with a `.` when both are present so the date
+ *    suffix gets a clean cutoff at the family + version boundary.
+ *  - Falls through to the original string for any non-Claude id (so
+ *    GPT and Gemini models pass through unchanged).
+ */
+export function compactModel(model: string | null | undefined): string {
+  if (!model) return ''
+  const m = model.match(/^claude-(opus|sonnet|haiku)(?:-(\d+))?(?:-(\d+))?$/)
+  if (!m) return model
+  const name = m[1]!
+  const major = m[2]
+  const minor = m[3]
+  if (minor) return `${name} ${major}.${minor}`
+  if (major) return `${name} ${major}`
+  return name
+}
+
+/** Format a `scan_completed_at` ISO timestamp as a small relative
+ *  string ("just now" / "12m ago" / "3h ago" / "5d ago"). Anchored
+ *  at `Date.now()`; returns "just now" for clock skew (negative
+ *  deltas) and "" for unparseable input. */
+export function formatScanAgo(iso: string, now: number = Date.now()): string {
+  try {
+    const t = new Date(iso).getTime()
+    const ms = now - t
+    if (!Number.isFinite(ms) || ms < 0) return 'just now'
+    const s = Math.floor(ms / 1000)
+    if (s < 45) return 'just now'
+    const m = Math.floor(s / 60)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    const d = Math.floor(h / 24)
+    return `${d}d ago`
+  } catch {
+    return ''
+  }
+}
+
+/** Whether a SensitiveKind belongs to the HIGH severity tier
+ *  (credentials). Thin wrapper around the redact set so callers
+ *  don't have to import the set + check membership inline. */
+export function isHighKind(kind: string): boolean {
+  return HIGH_SEVERITY_KINDS.has(kind as SensitiveKind)
+}
+
+/** Whether a SensitiveKind belongs to the INFO tier (paths / IPs /
+ *  internal hostnames). Used to suppress info-tier kinds from the
+ *  default Security page view. */
+export function isInfoKind(kind: string): boolean {
+  return INFO_SEVERITY_KINDS.has(kind as SensitiveKind)
+}
+
+/** Human-readable label for the per-kind purge mask + dismiss copy.
+ *  E.g. `api-key` → `API key`. Returns the input unchanged for
+ *  unknown kinds (forward-compat with kinds added later in the
+ *  redact package). */
+export function friendlyKind(kind: string): string {
+  return FRIENDLY_KIND_MAP[kind] ?? kind
+}
+
+const FRIENDLY_KIND_MAP: Record<string, string> = {
+  'api-key': 'API key',
+  'private-key': 'private key',
+  'jwt': 'JWT',
+  'bearer': 'bearer token',
+  'kubeconfig-token': 'kubeconfig token',
+  'env-var': 'env var',
+  'url-creds': 'URL credentials',
+  'connection-string': 'connection string',
+  'ssh-key': 'SSH key',
+  'cloud-cred-ini': 'cloud creds',
+  'netrc': 'netrc',
+  'basic-auth': 'basic auth',
+  'generic-secret': 'secret',
+  'email': 'email',
+  'person-name': 'name',
+  'phone': 'phone',
+  'street-address': 'address',
+  'credit-card': 'credit card',
+  'ssn': 'SSN',
+  'date-of-birth': 'DOB',
+  'absolute-path': 'absolute path',
+  'ip': 'IP address',
+  'internal-host': 'internal host',
+}
