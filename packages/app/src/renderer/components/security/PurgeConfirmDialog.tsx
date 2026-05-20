@@ -183,9 +183,7 @@ export default function PurgeConfirmDialog({
             className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-accent dark:bg-accent-dark border border-accent dark:border-accent-dark text-[12px] font-medium text-white hover:bg-accent/90 dark:hover:bg-accent-dark/90 transition-colors"
           >
             <Trash2 size={12} strokeWidth={1.7} aria-hidden />
-            {bulk
-              ? t('security.purge_confirm_bulk', { defaultValue: 'Purge {{count}} findings', count })
-              : t('security.purge_confirm_single', { defaultValue: 'Purge finding' })}
+            {t('security.purge_confirm', { defaultValue: 'Purge' })}
           </button>
         </div>
       </div>

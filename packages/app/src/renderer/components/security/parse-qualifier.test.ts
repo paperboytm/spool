@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseQualifier, withQualifier } from './parse-qualifier.js'
+import { parseQualifier, withQualifier, toggleKindQualifier } from './parse-qualifier.js'
 
 describe('parseQualifier', () => {
   it('empty string yields empty filter', () => {
@@ -66,6 +66,19 @@ describe('parseQualifier', () => {
     expect(p.filter.state).toBeUndefined()
     expect(p.filter.text).toBe(':active')
   })
+
+  it('multiple kind: tokens accumulate into kinds[]', () => {
+    const p = parseQualifier('kind:api-key kind:jwt aws')
+    expect(p.filter.kinds).toEqual(['api-key', 'jwt'])
+    // Singular `kind` falls back to the first one so old callers still work.
+    expect(p.filter.kind).toBe('api-key')
+    expect(p.filter.text).toBe('aws')
+  })
+
+  it('duplicate kind: tokens dedupe', () => {
+    const p = parseQualifier('kind:api-key kind:api-key')
+    expect(p.filter.kinds).toEqual(['api-key'])
+  })
 })
 
 describe('withQualifier', () => {
@@ -87,5 +100,20 @@ describe('withQualifier', () => {
     const parsed = parseQualifier(out)
     expect(parsed.filter.kind).toBe('api-key')
     expect(parsed.filter.text).toBe('aws migrate')
+  })
+})
+
+describe('toggleKindQualifier', () => {
+  it('adds a kind when not present', () => {
+    expect(toggleKindQualifier('', 'api-key')).toBe('kind:api-key')
+    expect(toggleKindQualifier('aws', 'api-key')).toBe('kind:api-key aws')
+  })
+  it('removes a kind when already present, leaving the rest intact', () => {
+    expect(toggleKindQualifier('kind:api-key', 'api-key')).toBe('')
+    expect(toggleKindQualifier('kind:api-key kind:jwt aws', 'api-key')).toBe('kind:jwt aws')
+  })
+  it('two clicks of the same kind return to the original state', () => {
+    const after = toggleKindQualifier(toggleKindQualifier('aws', 'api-key'), 'api-key')
+    expect(after).toBe('aws')
   })
 })
