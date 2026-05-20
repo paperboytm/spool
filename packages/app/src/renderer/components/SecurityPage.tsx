@@ -566,11 +566,6 @@ function ScanResultBanner({
           {t('security.scan_done', { defaultValue: 'Scan complete' })}
         </span>
         <span className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted">
-          {t('security.scan_done_summary', {
-            sessions: result.scanned,
-            defaultValue: '{{sessions}} sessions',
-          })}
-          {' · '}
           {noFindings ? (
             t('security.scan_done_clean', { defaultValue: 'nothing high-risk found' })
           ) : (
