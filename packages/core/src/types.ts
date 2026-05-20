@@ -1,4 +1,4 @@
-export type SessionSource = 'claude' | 'codex' | 'gemini'
+export type SessionSource = 'claude' | 'codex' | 'gemini' | 'opencode'
 export type Source = SessionSource
 export type SearchMatchType = 'fts' | 'phrase' | 'all_terms'
 
@@ -127,6 +127,7 @@ export interface StatusInfo {
   claudeSessions: number
   codexSessions: number
   geminiSessions: number
+  opencodeSessions: number
   lastSyncedAt: string | null
   dbSizeBytes: number
 }
@@ -140,4 +141,3 @@ export interface SyncResult {
 // ── Search ──────────────────────────────────────────────────────────────────
 
 export type SearchResult = FragmentResult & { kind: 'fragment' }
-

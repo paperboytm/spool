@@ -6,7 +6,7 @@ export const loader = defineHandler<Props>(() => ({}));
 
 const TITLE = "Spool — Your AI session library";
 const DESC =
-  "Every Claude, Codex, and Gemini session you've ever had, in one local library. Browse by project, pin what matters, and search across everything with ⌘K. Local-first; nothing leaves your machine.";
+  "Every Claude, Codex, Gemini, and OpenCode session you've ever had, in one local library. Browse by project, pin what matters, and search across everything with ⌘K. Local-first; nothing leaves your machine.";
 
 export const head = defineHead(() => ({
   title: TITLE,
@@ -38,7 +38,7 @@ export const head = defineHead(() => ({
         "@type": "SoftwareApplication",
         name: "Spool",
         description:
-          "Your local AI session library. Browse, pin, and search every Claude Code, Codex, and Gemini session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
+          "Your local AI session library. Browse, pin, and search every Claude Code, Codex, Gemini, and OpenCode session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
         url: "https://spool.pro",
         applicationCategory: "DeveloperApplication",
         operatingSystem: "macOS",

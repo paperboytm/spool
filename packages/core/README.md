@@ -17,14 +17,14 @@ const results = searchFragments(db, 'authentication middleware', { limit: 10 })
 // List recent sessions
 const sessions = listRecentSessions(db, 20)
 
-// Sync new sessions from Claude, Codex, Gemini
+// Sync new sessions from Claude, Codex, Gemini, OpenCode
 const syncer = new Syncer(db)
 syncer.syncAll()
 ```
 
 ## What's inside
 
-- **Session parsers** — reads Claude Code, Codex, and Gemini CLI session files
+- **Session parsers** — reads Claude Code, Codex, Gemini CLI, and OpenCode sessions
 - **Full-text search** — FTS5 with unicode + trigram indexes for CJK support
 - **Watcher** — incremental indexing as new session files arrive
 - **Stars** — pin sessions for quick recall

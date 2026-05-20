@@ -17,6 +17,12 @@ const SESSION_SOURCE_META = {
     color: '#5887D0',
     colorDark: '#8AB0E5',
   },
+  opencode: {
+    label: 'OpenCode',
+    shortLabel: 'opencode',
+    color: '#8A6F3D',
+    colorDark: '#C9A761',
+  },
 } as const
 
 export function getSessionSourceColor(source: string): string {

@@ -17,6 +17,7 @@ const ISOLATED_ENV = {
   SPOOL_CLAUDE_DIR: '/nonexistent/claude',
   SPOOL_CODEX_DIR: '/nonexistent/codex',
   SPOOL_GEMINI_DIR: '/nonexistent/gemini',
+  SPOOL_OPENCODE_DIR: '/nonexistent/opencode',
 }
 
 function run(args: string[], env?: Record<string, string>): string {
@@ -101,7 +102,7 @@ const SCHEMA_SQL = `
   );
   INSERT INTO sources (name, base_path) VALUES
     ('claude','~/.claude/projects'),('codex','~/.codex/sessions'),
-    ('gemini','~/.gemini/tmp');
+    ('gemini','~/.gemini/tmp'),('opencode','~/.local/share/opencode/opencode.db');
 
   CREATE TABLE projects (
     id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL REFERENCES sources(id),

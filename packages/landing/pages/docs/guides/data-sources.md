@@ -14,6 +14,7 @@ Spool indexes your AI agent sessions automatically. Each source is watched in re
 | Codex CLI | `~/.codex/sessions/` |
 | Codex CLI (profiles) | `~/.codex-profiles/*/sessions/` |
 | Gemini CLI | `~/.gemini/tmp/*/chats/` |
+| OpenCode | `~/.local/share/opencode/opencode.db` |
 
 ## Platform data (Twitter, GitHub, Reddit, etc.)
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
@@ -263,6 +264,61 @@ describe('Syncer', () => {
     expect(row.scan_completed_at).toBeNull()
     expect(changed).toEqual([row.id])
   })
+
+  it('indexes OpenCode sessions from the SQLite database', async () => {
+    const baseDir = makeTempDir('spool-syncer-opencode-')
+    const opencodeDir = join(baseDir, 'opencode')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(opencodeDir, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('SPOOL_CLAUDE_DIR', join(baseDir, 'missing-claude'))
+    vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
+    vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
+    vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
+
+    const dbPath = join(opencodeDir, 'opencode.db')
+    const openCodeDb = new Database(dbPath)
+    openDbs.push(openCodeDb)
+    createOpenCodeSchema(openCodeDb)
+    seedOpenCodeSession(openCodeDb, {
+      id: 'ses_opencode_1',
+      directory: '/tmp/opencode-project',
+      title: 'Investigate OpenCode persistence',
+      userText: 'Find the OpenCode persistence layer',
+      assistantText: 'The session data is stored in SQLite.',
+    })
+
+    const { getDB, Syncer, searchFragments } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    const syncer = new Syncer(db)
+
+    expect(syncer.syncAll()).toMatchObject({ added: 1, updated: 0, errors: 0 })
+    expect(searchFragments(db, 'OpenCode persistence', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'opencode',
+        sessionUuid: 'ses_opencode_1',
+        project: '/tmp/opencode-project',
+      }),
+    ])
+
+    seedOpenCodeSession(openCodeDb, {
+      id: 'ses_opencode_2',
+      directory: '/tmp/opencode-project',
+      title: 'Inspect permissions',
+      userText: 'Review permission prompts',
+      assistantText: 'Permissions are stored per session.',
+    })
+
+    expect(syncer.syncFile(dbPath, 'opencode')).toBe('updated')
+    expect(searchFragments(db, 'permission prompts', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'opencode',
+        sessionUuid: 'ses_opencode_2',
+      }),
+    ])
+  })
 })
 
 async function loadCoreModules() {
@@ -287,4 +343,74 @@ function makeTempDir(prefix: string): string {
 function touchFile(filePath: string): void {
   const nextTime = new Date(Date.now() + 1000)
   utimesSync(filePath, nextTime, nextTime)
+}
+
+function createOpenCodeSchema(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE session (
+      id text PRIMARY KEY,
+      project_id text NOT NULL,
+      slug text NOT NULL,
+      directory text NOT NULL,
+      title text NOT NULL,
+      version text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      time_archived integer,
+      model text,
+      agent text
+    );
+
+    CREATE TABLE message (
+      id text PRIMARY KEY,
+      session_id text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      data text NOT NULL
+    );
+
+    CREATE TABLE part (
+      id text PRIMARY KEY,
+      message_id text NOT NULL,
+      session_id text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      data text NOT NULL
+    );
+  `)
+}
+
+function seedOpenCodeSession(
+  db: Database.Database,
+  input: {
+    id: string
+    directory: string
+    title: string
+    userText: string
+    assistantText: string
+  },
+): void {
+  const created = Date.UTC(2026, 4, 19, 1, 0, 0) + Number(input.id.replace(/\D/g, '') || 0) * 1000
+  db.prepare(`
+    INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated, model, agent)
+    VALUES (?, 'proj_1', ?, ?, ?, '1.0.0', ?, ?, 'opencode/gpt-5.4', 'build')
+  `).run(input.id, input.id, input.directory, input.title, created, created + 3000)
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(`${input.id}_user`, input.id, created + 1000, created + 1000, JSON.stringify({ role: 'user' }))
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(`${input.id}_user_text`, `${input.id}_user`, input.id, created + 1000, created + 1000, JSON.stringify({ type: 'text', text: input.userText }))
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(`${input.id}_assistant`, input.id, created + 2000, created + 2000, JSON.stringify({ role: 'assistant' }))
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(`${input.id}_assistant_text`, `${input.id}_assistant`, input.id, created + 2000, created + 2000, JSON.stringify({ type: 'text', text: input.assistantText }))
 }

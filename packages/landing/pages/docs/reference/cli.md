@@ -19,6 +19,7 @@ Full-text search across all indexed sessions.
 spool search "auth middleware"
 spool search "auth middleware" --source claude
 spool search "auth middleware" --source gemini
+spool search "auth middleware" --source opencode
 spool search "auth"  --json -n 10
 spool search "fix" --since 7d
 spool search '"auth middleware"'   # exact phrase
@@ -32,7 +33,7 @@ List recent sessions across sources.
 
 ```bash
 spool list                     # recent across all sources
-spool list -s claude -n 10     # filter by source
+spool list -s opencode -n 10   # filter by source
 spool list --json              # machine-readable
 ```
 

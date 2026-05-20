@@ -9,7 +9,7 @@ export const statusCommand = new Command('status')
       const s = getStatus(db)
       console.log(`DB:           ${s.dbPath}`)
       console.log(`Size:         ${formatBytes(s.dbSizeBytes)}`)
-      console.log(`Sessions:     ${s.totalSessions} total  (claude: ${s.claudeSessions}, codex: ${s.codexSessions}, gemini: ${s.geminiSessions})`)
+      console.log(`Sessions:     ${s.totalSessions} total  (claude: ${s.claudeSessions}, codex: ${s.codexSessions}, gemini: ${s.geminiSessions}, opencode: ${s.opencodeSessions})`)
       console.log(`Last synced:  ${s.lastSyncedAt ? formatDate(s.lastSyncedAt) : 'never'}`)
     } catch (err) {
       if (err instanceof Error && err.message.includes('SQLITE_CANTOPEN')) {

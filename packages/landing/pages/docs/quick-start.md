@@ -7,7 +7,7 @@ After [installing Spool](/docs/installation), you're a few clicks away from a br
 
 ## 1. Launch Spool
 
-Open Spool from your Applications folder. It starts indexing your Claude Code, Codex CLI, and Gemini CLI sessions automatically — new sessions become visible the moment they're written.
+Open Spool from your Applications folder. It starts indexing your Claude Code, Codex CLI, Gemini CLI, and OpenCode sessions automatically — new sessions become visible the moment they're written.
 
 ## 2. Browse your library
 

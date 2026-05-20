@@ -89,6 +89,7 @@ Only currently-supported agent sources are listed. New sources arrive via the da
 | Claude Code | `#C26A4E` | `#E89A7C` |
 | Codex CLI | `#4A9670` | `#7CC9A2` |
 | Gemini | `#5887D0` | `#8AB0E5` |
+| OpenCode | `#8A6F3D` | `#C9A761` |
 
 ### Semantic States
 Status colors are warm-tuned to match the rest of the palette — never use Tailwind defaults (`green-500`, `red-500`).
@@ -177,7 +178,7 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 - Replaces the older Star concept; star-prefixed code/UI was migrated wholesale.
 
 ### Sources Panel (Settings tab)
-- Lists the three built-in agent sources with their session counts.
+- Lists the built-in agent sources with their session counts.
 - Status: `auto` label + green dot when watcher is healthy.
 
 ### AI Answer Card

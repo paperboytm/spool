@@ -26,6 +26,7 @@ interface Props {
   claudeCount: number | null
   codexCount: number | null
   geminiCount: number | null
+  opencodeCount: number | null
   themeEditor: ThemeEditorStateV1
   onThemeEditorChange: (next: ThemeEditorStateV1) => void
   language: LanguagePreference
@@ -128,6 +129,7 @@ export default function SettingsPanel({
   claudeCount,
   codexCount,
   geminiCount,
+  opencodeCount,
   themeEditor,
   onThemeEditorChange,
   language,
@@ -205,7 +207,7 @@ export default function SettingsPanel({
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
             {tab === 'shortcuts' && <ShortcutsTab />}
-            {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} />}
+            {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
             {tab === 'agent' && <AgentTab />}
             {tab === 'labs' && <LabsTab />}
             {tab === 'security' && securityFeatureEnabled() && <SecurityPane />}
@@ -387,7 +389,17 @@ function AppearanceTab({
 
 // ── Sources Tab ────────────────────────────────────────────────────────────
 
-function SourcesTab({ claudeCount, codexCount, geminiCount }: { claudeCount: number | null; codexCount: number | null; geminiCount: number | null }) {
+function SourcesTab({
+  claudeCount,
+  codexCount,
+  geminiCount,
+  opencodeCount,
+}: {
+  claudeCount: number | null
+  codexCount: number | null
+  geminiCount: number | null
+  opencodeCount: number | null
+}) {
   const { t } = useTranslation()
   return (
     <div className="space-y-6">
@@ -395,6 +407,7 @@ function SourcesTab({ claudeCount, codexCount, geminiCount }: { claudeCount: num
         <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
         <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
         <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
+        <BuiltInSource name={getSessionSourceLabel('opencode')} color={getSessionSourceColor('opencode')} count={opencodeCount} />
       </Section>
     </div>
   )
@@ -599,4 +612,3 @@ function ToggleRow({
     </div>
   )
 }
-

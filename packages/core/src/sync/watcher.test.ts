@@ -27,13 +27,16 @@ function makeTempRoots() {
   const claudeRoot = join(baseDir, 'claude', 'projects')
   const codexRoot = join(baseDir, 'codex', 'sessions')
   const geminiRoot = join(baseDir, 'gemini', 'tmp')
+  const opencodeRoot = join(baseDir, 'opencode')
   mkdirSync(join(claudeRoot, 'project-a'), { recursive: true })
   mkdirSync(join(codexRoot, '2026', '04', '20'), { recursive: true })
   mkdirSync(join(geminiRoot, 'workspace', 'chats'), { recursive: true })
+  mkdirSync(opencodeRoot, { recursive: true })
   vi.stubEnv('SPOOL_CLAUDE_DIR', claudeRoot)
   vi.stubEnv('SPOOL_CODEX_DIR', codexRoot)
   vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'gemini'))
-  return { baseDir, claudeRoot, codexRoot, geminiRoot }
+  vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeRoot)
+  return { baseDir, claudeRoot, codexRoot, geminiRoot, opencodeRoot }
 }
 
 interface SyncCall { path: string; source: SessionSource }
@@ -127,21 +130,24 @@ describe('SpoolWatcher', () => {
     for (const c of calls) expect(c.path).toBe(filePath)
   })
 
-  test('detects codex and gemini sources', async () => {
-    const { codexRoot, geminiRoot } = makeTempRoots()
+  test('detects codex, gemini, and opencode sources', async () => {
+    const { codexRoot, geminiRoot, opencodeRoot } = makeTempRoots()
     const { syncer, calls } = makeStubSyncer()
     await startWatcher(syncer)
 
     const codexFile = join(codexRoot, '2026', '04', '20', 'rollout.jsonl')
     const geminiFile = join(geminiRoot, 'workspace', 'chats', 'session-2026-04-20T00-00-deadbeef.json')
+    const opencodeFile = join(opencodeRoot, 'opencode.db')
     writeFileSync(codexFile, '{}\n')
     writeFileSync(geminiFile, '{}')
+    writeFileSync(opencodeFile, '')
 
-    await waitFor(() => calls.length >= 2, 3000)
+    await waitFor(() => calls.length >= 3, 3000)
 
     const sources = new Set(calls.map(c => c.source))
     expect(sources.has('codex')).toBe(true)
     expect(sources.has('gemini')).toBe(true)
+    expect(sources.has('opencode')).toBe(true)
   })
 
   test('coalesces many new-session events into a single count', async () => {
@@ -184,6 +190,7 @@ describe('SpoolWatcher', () => {
     vi.stubEnv('SPOOL_CLAUDE_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now()))
     vi.stubEnv('SPOOL_CODEX_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-b'))
     vi.stubEnv('SPOOL_GEMINI_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-g'))
+    vi.stubEnv('SPOOL_OPENCODE_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-o'))
     const { syncer } = makeStubSyncer()
     const w = new SpoolWatcher(syncer, FAST)
     runningWatchers.push(w)

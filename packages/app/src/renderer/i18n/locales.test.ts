@@ -77,6 +77,7 @@ describe('locale key parity vs en.json', () => {
     'settings.sources_count_claude',
     'settings.sources_count_codex',
     'settings.sources_count_gemini',
+    'settings.sources_count_opencode',
     'shares.minutesAgo',
     'shares.hoursAgo',
     'shares.daysAgo',

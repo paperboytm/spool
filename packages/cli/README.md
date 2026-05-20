@@ -21,7 +21,7 @@ spool search "bug" -n 5        # Limit results
 spool search "fix" --since 7d  # Only recent sessions
 
 spool list                     # List recent sessions
-spool list -s claude -n 10     # Filter by source
+spool list -s opencode -n 10   # Filter by source
 spool list --json              # Output as JSON
 
 spool show <uuid>              # Print full session content
@@ -33,7 +33,7 @@ spool status                   # Show index stats (session count, DB size)
 ### Sync
 
 ```bash
-spool sync                     # Index new AI sessions (Claude, Codex, Gemini)
+spool sync                     # Index new AI sessions (Claude, Codex, Gemini, OpenCode)
 spool sync --watch             # Keep watching for new sessions
 ```
 

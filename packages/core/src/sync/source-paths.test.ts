@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { detectSessionSource, getSessionRoots } from './source-paths.js'
@@ -57,6 +57,20 @@ describe('getSessionRoots', () => {
       join(geminiHome, 'tmp'),
     ])
   })
+
+  test('should normalize OpenCode data directories and database paths', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-opencode-source-paths-'))
+    const opencodeDir = join(baseDir, '.local', 'share', 'opencode')
+    tempDirs.push(baseDir)
+
+    mkdirSync(opencodeDir, { recursive: true })
+    writeFileSync(join(opencodeDir, 'opencode.db'), '')
+    vi.stubEnv('SPOOL_OPENCODE_DIR', join(opencodeDir, 'opencode.db'))
+
+    expect(getSessionRoots('opencode')).toEqual([
+      opencodeDir,
+    ])
+  })
 })
 
 describe('detectSessionSource', () => {
@@ -67,19 +81,23 @@ describe('detectSessionSource', () => {
     const claudeRoot = join(baseDir, 'claude-work', 'projects')
     const codexRoot = join(baseDir, 'codex-personal', 'sessions')
     const geminiRoot = join(baseDir, 'gemini', 'tmp')
+    const opencodeRoot = join(baseDir, 'opencode')
     mkdirSync(join(claudeRoot, 'project-a'), { recursive: true })
     mkdirSync(join(codexRoot, '2026', '03', '29'), { recursive: true })
     mkdirSync(join(geminiRoot, 'workspace', 'chats'), { recursive: true })
+    mkdirSync(opencodeRoot, { recursive: true })
 
     const sourceRoots = {
       claude: [claudeRoot],
       codex: [codexRoot],
       gemini: [geminiRoot],
+      opencode: [opencodeRoot],
     } as const
 
     expect(detectSessionSource(join(claudeRoot, 'project-a', 'session.jsonl'), sourceRoots)).toBe('claude')
     expect(detectSessionSource(join(codexRoot, '2026', '03', '29', 'rollout.jsonl'), sourceRoots)).toBe('codex')
     expect(detectSessionSource(join(geminiRoot, 'workspace', 'chats', 'session-2026-04-08T00-00-deadbeef.json'), sourceRoots)).toBe('gemini')
+    expect(detectSessionSource(join(opencodeRoot, 'opencode.db'), sourceRoots)).toBe('opencode')
     expect(detectSessionSource(join(baseDir, 'other', 'session.jsonl'), sourceRoots)).toBeUndefined()
   })
 

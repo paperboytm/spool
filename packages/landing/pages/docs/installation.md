@@ -20,7 +20,7 @@ This downloads the latest `.dmg` from GitHub Releases, mounts it, and copies `Sp
 
 ## Verify installation
 
-After installation, launch Spool from `/Applications` or Spotlight. The app will start indexing your Claude Code, Codex, and Gemini CLI sessions automatically.
+After installation, launch Spool from `/Applications` or Spotlight. The app will start indexing your Claude Code, Codex, Gemini CLI, and OpenCode sessions automatically.
 
 ## Optional: install the CLI
 

@@ -23,7 +23,7 @@ Inside a Claude Code conversation:
 > /spool auth middleware refresh token rotation
 ```
 
-Claude invokes the skill, runs `spool search` against your local index, and presents the top matches with source attribution (Claude / Codex / Gemini) and session UUIDs. You can ask Claude to load any of them with `spool show <uuid>` for full context.
+Claude invokes the skill, runs `spool search` against your local index, and presents the top matches with source attribution (Claude / Codex / Gemini / OpenCode) and session UUIDs. You can ask Claude to load any of them with `spool show <uuid>` for full context.
 
 ## How it works
 

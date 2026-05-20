@@ -78,7 +78,8 @@ export function runMigrations(db: Database.Database): void {
     INSERT OR IGNORE INTO sources (name, base_path) VALUES
       ('claude', '~/.claude/projects'),
       ('codex',  '~/.codex/sessions'),
-      ('gemini', '~/.gemini/tmp');
+      ('gemini', '~/.gemini/tmp'),
+      ('opencode', '~/.local/share/opencode/opencode.db');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,

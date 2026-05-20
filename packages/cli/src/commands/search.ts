@@ -2,13 +2,13 @@ import { Command } from 'commander'
 import { getDB, searchFragments } from '@spool-lab/core'
 import type { FragmentResult, SessionSource } from '@spool-lab/core'
 
-const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini'])
+const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode'])
 
 export const searchCommand = new Command('search')
   .description('Search your AI session history')
   .argument('<query>', 'Search query')
   .option('-n, --limit <n>', 'Max results', '10')
-  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini')
+  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|opencode')
   .option('--since <date>', 'Only search sessions after this date (ISO or relative like "7d")')
   .option('--json', 'Output as JSON')
   .action(async (query: string, opts: { limit: string; source?: string; since?: string; json?: boolean }) => {

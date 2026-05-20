@@ -69,7 +69,7 @@ function Hero() {
       </h1>
 
       <p className="hh-lede">
-        Every Claude, Codex, and Gemini session in one place. Browsable, pinnable, searchable —{" "}
+        Every Claude, Codex, Gemini, and OpenCode session in one place. Browsable, pinnable, searchable —{" "}
         <strong>and never leaves your machine</strong>.
       </p>
 
@@ -326,7 +326,7 @@ function BrowseSection() {
             <span className="accent">.</span>
           </>
         }
-        sub="Spool watches Claude, Codex, and Gemini session directories today — and we're adding more agents as fast as they ship. Sessions are grouped by working directory, so opening a project shows everything you discussed there, regardless of which agent you used."
+        sub="Spool watches Claude, Codex, Gemini, and OpenCode sessions today. Sessions are grouped by working directory, so opening a project shows everything you discussed there, regardless of which agent you used."
       />
 
       <div className="pillar-spec">

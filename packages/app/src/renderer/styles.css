@@ -80,6 +80,7 @@
   --color-src-claude: #C26A4E;
   --color-src-codex: #4A9670;
   --color-src-gemini: #5887D0;
+  --color-src-opencode: #8A6F3D;
 
   /* Typography */
   --font-sans: 'Inter Variable', system-ui, sans-serif;

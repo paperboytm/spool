@@ -157,7 +157,6 @@ const searchCache = new SearchCache()
  *  so that flipping the flag on later doesn't require a second
  *  upgrade pass. */
 function securityFeatureEnabled(): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const env = (import.meta as any).env as { DEV?: boolean; VITE_FEATURE_SECURITY?: string } | undefined
   if (env?.DEV) return true
   return env?.VITE_FEATURE_SECURITY === '1'
@@ -459,7 +458,7 @@ ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned, ide
     if (cached) return cached
   }
 
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini'
+  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
     ? source
     : undefined
   const results = searchFragments(db, query, {
@@ -481,7 +480,7 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
   const cached = searchCache.get(cacheKey)
   if (cached) return cached
 
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini'
+  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
     ? source
     : undefined
   const fragments = searchSessionPreview(db, query, {
@@ -758,4 +757,3 @@ ipcMain.handle(
     }
   },
 )
-

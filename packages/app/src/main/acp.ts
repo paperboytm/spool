@@ -190,12 +190,12 @@ function ensureAgentSearchCwd(): string {
 
 /**
  * Map an agentId from BUILTIN_AGENT_CONFIGS / custom config to a SessionSource.
- * Only agents whose JSONL output is indexable (Claude Code, Codex, Gemini)
- * have a source — others (kimi, opencode, alma, custom) return null and skip
+ * Only agents whose local session output is indexable (Claude Code, Codex,
+ * Gemini, OpenCode) have a source — others (kimi, alma, custom) return null and skip
  * the Spool-authored session write.
  */
 function agentIdToSource(agentId: string): SessionSource | null {
-  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini') return agentId
+  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini' || agentId === 'opencode') return agentId
   return null
 }
 
@@ -566,10 +566,9 @@ export class AcpManager {
       })
 
       // Step 2: New session
-      // Use a stable, dedicated cwd so JSONL output from each agent lands in
-      // a recognizable downstream slug (e.g. ~/.claude/projects/-Users-...-
-      // spool-agent-search-sessions/) rather than scattering across whatever
-      // directory Electron happens to be running from.
+      // Use a stable, dedicated cwd so local session output from each agent
+      // lands in a recognizable downstream project rather than scattering
+      // across whatever directory Electron happens to be running from.
       const stableCwd = ensureAgentSearchCwd()
       const sessionResp = await conn.newSession({
         cwd: stableCwd,
@@ -840,17 +839,17 @@ export class AcpManager {
    */
   private buildPrompt(userQuery: string): string {
     // System instructions are wrapped in a <spool-system-prelude> marker so
-    // the parsers (claude/codex/gemini) can strip them when indexing the
+    // the parsers (claude/codex/gemini/opencode) can strip them when indexing the
     // on-disk JSONL. The user's actual query is sent OUTSIDE the marker, so
     // after stripping the prelude only the bare query remains as the first
     // user message — clean derived title, clean FTS, clean session detail.
     const systemBody = [
-      'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI).',
+      'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI, OpenCode).',
       '',
       'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
       '',
       '── Schema ──',
-      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", or "gemini"',
+      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", "gemini", or "opencode"',
       '  projects(id, source_id, slug, display_path, display_name, last_synced)',
       '  sessions(id, project_id, source_id, session_uuid TEXT, title TEXT, started_at TEXT, ended_at TEXT, message_count INT, has_tool_use INT)',
       '  messages(id, session_id, source_id, role TEXT, content_text TEXT, timestamp TEXT, tool_names TEXT)',
@@ -865,7 +864,7 @@ export class AcpManager {
       '',
       'Important:',
       '- Interpret the user\'s intent and decide what to search. Don\'t just match their exact words.',
-      '- If the user names a specific source (claude/codex/gemini), only return results from that source unless they explicitly ask for cross-source search.',
+      '- If the user names a specific source (claude/codex/gemini/opencode), only return results from that source unless they explicitly ask for cross-source search.',
       '- For cross-source questions, first identify the relevant sources, then query each source separately, confirm hits or no-hits per source, and only then merge them into one answer.',
       '- For temporal queries ("what did I do recently"), use explicit date filters and be conservative when comparing times across different sources.',
       '- You may run multiple queries to find relevant information.',
