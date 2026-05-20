@@ -20,6 +20,7 @@ export type { ProfileOpts, ParsedProfile } from './profile.js'
 export {
   insertFindings,
   deleteActiveFindings,
+  deleteRefreshableFindings,
   updateSessionCounts,
   setSessionScanProfile,
   invalidateAllScanProfiles,
