@@ -135,7 +135,7 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
               <PurgeConfirmDialog
                 open={purgePending}
                 count={visibleFindings.length}
-                summary={summary.join(' · ')}
+                kind={visibleFindings[0]?.kind ?? 'mixed'}
                 onConfirm={() => { setPurgePending(false); void purgeAll() }}
                 onCancel={() => setPurgePending(false)}
               />
