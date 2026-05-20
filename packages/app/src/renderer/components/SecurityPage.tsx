@@ -28,6 +28,7 @@ import type {
   Session,
 } from '@spool-lab/core'
 import { securityApi } from '../api/security.js'
+import { securityFeatureEnabled } from '../featureFlags.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
 import { SourceBadge } from './Badges.js'
@@ -44,6 +45,11 @@ interface Props {
 type Sess = SessionWithFindingCounts & { source: Session['source'] }
 
 export default function SecurityPage({ onOpenSession, onShareSession }: Props) {
+  // Defensive: belt-and-suspenders with App.tsx's route guard. If
+  // some future path ever lands the renderer on the security view
+  // without the feature flag, render nothing rather than mount a
+  // full page that calls IPC handlers main may not have registered.
+  if (!securityFeatureEnabled()) return null
   const { t } = useTranslation()
   const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
   const [sessions, setSessions] = useState<Sess[]>([])

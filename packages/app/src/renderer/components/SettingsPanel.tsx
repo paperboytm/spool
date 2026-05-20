@@ -151,7 +151,7 @@ export default function SettingsPanel({
             <h2 className="text-sm font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-0.5">
-            {TAB_DEFS.map(def => (
+            {TAB_DEFS.filter(def => def.id !== 'security' || securityFeatureEnabled()).map(def => (
               <button
                 key={def.id}
                 type="button"

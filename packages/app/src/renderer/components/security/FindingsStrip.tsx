@@ -14,7 +14,7 @@
 // until the ship gate clears.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Trash2, X } from 'lucide-react'
+import { Check, Trash2, X } from 'lucide-react'
 import type { Session, FindingRow } from '@spool-lab/core'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import { securityApi } from '../../api/security.js'
@@ -24,6 +24,16 @@ import PurgeConfirmDialog from './PurgeConfirmDialog.js'
 // hostnames). Excluded from the strip so the count + rows match the
 // session counter columns (scanFindingCount = high + low only).
 const INFO_KINDS = new Set(['absolute-path', 'ip', 'internal-host'])
+
+// High-severity kinds — credentials + structured tokens. Drives the
+// "N high-risk" line in the strip header. Mirrors the redact lib's
+// HIGH_SEVERITY_KINDS set; duplicated here to avoid the strip
+// importing from @spool-lab/redact directly.
+const HIGH_KINDS = new Set([
+  'private-key', 'ssh-key', 'cloud-cred-ini', 'kubeconfig-token', 'netrc',
+  'connection-string', 'url-creds', 'api-key', 'jwt', 'bearer',
+  'basic-auth', 'env-var', 'generic-secret',
+])
 
 interface Props {
   session: Session
@@ -101,27 +111,51 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
     await refresh()
   }
 
+  // Drive the header summary from the actually-loaded list, not the
+  // potentially-stale session counter columns. After a Purge all the
+  // session prop still carries the pre-purge `scanHighCount` until
+  // SessionDetail re-fetches; deriving from `findings` keeps the
+  // header truthful immediately.
+  const loaded = findings !== null
+  const loadedVisible = visibleFindings
+  const loadedHigh = loadedVisible.filter(f => HIGH_KINDS.has(f.kind)).length
+  const loadedLow = loadedVisible.length - loadedHigh
+  const isCleared = loaded && loadedVisible.length === 0
   const summary: string[] = []
-  if (high > 0) summary.push(`${high} high-risk`)
-  if (low > 0) summary.push(`${low} low secret${low === 1 ? '' : 's'}`)
+  if (loaded) {
+    if (loadedHigh > 0) summary.push(`${loadedHigh} high-risk`)
+    if (loadedLow > 0) summary.push(`${loadedLow} low secret${loadedLow === 1 ? '' : 's'}`)
+  }
 
   return (
     <div
       data-testid="findings-strip"
+      data-cleared={isCleared ? '1' : '0'}
       className="mx-6 mt-1 mb-2 rounded-md bg-accent-bg dark:bg-accent-bg-dark"
     >
       <div className="px-3 py-2">
         <div className="flex items-center gap-3">
-          <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
-            Findings
-          </span>
-          {summary.length > 0 && (
-            <span className="text-xs text-warm-muted dark:text-dark-muted">
-              {summary.join(' · ')}
-            </span>
+          {isCleared ? (
+            <>
+              <Check size={14} strokeWidth={2} aria-hidden className="text-warm-muted dark:text-dark-muted" />
+              <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
+                All cleared
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
+                Findings
+              </span>
+              {summary.length > 0 && (
+                <span className="text-xs text-warm-muted dark:text-dark-muted">
+                  {summary.join(' · ')}
+                </span>
+              )}
+            </>
           )}
           <span className="flex-1" />
-          {visibleFindings.length > 0 && (
+          {loadedVisible.length > 0 && (
             <>
               <button
                 type="button"
@@ -134,8 +168,8 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
               </button>
               <PurgeConfirmDialog
                 open={purgePending}
-                count={visibleFindings.length}
-                kind={visibleFindings[0]?.kind ?? 'mixed'}
+                count={loadedVisible.length}
+                kind={loadedVisible[0]?.kind ?? 'mixed'}
                 bulk
                 onConfirm={() => { setPurgePending(false); void purgeAll() }}
                 onCancel={() => setPurgePending(false)}

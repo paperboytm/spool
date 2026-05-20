@@ -22,11 +22,17 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi, type SecurityPreferences } from '../../api/security.js'
+import { securityFeatureEnabled } from '../../featureFlags.js'
 import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
 import AllowlistManageModal from '../security/AllowlistManageModal.js'
 
 export default function SecurityPane() {
+  // Defensive: SettingsPanel already filters the Security tab when
+  // the feature is off, but a direct `initialTab='security'` from
+  // App.tsx (or future deep-link) could still mount this. Render
+  // nothing rather than call security IPCs main may not have set up.
+  if (!securityFeatureEnabled()) return null
   const { t } = useTranslation()
   const [status, setStatus] = useState<ScanStatus | null>(null)
   const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
