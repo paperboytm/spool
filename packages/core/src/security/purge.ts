@@ -95,20 +95,33 @@ export function purgeFinding(
   })
 }
 
-/** Bulk purge across many findings. Groups by message_id and applies
- *  each message's findings in descending offset order; after the
- *  message is rewritten, offsets of every other finding in the same
- *  session may have shifted, so callers should treat the affected
- *  sessions' findings as stale until a rescan fires. */
+/** Bulk purge across many findings. Caller passes an arbitrary
+ *  ordering; we re-sort to the only correct order:
+ *
+ *    1. Group by `message_id`
+ *    2. Within each group, apply in **descending** `start_offset` so
+ *       earlier offsets stay valid as the string shifts.
+ *
+ *  Without this re-sort, two findings inside the same message at
+ *  offsets [10..20] and [40..60] would corrupt: purging [10..20]
+ *  first shifts everything after offset 20 by `mask.length - 10`,
+ *  and the second slice [40..60] now points at the wrong bytes
+ *  (often leaking part of the second secret into the mask, or
+ *  losing it entirely). */
 export function purgeFindings(
   findingIds: readonly number[],
   deps: PurgeDeps,
 ): Effect.Effect<PurgeResult[], PurgeError> {
   return Effect.gen(function* () {
+    // Resolve offsets/message ids up front so we can deterministically
+    // order. The Effect.try preserves db-failure → PurgeError mapping.
+    const ordered = yield* Effect.try({
+      try: () => orderForBulkPurge(deps.db, findingIds),
+      catch: (cause) => new PurgeError({ findingId: -1, reason: 'db-failed', cause }),
+    })
+
     const out: PurgeResult[] = []
-    // Sequential — order matters within a message; correctness wins
-    // over throughput here (purges are rare and small).
-    for (const id of findingIds) {
+    for (const id of ordered) {
       const result = yield* purgeFinding(id, deps).pipe(
         Effect.catchTag('PurgeError', (err) =>
           err.reason === 'already-purged'
@@ -120,6 +133,51 @@ export function purgeFindings(
     }
     return out
   })
+}
+
+/** Produce a purge order that's safe against offset drift. Findings
+ *  with `message_id IS NULL` (orphan rows that the schema permits but
+ *  should never happen in practice) fall to the end so they don't
+ *  interfere with message-grouped batches.
+ *
+ *  Exported only for tests. */
+export function orderForBulkPurge(
+  db: Database.Database,
+  findingIds: readonly number[],
+): number[] {
+  if (findingIds.length === 0) return []
+  const placeholders = findingIds.map(() => '?').join(',')
+  const rows = db.prepare(
+    `SELECT id, message_id, start_offset
+       FROM findings
+      WHERE id IN (${placeholders})`,
+  ).all(...findingIds) as Array<{ id: number; message_id: number | null; start_offset: number }>
+
+  const byMessage = new Map<number | null, Array<{ id: number; start_offset: number }>>()
+  for (const r of rows) {
+    const key = r.message_id
+    let bucket = byMessage.get(key)
+    if (!bucket) { bucket = []; byMessage.set(key, bucket) }
+    bucket.push({ id: r.id, start_offset: r.start_offset })
+  }
+  for (const bucket of byMessage.values()) {
+    bucket.sort((a, b) => b.start_offset - a.start_offset)
+  }
+  // Stable iteration order over the messages doesn't matter for
+  // correctness — purges in different messages can't shift each
+  // other's offsets. We sort by message_id (nulls last) for
+  // determinism in tests.
+  const messageKeys = [...byMessage.keys()].sort((a, b) => {
+    if (a === null) return 1
+    if (b === null) return -1
+    return a - b
+  })
+
+  const out: number[] = []
+  for (const key of messageKeys) {
+    for (const r of byMessage.get(key)!) out.push(r.id)
+  }
+  return out
 }
 
 function applyPurgeTxn(

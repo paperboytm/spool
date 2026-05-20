@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import Database from 'better-sqlite3'
 import { runMigrations } from '../db/db.js'
 import { insertFindings, listFindings, updateSessionCounts } from './repo.js'
-import { purgeFinding, purgeFindings, PurgeError } from './purge.js'
+import { purgeFinding, purgeFindings, orderForBulkPurge, PurgeError } from './purge.js'
 
 function setupDb(): Database.Database {
   const db = new Database(':memory:')
@@ -150,5 +150,80 @@ describe('purgeFindings bulk', () => {
     // Second pass — should not throw; should return empty array.
     const results = await Effect.runPromise(purgeFindings([f.id], deps(db)))
     expect(results).toEqual([])
+  })
+
+  // Regression for the bug discovered during review: two findings in
+  // the SAME message at different offsets would corrupt each other if
+  // applied in ascending order. The first purge shifts the string by
+  // `mask.length - (end-start)`; the second slice then operates on
+  // stale offsets, leaking part of the second secret or losing it.
+  // The fix re-sorts to descending start_offset per message.
+  it('preserves both secrets when two findings sit in the same message', async () => {
+    const a = 'AKIAIOSFODNN7AAAAAAA'
+    const b = 'AKIAIOSFODNN7BBBBBBB'
+    const content = `first ${a} middle ${b} tail`
+    insertMessage(db, 20, content)
+    insertFindings(db, [
+      {
+        sessionId: 1, messageId: 20, kind: 'api-key', valueHash: 'ha', confidence: 0.95,
+        provider: 'regex',
+        startOffset: content.indexOf(a),
+        endOffset: content.indexOf(a) + a.length,
+        state: 'active',
+      },
+      {
+        sessionId: 1, messageId: 20, kind: 'api-key', valueHash: 'hb', confidence: 0.95,
+        provider: 'regex',
+        startOffset: content.indexOf(b),
+        endOffset: content.indexOf(b) + b.length,
+        state: 'active',
+      },
+    ])
+    updateSessionCounts(db, 1)
+    // Caller passes lower-offset first — the typical UI ordering.
+    // Without the fix, purgeFindings applies them in caller order and
+    // the second slice cuts the wrong bytes.
+    const findings = listFindings(db, { sessionId: 1 })
+    const ascendingIds = findings
+      .slice()
+      .sort((x, y) => x.startOffset - y.startOffset)
+      .map(r => r.id)
+
+    const results = await Effect.runPromise(purgeFindings(ascendingIds, deps(db)))
+    expect(results).toHaveLength(2)
+
+    const after = db.prepare('SELECT content_text FROM messages WHERE id = 20')
+      .get() as { content_text: string }
+    // Neither raw value should survive anywhere in the message.
+    expect(after.content_text.includes(a)).toBe(false)
+    expect(after.content_text.includes(b)).toBe(false)
+    // The surrounding tokens must remain intact — proves offsets
+    // landed correctly, not shifted into adjacent text.
+    expect(after.content_text.startsWith('first ')).toBe(true)
+    expect(after.content_text.includes(' middle ')).toBe(true)
+    expect(after.content_text.endsWith(' tail')).toBe(true)
+  })
+
+  describe('orderForBulkPurge', () => {
+    it('returns ids grouped by message, descending start_offset within a message', () => {
+      insertMessage(db, 30, 'msg A')
+      insertMessage(db, 31, 'msg B')
+      insertFindings(db, [
+        { sessionId: 1, messageId: 30, kind: 'api-key', valueHash: 'h1', confidence: 0.9, provider: 'regex', startOffset: 10, endOffset: 20, state: 'active' },
+        { sessionId: 1, messageId: 30, kind: 'api-key', valueHash: 'h2', confidence: 0.9, provider: 'regex', startOffset: 50, endOffset: 60, state: 'active' },
+        { sessionId: 1, messageId: 31, kind: 'api-key', valueHash: 'h3', confidence: 0.9, provider: 'regex', startOffset: 5, endOffset: 15, state: 'active' },
+      ])
+      const findings = listFindings(db, { sessionId: 1 })
+      const byHash = new Map(findings.map(f => [f.valueHash, f.id]))
+      const ascending = [byHash.get('h1')!, byHash.get('h2')!, byHash.get('h3')!]
+      const ordered = orderForBulkPurge(db, ascending)
+      // Same message: h2 (start 50) before h1 (start 10). Across
+      // messages: message_id 30 before 31 (deterministic).
+      expect(ordered).toEqual([byHash.get('h2'), byHash.get('h1'), byHash.get('h3')])
+    })
+
+    it('returns [] for empty input', () => {
+      expect(orderForBulkPurge(db, [])).toEqual([])
+    })
   })
 })
