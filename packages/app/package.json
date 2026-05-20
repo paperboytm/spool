@@ -10,7 +10,7 @@
     "build:core": "pnpm --filter @spool-lab/core build",
     "build:redact": "pnpm --filter @spool-lab/redact build",
     "build:share-kit": "pnpm --filter @spool/share-kit build",
-    "build:deps": "pnpm run build:core && pnpm run build:redact && pnpm run build:share-kit",
+    "build:deps": "pnpm run build:redact && pnpm run build:core && pnpm run build:share-kit",
     "dev": "pnpm run build:deps && pnpm run rebuild:native && node scripts/dev.mjs",
     "dev:reset-db": "node scripts/dev-reset-db.mjs",
     "dev:seed-from-prod": "node scripts/dev-seed-from-prod.mjs",
