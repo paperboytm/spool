@@ -21,7 +21,7 @@
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
     "test": "vitest run",
-    "test:e2e": "pnpm run build:deps && pnpm run rebuild:native:electron && VITE_FEATURE_SHARE=1 electron-vite build && npx playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "pnpm run build:deps && pnpm run rebuild:native:electron && VITE_FEATURE_SHARE=1 VITE_FEATURE_SECURITY=1 electron-vite build && npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",
