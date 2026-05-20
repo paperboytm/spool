@@ -22,6 +22,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         package: [redact, core, cli, share-kit, app]
+    # macOS unit coverage is redundant with Ubuntu — unit tests have no
+    # Electron / native-window surface, and macOS e2e still runs on PRs.
+    # Skip macOS unit on PRs; keep it on push to main as a safety net.
+    if: matrix.os != 'macos-latest' || github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
