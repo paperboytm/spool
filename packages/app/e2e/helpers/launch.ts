@@ -58,6 +58,12 @@ export async function launchApp(opts: {
 
   const args = [join(APP_DIR, 'out', 'main', 'index.js')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
+  // Force prefers-reduced-motion at the Chromium level so transitions /
+  // animations resolve instantly — Playwright's "wait for element to be
+  // stable" otherwise spins on CSS transitions and times out under CPU
+  // contention. Only affects the Electron instance launched here, not
+  // the production app.
+  args.unshift('--force-prefers-reduced-motion')
 
   const app = await electron.launch({ args, cwd: APP_DIR, env })
 
@@ -85,6 +91,7 @@ export async function restartApp(ctx: AppContext): Promise<AppContext> {
   await ctx.app.close()
   const args = [join(APP_DIR, 'out', 'main', 'index.js')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
+  args.unshift('--force-prefers-reduced-motion')
   const app = await electron.launch({ args, cwd: APP_DIR, env: ctx.env })
   const window = await app.firstWindow()
   return {
