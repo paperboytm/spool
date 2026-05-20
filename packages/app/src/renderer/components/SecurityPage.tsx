@@ -136,8 +136,9 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
     return () => { off() }
   }, [refresh])
 
-  // Refs let the onScanStatus subscription read the latest values
-  // without re-subscribing on every render.
+  // Refs for the snapshot the result-banner reads on the busy→idle
+  // edge; lets the edge-detection effect stay on stable deps instead
+  // of re-running whenever risk / sessions / backfillStart change.
   const backfillStartRef = useRef<number | null>(null)
   backfillStartRef.current = backfillStart
   const riskRef = useRef<RiskByCategoryRow[]>([])
@@ -145,35 +146,49 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const sessionsLenRef = useRef(0)
   sessionsLenRef.current = sessions.length
 
-  // Subscribe to scan status pushes from the worker. Replaces a
-  // 500 ms setInterval poll — fewer IPC trips and zero edge-detection
-  // latency on the busy→idle transition that drives the result banner.
+  // Pull-loop on worker status — the worker has no push channel for
+  // scan progress today, only getStatus(). One self-rearming setTimeout
+  // chain runs for the page's lifetime: while idle it polls slowly
+  // (3 s) so a Rescan click is picked up quickly; while busy it polls
+  // 500 ms for visible progress-bar smoothness. Re-arms itself on each
+  // tick so we never tear down and rebuild the timer mid-burst.
   useEffect(() => {
-    const off = securityApi.onScanStatus((next) => {
-      setScanStatus(next)
-      const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
-      setBackfillStart((prev) => {
-        if (inFlight === 0) return null
-        if (prev === null || inFlight > prev) return inFlight
-        return prev
-      })
-      const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
-      if (nowBusy) {
-        wasScanningRef.current = true
-        setScanResult(null)
-        return
-      }
-      if (wasScanningRef.current) {
-        wasScanningRef.current = false
-        setRescanInFlight(false)
-        setScanResult({
-          scanned: backfillStartRef.current ?? sessionsLenRef.current,
-          high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
-          low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
+    let active = true
+    let handle: ReturnType<typeof setTimeout> | null = null
+    async function tick() {
+      if (!active) return
+      const next = await securityApi.getScanStatus().catch(() => null)
+      if (!active) return
+      if (next) {
+        setScanStatus(next)
+        const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
+        setBackfillStart((prev) => {
+          if (inFlight === 0) return null
+          if (prev === null || inFlight > prev) return inFlight
+          return prev
         })
+        const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
+        if (nowBusy) {
+          wasScanningRef.current = true
+          setScanResult(null)
+        } else if (wasScanningRef.current) {
+          wasScanningRef.current = false
+          setRescanInFlight(false)
+          setScanResult({
+            scanned: backfillStartRef.current ?? sessionsLenRef.current,
+            high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
+            low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
+          })
+        }
       }
-    })
-    return () => { off() }
+      const busy = next !== null && (next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0)
+      handle = setTimeout(tick, busy ? 500 : 3000)
+    }
+    void tick()
+    return () => {
+      active = false
+      if (handle) clearTimeout(handle)
+    }
   }, [])
 
   const isScanning = rescanInFlight || (scanStatus !== null &&
@@ -183,8 +198,6 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
     if (rescanInFlight) return
     setRescanInFlight(true)
     await securityApi.rescanAll().catch(() => { setRescanInFlight(false) })
-    // `rescanInFlight` clears on the busy→idle transition observed via
-    // onScanStatus; no manual timeout needed.
   }
 
   function toggleKindFilter(kind: string) {
