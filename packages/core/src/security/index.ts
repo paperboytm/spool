@@ -29,6 +29,7 @@ export {
   listSessionsWithFindings,
   riskByCategory,
   getFindingValue,
+  getFindingValues,
   getAllowlists,
   isAllowlisted,
   addAllowlistSession,

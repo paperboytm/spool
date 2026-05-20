@@ -27,6 +27,8 @@ export const securityApi = {
     window.spool.security.riskByCategory(),
   getFindingValue: (findingId: number): Promise<string | null> =>
     window.spool.security.getFindingValue(findingId),
+  getFindingValues: (ids: number[]): Promise<Record<number, string | null>> =>
+    window.spool.security.getFindingValues(ids),
   getScanStatus: (): Promise<ScanStatus> =>
     window.spool.security.getScanStatus(),
 

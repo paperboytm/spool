@@ -361,6 +361,42 @@ export function getFindingValue(db: Database.Database, findingId: number): strin
   return row.content_text.slice(row.start_offset, row.end_offset)
 }
 
+/** Bulk version of `getFindingValue` — one SQL query for N finding
+ *  ids instead of N round-trips. Caller fans the result map back out
+ *  by id; missing keys are treated as `null` (purged / vanished). */
+export function getFindingValues(
+  db: Database.Database,
+  findingIds: readonly number[],
+): Record<number, string | null> {
+  const out: Record<number, string | null> = {}
+  if (findingIds.length === 0) return out
+  const placeholders = findingIds.map(() => '?').join(',')
+  const rows = db.prepare(
+    `SELECT f.id, f.start_offset, f.end_offset, f.state, m.content_text
+       FROM findings f
+       LEFT JOIN messages m ON m.id = f.message_id
+      WHERE f.id IN (${placeholders})`,
+  ).all(...findingIds) as Array<{
+    id: number
+    start_offset: number
+    end_offset: number
+    state: FindingState
+    content_text: string | null
+  }>
+  for (const r of rows) {
+    if (r.content_text === null || r.state === 'purged') {
+      out[r.id] = null
+    } else {
+      out[r.id] = r.content_text.slice(r.start_offset, r.end_offset)
+    }
+  }
+  // Fill in nulls for ids that didn't come back (deleted / cascade).
+  for (const id of findingIds) {
+    if (!(id in out)) out[id] = null
+  }
+  return out
+}
+
 // ─── Allowlists ───────────────────────────────────────────────────
 
 export interface AllowlistSnapshot {

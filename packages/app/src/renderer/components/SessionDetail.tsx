@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, SquarePen, MoreHorizontal, Copy } from 'lucide-react'
+import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
+import { securityFeatureEnabled } from '../featureFlags.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
@@ -30,6 +31,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [pinned, setPinned] = useState(false)
+  // Findings strip is collapsed by default — only the risk pill in the
+  // meta row appears. Clicking the pill drops the strip in; the strip's
+  // × button puts it away again. Reset on session change so opening
+  // session A's strip doesn't leak into B.
+  const [stripOpen, setStripOpen] = useState(false)
+  useEffect(() => { setStripOpen(false) }, [sessionUuid])
   const [resuming, setResuming] = useState(false)
   const [commandCopied, setCommandCopied] = useState(false)
   const [showFindBar, setShowFindBar] = useState(false)
@@ -268,6 +275,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             <span className="flex-none">{formatRelativeDate(session.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })}</span>
             <span aria-hidden>·</span>
             <span className="flex-none">{t('session.messages_other', { count: session.messageCount })}</span>
+            <RiskPill session={session} open={stripOpen} onToggle={() => setStripOpen(v => !v)} />
           </p>
         </div>
 
@@ -347,7 +355,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         onClose={closeFindBar}
       />
 
-      <FindingsStrip session={session} />
+      <FindingsStrip session={session} open={stripOpen} onClose={() => setStripOpen(false)} />
 
       {/* Messages */}
       <MessageList
@@ -363,6 +371,101 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         showTargetHighlight={showTargetHighlight}
       />
     </div>
+  )
+}
+
+/** Small risk indicator placed inline in the session meta row,
+ *  immediately after the message count. Reads as a session stat
+ *  ("4 risks" alongside "84 messages") rather than another command.
+ *  Click toggles the FindingsStrip open/closed.
+ *
+ *  Shown only when the feature flag is on AND the session has either
+ *  active findings or a non-zero purged-history tally. Production
+ *  builds without VITE_FEATURE_SECURITY render nothing. */
+function RiskPill({
+  session,
+  open,
+  onToggle,
+}: {
+  session: Session
+  open: boolean
+  onToggle: () => void
+}) {
+  if (!securityFeatureEnabled()) return null
+
+  const high = session.scanHighCount ?? 0
+  const total = session.scanFindingCount ?? 0
+  const purged = session.scanPurgedCount ?? 0
+  const completed = session.scanCompletedAt != null
+
+  // Three pill states:
+  //   active   — has findings; click drops the strip in
+  //   resolved — was scanned, no active findings, ≥1 was purged at
+  //              some point; shield + ✓
+  //   none     — never had findings, or never scanned; nothing renders
+  let icon: React.ReactNode
+  let label: React.ReactNode
+  let tone: string
+  let title: string
+  let clickable = true
+
+  if (total > 0) {
+    const low = Math.max(0, total - high)
+    icon = <ShieldAlert size={12} strokeWidth={1.75} aria-hidden />
+    label = total
+    tone = high > 0
+      ? 'text-accent dark:text-accent-dark'
+      : 'text-warm-muted dark:text-dark-muted'
+    title = high > 0 && low > 0
+      ? `${high} high-risk · ${low} low`
+      : high > 0
+      ? `${high} high-risk`
+      : `${low} low`
+  } else if (completed && purged > 0) {
+    // Cleared: scan ran, was once dirty, now empty.
+    icon = <ShieldAlert size={12} strokeWidth={1.75} aria-hidden />
+    label = <Check size={12} strokeWidth={1.9} aria-hidden />
+    tone = 'text-warm-muted dark:text-dark-muted'
+    title = `${purged} resolved`
+    // No strip to drop — the pill is a status indicator only.
+    clickable = false
+  } else {
+    return null
+  }
+
+  // Clickable variant drops the strip; static variant is a status
+  // indicator only (the cleared/resolved state has nothing to expand).
+  const cls = `flex-none inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono tabular-nums text-[11px] ${tone}`
+  return (
+    <>
+      <span aria-hidden>·</span>
+      {clickable ? (
+        <button
+          type="button"
+          data-testid="session-risk-pill"
+          data-open={open ? '1' : '0'}
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={title}
+          title={title}
+          className={`${cls} hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors`}
+        >
+          {icon}
+          <span>{label}</span>
+        </button>
+      ) : (
+        <span
+          data-testid="session-risk-pill"
+          data-resolved="1"
+          aria-label={title}
+          title={title}
+          className={cls}
+        >
+          {icon}
+          <span>{label}</span>
+        </span>
+      )}
+    </>
   )
 }
 

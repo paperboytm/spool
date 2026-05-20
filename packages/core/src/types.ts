@@ -52,6 +52,13 @@ export interface Session {
   scanFindingCount: number
   /** Subset of scanFindingCount limited to HIGH_SEVERITY_KINDS. */
   scanHighCount: number
+  /** Lifetime count of purged findings on this session. Combined with
+   *  scanFindingCount === 0 and a non-null scanCompletedAt, lets the
+   *  Library row show an "all-resolved" check instead of an empty slot. */
+  scanPurgedCount: number
+  /** ISO timestamp the worker last finished scanning this session.
+   *  null when never scanned. */
+  scanCompletedAt: string | null
 }
 
 export type ProjectIdentityKind =

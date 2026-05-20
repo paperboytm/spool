@@ -12,6 +12,7 @@ import {
   listSessionsWithFindings,
   riskByCategory,
   getFindingValue,
+  getFindingValues,
   dismissFinding,
   undismissFinding,
   type FindingFilter,
@@ -28,6 +29,7 @@ export const SECURITY_IPC_CHANNELS = {
   LIST_SESSIONS_WITH_FINDINGS: 'security:list-sessions-with-findings',
   RISK_BY_CATEGORY:            'security:risk-by-category',
   GET_FINDING_VALUE:           'security:get-finding-value',
+  GET_FINDING_VALUES:          'security:get-finding-values',
   GET_SCAN_STATUS:             'security:get-scan-status',
 
   // mutations
@@ -68,6 +70,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.GET_FINDING_VALUE, (_e, findingId: number) =>
     getFindingValue(db, findingId),
+  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.GET_FINDING_VALUES, (_e, ids: number[]) =>
+    getFindingValues(db, ids),
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.GET_SCAN_STATUS, () =>
     runPromise(worker.getStatus),

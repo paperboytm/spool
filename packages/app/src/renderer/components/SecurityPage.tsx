@@ -2,15 +2,12 @@
 //
 // Watchtower-style layout: Risk panel (categories with active counts)
 // up top, then a list of sessions that have findings. Each row offers
-// per-finding Dismiss actions; Purge ships in PR 4.
-//
-// Keep the component flat and small for now. The full filter-bar /
-// qualifier parser / kind allowlist UI is deferred — this surface
-// already lets a user see what was found, click into the session,
-// and dismiss things.
+// per-finding Dismiss actions; bulk Purge ships when the purge PR
+// merges.
 
-import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, ShieldAlert, RotateCw, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { AlertTriangle, ChevronDown, ChevronRight, ShieldAlert, RotateCw } from 'lucide-react'
 import type {
   FindingRow,
   RiskByCategoryRow,
@@ -22,46 +19,76 @@ interface Props {
   onOpenSession: (sessionUuid: string) => void
 }
 
+// 300ms trailing debounce for onChange-driven refreshes. backfill of N
+// sessions publishes N change events; without coalescing, each one
+// kicks two IPC calls (riskByCategory + listSessionsWithFindings) and
+// a state replace + re-render. Trailing-edge so we still feel live
+// (toggle a mute → see the page update under 300ms) without storming.
+const REFRESH_DEBOUNCE_MS = 300
+
+type PageState =
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; risk: RiskByCategoryRow[]; sessions: SessionWithFindingCounts[] }
+
 export default function SecurityPage({ onOpenSession }: Props) {
-  const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
-  const [sessions, setSessions] = useState<SessionWithFindingCounts[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation()
+  const [state, setState] = useState<PageState>({ kind: 'loading' })
 
   const refresh = useCallback(async () => {
     try {
-      const [r, s] = await Promise.all([
+      const [risk, sessions] = await Promise.all([
         securityApi.riskByCategory(),
         securityApi.listSessionsWithFindings({}),
       ])
-      setRisk(r)
-      setSessions(s)
-      setLoading(false)
-      setError(null)
+      setState({ kind: 'ready', risk, sessions })
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      setLoading(false)
+      setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
     }
   }, [])
 
   useEffect(() => {
     void refresh()
-    const off = securityApi.onChange(() => { void refresh() })
-    return () => { off() }
   }, [refresh])
 
-  async function handleRescanAll() {
+  // Subscribe to scan events, but coalesce the refresh — see comment
+  // on REFRESH_DEBOUNCE_MS.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = securityApi.onChange(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timer = null
+        void refresh()
+      }, REFRESH_DEBOUNCE_MS)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
+  }, [refresh])
+
+  const handleRescanAll = useCallback(async () => {
     await securityApi.rescanAll()
     void refresh()
+  }, [refresh])
+
+  if (state.kind === 'loading') {
+    return (
+      <div className="p-8 text-warm-muted dark:text-dark-muted">
+        {t('common.loading', { defaultValue: 'Loading…' })}
+      </div>
+    )
+  }
+  if (state.kind === 'error') {
+    return (
+      <div className="p-8 text-red-600 dark:text-red-400">
+        {t('security.loadFailed', { defaultValue: 'Security page failed to load: {{message}}', message: state.message })}
+      </div>
+    )
   }
 
-  if (loading) {
-    return <div className="p-8 text-warm-muted dark:text-dark-muted">Loading…</div>
-  }
-  if (error) {
-    return <div className="p-8 text-red-600 dark:text-red-400">Security page failed to load: {error}</div>
-  }
-
+  const { risk, sessions } = state
   const highCats = risk.filter(r => r.severity === 'high')
   const lowCats = risk.filter(r => r.severity === 'low')
   const totalActive = risk.reduce((acc, r) => acc + r.count, 0)
@@ -74,19 +101,21 @@ export default function SecurityPage({ onOpenSession }: Props) {
           <ShieldAlert
             size={24}
             strokeWidth={1.5}
-            className="text-warm-accent dark:text-dark-accent"
+            className="text-accent dark:text-accent-dark"
             aria-hidden
           />
-          <h1 className="text-2xl font-medium text-warm-text dark:text-dark-text">Security</h1>
+          <h1 className="text-2xl font-medium text-warm-text dark:text-dark-text">
+            {t('security.title', { defaultValue: 'Security' })}
+          </h1>
         </div>
         <button
           type="button"
           data-testid="security-rescan-all"
-          onClick={handleRescanAll}
+          onClick={() => { void handleRescanAll() }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm border border-warm-border dark:border-dark-border hover:bg-warm-surface dark:hover:bg-dark-surface transition"
         >
           <RotateCw size={14} strokeWidth={1.75} aria-hidden />
-          Rescan all
+          {t('security.rescanAll', { defaultValue: 'Rescan all' })}
         </button>
       </header>
 
@@ -95,14 +124,18 @@ export default function SecurityPage({ onOpenSession }: Props) {
         className="rounded-lg border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg-2 p-5 mb-6"
       >
         <p className="text-sm text-warm-muted dark:text-dark-muted mb-3">
-          {totalActive} active finding{totalActive === 1 ? '' : 's'} across {totalSessions} session{totalSessions === 1 ? '' : 's'}
+          {t('security.summary', {
+            defaultValue: '{{findings}} active across {{sessions}} sessions',
+            findings: totalActive,
+            sessions: totalSessions,
+          })}
         </p>
 
         {highCats.length > 0 && (
           <div className="mb-3">
             <div className="flex items-center gap-2 text-sm font-medium text-warm-text dark:text-dark-text mb-2">
-              <AlertTriangle size={14} className="text-warm-accent dark:text-dark-accent" aria-hidden />
-              High
+              <AlertTriangle size={14} className="text-accent dark:text-accent-dark" aria-hidden />
+              {t('security.severityHigh', { defaultValue: 'High' })}
             </div>
             <div className="flex flex-wrap gap-2">
               {highCats.map(c => (
@@ -113,30 +146,24 @@ export default function SecurityPage({ onOpenSession }: Props) {
         )}
 
         {lowCats.length > 0 && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition">
-              ▸ Low ({lowCats.length} categor{lowCats.length === 1 ? 'y' : 'ies'},
-              {' '}{lowCats.reduce((a, c) => a + c.count, 0)} items)
-            </summary>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {lowCats.map(c => (
-                <CategoryChip key={c.kind} kind={c.kind} count={c.count} severity="low" />
-              ))}
-            </div>
-          </details>
+          <LowCategoriesGroup categories={lowCats} />
         )}
 
         {risk.length === 0 && (
-          <p className="text-sm text-warm-muted dark:text-dark-muted">No active findings.</p>
+          <p className="text-sm text-warm-muted dark:text-dark-muted">
+            {t('security.noFindings', { defaultValue: 'No active findings.' })}
+          </p>
         )}
       </section>
 
       <section data-testid="security-session-list">
-        <h2 className="text-sm uppercase tracking-wide text-warm-muted dark:text-dark-muted mb-2">
-          Sessions with findings
+        <h2 className="text-xs uppercase tracking-wide text-warm-muted dark:text-dark-muted mb-2">
+          {t('security.sessionsWithFindings', { defaultValue: 'Sessions with findings' })}
         </h2>
         {sessions.length === 0 ? (
-          <p className="text-sm text-warm-muted dark:text-dark-muted">No sessions have findings yet.</p>
+          <p className="text-sm text-warm-muted dark:text-dark-muted">
+            {t('security.noSessions', { defaultValue: 'No sessions have findings yet.' })}
+          </p>
         ) : (
           <ul className="divide-y divide-warm-border dark:divide-dark-border border border-warm-border dark:border-dark-border rounded-lg overflow-hidden">
             {sessions.map(s => (
@@ -144,7 +171,6 @@ export default function SecurityPage({ onOpenSession }: Props) {
                 key={s.id}
                 session={s}
                 onOpen={() => onOpenSession(s.sessionUuid)}
-                onRefresh={refresh}
               />
             ))}
           </ul>
@@ -154,9 +180,41 @@ export default function SecurityPage({ onOpenSession }: Props) {
   )
 }
 
+function LowCategoriesGroup({ categories }: { categories: RiskByCategoryRow[] }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const total = categories.reduce((a, c) => a + c.count, 0)
+  return (
+    <div className="text-sm">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition"
+      >
+        {open
+          ? <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
+          : <ChevronRight size={12} strokeWidth={1.75} aria-hidden />}
+        {t('security.lowGroupLabel', {
+          defaultValue: 'Low ({{categories}} categories, {{items}} items)',
+          categories: categories.length,
+          items: total,
+        })}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {categories.map(c => (
+            <CategoryChip key={c.kind} kind={c.kind} count={c.count} severity="low" />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CategoryChip({ kind, count, severity }: { kind: string; count: number; severity: 'high' | 'low' }) {
   const cls = severity === 'high'
-    ? 'bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text border-warm-accent/40 dark:border-dark-accent/40'
+    ? 'bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text border-accent/40 dark:border-accent-dark/40'
     : 'bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted border-warm-border dark:border-dark-border'
   return (
     <span
@@ -175,62 +233,121 @@ function CategoryChip({ kind, count, severity }: { kind: string; count: number; 
 function SecuritySessionRow({
   session,
   onOpen,
-  onRefresh,
 }: {
   session: SessionWithFindingCounts
   onOpen: () => void
-  onRefresh: () => void
 }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [findings, setFindings] = useState<FindingRow[] | null>(null)
+  const [values, setValues] = useState<Record<number, string | null>>({})
 
-  async function toggle() {
-    const next = !expanded
-    setExpanded(next)
-    if (next && findings === null) {
-      const rows = await securityApi.listFindings({ sessionId: session.id })
-      setFindings(rows)
+  const loadFindings = useCallback(async () => {
+    const rows = await securityApi.listFindings({ sessionId: session.id })
+    setFindings(rows)
+    // Bulk-fetch values in one IPC instead of one-per-row useEffect.
+    if (rows.length > 0) {
+      const map = await securityApi.getFindingValues(rows.map(r => r.id))
+      setValues(map)
     }
-  }
+  }, [session.id])
+
+  useEffect(() => {
+    if (!expanded || findings !== null) return
+    void loadFindings()
+  }, [expanded, findings, loadFindings])
+
+  // Optimistic dismiss: drop the row from local state immediately so
+  // the user sees the action take effect without waiting on the
+  // round-trip + re-fetch. The worker's onChange fires anyway and the
+  // parent debounces a refresh.
+  const handleDismiss = useCallback(async (findingId: number, scope: 'session' | 'global') => {
+    setFindings(prev => prev?.filter(f => f.id !== findingId) ?? null)
+    try {
+      await securityApi.dismissFinding(findingId, scope)
+    } catch {
+      // Rollback on failure — reload the authoritative list.
+      void loadFindings()
+    }
+  }, [loadFindings])
+
+  const titleText = session.title?.trim() || t('session.noTitle', { defaultValue: '(untitled)' })
 
   return (
     <li className="px-4 py-3">
+      {/* One row, two click zones. Each zone is its own button so
+       *  there are no nested buttons; data-testid covers either way. */}
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={toggle}
-          className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text"
+          data-testid="security-row-toggle"
+          onClick={() => setExpanded(v => !v)}
           aria-expanded={expanded}
+          aria-label={expanded
+            ? t('common.collapse', { defaultValue: 'Collapse' })
+            : t('common.expand', { defaultValue: 'Expand' })}
+          className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface transition"
         >
-          {expanded ? '▾' : '▸'}
+          {expanded
+            ? <ChevronDown size={14} strokeWidth={1.75} aria-hidden />
+            : <ChevronRight size={14} strokeWidth={1.75} aria-hidden />}
         </button>
         <button
           type="button"
+          data-testid="security-row-open"
           onClick={onOpen}
-          className="flex-1 text-left min-w-0"
+          className="flex-1 text-left min-w-0 hover:underline decoration-warm-faint underline-offset-2"
         >
           <span className="block truncate font-medium text-warm-text dark:text-dark-text">
-            {session.title ?? '(untitled)'}
+            {titleText}
           </span>
           <span className="block text-xs text-warm-muted dark:text-dark-muted">
-            {new Date(session.startedAt).toLocaleString()} ·{' '}
+            {new Date(session.startedAt).toLocaleString()}
             {session.highCount > 0 && (
-              <span className="text-warm-accent dark:text-dark-accent">
-                {session.highCount} high
-              </span>
+              <>
+                {' · '}
+                <span className="text-accent dark:text-accent-dark">
+                  {t('security.nHighRisk', {
+                    defaultValue: '{{count}} high-risk',
+                    count: session.highCount,
+                  })}
+                </span>
+              </>
             )}
-            {session.highCount > 0 && session.findingCount > session.highCount ? ' · ' : ''}
             {session.findingCount > session.highCount && (
-              <span>{session.findingCount - session.highCount} low</span>
+              <>
+                {' · '}
+                <span>
+                  {t('security.nLow', {
+                    defaultValue: '{{count}} low',
+                    count: session.findingCount - session.highCount,
+                  })}
+                </span>
+              </>
             )}
           </span>
         </button>
       </div>
-      {expanded && findings && (
+      {expanded && (
         <div className="mt-3 ml-6 space-y-1">
-          {findings.map(f => (
-            <FindingRowView key={f.id} finding={f} onChange={() => { setFindings(null); onRefresh() }} />
-          ))}
+          {findings === null ? (
+            <p className="text-xs text-warm-muted dark:text-dark-muted">
+              {t('common.loading', { defaultValue: 'Loading…' })}
+            </p>
+          ) : findings.length === 0 ? (
+            <p className="text-xs text-warm-muted dark:text-dark-muted">
+              {t('security.noFindingsInSession', { defaultValue: 'No active findings.' })}
+            </p>
+          ) : (
+            findings.map(f => (
+              <FindingRowView
+                key={f.id}
+                finding={f}
+                value={values[f.id] ?? null}
+                onDismiss={handleDismiss}
+              />
+            ))
+          )}
         </div>
       )}
     </li>
@@ -239,22 +356,14 @@ function SecuritySessionRow({
 
 function FindingRowView({
   finding,
-  onChange,
+  value,
+  onDismiss,
 }: {
   finding: FindingRow
-  onChange: () => void
+  value: string | null
+  onDismiss: (findingId: number, scope: 'session' | 'global') => void
 }) {
-  const [value, setValue] = useState<string | null>(null)
-
-  useEffect(() => {
-    securityApi.getFindingValue(finding.id).then(setValue).catch(() => setValue(null))
-  }, [finding.id])
-
-  async function dismiss(scope: 'session' | 'global') {
-    await securityApi.dismissFinding(finding.id, scope)
-    onChange()
-  }
-
+  const { t } = useTranslation()
   return (
     <div
       data-testid="finding-row"
@@ -266,7 +375,7 @@ function FindingRowView({
         {finding.kind}
       </span>
       <span className="font-mono text-xs flex-1 truncate text-warm-text dark:text-dark-text">
-        {value ?? <em className="text-warm-faint dark:text-dark-faint">(unavailable)</em>}
+        {value ?? <em className="text-warm-faint dark:text-dark-faint">{t('security.valueUnavailable', { defaultValue: '(unavailable)' })}</em>}
       </span>
       <span className="text-xs text-warm-faint dark:text-dark-faint">
         {finding.provider}
@@ -276,25 +385,24 @@ function FindingRowView({
           <button
             type="button"
             data-testid="dismiss-in-session"
-            onClick={() => { void dismiss('session') }}
+            onClick={() => onDismiss(finding.id, 'session')}
             className="text-xs px-2 py-0.5 rounded hover:bg-warm-surface dark:hover:bg-dark-surface"
-            title="Dismiss in this session"
+            title={t('security.dismissInSessionTooltip', { defaultValue: 'Dismiss in this session' })}
           >
-            Dismiss in session
+            {t('security.dismissInSession', { defaultValue: 'Dismiss in session' })}
           </button>
           <button
             type="button"
             data-testid="dismiss-everywhere"
-            onClick={() => { void dismiss('global') }}
+            onClick={() => onDismiss(finding.id, 'global')}
             className="text-xs px-2 py-0.5 rounded hover:bg-warm-surface dark:hover:bg-dark-surface"
-            title="Dismiss everywhere"
+            title={t('security.dismissEverywhereTooltip', { defaultValue: 'Dismiss everywhere' })}
           >
-            Everywhere
+            {t('security.dismissEverywhere', { defaultValue: 'Everywhere' })}
           </button>
         </>
       ) : (
         <span className="inline-flex items-center gap-1 text-xs text-warm-muted dark:text-dark-muted">
-          <X size={12} aria-hidden />
           {finding.state}
         </span>
       )}

@@ -219,6 +219,8 @@ const api = {
       ipcRenderer.invoke('security:risk-by-category'),
     getFindingValue: (findingId: number): Promise<string | null> =>
       ipcRenderer.invoke('security:get-finding-value', findingId),
+    getFindingValues: (ids: number[]): Promise<Record<number, string | null>> =>
+      ipcRenderer.invoke('security:get-finding-values', ids),
     getScanStatus: (): Promise<ScanStatus> =>
       ipcRenderer.invoke('security:get-scan-status'),
     dismissFinding: (findingId: number, scope: 'session' | 'global'): Promise<{ ok: boolean }> =>

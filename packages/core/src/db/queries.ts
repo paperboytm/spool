@@ -226,6 +226,8 @@ export const SESSION_SELECT = `
     s.cwd, s.model,
     s.scan_finding_count AS scanFindingCount,
     s.scan_high_count    AS scanHighCount,
+    s.scan_purged_count  AS scanPurgedCount,
+    s.scan_completed_at  AS scanCompletedAt,
     src.name AS source,
     p.display_path AS projectDisplayPath,
     p.display_name AS projectDisplayName
@@ -997,6 +999,8 @@ export function rowToSession(r: Record<string, unknown>): Session {
     projectDisplayName: r['projectDisplayName'] as string,
     scanFindingCount: (r['scanFindingCount'] as number | null) ?? 0,
     scanHighCount: (r['scanHighCount'] as number | null) ?? 0,
+    scanPurgedCount: (r['scanPurgedCount'] as number | null) ?? 0,
+    scanCompletedAt: (r['scanCompletedAt'] as string | null) ?? null,
   }
 }
 
