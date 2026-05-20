@@ -108,9 +108,9 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   return (
     <div
       data-testid="findings-strip"
-      className="bg-accent-bg dark:bg-accent-bg-dark"
+      className="mx-6 mt-1 mb-2 rounded-md bg-accent-bg dark:bg-accent-bg-dark"
     >
-      <div className="px-5 py-2.5">
+      <div className="px-3 py-2">
         <div className="flex items-center gap-3">
           <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
             Findings
@@ -177,26 +177,24 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
 }
 
 function StripFindingRow({ finding, value }: { finding: FindingRow; value: string | null }) {
-  // `revealValuesOnHoverOnly` is a Settings preference shipped in the
-  // polish PR — until then we apply blur-on-default unconditionally
-  // so the screen-share scenario is safe by default. Polish PR will
-  // wire the preference through to gate this behavior.
+  // Match SecurityPage's value-display convention: default revealed,
+  // never auto-blurred. A future Eye/EyeOff toggle can opt the user
+  // into the screen-share-safe blurred mode (with hover-to-reveal),
+  // but the default is to show what was captured — hiding what the
+  // user came here to read is anti-UX.
   return (
     <li
       data-testid="strip-finding"
       data-kind={finding.kind}
       data-state={finding.state}
-      className="group flex items-center gap-4 text-xs pl-3"
+      className="flex items-center gap-4 text-xs pl-3"
     >
       <span aria-hidden className="text-warm-muted/60 dark:text-dark-muted/60 select-none">•</span>
       <span className="font-mono text-warm-muted dark:text-dark-muted w-24 shrink-0 truncate">
         {finding.kind}
       </span>
-      <span
-        className="font-mono flex-1 truncate text-warm-text dark:text-dark-text blur-[3px] group-hover:blur-0 transition-[filter] duration-100"
-        title="Hover to reveal"
-      >
-        {value ?? <em>(unavailable)</em>}
+      <span className="font-mono flex-1 truncate text-warm-text dark:text-dark-text">
+        {value ?? <em className="text-warm-faint dark:text-dark-faint">(unavailable)</em>}
       </span>
     </li>
   )

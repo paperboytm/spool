@@ -398,6 +398,13 @@ function RiskPill({
   const purged = session.scanPurgedCount ?? 0
   const completed = session.scanCompletedAt != null
 
+  // Defensive: if the session has no visible messages, suppress the
+  // pill. Stale findings can land on sessions whose user/assistant
+  // messages were stripped (sidechain-only state, file rewrite) and
+  // there's no useful action the user can take from this surface
+  // when the body is empty.
+  if ((session.messageCount ?? 0) === 0) return null
+
   // Three pill states:
   //   active   — has findings; click drops the strip in
   //   resolved — was scanned, no active findings, ≥1 was purged at
