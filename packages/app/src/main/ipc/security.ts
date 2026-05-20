@@ -184,21 +184,33 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     },
   )
 
-  // Forward worker change events to the renderer. The subscriber runs
-  // for the worker's lifetime; we interrupt it via the returned
-  // disposer when the IPC layer tears down.
+  // Forward worker change events to the renderer.
+  //
+  // Bug-fix note: this fiber MUST be `forkDaemon`, not `fork`. The
+  // previous `Effect.runPromise(Effect.fork(stream))` attached the
+  // forwarder to the runtime scope created by `runPromise`, which
+  // closes the instant runPromise resolves with the fiber handle.
+  // The forwarder fiber then got interrupted before seeing its
+  // first event, and renderers never received `session-rescanned`
+  // / `state-changed` events even though the worker was publishing
+  // them. This is what surfaced as "muting a kind in Settings does
+  // not refresh the Security page" — the DB state was correct but
+  // the page had no signal to re-fetch.
+  //
+  // `forkDaemon` detaches the fiber from the parent scope; it lives
+  // until explicitly interrupted by the returned disposer below.
   let forwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
   Effect.runPromise(
-    Effect.fork(
-      Stream.runForEach(worker.changes, (change) =>
-        Effect.sync(() => {
-          getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-        }),
-      ),
-    ),
-  )
-    .then((f) => { forwarderFiber = f as Fiber.RuntimeFiber<void, never> })
-    .catch(() => { /* fiber rejected; ignore (cleanup path) */ })
+    Effect.gen(function* () {
+      forwarderFiber = yield* Effect.forkDaemon(
+        Stream.runForEach(worker.changes, (change) =>
+          Effect.sync(() => {
+            getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
+          }),
+        ),
+      )
+    }),
+  ).catch(() => { /* fork rejected; ignore (cleanup path) */ })
 
   return () => {
     if (forwarderFiber) {
