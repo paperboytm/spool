@@ -220,7 +220,7 @@ function StripFindingRow({ finding, value }: { finding: FindingRow; value: strin
       <span className="font-mono text-warm-muted dark:text-dark-muted w-24 shrink-0 truncate">
         {finding.kind}
       </span>
-      <span className="font-mono flex-1 truncate text-warm-text dark:text-dark-text">
+      <span className="font-mono flex-1 truncate text-warm-text dark:text-dark-text select-text cursor-text">
         {value ?? <em className="text-warm-faint dark:text-dark-faint">{t('security.value_unavailable', { defaultValue: '(value unavailable)' })}</em>}
       </span>
     </li>

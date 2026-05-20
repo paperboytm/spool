@@ -1094,10 +1094,14 @@ function FindingItem({
       ? 'bg-accent dark:bg-accent-dark'
       : 'bg-warm-muted dark:bg-dark-muted'
 
+  // Body sets `user-select: none` app-wide; revealed values need to
+  // opt back in so the user can copy a leaked key / phone / email out.
+  // Blurred mode keeps `select-none` so a stray drag doesn't reveal
+  // the value via selection.
   const valueClass = isPurged
-    ? 'line-through text-warm-faint dark:text-dark-faint'
+    ? 'line-through text-warm-faint dark:text-dark-faint select-text cursor-text'
     : revealed
-      ? 'text-warm-text dark:text-dark-text'
+      ? 'text-warm-text dark:text-dark-text select-text cursor-text'
       : 'text-warm-text dark:text-dark-text blur-[3.5px] cursor-pointer select-none'
 
   const displayValue = isPurged
