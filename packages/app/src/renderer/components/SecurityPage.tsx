@@ -99,6 +99,11 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   // The latest moment `scan_completed_at` was set on ANY session — used
   // as the "scanned X ago" line in the meta row.
   const [lastScanCompletedAt, setLastScanCompletedAt] = useState<string | null>(null)
+  // Per-burst id used to fully remount ScanBanner on each new idle→busy
+  // transition. Without this, the bar's `width` CSS transition carries
+  // over from the previous burst's final 100% to the new burst's 0%,
+  // visually "rewinding" before going forward again.
+  const [scanBurstKey, setScanBurstKey] = useState(0)
   const parsed = useMemo(() => parseQualifier(query), [query])
 
   const filter: SessionFindingFilter = parsed.filter
@@ -162,9 +167,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
           // Just transitioned idle → busy. New scan started, so the
           // captured start represents THIS scan's max in-flight, not
           // a stale value from a prior burst. Clear any lingering
-          // result banner at the same time.
+          // result banner at the same time. Bump burst key so the
+          // progress bar remounts and doesn't CSS-transition from
+          // the prior 100% back to 0%.
           setBackfillStart(inFlight)
           setScanResult(null)
+          setScanBurstKey((k) => k + 1)
         } else {
           // Mid-scan — grow if a new high-water mark appears (e.g.
           // backfill kicked in mid-scan stacking on top of queued).
@@ -195,6 +203,13 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
 
   async function handleRescanAll() {
     if (rescanInFlight) return
+    // Reset stale per-burst state synchronously so the click is the
+    // visible "0% start" frame, not the prior burst's "100% end".
+    // The worker's first status event will then re-capture
+    // backfillStart for THIS burst.
+    setBackfillStart(null)
+    setScanResult(null)
+    setScanBurstKey((k) => k + 1)
     setRescanInFlight(true)
     await securityApi.rescanAll().catch(() => { setRescanInFlight(false) })
   }
@@ -332,7 +347,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
           ) : (
             <>
               {isScanning && scanStatus && (
-                <ScanBanner status={scanStatus} />
+                <ScanBanner key={scanBurstKey} status={scanStatus} backfillStart={backfillStart} />
               )}
               {!isScanning && scanResult && (
                 <ScanResultBanner
@@ -496,8 +511,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   )
 }
 
-function ScanBanner({ status }: { status: ScanStatus }) {
+function ScanBanner({ status, backfillStart }: { status: ScanStatus; backfillStart: number | null }) {
   const { t } = useTranslation()
+  const inFlight = status.backfillRemaining + (status.scanning !== null ? 1 : 0)
+  const total = backfillStart ?? inFlight
+  const done = Math.max(0, total - inFlight)
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
 
   return (
     <div
@@ -518,17 +537,20 @@ function ScanBanner({ status }: { status: ScanStatus }) {
         </span>
       </div>
       <span aria-hidden />
-      {/* Indeterminate progress strip — a 30%-wide accent bar slides
-       *  left-to-right on a 1.4 s loop. No `width` transition means no
-       *  visible "rewind" frame when the banner remounts after the
-       *  result→scanning swap. Also sidesteps the X / N counter mismatch:
-       *  `backfillRemaining` is cumulative across queue bursts (boot
-       *  backfill + manual Rescan stack), so a deterministic
-       *  done / total number isn't accurate without per-burst tracking
-       *  the worker doesn't expose today. */}
-      <div className="absolute left-0 right-0 bottom-0 h-[2px] overflow-hidden" aria-hidden>
-        <div className="h-full w-1/3 bg-accent dark:bg-accent-dark animate-[scan-progress_1.4s_ease-in-out_infinite]" />
-      </div>
+      {/* Deterministic progress strip. The pct read here is fine
+       *  ratio-wise: `backfillRemaining` is the worker's pending
+       *  counter and the captured max-in-flight is a stable
+       *  denominator for the current burst. The numeric values aren't
+       *  shown (X / N stayed misleading because backfillRemaining is
+       *  cumulative across burst stacking) but the *ratio* still
+       *  faithfully reflects progress within whichever burst the user
+       *  is observing. ScanBanner is keyed by burst id at the call
+       *  site so width transitions never carry over between bursts. */}
+      <div
+        className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width] duration-300"
+        style={{ width: `${pct}%` }}
+        aria-hidden
+      />
     </div>
   )
 }
