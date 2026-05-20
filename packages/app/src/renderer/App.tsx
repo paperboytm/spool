@@ -877,16 +877,6 @@ export default function App() {
           },
         } : {})}
         isSharesActive={isSharesView}
-        onSelectSecurity={() => {
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setActiveProjectKey(null)
-          setActiveProjectName(null)
-          setHomeMode(false)
-          setView('security')
-          setQuery('')
-        }}
-        isSecurityActive={isSecurityView}
         onOpenSearch={handleSearchOpen}
         syncStatus={syncStatus}
         status={status}

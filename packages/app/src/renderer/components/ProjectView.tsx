@@ -8,6 +8,8 @@ import { insertSessionSorted } from '../../shared/sessionSort.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { PROJECT_SORT_OPTIONS } from '../../shared/projectView.js'
+import { securityFeatureEnabled } from '../featureFlags.js'
+import { securityApi } from '../api/security.js'
 
 type Props = {
   identityKey: string
@@ -48,48 +50,30 @@ export default function ProjectView({
   const [scanRefreshKey, setScanRefreshKey] = useState(0)
   const fetchTokenRef = useRef(0)
 
-  // Re-fetch the session list when scan worker updates findings — the
-  // scan_finding_count denormalised counters on Session rows drive the
-  // Library row badge, and without a refetch the badge never appears
-  // after the initial backfill.
+  // Re-fetch the session list when the scan worker updates findings —
+  // the scan_finding_count denormalised counter on Session rows drives
+  // the Library row badge, and without a refetch the badge never
+  // appears after the initial backfill.
   //
-  // Two complementary triggers:
-  //   1. Subscribe to securityApi.onChange so future scan events
-  //      invalidate immediately.
-  //   2. Poll scan status while the worker is busy — covers the cold-
-  //      start race where the first scan can complete before this
-  //      effect's IPC subscription is registered.
+  // Gated by securityFeatureEnabled() so the IPC subscription, the
+  // mount-time bump, and the initial backfill check are all skipped
+  // when the feature is off — prod builds (where VITE_FEATURE_SECURITY
+  // isn't set) see this effect as a no-op.
   useEffect(() => {
-    let active = true
-    let off: (() => void) | null = null
-    let pollHandle: ReturnType<typeof setInterval> | null = null
+    if (!securityFeatureEnabled()) return
 
-    void import('../api/security.js').then(({ securityApi }) => {
-      if (!active) return
-      off = securityApi.onChange(() => { setScanRefreshKey(k => k + 1) })
-      // Always bump once on next tick to catch cold-start races where
-      // a scan completed before this effect's onChange subscription.
-      setTimeout(() => { if (active) setScanRefreshKey(k => k + 1) }, 800)
-      pollHandle = setInterval(async () => {
-        try {
-          const s = await securityApi.getScanStatus()
-          // Bump every tick — cheap (one IPC roundtrip + one refetch)
-          // and ensures we converge on the final state even if
-          // findings-changed events were missed.
-          setScanRefreshKey(k => k + 1)
-          if (s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && pollHandle) {
-            clearInterval(pollHandle)
-            pollHandle = null
-          }
-        } catch { /* feature off */ }
-      }, 750)
-    }).catch(() => { /* security api unavailable — feature off */ })
+    // Subscribe BEFORE the mount bump so an event that arrives
+    // between these two lines isn't missed. Both execute in the same
+    // JS tick — events can't actually interleave — but the ordering
+    // documents the invariant.
+    const off = securityApi.onChange(() => { setScanRefreshKey(k => k + 1) })
 
-    return () => {
-      active = false
-      if (off) off()
-      if (pollHandle) clearInterval(pollHandle)
-    }
+    // Bump once on mount to catch the cold-start race: a scan that
+    // completed between app boot and this subscription would
+    // otherwise leave us showing the pre-scan counts indefinitely.
+    setScanRefreshKey(k => k + 1)
+
+    return off
   }, [])
 
   useEffect(() => {
