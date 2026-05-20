@@ -40,9 +40,17 @@ export function parseQualifier(input: string): ParsedQualifier {
     const name = token.slice(0, colonIdx).toLowerCase()
     const value = token.slice(colonIdx + 1)
     switch (name) {
-      case 'kind':
-        out.filter.kind = value as SensitiveKind
+      case 'kind': {
+        // Multi-select: repeated `kind:X` tokens accumulate into kinds[].
+        // Also keep `kind` set to the first one for callers that only
+        // read the singular field. Order preserved so click order maps
+        // to chip activation order.
+        const existing = out.filter.kinds ? [...out.filter.kinds] : []
+        if (!existing.includes(value as SensitiveKind)) existing.push(value as SensitiveKind)
+        out.filter.kinds = existing
+        if (out.filter.kind === undefined) out.filter.kind = value as SensitiveKind
         break
+      }
       case 'is':
         if (KNOWN_STATES.has(value as FindingState | 'any')) {
           out.filter.state = value as FindingState | 'any'
@@ -71,8 +79,10 @@ export function parseQualifier(input: string): ParsedQualifier {
 
 /** Reverse — rebuild a qualifier string. Useful when a UI click fills
  *  the bar (e.g. clicking the Risk panel "api-key" chip sets
- *  `kind:api-key`). Existing qualifiers are preserved; the new one
- *  replaces or adds. */
+ *  `kind:api-key`). Existing qualifiers of the same name are replaced.
+ *  Used for `is:` / `severity:` / `session:` — for `kind:` you almost
+ *  always want `toggleKindQualifier` instead, which adds/removes a
+ *  single kind without disturbing the others. */
 export function withQualifier(
   current: string,
   name: 'kind' | 'is' | 'severity' | 'session',
@@ -81,4 +91,19 @@ export function withQualifier(
   const rx = new RegExp(`(^|\\s)${name}:[^\\s]+`, 'g')
   const stripped = current.replace(rx, '').trim()
   return `${name}:${value}${stripped ? ` ${stripped}` : ''}`
+}
+
+/** Toggle a single `kind:<value>` in the query string. If already
+ *  present, removes it; otherwise appends it. Leaves every other
+ *  qualifier (other `kind:`, `is:`, `severity:`, free text) untouched. */
+export function toggleKindQualifier(current: string, value: string): string {
+  const target = `kind:${value}`
+  const tokens = current.split(/\s+/).filter(Boolean)
+  const idx = tokens.indexOf(target)
+  if (idx >= 0) {
+    tokens.splice(idx, 1)
+  } else {
+    tokens.unshift(target)
+  }
+  return tokens.join(' ')
 }
