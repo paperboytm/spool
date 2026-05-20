@@ -132,6 +132,30 @@ class SearchCache {
 
 const searchCache = new SearchCache()
 
+/** Main-process mirror of the renderer's `securityFeatureEnabled()`.
+ *
+ *  The renderer reads `import.meta.env.DEV` and
+ *  `import.meta.env.VITE_FEATURE_SECURITY` (Vite inlines both at
+ *  build time). Electron's main process bundle can read the same
+ *  values — `electron-vite build` substitutes them just like for
+ *  the renderer.
+ *
+ *  Kept inline here (rather than imported from
+ *  `../renderer/featureFlags`) because main code mustn't import
+ *  React-side modules: those pull in the whole renderer dep graph.
+ *
+ *  When this returns `false`, the scan worker stays un-booted on
+ *  production user machines. The DB migrations still run
+ *  unconditionally — schema must be forward-compatible so that
+ *  flipping the flag on later doesn't require a second upgrade
+ *  pass. */
+function securityFeatureEnabled(): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const env = (import.meta as any).env as { DEV?: boolean; VITE_FEATURE_SECURITY?: string } | undefined
+  if (env?.DEV) return true
+  return env?.VITE_FEATURE_SECURITY === '1'
+}
+
 async function bootScanWorker(): Promise<void> {
   try {
     const scope = await Effect.runPromise(Scope.make())
@@ -293,7 +317,14 @@ app.whenReady().then(async () => {
 
   // Bring up the Security Scan worker before the syncer so the syncer
   // cascade callback already has somewhere to send invalidations.
-  await bootScanWorker()
+  //
+  // Gated by VITE_FEATURE_SECURITY so production builds (where the
+  // env var stays unset) never start the scanner. The downstream
+  // syncer hooks check `if (scanWorker)` before enqueueing, so
+  // leaving the worker null is a safe no-op everywhere.
+  if (securityFeatureEnabled()) {
+    await bootScanWorker()
+  }
 
   syncer = new Syncer(db, undefined, (sessionId) => {
     // Sync mutated this session's messages; existing findings now have
