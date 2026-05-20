@@ -33,8 +33,7 @@ import {
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
-  currentProfileString, invalidateSessionScanProfile,
-  type ScanWorker,
+  invalidateSessionScanProfile,
 } from '@spool-lab/core'
 import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
 import { Effect } from 'effect'
@@ -319,7 +318,15 @@ app.whenReady().then(async () => {
     // way, which keeps state consistent if the flag flips on later.
     invalidateSessionScanProfile(db, sessionId)
     if (scanWorker && loadSecurityPreferences().rescanAfterSync === 'auto') {
-      Effect.runFork(scanWorker.enqueue(sessionId))
+      // Promise-shaped so a worker-thread rejection (e.g. the child
+      // died) surfaces in the log instead of vanishing silently
+      // through Effect.runFork. The Effect itself is failure-free
+      // shape (Effect<void, never>) — `.catch` here is the safety
+      // net for runtime promise rejections from the underlying
+      // postMessage round-trip.
+      Effect.runPromise(scanWorker.enqueue(sessionId)).catch((err) => {
+        console.error('[security] scan-worker enqueue failed:', err)
+      })
     }
   })
   watcher = new SpoolWatcher(syncer)
@@ -347,7 +354,11 @@ app.whenReady().then(async () => {
     // Sessions were inserted by the worker thread which has its own DB
     // handle — no onSessionChanged callbacks reached this process. Kick
     // off a backfill round now that the sessions table is populated.
-    if (scanWorker) Effect.runFork(scanWorker.backfill())
+    if (scanWorker) {
+      Effect.runPromise(scanWorker.backfill()).catch((err) => {
+        console.error('[security] post-sync backfill failed:', err)
+      })
+    }
   }).catch((err) => {
     console.error('[sync-worker] failed:', err)
   })
@@ -372,7 +383,9 @@ app.whenReady().then(async () => {
         runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
         getMainWindow: () => mainWindow,
       })
-      Effect.runFork(scanWorker.backfill())
+      Effect.runPromise(scanWorker.backfill()).catch((err) => {
+        console.error('[security] boot backfill failed:', err)
+      })
     })
   }
 

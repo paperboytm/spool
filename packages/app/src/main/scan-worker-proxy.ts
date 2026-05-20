@@ -25,10 +25,17 @@ interface PendingCommand {
 /** Spawn the worker thread at `workerPath` and return the proxy
  *  once it sends its first `ready` event. Throws if the child
  *  dies before ready. */
+/** Boot timeout — guard against the worker_thread never reporting
+ *  ready (e.g. a native-binding load failure that hangs the child
+ *  rather than crashing it cleanly). 10s is comfortably above slow-
+ *  disk Spotlight-indexing migrations on a fresh install. */
+const BOOT_TIMEOUT_MS = 10_000
+
 export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerProxy> {
   const worker = new Worker(workerPath)
   const pending = new Map<number, PendingCommand>()
   let nextReqId = 1
+  let seenFirstStatus = false
   let lastStatus: ScanStatus = {
     queued: 0,
     scanning: null,
@@ -51,10 +58,21 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
   }
 
   await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+      // Best-effort terminate; if it's already dead this is a no-op.
+      worker.terminate().catch(() => { /* nothing to do */ })
+      reject(new Error(`scan worker did not report ready within ${BOOT_TIMEOUT_MS}ms`))
+    }, BOOT_TIMEOUT_MS)
+    function clear(): void {
+      clearTimeout(timeout)
+      worker.off('message', onMessage)
+      worker.off('error', onError)
+    }
     function onMessage(msg: FromWorker): void {
       if (msg.type === 'ready') {
-        worker.off('message', onMessage)
-        worker.off('error', onError)
+        clear()
         worker.on('message', onSteadyState)
         worker.on('error', onSteadyError)
         worker.on('exit', onExit)
@@ -62,14 +80,15 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
         return
       }
       if (msg.type === 'fatal') {
-        worker.off('message', onMessage)
-        worker.off('error', onError)
+        clear()
         reject(new Error(`scan worker failed during boot: ${msg.error}`))
       }
+      // Any other message type before ready is ignored — the worker
+      // sends ready first, so this branch only fires for protocol
+      // drift that should be caught in code review, not at runtime.
     }
     function onError(err: Error): void {
-      worker.off('message', onMessage)
-      worker.off('error', onError)
+      clear()
       reject(err)
     }
     worker.on('message', onMessage)
@@ -99,6 +118,7 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
         return
       case 'event-status':
         lastStatus = msg.status
+        seenFirstStatus = true
         Effect.runFork(PubSub.publish(statusChanges, msg.status))
         return
       case 'fatal':
@@ -126,11 +146,12 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
     backfill: () => Effect.promise(() => send<number>({ cmd: 'backfill' })),
     // getStatus uses the last pushed status when available — saves a
     // round-trip on every renderer mount. Falls back to a real call
-    // before the first push lands.
+    // before the first push lands (boolean sentinel because an empty
+    // profile string is a valid future value).
     getStatus: Effect.suspend(() =>
-      lastStatus.currentProfile === ''
-        ? Effect.promise(() => send<ScanStatus>({ cmd: 'getStatus' }))
-        : Effect.succeed(lastStatus),
+      seenFirstStatus
+        ? Effect.succeed(lastStatus)
+        : Effect.promise(() => send<ScanStatus>({ cmd: 'getStatus' })),
     ),
     changes: Stream.fromPubSub(changes),
     statusChanges: Stream.fromPubSub(statusChanges),

@@ -17,11 +17,11 @@
 //     this thread re-reads on every call so pref changes take
 //     effect on the next session without restarting the worker.
 //   • A 'shutdown' message closes the Effect Scope cleanly and
-//     exits 0. Anything else (unhandled rejection, exception)
-//     posts an 'error' message and exit(1) so the parent's
-//     `worker.on('exit')` handler can decide what to do.
+//     exits 0. Unhandled rejections / exceptions post a 'fatal'
+//     message and exit(1) so the parent's `worker.on('exit')`
+//     handler can decide what to do.
 //
-// Protocol — see ScanWorkerThreadMessage union below.
+// Protocol — see `ToWorker` / `FromWorker` unions below.
 
 import { parentPort, threadId } from 'node:worker_threads'
 import { Effect, Exit, Fiber, Scope, Stream } from 'effect'
@@ -73,7 +73,7 @@ process.on('unhandledRejection', reportFatal)
 process.on('uncaughtException', reportFatal)
 
 void (async () => {
-  console.log('[scan-worker-thread] booting; threadId =', threadId)
+  console.log('[security] scan worker thread booted; threadId =', threadId)
   // Main process already migrated the file before spawning this
   // thread; skipping here avoids a race with sync-worker (whose
   // getDB() also opens with migrations skipped now) over the
