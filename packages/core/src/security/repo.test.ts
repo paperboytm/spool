@@ -32,9 +32,9 @@ function setupDb(): Database.Database {
      VALUES (1, 1, 'p', '/p', 'p')`,
   ).run()
   db.prepare(
-    `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at)
-     VALUES (1, 1, 1, 's-1', '/p/s-1', 'Session 1', '2026-01-01', '2026-01-01'),
-            (2, 1, 1, 's-2', '/p/s-2', 'Other Session', '2026-01-02', '2026-01-02')`,
+    `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+     VALUES (1, 1, 1, 's-1', '/p/s-1', 'Session 1', '2026-01-01', '2026-01-01', 1),
+            (2, 1, 1, 's-2', '/p/s-2', 'Other Session', '2026-01-02', '2026-01-02', 1)`,
   ).run()
   db.prepare(
     `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
@@ -140,6 +140,16 @@ describe('repo: list + filter', () => {
 
   it('listSessionsWithFindings filters by kind', () => {
     const rows = listSessionsWithFindings(db, { kind: 'email' })
+    expect(rows.map(r => r.sessionUuid)).toEqual(['s-1'])
+  })
+
+  it('listSessionsWithFindings excludes sessions whose message_count dropped to 0 — stale finding rows from emptied/pruned sessions must not surface', () => {
+    // s-2 keeps its message row but its denormalised counter falls to
+    // 0 (mirrors the prod case where sessions were captured with zero
+    // body text — likely a source-file edge case — yet finding rows
+    // already exist).
+    db.prepare(`UPDATE sessions SET message_count = 0 WHERE id = 2`).run()
+    const rows = listSessionsWithFindings(db, {})
     expect(rows.map(r => r.sessionUuid)).toEqual(['s-1'])
   })
 

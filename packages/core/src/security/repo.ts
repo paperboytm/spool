@@ -361,6 +361,7 @@ export function listSessionsWithFindings(
     JOIN sources src ON src.id = s.source_id
     JOIN projects p ON p.id = s.project_id
     WHERE ${stateCondition} ${kindCondition} ${severityCondition} ${infoExclusion} ${textCondition}
+      AND COALESCE(s.message_count, 0) > 0
     GROUP BY s.id
     ORDER BY high_count DESC, finding_count DESC, s.started_at DESC
   `
