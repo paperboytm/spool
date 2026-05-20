@@ -84,8 +84,8 @@ function setupDb(): Database.Database {
      VALUES (1, 1, 'p', '/p', 'p')`,
   ).run()
   db.prepare(
-    `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at)
-     VALUES (1, 1, 1, 's-1', '/p/s-1', 'Session 1', '2026-01-01', '2026-01-01')`,
+    `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+     VALUES (1, 1, 1, 's-1', '/p/s-1', 'Session 1', '2026-01-01', '2026-01-01', 1)`,
   ).run()
   db.prepare(
     `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
