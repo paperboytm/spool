@@ -20,7 +20,8 @@
     "build:electron": "pnpm run build:deps && electron-vite build",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
-    "test": "vitest run",
+    "test": "pnpm run rebuild:native:node && vitest run",
+    "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
     "test:e2e": "pnpm run build:deps && pnpm run rebuild:native:electron && VITE_FEATURE_SHARE=1 VITE_FEATURE_SECURITY=1 electron-vite build && npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
