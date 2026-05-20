@@ -3,7 +3,17 @@ name: E2E Tests
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "packages/landing/**"
+      - "videos/**"
+      - "**/*.md"
+      - "docs/**"
   pull_request:
+    paths-ignore:
+      - "packages/landing/**"
+      - "videos/**"
+      - "**/*.md"
+      - "docs/**"
 
 jobs:
   unit:
@@ -11,6 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        package: [redact, core, cli, share-kit, app]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -21,14 +32,40 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @spool-lab/redact build
-      - run: pnpm --filter @spool-lab/redact test
-      - run: pnpm --filter @spool-lab/core build
-      - run: pnpm --filter @spool-lab/core test
-      - run: pnpm --filter @spool-lab/cli build
-      - run: pnpm --filter @spool-lab/cli test
-      - run: pnpm --filter @spool/share-kit test
-      - run: pnpm --filter @spool/app test
+
+      - name: Build dependencies
+        run: |
+          case "${{ matrix.package }}" in
+            redact)
+              pnpm --filter @spool-lab/redact build
+              ;;
+            core)
+              pnpm --filter @spool-lab/redact build
+              pnpm --filter @spool-lab/core build
+              ;;
+            cli)
+              pnpm --filter @spool-lab/redact build
+              pnpm --filter @spool-lab/core build
+              pnpm --filter @spool-lab/cli build
+              ;;
+            share-kit)
+              pnpm --filter @spool-lab/redact build
+              pnpm --filter @spool/share-kit build
+              ;;
+            app)
+              pnpm --filter @spool/app run build:deps
+              ;;
+          esac
+
+      - name: Test
+        run: |
+          case "${{ matrix.package }}" in
+            redact) pnpm --filter @spool-lab/redact test ;;
+            core) pnpm --filter @spool-lab/core test ;;
+            cli) pnpm --filter @spool-lab/cli test ;;
+            share-kit) pnpm --filter @spool/share-kit test ;;
+            app) pnpm --filter @spool/app test ;;
+          esac
 
   e2e:
     strategy:
@@ -49,18 +86,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build redact (core depends on it)
-        run: pnpm --filter @spool-lab/redact build
-
-      - name: Build core
-        run: pnpm --filter @spool-lab/core build
-
-      - name: Rebuild native modules for Electron
-        run: cd packages/app && npx @electron/rebuild -f -w better-sqlite3
-
-      - name: Build Electron app
-        run: pnpm --filter @spool/app build:electron
 
       - name: Run E2E tests (Linux)
         if: runner.os == 'Linux'
