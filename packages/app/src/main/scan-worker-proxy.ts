@@ -40,6 +40,8 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
     queued: 0,
     scanning: null,
     backfillRemaining: 0,
+    backfillTotal: 0,
+    manualBurstInFlight: false,
     currentProfile: '',
   }
 

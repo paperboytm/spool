@@ -110,6 +110,23 @@ export interface ScanStatus {
   scanning: number | null
   /** When in backfill mode, sessions still to process; 0 otherwise. */
   backfillRemaining: number
+  /** High-water mark for the active scan burst — the total session
+   *  count this burst has set out to scan. Held until the worker
+   *  goes fully idle (queued + scanning + backfillRemaining all 0),
+   *  then resets to 0. Lets the renderer's progress bar survive
+   *  navigation away from + back to the Security page mid-scan
+   *  without "restarting" at the remaining-now count. */
+  backfillTotal: number
+  /** True for the lifetime of a user-initiated `Rescan all` burst
+   *  (set by `worker.rescanAll()`; cleared automatically when the
+   *  worker goes fully idle). The renderer reads this directly
+   *  instead of tracking the click locally — a renderer-side flag
+   *  would race against any auto sync-driven enqueue that completed
+   *  between the click and the IPC reaching the worker, causing
+   *  the manual ACK banner to be hijacked + cleared by the auto
+   *  burst's idle edge. Tying it to the worker keeps a single
+   *  source of truth. */
+  manualBurstInFlight: boolean
   /** Composite identifier for the active provider set, e.g.
    *  'regex@3' or 'regex@3,pf@1.5b-q4'. Persisted on
    *  sessions.scan_profile to detect rescan candidates after

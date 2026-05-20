@@ -80,6 +80,8 @@ export function makeScanWorker(
       queued: 0,
       scanning: null,
       backfillRemaining: 0,
+      backfillTotal: 0,
+      manualBurstInFlight: false,
       currentProfile: resolveProfile(config),
     })
 
@@ -88,8 +90,44 @@ export function makeScanWorker(
     // Update statusRef AND publish the new snapshot so subscribers get
     // a push event for every mutation. One helper at the seam avoids
     // forgetting to publish from a future Ref.update site.
+    //
+    // `backfillTotal` is derived here so individual mutation sites
+    // (enqueue / rescanAll / backfill / scanOne) don't have to
+    // remember to bump it. The renderer's progress bar reads
+    // `backfillRemaining + (scanning ? 1 : 0)` as the active count;
+    // we track the high-water mark of that quantity since the last
+    // full-idle state, and reset to 0 once everything drains. Survives
+    // navigation: a user who switches tabs mid-burst and comes back
+    // gets the true original total via `getStatus`, not the
+    // remaining-at-remount-time approximation.
     const updateStatus = (f: (s: ScanStatus) => ScanStatus) =>
-      Ref.update(statusRef, f).pipe(
+      Ref.update(statusRef, (prev) => {
+        const after = f(prev)
+        // High-water mark of *backfillRemaining alone*. Including the
+        // scanning slot (br + 1 when scanning != null) bumped the
+        // total by one every time a scanOne started, and dropped it
+        // again when scanning went back to null between sessions —
+        // turning the renderer's `(total - remaining)/total` into a
+        // non-monotonic value that visibly rewound the progress bar
+        // on every cross-session tick. backfillRemaining itself is
+        // strictly monotonic (only decrements at scanOne end), so
+        // anchoring the total to it makes the progress bar strictly
+        // forward.
+        const fullyIdle =
+          after.backfillRemaining === 0 &&
+          after.queued === 0 &&
+          after.scanning === null
+        const backfillTotal = fullyIdle
+          ? 0
+          : Math.max(prev.backfillTotal, after.backfillRemaining)
+        // `manualBurstInFlight` rides along with the burst. The
+        // worker.rescanAll() mutation flips it on; this wrapper
+        // flips it off the instant the worker drains, so the
+        // renderer's "your manual scan finished" detection never
+        // sees a stale truth across burst boundaries.
+        const manualBurstInFlight = fullyIdle ? false : after.manualBurstInFlight
+        return { ...after, backfillTotal, manualBurstInFlight }
+      }).pipe(
         Effect.zipRight(Ref.get(statusRef)),
         Effect.flatMap((s) => PubSub.publish(statusEvents, s)),
         Effect.asVoid,
@@ -170,7 +208,14 @@ export function makeScanWorker(
             return rows
           })(),
         )
-        yield* updateStatus((s) => ({ ...s, backfillRemaining: all.length }))
+        yield* updateStatus((s) => ({
+          ...s,
+          backfillRemaining: all.length,
+          // Flag this as a user-initiated burst — the renderer
+          // hangs its result-banner ACK off this field instead of
+          // a click-local flag.
+          manualBurstInFlight: true,
+        }))
         for (const r of all) {
           yield* enqueue(r.id)
         }

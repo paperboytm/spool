@@ -4,6 +4,46 @@
 // unit-tested independently of the React tree.
 
 import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+import type { ScanStatus } from '@spool-lab/core'
+
+/** Threshold (sessions) below which a burst is treated as "ambient
+ *  background work" — the meta-row pulse dot replaces the full
+ *  ScanBanner. Manual `Rescan all` always far exceeds this; the
+ *  threshold filters out sync-driven 1-3 session bursts that don't
+ *  deserve full banner real estate. */
+export const AMBIENT_BANNER_THRESHOLD = 5
+
+/** True iff a status snapshot represents a meaningful, ongoing burst
+ *  the user should see a full ScanBanner for. The two conditions:
+ *
+ *  - **`backfillTotal >= threshold`**: filters out tiny auto bursts
+ *    (the worker's high-water mark for this burst is significant).
+ *  - **`displayBusy`**: caller-provided sticky-off mirror of "worker
+ *    is currently busy" — survives sub-1500ms idle gaps so the banner
+ *    doesn't strobe between two backfill waves.
+ *
+ *  Result-banner ("Scan complete · N high · M low") is NOT gated on
+ *  busy state — see SecurityPage.tsx's ScanResultBanner site. */
+export function shouldShowScanBanner(
+  status: ScanStatus | null,
+  displayBusy: boolean,
+  threshold: number = AMBIENT_BANNER_THRESHOLD,
+): boolean {
+  if (!status) return false
+  return displayBusy && status.backfillTotal >= threshold
+}
+
+/** "Sessions still to scan" — drives the progress bar's `inFlight`.
+ *  Anchored to `backfillRemaining` ALONE; intentionally does NOT
+ *  add the +1 for the scanning slot. The +1 would bounce the count
+ *  up at scanOne start and down at scanOne end, causing the
+ *  rendered `(total - inFlight) / total` to dip backwards on every
+ *  cross-session transition — most visible on a remount that
+ *  captured a "scanning != null" snapshot after the previous
+ *  reading saw "between scans". */
+export function scanInFlightCount(status: ScanStatus): number {
+  return status.backfillRemaining
+}
 
 /** Drop the long Claude model id (`claude-sonnet-4-5-20251022`) to
  *  the compact `sonnet 4.5` form used in session meta rows.

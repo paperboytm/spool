@@ -99,7 +99,7 @@ async function setupFixture(): Promise<Fixture> {
   const workerCalls = { rescanAll: 0, backfill: 0, enqueue: [] as number[], getStatus: 0 }
   // PubSub-backed stream so we can assert change-event forwarding.
   const pubsub = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
-  const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, currentProfile: 'regex@4' }
+  const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
 
   const worker: ScanWorker = {
     enqueue: (id) => Effect.sync(() => { workerCalls.enqueue.push(id) }),

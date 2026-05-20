@@ -1,11 +1,26 @@
 import { describe, it, expect } from 'vitest'
+import type { ScanStatus } from '@spool-lab/core'
 import {
+  AMBIENT_BANNER_THRESHOLD,
   compactModel,
   formatScanAgo,
   friendlyKind,
   isHighKind,
   isInfoKind,
+  scanInFlightCount,
+  shouldShowScanBanner,
 } from './page-helpers.js'
+
+function makeStatus(overrides: Partial<ScanStatus> = {}): ScanStatus {
+  return {
+    queued: 0,
+    scanning: null,
+    backfillRemaining: 0,
+    backfillTotal: 0,
+    currentProfile: 'regex@3',
+    ...overrides,
+  }
+}
 
 describe('compactModel', () => {
   it('returns empty string for null / undefined / ""', () => {
@@ -134,5 +149,60 @@ describe('friendlyKind', () => {
   it('passes unknown kinds through unchanged (forward-compat)', () => {
     expect(friendlyKind('some-future-kind')).toBe('some-future-kind')
     expect(friendlyKind('')).toBe('')
+  })
+})
+
+describe('shouldShowScanBanner', () => {
+  it('hides while idle even with a high prior total', () => {
+    // displayBusy=false matters more than backfillTotal — banner is
+    // for live work, not a frozen snapshot.
+    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 100 }), false)).toBe(false)
+  })
+
+  it('hides for sub-threshold auto bursts so single-session sync ticks stay ambient', () => {
+    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 1, backfillRemaining: 1 }), true)).toBe(false)
+    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 4, backfillRemaining: 4 }), true)).toBe(false)
+  })
+
+  it('shows once a burst hits the threshold', () => {
+    expect(shouldShowScanBanner(
+      makeStatus({ backfillTotal: AMBIENT_BANNER_THRESHOLD, backfillRemaining: AMBIENT_BANNER_THRESHOLD }),
+      true,
+    )).toBe(true)
+    expect(shouldShowScanBanner(
+      makeStatus({ backfillTotal: 100, backfillRemaining: 80 }),
+      true,
+    )).toBe(true)
+  })
+
+  it('null status is treated as no banner — guards renderer mounts that race ahead of the first push', () => {
+    expect(shouldShowScanBanner(null, true)).toBe(false)
+  })
+})
+
+describe('scanInFlightCount', () => {
+  // Regression for the rewinding-progress-bar bug. Including the
+  // +1 for the scanning slot made `inFlight` bounce up at scanOne
+  // start and down at scanOne end — visibly stepping the progress
+  // bar backwards on every cross-session transition.
+  it('returns ONLY backfillRemaining; does not add the scanning slot', () => {
+    expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: null }))).toBe(50)
+    expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: 7 }))).toBe(50)
+    expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: 7, queued: 30 }))).toBe(50)
+  })
+
+  it('rendered progress between two adjacent transitions (scanning=null → scanning=id) does not step backwards', () => {
+    // The exact pair of snapshots that used to produce a backwards
+    // jump on remount: backfillRemaining the same, only the scanning
+    // slot toggling.
+    const between = makeStatus({ backfillRemaining: 50, scanning: null, backfillTotal: 100 })
+    const active = makeStatus({ backfillRemaining: 50, scanning: 7, backfillTotal: 100 })
+    const pct = (s: ScanStatus): number => {
+      const inFlight = scanInFlightCount(s)
+      const total = Math.max(s.backfillTotal, inFlight)
+      return Math.round(((total - inFlight) / total) * 100)
+    }
+    expect(pct(between)).toBe(50)
+    expect(pct(active)).toBe(50)
   })
 })
