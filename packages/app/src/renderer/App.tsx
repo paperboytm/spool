@@ -34,7 +34,7 @@ import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
-import { useFeature } from './featureFlags.js'
+import { useFeature, securityFeatureEnabled } from './featureFlags.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs'
@@ -309,7 +309,11 @@ export default function App() {
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
   const isSharesView = shareEnabled && view === 'shares'
-  const isSecurityView = view === 'security'
+  // Mirrors `isSharesView`'s shareEnabled gate — defense in depth so
+  // a stale `view='security'` from persisted state (or a future
+  // deep link) can't surface the Security page when the feature
+  // flag is off in production.
+  const isSecurityView = securityFeatureEnabled() && view === 'security'
   const isShareEditorView = shareEnabled && view === 'share-editor'
 
   // Bounce out of share-only views when the user disables the flag from
