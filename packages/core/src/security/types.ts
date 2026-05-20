@@ -6,9 +6,6 @@
 //      can import a single source of truth.
 //   2. Promoting them to `Schema.Struct` later (for a Scope-B Effect
 //      RPC migration) is a local refactor, not a consumer rewrite.
-//
-// See `~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md`
-// for the full design — schema, surfaces, and Effect TS scoping.
 
 import type { SensitiveKind } from '@spool-lab/redact'
 

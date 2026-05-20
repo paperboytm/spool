@@ -478,8 +478,7 @@ export function runMigrations(db: Database.Database): void {
     // row remains as an audit record. scan_purged_count is the
     // lifetime tally of purged findings per session, used by the
     // Library row's "all-resolved ✓" badge to distinguish "never
-    // had findings" from "was clean after I cleaned it up". See
-    // ~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md.
+    // had findings" from "was clean after I cleaned it up".
     //
     // Wrapped in a transaction so a mid-migration failure (process
     // killed, disk full, etc.) doesn't leave the DB half-altered.
