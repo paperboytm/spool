@@ -16,7 +16,7 @@ import type Database from 'better-sqlite3'
 import type { SensitiveMatch, RedactProvider } from '@spool-lab/redact'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
 import {
-  deleteActiveFindings,
+  deleteRefreshableFindings,
   insertFindings,
   setSessionScanProfile,
   updateSessionCounts,
@@ -144,7 +144,7 @@ export function scanSession(
     yield* Effect.try({
       try: () => {
         deps.db.transaction(() => {
-          deleteActiveFindings(deps.db, sessionId, deps.providerNames)
+          deleteRefreshableFindings(deps.db, sessionId, deps.providerNames)
           insertFindings(deps.db, inputs)
           setSessionScanProfile(deps.db, sessionId, deps.currentProfile, new Date().toISOString())
           updateSessionCounts(deps.db, sessionId)
@@ -163,7 +163,7 @@ function applyEmpty(sessionId: number, deps: ScanSessionDeps): Effect.Effect<voi
   return Effect.try({
     try: () => {
       deps.db.transaction(() => {
-        deleteActiveFindings(deps.db, sessionId, deps.providerNames)
+        deleteRefreshableFindings(deps.db, sessionId, deps.providerNames)
         setSessionScanProfile(deps.db, sessionId, deps.currentProfile, new Date().toISOString())
         updateSessionCounts(deps.db, sessionId)
       })()

@@ -231,4 +231,69 @@ describe('scanSession', () => {
     const after = listFindings(db, { sessionId: 1, state: 'any' })
     expect(after.find(r => r.provider === 'fake')).toBeDefined()
   })
+
+  // Regression for the muted-kinds bug discovered against the live
+  // dev DB: a mute → unmute cycle used to accumulate phantom
+  // dismissed rows because `deleteActiveFindings` only deleted
+  // state='active'. Now `deleteRefreshableFindings` wipes both
+  // active + dismissed for the providers being rescanned so the
+  // re-insert is canonical.
+  it('mute → unmute leaves no phantom dismissed rows (regression)', async () => {
+    // Seed two messages each containing an email match.
+    db.prepare(
+      `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+       VALUES (10, 1, 1, 'user', 'first leak: alice@example.com here', '2026-01-01', 0),
+              (11, 1, 1, 'user', 'second leak: bob@example.com there', '2026-01-01', 1)`,
+    ).run()
+
+    // First scan with no allowlist — both emails should be active.
+    await Effect.runPromise(
+      scanSession(1, {
+        db,
+        providers: [regexProvider],
+        currentProfile: 'regex@3',
+        providerNames: ['regex'],
+        publish: () => Effect.void,
+      }),
+    )
+    const baseline = listFindings(db, { sessionId: 1, state: 'any' })
+      .filter(r => r.kind === 'email')
+    expect(baseline.length).toBe(2)
+    expect(baseline.every(r => r.state === 'active')).toBe(true)
+
+    // Mute email → rescan with kindAllowlist=['email']. Findings flip
+    // to dismissed; the dismissed *count* must equal the unique
+    // match count, not double it.
+    await Effect.runPromise(
+      scanSession(1, {
+        db,
+        providers: [regexProvider],
+        currentProfile: "regex@3,allow@deadbeef",
+        providerNames: ['regex'],
+        publish: () => Effect.void,
+        kindAllowlist: new Set(['email']),
+      }),
+    )
+    const muted = listFindings(db, { sessionId: 1, state: 'any' })
+      .filter(r => r.kind === 'email')
+    expect(muted.length).toBe(2)
+    expect(muted.every(r => r.state === 'dismissed')).toBe(true)
+
+    // Unmute email → rescan with empty allowlist. Findings flip back
+    // to active; total count stays at 2 (no phantom dismissed
+    // accumulation from the previous cycle).
+    await Effect.runPromise(
+      scanSession(1, {
+        db,
+        providers: [regexProvider],
+        currentProfile: 'regex@3',
+        providerNames: ['regex'],
+        publish: () => Effect.void,
+      }),
+    )
+    const restored = listFindings(db, { sessionId: 1, state: 'any' })
+      .filter(r => r.kind === 'email')
+    expect(restored.length).toBe(2)
+    expect(restored.every(r => r.state === 'active')).toBe(true)
+  })
 })

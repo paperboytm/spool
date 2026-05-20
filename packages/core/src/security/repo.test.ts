@@ -59,7 +59,7 @@ describe('repo: insert + count + delete cycle', () => {
     expect(row.scan_high_count).toBe(1) // api-key is high; email is low
   })
 
-  it('deleteActiveFindings respects the providers filter', () => {
+  it('deleteRefreshableFindings respects the providers filter', () => {
     insertFindings(db, [
       { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
       { sessionId: 1, messageId: 10, kind: 'person-name', valueHash: 'h2', confidence: 0.7, provider: 'pf', startOffset: 0, endOffset: 5, state: 'active' },
@@ -70,14 +70,24 @@ describe('repo: insert + count + delete cycle', () => {
     expect(rows[0]!.provider).toBe('pf')
   })
 
-  it('deleteActiveFindings does not touch dismissed or purged rows', () => {
+  it('deleteRefreshableFindings wipes BOTH active and dismissed for the providers — needed to avoid phantom-dismissed accumulation across mute/unmute cycles', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'dismissed' },
+      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
+      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 50, endOffset: 57, state: 'dismissed' },
+    ])
+    deleteActiveFindings(db, 1, ['regex'])
+    const rows = listFindings(db, { sessionId: 1, state: 'any' })
+    expect(rows).toHaveLength(0)
+  })
+
+  it('deleteRefreshableFindings preserves purged rows (audit trail for destructive actions)', () => {
+    insertFindings(db, [
+      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'purged' },
     ])
     deleteActiveFindings(db, 1, ['regex'])
     const rows = listFindings(db, { sessionId: 1, state: 'any' })
     expect(rows).toHaveLength(1)
-    expect(rows[0]!.state).toBe('dismissed')
+    expect(rows[0]!.state).toBe('purged')
   })
 })
 
