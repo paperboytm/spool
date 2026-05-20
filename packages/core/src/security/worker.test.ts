@@ -121,4 +121,63 @@ describe('ScanWorker', () => {
       expect(s.currentProfile).toBe('regex@3')
     })
   })
+
+  // Regression: the worker must read its profile lazily so that
+  // pref changes (kindAllowlist) make previously-scanned sessions
+  // look stale on the next backfill, instead of being permanently
+  // pinned to the boot-time profile string.
+  it('re-reads currentProfile from a thunk between backfill calls', async () => {
+    db = setupDb(1)
+    let profile = 'regex@3'
+    const scope = await Effect.runPromise(Scope.make())
+    try {
+      const worker = await Effect.runPromise(
+        Effect.provideService(
+          makeScanWorker({
+            db,
+            providers: [regexProvider],
+            currentProfile: () => profile,
+            providerNames: ['regex'],
+          }),
+          Scope.Scope,
+          scope,
+        ),
+      )
+      await Effect.runPromise(worker.backfill())
+      await Effect.runPromise(waitForIdle(worker))
+      // Session is now stamped 'regex@3'. Pretend the user toggled a
+      // kind allowlist — the profile thunk returns a different value.
+      profile = 'regex@3,allow@deadbeef'
+      const enqueued = await Effect.runPromise(worker.backfill())
+      expect(enqueued).toBe(1)
+      await Effect.runPromise(waitForIdle(worker))
+      const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = 1')
+        .get() as { scan_profile: string }
+      expect(sess.scan_profile).toBe('regex@3,allow@deadbeef')
+    } finally {
+      await Effect.runPromise(Scope.close(scope, Exit.void))
+    }
+  })
+
+  // Regression: rescanAll's SELECT + UPDATE must be atomic so a row
+  // inserted by sync between the two statements can't slip through
+  // (it would otherwise miss the profile-null pass AND be omitted
+  // from the enqueue list).
+  it('rescanAll wraps SELECT + UPDATE in a single transaction', async () => {
+    db = setupDb(2)
+    db.prepare("UPDATE sessions SET scan_profile = 'regex@3'").run()
+    await withWorker(db, async (worker) => {
+      // Sanity: pre-rescan both rows are stamped.
+      const before = db.prepare('SELECT scan_profile FROM sessions ORDER BY id')
+        .all() as Array<{ scan_profile: string | null }>
+      expect(before.every(r => r.scan_profile === 'regex@3')).toBe(true)
+      const count = await Effect.runPromise(worker.rescanAll())
+      expect(count).toBe(2)
+      // After enqueue + idle, both should be re-stamped.
+      await Effect.runPromise(waitForIdle(worker))
+      const after = db.prepare('SELECT scan_profile FROM sessions ORDER BY id')
+        .all() as Array<{ scan_profile: string | null }>
+      expect(after.every(r => r.scan_profile === 'regex@3')).toBe(true)
+    })
+  })
 })
