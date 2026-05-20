@@ -33,11 +33,11 @@ import {
   pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
-  makeScanWorker, currentProfileString, invalidateSessionScanProfile,
+  currentProfileString, invalidateSessionScanProfile,
   type ScanWorker,
 } from '@spool-lab/core'
-import { Effect, Scope, Exit } from 'effect'
-import { regexProvider } from '@spool-lab/redact'
+import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
+import { Effect } from 'effect'
 import { registerSecurityIpc } from './ipc/security.js'
 import { loadSecurityPreferences } from './securityPreferences.js'
 import type {
@@ -92,8 +92,7 @@ let syncer: Syncer
 let watcher: SpoolWatcher
 let acpManager: AcpManager
 let isSyncActive = false
-let scanWorker: ScanWorker | null = null
-let scanWorkerScope: Scope.CloseableScope | null = null
+let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
 
 type CachedSearchValue = FragmentResult[]
@@ -159,31 +158,12 @@ function securityFeatureEnabled(): boolean {
 
 async function bootScanWorker(): Promise<void> {
   try {
-    const scope = await Effect.runPromise(Scope.make())
-    scanWorkerScope = scope
-    const worker = await Effect.runPromise(
-      Effect.provideService(
-        makeScanWorker({
-          db,
-          providers: [regexProvider],
-          // Recompute the profile string on every read so a pref save
-          // (kindAllowlist change) immediately marks every session
-          // whose `scan_profile` no longer matches as stale —
-          // `worker.backfill()` then enqueues them on its next call.
-          currentProfile: () => currentProfileString({
-            kindAllowlist: loadSecurityPreferences().kindAllowlist,
-          }),
-          providerNames: ['regex'],
-          // Read the persisted kind allowlist on every scan so the
-          // Settings → Security pane's multi-select takes effect on
-          // the next session without a worker restart.
-          getKindAllowlist: () => new Set(loadSecurityPreferences().kindAllowlist),
-        }),
-        Scope.Scope,
-        scope,
-      ),
-    )
-    scanWorker = worker
+    // Engine lives in a worker thread so its synchronous SQL + regex
+    // CPU work doesn't block the main-process event loop — keeping
+    // window drag, foreground IPC, and renderer-driven queries
+    // responsive even mid-backfill. WAL mode lets the main-process
+    // read handle coexist with the worker's write handle.
+    scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.js'))
   } catch (err) {
     console.error('[security] scan worker failed to boot:', err)
     scanWorker = null
@@ -195,11 +175,10 @@ async function shutdownScanWorker(): Promise<void> {
     try { disposeSecurityIpc() } catch { /* best effort */ }
     disposeSecurityIpc = null
   }
-  if (scanWorkerScope) {
+  if (scanWorker) {
     try {
-      await Effect.runPromise(Scope.close(scanWorkerScope, Exit.void))
+      await scanWorker.shutdown()
     } catch { /* best effort */ }
-    scanWorkerScope = null
     scanWorker = null
   }
 }
@@ -439,9 +418,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', (event) => {
-  // Tear down the scan worker scope (interrupts the drain fiber) before
-  // Electron releases the database.
-  if (scanWorkerScope) {
+  // Tear down the scan worker thread before Electron releases the
+  // database — the thread holds its own DB handle and needs a clean
+  // Scope.close to drop it.
+  if (scanWorker) {
     event.preventDefault()
     shutdownScanWorker()
       .catch((err) => { console.error('[security] shutdown failed:', err) })
