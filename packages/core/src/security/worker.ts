@@ -55,10 +55,15 @@ export interface ScanWorker {
   /** Enqueue every session whose scan_profile != currentProfile.
    *  Called once on boot. */
   backfill: () => Effect.Effect<number>
-  /** Stream of change events. Translator in main process subscribes
-   *  and forwards over IPC. */
+  /** Stream of finding change events. Translator in main process
+   *  subscribes and forwards over IPC. */
   changes: Stream.Stream<FindingsChange>
-  /** Current snapshot. UI polls via IPC. */
+  /** Stream of status updates — emitted on every queued / scanning /
+   *  backfillRemaining mutation. Lets the UI replace polling with a
+   *  push subscription. */
+  statusChanges: Stream.Stream<ScanStatus>
+  /** Current snapshot. UI uses this for the first read; subsequent
+   *  updates land via `statusChanges`. */
   getStatus: Effect.Effect<ScanStatus>
 }
 
@@ -70,6 +75,7 @@ export function makeScanWorker(
   return Effect.gen(function* () {
     const queue = yield* Queue.unbounded<number>()
     const events = yield* PubSub.unbounded<FindingsChange>()
+    const statusEvents = yield* PubSub.unbounded<ScanStatus>()
     const statusRef = yield* Ref.make<ScanStatus>({
       queued: 0,
       scanning: null,
@@ -79,9 +85,19 @@ export function makeScanWorker(
 
     const publish = (c: FindingsChange) => PubSub.publish(events, c).pipe(Effect.asVoid)
 
+    // Update statusRef AND publish the new snapshot so subscribers get
+    // a push event for every mutation. One helper at the seam avoids
+    // forgetting to publish from a future Ref.update site.
+    const updateStatus = (f: (s: ScanStatus) => ScanStatus) =>
+      Ref.update(statusRef, f).pipe(
+        Effect.zipRight(Ref.get(statusRef)),
+        Effect.flatMap((s) => PubSub.publish(statusEvents, s)),
+        Effect.asVoid,
+      )
+
     const scanOne = (sessionId: number) =>
       Effect.gen(function* () {
-        yield* Ref.update(statusRef, (s) => ({
+        yield* updateStatus((s) => ({
           ...s,
           scanning: sessionId,
           queued: Math.max(0, s.queued - 1),
@@ -100,7 +116,7 @@ export function makeScanWorker(
             ),
           ),
         )
-        yield* Ref.update(statusRef, (s) => ({
+        yield* updateStatus((s) => ({
           ...s,
           scanning: null,
           backfillRemaining: Math.max(0, s.backfillRemaining - 1),
@@ -132,7 +148,7 @@ export function makeScanWorker(
     const enqueue = (sessionId: number) =>
       Effect.gen(function* () {
         yield* Queue.offer(queue, sessionId)
-        yield* Ref.update(statusRef, (s) => ({ ...s, queued: s.queued + 1 }))
+        yield* updateStatus((s) => ({ ...s, queued: s.queued + 1 }))
       })
 
     const rescanAll = () =>
@@ -154,7 +170,7 @@ export function makeScanWorker(
             return rows
           })(),
         )
-        yield* Ref.update(statusRef, (s) => ({ ...s, backfillRemaining: all.length }))
+        yield* updateStatus((s) => ({ ...s, backfillRemaining: all.length }))
         for (const r of all) {
           yield* enqueue(r.id)
         }
@@ -167,11 +183,11 @@ export function makeScanWorker(
         // changed kindAllowlist sees the updated hash before invoking
         // backfill. Keep the per-call status snapshot in sync too.
         const profile = resolveProfile(config)
-        yield* Ref.update(statusRef, (s) => ({ ...s, currentProfile: profile }))
+        yield* updateStatus((s) => ({ ...s, currentProfile: profile }))
         const stale = yield* Effect.sync(() =>
           listSessionsNeedingScan(config.db, profile),
         )
-        yield* Ref.update(statusRef, (s) => ({ ...s, backfillRemaining: stale.length }))
+        yield* updateStatus((s) => ({ ...s, backfillRemaining: stale.length }))
         for (const id of stale) {
           yield* enqueue(id)
         }
@@ -183,6 +199,7 @@ export function makeScanWorker(
       rescanAll,
       backfill,
       changes: Stream.fromPubSub(events),
+      statusChanges: Stream.fromPubSub(statusEvents),
       getStatus: Ref.get(statusRef),
     } satisfies ScanWorker
   })

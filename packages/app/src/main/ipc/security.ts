@@ -200,6 +200,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   // `forkDaemon` detaches the fiber from the parent scope; it lives
   // until explicitly interrupted by the returned disposer below.
   let forwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
+  let statusForwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
   Effect.runPromise(
     Effect.gen(function* () {
       forwarderFiber = yield* Effect.forkDaemon(
@@ -209,12 +210,26 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
           }),
         ),
       )
+      // Parallel forwarder for ScanStatus snapshots — every queue /
+      // scan / backfill mutation in the worker publishes one, the
+      // renderer's onScanStatus subscription replaces what used to be
+      // a 500 ms pull loop.
+      statusForwarderFiber = yield* Effect.forkDaemon(
+        Stream.runForEach(worker.statusChanges, (status) =>
+          Effect.sync(() => {
+            getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_SCAN_STATUS, status)
+          }),
+        ),
+      )
     }),
   ).catch(() => { /* fork rejected; ignore (cleanup path) */ })
 
   return () => {
     if (forwarderFiber) {
       Effect.runFork(Fiber.interrupt(forwarderFiber))
+    }
+    if (statusForwarderFiber) {
+      Effect.runFork(Fiber.interrupt(statusForwarderFiber))
     }
     for (const ch of Object.values(SECURITY_IPC_CHANNELS)) {
       ipcMain.removeHandler(ch)

@@ -146,48 +146,38 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const sessionsLenRef = useRef(0)
   sessionsLenRef.current = sessions.length
 
-  // Pull-loop on worker status — the worker has no push channel for
-  // scan progress today, only getStatus(). One self-rearming setTimeout
-  // chain runs for the page's lifetime: while idle it polls slowly
-  // (3 s) so a Rescan click is picked up quickly; while busy it polls
-  // 500 ms for visible progress-bar smoothness. Re-arms itself on each
-  // tick so we never tear down and rebuild the timer mid-burst.
+  // Subscribe to scan-status pushes from the worker. One getStatus()
+  // call seeds the first render; everything after lands via the
+  // event channel — zero polling latency on the busy→idle edge that
+  // drives the result banner.
   useEffect(() => {
     let active = true
-    let handle: ReturnType<typeof setTimeout> | null = null
-    async function tick() {
-      if (!active) return
-      const next = await securityApi.getScanStatus().catch(() => null)
-      if (!active) return
-      if (next) {
-        setScanStatus(next)
-        const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
-        setBackfillStart((prev) => {
-          if (inFlight === 0) return null
-          if (prev === null || inFlight > prev) return inFlight
-          return prev
+    void securityApi.getScanStatus().then((s) => { if (active) setScanStatus(s) }).catch(() => {})
+    const off = securityApi.onScanStatus((next) => {
+      setScanStatus(next)
+      const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
+      setBackfillStart((prev) => {
+        if (inFlight === 0) return null
+        if (prev === null || inFlight > prev) return inFlight
+        return prev
+      })
+      const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
+      if (nowBusy) {
+        wasScanningRef.current = true
+        setScanResult(null)
+      } else if (wasScanningRef.current) {
+        wasScanningRef.current = false
+        setRescanInFlight(false)
+        setScanResult({
+          scanned: backfillStartRef.current ?? sessionsLenRef.current,
+          high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
+          low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
         })
-        const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
-        if (nowBusy) {
-          wasScanningRef.current = true
-          setScanResult(null)
-        } else if (wasScanningRef.current) {
-          wasScanningRef.current = false
-          setRescanInFlight(false)
-          setScanResult({
-            scanned: backfillStartRef.current ?? sessionsLenRef.current,
-            high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
-            low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
-          })
-        }
       }
-      const busy = next !== null && (next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0)
-      handle = setTimeout(tick, busy ? 500 : 3000)
-    }
-    void tick()
+    })
     return () => {
       active = false
-      if (handle) clearTimeout(handle)
+      off()
     }
   }, [])
 

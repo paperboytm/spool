@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { Effect, Scope, Exit } from 'effect'
+import { Effect, Scope, Exit, Stream, Chunk, Fiber } from 'effect'
 import Database from 'better-sqlite3'
 import { regexProvider } from '@spool-lab/redact'
 import { runMigrations } from '../db/db.js'
@@ -178,6 +178,36 @@ describe('ScanWorker', () => {
       const after = db.prepare('SELECT scan_profile FROM sessions ORDER BY id')
         .all() as Array<{ scan_profile: string | null }>
       expect(after.every(r => r.scan_profile === 'regex@3')).toBe(true)
+    })
+  })
+
+  // The status push channel is what lets the Security page replace
+  // its old setInterval pull-loop with a subscription. Enqueue +
+  // drain should generate AT LEAST: queued++ → scanning=id → done
+  // (scanning=null, backfillRemaining--). All three must reach a
+  // subscriber that started listening before the events fired.
+  it('statusChanges emits a snapshot on every queue / scan mutation', async () => {
+    await withWorker(db, async (worker) => {
+      // Subscribe in a forked fiber so collection runs concurrently
+      // with enqueue + drain; then take() drains the buffer.
+      // Three events fire from enqueue + drain: queued++,
+      // scanning=id (queued--), scanning=null (backfillRemaining--).
+      const collectFiber = Effect.runFork(
+        Stream.take(worker.statusChanges, 3).pipe(Stream.runCollect),
+      )
+      // Tiny delay so the Stream subscriber is attached before publish.
+      await new Promise<void>((r) => setTimeout(r, 20))
+      await Effect.runPromise(worker.enqueue(1))
+      await Effect.runPromise(waitForIdle(worker))
+      const collected = Chunk.toReadonlyArray(
+        await Effect.runPromise(Fiber.join(collectFiber)),
+      )
+      // queued++ event present
+      expect(collected.some(s => s.queued === 1)).toBe(true)
+      // scanning=1 event present
+      expect(collected.some(s => s.scanning === 1)).toBe(true)
+      // drained back to idle
+      expect(collected.some(s => s.scanning === null && s.queued === 0)).toBe(true)
     })
   })
 })
