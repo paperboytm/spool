@@ -73,6 +73,35 @@ test('Settings → Security pane: Allowlist Manage modal opens with empty state'
   await expect(modal).toBeHidden()
 })
 
+test('Settings → Security pane: Mute by kind chip toggles + persists', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await openSecurityTab(window)
+
+  // Expand the muted-kinds row.
+  await window.locator('[data-testid="settings-muted-kinds-toggle"]').click()
+
+  // Pick a low-volume kind (`netrc`) so the toggle doesn't drag the
+  // worker into a heavy rescan during the test.
+  const chip = window.locator('[data-testid="settings-muted-kind-chip"][data-kind="netrc"]')
+  await expect(chip).toHaveAttribute('data-muted', 'false')
+  await chip.click()
+  await expect(chip).toHaveAttribute('data-muted', 'true')
+
+  // Close + reopen settings, verify persistence.
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
+  await openSecurityTab(window)
+  await window.locator('[data-testid="settings-muted-kinds-toggle"]').click()
+  await expect(
+    window.locator('[data-testid="settings-muted-kind-chip"][data-kind="netrc"]'),
+  ).toHaveAttribute('data-muted', 'true')
+
+  // Reset for the next test so global preferences don't leak.
+  await window.locator('[data-testid="settings-muted-kind-chip"][data-kind="netrc"]').click()
+})
+
 test('Settings → Security pane: Rescan all button completes without error', async () => {
   const { window } = ctx
   await waitForSync(window)

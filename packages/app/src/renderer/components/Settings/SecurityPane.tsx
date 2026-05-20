@@ -9,11 +9,18 @@
 // State persisted via securityApi.setPrefs(); see ../../../main/
 // securityPreferences.ts for the on-disk schema.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RotateCw, ArrowRight } from 'lucide-react'
+import { RotateCw, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ScanStatus, AllowlistEntryRow } from '@spool-lab/core'
+import {
+  SENSITIVE_KIND_ORDER,
+  SENSITIVE_KIND_LABEL,
+  HIGH_SEVERITY_KINDS,
+  INFO_SEVERITY_KINDS,
+  type SensitiveKind,
+} from '@spool-lab/redact'
 import { securityApi, type SecurityPreferences } from '../../api/security.js'
 import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
@@ -203,6 +210,14 @@ export default function SecurityPane() {
         </div>
       </Section>
 
+      {/* Muted kinds — entire categories silently dismissed at scan time */}
+      <Section title={t('settings.security.muted_kinds_title', { defaultValue: 'Muted kinds' })}>
+        <MutedKindsRow
+          value={prefs?.kindAllowlist ?? []}
+          onChange={(kinds) => { void update({ kindAllowlist: kinds }) }}
+        />
+      </Section>
+
       {/* Allowlist */}
       <Section title={t('settings.security.allowlist_title', { defaultValue: 'Allowlist' })}>
         <DefaultsRow
@@ -333,5 +348,152 @@ function SmallSelect({ value, onChange, options, testid }: SmallSelectProps) {
         </button>
       )}
     />
+  )
+}
+
+interface MutedKindsRowProps {
+  value: readonly SensitiveKind[]
+  onChange: (next: SensitiveKind[]) => void
+}
+
+/** Per-kind allowlist UI — entire SensitiveKind categories the user
+ *  wants silenced at scan time. Findings still land in the DB
+ *  (state='dismissed') for auditability, but the Library badge, the
+ *  session strip, and the Security page sessions list all ignore
+ *  them. Backfill kicks automatically on toggle via the SET_PREFS
+ *  IPC side-effect.
+ *
+ *  Collapsed by default — most users won't touch this. The summary
+ *  row exposes the count + an expand chevron; expanded view groups
+ *  kinds by severity (high / low / info) as clickable chips. */
+function MutedKindsRow({ value, onChange }: MutedKindsRowProps) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const muted = useMemo(() => new Set(value), [value])
+
+  const groups = useMemo(() => {
+    const high: SensitiveKind[] = []
+    const low: SensitiveKind[] = []
+    const info: SensitiveKind[] = []
+    for (const k of SENSITIVE_KIND_ORDER) {
+      if (HIGH_SEVERITY_KINDS.has(k)) high.push(k)
+      else if (INFO_SEVERITY_KINDS.has(k)) info.push(k)
+      else low.push(k)
+    }
+    return { high, low, info }
+  }, [])
+
+  function toggle(kind: SensitiveKind) {
+    const next = new Set(muted)
+    if (next.has(kind)) next.delete(kind)
+    else next.add(kind)
+    onChange([...next])
+  }
+
+  const count = muted.size
+
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid="settings-muted-kinds-toggle"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        className="w-full flex items-start justify-between gap-3 text-left rounded -ml-1 pl-1 py-1 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      >
+        <div className="min-w-0 flex-1">
+          <span className="text-xs text-warm-muted dark:text-dark-muted">
+            {t('settings.security.muted_kinds_label', { defaultValue: 'Mute by kind' })}
+          </span>
+          <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">
+            {count === 0
+              ? t('settings.security.muted_kinds_sub_empty', {
+                  defaultValue: 'Entire categories you never want to see. Findings still land as Dismissed for audit — just suppressed from the badge and lists.',
+                })
+              : t('settings.security.muted_kinds_sub_count', {
+                  count,
+                  defaultValue: '{{count}} kinds muted. Toggling a kind back on triggers a background rescan.',
+                })}
+          </p>
+        </div>
+        <span className="flex-none inline-flex items-center justify-center w-5 h-5 text-warm-faint dark:text-dark-muted">
+          {open
+            ? <ChevronDown size={13} strokeWidth={1.7} aria-hidden />
+            : <ChevronRight size={13} strokeWidth={1.7} aria-hidden />}
+        </span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <MutedKindsGroup
+            label={t('security.severity_high', { defaultValue: 'High · credentials' })}
+            kinds={groups.high}
+            muted={muted}
+            onToggle={toggle}
+            tone="high"
+          />
+          <MutedKindsGroup
+            label={t('security.severity_low', { defaultValue: 'Low · identity' })}
+            kinds={groups.low}
+            muted={muted}
+            onToggle={toggle}
+            tone="low"
+          />
+          <MutedKindsGroup
+            label={t('security.severity_info', { defaultValue: 'Info · environment' })}
+            kinds={groups.info}
+            muted={muted}
+            onToggle={toggle}
+            tone="info"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface MutedKindsGroupProps {
+  label: string
+  kinds: SensitiveKind[]
+  muted: ReadonlySet<SensitiveKind>
+  onToggle: (kind: SensitiveKind) => void
+  tone: 'high' | 'low' | 'info'
+}
+function MutedKindsGroup({ label, kinds, muted, onToggle, tone }: MutedKindsGroupProps) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-[0.08em] text-warm-faint dark:text-dark-muted mb-1.5">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {kinds.map((k) => {
+          const active = muted.has(k)
+          const palette = active
+            // Active = muted (user said "don't report this kind"). Visually
+            // emphasised with the same accent as the High tier so users see
+            // at a glance which kinds they've turned off.
+            ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark'
+            // Inactive = will be reported. Subtle border that picks up tone
+            // (high tier gets warmer, info gets a dashed border to indicate
+            // it's already a quieter category).
+            : tone === 'info'
+              ? 'border-dashed border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+              : 'border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+          return (
+            <button
+              key={k}
+              type="button"
+              data-testid="settings-muted-kind-chip"
+              data-kind={k}
+              data-muted={active}
+              onClick={() => onToggle(k)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1.5 h-6 px-2 rounded-[6px] border text-[11px] font-mono transition-colors ${palette}`}
+            >
+              {SENSITIVE_KIND_LABEL[k] ?? k}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
