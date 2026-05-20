@@ -59,21 +59,40 @@ export default function ProjectView({
   // mount-time bump, and the initial backfill check are all skipped
   // when the feature is off — prod builds (where VITE_FEATURE_SECURITY
   // isn't set) see this effect as a no-op.
+  //
+  // Debounce: backfill of N sessions publishes N session-rescanned
+  // events. Without coalescing, the renderer would refetch + re-render
+  // N times. Trail-edge debounce so we refetch once 300ms after the
+  // burst settles — fast enough that the badge feels live, slow
+  // enough that 500-session backfill collapses to a single refetch.
   useEffect(() => {
     if (!securityFeatureEnabled()) return
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const scheduleBump = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        timer = null
+        setScanRefreshKey(k => k + 1)
+      }, 300)
+    }
 
     // Subscribe BEFORE the mount bump so an event that arrives
     // between these two lines isn't missed. Both execute in the same
     // JS tick — events can't actually interleave — but the ordering
     // documents the invariant.
-    const off = securityApi.onChange(() => { setScanRefreshKey(k => k + 1) })
+    const off = securityApi.onChange(scheduleBump)
 
-    // Bump once on mount to catch the cold-start race: a scan that
-    // completed between app boot and this subscription would
-    // otherwise leave us showing the pre-scan counts indefinitely.
+    // Bump once on mount (immediate, not debounced) to catch the
+    // cold-start race: a scan that completed between app boot and
+    // this subscription would otherwise leave us showing the
+    // pre-scan counts until the next change event lands.
     setScanRefreshKey(k => k + 1)
 
-    return off
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
   }, [])
 
   useEffect(() => {

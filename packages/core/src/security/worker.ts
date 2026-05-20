@@ -92,8 +92,21 @@ export function makeScanWorker(
 
     // The drain fiber runs for the worker's lifetime; Scope.addFinalizer
     // interrupts it when the runtime tears down.
+    //
+    // Throttle: yield 50ms between scans. better-sqlite3 is synchronous
+    // so the DB lock is held for the full scanOne duration (~50-100ms
+    // per session). Without a yield, a backfill of N sessions becomes
+    // ~N*scanTime of uninterrupted lock contention — foreground reads
+    // (listSessions, FTS search) get queued behind every scan. The
+    // sleep gives the event loop a window to flush foreground IPC
+    // handlers before grabbing the next session. Doubles backfill
+    // duration but keeps the app responsive.
     const drain = Stream.fromQueue(queue).pipe(
-      Stream.mapEffect(scanOne, { concurrency: 1 }),
+      Stream.mapEffect(
+        (sessionId: number) =>
+          scanOne(sessionId).pipe(Effect.tap(() => Effect.sleep('50 millis'))),
+        { concurrency: 1 },
+      ),
       Stream.runDrain,
     )
     yield* Effect.forkScoped(drain)
