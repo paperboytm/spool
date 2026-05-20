@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Trash2 } from 'lucide-react'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 import type { AllowlistEntryRow } from '@spool-lab/core'
 import { SENSITIVE_KIND_LABEL, type SensitiveKind } from '@spool-lab/redact'
 import { securityApi } from '../../api/security.js'
@@ -29,10 +30,8 @@ export default function AllowlistManageModal({ onClose }: Props) {
 
   useEffect(() => {
     void securityApi.listAllowlistEntries().then(setEntries).catch(() => setEntries([]))
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
+  useHotkeys({ Escape: onClose }, { modal: true })
 
   const buckets = useMemo(() => {
     if (!entries) return { global: [] as AllowlistEntryRow[], session: [] as AllowlistEntryRow[] }

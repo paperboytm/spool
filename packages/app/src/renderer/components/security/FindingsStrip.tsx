@@ -16,24 +16,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Trash2, X } from 'lucide-react'
 import type { Session, FindingRow } from '@spool-lab/core'
+import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from '@spool-lab/redact'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import { securityApi } from '../../api/security.js'
 import PurgeConfirmDialog from './PurgeConfirmDialog.js'
-
-// Info-tier kinds — high false-positive rate (paths, IPs, internal
-// hostnames). Excluded from the strip so the count + rows match the
-// session counter columns (scanFindingCount = high + low only).
-const INFO_KINDS = new Set(['absolute-path', 'ip', 'internal-host'])
-
-// High-severity kinds — credentials + structured tokens. Drives the
-// "N high-risk" line in the strip header. Mirrors the redact lib's
-// HIGH_SEVERITY_KINDS set; duplicated here to avoid the strip
-// importing from @spool-lab/redact directly.
-const HIGH_KINDS = new Set([
-  'private-key', 'ssh-key', 'cloud-cred-ini', 'kubeconfig-token', 'netrc',
-  'connection-string', 'url-creds', 'api-key', 'jwt', 'bearer',
-  'basic-auth', 'env-var', 'generic-secret',
-])
 
 interface Props {
   session: Session
@@ -41,7 +27,12 @@ interface Props {
   onClose: () => void
 }
 
-export default function FindingsStrip({ session, open, onClose }: Props) {
+export default function FindingsStrip(props: Props) {
+  if (!securityFeatureEnabled()) return null
+  return <FindingsStripInner {...props} />
+}
+
+function FindingsStripInner({ session, open, onClose }: Props) {
   const [findings, setFindings] = useState<FindingRow[] | null>(null)
   const [values, setValues] = useState<Record<number, string | null>>({})
   const high = session.scanHighCount ?? 0
@@ -52,7 +43,7 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   const refresh = useCallback(async () => {
     const rows = await securityApi.listFindings({ sessionId: session.id, state: 'active' })
     setFindings(rows)
-    const reportable = rows.filter(r => !INFO_KINDS.has(r.kind))
+    const reportable = rows.filter(r => !INFO_SEVERITY_KINDS.has(r.kind))
     if (reportable.length > 0) {
       // Bulk-fetch raw values in one IPC instead of one-per-row.
       const map = await securityApi.getFindingValues(reportable.map(r => r.id))
@@ -67,7 +58,7 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   // today, so we filter client-side; cheap given strip lists are
   // bounded by the session's finding count.
   const visibleFindings = useMemo(
-    () => (findings ?? []).filter(f => !INFO_KINDS.has(f.kind)),
+    () => (findings ?? []).filter(f => !INFO_SEVERITY_KINDS.has(f.kind)),
     [findings],
   )
 
@@ -99,7 +90,6 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
     }
   }, [session.id, open, refresh])
 
-  if (!securityFeatureEnabled()) return null
   if (total === 0) return null
   if (!open) return null
 
@@ -118,7 +108,7 @@ export default function FindingsStrip({ session, open, onClose }: Props) {
   // header truthful immediately.
   const loaded = findings !== null
   const loadedVisible = visibleFindings
-  const loadedHigh = loadedVisible.filter(f => HIGH_KINDS.has(f.kind)).length
+  const loadedHigh = loadedVisible.filter(f => HIGH_SEVERITY_KINDS.has(f.kind)).length
   const loadedLow = loadedVisible.length - loadedHigh
   const isCleared = loaded && loadedVisible.length === 0
   const summary: string[] = []

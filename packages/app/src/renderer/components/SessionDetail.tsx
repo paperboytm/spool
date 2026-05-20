@@ -127,9 +127,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   // N findings publishes N events.
   useEffect(() => {
     if (!securityFeatureEnabled()) return
+    const sessionId = session?.id
+    if (sessionId === undefined) return
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = securityApi.onChange((c) => {
-      if (c.sessionId !== session?.id) return
+      if (c.sessionId !== sessionId) return
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         timer = null

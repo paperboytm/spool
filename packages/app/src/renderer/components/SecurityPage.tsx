@@ -13,7 +13,7 @@
 //   5. Info drawer — informational signals (paths, IPs, internal-host)
 //      collapsed by default with the false-positive audit fact visible.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Trash2, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -27,10 +27,17 @@ import type {
   SessionWithFindingCounts,
   Session,
 } from '@spool-lab/core'
+import {
+  HIGH_SEVERITY_KINDS,
+  INFO_SEVERITY_KINDS,
+  SENSITIVE_KIND_LABEL,
+  type SensitiveKind,
+} from '@spool-lab/redact'
 import { securityApi } from '../api/security.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
+import { truncateValue } from './security/truncate-value.js'
 import { SourceBadge } from './Badges.js'
 import Menu from './Menu.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
@@ -44,12 +51,16 @@ interface Props {
 
 type Sess = SessionWithFindingCounts & { source: Session['source'] }
 
-export default function SecurityPage({ onOpenSession, onShareSession }: Props) {
-  // Defensive: belt-and-suspenders with App.tsx's route guard. If
-  // some future path ever lands the renderer on the security view
-  // without the feature flag, render nothing rather than mount a
-  // full page that calls IPC handlers main may not have registered.
+export default function SecurityPage(props: Props) {
+  // Belt-and-suspenders gate at the wrapper so the inner component's
+  // hooks never run when the feature is off — keeping the conditional
+  // return ABOVE the hooks would violate Rules of Hooks the moment
+  // the flag becomes anything other than a build-time constant.
   if (!securityFeatureEnabled()) return null
+  return <SecurityPageInner {...props} />
+}
+
+function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const { t } = useTranslation()
   const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
   const [sessions, setSessions] = useState<Sess[]>([])
@@ -125,73 +136,55 @@ export default function SecurityPage({ onOpenSession, onShareSession }: Props) {
     return () => { off() }
   }, [refresh])
 
-  // Capture the backfill total the first tick we see > 0, reset when idle.
-  useEffect(() => {
-    if (!scanStatus) return
-    const inFlight = scanStatus.backfillRemaining + (scanStatus.scanning !== null ? 1 : 0)
-    if (inFlight === 0) {
-      if (backfillStart !== null) setBackfillStart(null)
-      return
-    }
-    if (backfillStart === null || inFlight > backfillStart) {
-      setBackfillStart(inFlight)
-    }
-  }, [scanStatus, backfillStart])
+  // Refs let the onScanStatus subscription read the latest values
+  // without re-subscribing on every render.
+  const backfillStartRef = useRef<number | null>(null)
+  backfillStartRef.current = backfillStart
+  const riskRef = useRef<RiskByCategoryRow[]>([])
+  riskRef.current = risk
+  const sessionsLenRef = useRef(0)
+  sessionsLenRef.current = sessions.length
 
-  // Poll status while the worker is busy so the progress bar moves.
+  // Subscribe to scan status pushes from the worker. Replaces a
+  // 500 ms setInterval poll — fewer IPC trips and zero edge-detection
+  // latency on the busy→idle transition that drives the result banner.
   useEffect(() => {
-    if (!scanStatus) return
-    const busy = scanStatus.queued > 0 || scanStatus.scanning !== null || scanStatus.backfillRemaining > 0
-    if (!busy) return
-    const handle = setInterval(() => {
-      void securityApi.getScanStatus().then(setScanStatus).catch(() => {})
-    }, 500)
-    return () => clearInterval(handle)
-  }, [scanStatus])
+    const off = securityApi.onScanStatus((next) => {
+      setScanStatus(next)
+      const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
+      setBackfillStart((prev) => {
+        if (inFlight === 0) return null
+        if (prev === null || inFlight > prev) return inFlight
+        return prev
+      })
+      const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
+      if (nowBusy) {
+        wasScanningRef.current = true
+        setScanResult(null)
+        return
+      }
+      if (wasScanningRef.current) {
+        wasScanningRef.current = false
+        setRescanInFlight(false)
+        setScanResult({
+          scanned: backfillStartRef.current ?? sessionsLenRef.current,
+          high: riskRef.current.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0),
+          low: riskRef.current.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0),
+        })
+      }
+    })
+    return () => { off() }
+  }, [])
 
   const isScanning = rescanInFlight || (scanStatus !== null &&
     (scanStatus.queued > 0 || scanStatus.scanning !== null || scanStatus.backfillRemaining > 0))
 
-  // Edge-detect the busy→idle transition. On the falling edge we
-  // freeze the post-scan counts so the result banner has something to
-  // show after isScanning goes back to false. A new rescan tears down
-  // the old result so we don't show stale numbers.
-  //
-  // useLayoutEffect (not useEffect) so the scanResult setState lands
-  // before the browser paints the post-transition frame. With
-  // useEffect React would commit the "scanning banner removed,
-  // result banner not yet added" DOM and paint once before the second
-  // re-render added the result banner — a one-frame gap the user
-  // perceives as a flash.
-  useLayoutEffect(() => {
-    if (isScanning) {
-      wasScanningRef.current = true
-      if (scanResult) setScanResult(null)
-      return
-    }
-    if (wasScanningRef.current) {
-      wasScanningRef.current = false
-      const highTotal = risk.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
-      const lowTotal = risk.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0)
-      setScanResult({
-        scanned: backfillStart ?? sessions.length,
-        high: highTotal,
-        low: lowTotal,
-      })
-    }
-  }, [isScanning, risk, sessions.length, backfillStart, scanResult])
-
   async function handleRescanAll() {
     if (rescanInFlight) return
     setRescanInFlight(true)
-    try {
-      await securityApi.rescanAll()
-      await refresh()
-    } finally {
-      // Clear the optimistic flag once the worker reports idle (or after
-      // a 200 ms minimum so very-fast rescans still flash a visible state).
-      setTimeout(() => setRescanInFlight(false), 200)
-    }
+    await securityApi.rescanAll().catch(() => { setRescanInFlight(false) })
+    // `rescanInFlight` clears on the busy→idle transition observed via
+    // onScanStatus; no manual timeout needed.
   }
 
   function toggleKindFilter(kind: string) {
@@ -202,25 +195,32 @@ export default function SecurityPage({ onOpenSession, onShareSession }: Props) {
     setQuery('')
   }
 
-  const activeKinds: readonly string[] = parsed.filter.kinds ?? []
-  const activeKindSet = new Set(activeKinds)
+  // Stable references — string-array identity from parseQualifier
+  // changes on every input character, but the SessionCard load
+  // callback's dep array only cares about content equality. Memoise
+  // off the joined string so a debounced parent re-render doesn't
+  // refetch every session card.
+  const kindsKey = (parsed.filter.kinds ?? []).join('|')
+  const activeKinds = useMemo<readonly string[]>(
+    () => kindsKey ? kindsKey.split('|') : [],
+    [kindsKey],
+  )
+  const activeKindSet = useMemo(() => new Set(activeKinds), [activeKinds])
 
   async function openBulkPurge(kind: string) {
     setBulkPurgeKind(kind)
-    // Fetch a few sample values up-front so the modal can show them.
     const rows = await securityApi.listFindings({
       kind: kind as NonNullable<FindingFilter['kind']>,
       state: 'active',
     })
-    const samples: Array<{ value: string; sessionTitle: string }> = []
-    for (const r of rows.slice(0, 4)) {
-      const v = await securityApi.getFindingValue(r.id).catch(() => null)
-      if (v !== null) {
-        const session = sessions.find(s => s.id === r.sessionId)
-        const truncated = v.length > 56 ? v.slice(0, 54) + '…' : v
-        samples.push({ value: truncated, sessionTitle: session?.title?.trim() || '(no title)' })
-      }
-    }
+    const sample = rows.slice(0, 4)
+    const values = await securityApi.getFindingValues(sample.map(r => r.id)).catch(() => ({} as Record<number, string | null>))
+    const samples = sample.flatMap(r => {
+      const v = values[r.id]
+      if (!v) return []
+      const session = sessions.find(s => s.id === r.sessionId)
+      return [{ value: truncateValue(v), sessionTitle: session?.title?.trim() || '(no title)' }]
+    })
     setBulkPurgeSamples(samples)
   }
 
@@ -590,20 +590,6 @@ function ScanResultBanner({
   )
 }
 
-function SectionHeader({ label, count, leading }: { label: string; count: number; leading?: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 mb-2.5">
-      {leading}
-      <span className="text-[13px] font-medium leading-[18px] text-warm-text dark:text-dark-text">
-        {label}
-      </span>
-      <span className="font-mono text-[12px] text-warm-faint dark:text-dark-muted tabular-nums ml-1">
-        {count}
-      </span>
-    </div>
-  )
-}
-
 function CollapsibleHeader({
   expanded,
   onToggle,
@@ -797,10 +783,7 @@ function SessionCard({
   const [collapsed, setCollapsed] = useState(false)
   const [resuming, setResuming] = useState(false)
   const LIMIT = 3
-
-  // Stable key for the dependency array — otherwise array identity
-  // changes every render even when contents are the same.
-  const kindsKey = activeKinds.join('|')
+  const [values, setValues] = useState<Record<number, string | null>>({})
 
   const load = useCallback(async () => {
     const f: FindingFilter = { sessionId: session.id, state: 'active' }
@@ -810,15 +793,21 @@ function SessionCard({
     try {
       const rows = await securityApi.listFindings(f)
       setFindings(rows)
+      // Bulk-fetch raw values for the rows we're about to render in
+      // one IPC trip instead of one-per-row. Caller passes the value
+      // down as a prop; FindingItem no longer needs its own fetch.
+      if (rows.length > 0) {
+        const map = await securityApi.getFindingValues(rows.map(r => r.id))
+        setValues(map)
+      } else {
+        setValues({})
+      }
     } catch (err) {
-      // Don't strand the user on the loading skeleton if the IPC call
-      // fails (DB locked, worker dead, etc.). Render as "no findings"
-      // and log so the issue surfaces in devtools.
       console.error('[security] listFindings failed for session', session.id, err)
       setFindings([])
+      setValues({})
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.id, kindsKey])
+  }, [session.id, activeKinds])
 
   useEffect(() => { void load() }, [load])
 
@@ -853,15 +842,15 @@ function SessionCard({
   // info findings are stored as an audit record but have ~98% false-
   // positive rate, so showing 848 absolute-path rows would drown the
   // real leaks. The Info drawer at the bottom is where they surface.
-  const allowInfo = activeKinds.some(k => isInfo(k))
+  const allowInfo = activeKinds.some(k => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
   const reportable = allowInfo
     ? findings
-    : findings.filter(f => !isInfo(f.kind))
+    : findings.filter(f => !INFO_SEVERITY_KINDS.has(f.kind as SensitiveKind))
 
   const visible = showAll ? reportable : reportable.slice(0, LIMIT)
   const hidden = reportable.length - visible.length
-  const high = reportable.filter(f => f.state === 'active' && isHigh(f.kind)).length
-  const low = reportable.filter(f => f.state === 'active' && !isHigh(f.kind)).length
+  const high = reportable.filter(f => f.state === 'active' && HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind)).length
+  const low = reportable.filter(f => f.state === 'active' && !HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind)).length
   const title = session.title?.trim() || t('common.noTitle')
 
   // Match SessionRow's meta format exactly: relative date · N msgs · model
@@ -986,6 +975,7 @@ function SessionCard({
             <FindingItem
               key={f.id}
               finding={f}
+              value={values[f.id] ?? null}
               valuesHidden={valuesHidden}
               onChange={() => { void load(); onRefresh() }}
             />
@@ -1021,10 +1011,14 @@ function compactModel(model: string | null | undefined): string {
 
 function FindingItem({
   finding,
+  value,
   valuesHidden,
   onChange,
 }: {
   finding: FindingRow
+  /** Raw value — fetched in bulk by the parent SessionCard so a card
+   *  with N findings stays at one IPC round-trip total. */
+  value: string | null
   /** Global hide toggle (screen-share mode). When true, blur every value
    *  until the user hover-reveals it. When false (default), values render
    *  in clear — the user is here to review them. */
@@ -1032,17 +1026,9 @@ function FindingItem({
   onChange: () => void
 }) {
   const { t } = useTranslation()
-  const [value, setValue] = useState<string | null>(null)
   // Per-row reveal override — only meaningful when valuesHidden is true.
   const [localReveal, setLocalReveal] = useState(false)
   const [purgePending, setPurgePending] = useState(false)
-
-  useEffect(() => {
-    securityApi.getFindingValue(finding.id).then(setValue).catch(() => setValue(null))
-  }, [finding.id])
-
-  // Reset local reveal whenever the global toggle flips back on.
-  useEffect(() => { if (valuesHidden) setLocalReveal(false) }, [valuesHidden])
 
   const revealed = !valuesHidden || localReveal
 
@@ -1078,7 +1064,7 @@ function FindingItem({
 
   const isActive = finding.state === 'active'
   const isPurged = finding.state === 'purged'
-  const high = isHigh(finding.kind)
+  const high = HIGH_SEVERITY_KINDS.has(finding.kind as SensitiveKind)
   const bulletClass = isPurged
     ? 'bg-warm-faint dark:bg-dark-faint'
     : high
@@ -1092,7 +1078,7 @@ function FindingItem({
       : 'text-warm-text dark:text-dark-text blur-[3.5px] cursor-pointer select-none'
 
   const displayValue = isPurged
-    ? `[redacted: ${friendlyKind(finding.kind)}]`
+    ? `[redacted: ${(SENSITIVE_KIND_LABEL[finding.kind as SensitiveKind] ?? finding.kind)}]`
     : value === null
       ? t('security.value_unavailable', { defaultValue: '(value unavailable)' })
       : value
@@ -1246,32 +1232,3 @@ function formatScanAgo(iso: string): string {
   }
 }
 
-const HIGH_KINDS = new Set([
-  'private-key', 'ssh-key', 'cloud-cred-ini', 'kubeconfig-token', 'netrc',
-  'connection-string', 'url-creds', 'api-key', 'jwt', 'bearer',
-  'basic-auth', 'env-var', 'generic-secret',
-])
-const INFO_KINDS = new Set(['absolute-path', 'ip', 'internal-host'])
-function isHigh(kind: string): boolean {
-  return HIGH_KINDS.has(kind)
-}
-function isInfo(kind: string): boolean {
-  return INFO_KINDS.has(kind)
-}
-
-function friendlyKind(kind: string): string {
-  const map: Record<string, string> = {
-    'api-key': 'API key', 'private-key': 'private key', 'jwt': 'JWT',
-    'bearer': 'bearer token', 'kubeconfig-token': 'kubeconfig token',
-    'env-var': 'env var', 'url-creds': 'URL credentials',
-    'connection-string': 'connection string', 'ssh-key': 'SSH key',
-    'cloud-cred-ini': 'cloud creds', 'netrc': 'netrc',
-    'basic-auth': 'basic auth', 'generic-secret': 'secret',
-    'email': 'email', 'person-name': 'name', 'phone': 'phone',
-    'street-address': 'address', 'credit-card': 'credit card',
-    'ssn': 'SSN', 'date-of-birth': 'DOB',
-    'absolute-path': 'absolute path', 'ip': 'IP address',
-    'internal-host': 'internal host',
-  }
-  return map[kind] ?? kind
-}

@@ -7,6 +7,8 @@
 import { AlertTriangle, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef } from 'react'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
+import { truncateValue } from './truncate-value.js'
 
 interface BulkSample {
   /** Raw value being rewritten (may be truncated by caller). */
@@ -45,20 +47,15 @@ export default function PurgeConfirmDialog({
   const cancelRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    cancelRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+    if (open) cancelRef.current?.focus()
+  }, [open])
+  useHotkeys({ Escape: onCancel }, { active: open, modal: true })
 
   if (!open) return null
 
   const friendly = friendlyMaskName(kind)
   const afterValue = `[redacted: ${friendly}]`
-  const beforePreview = before && before.length > 56 ? before.slice(0, 54) + '…' : before
+  const beforePreview = before ? truncateValue(before) : undefined
   const showBeforeRow = Boolean(beforePreview && !bulk)
 
   return (
