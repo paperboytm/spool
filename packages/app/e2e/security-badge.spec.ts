@@ -65,6 +65,9 @@ test('Library row shows a high-severity Security Scan badge for a session with a
 
   // The polling fallback in ProjectView refetches every 750ms while
   // the worker is busy, so by now the badge should be in the DOM.
-  const badge = target.locator('[data-testid="security-badge"][data-severity="high"]')
+  // `.first()` tolerates Library renders where the session shows up
+  // in multiple lists (e.g. pinned slot + active list) so the
+  // strict-mode locator doesn't fail on the duplicate.
+  const badge = target.locator('[data-testid="security-badge"][data-severity="high"]').first()
   await expect(badge).toBeVisible({ timeout: 5_000 })
 })
