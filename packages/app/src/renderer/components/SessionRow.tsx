@@ -1,7 +1,7 @@
 import type React from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, AlertTriangle } from 'lucide-react'
+import { SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, AlertTriangle, Check } from 'lucide-react'
 import type { Session } from '@spool-lab/core'
 import { SourceBadge } from './Badges.js'
 import PinButton from './PinButton.js'
@@ -91,6 +91,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
       </div>
 
       <div className="flex-none flex items-center gap-1 -mt-0.5" onClick={(e) => e.stopPropagation()}>
+        <SecurityBadgeSlot session={session} />
         <span
           className={
             pinned
@@ -152,45 +153,75 @@ export default function SessionRow({ session, pinned = false, showProject = fals
   )
 }
 
+/** Fixed-width state slot containing the SecurityBadge.
+ *
+ *  Naive placement (`{badge && <SecurityBadge />}` inline) shifts the pin
+ *  icon column left on rows without a badge. By reserving a 32px slot
+ *  for every row — even when empty — the pin/menu icons lock to the
+ *  same X across the entire library.
+ *
+ *  Vertical alignment: the slot is `h-5` to match `PinButton`'s `w-5
+ *  h-5` button, and lives inside the action group so it inherits the
+ *  group's `-mt-0.5` offset against the title row. Icon size = 13 so
+ *  the AlertTriangle reads as the same visual weight as PinIcon (also
+ *  size 13). */
+function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElement {
+  return (
+    <span className="flex-none inline-flex items-center justify-center w-5 h-5">
+      <SecurityBadge session={session} />
+    </span>
+  )
+}
+
+
 function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
   if (!securityFeatureEnabled()) return null
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0
-  if (total === 0) return null
+  const purged = session.scanPurgedCount ?? 0
+  const completed = session.scanCompletedAt != null
   const low = Math.max(0, total - high)
-  const tooltip = high > 0
-    ? `${high} high-risk · ${low} low`
-    : `${total} low-risk finding${total === 1 ? '' : 's'}`
-  if (high > 0) {
-    return (
-      <span
-        data-testid="security-badge"
-        data-severity="high"
-        title={tooltip}
-        aria-label={tooltip}
-        className="flex-none inline-flex items-center justify-center"
-      >
-        <AlertTriangle
-          size={16}
-          strokeWidth={1.6}
-          className="text-warm-accent dark:text-dark-accent"
-          aria-hidden
-        />
-      </span>
-    )
+
+  // "All resolved" state: the session was scanned, has zero active
+  // findings, but at least one was purged historically. Surfaces a
+  // checkmark so the user can tell "scanned-clean from the start"
+  // (no badge) from "scanned-clean because I purged it" (✓).
+  if (high === 0 && low === 0) {
+    if (completed && purged > 0) {
+      const tooltip = `${purged} resolved`
+      return (
+        <span
+          data-testid="security-badge"
+          data-severity="resolved"
+          title={tooltip}
+          aria-label={tooltip}
+          className="inline-flex items-center justify-center w-5 h-5 text-warm-muted dark:text-dark-muted"
+        >
+          <Check size={13} strokeWidth={1.7} aria-hidden />
+        </span>
+      )
+    }
+    return null
   }
+
+  const isHigh = high > 0
+  // Icon-only at the row level — the tooltip carries the exact count
+  // so the row stays scan-readable at scale (Library home shows 50+
+  // rows; per-row digits become visual noise). Hover gives detail.
+  const tooltip = isHigh
+    ? (low > 0 ? `${high} high-risk · ${low} low` : `${high} high-risk`)
+    : `${low} low`
+  const tone = isHigh ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'
+
   return (
     <span
       data-testid="security-badge"
       data-severity="low"
       title={tooltip}
       aria-label={tooltip}
-      className="flex-none inline-flex items-center justify-center"
+      className={`inline-flex items-center justify-center w-5 h-5 ${tone}`}
     >
-      <span
-        className="block w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted"
-        aria-hidden
-      />
+      <AlertTriangle size={13} strokeWidth={1.7} aria-hidden />
     </span>
   )
 }

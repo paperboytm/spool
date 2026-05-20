@@ -36,6 +36,7 @@ export {
   addAllowlistGlobal,
   removeAllowlistSession,
   removeAllowlistGlobal,
+  listAllowlistEntries,
   dismissFinding,
   undismissFinding,
 } from './repo.js'
@@ -43,6 +44,7 @@ export type {
   FindingFilter,
   SessionFindingFilter,
   FindingInput,
+  AllowlistEntryRow,
   AllowlistSnapshot,
 } from './repo.js'
 

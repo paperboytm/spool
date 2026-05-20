@@ -18,8 +18,8 @@ function seedProjectAndSession(db: Database.Database, sessionUuid: string): numb
 }
 
 describe('migration v12 — security scan schema', () => {
-  it('LATEST_SCHEMA_VERSION is 12', () => {
-    expect(LATEST_SCHEMA_VERSION).toBe(12)
+  it('LATEST_SCHEMA_VERSION reflects the latest migration', () => {
+    expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(12)
   })
 
   it('adds 5 scan_* columns to sessions (profile / completed_at / finding_count / high_count / purged_count)', () => {
@@ -94,17 +94,17 @@ describe('migration v12 — security scan schema', () => {
     ).toBeDefined()
   })
 
-  it('user_version is 12 after a clean migration', () => {
+  it('user_version reaches the latest schema after a clean migration', () => {
     const db = new Database(':memory:')
     runMigrations(db)
-    expect(userVersion(db)).toBe(12)
+    expect(userVersion(db)).toBe(LATEST_SCHEMA_VERSION)
   })
 
-  it('migration is idempotent — running twice does not error and stays at v12', () => {
+  it('migration is idempotent — running twice does not error and stays at the latest schema', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     expect(() => runMigrations(db)).not.toThrow()
-    expect(userVersion(db)).toBe(12)
+    expect(userVersion(db)).toBe(LATEST_SCHEMA_VERSION)
   })
 
   // Regression for the partial-failure case the audit flagged: if

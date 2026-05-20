@@ -49,7 +49,26 @@ export interface SessionWithFindingCounts {
   findingCount: number
   /** Active findings whose kind is in `HIGH_SEVERITY_KINDS`. */
   highCount: number
+  /** Lifetime count of purged findings on this session. Combined with
+   *  scan_completed_at + a zero findingCount, lets the Library row
+   *  show an "all-resolved" check rather than a stale red badge. */
+  purgedCount: number
   scanCompletedAt: string | null
+  /** Sources name ('claude' / 'codex' / 'gemini'). */
+  source: string
+  /** Number of non-sidechain messages in the session. */
+  messageCount: number
+  /** Model identifier as captured at sync time. May be null for
+   *  sessions where the parser couldn't infer it. */
+  model: string | null
+  /** Working directory captured when the session started; used to
+   *  build the resume-CLI command and the "Copy terminal command"
+   *  menu action. Null when the parser couldn't infer it. */
+  cwd: string | null
+  /** Human-readable project name, e.g. "spool". Surfaced at the head
+   *  of the session card's meta row so users can locate the session
+   *  in the Library at a glance. */
+  projectDisplayName: string | null
 }
 
 /** Row in the Security page's Risk-by-category panel. One per kind

@@ -59,12 +59,17 @@ function rowToFinding(r: FindingRowDb): FindingRow {
 export interface FindingFilter {
   sessionId?: number
   kind?: SensitiveKind
+  /** Multi-select kinds. When non-empty takes precedence over `kind`.
+   *  Used by the Security page filter pills which support clicking
+   *  multiple chips to OR them together. */
+  kinds?: readonly SensitiveKind[]
   state?: FindingState | 'any'
   severity?: 'high' | 'low'
 }
 
 export interface SessionFindingFilter {
   kind?: SensitiveKind
+  kinds?: readonly SensitiveKind[]
   state?: FindingState | 'any'
   severity?: 'high' | 'low'
   /** Free-text on session title. */
@@ -140,7 +145,7 @@ export function deleteActiveFindings(
  *  because their pattern-only signal has too high a false-positive
  *  rate to be meaningful at first glance. */
 export function updateSessionCounts(db: Database.Database, sessionId: number): void {
-  const row = db.prepare(
+  const active = db.prepare(
     `SELECT
         SUM(CASE WHEN kind NOT IN (${infoKindsPlaceholders()}) THEN 1 ELSE 0 END) AS total,
         SUM(CASE WHEN kind IN (${highKindsPlaceholders()}) THEN 1 ELSE 0 END) AS high
@@ -151,12 +156,18 @@ export function updateSessionCounts(db: Database.Database, sessionId: number): v
     ...HIGH_SEVERITY_KINDS_ARRAY,
     sessionId,
   ) as { total: number | null; high: number | null }
+  const purged = db.prepare(
+    `SELECT COUNT(*) AS c
+       FROM findings
+      WHERE session_id = ? AND state = 'purged'`,
+  ).get(sessionId) as { c: number }
   db.prepare(
     `UPDATE sessions
         SET scan_finding_count = ?,
-            scan_high_count    = ?
+            scan_high_count    = ?,
+            scan_purged_count  = ?
       WHERE id = ?`,
-  ).run(row.total ?? 0, row.high ?? 0, sessionId)
+  ).run(active.total ?? 0, active.high ?? 0, purged.c, sessionId)
 }
 
 const HIGH_SEVERITY_KINDS_ARRAY = Array.from(HIGH_SEVERITY_KINDS)
@@ -228,7 +239,11 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
     where.push('session_id = ?')
     params.push(filter.sessionId)
   }
-  if (filter.kind !== undefined) {
+  if (filter.kinds && filter.kinds.length > 0) {
+    const placeholders = filter.kinds.map(() => '?').join(',')
+    where.push(`kind IN (${placeholders})`)
+    params.push(...filter.kinds)
+  } else if (filter.kind !== undefined) {
     where.push('kind = ?')
     params.push(filter.kind)
   }
@@ -261,25 +276,41 @@ export function listSessionsWithFindings(
   // from the findings table directly (denormalised counters can't
   // express "only api-key findings"). We always recompute here.
   const params: unknown[] = []
-  const conditions: string[] = ["f.state = COALESCE(NULL, 'active')"] // overridden below
-  conditions.length = 0
   const stateCondition = filter.state && filter.state !== 'any'
     ? 'f.state = ?'
     : "f.state = 'active'"
   if (filter.state && filter.state !== 'any') params.push(filter.state)
 
   let kindCondition = ''
-  if (filter.kind !== undefined) {
-    kindCondition = 'AND f.kind = ?'
-    params.push(filter.kind)
+  const explicitKinds: readonly string[] | undefined =
+    filter.kinds && filter.kinds.length > 0
+      ? filter.kinds
+      : filter.kind !== undefined ? [filter.kind] : undefined
+  if (explicitKinds) {
+    const placeholders = explicitKinds.map(() => '?').join(',')
+    kindCondition = `AND f.kind IN (${placeholders})`
+    params.push(...explicitKinds)
   }
   let severityCondition = ''
   if (filter.severity === 'high') {
     severityCondition = `AND f.kind IN (${highKindsPlaceholders()})`
     params.push(...HIGH_SEVERITY_KINDS_ARRAY)
   } else if (filter.severity === 'low') {
-    severityCondition = `AND f.kind NOT IN (${highKindsPlaceholders()})`
-    params.push(...HIGH_SEVERITY_KINDS_ARRAY)
+    // Exclude both HIGH (not low) and INFO (noisy infra signals) so
+    // `severity:low` returns only the identity-tier kinds (email,
+    // phone, person-name, etc.).
+    severityCondition = `AND f.kind NOT IN (${highKindsPlaceholders()}) AND f.kind NOT IN (${infoKindsPlaceholders()})`
+    params.push(...HIGH_SEVERITY_KINDS_ARRAY, ...INFO_SEVERITY_KINDS_ARRAY)
+  }
+
+  // Default exclusion: info-tier findings don't surface a session on
+  // their own — they're stored as an audit record (see Info drawer at
+  // the bottom of the page). Only when the user has explicitly pinned
+  // an info kind via filter.kind/filter.kinds do we let them through.
+  let infoExclusion = ''
+  if (!explicitKinds && filter.severity !== 'high' && filter.severity !== 'low') {
+    infoExclusion = `AND f.kind NOT IN (${infoKindsPlaceholders()})`
+    params.push(...INFO_SEVERITY_KINDS_ARRAY)
   }
 
   let textCondition = ''
@@ -295,11 +326,19 @@ export function listSessionsWithFindings(
       s.title           AS title,
       s.started_at      AS started_at,
       s.scan_completed_at AS scan_completed_at,
+      s.scan_purged_count AS purged_count,
+      s.message_count   AS message_count,
+      s.model           AS model,
+      s.cwd             AS cwd,
+      src.name          AS source,
+      p.display_name    AS project_display_name,
       SUM(1) AS finding_count,
       SUM(CASE WHEN f.kind IN (${highKindsPlaceholders()}) THEN 1 ELSE 0 END) AS high_count
     FROM sessions s
     JOIN findings f ON f.session_id = s.id
-    WHERE ${stateCondition} ${kindCondition} ${severityCondition} ${textCondition}
+    JOIN sources src ON src.id = s.source_id
+    JOIN projects p ON p.id = s.project_id
+    WHERE ${stateCondition} ${kindCondition} ${severityCondition} ${infoExclusion} ${textCondition}
     GROUP BY s.id
     ORDER BY high_count DESC, finding_count DESC, s.started_at DESC
   `
@@ -312,6 +351,12 @@ export function listSessionsWithFindings(
     title: string | null
     started_at: string
     scan_completed_at: string | null
+    purged_count: number | null
+    message_count: number | null
+    model: string | null
+    cwd: string | null
+    source: string
+    project_display_name: string | null
     finding_count: number
     high_count: number | null
   }>
@@ -323,6 +368,12 @@ export function listSessionsWithFindings(
     scanCompletedAt: r.scan_completed_at,
     findingCount: r.finding_count,
     highCount: r.high_count ?? 0,
+    purgedCount: r.purged_count ?? 0,
+    source: r.source,
+    messageCount: r.message_count ?? 0,
+    model: r.model,
+    cwd: r.cwd,
+    projectDisplayName: r.project_display_name,
   }))
 }
 
@@ -472,6 +523,65 @@ export function removeAllowlistGlobal(
   db.prepare(
     `DELETE FROM allowlist_global WHERE kind = ? AND value_hash = ?`,
   ).run(kind, valueHash)
+}
+
+export interface AllowlistEntryRow {
+  scope: 'session' | 'global'
+  kind: SensitiveKind
+  valueHash: string
+  createdAt: string
+  /** Session row context — null for global entries. */
+  sessionUuid: string | null
+  sessionTitle: string | null
+}
+
+/** All allowlist rows from both tables, joined with the originating
+ *  session metadata. Drives the Settings → Security pane's "Manage…"
+ *  modal so the user can review and revoke past decisions. */
+export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[] {
+  const sessionRows = db.prepare(
+    `SELECT a.kind          AS kind,
+            a.value_hash    AS value_hash,
+            a.created_at    AS created_at,
+            s.session_uuid  AS session_uuid,
+            s.title         AS session_title
+       FROM allowlist_session a
+       JOIN sessions s ON s.id = a.session_id
+      ORDER BY a.created_at DESC`,
+  ).all() as Array<{
+    kind: string
+    value_hash: string
+    created_at: string
+    session_uuid: string
+    session_title: string | null
+  }>
+  const globalRows = db.prepare(
+    `SELECT kind, value_hash, created_at
+       FROM allowlist_global
+      ORDER BY created_at DESC`,
+  ).all() as Array<{
+    kind: string
+    value_hash: string
+    created_at: string
+  }>
+  return [
+    ...globalRows.map((r): AllowlistEntryRow => ({
+      scope: 'global',
+      kind: r.kind as SensitiveKind,
+      valueHash: r.value_hash,
+      createdAt: r.created_at,
+      sessionUuid: null,
+      sessionTitle: null,
+    })),
+    ...sessionRows.map((r): AllowlistEntryRow => ({
+      scope: 'session',
+      kind: r.kind as SensitiveKind,
+      valueHash: r.value_hash,
+      createdAt: r.created_at,
+      sessionUuid: r.session_uuid,
+      sessionTitle: r.session_title,
+    })),
+  ]
 }
 
 // ─── Mutations called from IPC dismiss handlers ───────────────────
