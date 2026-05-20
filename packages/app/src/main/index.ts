@@ -145,11 +145,11 @@ const searchCache = new SearchCache()
  *  `../renderer/featureFlags`) because main code mustn't import
  *  React-side modules: those pull in the whole renderer dep graph.
  *
- *  When this returns `false`, the scan worker stays un-booted on
- *  production user machines. The DB migrations still run
- *  unconditionally — schema must be forward-compatible so that
- *  flipping the flag on later doesn't require a second upgrade
- *  pass. */
+ *  When this returns `false`, the scan worker and IPC handlers
+ *  stay un-booted on production user machines. The DB migrations
+ *  still run unconditionally — schema must be forward-compatible
+ *  so that flipping the flag on later doesn't require a second
+ *  upgrade pass. */
 function securityFeatureEnabled(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const env = (import.meta as any).env as { DEV?: boolean; VITE_FEATURE_SECURITY?: string } | undefined
@@ -333,6 +333,11 @@ app.whenReady().then(async () => {
     // unless the user opted out of auto-rescan in Settings → Security,
     // in which case we leave scan_profile dirty for the next manual
     // Rescan all click.
+    // `invalidateSessionScanProfile` updates the v12 `scan_profile`
+    // column regardless of the feature flag — the column lives in
+    // every user's schema. Re-enqueuing only runs when the worker
+    // is booted (i.e. the flag is on); the column resets either
+    // way, which keeps state consistent if the flag flips on later.
     invalidateSessionScanProfile(db, sessionId)
     if (scanWorker && loadSecurityPreferences().rescanAfterSync === 'auto') {
       Effect.runFork(scanWorker.enqueue(sessionId))
