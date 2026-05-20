@@ -112,6 +112,15 @@ body {
   animation: fadeIn var(--tw-duration, 150ms) ease-out;
 }
 
+/* Security-page scanning banner — indeterminate progress strip. A
+ * 33%-wide bar slides left→right on a loop; no `width` transition
+ * means the banner can remount on a new Rescan click without the
+ * 100%→0% rewind animation the deterministic version produced. */
+@keyframes scan-progress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
 .duration-150 {
   --tw-duration: 150ms;
 }

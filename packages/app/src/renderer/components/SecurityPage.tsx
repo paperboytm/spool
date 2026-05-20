@@ -332,7 +332,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
           ) : (
             <>
               {isScanning && scanStatus && (
-                <ScanBanner status={scanStatus} backfillStart={backfillStart} />
+                <ScanBanner status={scanStatus} />
               )}
               {!isScanning && scanResult && (
                 <ScanResultBanner
@@ -496,12 +496,8 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   )
 }
 
-function ScanBanner({ status, backfillStart }: { status: ScanStatus; backfillStart: number | null }) {
+function ScanBanner({ status }: { status: ScanStatus }) {
   const { t } = useTranslation()
-  const inFlight = status.backfillRemaining + (status.scanning !== null ? 1 : 0)
-  const total = backfillStart ?? inFlight
-  const done = Math.max(0, total - inFlight)
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
 
   return (
     <div
@@ -518,24 +514,21 @@ function ScanBanner({ status, backfillStart }: { status: ScanStatus; backfillSta
           {t('security.scanning', { defaultValue: 'Scanning' })}
         </span>
         <span className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums">
-          {t('security.scanning_progress', {
-            done, total,
-            defaultValue: '{{done}} / {{total}} sessions',
-          })}
-          {' · '}
           {status.currentProfile}
         </span>
       </div>
       <span aria-hidden />
-      {/* Progress strip pinned to the bottom border — sits inside
-       *  overflow:hidden so the rounded corners clip cleanly. No vertical
-       *  space cost; the banner stays the same height as the result
-       *  variant, so the swap doesn't jolt the layout. */}
-      <div
-        className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width] duration-300"
-        style={{ width: `${pct}%` }}
-        aria-hidden
-      />
+      {/* Indeterminate progress strip — a 30%-wide accent bar slides
+       *  left-to-right on a 1.4 s loop. No `width` transition means no
+       *  visible "rewind" frame when the banner remounts after the
+       *  result→scanning swap. Also sidesteps the X / N counter mismatch:
+       *  `backfillRemaining` is cumulative across queue bursts (boot
+       *  backfill + manual Rescan stack), so a deterministic
+       *  done / total number isn't accurate without per-burst tracking
+       *  the worker doesn't expose today. */}
+      <div className="absolute left-0 right-0 bottom-0 h-[2px] overflow-hidden" aria-hidden>
+        <div className="h-full w-1/3 bg-accent dark:bg-accent-dark animate-[scan-progress_1.4s_ease-in-out_infinite]" />
+      </div>
     </div>
   )
 }
