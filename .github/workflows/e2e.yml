@@ -24,11 +24,6 @@ jobs:
         # Electron / native-window surface, and macOS e2e still runs on PRs.
         # Skip macOS unit on PRs; keep it on push to main as a safety net.
         os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","macos-latest"]') }}
-        # Three buckets balance parallelism against queue contention:
-        #   fast = redact + share-kit (small, no core dep) → ~50s
-        #   core = core + cli (cli depends on core anyway) → ~2:00
-        #   app  = app (heavy, owns its own build:deps + native rebuild) → ~2:00
-        suite: [fast, core, app]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -39,39 +34,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-
-      - name: Build dependencies
-        run: |
-          case "${{ matrix.suite }}" in
-            fast)
-              pnpm --filter @spool-lab/redact build
-              pnpm --filter @spool/share-kit build
-              ;;
-            core)
-              pnpm --filter @spool-lab/redact build
-              pnpm --filter @spool-lab/core build
-              pnpm --filter @spool-lab/cli build
-              ;;
-            app)
-              pnpm --filter @spool/app run build:deps
-              ;;
-          esac
-
-      - name: Test
-        run: |
-          case "${{ matrix.suite }}" in
-            fast)
-              pnpm --filter @spool-lab/redact test
-              pnpm --filter @spool/share-kit test
-              ;;
-            core)
-              pnpm --filter @spool-lab/core test
-              pnpm --filter @spool-lab/cli test
-              ;;
-            app)
-              pnpm --filter @spool/app test
-              ;;
-          esac
+      - run: pnpm --filter @spool-lab/redact build
+      - run: pnpm --filter @spool-lab/redact test
+      - run: pnpm --filter @spool-lab/core build
+      - run: pnpm --filter @spool-lab/core test
+      - run: pnpm --filter @spool-lab/cli build
+      - run: pnpm --filter @spool-lab/cli test
+      - run: pnpm --filter @spool/share-kit test
+      - run: pnpm --filter @spool/app test
 
   e2e:
     strategy:
