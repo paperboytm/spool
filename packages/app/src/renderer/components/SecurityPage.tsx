@@ -156,16 +156,25 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
     const off = securityApi.onScanStatus((next) => {
       setScanStatus(next)
       const inFlight = next.backfillRemaining + (next.scanning !== null ? 1 : 0)
-      setBackfillStart((prev) => {
-        if (inFlight === 0) return null
-        if (prev === null || inFlight > prev) return inFlight
-        return prev
-      })
       const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
       if (nowBusy) {
+        if (!wasScanningRef.current) {
+          // Just transitioned idle → busy. New scan started, so the
+          // captured start represents THIS scan's max in-flight, not
+          // a stale value from a prior burst. Clear any lingering
+          // result banner at the same time.
+          setBackfillStart(inFlight)
+          setScanResult(null)
+        } else {
+          // Mid-scan — grow if a new high-water mark appears (e.g.
+          // backfill kicked in mid-scan stacking on top of queued).
+          setBackfillStart((prev) => (prev === null || inFlight > prev) ? inFlight : prev)
+        }
         wasScanningRef.current = true
-        setScanResult(null)
       } else if (wasScanningRef.current) {
+        // Busy → idle edge. KEEP backfillStart so the result banner
+        // reads the true max-in-flight from this scan; it gets reset
+        // on the next idle → busy transition above.
         wasScanningRef.current = false
         setRescanInFlight(false)
         setScanResult({
