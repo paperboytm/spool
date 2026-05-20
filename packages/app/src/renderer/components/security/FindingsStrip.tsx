@@ -14,6 +14,7 @@
 // until the ship gate clears.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Trash2, X } from 'lucide-react'
 import type { Session, FindingRow } from '@spool-lab/core'
 import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from '@spool-lab/redact'
@@ -33,6 +34,7 @@ export default function FindingsStrip(props: Props) {
 }
 
 function FindingsStripInner({ session, open, onClose }: Props) {
+  const { t } = useTranslation()
   const [findings, setFindings] = useState<FindingRow[] | null>(null)
   const [values, setValues] = useState<Record<number, string | null>>({})
   const high = session.scanHighCount ?? 0
@@ -113,8 +115,8 @@ function FindingsStripInner({ session, open, onClose }: Props) {
   const isCleared = loaded && loadedVisible.length === 0
   const summary: string[] = []
   if (loaded) {
-    if (loadedHigh > 0) summary.push(`${loadedHigh} high-risk`)
-    if (loadedLow > 0) summary.push(`${loadedLow} low secret${loadedLow === 1 ? '' : 's'}`)
+    if (loadedHigh > 0) summary.push(t('security.strip_summary_high', { count: loadedHigh, defaultValue: '{{count}} high-risk' }))
+    if (loadedLow > 0) summary.push(t('security.strip_summary_low', { count: loadedLow, defaultValue: '{{count}} low secret' }))
   }
 
   return (
@@ -129,13 +131,13 @@ function FindingsStripInner({ session, open, onClose }: Props) {
             <>
               <Check size={14} strokeWidth={2} aria-hidden className="text-warm-muted dark:text-dark-muted" />
               <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
-                All cleared
+                {t('security.strip_cleared', { defaultValue: 'All cleared' })}
               </span>
             </>
           ) : (
             <>
               <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
-                Findings
+                {t('security.strip_title', { defaultValue: 'Findings' })}
               </span>
               {summary.length > 0 && (
                 <span className="text-xs text-warm-muted dark:text-dark-muted">
@@ -154,7 +156,7 @@ function FindingsStripInner({ session, open, onClose }: Props) {
                 className="text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded text-warm-text dark:text-dark-text hover:bg-accent/10 dark:hover:bg-accent-dark/15 transition-colors"
               >
                 <Trash2 size={12} strokeWidth={1.75} aria-hidden />
-                Purge all
+                {t('security.strip_purge_all', { defaultValue: 'Purge all' })}
               </button>
               <PurgeConfirmDialog
                 open={purgePending}
@@ -170,7 +172,7 @@ function FindingsStripInner({ session, open, onClose }: Props) {
             type="button"
             data-testid="strip-close"
             onClick={onClose}
-            aria-label="Close findings strip"
+            aria-label={t('security.strip_close', { defaultValue: 'Close findings strip' })}
             className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-accent/10 dark:hover:bg-accent-dark/15 hover:text-warm-text dark:hover:text-dark-text transition-colors"
           >
             <X size={13} strokeWidth={1.75} aria-hidden />
@@ -201,6 +203,7 @@ function FindingsStripInner({ session, open, onClose }: Props) {
 }
 
 function StripFindingRow({ finding, value }: { finding: FindingRow; value: string | null }) {
+  const { t } = useTranslation()
   // Match SecurityPage's value-display convention: default revealed,
   // never auto-blurred. A future Eye/EyeOff toggle can opt the user
   // into the screen-share-safe blurred mode (with hover-to-reveal),
@@ -218,7 +221,7 @@ function StripFindingRow({ finding, value }: { finding: FindingRow; value: strin
         {finding.kind}
       </span>
       <span className="font-mono flex-1 truncate text-warm-text dark:text-dark-text">
-        {value ?? <em className="text-warm-faint dark:text-dark-faint">(unavailable)</em>}
+        {value ?? <em className="text-warm-faint dark:text-dark-faint">{t('security.value_unavailable', { defaultValue: '(value unavailable)' })}</em>}
       </span>
     </li>
   )

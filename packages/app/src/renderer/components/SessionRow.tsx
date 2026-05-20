@@ -174,6 +174,7 @@ function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElemen
 
 
 function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
+  const { t } = useTranslation()
   if (!securityFeatureEnabled()) return null
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0
@@ -187,7 +188,7 @@ function SecurityBadge({ session }: { session: Session }): React.ReactElement | 
   // (no badge) from "scanned-clean because I purged it" (✓).
   if (high === 0 && low === 0) {
     if (completed && purged > 0) {
-      const tooltip = `${purged} resolved`
+      const tooltip = t('security.badge_tooltip_resolved', { count: purged, defaultValue: '{{count}} resolved' })
       return (
         <span
           data-testid="security-badge"
@@ -208,8 +209,10 @@ function SecurityBadge({ session }: { session: Session }): React.ReactElement | 
   // so the row stays scan-readable at scale (Library home shows 50+
   // rows; per-row digits become visual noise). Hover gives detail.
   const tooltip = isHigh
-    ? (low > 0 ? `${high} high-risk · ${low} low` : `${high} high-risk`)
-    : `${low} low`
+    ? (low > 0
+        ? t('security.badge_tooltip_mixed', { high, low, defaultValue: '{{high}} high-risk · {{low}} low' })
+        : t('security.badge_tooltip_high', { count: high, defaultValue: '{{count}} high-risk' }))
+    : t('security.badge_tooltip_low', { count: low, defaultValue: '{{count}} low' })
   const tone = isHigh ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'
 
   return (

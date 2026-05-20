@@ -290,7 +290,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
             <>
               {' · '}
               {t('security.scanned_ago', {
-                ago: formatScanAgo(lastScanCompletedAt),
+                ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
                 defaultValue: 'scanned {{ago}}',
               })}
             </>
@@ -734,6 +734,7 @@ function KindTile({
   onSelect: () => void
   onBulkPurge: () => void
 }) {
+  const { t } = useTranslation()
   const toneClasses =
     tone === 'high'
       ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent-bg-strong dark:border-accent-bg-strong-dark hover:border-accent dark:hover:border-accent-dark'
@@ -754,7 +755,7 @@ function KindTile({
       role="button"
       tabIndex={0}
       aria-pressed={active}
-      aria-label={`${kind} · ${count} ${count === 1 ? 'finding' : 'findings'} in ${sessions} ${sessions === 1 ? 'session' : 'sessions'}`}
+      aria-label={t('security.chip_aria', { kind, count, sessions, defaultValue: '{{kind}} · {{count}} findings in {{sessions}} sessions' })}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     >
       <span className="font-mono text-[12px] text-warm-text dark:text-dark-text truncate">
@@ -765,14 +766,14 @@ function KindTile({
           {count}
         </span>
         <span className="font-mono text-[10px] text-warm-muted dark:text-dark-muted tabular-nums truncate">
-          {sessions} {sessions === 1 ? 'session' : 'sessions'}
+          {t('sidebar.sessionCount', { count: sessions, defaultValue: '{{count}} sessions' })}
         </span>
       </span>
       <button
         type="button"
         data-testid="risk-bulk-purge"
-        title={`Purge all ${kind}`}
-        aria-label={`Purge all ${kind}`}
+        title={t('security.purge_all_kind', { kind, defaultValue: 'Purge all {{kind}}' })}
+        aria-label={t('security.purge_all_kind', { kind, defaultValue: 'Purge all {{kind}}' })}
         onClick={(e) => { e.stopPropagation(); onBulkPurge() }}
         className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded inline-flex items-center justify-center text-warm-faint dark:text-dark-muted opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 hover:text-accent dark:hover:text-accent-dark transition-opacity"
       >
@@ -1221,7 +1222,7 @@ function EmptyState({
             <div className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted leading-[18px]">
               {lastScan && (
                 <div>
-                  {t('security.last_scan_when', { ago: formatScanAgo(lastScan), defaultValue: 'scanned {{ago}}' })}
+                  {t('security.last_scan_when', { ago: formatScanAgo(lastScan, t as unknown as (k: string, o?: Record<string, unknown>) => string), defaultValue: 'scanned {{ago}}' })}
                 </div>
               )}
               {currentProfile && (
@@ -1235,20 +1236,19 @@ function EmptyState({
   )
 }
 
-/** Format a scan_completed_at timestamp as "2m ago" / "just now". */
-function formatScanAgo(iso: string): string {
+function formatScanAgo(iso: string, t: (k: string, o?: Record<string, unknown>) => string): string {
   try {
-    const t = new Date(iso).getTime()
-    const ms = Date.now() - t
-    if (!Number.isFinite(ms) || ms < 0) return 'just now'
+    const ts = new Date(iso).getTime()
+    const ms = Date.now() - ts
+    if (!Number.isFinite(ms) || ms < 0) return t('security.ago_just_now', { defaultValue: 'just now' })
     const s = Math.floor(ms / 1000)
-    if (s < 45) return 'just now'
+    if (s < 45) return t('security.ago_just_now', { defaultValue: 'just now' })
     const m = Math.floor(s / 60)
-    if (m < 60) return `${m}m ago`
+    if (m < 60) return t('security.ago_minutes', { count: m, defaultValue: '{{count}}m ago' })
     const h = Math.floor(m / 60)
-    if (h < 24) return `${h}h ago`
+    if (h < 24) return t('security.ago_hours', { count: h, defaultValue: '{{count}}h ago' })
     const d = Math.floor(h / 24)
-    return `${d}d ago`
+    return t('security.ago_days', { count: d, defaultValue: '{{count}}d ago' })
   } catch {
     return ''
   }

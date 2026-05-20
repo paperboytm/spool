@@ -420,6 +420,7 @@ function RiskPill({
   open: boolean
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   if (!securityFeatureEnabled()) return null
 
   const high = session.scanHighCount ?? 0
@@ -453,16 +454,16 @@ function RiskPill({
       ? 'text-accent dark:text-accent-dark'
       : 'text-warm-muted dark:text-dark-muted'
     title = high > 0 && low > 0
-      ? `${high} high-risk · ${low} low`
+      ? t('security.pill_tooltip_mixed', { high, low, defaultValue: '{{high}} high-risk · {{low}} low' })
       : high > 0
-      ? `${high} high-risk`
-      : `${low} low`
+      ? t('security.pill_tooltip_high', { count: high, defaultValue: '{{count}} high-risk' })
+      : t('security.pill_tooltip_low', { count: low, defaultValue: '{{count}} low' })
   } else if (completed && purged > 0) {
     // Cleared: scan ran, was once dirty, now empty.
     icon = <ShieldAlert size={12} strokeWidth={1.75} aria-hidden />
     label = <Check size={12} strokeWidth={1.9} aria-hidden />
     tone = 'text-warm-muted dark:text-dark-muted'
-    title = `${purged} resolved`
+    title = t('security.pill_tooltip_resolved', { count: purged, defaultValue: '{{count}} resolved' })
     // No strip to drop — the pill is a status indicator only.
     clickable = false
   } else {

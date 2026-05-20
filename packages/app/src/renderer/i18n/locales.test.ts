@@ -93,6 +93,11 @@ describe('locale key parity vs en.json', () => {
     // pluralised `summary` ("X risk · Y sessions") that DOES have
     // separate one/other forms in some languages.
     'security.summary_info',
+    // Aria label combines {{count}} with {{kind}} + {{sessions}} —
+    // not a count-driven phrase, the number is just one of three
+    // interpolated values. Inflecting would require dropping the
+    // multi-arg form.
+    'security.chip_aria',
   ]
 
   it('every {{count}} interpolation in en.json either has _other or is in the allow-list snapshot', () => {
