@@ -315,15 +315,22 @@ app.whenReady().then(async () => {
   db = getDB()
   acpManager = new AcpManager()
 
-  // Bring up the Security Scan worker before the syncer so the syncer
-  // cascade callback already has somewhere to send invalidations.
+  // Boot the Security Scan worker in parallel with the syncer + window
+  // creation rather than awaiting it. Worker setup takes 100-500ms;
+  // awaiting it pushes the renderer mount out by that much, which on
+  // CI Ubuntu was enough to tip the race between the initial sync
+  // inserts and the renderer's first listSessions call, leaving home
+  // and project views empty.
+  //
+  // The downstream syncer cascade callback already guards on
+  // `if (scanWorker)`, so any session changes that fire before the
+  // worker is ready are no-ops; `scanWorker.backfill()` (kicked once
+  // the sync worker resolves) picks them up.
   //
   // Gated by VITE_FEATURE_SECURITY so production builds (where the
-  // env var stays unset) never start the scanner. The downstream
-  // syncer hooks check `if (scanWorker)` before enqueueing, so
-  // leaving the worker null is a safe no-op everywhere.
+  // env var stays unset) never start the scanner.
   if (securityFeatureEnabled()) {
-    await bootScanWorker()
+    void bootScanWorker()
   }
 
   syncer = new Syncer(db, undefined, (sessionId) => {
