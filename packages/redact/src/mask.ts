@@ -19,7 +19,7 @@
 // is usually public, vendor token prefixes are documented. What's
 // secret is the random tail.
 
-import type { SensitiveKind } from './types'
+import type { SensitiveKind } from './types.js'
 
 /** Compute the per-kind replacement string for a detected match.
  *  `kind` is loosely typed so synthetic categories (author names,

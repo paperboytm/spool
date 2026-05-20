@@ -44,8 +44,8 @@
 //   • In the Settings panel, gate behind a toggle showing model
 //     size, where the file lives, and how to delete it
 
-import type { SensitiveMatch } from './types'
-import { detectWithRegex } from './detectors'
+import type { SensitiveMatch } from './types.js'
+import { detectWithRegex } from './detectors.js'
 
 export interface RedactProvider {
   /** Stable identifier used in `SensitiveMatch.provider` and shown

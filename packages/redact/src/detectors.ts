@@ -14,8 +14,8 @@
 // the secret value. JWT runs before `Bearer` so a JWT-shaped bearer
 // surfaces as a JWT rather than a generic bearer wrapping a JWT.
 
-import type { SensitiveKind, SensitiveMatch } from './types'
-import { hasQuotedEntropy, luhnOk } from './validators'
+import type { SensitiveKind, SensitiveMatch } from './types.js'
+import { hasQuotedEntropy, luhnOk } from './validators.js'
 
 interface Rule {
   kind: SensitiveKind

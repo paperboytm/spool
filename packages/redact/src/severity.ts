@@ -15,7 +15,7 @@
 // this three-way split. `scan_high_count` only counts `high`; the
 // session badge only fires when a finding is `high` or `low`.
 
-import type { SensitiveKind } from './types'
+import type { SensitiveKind } from './types.js'
 
 export const HIGH_SEVERITY_KINDS: ReadonlySet<SensitiveKind> = new Set([
   'private-key',

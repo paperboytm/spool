@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { maskValueByKind } from './mask'
+import { maskValueByKind } from './mask.js'
 
 describe('maskValueByKind', () => {
   it('email preserves the first character of the local part and the domain', () => {

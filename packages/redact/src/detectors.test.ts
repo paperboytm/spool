@@ -8,8 +8,8 @@ import {
   analyzeWith,
   luhnOk,
   shannon,
-} from './index'
-import type { SensitiveKind } from './types'
+} from './index.js'
+import type { SensitiveKind } from './types.js'
 
 const kindsOf = (text: string): SensitiveKind[] =>
   detectSensitiveSpans(text).map((m) => m.kind)

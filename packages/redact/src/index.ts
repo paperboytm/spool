@@ -14,32 +14,32 @@ export type {
   SensitiveMatch,
   SensitiveGroup,
   SensitiveValue,
-} from './types'
+} from './types.js'
 
 export {
   SENSITIVE_KIND_LABEL,
   SENSITIVE_KIND_ORDER,
-} from './types'
+} from './types.js'
 
-export { detectWithRegex } from './detectors'
+export { detectWithRegex } from './detectors.js'
 
 export {
   regexProvider,
   analyzeWith,
-} from './providers'
+} from './providers.js'
 
-export type { RedactProvider } from './providers'
+export type { RedactProvider } from './providers.js'
 
-export { luhnOk, shannon, hashValueForRedactExclude } from './validators'
+export { luhnOk, shannon, hashValueForRedactExclude } from './validators.js'
 
-export { maskValueByKind } from './mask'
+export { maskValueByKind } from './mask.js'
 
-export { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from './severity'
-export type { Severity } from './severity'
+export { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from './severity.js'
+export type { Severity } from './severity.js'
 
-import { detectWithRegex } from './detectors'
-import type { SensitiveGroup, SensitiveKind, SensitiveMatch } from './types'
-import { SENSITIVE_KIND_ORDER } from './types'
+import { detectWithRegex } from './detectors.js'
+import type { SensitiveGroup, SensitiveKind, SensitiveMatch } from './types.js'
+import { SENSITIVE_KIND_ORDER } from './types.js'
 
 /** Convenience wrapper for the common "scan one string" call. Equivalent
  *  to `regexProvider.analyze(text)` minus the Promise — synchronous so

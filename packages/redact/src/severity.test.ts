@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { severityOf, HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from './severity'
+import { severityOf, HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from './severity.js'
 
 describe('severity', () => {
   it('credential kinds are high', () => {
