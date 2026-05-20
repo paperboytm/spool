@@ -53,7 +53,18 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
     const reqId = nextReqId++
     return new Promise<T>((resolve, reject) => {
       pending.set(reqId, { resolve: resolve as (v: unknown) => void, reject })
-      worker.postMessage({ type: 'cmd', reqId, payload } satisfies ToWorker)
+      try {
+        worker.postMessage({ type: 'cmd', reqId, payload } satisfies ToWorker)
+      } catch (err) {
+        // worker.postMessage throws synchronously if the MessagePort
+        // is closed (e.g. the thread has already exited). Without
+        // this catch the Promise would hang forever — onExit's
+        // pending-rejection sweep only fires if the worker emits
+        // the 'exit' event AFTER we registered it, which isn't the
+        // case for a posthumous send.
+        pending.delete(reqId)
+        reject(err instanceof Error ? err : new Error(String(err)))
+      }
     })
   }
 
@@ -158,7 +169,16 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
     shutdown: () =>
       new Promise<void>((resolve) => {
         worker.once('exit', () => resolve())
-        worker.postMessage({ type: 'shutdown' } satisfies ToWorker)
+        try {
+          worker.postMessage({ type: 'shutdown' } satisfies ToWorker)
+        } catch {
+          // postMessage throws on a closed port — the thread is
+          // already gone, so satisfy the shutdown contract by
+          // resolving immediately. Without this the exit listener
+          // would never fire and the parent's `before-quit` handler
+          // could stall the app shutdown.
+          resolve()
+        }
       }),
   }
 }

@@ -99,21 +99,30 @@ void (async () => {
 
   // Forward both event streams over postMessage. Daemon fibers so
   // they outlive any single Effect.runPromise call site.
+  //
+  // `postMessage` throws synchronously when the parent's port has
+  // closed (parent shutting down / child being terminated). We
+  // swallow the throw here so the daemon fiber stays alive — when
+  // shutdown is on the way, `port.on('message', shutdown)` will run
+  // shortly and exit cleanly. Without this, a single failed post
+  // tears down the fiber and every subsequent event is dropped.
+  function safePost(msg: FromWorker): Effect.Effect<void> {
+    return Effect.sync(() => {
+      try { port.postMessage(msg) } catch { /* parent gone */ }
+    })
+  }
+
   const changesFiber = await Effect.runPromise(
     Effect.forkDaemon(
       Stream.runForEach(worker.changes, (change) =>
-        Effect.sync(() => {
-          port.postMessage({ type: 'event-change', change } satisfies FromWorker)
-        }),
+        safePost({ type: 'event-change', change }),
       ),
     ),
   )
   const statusFiber = await Effect.runPromise(
     Effect.forkDaemon(
       Stream.runForEach(worker.statusChanges, (status) =>
-        Effect.sync(() => {
-          port.postMessage({ type: 'event-status', status } satisfies FromWorker)
-        }),
+        safePost({ type: 'event-status', status }),
       ),
     ),
   )

@@ -201,13 +201,31 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   // until explicitly interrupted by the returned disposer below.
   let forwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
   let statusForwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
+  // Stream consumers wrapped in `Effect.catchAllDefect` — webContents
+  // .send synchronously throws on a destroyed window (e.g. user closed
+  // the main window while a scan was mid-burst). Without this the
+  // daemon fiber dies on the first throw and every subsequent
+  // change / status event is silently lost. Logging + swallowing
+  // keeps the fiber alive across window lifecycle events; the next
+  // surviving send will reach a new window if one opens.
+  function safeSend(channel: string, payload: unknown): Effect.Effect<void> {
+    return Effect.sync(() => {
+      try {
+        // webContents.send throws if the BrowserWindow has been
+        // destroyed — caught here so a closed window doesn't take
+        // the daemon fiber with it.
+        getMainWindow()?.webContents.send(channel, payload)
+      } catch (err) {
+        console.error('[security] forwarder send failed:', err)
+      }
+    })
+  }
+
   Effect.runPromise(
     Effect.gen(function* () {
       forwarderFiber = yield* Effect.forkDaemon(
         Stream.runForEach(worker.changes, (change) =>
-          Effect.sync(() => {
-            getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-          }),
+          safeSend(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change),
         ),
       )
       // Parallel forwarder for ScanStatus snapshots — every queue /
@@ -216,9 +234,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
       // a 500 ms pull loop.
       statusForwarderFiber = yield* Effect.forkDaemon(
         Stream.runForEach(worker.statusChanges, (status) =>
-          Effect.sync(() => {
-            getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_SCAN_STATUS, status)
-          }),
+          safeSend(SECURITY_IPC_CHANNELS.EVT_SCAN_STATUS, status),
         ),
       )
     }),
