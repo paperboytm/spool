@@ -22,6 +22,39 @@ describe('currentProfileString', () => {
   it('throws when pfEnabled without pfVersion', () => {
     expect(() => currentProfileString({ pfEnabled: true })).toThrow(/pfVersion/)
   })
+
+  // kindAllowlist hash — must be stable and only present when non-empty.
+  it('omits the allow segment for empty / undefined kindAllowlist', () => {
+    expect(currentProfileString()).not.toMatch(/allow@/)
+    expect(currentProfileString({ kindAllowlist: [] })).not.toMatch(/allow@/)
+  })
+  it('appends `allow@<hex>` when kinds are present', () => {
+    expect(currentProfileString({ kindAllowlist: ['email'] })).toMatch(/^regex@\d+,allow@[0-9a-f]{8}$/)
+  })
+  it('is order-insensitive over the kind list', () => {
+    const a = currentProfileString({ kindAllowlist: ['email', 'phone'] })
+    const b = currentProfileString({ kindAllowlist: ['phone', 'email'] })
+    expect(a).toBe(b)
+  })
+  it('changes the hash when the set membership changes', () => {
+    const a = currentProfileString({ kindAllowlist: ['email'] })
+    const b = currentProfileString({ kindAllowlist: ['email', 'phone'] })
+    expect(a).not.toBe(b)
+  })
+  it("deduplicates so ['a','a'] hashes the same as ['a']", () => {
+    expect(currentProfileString({ kindAllowlist: ['email', 'email'] }))
+      .toBe(currentProfileString({ kindAllowlist: ['email'] }))
+  })
+  it('parses and round-trips the allow segment', () => {
+    const s = currentProfileString({ kindAllowlist: ['email', 'phone'] })
+    const parsed = parseProfile(s)
+    expect(parsed?.allow).toMatch(/^[0-9a-f]{8}$/)
+  })
+  it('profilesMatch is false when only the allow hash differs', () => {
+    const a = currentProfileString({ kindAllowlist: ['email'] })
+    const b = currentProfileString({ kindAllowlist: ['phone'] })
+    expect(profilesMatch(a, b)).toBe(false)
+  })
 })
 
 describe('parseProfile', () => {

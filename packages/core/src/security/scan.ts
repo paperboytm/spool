@@ -63,6 +63,11 @@ export interface ScanSessionDeps {
   /** Sink for change notifications. The worker layer wraps PubSub
    *  here; tests pass a simple collector. */
   publish: (change: FindingsChange) => Effect.Effect<void>
+  /** Kind-level allowlist. Findings whose kind is in this set get
+   *  inserted with state='dismissed' (instead of 'active') without
+   *  needing a per-value allowlist row. Driven by the Settings →
+   *  Security pane's multi-select. */
+  kindAllowlist?: ReadonlySet<string>
 }
 
 /** Scan one session end to end. Idempotent: running twice produces
@@ -130,7 +135,9 @@ export function scanSession(
       provider: m.provider,
       startOffset: m.start,
       endOffset: m.end,
-      state: isAllowlisted(allow, m.kind, m.valueHash) ? 'dismissed' : 'active',
+      state: (deps.kindAllowlist?.has(m.kind) || isAllowlisted(allow, m.kind, m.valueHash))
+        ? 'dismissed'
+        : 'active',
     }))
 
     // 5. Apply atomically.
