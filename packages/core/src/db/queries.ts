@@ -124,10 +124,24 @@ export function upsertSession(
   },
 ): number {
   const existing = db
-    .prepare('SELECT id FROM sessions WHERE session_uuid = ?')
-    .get(opts.sessionUuid) as { id: number } | undefined
+    .prepare('SELECT id, file_path FROM sessions WHERE session_uuid = ?')
+    .get(opts.sessionUuid) as { id: number; file_path: string } | undefined
 
   if (existing) {
+    // Warn loudly if two files claim the same session_uuid. The 'spool:pending:'
+    // sentinel rebinding is legitimate (Spool-authored sessions); anything else
+    // means we're about to silently overwrite a session row — historically this
+    // happened when subagent jsonls under <slug>/<uuid>/subagents/ got indexed
+    // and clobbered the parent row.
+    if (
+      existing.file_path !== opts.filePath
+      && !existing.file_path.startsWith('spool:pending:')
+    ) {
+      console.warn(
+        `[upsertSession] session_uuid ${opts.sessionUuid} switching file_path: `
+        + `${existing.file_path} → ${opts.filePath}`,
+      )
+    }
     db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id)
     // file_path is updated too: Spool-authored sessions start with a sentinel
     // ('spool:pending:<uuid>') and get rebound to the real JSONL path here on

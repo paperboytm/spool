@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, delimiter, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { SessionSource } from '../types.js'
 
 const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini'>, string> = {
@@ -122,14 +122,23 @@ function getGeminiBaseDir(): string {
     : join(homedir(), '.gemini')
 }
 
-function isSessionFileForSource(source: SessionSource, filePath: string, root: string): boolean {
+export function isSessionFileForSource(source: SessionSource, filePath: string, root: string): boolean {
   if (!isWithinRoot(filePath, root)) return false
   if (source === 'gemini') {
     return filePath.endsWith('.json')
       && basename(filePath).startsWith('session-')
       && /(?:^|\/)chats\//.test(filePath)
   }
-  return filePath.endsWith('.jsonl')
+  if (!filePath.endsWith('.jsonl')) return false
+  if (source === 'claude') {
+    // Claude sessions live at <root>/<slug>/<uuid>.jsonl — exactly two segments
+    // relative to root. Nested files (e.g. <slug>/<uuid>/subagents/agent-*.jsonl)
+    // are subagent scratchpads that share the parent's sessionId; indexing them
+    // clobbers the parent row via UNIQUE(session_uuid) and zeros message_count.
+    const rel = relative(root, filePath)
+    return rel.length > 0 && rel.split(sep).length === 2
+  }
+  return true
 }
 
 function isWithinRoot(filePath: string, root: string): boolean {

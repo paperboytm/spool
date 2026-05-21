@@ -6,7 +6,7 @@ import { loadClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
 import { loadCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
 import { loadGeminiSession } from '../parsers/gemini.js'
 import type { SessionSource } from '../types.js'
-import { getSessionRoots } from './source-paths.js'
+import { getSessionRoots, isSessionFileForSource } from './source-paths.js'
 import {
   deleteSessionByFilePath,
   getSourceId,
@@ -292,12 +292,13 @@ function collectSessionFiles(
   source: SessionSource,
 ): Array<{ path: string; source: SessionSource }> {
   const results: Array<{ path: string; source: SessionSource }> = []
-  walkDir(dir, results, source)
+  walkDir(dir, dir, results, source)
   return results
 }
 
 function walkDir(
   dir: string,
+  root: string,
   results: Array<{ path: string; source: SessionSource }>,
   source: SessionSource,
 ): void {
@@ -311,8 +312,12 @@ function walkDir(
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
       if (source === 'gemini' && !shouldTraverseGeminiDir(dir, fullPath, entry.name)) continue
-      walkDir(fullPath, results, source)
-    } else if (entry.isFile() && isSessionFilePath(fullPath, source)) {
+      // For claude, session files only live at <root>/<slug>/<uuid>.jsonl. Anything
+      // deeper is subagent / future-nested scratch data that hijacks the parent
+      // sessionId — see isSessionFileForSource for the matching read-side check.
+      if (source === 'claude' && dirname(fullPath) !== root) continue
+      walkDir(fullPath, root, results, source)
+    } else if (entry.isFile() && isSessionFileForSource(source, fullPath, root)) {
       results.push({ path: fullPath, source })
     }
   }
@@ -323,15 +328,6 @@ function shouldTraverseGeminiDir(parentDir: string, fullPath: string, entryName:
   if (basename(parentDir) === 'tmp') return true
   if (/(?:^|\/)chats(?:\/|$)/.test(parentDir)) return true
   return existsSync(join(fullPath, 'chats'))
-}
-
-function isSessionFilePath(filePath: string, source: SessionSource): boolean {
-  if (source === 'gemini') {
-    return filePath.endsWith('.json')
-      && basename(filePath).startsWith('session-')
-      && /(?:^|\/)chats\//.test(filePath)
-  }
-  return filePath.endsWith('.jsonl')
 }
 
 function loadCodexSessionIndex(): Map<string, string> {

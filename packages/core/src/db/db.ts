@@ -14,7 +14,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 12
+export const LATEST_SCHEMA_VERSION = 13
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -548,6 +548,36 @@ export function runMigrations(db: Database.Database): void {
         );
       `)
       db.pragma('user_version = 12')
+    })()
+  }
+
+  if (version < 13) {
+    // v13: purge subagent jsonl rows that hijacked their parent's session_uuid.
+    // Claude code writes subagent transcripts to <slug>/<uuid>/subagents/agent-*.jsonl;
+    // every record inside carries sessionId = parent uuid, so the indexer used to
+    // upsert these on top of the parent row via UNIQUE(session_uuid) — clobbering
+    // file_path and zeroing message_count (all messages are isSidechain). The
+    // matching read-side fix in source-paths.ts excludes the files going forward;
+    // here we delete the orphan rows so the next sync re-indexes the real parent.
+    // Cascades cover messages / session_search / findings / allowlist_session;
+    // pins survives (keyed by session_uuid TEXT, no FK) and re-attaches on re-sync.
+    db.transaction(() => {
+      const claudeSourceId = (db.prepare(
+        "SELECT id FROM sources WHERE name = 'claude'"
+      ).get() as { id: number } | undefined)?.id
+      if (claudeSourceId !== undefined) {
+        db.prepare(
+          `DELETE FROM sessions
+             WHERE source_id = ?
+               AND file_path LIKE '%/subagents/agent-%'`
+        ).run(claudeSourceId)
+        db.prepare(
+          `DELETE FROM sync_log
+             WHERE source_id = ?
+               AND file_path LIKE '%/subagents/agent-%'`
+        ).run(claudeSourceId)
+      }
+      db.pragma('user_version = 13')
     })()
   }
 
