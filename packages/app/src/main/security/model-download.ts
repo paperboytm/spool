@@ -107,7 +107,24 @@ async function fetchAndAppend(args: {
 
   const init: RequestInit = { headers }
   if (args.signal !== undefined) init.signal = args.signal
-  const res = await args.fetcher(args.url, init)
+  let res: Response
+  try {
+    res = await args.fetcher(args.url, init)
+  } catch (cause) {
+    // Preserve AbortError so the coordinator's cancel branch (which
+    // checks err.name === 'AbortError') still drops back to
+    // not-installed instead of flipping to failed.
+    if ((cause as { name?: string } | undefined)?.name === 'AbortError') throw cause
+    // Network-level failure (DNS, TLS, proxy, connection reset) —
+    // re-raise as DownloadError so the coordinator surfaces a
+    // useful message instead of a bare "fetch failed".
+    const host = safeHost(args.url)
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    throw new DownloadError(
+      `Couldn't reach ${host} (${detail}). Check network / proxy.`,
+      { file: args.partPath, stage: 'http' },
+    )
+  }
 
   if (args.startOffset > 0 && res.status !== 206 && res.status !== 200) {
     throw new DownloadError(
@@ -144,4 +161,8 @@ function fileMatches(path: string, file: ManifestFile): boolean {
   } catch {
     return false
   }
+}
+
+function safeHost(url: string): string {
+  try { return new URL(url).host } catch { return url }
 }
