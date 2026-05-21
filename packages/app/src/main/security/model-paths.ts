@@ -33,5 +33,12 @@ export function pfManifestPath(): string {
 }
 
 /** Profile segment produced when PF is enabled. Used by
- *  `currentProfileString({ pfEnabled: true, pfVersion: ... })`. */
-export const PF_PROFILE_VERSION = PF_MODEL_VERSION
+ *  `currentProfileString({ pfEnabled: true, pfVersion: ... })`.
+ *  Tracked independently of PF_MODEL_VERSION so tuning the
+ *  class-mapping (precision/recall tradeoffs, suppressed classes)
+ *  can force a backfill rescan without re-downloading weights.
+ *  Bump suffix when scan-result shape would meaningfully differ:
+ *    r1 — initial release (all 8 classes considered)
+ *    r2 — 2026-05-21: restricted to email/phone/dob/secret-boost;
+ *         person/address/url/account dropped due to OOD precision */
+export const PF_PROFILE_VERSION = `${PF_MODEL_VERSION}.r2`
