@@ -13,6 +13,7 @@ import {
   listFindingsPage,
   listSessionsWithFindings,
   listSessionsWithFindingsPage,
+  countSessionsWithFindings,
   riskByCategory,
   getFindingValue,
   getAllowlists,
@@ -312,6 +313,51 @@ describe('repo: pagination', () => {
     const full = listSessionsWithFindingsPage(db, { limit: total })
     expect(full.hasMore).toBe(false)
     expect(full.rows).toHaveLength(total)
+  })
+
+  it('countSessionsWithFindings returns the same total as the unpaginated list', () => {
+    const db = setupDb()
+    for (let i = 3; i <= 9; i++) {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (?, 1, 1, ?, ?, ?, '2026-01-01', '2026-01-01', 1)`,
+      ).run(i, `c-${i}`, `/p/c-${i}`, `C${i}`)
+      db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
+      ).run(200 + i, i)
+      insertFindings(db, [{
+        sessionId: i, messageId: 200 + i, kind: i <= 5 ? 'api-key' : 'email', valueHash: `c-${i}`,
+        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
+      }])
+      updateSessionCounts(db, i)
+    }
+    expect(countSessionsWithFindings(db, {})).toBe(listSessionsWithFindings(db, {}).length)
+    expect(countSessionsWithFindings(db, { kind: 'api-key' }))
+      .toBe(listSessionsWithFindings(db, { kind: 'api-key' }).length)
+  })
+
+  it('countSessionsWithFindings is independent of limit/offset on the same filter', () => {
+    const db = setupDb()
+    for (let i = 3; i <= 7; i++) {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (?, 1, 1, ?, ?, ?, '2026-01-01', '2026-01-01', 1)`,
+      ).run(i, `d-${i}`, `/p/d-${i}`, `D${i}`)
+      db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
+      ).run(300 + i, i)
+      insertFindings(db, [{
+        sessionId: i, messageId: 300 + i, kind: 'api-key', valueHash: `d-${i}`,
+        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
+      }])
+      updateSessionCounts(db, i)
+    }
+    const total = countSessionsWithFindings(db, {})
+    expect(total).toBe(5)
+    expect(countSessionsWithFindings(db, { limit: 2, offset: 0 })).toBe(total)
+    expect(countSessionsWithFindings(db, { limit: 2, offset: 2 })).toBe(total)
   })
 })
 

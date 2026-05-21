@@ -71,6 +71,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
   const [sessions, setSessions] = useState<Sess[]>([])
   const [sessionsHasMore, setSessionsHasMore] = useState(false)
+  const [sessionsTotal, setSessionsTotal] = useState<number | null>(null)
   const [sessionsPageCount, setSessionsPageCount] = useState(1)
   const SESSIONS_PAGE_SIZE = 50
   const [loading, setLoading] = useState(true)
@@ -122,17 +123,19 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const [r, sPage, st] = await Promise.all([
+      const [r, sPage, sTotal, st] = await Promise.all([
         securityApi.riskByCategory(),
         securityApi.listSessionsWithFindingsPage({
           ...filter,
           limit: sessionsPageCount * SESSIONS_PAGE_SIZE,
         }),
+        securityApi.countSessionsWithFindings(filter),
         securityApi.getScanStatus(),
       ])
       setRisk(r)
       setSessions(sPage.rows as Sess[])
       setSessionsHasMore(sPage.hasMore)
+      setSessionsTotal(sTotal)
       setScanStatus(st)
       // Pick the most recent scan_completed_at across the session set
       // we just fetched. Cheap because s is already in-memory.
@@ -416,7 +419,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
        *  the distance from the sidebar reads identical across pages. */}
       <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
         <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-          {t('security.summary', { findings: visibleActive, sessions: sessions.length, defaultValue: '{{findings}} risk · {{sessions}} sessions' })}
+          {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
           {infoCount > 0 && (
             <span className="opacity-70">
               {' · '}
@@ -616,7 +619,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
                     {t('security.sessions_with_findings', { defaultValue: 'Sessions with active findings' })}
                   </span>
                   <span className="font-mono text-[12px] text-warm-faint dark:text-dark-muted tabular-nums ml-1">
-                    {sessions.length}
+                    {sessionsTotal ?? sessions.length}
                   </span>
                   {/* Icon-only toggle, tooltip via title.
                    *  Eye = values currently visible, click to hide;

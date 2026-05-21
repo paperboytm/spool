@@ -230,6 +230,8 @@ const api = {
       ipcRenderer.invoke('security:list-sessions-with-findings', filter),
     listSessionsWithFindingsPage: (filter: SessionFindingFilter): Promise<Page<SessionWithFindingCounts>> =>
       ipcRenderer.invoke('security:list-sessions-with-findings-page', filter),
+    countSessionsWithFindings: (filter: SessionFindingFilter): Promise<number> =>
+      ipcRenderer.invoke('security:count-sessions-with-findings', filter),
     riskByCategory: (): Promise<RiskByCategoryRow[]> =>
       ipcRenderer.invoke('security:risk-by-category'),
     getFindingValue: (findingId: number): Promise<string | null> =>

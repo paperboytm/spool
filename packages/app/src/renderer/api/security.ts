@@ -33,6 +33,8 @@ export const securityApi = {
     window.spool.security.listSessionsWithFindings(filter),
   listSessionsWithFindingsPage: (filter: SessionFindingFilter = {}): Promise<Page<SessionWithFindingCounts>> =>
     window.spool.security.listSessionsWithFindingsPage(filter),
+  countSessionsWithFindings: (filter: SessionFindingFilter = {}): Promise<number> =>
+    window.spool.security.countSessionsWithFindings(filter),
   riskByCategory: (): Promise<RiskByCategoryRow[]> =>
     window.spool.security.riskByCategory(),
   getFindingValue: (findingId: number): Promise<string | null> =>

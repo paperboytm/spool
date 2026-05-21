@@ -30,6 +30,7 @@ export {
   listFindingsPage,
   listSessionsWithFindings,
   listSessionsWithFindingsPage,
+  countSessionsWithFindings,
   riskByCategory,
   getFindingValue,
   getFindingValues,

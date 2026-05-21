@@ -251,7 +251,7 @@
     }
   },
   "security": {
-    "summary": "{{findings}} 项风险 · 涉及 {{sessions}} 个会话",
+    "summary": "{{findings}} 项风险",
     "summary_info": "{{count}} 项信息",
     "rescanAll": "全部重扫",
     "severity_high": "高风险",

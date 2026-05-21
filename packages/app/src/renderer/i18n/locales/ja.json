@@ -251,7 +251,7 @@
     }
   },
   "security": {
-    "summary": "{{findings}} 件 · {{sessions}} セッション",
+    "summary": "{{findings}} 件",
     "rescanAll": "すべて再スキャン",
     "severity_high": "高",
     "severity_low": "低",

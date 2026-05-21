@@ -251,7 +251,7 @@
     }
   },
   "security": {
-    "summary": "{{findings}} 項 · 涉及 {{sessions}} 個會話",
+    "summary": "{{findings}} 項",
     "rescanAll": "全部重掃",
     "severity_high": "高風險",
     "severity_low": "低風險",

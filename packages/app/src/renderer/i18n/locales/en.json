@@ -260,7 +260,7 @@
     }
   },
   "security": {
-    "summary": "{{findings}} risk · {{sessions}} sessions",
+    "summary": "{{findings}} risk",
     "summary_info": "{{count}} info",
     "rescanAll": "Rescan all",
     "severity_high": "High",

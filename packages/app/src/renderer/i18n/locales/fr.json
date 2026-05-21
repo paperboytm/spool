@@ -260,7 +260,7 @@
     }
   },
   "security": {
-    "summary": "{{findings}} actifs · {{sessions}} sessions",
+    "summary": "{{findings}} actifs",
     "rescanAll": "Tout rescanner",
     "severity_high": "Élevé",
     "severity_low": "Faible",
