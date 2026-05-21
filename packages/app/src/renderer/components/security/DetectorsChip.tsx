@@ -48,7 +48,7 @@ export default function DetectorsChip({ profile }: { profile: string | null }) {
         label={t('security.detector_pattern_short', { defaultValue: 'Pattern matching' })}
         meta={regexVersion ? `v${regexVersion}` : null}
         tone="active"
-        icon={<Shield size={10} strokeWidth={1.8} aria-hidden />}
+        icon={<Shield size={9} strokeWidth={1.8} aria-hidden />}
       />
       {hasPf && (
         <DetectorPill
@@ -82,7 +82,7 @@ function DetectorPill({
       // typography exactly — sans-at-same-px optically reads bigger
       // than the mono digits next to it, which made the chips bulge
       // out of the row.
-      className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-[5px] border bg-warm-surface dark:bg-dark-surface font-mono text-[11px] ${palette}`}
+      className={`inline-flex items-center gap-[3px] h-[18px] px-1.5 rounded-[4px] border bg-warm-surface dark:bg-dark-surface font-mono text-[10px] ${palette}`}
     >
       {icon}
       <span>{label}</span>
@@ -117,7 +117,7 @@ function pfMetaText(
 }
 
 function pfIcon(info: PfRuntimeInfo | null): React.ReactNode {
-  if (info?.status === 'failed') return <AlertTriangle size={10} strokeWidth={1.9} aria-hidden />
-  if (info?.status === 'ready') return <Sparkles size={10} strokeWidth={1.9} aria-hidden />
-  return <Loader2 size={10} strokeWidth={1.9} className="animate-spin" aria-hidden />
+  if (info?.status === 'failed') return <AlertTriangle size={9} strokeWidth={1.9} aria-hidden />
+  if (info?.status === 'ready') return <Sparkles size={9} strokeWidth={1.9} aria-hidden />
+  return <Loader2 size={9} strokeWidth={1.9} className="animate-spin" aria-hidden />
 }
