@@ -53,7 +53,7 @@ export default function PfDownloadCard() {
               {t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
             </span>
             <code className="font-mono text-[10px] text-warm-faint dark:text-dark-muted bg-warm-surface dark:bg-dark-surface px-1.5 py-0.5 rounded">
-              {formatBytes(state.bytesTotal || 800_000_000)}
+              {formatBytes(state.bytesTotal || 945_000_000)}
             </code>
           </div>
           <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">

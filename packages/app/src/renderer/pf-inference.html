@@ -3,11 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <title>Spool · PF inference</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <!-- transformers.js compiles ONNX Runtime Web from WASM, which
+         requires 'wasm-unsafe-eval'; pf-model: is our local model
+         protocol; blob: is needed for the WebWorker shim ORT spawns.
+         Network access is otherwise denied — `default-src 'self'`
+         keeps the renderer offline. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' pf-model:; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' pf-model: blob:; style-src 'self' 'unsafe-inline'" />
   </head>
   <body>
-    <!-- Hidden window. Body intentionally empty — runtime detection
-         and (in future PRs) ONNX inference happen entirely in JS. -->
     <script type="module" src="../inference/pf-inference.ts"></script>
   </body>
 </html>

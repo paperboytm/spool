@@ -76,7 +76,11 @@ export function makeModelHost(
 ): Effect.Effect<ModelHost, never, Scope.Scope> {
   return Effect.gen(function* () {
     const ipc = deps.ipc ?? ipcMain
-    const readyTimeoutMs = deps.readyTimeoutMs ?? 10_000
+    // The renderer signals pf:ready AFTER transformers.js has finished
+    // loading + warming up the model. On a cold WASM path that can run
+    // close to a minute; 90 s gives headroom without inviting an
+    // indefinite hang.
+    const readyTimeoutMs = deps.readyTimeoutMs ?? 90_000
     const analyzeTimeoutMs = deps.analyzeTimeoutMs ?? 30_000
     const stateRef = yield* Ref.make<PfState>({ status: 'loading', runtime: null })
     const pending = new Map<number, {

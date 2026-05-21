@@ -1,16 +1,26 @@
 // Privacy Filter class mapping.
 //
-// OpenAI Privacy Filter emits 8 classes; we map them to Spool's
-// SensitiveKind. Some classes need suppression rules to avoid the
-// model out-shouting the regex detector for things the regex
-// already covers with checksums.
+// openai/privacy-filter emits 8 entity-group categories after the
+// constrained Viterbi decoder collapses BIOES tags:
 //
-// Spec: ~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md
-// §"Class mapping"
+//   private_person / private_email / private_phone / private_address /
+//   private_url / private_date / account_number / secret
+//
+// pf-inference.ts strips the `private_` prefix before sending the
+// match to this module, so the class strings handled here are the
+// short forms ('person', 'email', 'phone', 'address', 'url', 'date',
+// 'account_number', 'secret').
+//
+// Some classes need suppression rules so the ML model doesn't
+// out-shout the regex detector for things the regex already covers
+// with checksums or vendor-prefix tokens. Spec:
+// ~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md
+// §"Class mapping".
 
 import type { SensitiveKind, SensitiveMatch } from '@spool-lab/redact'
 
-/** Privacy Filter's published class labels. */
+/** Short-form class label emitted by pf-inference.ts after the
+ *  `private_` prefix is stripped. */
 export type PfClass =
   | 'person'
   | 'email'
@@ -20,13 +30,16 @@ export type PfClass =
   | 'date'
   | 'account_number'
   | 'secret'
+  // Allow string so unknown labels from future model bumps fall
+  // through to the default suppression in mapClass().
+  | string
 
 export interface PfRawMatch {
   class: PfClass
   value: string
   start: number
   end: number
-  /** PF model logit-derived confidence, 0–1. */
+  /** Viterbi-decoded confidence, 0–1. */
   score: number
 }
 
@@ -36,16 +49,12 @@ export interface MappingContext {
    *  flagged the same span, so the pf hit acts as a confidence
    *  boost rather than a noisy standalone signal. */
   regexMatches: ReadonlyArray<SensitiveMatch>
-  /** Optional substring around each match (~16 chars on each side)
-   *  used for date-of-birth context gating. Caller passes the full
-   *  text — gating runs cheaply. */
+  /** Substring around each match used for DOB context gating. */
   fullText: string
 }
 
 const DOB_CONTEXT_RX = /\b(dob|date\s+of\s+birth|born\s+on|birthday|d\.?o\.?b\.?)\b/i
 
-/** Map one PF raw match to a SensitiveMatch, or null when the
- *  suppression rules say to drop it. */
 export function mapPfMatch(
   pf: PfRawMatch,
   ctx: MappingContext,
@@ -72,23 +81,35 @@ function mapClass(pf: PfRawMatch, ctx: MappingContext): SensitiveKind | null {
       return 'phone'
     case 'address':
       return 'street-address'
+
     case 'url':
-      // URLs are not secrets on their own. Only emit when the regex
-      // already saw url-creds in the same span — pf then acts as a
+      // URLs aren't secrets on their own. Only emit when the regex
+      // also saw url-creds in the same span — pf then acts as a
       // confidence boost on the regex hit.
       return overlapsRegexKind(pf, ctx.regexMatches, 'url-creds') ? 'url-creds' : null
+
     case 'date':
       // Dates by themselves are noisy. Only emit when the +/- 32
       // chars around the match look like a DOB context.
       return looksLikeDob(pf, ctx.fullText) ? 'date-of-birth' : null
+
     case 'account_number':
       // Too noisy without a Luhn-style checksum. Regex's `credit-card`
       // already covers Luhn-valid hits; everything else is suppressed.
       return null
+
     case 'secret':
       // Regex is authoritative for known credential prefixes. PF's
       // `secret` only fires as a boost on existing regex hits.
       return overlapsRegexKind(pf, ctx.regexMatches, 'generic-secret') ? 'generic-secret' : null
+
+    default:
+      // Unknown label — log once in dev, drop in prod. Only fires on
+      // model swaps that forgot to update this switch.
+      if (process.env['NODE_ENV'] !== 'production') {
+        console.warn('[pf class-mapping] unknown label:', pf.class)
+      }
+      return null
   }
 }
 
