@@ -92,7 +92,9 @@ export function purgeFinding(
     })
 
     return result
-  })
+  }).pipe(
+    Effect.withSpan('security.purge.single', { attributes: { findingId } }),
+  )
 }
 
 /** Bulk purge across many findings. Caller passes an arbitrary
@@ -131,8 +133,11 @@ export function purgeFindings(
       )
       if (result) out.push(result)
     }
+    yield* Effect.annotateCurrentSpan('purged', out.length)
     return out
-  })
+  }).pipe(
+    Effect.withSpan('security.purge.bulk', { attributes: { requested: findingIds.length } }),
+  )
 }
 
 /** Produce a purge order that's safe against offset drift. Findings

@@ -34,6 +34,8 @@ import {
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
   invalidateSessionScanProfile,
+  makeObservabilityRuntime,
+  SPOOL_DIR,
 } from '@spool-lab/core'
 import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
 import { Effect } from 'effect'
@@ -69,6 +71,12 @@ const customUserDataDir = process.env['SPOOL_ELECTRON_USER_DATA_DIR']?.trim()
 if (customUserDataDir) {
   app.setPath('userData', customUserDataDir)
 }
+
+const { run: runWithObservability } = makeObservabilityRuntime(
+  isDevMode
+    ? { serviceName: 'spool-app-main', serviceVersion: app.getVersion(), env: 'dev' }
+    : { serviceName: 'spool-app-main', serviceVersion: app.getVersion(), env: 'prod', logsDir: join(SPOOL_DIR, 'logs') },
+)
 // macOS menu bar shows the first menu's label as the app name
 app.setName(isDevMode ? 'Spool DEV' : 'Spool')
 
@@ -324,7 +332,7 @@ app.whenReady().then(async () => {
       // shape (Effect<void, never>) — `.catch` here is the safety
       // net for runtime promise rejections from the underlying
       // postMessage round-trip.
-      Effect.runPromise(scanWorker.enqueue(sessionId)).catch((err) => {
+      runWithObservability(scanWorker.enqueue(sessionId)).catch((err) => {
         console.error('[security] scan-worker enqueue failed:', err)
       })
     }
@@ -355,7 +363,7 @@ app.whenReady().then(async () => {
     // handle — no onSessionChanged callbacks reached this process. Kick
     // off a backfill round now that the sessions table is populated.
     if (scanWorker) {
-      Effect.runPromise(scanWorker.backfill()).catch((err) => {
+      runWithObservability(scanWorker.backfill()).catch((err) => {
         console.error('[security] post-sync backfill failed:', err)
       })
     }
@@ -380,10 +388,10 @@ app.whenReady().then(async () => {
       disposeSecurityIpc = registerSecurityIpc({
         db,
         worker: scanWorker,
-        runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+        runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
       })
-      Effect.runPromise(scanWorker.backfill()).catch((err) => {
+      runWithObservability(scanWorker.backfill()).catch((err) => {
         console.error('[security] boot backfill failed:', err)
       })
     })

@@ -219,8 +219,9 @@ export function makeScanWorker(
         for (const r of all) {
           yield* enqueue(r.id)
         }
+        yield* Effect.annotateCurrentSpan('enqueued', all.length)
         return all.length
-      })
+      }).pipe(Effect.withSpan('security.worker.rescan_all'))
 
     const backfill = () =>
       Effect.gen(function* () {
@@ -236,8 +237,9 @@ export function makeScanWorker(
         for (const id of stale) {
           yield* enqueue(id)
         }
+        yield* Effect.annotateCurrentSpan('enqueued', stale.length)
         return stale.length
-      })
+      }).pipe(Effect.withSpan('security.worker.backfill'))
 
     return {
       enqueue,

@@ -90,6 +90,8 @@ export function scanSession(
       catch: (cause) => new ScanError({ sessionId, cause, reason: 'db-failed' }),
     })
 
+    yield* Effect.annotateCurrentSpan('messageCount', messages.length)
+
     if (messages.length === 0) {
       // Session has no messages yet. Still mark it scanned with the
       // current profile so we don't loop on it; future sync will
@@ -154,9 +156,12 @@ export function scanSession(
     })
 
     yield* deps.publish({ type: 'session-rescanned', sessionId })
+    yield* Effect.annotateCurrentSpan('inserted', inputs.length)
 
     return { sessionId, inserted: inputs.length, profile: deps.currentProfile }
-  })
+  }).pipe(
+    Effect.withSpan('security.scan.session', { attributes: { sessionId } }),
+  )
 }
 
 function applyEmpty(sessionId: number, deps: ScanSessionDeps): Effect.Effect<void, ScanError> {

@@ -24,11 +24,14 @@
 // Protocol — see `ToWorker` / `FromWorker` unions below.
 
 import { parentPort, threadId } from 'node:worker_threads'
+import { join } from 'node:path'
 import { Effect, Exit, Fiber, Scope, Stream } from 'effect'
 import {
   currentProfileString,
   getDB,
+  makeObservabilityRuntime,
   makeScanWorker,
+  SPOOL_DIR,
   type FindingsChange,
   type ScanStatus,
 } from '@spool-lab/core'
@@ -74,6 +77,16 @@ process.on('uncaughtException', reportFatal)
 
 void (async () => {
   console.log('[security] scan worker thread booted; threadId =', threadId)
+
+  // Worker has its own Effect runtime; without provisioning the layer
+  // here, spans inside scanSession/backfill never reach an exporter.
+  const isDevMode = Boolean(process.env['ELECTRON_RENDERER_URL'])
+  const { run: runEff } = makeObservabilityRuntime(
+    isDevMode
+      ? { serviceName: 'spool-app-scan-worker', env: 'dev' }
+      : { serviceName: 'spool-app-scan-worker', env: 'prod', logsDir: join(SPOOL_DIR, 'logs') },
+  )
+
   // Main process already migrated the file before spawning this
   // thread; skipping here avoids a race with sync-worker (whose
   // getDB() also opens with migrations skipped now) over the
@@ -81,7 +94,7 @@ void (async () => {
   const db = getDB({ runMigrations: false })
   const scope = await Effect.runPromise(Scope.make())
 
-  const worker = await Effect.runPromise(
+  const worker = await runEff(
     Effect.provideService(
       makeScanWorker({
         db,
@@ -112,14 +125,14 @@ void (async () => {
     })
   }
 
-  const changesFiber = await Effect.runPromise(
+  const changesFiber = await runEff(
     Effect.forkDaemon(
       Stream.runForEach(worker.changes, (change) =>
         safePost({ type: 'event-change', change }),
       ),
     ),
   )
-  const statusFiber = await Effect.runPromise(
+  const statusFiber = await runEff(
     Effect.forkDaemon(
       Stream.runForEach(worker.statusChanges, (status) =>
         safePost({ type: 'event-status', status }),
@@ -134,9 +147,9 @@ void (async () => {
           // Interrupt forwarders first so no events leak in after the
           // parent has stopped listening, then close the scope which
           // tears down the worker's drain fiber + PubSubs.
-          await Effect.runPromise(Fiber.interrupt(changesFiber))
-          await Effect.runPromise(Fiber.interrupt(statusFiber))
-          await Effect.runPromise(Scope.close(scope, Exit.void))
+          await runEff(Fiber.interrupt(changesFiber))
+          await runEff(Fiber.interrupt(statusFiber))
+          await runEff(Scope.close(scope, Exit.void))
         } finally {
           process.exit(0)
         }
@@ -150,16 +163,16 @@ void (async () => {
         let result: unknown = null
         switch (payload.cmd) {
           case 'enqueue':
-            await Effect.runPromise(worker.enqueue(payload.sessionId))
+            await runEff(worker.enqueue(payload.sessionId))
             break
           case 'rescanAll':
-            result = await Effect.runPromise(worker.rescanAll())
+            result = await runEff(worker.rescanAll())
             break
           case 'backfill':
-            result = await Effect.runPromise(worker.backfill())
+            result = await runEff(worker.backfill())
             break
           case 'getStatus':
-            result = await Effect.runPromise(worker.getStatus)
+            result = await runEff(worker.getStatus)
             break
         }
         port.postMessage({ type: 'cmd-result', reqId, result } satisfies FromWorker)
