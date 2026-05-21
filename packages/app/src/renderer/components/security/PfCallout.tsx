@@ -76,7 +76,7 @@ export default function PfCallout() {
   if (state.phase === 'downloading') {
     return (
       <Shell testId="security-pf-callout" phase="downloading">
-        <span className="inline-flex items-center justify-center w-4 h-4 text-accent dark:text-accent-dark">
+        <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
           <Loader2 size={14} strokeWidth={2} className="animate-spin" aria-hidden />
         </span>
         <div className="flex flex-col gap-1 min-w-0">
@@ -104,7 +104,7 @@ export default function PfCallout() {
   if (state.phase === 'failed') {
     return (
       <Shell testId="security-pf-callout" phase="failed">
-        <span className="inline-flex items-center justify-center w-4 h-4 text-accent dark:text-accent-dark">
+        <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
           <AlertTriangle size={13} strokeWidth={1.9} aria-hidden />
         </span>
         <div className="flex flex-col gap-1 min-w-0">
@@ -137,7 +137,7 @@ export default function PfCallout() {
   // surface the same primary CTA).
   return (
     <Shell testId="security-pf-callout" phase={state.phase}>
-      <span className="inline-flex items-center justify-center w-4 h-4 text-accent dark:text-accent-dark">
+      <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
         <Sparkles size={13} strokeWidth={1.9} aria-hidden />
       </span>
       <div className="flex flex-col gap-0.5 min-w-0">
@@ -181,11 +181,17 @@ function Shell({
   phase: PfDownloadState['phase']
   children: React.ReactNode
 }) {
+  // items-start (not items-center) so the leading icon + trailing
+  // actions sit at the TITLE baseline rather than the midpoint of
+  // the 2-line title+body block. A 13px icon centered between two
+  // lines visually floats — top-aligned with a tiny pt offset
+  // anchors it to the title, matching shadcn / Notion / GitHub
+  // inline alerts.
   return (
     <div
       data-testid={testId}
       data-phase={phase}
-      className="relative grid items-center gap-3 mb-5 px-4 py-2.5 rounded-lg bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border overflow-hidden"
+      className="relative grid items-start gap-3 mb-5 px-4 py-2.5 rounded-lg bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border overflow-hidden"
       style={{ gridTemplateColumns: 'auto 1fr auto' }}
     >
       {children}
