@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, net, shell } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 
@@ -434,7 +434,14 @@ app.whenReady().then(async () => {
   if (securityFeatureEnabled()) {
     // Has to happen post-ready (uses protocol.handle + app.getPath).
     registerPfModelProtocol()
-    pfCoordinator = makePfCoordinator({ modelDir: pfModelDir() })
+    // Electron's `net.fetch` honours system proxy + custom CA bundle;
+    // globalThis.fetch (undici) bypasses both. Per bug_electron_proxy
+    // memory: stealer logs / corp proxies / mainland China all need
+    // this for outbound HF traffic.
+    pfCoordinator = makePfCoordinator({
+      modelDir: pfModelDir(),
+      fetch: ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch,
+    })
     void bootScanWorker().then(() => {
       if (!scanWorker) return
       disposeSecurityIpc = registerSecurityIpc({
