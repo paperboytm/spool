@@ -3,6 +3,12 @@ import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// Per-iter AKIA-shaped fixtures (5 sessions, 5 distinct keys). Each
+// is exactly `AKIA + 16 [A-Z0-9]` so the regex matches and the new
+// validator (drops `*EXAMPLE` suffix) doesn't.
+const akiaForIter = (i: number) =>
+  'AKIA' + 'V3QFKW72ZDLNP4'.padEnd(14, 'X') + i.toString().padStart(2, '0')
+
 // Regression test for the manual-rescan ACK banner race (May 2026):
 //
 // Click `Rescan all` → worker.rescanAll() runs in the thread →
@@ -43,7 +49,7 @@ test.beforeAll(async () => {
               timestamp: `2026-05-20T10:00:0${i}Z`,
               message: {
                 role: 'user',
-                content: `leaked AKIAIOSFODNN7EXAMPLE${i} to a log, rotate it`,
+                content: `leaked ${akiaForIter(i)} to a log, rotate it`,
               },
             }),
             JSON.stringify({

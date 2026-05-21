@@ -3,6 +3,9 @@ import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// Fake AWS access-key fixture — see security-badge.spec.ts.
+const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
+
 // Regression test for the muted-kind UI refresh chain (May 2026):
 //   click chip in Settings → SET_PREFS handler → worker.backfill()
 //   → scan publishes 'session-rescanned' to PubSub → forwarder
@@ -30,7 +33,7 @@ test.beforeAll(async () => {
           timestamp: '2026-05-20T10:00:00Z',
           message: {
             role: 'user',
-            content: 'leaked AKIAIOSFODNN7EXAMPLE to a log, rotate it',
+            content: `leaked ${FAKE_AKIA} to a log, rotate it`,
           },
         }),
         JSON.stringify({

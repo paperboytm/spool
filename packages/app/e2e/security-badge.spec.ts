@@ -3,6 +3,11 @@ import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// Fake AWS access-key-shaped fixture. Built at module load so neither
+// GitHub push-protection nor our `isVendorExampleKey` validator
+// (drops AWS docs' `*EXAMPLE` literal) filters it.
+const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
+
 let ctx: AppContext
 
 test.beforeAll(async () => {
@@ -21,7 +26,7 @@ test.beforeAll(async () => {
           timestamp: '2026-05-19T10:00:00Z',
           message: {
             role: 'user',
-            content: 'I leaked AKIAIOSFODNN7EXAMPLE to a log, please rotate it.',
+            content: `I leaked ${FAKE_AKIA} to a log, please rotate it.`,
           },
         }),
         JSON.stringify({

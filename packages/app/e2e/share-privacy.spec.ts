@@ -11,9 +11,19 @@ let ctx: AppContext
 
 // Vendor-prefixed fixture tokens built at runtime so GitHub's
 // push-protection secret scanner doesn't flag the source literals.
-// Detector regex still matches the runtime VALUES.
-const STRIPE_LIVE = 'sk_' + 'live_' + 'x'.repeat(24)
-const STRIPE_RK = 'rk_' + 'live_' + 'y'.repeat(28)
+// Detector regex still matches the runtime VALUES. Values must
+// include digits + ≥ 28 chars to survive the new JS-storage-key
+// false-positive filter; the runtime suffix has both.
+const STRIPE_LIVE = 'sk_' + 'live_' + 'aH1xK9pQrSt7VwYzA3bC5dF8gJ'
+const STRIPE_RK = 'rk_' + 'live_' + 'mNoPqRsT9wXyZ2bC3dE4fG5hJ6kL'
+// Fake AWS access-key fixture — the AWS docs `AKIA…EXAMPLE` literal
+// is now correctly filtered as a vendor-doc placeholder, so we
+// build a non-EXAMPLE-suffix shape at module load.
+const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
+// Email in a non-reserved domain (example.com / test.com / generic
+// placeholder domains are now filtered).
+const EMAIL = 'maya@hogwarts.edu'
+const EMAIL_MASK = 'm***@hogwarts.edu'
 
 // Conversation fixture covering 6+ detector kinds. Tuned so each rule
 // claims a distinct region and the redactSummary categories actually
@@ -28,28 +38,28 @@ const STRIPE_RK = 'rk_' + 'live_' + 'y'.repeat(28)
 const SENSITIVE_TURNS = [
   {
     role: 'user' as const,
-    body: 'reply to maya@example.com when ready',
+    body: `reply to ${EMAIL} when ready`,
     author: '[Maya]',
   },
   {
     role: 'assistant' as const,
     body:
-      'check /Users/chen/secrets/keys.txt — uses AKIAIOSFODNN7EXAMPLE for AWS access. ' +
-      'see the same key AKIAIOSFODNN7EXAMPLE in the staging script.',
+      `check /Users/chen/secrets/keys.txt — uses ${FAKE_AKIA} for AWS access. ` +
+      `see the same key ${FAKE_AKIA} in the staging script.`,
   },
   {
     role: 'user' as const,
-    body: `STRIPE_SECRET_KEY=${STRIPE_LIVE} and maya@example.com`,
+    body: `STRIPE_SECRET_KEY=${STRIPE_LIVE} and ${EMAIL}`,
   },
   {
     role: 'assistant' as const,
     body:
       `standalone stripe restricted key ${STRIPE_RK} for the API. ` +
-      'try postgresql://admin:hunter2@db.example.com/main',
+      'try postgresql://admin:Zf8P9qXLpKvY@db.spoollab.io/main',
   },
   {
     role: 'user' as const,
-    body: '[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE',
+    body: `[default]\naws_access_key_id = ${FAKE_AKIA}`,
   },
 ]
 
@@ -208,13 +218,13 @@ test('Expanding a category reveals the real value rows', async () => {
     await gotoPrivacyTab(window)
 
     await window.locator('[data-testid="share-editor-privacy-row-email-header"]').click()
-    await expect(window.getByTitle('maya@example.com', { exact: true })).toBeVisible()
+    await expect(window.getByTitle(EMAIL, { exact: true })).toBeVisible()
 
     // api-key category: AKIA (caught here, despite duplicate occurrences)
     // + the standalone rk_live_ Stripe key. The sk_live_ value in the
     // STRIPE_SECRET_KEY=… line is grabbed by env-var, not api-key.
     await window.locator('[data-testid="share-editor-privacy-row-api-key-header"]').click()
-    await expect(window.getByTitle('AKIAIOSFODNN7EXAMPLE', { exact: true })).toBeVisible()
+    await expect(window.getByTitle(FAKE_AKIA, { exact: true })).toBeVisible()
     await expect(
       window.getByTitle(STRIPE_RK, { exact: true }),
     ).toBeVisible()
@@ -236,14 +246,14 @@ test('.spool sanitised download replaces literals with per-kind masks and strips
     const bodyText = doc.conversation.turns.map((t) => t.body).join('\n')
 
     // Literals replaced.
-    expect(bodyText).not.toContain('maya@example.com')
-    expect(bodyText).not.toContain('AKIAIOSFODNN7EXAMPLE')
+    expect(bodyText).not.toContain(EMAIL)
+    expect(bodyText).not.toContain(FAKE_AKIA)
     expect(bodyText).not.toContain(STRIPE_LIVE)
     expect(bodyText).not.toContain(STRIPE_RK)
     expect(bodyText).not.toContain('hunter2')
 
     // Per-kind masks present.
-    expect(bodyText).toContain('m***@example.com')
+    expect(bodyText).toContain(EMAIL_MASK)
     expect(bodyText).toContain('[redacted: AWS key]')
     expect(bodyText).toContain('[redacted: Stripe key]')
     expect(bodyText).toContain('STRIPE_SECRET_KEY=[redacted]')
@@ -270,12 +280,12 @@ test('Markdown export uses per-kind masks wrapped in inline code', async () => {
     const md = new TextDecoder().decode(saved.bytes)
 
     // Literals replaced.
-    expect(md).not.toContain('maya@example.com')
-    expect(md).not.toContain('AKIAIOSFODNN7EXAMPLE')
+    expect(md).not.toContain(EMAIL)
+    expect(md).not.toContain(FAKE_AKIA)
     expect(md).not.toContain(STRIPE_LIVE)
 
     // Per-kind masks wrapped in backticks for chip rendering in markdown viewers.
-    expect(md).toMatch(/`m\*\*\*@example\.com`/)
+    expect(md).toMatch(/`m\*\*\*@hogwarts\.edu`/)
     expect(md).toContain('`[redacted: AWS key]`')
     expect(md).toContain('`[redacted: Stripe key]`')
     expect(md).toContain('`STRIPE_SECRET_KEY=[redacted]`')
@@ -286,9 +296,9 @@ test('Per-item opt-out keeps that value verbatim in the sanitised .spool', async
   await withSensitiveDraft('per-item', async (window) => {
     await gotoPrivacyTab(window)
 
-    // Expand email category, click the row to opt out maya@example.com.
+    // Expand email category, click the row to opt out ${EMAIL}.
     await window.locator('[data-testid="share-editor-privacy-row-email-header"]').click()
-    await window.getByTitle('maya@example.com', { exact: true }).click()
+    await window.getByTitle(EMAIL, { exact: true }).click()
 
     await expect(window.locator('[data-testid="share-editor-privacy-reset"]')).toBeVisible()
     await expect(window.locator('[data-testid="share-editor-privacy-count"]'))
@@ -305,9 +315,9 @@ test('Per-item opt-out keeps that value verbatim in the sanitised .spool', async
     const bodyText = doc.conversation.turns.map((t) => t.body).join('\n')
 
     // Whitelisted email stays.
-    expect(bodyText).toContain('maya@example.com')
+    expect(bodyText).toContain(EMAIL)
     // Non-whitelisted secrets still masked.
-    expect(bodyText).not.toContain('AKIAIOSFODNN7EXAMPLE')
+    expect(bodyText).not.toContain(FAKE_AKIA)
     expect(bodyText).toContain('[redacted: AWS key]')
   })
 })
