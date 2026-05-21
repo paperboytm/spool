@@ -67,7 +67,7 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, trafficLi
             <div
               className={[
                 'flex-none transition-[width] duration-[280ms] ease-out',
-                sidebarCollapsed ? 'w-0' : 'w-[138px]',
+                sidebarCollapsed ? 'w-0' : 'w-[134px]',
               ].join(' ')}
               aria-hidden="true"
             />
@@ -117,10 +117,10 @@ function SidebarToggleButton({
       title={title}
       aria-label={ariaLabel}
       aria-pressed={pressed}
-      className="flex-none inline-flex items-center justify-center w-6 h-6 rounded-md text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+      className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
       style={noDragStyle}
     >
-      <PanelLeft size={14} strokeWidth={1.5} />
+      <PanelLeft size={13} strokeWidth={1.75} />
     </button>
   )
 }

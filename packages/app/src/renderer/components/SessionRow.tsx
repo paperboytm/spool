@@ -91,7 +91,7 @@ export default function SessionRow({ session, pinned = false, showProject = fals
       </div>
 
       <div className="flex-none flex items-center gap-1 -mt-0.5" onClick={(e) => e.stopPropagation()}>
-        <SecurityBadge session={session} />
+        <SecurityBadgeSlot session={session} />
         <span
           className={
             pinned
@@ -152,6 +152,27 @@ export default function SessionRow({ session, pinned = false, showProject = fals
     </div>
   )
 }
+
+/** Fixed-width state slot containing the SecurityBadge.
+ *
+ *  Naive placement (`{badge && <SecurityBadge />}` inline) shifts the pin
+ *  icon column left on rows without a badge. By reserving a 32px slot
+ *  for every row — even when empty — the pin/menu icons lock to the
+ *  same X across the entire library.
+ *
+ *  Vertical alignment: the slot is `h-5` to match `PinButton`'s `w-5
+ *  h-5` button, and lives inside the action group so it inherits the
+ *  group's `-mt-0.5` offset against the title row. Icon size = 13 so
+ *  the AlertTriangle reads as the same visual weight as PinIcon (also
+ *  size 13). */
+function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElement {
+  return (
+    <span className="flex-none inline-flex items-center justify-center w-5 h-5">
+      <SecurityBadge session={session} />
+    </span>
+  )
+}
+
 
 function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
   const { t } = useTranslation()

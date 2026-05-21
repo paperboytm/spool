@@ -128,7 +128,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
           ) : (
             <NavRow
               testId="sidebar-toggle"
-              icon={<PanelLeft size={14} strokeWidth={1.5} />}
+              icon={<PanelLeft size={14} strokeWidth={1.75} />}
               label={t('sidebar.sidebar')}
               trailing={<KbdHint>{formatModShortcut('B')}</KbdHint>}
               onClick={sidebarToggle.onToggle}
@@ -364,7 +364,7 @@ function NavRow({
       aria-current={active ? 'page' : undefined}
       aria-pressed={ariaPressed}
       className={[
-        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px] leading-4',
+        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px]',
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
@@ -390,13 +390,13 @@ function SidebarCollapsedToggle({ collapsed, onToggle, title }: { collapsed: boo
       className="ml-1 flex-none inline-flex items-center justify-center w-6 h-6 rounded-md text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
       style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
-      <PanelLeft size={14} strokeWidth={1.5} />
+      <PanelLeft size={14} strokeWidth={1.75} />
     </button>
   )
 }
 
 function formatModShortcut(key: string) {
-  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  const isMac = typeof window !== 'undefined' && window.spool?.platform === 'darwin'
   return isMac ? `⌘${key}` : `Ctrl+${key}`
 }
 
