@@ -5,7 +5,10 @@ import { DEFAULT_OPTS, type Conversation, type EditorOpts } from '../types'
 
 // Built at runtime so GitHub's push-protection secret scanner
 // doesn't flag the literal Stripe-shaped prefix in source.
-const STRIPE_FIXTURE = 'sk_' + 'live_' + 'x'.repeat(24)
+const STRIPE_FIXTURE = 'sk_' + 'live_' + 'aH1xK9pQrSt7VwYzA3bC5dF8gJ'
+// Email in a non-reserved domain — example.com is now filtered.
+const EMAIL_FIXTURE = 'maya@hogwarts.edu'
+const EMAIL_MASK = 'm***@hogwarts.edu'
 
 function makeConvo(): Conversation {
   return {
@@ -21,7 +24,7 @@ function makeConvo(): Conversation {
       } as Conversation['turns'][number],
       {
         role: 'assistant',
-        body: 'sure — but maya@example.com is in the body too',
+        body: `sure — but ${EMAIL_FIXTURE} is in the body too`,
       } as Conversation['turns'][number],
     ],
   }
@@ -42,8 +45,8 @@ describe('buildSpoolDocument', () => {
     const doc = buildSpoolDocument(convo, opts, { sanitize: true })
     expect(doc.conversation.turns[0]!.body).not.toContain(STRIPE_FIXTURE)
     expect(doc.conversation.turns[0]!.body).toContain('[redacted: Stripe key]')
-    expect(doc.conversation.turns[1]!.body).not.toContain('maya@example.com')
-    expect(doc.conversation.turns[1]!.body).toContain('m***@example.com')
+    expect(doc.conversation.turns[1]!.body).not.toContain(EMAIL_FIXTURE)
+    expect(doc.conversation.turns[1]!.body).toContain(EMAIL_MASK)
     expect(doc.conversation.turns[0]!.author).toBe('[[redacted name]]')
   })
 
@@ -61,14 +64,14 @@ describe('buildSpoolDocument', () => {
       redact: true,
       redactExclude: {
         kinds: ['absolute-path'],
-        valueHashes: [hashValueForRedactExclude('maya@example.com')],
+        valueHashes: [hashValueForRedactExclude(EMAIL_FIXTURE)],
       },
     }
     const doc = buildSpoolDocument(convo, opts, { sanitize: true })
     expect(doc.opts.redactExclude).toBeUndefined()
     // And the email IS still in the sanitised body because the per-
     // item opt-out asked us to keep it.
-    expect(doc.conversation.turns[1]!.body).toContain('maya@example.com')
+    expect(doc.conversation.turns[1]!.body).toContain(EMAIL_FIXTURE)
   })
 
   it('sanitize=false preserves redactExclude in the embedded opts', () => {
@@ -87,10 +90,10 @@ describe('buildSpoolDocument', () => {
     const opts: EditorOpts = {
       ...DEFAULT_OPTS,
       redact: true,
-      redactExclude: { valueHashes: [hashValueForRedactExclude('maya@example.com')] },
+      redactExclude: { valueHashes: [hashValueForRedactExclude(EMAIL_FIXTURE)] },
     }
     const doc = buildSpoolDocument(convo, opts, { sanitize: true })
-    expect(doc.conversation.turns[1]!.body).toContain('maya@example.com')
+    expect(doc.conversation.turns[1]!.body).toContain(EMAIL_FIXTURE)
     expect(doc.conversation.turns[0]!.body).not.toContain(STRIPE_FIXTURE)
   })
 })
