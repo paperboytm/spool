@@ -14,13 +14,6 @@ describe('compactModel', () => {
     expect(compactModel('claude-haiku-3-5')).toBe('haiku 3.5')
   })
 
-  it('drops the trailing date segment (e.g. -20251022)', () => {
-    // The regex only matches up to two numeric trailers, so a long
-    // YYYYMMDD tail falls through to the no-match branch — the raw
-    // input is returned verbatim. Document the current behavior.
-    expect(compactModel('claude-sonnet-4-5-20251022')).toBe('claude-sonnet-4-5-20251022')
-  })
-
   it('handles major-only forms', () => {
     expect(compactModel('claude-opus-4')).toBe('opus 4')
   })
@@ -29,9 +22,12 @@ describe('compactModel', () => {
     expect(compactModel('claude-sonnet')).toBe('sonnet')
   })
 
-  it('returns the raw string when it does not match the claude- pattern', () => {
+  it('returns the raw string when input does not match the pattern', () => {
     expect(compactModel('gpt-4o')).toBe('gpt-4o')
     expect(compactModel('llama3')).toBe('llama3')
+    // Date-suffixed form (e.g. claude-sonnet-4-5-20251022) has three
+    // numeric trailers and falls through unchanged.
+    expect(compactModel('claude-sonnet-4-5-20251022')).toBe('claude-sonnet-4-5-20251022')
   })
 })
 
