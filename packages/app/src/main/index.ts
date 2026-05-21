@@ -437,13 +437,13 @@ app.whenReady().then(async () => {
     pfCoordinator = makePfCoordinator({ modelDir: pfModelDir() })
     void bootScanWorker().then(() => {
       if (!scanWorker) return
-      pfCoordinator = makePfCoordinator({ modelDir: pfModelDir() })
       disposeSecurityIpc = registerSecurityIpc({
         db,
         worker: scanWorker,
         runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
         pfCoordinator,
+        pfRuntime,
         onPfEnabledChanged: (enabled) => {
           void syncPfRuntime(enabled).catch((err) => {
             console.error('[security] pf runtime transition failed:', err)

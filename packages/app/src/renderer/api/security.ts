@@ -21,9 +21,9 @@ import type {
 
 export type { BackupFileInfo }
 import type { SensitiveKind } from '@spool-lab/redact'
-import type { SecurityPreferences, PfDownloadState } from '../../preload/index.js'
+import type { SecurityPreferences, PfDownloadState, PfRuntimeInfo } from '../../preload/index.js'
 
-export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState }
+export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState, PfRuntimeInfo }
 
 /** Single source of truth for the renderer-side adapter. Components
  *  hold this object, not `window.spool.security` — keeps replaceability
@@ -91,6 +91,8 @@ export const securityApi = {
     window.spool.security.pfDownloadStart(),
   pfDownloadCancel: (): Promise<{ ok: boolean }> =>
     window.spool.security.pfDownloadCancel(),
+  pfGetRuntimeInfo: (): Promise<PfRuntimeInfo | null> =>
+    window.spool.security.pfGetRuntimeInfo(),
   onPfState: (handler: (s: PfDownloadState) => void): (() => void) =>
     window.spool.security.onPfState(handler),
 }

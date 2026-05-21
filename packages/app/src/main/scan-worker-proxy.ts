@@ -65,6 +65,12 @@ export async function spawnScanWorker(
   const changes = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
   const statusChanges = await Effect.runPromise(PubSub.unbounded<ScanStatus>())
 
+  // postMessage throws synchronously when the worker's MessagePort has
+  // closed. Swallow it — caller is post-shutdown territory.
+  function postSafe(msg: ToWorker): void {
+    try { worker.postMessage(msg) } catch { /* worker gone */ }
+  }
+
   function send<T>(payload: ScanCommand): Promise<T> {
     const reqId = nextReqId++
     return new Promise<T>((resolve, reject) => {
@@ -153,22 +159,14 @@ export async function spawnScanWorker(
         // No bridge wired (e.g. PF runtime not booted) → answer
         // immediately with empty matches so the worker unblocks.
         if (!pfBridge) {
-          try {
-            worker.postMessage({ type: 'pf-analyze-res', reqId, ok: true, matches: [] } satisfies ToWorker)
-          } catch { /* worker gone */ }
+          postSafe({ type: 'pf-analyze-res', reqId, ok: true, matches: [] })
           return
         }
         pfBridge.analyze(text)
-          .then((matches) => {
-            try {
-              worker.postMessage({ type: 'pf-analyze-res', reqId, ok: true, matches } satisfies ToWorker)
-            } catch { /* worker gone */ }
-          })
+          .then((matches) => postSafe({ type: 'pf-analyze-res', reqId, ok: true, matches }))
           .catch((err: unknown) => {
             const message = err instanceof Error ? err.message : String(err)
-            try {
-              worker.postMessage({ type: 'pf-analyze-res', reqId, ok: false, message } satisfies ToWorker)
-            } catch { /* worker gone */ }
+            postSafe({ type: 'pf-analyze-res', reqId, ok: false, message })
           })
         return
       }
@@ -220,13 +218,7 @@ export async function spawnScanWorker(
           resolve()
         }
       }),
-    notifyPfOnline: () => {
-      try { worker.postMessage({ type: 'pf-online' } satisfies ToWorker) }
-      catch { /* worker gone */ }
-    },
-    notifyPfOffline: () => {
-      try { worker.postMessage({ type: 'pf-offline' } satisfies ToWorker) }
-      catch { /* worker gone */ }
-    },
+    notifyPfOnline: () => postSafe({ type: 'pf-online' }),
+    notifyPfOffline: () => postSafe({ type: 'pf-offline' }),
   }
 }
