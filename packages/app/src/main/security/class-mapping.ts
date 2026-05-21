@@ -55,10 +55,21 @@ export interface MappingContext {
 
 const DOB_CONTEXT_RX = /\b(dob|date\s+of\s+birth|born\s+on|birthday|d\.?o\.?b\.?)\b/i
 
+/** Confidence floor for ANY PF emission. Below this the model is
+ *  effectively guessing — empirically ~40% of low-conf matches on
+ *  Spool's dev DB were obvious junk ("bgvnljn80" 0.36, "toolu_01..."
+ *  0.38, "id" 0.5). The model's own published F1 is on natural-language
+ *  PII benchmarks; our dev session text (mixed Chinese + code + tool
+ *  IDs + hashes) is well out of distribution. */
+const PF_MIN_CONFIDENCE = 0.85
+
 export function mapPfMatch(
   pf: PfRawMatch,
   ctx: MappingContext,
 ): SensitiveMatch | null {
+  // Universal confidence floor — applied before any per-class logic
+  // so noise gets dropped regardless of suppression rules.
+  if (pf.score < PF_MIN_CONFIDENCE) return null
   const kind = mapClass(pf, ctx)
   if (!kind) return null
   return {
@@ -72,36 +83,44 @@ export function mapPfMatch(
 }
 
 function mapClass(pf: PfRawMatch, ctx: MappingContext): SensitiveKind | null {
+  // Restricted to PF categories where the model's published precision
+  // is meaningfully above regex's already-strong patterns:
+  //   email  (P=0.97 even without contextual clues)
+  //   phone  (P=0.92, catches digit-word + spacing variants regex misses)
+  //   date   (P=1.00 — but only paired with a DOB context)
+  //   secret (P=1.00 — only as a regex-hit boost)
+  // We DROP person / address / url / account_number entirely. On the
+  // model card's "PII only" (no clue) numbers — which is Spool's
+  // actual setting — those four sit at P=0.62-0.82, i.e. 18-38% false
+  // positives. On out-of-distribution technical content (hashes /
+  // tool ids / split URLs) the card shows precision crashing further
+  // (line_breaks 0.45, phonetic 0.27). Regex doesn't cover these
+  // kinds either, so we accept the recall gap — coverage we can't
+  // trust isn't coverage.
   switch (pf.class) {
-    case 'person':
-      return 'person-name'
     case 'email':
       return 'email'
     case 'phone':
       return 'phone'
-    case 'address':
-      return 'street-address'
-
-    case 'url':
-      // URLs aren't secrets on their own. Only emit when the regex
-      // also saw url-creds in the same span — pf then acts as a
-      // confidence boost on the regex hit.
-      return overlapsRegexKind(pf, ctx.regexMatches, 'url-creds') ? 'url-creds' : null
 
     case 'date':
       // Dates by themselves are noisy. Only emit when the +/- 32
       // chars around the match look like a DOB context.
       return looksLikeDob(pf, ctx.fullText) ? 'date-of-birth' : null
 
-    case 'account_number':
-      // Too noisy without a Luhn-style checksum. Regex's `credit-card`
-      // already covers Luhn-valid hits; everything else is suppressed.
-      return null
-
     case 'secret':
       // Regex is authoritative for known credential prefixes. PF's
       // `secret` only fires as a boost on existing regex hits.
       return overlapsRegexKind(pf, ctx.regexMatches, 'generic-secret') ? 'generic-secret' : null
+
+    case 'person':
+    case 'address':
+    case 'url':
+    case 'account_number':
+      // See block comment above — disabled until either a domain
+      // fine-tune or a shipping shape filter that survives Spool's
+      // technical content.
+      return null
 
     default:
       // Unknown label — log once in dev, drop in prod. Only fires on

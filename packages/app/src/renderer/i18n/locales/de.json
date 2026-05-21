@@ -222,7 +222,7 @@
       "detector_pattern_footer": "13 Detektoren · unter 100 ms pro Sitzung",
       "detector_always_on": "Immer aktiv",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "PII-Muster, die Regex nicht erkennen kann — Namen, Adressen und Ähnliches.",
+      "detector_pf_body": "Erkennt verschleierte E-Mails, Telefonnummern und Geburtsdaten, die Regex nicht erfasst.",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · läuft lokal",
       "detector_pf_download": "Download",
       "detector_pf_cancel": "Cancel",

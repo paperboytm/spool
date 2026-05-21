@@ -216,7 +216,7 @@
       "detector_pattern_footer": "13개 탐지기 · 세션당 100ms 미만",
       "detector_always_on": "항상 켜짐",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "정규식으로 잡지 못하는 PII — 이름, 주소 등.",
+      "detector_pf_body": "정규식으로는 잡을 수 없는 난독화된 이메일, 전화번호, 생년월일을 감지합니다.",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · 기기 내 실행",
       "detector_pf_download": "Download",
       "detector_pf_cancel": "Cancel",

@@ -216,7 +216,7 @@
       "detector_pattern_footer": "13 个检测器 · 单会话 < 100ms",
       "detector_always_on": "始终开启",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "正则覆盖不到的 PII —— 姓名、地址等。",
+      "detector_pf_body": "抓取正则规则匹配不到的混淆邮箱、电话号码和出生日期。",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · 本地运行",
       "detector_pf_download": "下载",
       "detector_pf_cancel": "取消",

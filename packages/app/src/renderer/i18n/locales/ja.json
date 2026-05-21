@@ -216,7 +216,7 @@
       "detector_pattern_footer": "13 個の検出器 · セッションあたり 100ms 未満",
       "detector_always_on": "常時オン",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "正規表現で捉えられない PII — 名前、住所など。",
+      "detector_pf_body": "正規表現では検出できない難読化メール、電話番号、生年月日を検出します。",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · デバイス内で実行",
       "detector_pf_download": "Download",
       "detector_pf_cancel": "Cancel",

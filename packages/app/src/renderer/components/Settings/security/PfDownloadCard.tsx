@@ -78,7 +78,7 @@ export default function PfDownloadCard() {
           </div>
           <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">
             {t('settings.security.detector_pf_body', {
-              defaultValue: "PII patterns that regex can't catch — names, addresses, and similar.",
+              defaultValue: 'Catches obfuscated emails, phone numbers, and DOB that regex patterns miss.',
             })}
           </p>
           <p className="font-mono text-[10px] text-warm-faint dark:text-dark-muted/70">
