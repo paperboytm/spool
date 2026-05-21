@@ -128,6 +128,11 @@ void (async () => {
     displayName: 'Privacy Filter (ML)',
     available: () => pfOnline && loadSecurityPreferences().pfEnabled,
     analyze: async (text: string): Promise<SensitiveMatch[]> => {
+      // Short-circuit empty / whitespace-only chunks. The model's
+      // GatherBlockQuantized op fails with "Invalid dispatch group
+      // size (0, 1, 1)" on zero-token input; cheaper for everyone to
+      // skip the IPC round-trip entirely.
+      if (text.trim().length === 0) return []
       const reqId = pfNextReqId++
       const raw: PfRawMatchWire[] = await new Promise((resolve, reject) => {
         pfPending.set(reqId, { resolve, reject })
