@@ -78,12 +78,16 @@ function DetectorPill({
   return (
     <span
       data-tone={tone}
-      className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-[5px] border bg-warm-surface dark:bg-dark-surface text-[11px] ${palette}`}
+      // font-mono matches the meta row's "{N} 项风险 · {N} 项信息"
+      // typography exactly — sans-at-same-px optically reads bigger
+      // than the mono digits next to it, which made the chips bulge
+      // out of the row.
+      className={`inline-flex items-center gap-1 h-5 px-1.5 rounded-[5px] border bg-warm-surface dark:bg-dark-surface font-mono text-[11px] ${palette}`}
     >
       {icon}
       <span>{label}</span>
       {meta && (
-        <span className="font-mono text-warm-faint dark:text-dark-muted tabular-nums">{meta}</span>
+        <span className="text-warm-faint dark:text-dark-muted tabular-nums">{meta}</span>
       )}
     </span>
   )
