@@ -9,6 +9,7 @@ import Menu from './Menu.js'
 import { formatRelativeDate, type BucketKey } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
+import { compactModel } from './security/format.js'
 
 type Props = {
   session: Session
@@ -226,17 +227,5 @@ function SecurityBadge({ session }: { session: Session }): React.ReactElement | 
       <AlertTriangle size={13} strokeWidth={1.7} aria-hidden />
     </span>
   )
-}
-
-function compactModel(model: string | null | undefined): string {
-  if (!model) return ''
-  const m = model.match(/^claude-(opus|sonnet|haiku)(?:-(\d+))?(?:-(\d+))?$/)
-  if (!m) return model
-  const name = m[1]!
-  const major = m[2]
-  const minor = m[3]
-  if (minor) return `${name} ${major}.${minor}`
-  if (major) return `${name} ${major}`
-  return name
 }
 

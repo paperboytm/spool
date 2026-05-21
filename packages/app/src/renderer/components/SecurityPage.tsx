@@ -43,6 +43,7 @@ import {
   scanInFlightCount,
   shouldShowScanBanner,
 } from './security/page-helpers.js'
+import { compactModel } from './security/format.js'
 import { SourceBadge } from './Badges.js'
 import Menu from './Menu.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
@@ -1181,20 +1182,6 @@ function SessionCard({
       )}
     </article>
   )
-}
-
-/** Drops the long `claude-sonnet-4-5-20251022` form to `sonnet 4.5`.
- *  Mirrors SessionRow's helper. */
-function compactModel(model: string | null | undefined): string {
-  if (!model) return ''
-  const m = model.match(/^claude-(opus|sonnet|haiku)(?:-(\d+))?(?:-(\d+))?$/)
-  if (!m) return model
-  const name = m[1]!
-  const major = m[2]
-  const minor = m[3]
-  if (minor) return `${name} ${major}.${minor}`
-  if (major) return `${name} ${major}`
-  return name
 }
 
 function FindingItem({

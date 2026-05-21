@@ -7,9 +7,9 @@
 import { AlertTriangle, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef } from 'react'
-import { SENSITIVE_KIND_LABEL, type SensitiveKind } from '@spool-lab/redact'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { truncateValue } from './truncate-value.js'
+import { friendlyMaskName } from './format.js'
 
 interface BulkSample {
   /** Raw value being rewritten (may be truncated by caller). */
@@ -223,10 +223,3 @@ function Fact({ children }: { children: React.ReactNode }) {
   )
 }
 
-function friendlyMaskName(kind: string): string {
-  // Single source of truth — same lookup the rest of the security UI
-  // uses. Unknown kinds fall back to the raw enum value (will only
-  // happen if a future SensitiveKind ships before the locale strings
-  // catch up).
-  return SENSITIVE_KIND_LABEL[kind as SensitiveKind] ?? kind
-}
