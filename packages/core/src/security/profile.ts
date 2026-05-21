@@ -13,11 +13,18 @@
 // `@spool-lab/redact` (added in PR 1a); we re-export it here for
 // callers that only depend on @spool-lab/core.
 
-// v4: tightened IPv6 (rejects HH:MM:SS look-alikes) + dropped
-// `.local` from internal-host TLDs (collides with `.env.local`).
-// Bumping the version forces a rescan on every session, so old
-// findings under the v3 rules get replaced with the cleaner v4 set.
-export const REDACT_DETECTOR_VERSION = 4
+// Cache-nonce for the regex detector rule set. Bumping it makes
+// `currentProfileString()` differ from what's stored on
+// `sessions.scan_profile`, which the backfill loop reads as "this
+// session needs a rescan". No semantic meaning outside that diff —
+// it's NOT a user-visible "version of the security feature".
+//
+// Scope: consumed only by code gated behind VITE_FEATURE_SECURITY.
+// While the feature is pre-GA we keep this at 1 and force rescans
+// during development via `Settings → Security → Rescan all` or a
+// direct DB wipe. Once the feature ships, bump on every rule change
+// so users with old stamps automatically pick up the new rules.
+export const REDACT_DETECTOR_VERSION = 1
 
 export interface ProfileOpts {
   /** Regex detector revision. Bump in lockstep with rule changes. */
