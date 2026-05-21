@@ -3,13 +3,16 @@
 //
 // WebGPU is renderer-only in Chromium, so main can't run it directly.
 // The hidden window loads `pf-inference.html`, detects WebGPU (with
-// WASM fallback), and reports back via the `pf:ready` IPC channel.
-// PR 5a covers lifecycle + handshake only; model download lands in 5b
-// and `pf:analyze` in 5c.
+// WASM fallback), reports readiness via `pf:ready`, and answers
+// `pf:analyze-request` correlated by `reqId`.
 
 import { Effect, Ref, Data, Scope } from 'effect'
 import { ipcMain, type BrowserWindow, type IpcMainEvent } from 'electron'
-import { PF_IPC, type PfReadyMessage, type PfFailedMessage, type PfRuntime } from '../../inference/types.js'
+import {
+  PF_IPC,
+  type PfReadyMessage, type PfFailedMessage, type PfRuntime,
+  type PfAnalyzeRequest, type PfAnalyzeResult,
+} from '../../inference/types.js'
 
 export type { PfRuntime }
 
@@ -42,7 +45,8 @@ export interface ModelHost {
   getRuntime: Effect.Effect<PfRuntime | null>
   /** Current high-level state for Settings UI consumption. */
   getState: Effect.Effect<PfState>
-  /** Analyse a chunk of text. PR 5a stub: returns []. Real impl lands in 5c. */
+  /** Analyse a chunk of text. Fails with ModelHostError if the host
+   *  isn't ready, the request times out, or the inference side errors. */
   analyze: (text: string) => Effect.Effect<PfMatchResult[], ModelHostError>
 }
 
@@ -53,6 +57,9 @@ export interface ModelHostDeps {
   spawnWindow: () => Promise<BrowserWindow>
   /** Timeout for the ready handshake. Default 10 s. */
   readyTimeoutMs?: number
+  /** Per-analyse timeout. Default 30 s — generous because WASM
+   *  inference on cold cache can run 10-30 s per session. */
+  analyzeTimeoutMs?: number
   /** Override for tests — defaults to Electron's `ipcMain`. */
   ipc?: Pick<typeof ipcMain, 'on' | 'removeListener'>
 }
@@ -70,7 +77,14 @@ export function makeModelHost(
   return Effect.gen(function* () {
     const ipc = deps.ipc ?? ipcMain
     const readyTimeoutMs = deps.readyTimeoutMs ?? 10_000
+    const analyzeTimeoutMs = deps.analyzeTimeoutMs ?? 30_000
     const stateRef = yield* Ref.make<PfState>({ status: 'loading', runtime: null })
+    const pending = new Map<number, {
+      resolve: (matches: PfMatchResult[]) => void
+      reject: (err: ModelHostError) => void
+      timer: ReturnType<typeof setTimeout>
+    }>()
+    let nextReqId = 1
 
     const failWith = (err: unknown) =>
       Ref.set(stateRef, {
@@ -79,7 +93,7 @@ export function makeModelHost(
         error: err instanceof ModelHostError ? String(err.cause) : String(err),
       })
 
-    yield* Effect.acquireRelease(
+    const win = yield* Effect.acquireRelease(
       Effect.gen(function* () {
         const w = yield* Effect.tryPromise({
           try: () => deps.spawnWindow(),
@@ -111,16 +125,76 @@ export function makeModelHost(
       }),
       (w) =>
         Effect.sync(() => {
+          // Reject every pending analyze so callers stop waiting for a
+          // response that's never coming once the window is gone.
+          for (const p of pending.values()) {
+            clearTimeout(p.timer)
+            p.reject(new ModelHostError({ stage: 'shutdown', cause: 'window closed' }))
+          }
+          pending.clear()
           if (w && !w.isDestroyed()) w.destroy()
         }),
     )
+
+    // Route analyze results back to the resolver waiting on that reqId.
+    // We have to install this listener even when handshake hasn't
+    // succeeded yet — the result message may arrive before
+    // `state.status === 'ready'` is observed by callers.
+    const targetSenderId = win?.webContents.id
+    const onAnalyzeResult = (event: IpcMainEvent, payload: PfAnalyzeResult) => {
+      if (targetSenderId !== undefined && event.sender.id !== targetSenderId) return
+      const slot = pending.get(payload.reqId)
+      if (!slot) return
+      pending.delete(payload.reqId)
+      clearTimeout(slot.timer)
+      if (payload.ok) {
+        slot.resolve(payload.matches as PfMatchResult[])
+      } else {
+        slot.reject(new ModelHostError({ stage: 'analyze', cause: payload.message }))
+      }
+    }
+    yield* Effect.acquireRelease(
+      Effect.sync(() => { ipc.on(PF_IPC.ANALYZE_RESULT, onAnalyzeResult) }),
+      () => Effect.sync(() => { ipc.removeListener(PF_IPC.ANALYZE_RESULT, onAnalyzeResult) }),
+    )
+
+    function analyze(text: string): Effect.Effect<PfMatchResult[], ModelHostError> {
+      return Effect.gen(function* () {
+        const state = yield* Ref.get(stateRef)
+        if (state.status !== 'ready' || !win || win.isDestroyed()) {
+          return yield* Effect.fail(new ModelHostError({ stage: 'analyze', cause: 'not ready' }))
+        }
+        const reqId = nextReqId++
+        const result = yield* Effect.async<PfMatchResult[], ModelHostError>((resume) => {
+          const timer = setTimeout(() => {
+            pending.delete(reqId)
+            resume(Effect.fail(new ModelHostError({
+              stage: 'analyze',
+              cause: `analyze timed out after ${analyzeTimeoutMs}ms`,
+            })))
+          }, analyzeTimeoutMs)
+          pending.set(reqId, {
+            resolve: (matches) => resume(Effect.succeed(matches)),
+            reject: (err) => resume(Effect.fail(err)),
+            timer,
+          })
+          try {
+            win.webContents.send(PF_IPC.ANALYZE_REQUEST, { reqId, text } satisfies PfAnalyzeRequest)
+          } catch (cause) {
+            pending.delete(reqId)
+            clearTimeout(timer)
+            resume(Effect.fail(new ModelHostError({ stage: 'analyze', cause })))
+          }
+        })
+        return result
+      })
+    }
 
     return {
       ready: Ref.get(stateRef).pipe(Effect.map((s) => s.status === 'ready')),
       getRuntime: Ref.get(stateRef).pipe(Effect.map((s) => s.runtime)),
       getState: Ref.get(stateRef),
-      // PR 5a stub. Real impl lands in PR 5c once `pf:analyze` ships.
-      analyze: (_text: string) => Effect.succeed<PfMatchResult[]>([]),
+      analyze,
     }
   })
 }

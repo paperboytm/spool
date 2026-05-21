@@ -1,19 +1,18 @@
-// Hidden inference renderer entry. Loads in a BrowserWindow created by
-// `model-host.ts`, performs the WebGPU/WASM runtime probe, and hands
-// the result back to main via the `pf:ready` IPC channel.
-//
-// PR 5a scope: handshake only. transformers.js + ONNX model loading
-// lands in PR 5c.
+// Hidden inference renderer entry. Loads in a BrowserWindow created
+// by `model-host.ts`, performs the WebGPU/WASM runtime probe, and
+// answers `pf:analyze-request` IPCs. The analyze handler currently
+// returns []; real ONNX inference lands in a follow-up PR.
 
 import { detectRuntime } from './runtime-detect.js'
-import type { PfReadyMessage, PfFailedMessage } from './types.js'
+import type { PfAnalyzeRequest, PfAnalyzeResult, PfReadyMessage, PfFailedMessage } from './types.js'
 
 declare global {
   interface Window {
-    /** Provided by `inference-preload.ts` (exposed via contextBridge). */
     pfBridge?: {
       ready: (payload: PfReadyMessage) => void
       failed: (payload: PfFailedMessage) => void
+      onAnalyzeRequest: (handler: (req: PfAnalyzeRequest) => void) => () => void
+      sendAnalyzeResult: (payload: PfAnalyzeResult) => void
     }
   }
 }
@@ -21,12 +20,16 @@ declare global {
 async function main(): Promise<void> {
   const bridge = window.pfBridge
   if (!bridge) {
-    // No preload means contextBridge isn't wired. We can't reach main
-    // without IPC; surface to devtools for engineers running with
-    // `openDevTools()`.
     console.error('[pf-inference] pfBridge missing — preload not wired')
     return
   }
+
+  // Stub: round-trip the request with an empty match list. Real ONNX
+  // inference replaces this body in a follow-up PR.
+  bridge.onAnalyzeRequest((req) => {
+    bridge.sendAnalyzeResult({ reqId: req.reqId, ok: true, matches: [] })
+  })
+
   const t0 = performance.now()
   try {
     const res = await detectRuntime()
