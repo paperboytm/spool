@@ -46,6 +46,7 @@ describe('loadSecurityPreferences', () => {
       revealValuesOnHoverOnly: false,
       pfEnabled: false,
       pfCalloutDismissed: false,
+      pfActivationPending: false,
     })
   })
 
@@ -196,6 +197,7 @@ describe('saveSecurityPreferences', () => {
       // also auto-sets pfCalloutDismissed so the in-page discovery
       // banner doesn't re-appear after the user opts in.
       pfCalloutDismissed: true,
+      pfActivationPending: false,
     })
   })
 

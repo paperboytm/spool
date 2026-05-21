@@ -39,8 +39,8 @@ import {
 } from '@spool-lab/core'
 import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
 import { Effect } from 'effect'
-import { registerSecurityIpc } from './ipc/security.js'
-import { loadSecurityPreferences } from './securityPreferences.js'
+import { registerSecurityIpc, SECURITY_IPC_CHANNELS } from './ipc/security.js'
+import { loadSecurityPreferences, saveSecurityPreferences } from './securityPreferences.js'
 import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
 import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
 import { makePfCoordinator } from './security/pf-coordinator.js'
@@ -220,22 +220,30 @@ async function shutdownScanWorker(): Promise<void> {
  *  the download hasn't finished would just spawn a window with
  *  nothing to load. Tells the scan worker about the transition so its
  *  pfProvider.available() agrees with reality and `scan_profile`
- *  drifts (triggering a backfill rescan via worker.backfill()). */
+ *  drifts (triggering a backfill rescan via worker.backfill()).
+ *
+ *  Also clears pfActivationPending on the way out — the callout's
+ *  "Activating Privacy Filter…" state hangs on that flag, so it
+ *  needs to drop the moment the runtime + backfill have settled
+ *  (success or fail). The ScanBanner then takes over visually. */
 async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
-  if (pfEnabled && pfModelInstalled()) {
-    await pfRuntime.start()
-    scanWorker?.notifyPfOnline()
-  } else {
-    scanWorker?.notifyPfOffline()
-    await pfRuntime.stop()
-  }
-  // The profile string changes on every transition — kick a backfill
-  // so sessions whose stored scan_profile no longer matches get
-  // re-enqueued.
-  if (scanWorker) {
-    runWithObservability(scanWorker.backfill()).catch((err) => {
-      console.error('[security] pf-driven backfill failed:', err)
-    })
+  try {
+    if (pfEnabled && pfModelInstalled()) {
+      await pfRuntime.start()
+      scanWorker?.notifyPfOnline()
+    } else {
+      scanWorker?.notifyPfOffline()
+      await pfRuntime.stop()
+    }
+    if (scanWorker) {
+      await runWithObservability(scanWorker.backfill())
+    }
+  } finally {
+    const cur = loadSecurityPreferences()
+    if (cur.pfActivationPending) {
+      const next = saveSecurityPreferences({ pfActivationPending: false })
+      mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+    }
   }
 }
 
@@ -441,6 +449,23 @@ app.whenReady().then(async () => {
     pfCoordinator = makePfCoordinator({
       modelDir: pfModelDir(),
       fetch: ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch,
+    })
+    // When a download initiated from the callout completes, finish
+    // the activation handshake on the user's behalf — flip pfEnabled
+    // so syncPfRuntime spawns the inference window + kicks backfill.
+    // The callout self-renders an "Activating..." state until
+    // syncPfRuntime clears pfActivationPending below.
+    pfCoordinator.subscribe((s) => {
+      if (s.phase !== 'installed') return
+      const prefs = loadSecurityPreferences()
+      if (!prefs.pfActivationPending || prefs.pfEnabled) return
+      void (async () => {
+        const next = saveSecurityPreferences({ pfEnabled: true })
+        mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+        await syncPfRuntime(true).catch((err) => {
+          console.error('[security] callout-driven activation failed:', err)
+        })
+      })()
     })
     void bootScanWorker().then(() => {
       if (!scanWorker) return

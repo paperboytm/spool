@@ -46,9 +46,14 @@ export interface SecurityPreferences {
   /** True once the user has dismissed the in-page PF discovery callout
    *  on the Security page. Permanent — the Settings card stays as the
    *  ongoing management surface, the callout is only an acquisition
-   *  prompt. Auto-set to true the moment pfEnabled flips on so users
-   *  who came in through Settings never see a redundant nudge. */
+   *  prompt. */
   pfCalloutDismissed: boolean
+  /** Survives renderer remounts + app restarts. True between the moment
+   *  the user clicks Enable in the callout and the moment the runtime
+   *  + backfill have settled. Lets main know to auto-flip pfEnabled
+   *  the moment the download lands, and lets the callout render an
+   *  "Activating..." state instead of vanishing into a silent gap. */
+  pfActivationPending: boolean
 }
 
 const DEFAULTS: SecurityPreferences = {
@@ -58,6 +63,7 @@ const DEFAULTS: SecurityPreferences = {
   revealValuesOnHoverOnly: false,
   pfEnabled: false,
   pfCalloutDismissed: false,
+  pfActivationPending: false,
 }
 
 interface SecurityConfigFile {
@@ -67,6 +73,7 @@ interface SecurityConfigFile {
   revealValuesOnHoverOnly?: unknown
   pfEnabled?: unknown
   pfCalloutDismissed?: unknown
+  pfActivationPending?: unknown
   [key: string]: unknown
 }
 
@@ -102,6 +109,7 @@ export function loadSecurityPreferences(): SecurityPreferences {
     revealValuesOnHoverOnly: c.revealValuesOnHoverOnly === true,
     pfEnabled: c.pfEnabled === true,
     pfCalloutDismissed: c.pfCalloutDismissed === true,
+    pfActivationPending: c.pfActivationPending === true,
   }
 }
 
@@ -115,12 +123,15 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
   if (next.revealValuesOnHoverOnly !== undefined) merged.revealValuesOnHoverOnly = next.revealValuesOnHoverOnly === true
   if (next.pfEnabled !== undefined) {
     merged.pfEnabled = next.pfEnabled === true
-    // Enabling pf supersedes the in-page nudge — once a user actually
-    // turns it on (via Settings or the callout itself) the callout
-    // becomes redundant and should never appear again.
+    // Enabling pf supersedes the in-page discovery nudge — once a user
+    // actually turns it on (via Settings or the callout itself) the
+    // "Add Privacy Filter" prompt becomes redundant and should never
+    // re-appear. The callout's Activating / Re-scanning states are
+    // separate signals gated by pfActivationPending, not by this flag.
     if (next.pfEnabled === true) merged.pfCalloutDismissed = true
   }
   if (next.pfCalloutDismissed !== undefined) merged.pfCalloutDismissed = next.pfCalloutDismissed === true
+  if (next.pfActivationPending !== undefined) merged.pfActivationPending = next.pfActivationPending === true
   writeFile(merged)
   return loadSecurityPreferences()
 }
