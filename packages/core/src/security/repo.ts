@@ -65,8 +65,6 @@ export interface FindingFilter {
   kinds?: readonly SensitiveKind[]
   state?: FindingState | 'any'
   severity?: 'high' | 'low'
-  /** Pagination — when set, SQL appends `LIMIT ? OFFSET ?`. Undefined
-   *  preserves the historical unbounded read. */
   limit?: number
   offset?: number
 }
@@ -306,19 +304,22 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
   return rows.map(rowToFinding)
 }
 
-/** Paginated variant — uses a `limit+1` peek to set `hasMore` without
- *  an extra COUNT(*) round-trip. Callers pass the displayed `limit`;
- *  the trimmed `rows` length stays ≤ limit. */
+/** limit+1 peek to set `hasMore` without an extra COUNT round-trip. */
+function paginate<F extends { limit?: number }, R>(
+  filter: F,
+  fetch: (f: F) => R[],
+): Page<R> {
+  if (filter.limit === undefined) return { rows: fetch(filter), hasMore: false }
+  const peeked = fetch({ ...filter, limit: filter.limit + 1 })
+  const hasMore = peeked.length > filter.limit
+  return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
+}
+
 export function listFindingsPage(
   db: Database.Database,
   filter: FindingFilter,
 ): Page<FindingRow> {
-  if (filter.limit === undefined) {
-    return { rows: listFindings(db, filter), hasMore: false }
-  }
-  const peeked = listFindings(db, { ...filter, limit: filter.limit + 1 })
-  const hasMore = peeked.length > filter.limit
-  return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
+  return paginate(filter, f => listFindings(db, f))
 }
 
 export function listSessionsWithFindings(
@@ -435,18 +436,11 @@ export function listSessionsWithFindings(
   }))
 }
 
-/** Paginated variant — limit+1 peek to set `hasMore` without a
- *  separate COUNT round-trip. */
 export function listSessionsWithFindingsPage(
   db: Database.Database,
   filter: SessionFindingFilter,
 ): Page<SessionWithFindingCounts> {
-  if (filter.limit === undefined) {
-    return { rows: listSessionsWithFindings(db, filter), hasMore: false }
-  }
-  const peeked = listSessionsWithFindings(db, { ...filter, limit: filter.limit + 1 })
-  const hasMore = peeked.length > filter.limit
-  return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
+  return paginate(filter, f => listSessionsWithFindings(db, f))
 }
 
 /** Risk by category — one row per kind that has ≥ 1 active finding.
