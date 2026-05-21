@@ -338,6 +338,7 @@
     "show_values_full": "Show values",
     "hide_values_full": "Hide values for screen-share",
     "scanning": "Scanning",
+    "scanning_progress": "{{done}} of {{total}} rescans",
     "scan_done": "Scan complete",
     "scan_done_clean": "nothing high-risk found",
     "scan_done_high_one": "{{count}} high",

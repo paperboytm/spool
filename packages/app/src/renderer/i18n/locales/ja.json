@@ -322,6 +322,7 @@
     "show_values_full": "値を表示",
     "hide_values_full": "画面共有用に値を隠す",
     "scanning": "スキャン中",
+    "scanning_progress": "{{done}} of {{total}} rescans",
     "scan_done": "スキャン完了",
     "scan_done_clean": "高リスクは見つかりませんでした",
     "scan_done_high_other": "高 {{count}} 件",

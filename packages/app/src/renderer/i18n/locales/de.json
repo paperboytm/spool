@@ -338,6 +338,7 @@
     "show_values_full": "Werte anzeigen",
     "hide_values_full": "Werte für Bildschirmfreigabe verbergen",
     "scanning": "Scan läuft",
+    "scanning_progress": "{{done}} of {{total}} rescans",
     "scan_done": "Scan abgeschlossen",
     "scan_done_clean": "nichts Hochriskantes gefunden",
     "scan_done_high_one": "{{count}} hoch",

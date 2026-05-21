@@ -322,6 +322,7 @@
     "show_values_full": "显示原值",
     "hide_values_full": "隐藏原值",
     "scanning": "扫描中",
+    "scanning_progress": "已重扫 {{done}} / {{total}}",
     "scan_done": "扫描完成",
     "scan_done_clean": "未发现高风险项",
     "scan_done_high_other": "{{count}} 条高风险",

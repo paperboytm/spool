@@ -322,6 +322,7 @@
     "show_values_full": "값 표시",
     "hide_values_full": "화면 공유용으로 값 숨기기",
     "scanning": "스캔 중",
+    "scanning_progress": "{{done}} of {{total}} rescans",
     "scan_done": "스캔 완료",
     "scan_done_clean": "높은 위험 항목 없음",
     "scan_done_high_other": "높음 {{count}}건",

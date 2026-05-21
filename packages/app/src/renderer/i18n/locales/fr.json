@@ -338,6 +338,7 @@
     "show_values_full": "Afficher les valeurs",
     "hide_values_full": "Masquer les valeurs pour le partage d'écran",
     "scanning": "Analyse en cours",
+    "scanning_progress": "{{done}} of {{total}} rescans",
     "scan_done": "Analyse terminée",
     "scan_done_clean": "rien à haut risque trouvé",
     "scan_done_high_one": "{{count}} élevé",
