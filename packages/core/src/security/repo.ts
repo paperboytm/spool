@@ -65,6 +65,14 @@ export interface FindingFilter {
   kinds?: readonly SensitiveKind[]
   state?: FindingState | 'any'
   severity?: 'high' | 'low'
+  /** When true, info-tier kinds (absolute-path / ip / internal-host)
+   *  are excluded at the SQL layer. Needed by SessionCard fetches —
+   *  a session with 800+ absolute-path + a handful of api-keys would
+   *  otherwise have its non-info findings shoved off the first page
+   *  by `detected_at DESC` ordering, and the client-side info filter
+   *  has nothing left to render. Ignored when `kind` or `kinds`
+   *  explicitly includes an info kind. */
+  excludeInfo?: boolean
   limit?: number
   offset?: number
 }
@@ -291,6 +299,18 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
   } else if (filter.severity === 'low') {
     where.push(`kind NOT IN (${highKindsPlaceholders()})`)
     params.push(...HIGH_SEVERITY_KINDS_ARRAY)
+  }
+  // Skip info-tier kinds unless the caller is explicitly asking for
+  // one. Saves the renderer from paging through 800+ absolute-path
+  // findings before reaching the api-key that actually matters.
+  const explicitKindsInclude = (kinds: readonly SensitiveKind[] | undefined, kind: SensitiveKind | undefined): boolean => {
+    if (kinds && kinds.length > 0) return kinds.some(k => INFO_SEVERITY_KINDS.has(k))
+    if (kind !== undefined) return INFO_SEVERITY_KINDS.has(kind)
+    return false
+  }
+  if (filter.excludeInfo && !explicitKindsInclude(filter.kinds, filter.kind)) {
+    where.push(`kind NOT IN (${infoKindsPlaceholders()})`)
+    params.push(...INFO_SEVERITY_KINDS_ARRAY)
   }
   let pagination = ''
   if (filter.limit !== undefined) {
