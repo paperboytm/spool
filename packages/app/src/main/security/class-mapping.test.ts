@@ -6,13 +6,7 @@ const regex = (kind: SensitiveMatch['kind'], start: number, end: number): Sensit
   kind, value: '', start, end, confidence: 0.95, provider: 'regex',
 })
 
-describe('class mapping — direct mappings (openai/privacy-filter classes)', () => {
-  it('person → person-name', () => {
-    const pf: PfRawMatch = { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 }
-    const out = mapPfMatch(pf, { regexMatches: [], fullText: 'Maya' })
-    expect(out?.kind).toBe('person-name')
-    expect(out?.provider).toBe('pf')
-  })
+describe('class mapping — kept classes (high-precision on PII-only setting)', () => {
   it('email → email', () => {
     const pf: PfRawMatch = { class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.95 }
     expect(mapPfMatch(pf, { regexMatches: [], fullText: 'a@b.c' })?.kind).toBe('email')
@@ -21,38 +15,40 @@ describe('class mapping — direct mappings (openai/privacy-filter classes)', ()
     const pf: PfRawMatch = { class: 'phone', value: '+1234567890', start: 0, end: 11, score: 0.92 }
     expect(mapPfMatch(pf, { regexMatches: [], fullText: '+1234567890' })?.kind).toBe('phone')
   })
-  it('address → street-address', () => {
-    const pf: PfRawMatch = { class: 'address', value: '1 Main St', start: 0, end: 9, score: 0.88 }
-    expect(mapPfMatch(pf, { regexMatches: [], fullText: '1 Main St' })?.kind).toBe('street-address')
+})
+
+describe('class mapping — disabled classes (precision too low without clues)', () => {
+  // person / address / url / account_number sit at P=0.62-0.82 on the
+  // model card's "PII only" setting (Spool's actual content shape).
+  // Each kind is suppressed entirely until either domain fine-tune or
+  // a shape filter that survives technical content.
+  for (const cls of ['person', 'address', 'url', 'account_number'] as const) {
+    it(`${cls} is always suppressed`, () => {
+      const pf: PfRawMatch = { class: cls, value: 'whatever', start: 0, end: 8, score: 0.99 }
+      expect(mapPfMatch(pf, { regexMatches: [], fullText: 'whatever' })).toBeNull()
+    })
+  }
+})
+
+describe('class mapping — confidence floor', () => {
+  it('drops any match below 0.85 even if class would otherwise pass', () => {
+    const pf: PfRawMatch = { class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.84 }
+    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'a@b.c' })).toBeNull()
+  })
+  it('keeps matches at 0.85 exactly', () => {
+    const pf: PfRawMatch = { class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.85 }
+    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'a@b.c' })?.kind).toBe('email')
   })
 })
 
 describe('class mapping — suppression rules', () => {
-  it('url with no overlapping regex url-creds is suppressed', () => {
-    const pf: PfRawMatch = { class: 'url', value: 'https://example.com', start: 0, end: 19, score: 0.9 }
-    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'https://example.com' })).toBeNull()
-  })
-  it('url overlapping a regex url-creds match → url-creds (boost)', () => {
-    const pf: PfRawMatch = { class: 'url', value: 'https://u:p@x.com', start: 0, end: 17, score: 0.9 }
-    const out = mapPfMatch(pf, {
-      regexMatches: [regex('url-creds', 0, 17)],
-      fullText: 'https://u:p@x.com',
-    })
-    expect(out?.kind).toBe('url-creds')
-  })
-
-  it('account_number is always suppressed', () => {
-    const pf: PfRawMatch = { class: 'account_number', value: '4111 1111 1111 1111', start: 0, end: 19, score: 0.95 }
-    expect(mapPfMatch(pf, { regexMatches: [], fullText: '4111 1111 1111 1111' })).toBeNull()
-  })
-
   it('secret with no regex generic-secret nearby is suppressed', () => {
-    const pf: PfRawMatch = { class: 'secret', value: 'abc', start: 0, end: 3, score: 0.7 }
+    const pf: PfRawMatch = { class: 'secret', value: 'abc', start: 0, end: 3, score: 0.9 }
     expect(mapPfMatch(pf, { regexMatches: [], fullText: 'abc' })).toBeNull()
   })
 
   it('secret overlapping a regex generic-secret → generic-secret (boost)', () => {
-    const pf: PfRawMatch = { class: 'secret', value: 'xyz', start: 5, end: 8, score: 0.7 }
+    const pf: PfRawMatch = { class: 'secret', value: 'xyz', start: 5, end: 8, score: 0.9 }
     const out = mapPfMatch(pf, {
       regexMatches: [regex('generic-secret', 0, 20)],
       fullText: 'token = "xyz" plus extra',
@@ -92,11 +88,11 @@ describe('class mapping — suppression rules', () => {
 describe('mapPfMatches', () => {
   it('drops suppressed entries while keeping the rest', () => {
     const pf: PfRawMatch[] = [
-      { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 },
-      { class: 'account_number', value: '0123456', start: 10, end: 17, score: 0.95 },
-      { class: 'email', value: 'a@b.c', start: 20, end: 25, score: 0.9 },
+      { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 },           // disabled class
+      { class: 'account_number', value: '0123456', start: 10, end: 17, score: 0.95 }, // disabled class
+      { class: 'email', value: 'a@b.c', start: 20, end: 25, score: 0.9 },         // kept
     ]
     const out = mapPfMatches(pf, { regexMatches: [], fullText: 'Maya       0123456    a@b.c' })
-    expect(out.map(m => m.kind)).toEqual(['person-name', 'email'])
+    expect(out.map(m => m.kind)).toEqual(['email'])
   })
 })

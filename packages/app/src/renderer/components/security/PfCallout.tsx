@@ -224,7 +224,7 @@ export default function PfCallout() {
         </span>
         <span className="text-[11px] leading-[15px] text-warm-faint dark:text-dark-muted">
           {t('security.pf_callout_body', {
-            defaultValue: "Catches names, addresses, and other patterns regex misses. On-device · {{size}}.",
+            defaultValue: 'Catches obfuscated emails, phone numbers, and DOB that regex patterns miss. On-device · {{size}}.',
             size: formatBytes(totalBytes),
           })}
         </span>
