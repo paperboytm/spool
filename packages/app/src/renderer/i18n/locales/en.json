@@ -63,9 +63,7 @@
     "noPinned": "No pinned sessions yet",
     "noProjects": "No projects yet",
     "sessionCount_one": "{{count}} session",
-    "sessionCount_other": "{{count}} sessions",
-    "security_badge_one": "{{count}} high-risk finding",
-    "security_badge_other": "{{count}} high-risk findings"
+    "sessionCount_other": "{{count}} sessions"
   },
   "search": {
     "placeholder_home": "Search your sessions…",

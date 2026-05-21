@@ -62,8 +62,7 @@
     "sort_recent_used": "最近使用",
     "noPinned": "还没有置顶的会话",
     "noProjects": "还没有项目",
-    "sessionCount_other": "{{count}} 个会话",
-    "security_badge_other": "{{count}} 条高风险发现"
+    "sessionCount_other": "{{count}} 个会话"
   },
   "search": {
     "placeholder_home": "搜索你的会话…",

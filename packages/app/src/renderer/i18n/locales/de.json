@@ -63,9 +63,7 @@
     "noPinned": "Noch keine angehefteten Sitzungen",
     "noProjects": "Noch keine Projekte",
     "sessionCount_one": "{{count}} Sitzung",
-    "sessionCount_other": "{{count}} Sitzungen",
-    "security_badge_one": "{{count}} Hochrisiko-Fund",
-    "security_badge_other": "{{count}} Hochrisiko-Funde"
+    "sessionCount_other": "{{count}} Sitzungen"
   },
   "search": {
     "placeholder_home": "Sitzungen durchsuchen…",

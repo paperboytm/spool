@@ -62,8 +62,7 @@
     "sort_recent_used": "최근 사용순",
     "noPinned": "아직 고정된 세션이 없습니다",
     "noProjects": "아직 프로젝트가 없습니다",
-    "sessionCount_other": "{{count}}개 세션",
-    "security_badge_other": "높은 위험 발견 {{count}}건"
+    "sessionCount_other": "{{count}}개 세션"
   },
   "search": {
     "placeholder_home": "세션 검색…",

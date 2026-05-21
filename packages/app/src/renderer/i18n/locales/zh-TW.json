@@ -62,8 +62,7 @@
     "sort_recent_used": "最近使用",
     "noPinned": "尚未釘選任何會話",
     "noProjects": "尚未有專案",
-    "sessionCount_other": "{{count}} 個會話",
-    "security_badge_other": "{{count}} 條高風險發現"
+    "sessionCount_other": "{{count}} 個會話"
   },
   "search": {
     "placeholder_home": "搜尋你的會話…",

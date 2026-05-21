@@ -63,9 +63,7 @@
     "noPinned": "Aucune session épinglée pour l'instant",
     "noProjects": "Aucun projet pour l'instant",
     "sessionCount_one": "{{count}} session",
-    "sessionCount_other": "{{count}} sessions",
-    "security_badge_one": "{{count}} découverte à haut risque",
-    "security_badge_other": "{{count}} découvertes à haut risque"
+    "sessionCount_other": "{{count}} sessions"
   },
   "search": {
     "placeholder_home": "Rechercher dans vos sessions…",

@@ -62,8 +62,7 @@
     "sort_recent_used": "最近使用した順",
     "noPinned": "ピン留めしたセッションはまだありません",
     "noProjects": "プロジェクトはまだありません",
-    "sessionCount_other": "{{count}} セッション",
-    "security_badge_other": "高リスクの検出が {{count}} 件"
+    "sessionCount_other": "{{count}} セッション"
   },
   "search": {
     "placeholder_home": "セッションを検索…",
