@@ -146,11 +146,16 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
   // renderer's index.html into the hidden window (the symptom: a
   // bunch of Sidebar / LibraryLanding "undefined" errors and pf:ready
   // never arrives). Use Vite's @fs/<abs-path> escape hatch, paired
-  // with server.fs.allow in electron.vite.config.ts. Devtools opens
-  // detached in dev so a failed model load is immediately inspectable.
+  // with server.fs.allow in electron.vite.config.ts.
+  // Devtools are opt-in via SPOOL_PF_DEVTOOLS=1 — the console-message
+  // forwarder above already pipes pf-inference logs into main's
+  // stdout, so a detached devtools window every restart is just noise
+  // unless we're actively debugging this surface.
   const rendererBase = process.env['ELECTRON_RENDERER_URL']
   if (rendererBase) {
-    win.webContents.openDevTools({ mode: 'detach' })
+    if (process.env['SPOOL_PF_DEVTOOLS']) {
+      win.webContents.openDevTools({ mode: 'detach' })
+    }
     // __dirname in dev = packages/app/out/main → ../.. = packages/app
     const inferenceHtml = join(__dirname, '../../src/inference/pf-inference.html')
     await win.loadURL(`${rendererBase.replace(/\/$/, '')}/@fs${inferenceHtml}`)
