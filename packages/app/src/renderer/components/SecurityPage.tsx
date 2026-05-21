@@ -37,6 +37,7 @@ import { securityApi } from '../api/security.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import PfCallout from './security/PfCallout.js'
+import DetectorsChip from './security/DetectorsChip.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
 import { truncateValue } from './security/truncate-value.js'
 import {
@@ -474,6 +475,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
               >
                 {t('security.filter_clear', { defaultValue: 'clear' })}
               </button>
+            </>
+          )}
+          {scanStatus?.currentProfile && (
+            <>
+              {' · '}
+              <DetectorsChip profile={scanStatus.currentProfile} />
             </>
           )}
         </span>
