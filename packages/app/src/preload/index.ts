@@ -19,6 +19,7 @@ export interface SecurityPreferences {
   revealValuesOnHoverOnly: boolean
   pfEnabled: boolean
   pfCalloutDismissed: boolean
+  pfActivationPending: boolean
 }
 
 export type PfPhase =

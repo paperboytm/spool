@@ -1,16 +1,33 @@
-// In-page Privacy Filter discovery callout. Sits at the top of the
-// Security page when the model isn't installed + enabled yet, so users
-// who land here while reviewing findings get nudged to upgrade
-// detection without having to dig through Settings.
+// In-page Privacy Filter discovery + activation callout. Sits at the
+// top of the Security page so users who land here while reviewing
+// findings get nudged + walked through the full activation flow
+// without having to dig through Settings.
 //
 // Visual rhythm matches ScanBanner / ScanResultBanner (same height,
 // rounded-lg, mb-5) so when one banner is replaced by another the
-// layout doesn't jump. The parent page decides whether to mount this
-// component — see `hidden` prop usage in SecurityPage.
+// layout doesn't jump. Parent gates: hidden while ScanBanner /
+// ScanResultBanner are active so transient scan signals win.
+//
+// State machine (UI states it can render):
+//
+//   - failed                       : "Couldn't download" + Retry + ×
+//   - downloading                  : "Downloading X / Y · Z%" + Cancel
+//   - installed + activationPending: "Activating Privacy Filter…"
+//   - installed + bytesDownloaded>0: "Resume Privacy Filter" + Resume + ×
+//                                    (a partial download from a prior
+//                                    cancel / app kill — Settings
+//                                    callers see this too via the
+//                                    download card progress)
+//   - not-installed default        : "Add Privacy Filter" discovery
+//
+// Hidden when:
+//   - prefs.pfCalloutDismissed (user clicked × explicitly), AND
+//     none of the operational states above apply
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sparkles, X, RotateCw, AlertTriangle, Download, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { securityApi, type PfDownloadState, type SecurityPreferences } from '../../api/security.js'
 import { formatBytes } from './format.js'
 
@@ -20,11 +37,7 @@ export default function PfCallout() {
   const { t } = useTranslation()
   const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
   const [state, setState] = useState<PfDownloadState>(INITIAL)
-  const [busy, setBusy] = useState(false)
-  // Tracks whether THIS callout instance kicked off the download. We
-  // only auto-flip pfEnabled on install if the user opted in here —
-  // a download started from Settings should leave the toggle alone.
-  const intendingToEnable = useRef(false)
+  const prevActivationPending = useRef<boolean>(false)
 
   useEffect(() => {
     void securityApi.getPrefs().then(setPrefs).catch(() => { /* keep null → no render */ })
@@ -34,65 +47,67 @@ export default function PfCallout() {
     return () => { offPrefs(); offState() }
   }, [])
 
-  // Auto-enable after the download we started completes. We don't
-  // need to clear `intendingToEnable` afterwards — setPrefs flipping
-  // pfEnabled also auto-sets pfCalloutDismissed, which unmounts us.
+  // Sonner toast when the activation cycle finishes — fired by main
+  // clearing pfActivationPending after pfRuntime starts + backfill
+  // kicks. The toast keeps the user informed even after the callout
+  // hands off to ScanBanner.
   useEffect(() => {
-    if (state.phase !== 'installed') return
-    if (!intendingToEnable.current) return
-    if (prefs?.pfEnabled) return
-    void securityApi.setPrefs({ pfEnabled: true })
-  }, [state.phase, prefs?.pfEnabled])
+    const prev = prevActivationPending.current
+    const now = prefs?.pfActivationPending ?? false
+    if (prev && !now && prefs?.pfEnabled) {
+      toast.success(t('security.pf_callout_activated', {
+        defaultValue: 'Privacy Filter enabled · re-scanning your sessions',
+      }))
+    }
+    prevActivationPending.current = now
+  }, [prefs?.pfActivationPending, prefs?.pfEnabled, t])
 
   if (!prefs) return null
-  if (prefs.pfCalloutDismissed) return null
-  if (prefs.pfEnabled) return null
 
   const startDownload = async () => {
-    intendingToEnable.current = true
+    // Persisting the intent in prefs (not a useRef) lets it survive
+    // page navigation + the activation handshake spanning multiple
+    // remounts. Main's pf-coordinator subscriber reads it on
+    // phase=installed and finishes the activation on our behalf.
+    await securityApi.setPrefs({ pfActivationPending: true })
     if (state.phase === 'installed') {
       await securityApi.setPrefs({ pfEnabled: true })
       return
     }
-    setBusy(true)
-    try { await securityApi.pfDownloadStart() } finally { setBusy(false) }
+    await securityApi.pfDownloadStart()
   }
 
   const cancelDownload = () => {
-    intendingToEnable.current = false
+    void securityApi.setPrefs({ pfActivationPending: false })
     void securityApi.pfDownloadCancel()
   }
 
   const dismiss = () => {
-    intendingToEnable.current = false
-    void securityApi.setPrefs({ pfCalloutDismissed: true })
+    void securityApi.setPrefs({
+      pfActivationPending: false,
+      pfCalloutDismissed: true,
+    })
   }
 
   const totalBytes = state.bytesTotal || 945_000_000
   const percent = state.bytesTotal > 0
     ? Math.min(100, Math.round((state.bytesDownloaded / state.bytesTotal) * 100))
     : 0
+  const hasPartial = state.phase === 'not-installed' && state.bytesDownloaded > 0
+
+  // ── render branches ────────────────────────────────────────────
 
   if (state.phase === 'downloading') {
     return (
       <Shell testId="security-pf-callout" phase="downloading">
-        <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
+        <IconSlot>
           <Loader2 size={14} strokeWidth={2} className="animate-spin" aria-hidden />
-        </span>
+        </IconSlot>
         <div className="flex flex-col gap-1 min-w-0">
           <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
             {t('security.pf_callout_downloading', { defaultValue: 'Downloading Privacy Filter' })}
           </span>
-          {/* Each value lives in a right-aligned fixed-width slot so
-            * digit-count changes (47.3 MB → 100 MB; 5% → 10% → 100%)
-            * don't reflow the row width on every progress tick. */}
-          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
-            <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesDownloaded)}</span>
-            {' / '}
-            <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesTotal)}</span>
-            {' · '}
-            <span className="inline-block w-[3em] text-right">{percent}%</span>
-          </span>
+          <ProgressLine bytesDownloaded={state.bytesDownloaded} bytesTotal={state.bytesTotal} percent={percent} />
         </div>
         <button
           type="button"
@@ -103,7 +118,7 @@ export default function PfCallout() {
           <X size={11} strokeWidth={1.8} aria-hidden />
           {t('common.cancel', { defaultValue: 'Cancel' })}
         </button>
-        <Progress percent={percent} />
+        <ProgressBar percent={percent} />
       </Shell>
     )
   }
@@ -111,9 +126,9 @@ export default function PfCallout() {
   if (state.phase === 'failed') {
     return (
       <Shell testId="security-pf-callout" phase="failed">
-        <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
+        <IconSlot>
           <AlertTriangle size={13} strokeWidth={1.9} aria-hidden />
-        </span>
+        </IconSlot>
         <div className="flex flex-col gap-1 min-w-0">
           <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
             {t('security.pf_callout_failed', { defaultValue: "Couldn't download Privacy Filter" })}
@@ -125,28 +140,82 @@ export default function PfCallout() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            data-testid="security-pf-callout-retry"
-            onClick={() => { void startDownload() }}
-            className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text transition-colors"
-          >
+          <PrimaryButton testId="security-pf-callout-retry" onClick={() => { void startDownload() }} variant="quiet">
             <RotateCw size={11} strokeWidth={1.8} aria-hidden />
             {t('common.retry', { defaultValue: 'Retry' })}
-          </button>
+          </PrimaryButton>
           <DismissButton onClick={dismiss} />
         </div>
       </Shell>
     )
   }
 
-  // not-installed (or installed but user hasn't enabled yet — both
-  // surface the same primary CTA).
+  // phase === 'installed' with activation pending → Activating bridge
+  // (lives between download-complete and the moment ScanBanner takes
+  // over). Parent unmounts us once scan kicks in.
+  if (state.phase === 'installed' && prefs.pfActivationPending) {
+    return (
+      <Shell testId="security-pf-callout" phase="activating">
+        <IconSlot>
+          <Loader2 size={14} strokeWidth={2} className="animate-spin" aria-hidden />
+        </IconSlot>
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
+            {t('security.pf_callout_activating', { defaultValue: 'Activating Privacy Filter' })}
+          </span>
+          <span className="text-[11px] text-warm-faint dark:text-dark-muted">
+            {t('security.pf_callout_activating_body', {
+              defaultValue: 'Loading the model and queuing your sessions for a fresh scan.',
+            })}
+          </span>
+        </div>
+        <span aria-hidden />
+      </Shell>
+    )
+  }
+
+  // Below this point the only visible states are discovery / resume,
+  // both gated by !pfEnabled (already on → nothing to discover) and
+  // by !pfCalloutDismissed (user has × dismissed → leave them alone).
+  if (prefs.pfEnabled) return null
+  if (prefs.pfCalloutDismissed) return null
+
+  if (hasPartial) {
+    return (
+      <Shell testId="security-pf-callout" phase="partial">
+        <IconSlot>
+          <Sparkles size={13} strokeWidth={1.9} aria-hidden />
+        </IconSlot>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
+            {t('security.pf_callout_partial_title', {
+              defaultValue: 'Resume Privacy Filter download',
+            })}
+          </span>
+          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+            <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesDownloaded)}</span>
+            {' / '}
+            <span className="inline-block w-[5.5em] text-right">{formatBytes(totalBytes)}</span>
+            {' '}
+            {t('security.pf_callout_partial_suffix', { defaultValue: 'already downloaded.' })}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <PrimaryButton testId="security-pf-callout-resume" onClick={() => { void startDownload() }}>
+            <Download size={11} strokeWidth={1.9} aria-hidden />
+            {t('security.pf_callout_resume', { defaultValue: 'Resume' })}
+          </PrimaryButton>
+          <DismissButton onClick={dismiss} />
+        </div>
+      </Shell>
+    )
+  }
+
   return (
     <Shell testId="security-pf-callout" phase={state.phase}>
-      <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
+      <IconSlot>
         <Sparkles size={13} strokeWidth={1.9} aria-hidden />
-      </span>
+      </IconSlot>
       <div className="flex flex-col gap-0.5 min-w-0">
         <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
           {t('security.pf_callout_title', {
@@ -161,20 +230,10 @@ export default function PfCallout() {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="security-pf-callout-enable"
-          disabled={busy}
-          onClick={() => { void startDownload() }}
-          className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-accent/40 dark:border-accent-dark/40 bg-accent dark:bg-accent-dark text-white dark:text-warm-bg hover:opacity-90 px-2.5 text-[12px] font-medium disabled:opacity-60 transition-opacity"
-        >
-          {state.phase === 'installed'
-            ? t('security.pf_callout_enable', { defaultValue: 'Enable' })
-            : <>
-                <Download size={11} strokeWidth={1.9} aria-hidden />
-                {t('security.pf_callout_enable', { defaultValue: 'Enable' })}
-              </>}
-        </button>
+        <PrimaryButton testId="security-pf-callout-enable" onClick={() => { void startDownload() }}>
+          <Download size={11} strokeWidth={1.9} aria-hidden />
+          {t('security.pf_callout_enable', { defaultValue: 'Enable' })}
+        </PrimaryButton>
         <DismissButton onClick={dismiss} />
       </div>
     </Shell>
@@ -185,15 +244,13 @@ function Shell({
   testId, phase, children,
 }: {
   testId: string
-  phase: PfDownloadState['phase']
+  phase: string
   children: React.ReactNode
 }) {
-  // items-start (not items-center) so the leading icon + trailing
-  // actions sit at the TITLE baseline rather than the midpoint of
-  // the 2-line title+body block. A 13px icon centered between two
-  // lines visually floats — top-aligned with a tiny pt offset
-  // anchors it to the title, matching shadcn / Notion / GitHub
-  // inline alerts.
+  // items-start so the leading icon + trailing actions sit at the
+  // title baseline rather than between two text lines. 13px icons
+  // get a small mt-0.5 below so they optically baseline-align with
+  // the 13px title text.
   return (
     <div
       data-testid={testId}
@@ -206,13 +263,64 @@ function Shell({
   )
 }
 
-function Progress({ percent }: { percent: number }) {
+function IconSlot({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center justify-center w-4 h-4 mt-0.5 text-accent dark:text-accent-dark">
+      {children}
+    </span>
+  )
+}
+
+function ProgressLine({
+  bytesDownloaded, bytesTotal, percent,
+}: {
+  bytesDownloaded: number
+  bytesTotal: number
+  percent: number
+}) {
+  // Each value gets its own fixed-width right-aligned slot so digit
+  // count transitions (47.3 MB → 100 MB; 5% → 100%) don't reflow.
+  return (
+    <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
+      <span className="inline-block w-[5.5em] text-right">{formatBytes(bytesDownloaded)}</span>
+      {' / '}
+      <span className="inline-block w-[5.5em] text-right">{formatBytes(bytesTotal)}</span>
+      {' · '}
+      <span className="inline-block w-[3em] text-right">{percent}%</span>
+    </span>
+  )
+}
+
+function ProgressBar({ percent }: { percent: number }) {
   return (
     <div
       className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width] duration-300"
       style={{ width: `${percent}%`, gridColumn: '1 / -1' }}
       aria-hidden
     />
+  )
+}
+
+function PrimaryButton({
+  testId, onClick, variant = 'accent', children,
+}: {
+  testId: string
+  onClick: () => void
+  variant?: 'accent' | 'quiet'
+  children: React.ReactNode
+}) {
+  const cls = variant === 'accent'
+    ? 'border border-accent/40 dark:border-accent-dark/40 bg-accent dark:bg-accent-dark text-white dark:text-warm-bg hover:opacity-90 font-medium transition-opacity'
+    : 'border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 text-warm-text dark:text-dark-text transition-colors'
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 h-7 rounded-[6px] px-2.5 text-[12px] ${cls}`}
+    >
+      {children}
+    </button>
   )
 }
 
