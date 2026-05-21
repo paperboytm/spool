@@ -182,6 +182,19 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      # Fail fast if the npm token has expired or lost write scope. Granular
+      # @spool-lab tokens default to 30-day expiry on npmjs.com — without this
+      # check, the workflow would do a full pnpm install + build before
+      # discovering the auth is dead, and a re-dispatch costs another full
+      # mac + linux build cycle.
+      - name: Verify npm auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          npm whoami
+          rm ~/.npmrc
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
