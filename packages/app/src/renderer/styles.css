@@ -89,8 +89,16 @@
 :root {
   -webkit-font-smoothing: antialiased;
   font-family: var(--font-sans);
-  background: #FAFAF8;
-  color: #1C1C18;
+  color-scheme: light dark;
+  background: var(--color-warm-bg);
+  color: var(--color-warm-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: var(--color-dark-bg);
+    color: var(--color-dark-text);
+  }
 }
 
 * {
