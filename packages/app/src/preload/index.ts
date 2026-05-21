@@ -7,6 +7,7 @@ import type {
   FindingRow, SessionWithFindingCounts, RiskByCategoryRow,
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
   AllowlistEntryRow,
+  Page,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 
@@ -223,8 +224,12 @@ const api = {
   security: {
     listFindings: (filter: FindingFilter): Promise<FindingRow[]> =>
       ipcRenderer.invoke('security:list-findings', filter),
+    listFindingsPage: (filter: FindingFilter): Promise<Page<FindingRow>> =>
+      ipcRenderer.invoke('security:list-findings-page', filter),
     listSessionsWithFindings: (filter: SessionFindingFilter): Promise<SessionWithFindingCounts[]> =>
       ipcRenderer.invoke('security:list-sessions-with-findings', filter),
+    listSessionsWithFindingsPage: (filter: SessionFindingFilter): Promise<Page<SessionWithFindingCounts>> =>
+      ipcRenderer.invoke('security:list-sessions-with-findings-page', filter),
     riskByCategory: (): Promise<RiskByCategoryRow[]> =>
       ipcRenderer.invoke('security:risk-by-category'),
     getFindingValue: (findingId: number): Promise<string | null> =>

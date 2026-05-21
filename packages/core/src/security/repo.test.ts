@@ -10,7 +10,9 @@ import {
   invalidateSessionScanProfile,
   listSessionsNeedingScan,
   listFindings,
+  listFindingsPage,
   listSessionsWithFindings,
+  listSessionsWithFindingsPage,
   riskByCategory,
   getFindingValue,
   getAllowlists,
@@ -166,6 +168,150 @@ describe('repo: list + filter', () => {
     const f = listFindings(db, { kind: 'api-key', sessionId: 1 })[0]!
     db.prepare("UPDATE findings SET state='purged' WHERE id = ?").run(f.id)
     expect(getFindingValue(db, f.id)).toBeNull()
+  })
+})
+
+describe('repo: pagination', () => {
+  let db: Database.Database
+  beforeEach(() => {
+    db = setupDb()
+    // 12 findings in session 1, all api-key (high) with distinct
+    // detected_at timestamps so order is deterministic.
+    const rows = Array.from({ length: 12 }, (_, i) => ({
+      sessionId: 1,
+      messageId: 10,
+      kind: 'api-key' as const,
+      valueHash: `h-${i}`,
+      confidence: 0.9,
+      provider: 'regex',
+      startOffset: i,
+      endOffset: i + 1,
+      state: 'active' as const,
+    }))
+    insertFindings(db, rows)
+    // Spread detected_at so ordering is unambiguous — default insert
+    // assigns the same timestamp to every row, which leaves only `id
+    // DESC` as the tiebreaker. We want to exercise BOTH clauses.
+    for (let i = 0; i < 12; i++) {
+      db.prepare(
+        `UPDATE findings SET detected_at = ? WHERE value_hash = ?`,
+      ).run(`2026-01-01T00:00:${(10 + i).toString().padStart(2, '0')}Z`, `h-${i}`)
+    }
+    updateSessionCounts(db, 1)
+  })
+
+  it('listFindings honours limit only', () => {
+    const rows = listFindings(db, { sessionId: 1, limit: 5 })
+    expect(rows).toHaveLength(5)
+  })
+
+  it('listFindings honours limit + offset', () => {
+    const all = listFindings(db, { sessionId: 1 })
+    expect(all).toHaveLength(12)
+    const first = listFindings(db, { sessionId: 1, limit: 5, offset: 0 })
+    const second = listFindings(db, { sessionId: 1, limit: 5, offset: 5 })
+    expect(first.map(r => r.valueHash)).toEqual(all.slice(0, 5).map(r => r.valueHash))
+    expect(second.map(r => r.valueHash)).toEqual(all.slice(5, 10).map(r => r.valueHash))
+  })
+
+  it('listFindings filter semantics unchanged when limit absent', () => {
+    // Add a non-active row that the default state filter should
+    // exclude. Pagination machinery must not affect WHERE semantics.
+    db.prepare(`INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state)
+                VALUES (1, 10, 'email', 'h-dismissed', 0.5, 'regex', 0, 1, 'dismissed')`).run()
+    const def = listFindings(db, { sessionId: 1 })
+    expect(def).toHaveLength(12) // dismissed row excluded
+    expect(def.every(r => r.state === 'active')).toBe(true)
+  })
+
+  it('listFindings stable ordering across pages — no dup, no skip', () => {
+    // Sweep all 12 rows in 3 pages of 5/5/2 and assert the union has
+    // no duplicates and matches the full-fetch order.
+    const all = listFindings(db, { sessionId: 1 })
+    const p1 = listFindings(db, { sessionId: 1, limit: 5, offset: 0 })
+    const p2 = listFindings(db, { sessionId: 1, limit: 5, offset: 5 })
+    const p3 = listFindings(db, { sessionId: 1, limit: 5, offset: 10 })
+    const concat = [...p1, ...p2, ...p3]
+    expect(concat.map(r => r.id)).toEqual(all.map(r => r.id))
+    expect(new Set(concat.map(r => r.id)).size).toBe(12)
+  })
+
+  it('listFindingsPage sets hasMore=true when more rows exist', () => {
+    const page = listFindingsPage(db, { sessionId: 1, limit: 5 })
+    expect(page.rows).toHaveLength(5)
+    expect(page.hasMore).toBe(true)
+  })
+
+  it('listFindingsPage sets hasMore=false on the last page (exact match)', () => {
+    const page = listFindingsPage(db, { sessionId: 1, limit: 12 })
+    expect(page.rows).toHaveLength(12)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('listFindingsPage with no limit returns all rows + hasMore=false', () => {
+    const page = listFindingsPage(db, { sessionId: 1 })
+    expect(page.rows).toHaveLength(12)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('listSessionsWithFindings honours limit + offset and orders deterministically', () => {
+    // Seed extra sessions so the result set spans multiple pages.
+    for (let i = 3; i <= 8; i++) {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (?, 1, 1, ?, ?, ?, ?, ?, 1)`,
+      ).run(i, `s-${i}`, `/p/s-${i}`, `S${i}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`)
+      db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
+      ).run(100 + i, i)
+      insertFindings(db, [{
+        sessionId: i, messageId: 100 + i, kind: 'api-key', valueHash: `gh-${i}`,
+        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
+      }])
+      updateSessionCounts(db, i)
+    }
+    const all = listSessionsWithFindings(db, {})
+    expect(all.length).toBeGreaterThanOrEqual(7)
+    const p1 = listSessionsWithFindings(db, { limit: 3, offset: 0 })
+    const p2 = listSessionsWithFindings(db, { limit: 3, offset: 3 })
+    expect(p1.map(r => r.id)).toEqual(all.slice(0, 3).map(r => r.id))
+    expect(p2.map(r => r.id)).toEqual(all.slice(3, 6).map(r => r.id))
+    // No overlap between adjacent pages.
+    const p1Ids = new Set(p1.map(r => r.id))
+    expect(p2.some(r => p1Ids.has(r.id))).toBe(false)
+  })
+
+  it('listSessionsWithFindings semantics unchanged when limit absent', () => {
+    // Filter by kind should still work normally — pagination is opt-in.
+    const rows = listSessionsWithFindings(db, { kind: 'api-key' })
+    expect(rows.map(r => r.sessionUuid).sort()).toContain('s-1')
+  })
+
+  it('listSessionsWithFindingsPage sets hasMore correctly', () => {
+    // Seed 4 sessions with findings so we can probe both true and false.
+    for (let i = 3; i <= 5; i++) {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (?, 1, 1, ?, ?, ?, ?, ?, 1)`,
+      ).run(i, `s-${i}`, `/p/s-${i}`, `S${i}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`)
+      db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
+      ).run(100 + i, i)
+      insertFindings(db, [{
+        sessionId: i, messageId: 100 + i, kind: 'api-key', valueHash: `gh-${i}`,
+        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
+      }])
+      updateSessionCounts(db, i)
+    }
+    const total = listSessionsWithFindings(db, {}).length
+    const partial = listSessionsWithFindingsPage(db, { limit: total - 1 })
+    expect(partial.hasMore).toBe(true)
+    expect(partial.rows).toHaveLength(total - 1)
+    const full = listSessionsWithFindingsPage(db, { limit: total })
+    expect(full.hasMore).toBe(false)
+    expect(full.rows).toHaveLength(total)
   })
 })
 

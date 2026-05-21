@@ -70,6 +70,9 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const { t } = useTranslation()
   const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
   const [sessions, setSessions] = useState<Sess[]>([])
+  const [sessionsHasMore, setSessionsHasMore] = useState(false)
+  const [sessionsPageCount, setSessionsPageCount] = useState(1)
+  const SESSIONS_PAGE_SIZE = 50
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -110,19 +113,30 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
 
   const filter: SessionFindingFilter = parsed.filter
 
+  // Reset to first page whenever the active filter changes so a chip
+  // toggle doesn't try to display offset-50 of a different result set.
+  const filterKey = JSON.stringify(filter)
+  useEffect(() => {
+    setSessionsPageCount(1)
+  }, [filterKey])
+
   const refresh = useCallback(async () => {
     try {
-      const [r, s, st] = await Promise.all([
+      const [r, sPage, st] = await Promise.all([
         securityApi.riskByCategory(),
-        securityApi.listSessionsWithFindings(filter),
+        securityApi.listSessionsWithFindingsPage({
+          ...filter,
+          limit: sessionsPageCount * SESSIONS_PAGE_SIZE,
+        }),
         securityApi.getScanStatus(),
       ])
       setRisk(r)
-      setSessions(s as Sess[])
+      setSessions(sPage.rows as Sess[])
+      setSessionsHasMore(sPage.hasMore)
       setScanStatus(st)
       // Pick the most recent scan_completed_at across the session set
       // we just fetched. Cheap because s is already in-memory.
-      const completedAts = (s as Sess[])
+      const completedAts = (sPage.rows as Sess[])
         .map(x => x.scanCompletedAt)
         .filter((x): x is string => Boolean(x))
       if (completedAts.length > 0) {
@@ -135,7 +149,7 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
       setError(err instanceof Error ? err.message : String(err))
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, sessionsPageCount])
 
   useEffect(() => {
     void refresh()
@@ -648,6 +662,16 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
                         onRefresh={refresh}
                       />
                     ))}
+                    {sessionsHasMore && (
+                      <button
+                        type="button"
+                        data-testid="security-sessions-load-more"
+                        onClick={() => setSessionsPageCount((n) => n + 1)}
+                        className="self-start mt-2 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                      >
+                        {t('security.load_more', { defaultValue: 'Load more' })}
+                      </button>
+                    )}
                   </div>
                 )}
               </section>
@@ -966,6 +990,9 @@ function SessionCard({
 }) {
   const { t } = useTranslation()
   const [findings, setFindings] = useState<FindingRow[] | null>(null)
+  const [findingsHasMore, setFindingsHasMore] = useState(false)
+  const [findingsPageCount, setFindingsPageCount] = useState(1)
+  const FINDINGS_PAGE_SIZE = 200
   const [showAll, setShowAll] = useState(false)
   // Click-to-collapse on the title row. Default expanded so the user
   // sees what's inside each card; can fold shut once they've reviewed.
@@ -975,18 +1002,23 @@ function SessionCard({
   const [values, setValues] = useState<Record<number, string | null>>({})
 
   const load = useCallback(async () => {
-    const f: FindingFilter = { sessionId: session.id, state: 'active' }
+    const f: FindingFilter = {
+      sessionId: session.id,
+      state: 'active',
+      limit: findingsPageCount * FINDINGS_PAGE_SIZE,
+    }
     if (activeKinds.length > 0) {
       f.kinds = activeKinds as NonNullable<FindingFilter['kinds']>
     }
     try {
-      const rows = await securityApi.listFindings(f)
-      setFindings(rows)
+      const page = await securityApi.listFindingsPage(f)
+      setFindings(page.rows)
+      setFindingsHasMore(page.hasMore)
       // Bulk-fetch raw values for the rows we're about to render in
       // one IPC trip instead of one-per-row. Caller passes the value
       // down as a prop; FindingItem no longer needs its own fetch.
-      if (rows.length > 0) {
-        const map = await securityApi.getFindingValues(rows.map(r => r.id))
+      if (page.rows.length > 0) {
+        const map = await securityApi.getFindingValues(page.rows.map(r => r.id))
         setValues(map)
       } else {
         setValues({})
@@ -996,9 +1028,16 @@ function SessionCard({
       setFindings([])
       setValues({})
     }
-  }, [session.id, activeKinds])
+  }, [session.id, activeKinds, findingsPageCount])
 
   useEffect(() => { void load() }, [load])
+
+  // Reset pagination to first page when the active kind filter
+  // changes — keeps Load-more counts aligned with the new result set.
+  const activeKindsKey = activeKinds.join('|')
+  useEffect(() => {
+    setFindingsPageCount(1)
+  }, [activeKindsKey])
 
   async function handleCopyId() {
     try { await navigator.clipboard.writeText(session.sessionUuid) } catch { /* clipboard blocked */ }
@@ -1176,6 +1215,16 @@ function SessionCard({
               className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
             >
               {t('security.show_more', { count: hidden, defaultValue: 'show {{count}} more' })}
+            </button>
+          )}
+          {showAll && findingsHasMore && (
+            <button
+              type="button"
+              data-testid="security-findings-load-more"
+              onClick={() => setFindingsPageCount((n) => n + 1)}
+              className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              {t('security.load_more', { defaultValue: 'Load more' })}
             </button>
           )}
         </div>

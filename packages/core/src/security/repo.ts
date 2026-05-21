@@ -65,6 +65,10 @@ export interface FindingFilter {
   kinds?: readonly SensitiveKind[]
   state?: FindingState | 'any'
   severity?: 'high' | 'low'
+  /** Pagination — when set, SQL appends `LIMIT ? OFFSET ?`. Undefined
+   *  preserves the historical unbounded read. */
+  limit?: number
+  offset?: number
 }
 
 export interface SessionFindingFilter {
@@ -74,6 +78,13 @@ export interface SessionFindingFilter {
   severity?: 'high' | 'low'
   /** Free-text on session title. */
   text?: string
+  limit?: number
+  offset?: number
+}
+
+export interface Page<T> {
+  rows: T[]
+  hasMore: boolean
 }
 
 // ─── Insert / delete (scan path) ──────────────────────────────────
@@ -283,11 +294,31 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
     where.push(`kind NOT IN (${highKindsPlaceholders()})`)
     params.push(...HIGH_SEVERITY_KINDS_ARRAY)
   }
+  let pagination = ''
+  if (filter.limit !== undefined) {
+    pagination = ' LIMIT ? OFFSET ?'
+    params.push(filter.limit, filter.offset ?? 0)
+  }
   const sql = `SELECT * FROM findings
                ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-               ORDER BY detected_at DESC, id DESC`
+               ORDER BY detected_at DESC, id DESC${pagination}`
   const rows = db.prepare(sql).all(...params) as FindingRowDb[]
   return rows.map(rowToFinding)
+}
+
+/** Paginated variant — uses a `limit+1` peek to set `hasMore` without
+ *  an extra COUNT(*) round-trip. Callers pass the displayed `limit`;
+ *  the trimmed `rows` length stays ≤ limit. */
+export function listFindingsPage(
+  db: Database.Database,
+  filter: FindingFilter,
+): Page<FindingRow> {
+  if (filter.limit === undefined) {
+    return { rows: listFindings(db, filter), hasMore: false }
+  }
+  const peeked = listFindings(db, { ...filter, limit: filter.limit + 1 })
+  const hasMore = peeked.length > filter.limit
+  return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
 }
 
 export function listSessionsWithFindings(
@@ -363,11 +394,15 @@ export function listSessionsWithFindings(
     WHERE ${stateCondition} ${kindCondition} ${severityCondition} ${infoExclusion} ${textCondition}
       AND COALESCE(s.message_count, 0) > 0
     GROUP BY s.id
-    ORDER BY high_count DESC, finding_count DESC, s.started_at DESC
+    ORDER BY high_count DESC, finding_count DESC, s.started_at DESC, s.id DESC
+    ${filter.limit !== undefined ? 'LIMIT ? OFFSET ?' : ''}
   `
   // Placeholder order matches SQL: SELECT's CASE WHEN IN (?) binds first,
   // then the WHERE clause's params.
   const allParams = [...HIGH_SEVERITY_KINDS_ARRAY, ...params]
+  if (filter.limit !== undefined) {
+    allParams.push(filter.limit, filter.offset ?? 0)
+  }
   const rows = db.prepare(sql).all(...allParams) as Array<{
     id: number
     session_uuid: string
@@ -398,6 +433,20 @@ export function listSessionsWithFindings(
     cwd: r.cwd,
     projectDisplayName: r.project_display_name,
   }))
+}
+
+/** Paginated variant — limit+1 peek to set `hasMore` without a
+ *  separate COUNT round-trip. */
+export function listSessionsWithFindingsPage(
+  db: Database.Database,
+  filter: SessionFindingFilter,
+): Page<SessionWithFindingCounts> {
+  if (filter.limit === undefined) {
+    return { rows: listSessionsWithFindings(db, filter), hasMore: false }
+  }
+  const peeked = listSessionsWithFindings(db, { ...filter, limit: filter.limit + 1 })
+  const hasMore = peeked.length > filter.limit
+  return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
 }
 
 /** Risk by category — one row per kind that has ≥ 1 active finding.

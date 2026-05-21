@@ -9,7 +9,9 @@ import { ipcMain, type BrowserWindow } from 'electron'
 import { Effect, Fiber, Stream } from 'effect'
 import {
   listFindings,
+  listFindingsPage,
   listSessionsWithFindings,
+  listSessionsWithFindingsPage,
   riskByCategory,
   getFindingValue,
   getFindingValues,
@@ -38,7 +40,9 @@ import {
 export const SECURITY_IPC_CHANNELS = {
   // queries
   LIST_FINDINGS:               'security:list-findings',
+  LIST_FINDINGS_PAGE:          'security:list-findings-page',
   LIST_SESSIONS_WITH_FINDINGS: 'security:list-sessions-with-findings',
+  LIST_SESSIONS_WITH_FINDINGS_PAGE: 'security:list-sessions-with-findings-page',
   RISK_BY_CATEGORY:            'security:risk-by-category',
   GET_FINDING_VALUE:           'security:get-finding-value',
   GET_FINDING_VALUES:          'security:get-finding-values',
@@ -85,8 +89,14 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS, (_e, filter: FindingFilter) =>
     listFindings(db, filter),
   )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS_PAGE, (_e, filter: FindingFilter) =>
+    listFindingsPage(db, filter),
+  )
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS, (_e, filter: SessionFindingFilter) =>
     listSessionsWithFindings(db, filter),
+  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS_PAGE, (_e, filter: SessionFindingFilter) =>
+    listSessionsWithFindingsPage(db, filter),
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY, () =>
     riskByCategory(db),

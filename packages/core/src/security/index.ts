@@ -27,7 +27,9 @@ export {
   invalidateSessionScanProfile,
   listSessionsNeedingScan,
   listFindings,
+  listFindingsPage,
   listSessionsWithFindings,
+  listSessionsWithFindingsPage,
   riskByCategory,
   getFindingValue,
   getFindingValues,
@@ -47,6 +49,7 @@ export type {
   FindingInput,
   AllowlistEntryRow,
   AllowlistSnapshot,
+  Page,
 } from './repo.js'
 
 export { scanSession, ScanError } from './scan.js'

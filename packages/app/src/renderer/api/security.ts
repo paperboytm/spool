@@ -14,6 +14,7 @@ import type {
   FindingsChange,
   ScanStatus,
   AllowlistEntryRow,
+  Page,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 import type { SecurityPreferences } from '../../preload/index.js'
@@ -26,8 +27,12 @@ export type { SecurityPreferences, AllowlistEntryRow }
 export const securityApi = {
   listFindings: (filter: FindingFilter = {}): Promise<FindingRow[]> =>
     window.spool.security.listFindings(filter),
+  listFindingsPage: (filter: FindingFilter = {}): Promise<Page<FindingRow>> =>
+    window.spool.security.listFindingsPage(filter),
   listSessionsWithFindings: (filter: SessionFindingFilter = {}): Promise<SessionWithFindingCounts[]> =>
     window.spool.security.listSessionsWithFindings(filter),
+  listSessionsWithFindingsPage: (filter: SessionFindingFilter = {}): Promise<Page<SessionWithFindingCounts>> =>
+    window.spool.security.listSessionsWithFindingsPage(filter),
   riskByCategory: (): Promise<RiskByCategoryRow[]> =>
     window.spool.security.riskByCategory(),
   getFindingValue: (findingId: number): Promise<string | null> =>
