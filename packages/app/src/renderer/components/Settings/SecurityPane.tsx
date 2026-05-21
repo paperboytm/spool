@@ -26,10 +26,12 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi, type SecurityPreferences, type BackupFileInfo } from '../../api/security.js'
+import { formatBytes } from '../security/format.js'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
 import AllowlistManageModal from '../security/AllowlistManageModal.js'
+import PfDownloadCard from './security/PfDownloadCard.js'
 
 export default function SecurityPane() {
   if (!securityFeatureEnabled()) return null
@@ -115,58 +117,10 @@ function SecurityPaneInner() {
           </div>
         </div>
 
-        {/* Privacy Filter card — coming soon */}
-        <div
-          data-testid="settings-detector-pf"
-          className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface/40 dark:bg-dark-surface/40 px-3.5 py-3"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium text-warm-text dark:text-dark-text">
-                  {t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
-                </span>
-                <code className="font-mono text-[10px] text-warm-faint dark:text-dark-muted bg-warm-surface dark:bg-dark-surface px-1.5 py-0.5 rounded">
-                  ~800 MB
-                </code>
-              </div>
-              <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">
-                {t('settings.security.detector_pf_body', {
-                  defaultValue: "PII patterns that regex can't catch — names, addresses, and similar.",
-                })}
-              </p>
-              <p className="font-mono text-[10px] text-warm-faint dark:text-dark-muted/70">
-                {t('settings.security.detector_pf_footer', {
-                  defaultValue: 'OpenAI Privacy Filter · Apache 2.0 · runs on-device',
-                })}
-              </p>
-            </div>
-            <div className="shrink-0 flex items-center gap-2">
-              <span className="text-[9px] uppercase tracking-[0.06em] font-medium text-warm-faint dark:text-dark-muted">
-                {t('settings.security.detector_coming_soon', { defaultValue: 'Coming soon' })}
-              </span>
-              {/* Visually disabled; also blocks keyboard activation
-               *  via inert so screen-reader / keyboard users can't
-               *  trip the no-op onChange while the ML runtime is
-               *  still in stub form. `inert` is not in React 18's
-               *  stock HTMLAttributes typings; the cast spreads it
-               *  through as a plain HTML attribute. */}
-              <span
-                className="pointer-events-none opacity-50"
-                aria-hidden="true"
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                {...({ inert: '' } as any)}
-              >
-                <Toggle
-                  checked={prefs?.pfEnabled ?? false}
-                  onChange={() => { /* stub until ML runtime lands */ }}
-                  ariaLabel={t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
-                  testId="settings-pf-toggle"
-                />
-              </span>
-            </div>
-          </div>
-        </div>
+        {/* Privacy Filter card — download surface lives in its own
+            component. The toggle that actually flips pfEnabled lands
+            in PR 5c once the model can be loaded into ModelHost. */}
+        <PfDownloadCard />
       </Section>
 
       {/* Defaults */}
@@ -905,19 +859,4 @@ function formatAge(mtimeMs: number, t: (k: string, o?: Record<string, unknown>) 
   if (day < 30) return t('settings.security.backups_age_day', { count: day, defaultValue: '{{count}}d ago' })
   const mo = Math.floor(day / 30)
   return t('settings.security.backups_age_mo', { count: mo, defaultValue: '{{count}}mo ago' })
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  const formatted = value >= 100 || unit === 0
-    ? Math.round(value).toString()
-    : value.toFixed(1).replace(/\.0$/, '')
-  return `${formatted} ${units[unit]}`
 }

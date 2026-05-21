@@ -19,6 +19,19 @@ export interface SecurityPreferences {
   revealValuesOnHoverOnly: boolean
   pfEnabled: boolean
 }
+
+export type PfPhase =
+  | 'not-installed'
+  | 'downloading'
+  | 'installed'
+  | 'failed'
+
+export interface PfDownloadState {
+  phase: PfPhase
+  bytesDownloaded: number
+  bytesTotal: number
+  error?: string
+}
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
@@ -291,6 +304,18 @@ const api = {
       ipcRenderer.invoke('security:list-backups'),
     deleteBackups: (args: { names: string[] }): Promise<DeleteBackupsResult> =>
       ipcRenderer.invoke('security:delete-backups', args),
+
+    pfGetState: (): Promise<PfDownloadState> =>
+      ipcRenderer.invoke('security:pf-get-state'),
+    pfDownloadStart: (): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('security:pf-download-start'),
+    pfDownloadCancel: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:pf-download-cancel'),
+    onPfState: (cb: (state: PfDownloadState) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as PfDownloadState)
+      ipcRenderer.on('security:evt-pf-state', handler)
+      return () => ipcRenderer.removeListener('security:evt-pf-state', handler)
+    },
   },
 }
 

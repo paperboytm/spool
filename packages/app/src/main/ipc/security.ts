@@ -39,6 +39,7 @@ import {
   saveSecurityPreferences,
   type SecurityPreferences,
 } from '../securityPreferences.js'
+import type { PfCoordinator } from '../security/pf-coordinator.js'
 
 /** Channel name table. Shared via type only with the renderer adapter
  *  (no runtime import — preload uses the strings literally). */
@@ -74,10 +75,16 @@ export const SECURITY_IPC_CHANNELS = {
   LIST_BACKUPS:                'security:list-backups',
   DELETE_BACKUPS:              'security:delete-backups',
 
+  // Privacy Filter ML download lifecycle
+  PF_GET_STATE:                'security:pf-get-state',
+  PF_DOWNLOAD_START:           'security:pf-download-start',
+  PF_DOWNLOAD_CANCEL:          'security:pf-download-cancel',
+
   // events (push: main → renderer via webContents.send)
   EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
   EVT_SCAN_STATUS:             'security:evt-scan-status',
   EVT_PREFS_CHANGED:           'security:evt-prefs-changed',
+  EVT_PF_STATE:                'security:evt-pf-state',
 } as const
 
 export interface SecurityIpcDeps {
@@ -88,13 +95,17 @@ export interface SecurityIpcDeps {
   runPromise: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
   /** Subscribe to per-window pushes; called once per main window. */
   getMainWindow: () => BrowserWindow | null
+  /** Privacy Filter download orchestrator. Optional in 5b — null means
+   *  the PF channels return a default not-installed snapshot. PR 5c
+   *  swaps in a real coordinator when the toggle flips on. */
+  pfCoordinator?: PfCoordinator | null
 }
 
 /** Register every Security Scan ipcMain.handle and start a background
  *  fiber that forwards worker change events to the main window. The
  *  returned disposer interrupts the forwarding fiber. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
-  const { db, worker, runPromise, getMainWindow } = deps
+  const { db, worker, runPromise, getMainWindow, pfCoordinator } = deps
 
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS, (_e, filter: FindingFilter) =>
     listFindings(db, filter),
@@ -197,6 +208,25 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     (_e, args: { names: string[] }): DeleteBackupsResult => deleteBackups(db, args.names),
   )
 
+  // Privacy Filter ML. When pfCoordinator is null (5b production), the
+  // channels return a static not-installed snapshot so the renderer
+  // renders its Download affordance instead of crashing.
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PF_GET_STATE, () =>
+    pfCoordinator?.getState() ?? { phase: 'not-installed', bytesDownloaded: 0, bytesTotal: 0 },
+  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PF_DOWNLOAD_START, async () => {
+    if (!pfCoordinator) return { ok: false, reason: 'unavailable' as const }
+    await pfCoordinator.startDownload()
+    return { ok: true as const }
+  })
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PF_DOWNLOAD_CANCEL, () => {
+    pfCoordinator?.cancelDownload()
+    return { ok: true as const }
+  })
+  const unsubscribePf = pfCoordinator?.subscribe((s) => {
+    getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PF_STATE, s)
+  })
+
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES, () => listAllowlistEntries(db))
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.REMOVE_ALLOWLIST_ENTRY,
@@ -279,6 +309,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     if (statusForwarderFiber) {
       Effect.runFork(Fiber.interrupt(statusForwarderFiber))
     }
+    unsubscribePf?.()
     for (const ch of Object.values(SECURITY_IPC_CHANNELS)) {
       ipcMain.removeHandler(ch)
     }

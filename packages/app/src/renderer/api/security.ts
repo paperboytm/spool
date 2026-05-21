@@ -21,9 +21,9 @@ import type {
 
 export type { BackupFileInfo }
 import type { SensitiveKind } from '@spool-lab/redact'
-import type { SecurityPreferences } from '../../preload/index.js'
+import type { SecurityPreferences, PfDownloadState } from '../../preload/index.js'
 
-export type { SecurityPreferences, AllowlistEntryRow }
+export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState }
 
 /** Single source of truth for the renderer-side adapter. Components
  *  hold this object, not `window.spool.security` — keeps replaceability
@@ -84,6 +84,15 @@ export const securityApi = {
     window.spool.security.listBackups(),
   deleteBackups: (names: string[]): Promise<DeleteBackupsResult> =>
     window.spool.security.deleteBackups({ names }),
+
+  pfGetState: (): Promise<PfDownloadState> =>
+    window.spool.security.pfGetState(),
+  pfDownloadStart: (): Promise<{ ok: boolean; reason?: string }> =>
+    window.spool.security.pfDownloadStart(),
+  pfDownloadCancel: (): Promise<{ ok: boolean }> =>
+    window.spool.security.pfDownloadCancel(),
+  onPfState: (handler: (s: PfDownloadState) => void): (() => void) =>
+    window.spool.security.onPfState(handler),
 }
 
 export type SecurityApi = typeof securityApi
