@@ -159,12 +159,148 @@ describe('makeModelHost', () => {
     expect(out.error).toMatch(/blew up/)
   })
 
-  it('analyze returns [] in PR 5a — model inference lands in 5c', async () => {
-    const { deps } = depsEmittingReady(23, { runtime: 'wasm', detectionMs: 1 })
+  it('analyze fails fast when the host is not ready', async () => {
+    const win = fakeBrowserWindow(30)
+    const { ipc } = fakeIpc()
+    const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const host = yield* makeModelHost({
+        spawnWindow: async () => win,
+        ipc,
+        readyTimeoutMs: 20,
+      })
+      return yield* Effect.either(host.analyze('hello'))
+    })))
+    expect(result._tag).toBe('Left')
+  })
+
+  it('analyze routes a request to the inference window and resolves the matching result', async () => {
+    const win = fakeBrowserWindowWithSender(31)
+    const { ipc, bus } = fakeIpc()
+    const deps: ModelHostDeps = {
+      spawnWindow: async () => {
+        setTimeout(() => bus.emit(PF_IPC.READY, senderEvent(31), {
+          runtime: 'webgpu', detectionMs: 1,
+        }), 0)
+        return win
+      },
+      ipc,
+    }
+    // Simulate the inference window: as soon as a request is sent, fake
+    // a response back through the bus on the result channel.
+    win.webContents.sendImpl = (channel: string, payload: unknown) => {
+      if (channel !== PF_IPC.ANALYZE_REQUEST) return
+      const req = payload as { reqId: number; text: string }
+      setTimeout(() => bus.emit(PF_IPC.ANALYZE_RESULT, senderEvent(31), {
+        reqId: req.reqId, ok: true,
+        matches: [{ class: 'email', value: req.text, start: 0, end: req.text.length, score: 0.9 }],
+      }), 0)
+    }
+    const matches = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const host = yield* makeModelHost(deps)
+      return yield* host.analyze('a@b.c')
+    })))
+    expect(matches).toEqual([{ class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.9 }])
+  })
+
+  it('analyze ignores results from a different sender id', async () => {
+    const win = fakeBrowserWindowWithSender(32)
+    const { ipc, bus } = fakeIpc()
+    const deps: ModelHostDeps = {
+      spawnWindow: async () => {
+        setTimeout(() => bus.emit(PF_IPC.READY, senderEvent(32), {
+          runtime: 'wasm', detectionMs: 1,
+        }), 0)
+        return win
+      },
+      ipc,
+      analyzeTimeoutMs: 50,
+    }
+    win.webContents.sendImpl = (channel: string, payload: unknown) => {
+      if (channel !== PF_IPC.ANALYZE_REQUEST) return
+      const req = payload as { reqId: number; text: string }
+      // Wrong sender — should be ignored, request times out.
+      setTimeout(() => bus.emit(PF_IPC.ANALYZE_RESULT, senderEvent(999), {
+        reqId: req.reqId, ok: true, matches: [],
+      }), 0)
+    }
     const out = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const host = yield* makeModelHost(deps)
-      return yield* host.analyze('contains a@b.c')
+      return yield* Effect.either(host.analyze('x'))
     })))
-    expect(out).toEqual([])
+    expect(out._tag).toBe('Left')
+  })
+
+  it('analyze times out when the inference window never responds', async () => {
+    const win = fakeBrowserWindowWithSender(33)
+    const { ipc, bus } = fakeIpc()
+    const deps: ModelHostDeps = {
+      spawnWindow: async () => {
+        setTimeout(() => bus.emit(PF_IPC.READY, senderEvent(33), {
+          runtime: 'wasm', detectionMs: 1,
+        }), 0)
+        return win
+      },
+      ipc,
+      analyzeTimeoutMs: 30,
+    }
+    win.webContents.sendImpl = () => { /* swallow */ }
+    const out = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const host = yield* makeModelHost(deps)
+      return yield* Effect.either(host.analyze('x'))
+    })))
+    expect(out._tag).toBe('Left')
+    if (out._tag === 'Left') {
+      expect(String(out.left.cause)).toMatch(/timed out/)
+    }
+  })
+
+  it('analyze propagates inference-side errors', async () => {
+    const win = fakeBrowserWindowWithSender(34)
+    const { ipc, bus } = fakeIpc()
+    const deps: ModelHostDeps = {
+      spawnWindow: async () => {
+        setTimeout(() => bus.emit(PF_IPC.READY, senderEvent(34), {
+          runtime: 'wasm', detectionMs: 1,
+        }), 0)
+        return win
+      },
+      ipc,
+    }
+    win.webContents.sendImpl = (channel: string, payload: unknown) => {
+      if (channel !== PF_IPC.ANALYZE_REQUEST) return
+      const req = payload as { reqId: number }
+      setTimeout(() => bus.emit(PF_IPC.ANALYZE_RESULT, senderEvent(34), {
+        reqId: req.reqId, ok: false, message: 'model crashed',
+      }), 0)
+    }
+    const out = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const host = yield* makeModelHost(deps)
+      return yield* Effect.either(host.analyze('x'))
+    })))
+    expect(out._tag).toBe('Left')
+    if (out._tag === 'Left') {
+      expect(String(out.left.cause)).toBe('model crashed')
+    }
   })
 })
+
+interface FakeWindowWithSender extends FakeWindow {
+  webContents: BrowserWindow['webContents'] & {
+    sendImpl?: (channel: string, payload: unknown) => void
+  }
+}
+
+/** Like fakeBrowserWindow but with a stub `webContents.send` so tests
+ *  can react when ModelHost posts an analyze request. */
+function fakeBrowserWindowWithSender(id: number): FakeWindowWithSender {
+  const sendStub = (channel: string, payload: unknown) => {
+    w.webContents.sendImpl?.(channel, payload)
+  }
+  const w: Partial<FakeWindowWithSender> = {
+    destroyed: false,
+    webContents: { id, send: sendStub } as unknown as FakeWindowWithSender['webContents'],
+    destroy() { (w as FakeWindowWithSender).destroyed = true },
+    isDestroyed() { return (w as FakeWindowWithSender).destroyed },
+  }
+  return w as FakeWindowWithSender
+}

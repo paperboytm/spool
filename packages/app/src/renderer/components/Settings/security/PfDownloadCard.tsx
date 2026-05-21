@@ -4,8 +4,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, X, RotateCw, AlertTriangle } from 'lucide-react'
-import { securityApi, type PfDownloadState } from '../../../api/security.js'
+import { securityApi, type PfDownloadState, type SecurityPreferences } from '../../../api/security.js'
 import { formatBytes } from '../../security/format.js'
+import Toggle from '../../Toggle.js'
 
 const INITIAL: PfDownloadState = { phase: 'not-installed', bytesDownloaded: 0, bytesTotal: 0 }
 
@@ -13,10 +14,14 @@ export default function PfDownloadCard() {
   const { t } = useTranslation()
   const [state, setState] = useState<PfDownloadState>(INITIAL)
   const [busy, setBusy] = useState(false)
+  const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
 
   useEffect(() => {
     void securityApi.pfGetState().then(setState).catch(() => setState(INITIAL))
-    return securityApi.onPfState(setState)
+    void securityApi.getPrefs().then(setPrefs).catch(() => setPrefs(null))
+    const offState = securityApi.onPfState(setState)
+    const offPrefs = securityApi.onPrefsChanged(setPrefs)
+    return () => { offState(); offPrefs() }
   }, [])
 
   const startDownload = async () => {
@@ -24,6 +29,12 @@ export default function PfDownloadCard() {
     try { await securityApi.pfDownloadStart() } finally { setBusy(false) }
   }
   const cancelDownload = () => { void securityApi.pfDownloadCancel() }
+  const togglePf = async (next: boolean) => {
+    if (!prefs) return
+    setPrefs({ ...prefs, pfEnabled: next })
+    const saved = await securityApi.setPrefs({ pfEnabled: next })
+    setPrefs(saved)
+  }
 
   const percent = state.bytesTotal > 0
     ? Math.min(100, Math.round((state.bytesDownloaded / state.bytesTotal) * 100))
@@ -103,12 +114,12 @@ export default function PfDownloadCard() {
             </button>
           )}
           {state.phase === 'installed' && (
-            <span
-              data-testid="settings-pf-ready"
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] uppercase tracking-[0.06em] font-medium text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark border border-accent/40 dark:border-accent-dark/40"
-            >
-              {t('settings.security.detector_pf_ready', { defaultValue: 'Ready' })}
-            </span>
+            <Toggle
+              checked={prefs?.pfEnabled ?? false}
+              onChange={(v) => { void togglePf(v) }}
+              ariaLabel={t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
+              testId="settings-pf-toggle"
+            />
           )}
           {state.phase === 'failed' && (
             <button

@@ -99,13 +99,17 @@ export interface SecurityIpcDeps {
    *  the PF channels return a default not-installed snapshot. PR 5c
    *  swaps in a real coordinator when the toggle flips on. */
   pfCoordinator?: PfCoordinator | null
+  /** Notified when the user flips `pfEnabled` in Settings. Main wires
+   *  this to pfRuntime.start() / stop() so the inference window only
+   *  exists when the user actually wants ML detection on. */
+  onPfEnabledChanged?: (enabled: boolean) => void
 }
 
 /** Register every Security Scan ipcMain.handle and start a background
  *  fiber that forwards worker change events to the main window. The
  *  returned disposer interrupts the forwarding fiber. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
-  const { db, worker, runPromise, getMainWindow, pfCoordinator } = deps
+  const { db, worker, runPromise, getMainWindow, pfCoordinator, onPfEnabledChanged } = deps
 
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS, (_e, filter: FindingFilter) =>
     listFindings(db, filter),
@@ -193,6 +197,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
         [...nextKinds].some(k => !prevKinds.has(k))
       if (changed) {
         await runPromise(worker.backfill())
+      }
+      if (prev.pfEnabled !== saved.pfEnabled) {
+        try { onPfEnabledChanged?.(saved.pfEnabled) }
+        catch (err) { console.error('[security] onPfEnabledChanged threw:', err) }
       }
       getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, saved)
       return saved

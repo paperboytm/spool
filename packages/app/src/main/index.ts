@@ -41,6 +41,7 @@ import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
 import { Effect } from 'effect'
 import { registerSecurityIpc } from './ipc/security.js'
 import { loadSecurityPreferences } from './securityPreferences.js'
+import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
@@ -101,6 +102,7 @@ let acpManager: AcpManager
 let isSyncActive = false
 let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
+const pfRuntime = makePfRuntime()
 
 type CachedSearchValue = FragmentResult[]
 
@@ -187,6 +189,20 @@ async function shutdownScanWorker(): Promise<void> {
       await scanWorker.shutdown()
     } catch { /* best effort */ }
     scanWorker = null
+  }
+  try { await pfRuntime.stop() } catch { /* best effort */ }
+}
+
+/** Bring the Privacy Filter inference window up or down to match the
+ *  user's pfEnabled preference. We refuse to start the runtime if the
+ *  ONNX weights aren't installed yet — flipping the toggle on while
+ *  the download hasn't finished would just spawn a window with
+ *  nothing to load. */
+async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
+  if (pfEnabled && pfModelInstalled()) {
+    await pfRuntime.start()
+  } else {
+    await pfRuntime.stop()
   }
 }
 
@@ -390,10 +406,22 @@ app.whenReady().then(async () => {
         worker: scanWorker,
         runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
+        onPfEnabledChanged: (enabled) => {
+          void syncPfRuntime(enabled).catch((err) => {
+            console.error('[security] pf runtime transition failed:', err)
+          })
+        },
       })
       runWithObservability(scanWorker.backfill()).catch((err) => {
         console.error('[security] boot backfill failed:', err)
       })
+      // If the user enabled PF before this app launch, bring the
+      // inference window up now that the rest of Spool is booted.
+      if (loadSecurityPreferences().pfEnabled) {
+        void syncPfRuntime(true).catch((err) => {
+          console.error('[security] pf runtime boot failed:', err)
+        })
+      }
     })
   }
 
