@@ -1017,9 +1017,21 @@ function SessionCard({
       sessionId: session.id,
       state: 'active',
       limit: findingsPageCount * FINDINGS_PAGE_SIZE,
+      // Without this, a session with 800+ absolute-path findings would
+      // page-window-shove every env-var / api-key off the first page
+      // and the strip would render empty. Skip info-tier at the SQL
+      // layer; the Info drawer at the bottom of the page is where
+      // those audit records surface.
+      excludeInfo: true,
     }
     if (activeKinds.length > 0) {
       f.kinds = activeKinds as NonNullable<FindingFilter['kinds']>
+      // When the user pins an info kind explicitly, we DO want it back.
+      // listFindings already ignores excludeInfo if `kinds` contains an
+      // info kind, but flip the flag here too so the contract is
+      // obvious at the call site.
+      const someInfo = activeKinds.some(k => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
+      if (someInfo) f.excludeInfo = false
     }
     try {
       const page = await securityApi.listFindingsPage(f)
