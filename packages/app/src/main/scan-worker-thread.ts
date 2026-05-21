@@ -35,8 +35,11 @@ import {
   type FindingsChange,
   type ScanStatus,
 } from '@spool-lab/core'
-import { regexProvider } from '@spool-lab/redact'
+import { regexProvider, type RedactProvider, type SensitiveMatch } from '@spool-lab/redact'
 import { loadSecurityPreferences } from './securityPreferences.js'
+import { mapPfMatches, type PfRawMatch } from './security/class-mapping.js'
+import { detectWithRegex } from '@spool-lab/redact'
+import { PF_PROFILE_VERSION } from './security/model-paths.js'
 
 if (!parentPort) {
   throw new Error('scan-worker-thread.ts is only meant to run as a worker_thread child')
@@ -49,9 +52,24 @@ export type ScanCommand =
   | { cmd: 'backfill' }
   | { cmd: 'getStatus' }
 
+export interface PfRawMatchWire {
+  class: string
+  value: string
+  start: number
+  end: number
+  score: number
+}
+
 export type ToWorker =
   | { type: 'cmd'; reqId: number; payload: ScanCommand }
   | { type: 'shutdown' }
+  /** Main tells the worker the inference window is live + ready, so
+   *  pfProvider.available() may start returning true. */
+  | { type: 'pf-online' }
+  | { type: 'pf-offline' }
+  /** Response to an earlier pf-analyze-req. */
+  | { type: 'pf-analyze-res'; reqId: number; ok: true; matches: PfRawMatchWire[] }
+  | { type: 'pf-analyze-res'; reqId: number; ok: false; message: string }
 
 export type FromWorker =
   | { type: 'ready' }
@@ -60,6 +78,9 @@ export type FromWorker =
   | { type: 'event-change'; change: FindingsChange }
   | { type: 'event-status'; status: ScanStatus }
   | { type: 'fatal'; error: string }
+  /** Worker asks main to run the inference window over `text`. Main
+   *  routes to pfRuntime.analyze and posts a pf-analyze-res back. */
+  | { type: 'pf-analyze-req'; reqId: number; text: string }
 
 function reportFatal(err: unknown): void {
   const error = err instanceof Error ? (err.stack ?? err.message) : String(err)
@@ -94,15 +115,50 @@ void (async () => {
   const db = getDB({ runMigrations: false })
   const scope = await Effect.runPromise(Scope.make())
 
+  // PF analyze bridge — worker → main → inference window. The flag is
+  // flipped by 'pf-online'/'pf-offline' messages from main; available()
+  // reads it synchronously so the scan loop doesn't have to await
+  // anything before deciding whether to call this provider.
+  let pfOnline = false
+  let pfNextReqId = 1
+  const pfPending = new Map<number, { resolve: (m: PfRawMatchWire[]) => void; reject: (e: Error) => void }>()
+
+  const pfProvider: RedactProvider = {
+    name: 'pf',
+    displayName: 'Privacy Filter (ML)',
+    available: () => pfOnline && loadSecurityPreferences().pfEnabled,
+    analyze: async (text: string): Promise<SensitiveMatch[]> => {
+      const reqId = pfNextReqId++
+      const raw: PfRawMatchWire[] = await new Promise((resolve, reject) => {
+        pfPending.set(reqId, { resolve, reject })
+        try {
+          port.postMessage({ type: 'pf-analyze-req', reqId, text } satisfies FromWorker)
+        } catch (err) {
+          pfPending.delete(reqId)
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
+      })
+      if (raw.length === 0) return []
+      // Regex pass for class-mapping suppression context (url/secret
+      // boost rules, DOB gating). Cheap and stateless — same input text
+      // the scan engine already ran regex over upstream, but we don't
+      // have access to those matches here.
+      const regexMatches = detectWithRegex(text, 'regex')
+      return mapPfMatches(raw as PfRawMatch[], { regexMatches, fullText: text })
+    },
+  }
+
   const worker = await runEff(
     Effect.provideService(
       makeScanWorker({
         db,
-        providers: [regexProvider],
+        providers: [regexProvider, pfProvider],
         currentProfile: () => currentProfileString({
           kindAllowlist: loadSecurityPreferences().kindAllowlist,
+          pfEnabled: loadSecurityPreferences().pfEnabled && pfOnline,
+          pfVersion: PF_PROFILE_VERSION,
         }),
-        providerNames: ['regex'],
+        providerNames: ['regex', 'pf'],
         getKindAllowlist: () => new Set(loadSecurityPreferences().kindAllowlist),
       }),
       Scope.Scope,
@@ -154,6 +210,22 @@ void (async () => {
           process.exit(0)
         }
       })()
+      return
+    }
+    if (msg.type === 'pf-online') { pfOnline = true; return }
+    if (msg.type === 'pf-offline') {
+      pfOnline = false
+      // Reject every pending analyze so the scan loop unblocks.
+      for (const slot of pfPending.values()) slot.reject(new Error('pf offline'))
+      pfPending.clear()
+      return
+    }
+    if (msg.type === 'pf-analyze-res') {
+      const slot = pfPending.get(msg.reqId)
+      if (!slot) return
+      pfPending.delete(msg.reqId)
+      if (msg.ok) slot.resolve(msg.matches)
+      else slot.reject(new Error(msg.message))
       return
     }
     if (msg.type !== 'cmd') return
