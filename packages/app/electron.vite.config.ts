@@ -57,6 +57,17 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    server: {
+      fs: {
+        // The hidden inference window lives at src/inference/, outside
+        // the main renderer's root. Without explicit allow, Vite's
+        // dev server refuses to serve it AND falls back to index.html
+        // (so the inference window silently runs the main app
+        // instead — confusing). Whitelist the source dir so
+        // `${rendererBase}/@fs/<abs-path>` resolves correctly.
+        allow: [resolve(__dirname, 'src/inference'), resolve(__dirname, 'src/renderer')],
+      },
+    },
     build: {
       rollupOptions: {
         input: {

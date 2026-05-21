@@ -46,6 +46,13 @@ export function registerPfModelScheme(): void {
       standard: true,
       secure: true,
       supportFetchAPI: true,
+      // The inference renderer is loaded from http://localhost in dev
+      // (Vite) and file:// in prod; either way the document origin
+      // differs from pf-model:// so Chromium's CORS layer would block
+      // the fetch without explicit allow. Our handler only serves files
+      // inside pfModelsRoot() (path-traversal refused with 403), no
+      // sensitive surface to widen.
+      corsEnabled: true,
       bypassCSP: false,
       stream: true,
     },
