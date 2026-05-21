@@ -5,7 +5,12 @@ set -euo pipefail
 # Build + sign + notarize + artifact upload run in GitHub Actions using the
 # Developer ID Application cert and app-specific password stored as repo
 # secrets (CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
-# APPLE_TEAM_ID). See .github/workflows/release.yml.
+# APPLE_TEAM_ID). The workflow also publishes @spool-lab/core and
+# @spool-lab/cli to npm using NODE_AUTH_TOKEN (granular token,
+# scope=@spool-lab, read+write, "Bypass 2FA" enabled). @spool-lab/redact
+# is published only when its version on disk differs from the registry —
+# bump its package.json manually whenever redact source changes.
+# See .github/workflows/release.yml.
 #
 # Usage:
 #   ./scripts/release.sh              # patch bump (0.3.8 → 0.3.9)

@@ -164,3 +164,58 @@ jobs:
               --title "Spool ${{ steps.version.outputs.version }}" \
               --notes-file /tmp/release-notes.md
           fi
+
+  publish-npm:
+    needs: [build-mac, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build dist for every package we publish so the prepack step has a tree
+      # to ship. Order matters only for redact → core → cli because the upstream
+      # consumer reads dist/index.d.ts at typecheck time during downstream build.
+      - name: Build publish targets
+        run: |
+          pnpm -F @spool-lab/redact build
+          pnpm -F @spool-lab/core build
+          pnpm -F @spool-lab/cli build
+
+      # Publish in dependency order. Each step is idempotent: if the registry
+      # already has this version (re-run after a partial-fail, or redact's
+      # version was unchanged this release), we skip rather than error. We must
+      # still update redact whenever its source changes — the version bump is
+      # manual since redact tracks its own semver, independent of the app.
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          publish_if_missing() {
+            local pkg_dir="$1"
+            local pkg_name
+            local pkg_version
+            pkg_name=$(jq -r .name "$pkg_dir/package.json")
+            pkg_version=$(jq -r .version "$pkg_dir/package.json")
+            if npm view "${pkg_name}@${pkg_version}" version >/dev/null 2>&1; then
+              echo "::notice::${pkg_name}@${pkg_version} already on registry — skipping"
+            else
+              echo "::notice::Publishing ${pkg_name}@${pkg_version}"
+              ( cd "$pkg_dir" && pnpm publish --no-git-checks --access public )
+            fi
+          }
+          publish_if_missing packages/redact
+          publish_if_missing packages/core
+          publish_if_missing packages/cli
