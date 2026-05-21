@@ -230,7 +230,25 @@ async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
   try {
     if (pfEnabled && pfModelInstalled()) {
       await pfRuntime.start()
-      scanWorker?.notifyPfOnline()
+      // pfRuntime.start() resolves even when the handshake failed —
+      // the hidden window might be up but transformers.js / ONNX
+      // crashed during model load. Check the actual runtime state
+      // before telling the scan worker pf is online: otherwise
+      // currentProfile drifts to `regex@4,pf@1.5b-q4`, every analyze
+      // round-trips to a dead host that returns [], and the user
+      // sees regex-only findings tagged with a profile string that
+      // lies about what scanned them.
+      const state = await pfRuntime.getState()
+      if (state?.status === 'ready') {
+        scanWorker?.notifyPfOnline()
+      } else {
+        console.error(
+          '[security] pf runtime failed to reach ready (status=%s, error=%s) — keeping worker pfOnline=false',
+          state?.status ?? 'unknown',
+          state?.error ?? 'unknown',
+        )
+        scanWorker?.notifyPfOffline()
+      }
     } else {
       scanWorker?.notifyPfOffline()
       await pfRuntime.stop()
