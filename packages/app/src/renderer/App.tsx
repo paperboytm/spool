@@ -113,6 +113,7 @@ export default function App() {
   const [searchScopeProject, setSearchScopeProject] = useState<ScopeValue | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(true)
+  const trafficLightInset = typeof window !== 'undefined' && window.spool?.platform === 'darwin'
   /** Active share-editor session: conversation, the user's last
    *  accepted opts, and the draft-row metadata the editor needs to
    *  upsert autosaves back into share_drafts. Cleared on Back. */
@@ -835,6 +836,13 @@ export default function App() {
       onPinnedSortOrderChange={handlePinnedSortChange}
       onCopySessionId={handleCopySessionId}
       {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+      {...(!trafficLightInset ? {
+        sidebarToggle: {
+          collapsed: sidebarCollapsed,
+          onToggle: toggleSidebar,
+        },
+      } : {})}
+      chromeOnly={!trafficLightInset && sidebarCollapsed}
       onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
     />
   )
@@ -856,6 +864,7 @@ export default function App() {
           sidebar={sidebarElement}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={toggleSidebar}
+          trafficLightInset={trafficLightInset}
         />
         <AppToaster />
         {/* App-level overlays (settings, search) still mount above the
@@ -905,67 +914,17 @@ export default function App() {
       <AppTopBar
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={toggleSidebar}
+        trafficLightInset={trafficLightInset}
       />
       <div className="flex flex-1 min-h-0">
-      <SidebarRail collapsed={sidebarCollapsed}>
-      <Sidebar
-        activeIdentityKey={activeProjectKey}
-        activeSessionUuid={view === 'session' ? selectedSession : null}
-        isLibraryActive={isHomeMode}
-        onSelectProject={(key) => {
-          setActiveProjectKey(key)
-          setHomeMode(false)
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setView('search')
-          setQuery('')
-        }}
-        onSelectSession={handleOpenSession}
-        onSelectHome={() => {
-          setActiveProjectKey(null)
-          setHomeMode(true)
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setView('search')
-          setQuery('')
-        }}
-        {...(shareEnabled ? {
-          onSelectShares: () => {
-            setActiveProjectKey(null)
-            setHomeMode(false)
-            setSelectedSession(null)
-            setTargetMessageId(null)
-            setView('shares')
-            setQuery('')
-          },
-        } : {})}
-        isSharesActive={isSharesView}
-        onSelectSecurity={() => {
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setActiveProjectKey(null)
-          setActiveProjectName(null)
-          setHomeMode(false)
-          setView('security')
-          setQuery('')
-        }}
-        isSecurityActive={isSecurityView}
-        onOpenSearch={handleSearchOpen}
-        syncStatus={syncStatus}
-        status={status}
-        showSourceDots={sidebarShowSourceDots}
-        showSessionCount={sidebarShowSessionCount}
-        sortOrder={sidebarSortOrder}
-        onSortOrderChange={handleSidebarSortChange}
-        pinnedSortOrder={pinnedSortOrder}
-        onPinnedSortOrderChange={handlePinnedSortChange}
-        onCopySessionId={handleCopySessionId}
-        {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
-        onSettingsClick={() => { setSettingsTab('general'); setShowSettings(true) }}
-      />
-      </SidebarRail>
-      <div className="relative flex flex-col flex-1 min-w-0">
-      <div className="flex flex-col flex-1 min-h-0 relative">
+        <SidebarRail
+          collapsed={sidebarCollapsed}
+          collapsedWidth={!trafficLightInset ? 'chrome' : 'none'}
+        >
+          {sidebarElement}
+        </SidebarRail>
+        <div className="relative flex flex-col flex-1 min-w-0">
+          <div className="flex flex-col flex-1 min-h-0 relative">
         {isSharesView ? (
           <SharesPage
             onOpenDraft={handleOpenDraft}
@@ -1097,9 +1056,8 @@ export default function App() {
             </div>
           </>
         )}
-      </div>
-
-      </div>
+          </div>
+        </div>
       </div>
 
       <AppToaster />
@@ -1192,4 +1150,3 @@ const AgentSelector = memo(function AgentSelector({ agents, activeAgent, onSelec
     </div>
   )
 })
-

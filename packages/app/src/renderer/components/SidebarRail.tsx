@@ -14,6 +14,7 @@ export const FOLD_DURATION_MS = 280
 type Props = {
   collapsed: boolean
   children: ReactNode
+  collapsedWidth?: 'none' | 'chrome'
 }
 
 /**
@@ -27,14 +28,15 @@ type Props = {
  * AppTopBar's bg sidebar segment, which paints the same surface
  * colour over the top of the chrome.
  */
-export default function SidebarRail({ collapsed, children }: Props) {
+export default function SidebarRail({ collapsed, collapsedWidth = 'none', children }: Props) {
+  const collapsedClass = collapsedWidth === 'chrome' ? 'w-12' : 'w-0'
   return (
     <div
       className={[
         'flex-none overflow-hidden transition-[width] duration-[280ms] ease-out',
-        collapsed ? 'w-0' : 'w-60',
+        collapsed ? collapsedClass : 'w-60',
       ].join(' ')}
-      aria-hidden={collapsed}
+      aria-hidden={collapsed && collapsedWidth === 'none'}
     >
       {children}
     </div>

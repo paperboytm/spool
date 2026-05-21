@@ -39,6 +39,7 @@ export interface BuiltinAgent {
 }
 
 export type LanguagePreference = 'system' | 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'
+export type RuntimePlatform = NodeJS.Platform
 
 export interface AgentsConfig {
   defaultAgent?: string
@@ -64,6 +65,8 @@ export interface AgentsConfig {
 export type SpoolAPI = typeof api
 
 const api = {
+  platform: process.platform as RuntimePlatform,
+
   search: (query: string, limit?: number, source?: string, onlyPinned?: boolean, identityKey?: string): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned, identityKey }),
 

@@ -38,6 +38,7 @@
     "errorDialog_keepRunning": "Spool continue de fonctionner. Si ce message revient, redémarrez l'application."
   },
   "sidebar": {
+    "sidebar": "Barre latérale",
     "library": "Sessions",
     "search": "Recherche",
     "shares": "Partages",

@@ -11,6 +11,7 @@ type Props = {
   sidebar: ReactNode
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
+  trafficLightInset?: boolean
   /** Page chrome that gets portaled into the top bar's flex slot
    *  (back arrow, title, primary action buttons). Pass null on pages
    *  that don't need any. */
@@ -39,6 +40,7 @@ export default function PageLayout({
   sidebar,
   sidebarCollapsed,
   onToggleSidebar,
+  trafficLightInset = true,
   topBar,
   rightPanel,
   rightPanelOpen = false,
@@ -49,11 +51,17 @@ export default function PageLayout({
       <AppTopBar
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
+        trafficLightInset={trafficLightInset}
       >
         {topBar}
       </AppTopBar>
       <div className="flex flex-1 min-h-0">
-        <SidebarRail collapsed={sidebarCollapsed}>{sidebar}</SidebarRail>
+        <SidebarRail
+          collapsed={sidebarCollapsed}
+          collapsedWidth={!trafficLightInset ? 'chrome' : 'none'}
+        >
+          {sidebar}
+        </SidebarRail>
         <div className="relative flex flex-col flex-1 min-w-0">
           {children}
         </div>

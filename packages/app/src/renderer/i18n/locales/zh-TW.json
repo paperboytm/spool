@@ -38,6 +38,7 @@
     "errorDialog_keepRunning": "Spool 會繼續運行；若反覆出現此訊息，請重新啟動應用程式。"
   },
   "sidebar": {
+    "sidebar": "側欄",
     "library": "會話",
     "search": "搜尋",
     "shares": "分享",

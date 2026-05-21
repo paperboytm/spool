@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, AlertTriangle, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen } from 'lucide-react'
+import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, AlertTriangle, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, PanelLeft } from 'lucide-react'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
@@ -45,9 +45,14 @@ type Props = {
   onPinnedSortOrderChange?: (next: PinnedSortOrder) => void
   onCopySessionId?: (source: SessionSource) => void
   onShareSession?: (uuid: string) => void
+  sidebarToggle?: {
+    collapsed: boolean
+    onToggle: () => void
+  }
+  chromeOnly?: boolean
 }
 
-export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, securityHighCount = 0, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession }: Props) {
+export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, securityHighCount = 0, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession, sidebarToggle, chromeOnly = false }: Props) {
   const { t } = useTranslation()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
     switch (value) {
@@ -105,9 +110,37 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
   return (
     <aside
       data-testid="sidebar"
-      className="w-60 flex-none bg-warm-surface dark:bg-dark-surface flex flex-col h-full overflow-hidden"
+      className={[
+        'w-60 flex-none flex flex-col h-full overflow-hidden transition-colors duration-[280ms] ease-out',
+        chromeOnly
+          ? 'bg-warm-bg dark:bg-dark-bg'
+          : 'bg-warm-surface dark:bg-dark-surface',
+      ].join(' ')}
     >
-      <nav className="px-2 pt-1 pb-2 flex-none flex flex-col gap-0.5" aria-label={t('sidebar.library')}>
+      {sidebarToggle && (
+        <div className="px-2 pt-1 flex-none flex flex-col gap-0.5">
+          {chromeOnly ? (
+            <SidebarCollapsedToggle
+              collapsed={sidebarToggle.collapsed}
+              onToggle={sidebarToggle.onToggle}
+              title={sidebarToggle.collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            />
+          ) : (
+            <NavRow
+              testId="sidebar-toggle"
+              icon={<PanelLeft size={14} strokeWidth={1.5} />}
+              label={t('sidebar.sidebar')}
+              trailing={<KbdHint>{formatModShortcut('B')}</KbdHint>}
+              onClick={sidebarToggle.onToggle}
+              title={sidebarToggle.collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+              ariaPressed={sidebarToggle.collapsed}
+            />
+          )}
+        </div>
+      )}
+      {!chromeOnly && (
+        <>
+      <nav className={`px-2 ${sidebarToggle ? 'pt-0 mt-0.5' : 'pt-1'} pb-2 flex-none flex flex-col gap-0.5`} aria-label={t('sidebar.library')}>
         {onSelectHome && (
           <NavRow
             testId="sidebar-library"
@@ -154,7 +187,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             testId="sidebar-search"
             icon={<SearchIcon size={14} strokeWidth={1.75} />}
             label={t('sidebar.search')}
-            trailing={<KbdHint>⌘K</KbdHint>}
+            trailing={<KbdHint>{formatModShortcut('K')}</KbdHint>}
             onClick={onOpenSearch}
           />
         )}
@@ -296,6 +329,8 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
         status={status ?? null}
         {...(onSettingsClick ? { onSettingsClick } : {})}
       />
+        </>
+      )}
     </aside>
   )
 }
@@ -306,6 +341,8 @@ function NavRow({
   label,
   active = false,
   trailing,
+  title,
+  ariaPressed,
   onClick,
 }: {
   testId?: string
@@ -313,6 +350,8 @@ function NavRow({
   label: string
   active?: boolean
   trailing?: ReactNode
+  title?: string
+  ariaPressed?: boolean
   onClick: () => void
 }) {
   const dataAttrs = testId ? { 'data-testid': testId } : {}
@@ -321,9 +360,11 @@ function NavRow({
       type="button"
       {...dataAttrs}
       onClick={onClick}
+      title={title}
       aria-current={active ? 'page' : undefined}
+      aria-pressed={ariaPressed}
       className={[
-        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px]',
+        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px] leading-4',
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
@@ -334,6 +375,29 @@ function NavRow({
       {trailing}
     </button>
   )
+}
+
+function SidebarCollapsedToggle({ collapsed, onToggle, title }: { collapsed: boolean; onToggle: () => void; title: string }) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      data-testid="sidebar-toggle"
+      onClick={onToggle}
+      title={title}
+      aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+      aria-pressed={collapsed}
+      className="ml-1 flex-none inline-flex items-center justify-center w-6 h-6 rounded-md text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+      style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+    >
+      <PanelLeft size={14} strokeWidth={1.5} />
+    </button>
+  )
+}
+
+function formatModShortcut(key: string) {
+  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  return isMac ? `⌘${key}` : `Ctrl+${key}`
 }
 
 function KbdHint({ children }: { children: ReactNode }) {

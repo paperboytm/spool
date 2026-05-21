@@ -38,6 +38,7 @@
     "errorDialog_keepRunning": "Spool läuft weiter. Wenn diese Meldung wiederholt erscheint, starten Sie die App bitte neu."
   },
   "sidebar": {
+    "sidebar": "Seitenleiste",
     "library": "Sitzungen",
     "search": "Suche",
     "shares": "Teilen",

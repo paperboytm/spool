@@ -38,6 +38,7 @@
     "errorDialog_keepRunning": "Spool will keep running, but if you see this repeatedly please restart the app."
   },
   "sidebar": {
+    "sidebar": "Sidebar",
     "library": "Sessions",
     "search": "Search",
     "shares": "Shares",

@@ -44,6 +44,7 @@ type Props = {
   sidebar: ReactNode
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
+  trafficLightInset?: boolean
 }
 
 type SaveState = 'idle' | 'saving' | 'error'
@@ -67,6 +68,7 @@ export default function ShareEditorPage({
   sidebar,
   sidebarCollapsed,
   onToggleSidebar,
+  trafficLightInset = true,
 }: Props) {
   const { t } = useTranslation()
   // opts + title share one undo stack — Cmd+Z reverts whichever was
@@ -485,6 +487,7 @@ export default function ShareEditorPage({
       sidebar={sidebar}
       sidebarCollapsed={sidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
+      trafficLightInset={trafficLightInset}
       topBar={topBarContent}
       rightPanel={<ControlPanel convo={liveConversation} opts={opts} setOpts={setOpts} />}
       rightPanelOpen={panelOpen}

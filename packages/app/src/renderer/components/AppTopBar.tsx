@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelLeft } from 'lucide-react'
 
 type Props = {
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
+  trafficLightInset?: boolean
   /** Page-level chrome (page title, primary action). Rendered into a
    *  flex slot to the right of the sidebar fold toggle. */
   children?: ReactNode
@@ -17,61 +18,69 @@ type Props = {
  * boundary below it, so the eye reads "left column + right column"
  * running top-to-bottom.
  */
-export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children }: Props) {
+export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, trafficLightInset = true, children }: Props) {
   const { t } = useTranslation()
-  const dragStyle = { WebkitAppRegion: 'drag' } as React.CSSProperties
-  const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
+  const dragStyle = { WebkitAppRegion: 'drag' } as CSSProperties
+  const noDragStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties
   const sidebarTitle = sidebarCollapsed
     ? `${t('sidebar.expand')} (⌘B)`
     : `${t('sidebar.collapse')} (⌘B)`
 
+  if (!trafficLightInset && !children) {
+    return null
+  }
+
   return (
     <div data-testid="app-top-bar" className="relative flex-none min-h-9 select-none" style={dragStyle}>
       {/* Background: animated sidebar split + content bg flooding the
-          rest of the bar (including over the right rail). The rail
-          itself gets its surface tint only BELOW the bar. */}
+          rest of the bar. macOS collapses the sidebar segment to zero
+          because its traffic-light gutter stays in the top bar; Linux
+          keeps a narrow sidebar chrome segment so page chrome aligns
+          with the content pane below. */}
       <div className="absolute inset-0 flex pointer-events-none" aria-hidden="true">
         <div
           className={[
             'flex-none transition-[width] duration-[280ms] ease-out bg-warm-surface dark:bg-dark-surface',
-            sidebarCollapsed ? 'w-0' : 'w-60',
+            sidebarCollapsed ? (trafficLightInset ? 'w-0' : 'w-12') : 'w-60',
           ].join(' ')}
         />
         <div className="flex-1 bg-warm-bg dark:bg-dark-bg" />
       </div>
 
-      {/* Foreground: traffic-light gutter + fold button + sidebar-width
-          spacer + page slot. */}
+      {/* Foreground: macOS keeps the fold button in the hiddenInset title
+          bar next to the traffic lights. Other platforms render the
+          fold row inside the sidebar itself, so this bar only reserves
+          the sidebar width before page chrome. */}
       <div className="relative min-h-9 flex items-stretch">
-        <div className="flex-none w-[78px]" aria-hidden="true" />
-        <div className="flex-none flex items-center">
-          <button
-            type="button"
-            data-testid="sidebar-toggle"
-            onClick={onToggleSidebar}
-            title={sidebarTitle}
-            aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
-            aria-pressed={sidebarCollapsed}
-            className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
-            style={noDragStyle}
-          >
-            <PanelLeft size={13} strokeWidth={1.75} />
-          </button>
-        </div>
-        {/* Animates over the same 280ms and the same Tailwind ease-out
-         *  curve as the bg sidebar layer above and the sidebar wrapper
-         *  below, so the page slot's left edge stays in lock-step with
-         *  the sidebar fold. Per-pixel velocity is lower than the
-         *  sidebar's (this spacer is 134px, sidebar is 240px), but the
-         *  motions share start/end frames so the eye reads them as one
-         *  unified fold rather than two separate animations. */}
-        <div
-          className={[
-            'flex-none transition-[width] duration-[280ms] ease-out',
-            sidebarCollapsed ? 'w-0' : 'w-[134px]',
-          ].join(' ')}
-          aria-hidden="true"
-        />
+        {trafficLightInset ? (
+          <>
+            <div className="flex-none w-[78px]" aria-hidden="true" />
+            <div className="flex-none flex items-center">
+              <SidebarToggleButton
+                title={sidebarTitle}
+                ariaLabel={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+                pressed={sidebarCollapsed}
+                onToggle={onToggleSidebar}
+                noDragStyle={noDragStyle}
+              />
+            </div>
+            <div
+              className={[
+                'flex-none transition-[width] duration-[280ms] ease-out',
+                sidebarCollapsed ? 'w-0' : 'w-[138px]',
+              ].join(' ')}
+              aria-hidden="true"
+            />
+          </>
+        ) : (
+          <div
+            className={[
+              'flex-none transition-[width] duration-[280ms] ease-out',
+              sidebarCollapsed ? 'w-12' : 'w-60',
+            ].join(' ')}
+            aria-hidden="true"
+          />
+        )}
         {/* Slot inherits `drag` from the bar so whitespace around page
             chrome remains a drag handle. Interactive elements injected
             into this slot must opt out individually with
@@ -84,5 +93,34 @@ export default function AppTopBar({ sidebarCollapsed, onToggleSidebar, children 
         </div>
       </div>
     </div>
+  )
+}
+
+function SidebarToggleButton({
+  title,
+  ariaLabel,
+  pressed,
+  onToggle,
+  noDragStyle,
+}: {
+  title: string
+  ariaLabel: string
+  pressed: boolean
+  onToggle: () => void
+  noDragStyle: CSSProperties
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="sidebar-toggle"
+      onClick={onToggle}
+      title={title}
+      aria-label={ariaLabel}
+      aria-pressed={pressed}
+      className="flex-none inline-flex items-center justify-center w-6 h-6 rounded-md text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+      style={noDragStyle}
+    >
+      <PanelLeft size={14} strokeWidth={1.5} />
+    </button>
   )
 }
