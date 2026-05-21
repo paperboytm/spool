@@ -75,3 +75,115 @@ export function hasQuotedEntropy(min: number): (value: string) => boolean {
     return shannon(inner) >= min
   }
 }
+
+// ── Shared false-positive filters ─────────────────────────────────
+//
+// Every regex below is a "this string says I am NOT a real secret"
+// signal — extracted into one place so per-rule validators read as a
+// composition of intent ("env-var that isn't placeholder, redacted,
+// or a public-prefix") instead of bespoke patchwork. Empirical: most
+// scan-induced noise on real chat content is one of these four:
+//   1. user manually redacted before paste (`[redacted]`, `…`)
+//   2. vendor docs example (AWS `AKIAIOSFODNN7EXAMPLE`)
+//   3. JS code matching the env shape (`const FOO_KEY = 'string'`)
+//   4. value is a placeholder (`xxxx`, `your_token`, `password`)
+
+/** "[redacted]" / "<redacted>" / "[SECRET:…]" / "【已隐藏】" — set by a
+ *  user or an upstream tool to flag the literal was scrubbed. */
+const REDACTION_MARKER_RX = /\[(?:redacted|hidden|secret|removed|masked)(?::[^\]]*)?\]|<(?:redacted|hidden)>|【已?隐藏】/i
+
+export function containsRedactionMarker(value: string): boolean {
+  return REDACTION_MARKER_RX.test(value)
+}
+
+/** Visual ellipsis (`…` or `...`) — the original value was truncated
+ *  in the middle, so the substring we're holding isn't actually the
+ *  secret even if the surrounding shape looks credential-like. */
+export function containsEllipsis(value: string): boolean {
+  return /…|\.\.\./.test(value)
+}
+
+/** Self-evidently-fake placeholder values: `xxxx-xxxx-xxxx`, repeated
+ *  chars, `<your-key>`, `letmein`, `hunter2`, alphabet-sequence dumps. */
+const PLACEHOLDER_PATTERNS: ReadonlyArray<RegExp> = [
+  /^[xX]+(?:[-_ ][xX]+)*$/,                                   // xxxx, xxxx-xxxx
+  /^(.)\1{4,}$/,                                              // 5+ repeats: aaaaa, 00000
+  /^<[a-zA-Z0-9_\-\s]+>$/,                                    // <YOUR_TOKEN>
+  /\byour[_-]?(?:secret|key|token|password|api[_-]?key)\b/i,
+  /\b(?:placeholder|todo|fixme|example|sample|dummy|fake|test[_-]?value)\b/i,
+  /^(?:letmein|changeme|password|passwd|hunter2|123456|qwerty|abc123|admin)$/i,
+  /^abcdefghijklmnopqrstuvwxyz/,                              // alphabet dumps
+  /^0?123456789/,                                             // sequential digits
+]
+
+export function looksLikePlaceholder(value: string): boolean {
+  return PLACEHOLDER_PATTERNS.some((rx) => rx.test(value))
+}
+
+/** Strict union of (a) IETF/IANA reserved example/test labels and
+ *  (b) generic "fake company" domains that show up constantly in
+ *  documentation. Source: RFC 2606 + RFC 6761. */
+const RESERVED_DOMAINS = new Set([
+  'example.com', 'example.net', 'example.org', 'example.edu',
+  'test.com', 'test.net', 'test.org', 'invalid', 'localhost', 'example', 'test',
+  'company.com', 'mycompany.com', 'yourcompany.com', 'yourdomain.com', 'mydomain.com',
+  'domain.com', 'domain.net', 'foo.com', 'bar.com', 'foobar.com',
+])
+
+export function isReservedDomain(domain: string): boolean {
+  return RESERVED_DOMAINS.has(domain.toLowerCase())
+}
+
+/** macOS icon assets (`icon_16x16@2x.png`), Sketch / Figma exports,
+ *  Slack emoji files — all contain `@N x` style suffixes that the
+ *  email regex matches. Reject when the trailing token is a known
+ *  image extension. */
+export function looksLikeImageAsset(value: string): boolean {
+  return /\.(?:png|jpe?g|gif|webp|svg|bmp|ico|tiff?|heic|avif)$/i.test(value)
+}
+
+/** Public-by-convention env-var prefixes. Frameworks intentionally
+ *  bundle these to the client / commit them to repos:
+ *    NEXT_PUBLIC_*, VITE_*, REACT_APP_*, NUXT_PUBLIC_*, EXPO_PUBLIC_*,
+ *    GATSBY_*, VUE_APP_*, STORYBOOK_* */
+const PUBLIC_ENV_PREFIX_RX = /^(?:NEXT_PUBLIC|REACT_APP|VITE|PUBLIC|VUE_APP|GATSBY|EXPO_PUBLIC|NUXT_PUBLIC|STORYBOOK)_/
+
+export function hasPublicEnvPrefix(name: string): boolean {
+  return PUBLIC_ENV_PREFIX_RX.test(name)
+}
+
+/** AWS / vendor "this is the documentation key" patterns. AWS' own
+ *  IAM docs use `AKIAIOSFODNN7EXAMPLE` + `wJalrXUtnFEMI/K7MDENG/…EXAMPLEKEY`
+ *  literally in every tutorial. Treat any vendor key ending in
+ *  EXAMPLE / SAMPLE / DEMO / YOUR_KEY as a non-secret. */
+export function isVendorExampleKey(value: string): boolean {
+  return /(?:EXAMPLE|SAMPLE|DEMO|YOUR_?(?:KEY|TOKEN|SECRET)?)(?:KEY)?$/i.test(value)
+}
+
+/** Composite filter used by every text-credential rule. */
+export function isObviouslyNonSecretValue(value: string): boolean {
+  return containsRedactionMarker(value)
+      || containsEllipsis(value)
+      || looksLikePlaceholder(value)
+}
+
+/** Non-routable / documentation IP ranges that aren't real network
+ *  endpoints — loopback, RFC 5737 doc ranges, RFC 3849 IPv6 doc
+ *  range, unspecified address, link-local. */
+export function isReservedIp(value: string): boolean {
+  // Loopback
+  if (value === '127.0.0.1' || value === '::1') return true
+  if (value.startsWith('127.')) return true
+  // RFC 5737 IPv4 documentation
+  if (value.startsWith('192.0.2.')) return true
+  if (value.startsWith('198.51.100.')) return true
+  if (value.startsWith('203.0.113.')) return true
+  // RFC 3849 IPv6 documentation
+  if (/^2001:0?db8/i.test(value)) return true
+  // Unspecified / wildcard
+  if (value === '0.0.0.0' || value === '::') return true
+  // Link-local (RFC 3927 / RFC 4291)
+  if (value.startsWith('169.254.')) return true
+  if (/^fe80:/i.test(value)) return true
+  return false
+}

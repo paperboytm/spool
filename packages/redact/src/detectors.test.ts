@@ -16,11 +16,13 @@ const kindsOf = (text: string): SensitiveKind[] =>
 
 describe('identity', () => {
   it('finds an email and reports its span', () => {
-    const text = 'reply to maya@example.com when ready'
+    // Fixture uses a non-reserved domain (the validator drops
+    // RFC 2606 example.com / test.com / generic "yourcompany.com").
+    const text = 'reply to maya@hogwarts.edu when ready'
     const [m] = detectSensitiveSpans(text)
     expect(m?.kind).toBe('email')
-    expect(m?.value).toBe('maya@example.com')
-    expect(text.slice(m!.start, m!.end)).toBe('maya@example.com')
+    expect(m?.value).toBe('maya@hogwarts.edu')
+    expect(text.slice(m!.start, m!.end)).toBe('maya@hogwarts.edu')
   })
   it('does not flag CSS hex colors as emails', () => {
     expect(detectSensitiveSpans('background: #FF8800;')).toEqual([])
@@ -43,10 +45,12 @@ describe('identity', () => {
   })
   it('finds IPv4 and IPv6', () => {
     expect(kindsOf('server at 192.168.1.42')).toContain('ip')
-    expect(kindsOf('addr 2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toContain('ip')
+    // Real public IPv6 (Google DNS) — not the RFC 3849 documentation
+    // range, which the validator now correctly rejects.
+    expect(kindsOf('dns 2001:4860:4860:0:0:0:0:8888 today')).toContain('ip')
   })
   it('accepts compressed IPv6 forms with ::', () => {
-    expect(kindsOf('loopback ::1 plus 2001:db8::1 thanks')).toContain('ip')
+    expect(kindsOf('cdn 2606:4700:4700::1111 used by Cloudflare')).toContain('ip')
   })
   it('rejects HH:MM:SS time strings that the broad IPv6 regex superficially matches', () => {
     // `12:22:57` is 3 colon-separated decimal groups — looks like
@@ -75,7 +79,11 @@ describe('credentials — vendor api keys', () => {
     expect(kindsOf(`GH_TOKEN=${tok('ghp_', 'abcdefghijklmnopqrstuvwxyz0123456789')}`)).toContain('api-key')
   })
   it('finds an AWS access key id', () => {
-    expect(detectSensitiveSpans('AKIAIOSFODNN7EXAMPLE')[0]?.kind).toBe('api-key')
+    // Real-shape (no EXAMPLE / SAMPLE suffix — those are vendor-doc
+    // placeholders the validator now rejects). Split via tok so the
+    // source literal doesn't trip GitHub secret scanning.
+    const k = tok('AKIA', 'V3QFKW72ZDLNP4XR')
+    expect(detectSensitiveSpans(k)[0]?.kind).toBe('api-key')
   })
   it('finds an AWS session token (ASIA prefix)', () => {
     expect(kindsOf(`cred=${tok('ASIA', '1234567890ABCDEF')}`)).toContain('api-key')
@@ -120,16 +128,28 @@ describe('credentials — composite blocks', () => {
     expect(kindsOf(`paste: ${body}`)).toContain('ssh-key')
   })
   it('finds an AWS credentials INI block', () => {
-    const block = '[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE\naws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n'
+    const accessKey = tok('AKIA', 'V3QFKW72ZDLNP4XR')
+    // Avoid the canonical `wJalrXUt…` prefix from AWS docs — the
+    // credentialBlockLooksReal validator drops anything containing
+    // that literal as a vendor-doc placeholder.
+    const secretBody = tok('p7Yz0RbHm6Q+', 'k8L2nVtD3fXgJ', '/W4UeKaPiHsQzCxMlV1y')
+    const block = `[default]\naws_access_key_id = ${accessKey}\naws_secret_access_key = ${secretBody}\n`
     const m = detectSensitiveSpans(`cat ~/.aws/credentials\n${block}`)
     expect(m.some((x) => x.kind === 'cloud-cred-ini')).toBe(true)
   })
   it('finds kubeconfig token field', () => {
-    expect(kindsOf('users:\n- name: admin\n  user:\n    token: abcdefghijklmnopqrstuvwxyz0123456789'))
+    // Random-shape body via tok so the source doesn't read as a real
+    // secret. Entropy clears the validator floor (≥ 3.0).
+    const t = tok('j82H1xK9pQrSt7Vw', 'YzA3bC5dF8gJkL2', 'mNoPqRsT')
+    expect(kindsOf(`users:\n- name: admin\n  user:\n    token: ${t}`))
       .toContain('kubeconfig-token')
   })
   it('finds a .netrc line', () => {
-    expect(kindsOf('machine api.example.com login chen password hunter2'))
+    // Avoid `example.com` (reserved domain on emails — same string
+    // would slip credentialBlockLooksReal but we still want a
+    // realistic shape) and avoid `hunter2` (placeholder).
+    const pw = tok('j82H1xK9', 'pQrSt7VwYzA3bC5dF8gJ')
+    expect(kindsOf(`machine api.spoollab.io login chen password ${pw}`))
       .toContain('netrc')
   })
   it('finds a gcloud application_default_credentials field', () => {
@@ -144,11 +164,13 @@ describe('credentials — connection strings', () => {
       .toContain('connection-string')
   })
   it('finds mongodb+srv URI', () => {
-    expect(kindsOf('client = MongoClient("mongodb+srv://u:p@cluster.mongodb.net/test")'))
+    // Drop `test` and `example`-named hosts — both trigger the
+    // placeholder filter on the credentialBlockLooksReal validator.
+    expect(kindsOf('client = MongoClient("mongodb+srv://u:p@cluster.mongodb.net/main")'))
       .toContain('connection-string')
   })
   it('finds redis URI', () => {
-    expect(kindsOf('REDIS_URL=rediss://user:pass@redis.example.com:6380'))
+    expect(kindsOf('REDIS_URL=rediss://user:pass@redis.spoollab.io:6380'))
       .toContain('connection-string')
   })
 })
@@ -166,10 +188,16 @@ describe('credentials — context wrappers', () => {
     expect(kindsOf('Authorization: Basic dXNlcjpwYXNz')).toContain('basic-auth')
   })
   it('finds URL-embedded credentials', () => {
-    expect(kindsOf('connect to https://admin:hunter2@db.example.com:5432/main')).toContain('url-creds')
+    // Avoid `hunter2` (placeholder) and `example.com` (reserved).
+    const pw = tok('j82H1xK9', 'pQrSt7VwYzA3')
+    expect(kindsOf(`connect to https://admin:${pw}@db.spoollab.io:5432/main`)).toContain('url-creds')
   })
   it('finds an env-var-style assignment', () => {
-    expect(kindsOf(`STRIPE_SECRET_KEY=${tok('sk_', 'live_', 'x'.repeat(24))}`)).toContain('env-var')
+    // Value must not look like a JS storage-key identifier (pure
+    // lowercase letters / underscores < 28 chars), so include a
+    // digit + sufficient length.
+    const body = tok('sk_', 'live_', 'aH1xK9pQrSt7VwYzA3bC5dF8gJ')
+    expect(kindsOf(`STRIPE_SECRET_KEY=${body}`)).toContain('env-var')
   })
   it('finds a generic high-entropy secret near a keyword', () => {
     expect(kindsOf('api_key = "j82H1xK9pQrSt7VwYzA3bC5dF8gJ"')).toContain('generic-secret')
@@ -201,13 +229,137 @@ describe('location / infra', () => {
   })
 })
 
+describe('false-positive filters (precision tuning)', () => {
+  // Per-rule validators dropping noise that the regex would otherwise
+  // happily accept. Each block names the FP class + the assertion.
+
+  describe('placeholder / redaction-marker values', () => {
+    for (const text of [
+      'API_KEY=xxxx-xxxx-xxxx-xxxx',
+      'API_TOKEN=<your-token>',
+      'GH_TOKEN=...',
+      'DB_PASSWORD=…',
+      'API_KEY=[redacted]',
+      'MY_SECRET=changeme',
+      'cred=letmein',
+    ]) {
+      it(`drops ${JSON.stringify(text)}`, () => {
+        expect(kindsOf(text)).not.toContain('env-var')
+      })
+    }
+  })
+
+  describe('public-by-convention env-var prefixes', () => {
+    for (const name of [
+      'NEXT_PUBLIC_API_URL',
+      'VITE_PUBLIC_KEY',
+      'REACT_APP_API_URL',
+      'GATSBY_API_URL',
+      'EXPO_PUBLIC_API_URL',
+    ]) {
+      it(`drops ${name} (frameworks bundle these to the client)`, () => {
+        expect(kindsOf(`${name}=https://api.spoollab.io/v1`)).not.toContain('env-var')
+      })
+    }
+  })
+
+  describe('JS const declarations matching env-var shape', () => {
+    for (const text of [
+      "const LAST_COUNT_KEY = 'spool.shares.skeletonCount'",
+      "const STORAGE_KEY = 'spool_theme_editor'",
+      "FEATURE_KEY = 'auth.session.id'",
+    ]) {
+      it(`drops ${JSON.stringify(text)} (storage-key string, not env)`, () => {
+        expect(kindsOf(text)).not.toContain('env-var')
+      })
+    }
+  })
+
+  describe('reserved / example domains in emails', () => {
+    for (const e of [
+      'user@example.com', 'a@example.net', 'b@test.com',
+      'c@yourcompany.com', 'd@mydomain.com', 'e@localhost',
+    ]) {
+      it(`drops ${e}`, () => {
+        expect(kindsOf(`mail ${e}`)).not.toContain('email')
+      })
+    }
+  })
+
+  describe('image filenames look like emails', () => {
+    for (const f of ['icon_16x16@2x.png', 'badge@3x.jpg', 'header@hires.webp']) {
+      it(`drops ${f}`, () => {
+        expect(kindsOf(`asset ${f}`)).not.toContain('email')
+      })
+    }
+  })
+
+  describe('reserved IP ranges', () => {
+    for (const ip of [
+      '127.0.0.1', '127.5.6.7',
+      '192.0.2.42', '198.51.100.99', '203.0.113.1',
+      '0.0.0.0', '169.254.1.1',
+      '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
+    ]) {
+      it(`drops ${ip} (loopback / docs / link-local)`, () => {
+        expect(kindsOf(`addr ${ip} here`)).not.toContain('ip')
+      })
+    }
+  })
+
+  describe('vendor-doc example API keys', () => {
+    it('drops AWS docs canonical AKIAIOSFODNN7EXAMPLE', () => {
+      // Constructed at runtime so source-level scanner doesn't flag.
+      const k = tok('AKIA', 'IOSFODNN7EXAMPLE')
+      expect(kindsOf(`key=${k}`)).not.toContain('api-key')
+    })
+  })
+
+  describe('JS property chains the internal-host regex matches', () => {
+    for (const code of ['process.env.HOME', 'import.meta.home']) {
+      it(`drops ${code}`, () => {
+        expect(kindsOf(`val = ${code}`)).not.toContain('internal-host')
+      })
+    }
+  })
+
+  describe('phone shape false positives', () => {
+    it('drops "+0000 2026" (year, no real country code starts with 0)', () => {
+      expect(kindsOf('release +0000 2026 today')).not.toContain('phone')
+    })
+  })
+
+  describe('connection-string / url-creds containing redaction markers', () => {
+    for (const text of [
+      'connect postgres://user:[SECRET:password]@host/db',
+      'redis URI: rediss://[redacted]@cache.spoollab.io:6380',
+      'mongo mongodb://admin:…@cluster.spoollab.io/main',
+      'plain https://[redacted:redacted]@db.spoollab.io',
+    ]) {
+      it(`drops ${JSON.stringify(text)}`, () => {
+        const kinds = kindsOf(text)
+        expect(kinds).not.toContain('connection-string')
+        expect(kinds).not.toContain('url-creds')
+      })
+    }
+  })
+
+  describe('kubeconfig token is a low-entropy placeholder', () => {
+    it('drops alphabet-sequence token', () => {
+      expect(kindsOf('token: abcdefghijklmnopqrstuvwxyz'))
+        .not.toContain('kubeconfig-token')
+    })
+  })
+})
+
 describe('general behaviour', () => {
   it('does not flag plain prose', () => {
     expect(detectSensitiveSpans('The cache TTL is five minutes.')).toEqual([])
   })
   it('orders matches by start position', () => {
+    const apiKey = tok('sk-', '12abcdefghij1234567890', 'ABCDEFGHIJklmnopqr')
     const matches = detectSensitiveSpans(
-      'first: maya@example.com, then key sk-1234567890abcdefghij1234567890ab',
+      `first: maya@hogwarts.edu, then key ${apiKey}`,
     )
     expect(matches.length).toBeGreaterThanOrEqual(2)
     for (let i = 1; i < matches.length; i++) {
@@ -215,11 +367,13 @@ describe('general behaviour', () => {
     }
   })
   it('does not loop forever on dense repeated content', () => {
-    const text = ('a@b.co '.repeat(100) + 'AKIAIOSFODNN7EXAMPLE ').repeat(10)
+    const k = tok('AKIA', 'V3QFKW72ZDLNP4XR')
+    const text = ('a@b.co '.repeat(100) + `${k} `).repeat(10)
     expect(detectSensitiveSpans(text).length).toBeGreaterThan(0)
   })
   it('attaches confidence + provider to every match', () => {
-    const matches = detectSensitiveSpans('email maya@example.com and AKIAIOSFODNN7EXAMPLE')
+    const k = tok('AKIA', 'V3QFKW72ZDLNP4XR')
+    const matches = detectSensitiveSpans(`email maya@hogwarts.edu and ${k}`)
     for (const m of matches) {
       expect(m.confidence).toBeGreaterThan(0)
       expect(m.confidence).toBeLessThanOrEqual(1)
@@ -230,28 +384,30 @@ describe('general behaviour', () => {
 
 describe('groupBySensitiveKind', () => {
   it('groups matches by kind with distinct values in detection order', () => {
+    const k = tok('AKIA', 'V3QFKW72ZDLNP4XR')
     const text = [
-      'a@one.com', 'b@two.com', 'c@three.com', 'd@four.com',
-      'AKIAIOSFODNN7EXAMPLE',
+      'a@one.io', 'b@two.io', 'c@three.io', 'd@four.io', k,
     ].join(' ')
     const groups = groupBySensitiveKind(detectSensitiveSpans(text))
     const emailGroup = groups.find((g) => g.kind === 'email')
     expect(emailGroup?.count).toBe(4)
     expect(emailGroup?.values.map((v) => v.value)).toEqual([
-      'a@one.com', 'b@two.com', 'c@three.com', 'd@four.com',
+      'a@one.io', 'b@two.io', 'c@three.io', 'd@four.io',
     ])
     expect(emailGroup?.values.every((v) => v.count === 1)).toBe(true)
     expect(groups.find((g) => g.kind === 'api-key')?.count).toBe(1)
   })
 
   it('dedupes repeated literals and counts occurrences', () => {
-    const text = 'first AKIAIOSFODNN7EXAMPLE, again AKIAIOSFODNN7EXAMPLE, plus ASIA1234567890ABCDEF'
+    const a = tok('AKIA', 'V3QFKW72ZDLNP4XR')
+    const b = tok('ASIA', '7CNPXJWLKMNRBV9Q')
+    const text = `first ${a}, again ${a}, plus ${b}`
     const groups = groupBySensitiveKind(detectSensitiveSpans(text))
     const apiGroup = groups.find((g) => g.kind === 'api-key')
     expect(apiGroup?.count).toBe(3)
     expect(apiGroup?.values).toHaveLength(2)
-    expect(apiGroup?.values[0]).toEqual({ value: 'AKIAIOSFODNN7EXAMPLE', count: 2 })
-    expect(apiGroup?.values[1]).toEqual({ value: 'ASIA1234567890ABCDEF', count: 1 })
+    expect(apiGroup?.values[0]).toEqual({ value: a, count: 2 })
+    expect(apiGroup?.values[1]).toEqual({ value: b, count: 1 })
   })
   it('exposes a human label for every kind', () => {
     const allKinds: SensitiveKind[] = [
@@ -270,7 +426,7 @@ describe('groupBySensitiveKind', () => {
 describe('providers', () => {
   it('regex provider returns Promise of matches', async () => {
     expect(regexProvider.available()).toBe(true)
-    const matches = await regexProvider.analyze('email maya@example.com')
+    const matches = await regexProvider.analyze('email maya@hogwarts.edu')
     expect(matches.some((m) => m.kind === 'email')).toBe(true)
   })
   it('analyzeWith merges results and de-overlaps by provider priority', async () => {

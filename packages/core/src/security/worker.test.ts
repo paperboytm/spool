@@ -6,6 +6,10 @@ import { runMigrations } from '../db/db.js'
 import { makeScanWorker, waitForIdle, type ScanWorker } from './worker.js'
 import { listFindings } from './repo.js'
 
+// Fake AWS access key — split at concat time so neither GitHub
+// push-protection nor our `*EXAMPLE` validator filters it.
+const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
+
 function setupDb(sessionCount = 1): Database.Database {
   const db = new Database(':memory:')
   runMigrations(db)
@@ -23,7 +27,7 @@ function setupDb(sessionCount = 1): Database.Database {
   )
   for (let i = 1; i <= sessionCount; i++) {
     insertSession.run(i, `s-${i}`, `/p/s-${i}`, `Session ${i}`, '2026-01-01', '2026-01-01')
-    insertMessage.run(i * 10, i, `Found AKIAIOSFODNN7EXAMPLE in session ${i}`)
+    insertMessage.run(i * 10, i, `Found ${FAKE_AKIA} in session ${i}`)
   }
   return db
 }

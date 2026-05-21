@@ -15,7 +15,20 @@
 // surfaces as a JWT rather than a generic bearer wrapping a JWT.
 
 import type { SensitiveKind, SensitiveMatch } from './types.js'
-import { hasQuotedEntropy, luhnOk } from './validators.js'
+import {
+  containsEllipsis,
+  containsRedactionMarker,
+  hasPublicEnvPrefix,
+  hasQuotedEntropy,
+  isObviouslyNonSecretValue,
+  isReservedDomain,
+  isReservedIp,
+  isVendorExampleKey,
+  looksLikeImageAsset,
+  looksLikePlaceholder,
+  luhnOk,
+  shannon,
+} from './validators.js'
 
 interface Rule {
   kind: SensitiveKind
@@ -139,7 +152,12 @@ const IPV4_RX = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[
 // Permissive match; `validIPv6` below rejects look-alikes (timestamps,
 // short colon-separated number strings). Real IPv6 either uses the
 // compressed `::` marker or contains the full 8 groups.
-const IPV6_RX = /\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b|\b(?:[0-9a-fA-F]{1,4}:){1,7}:|\b(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}\b/g
+//
+// Alternation order matters: try compressed forms (`hex:hex::hex`,
+// `hex:hex::`) FIRST so the greedy first alt doesn't gobble a 3-group
+// prefix of `2606:4700:4700::1111` and orphan the `::1111` tail. The
+// uncompressed full form goes last.
+const IPV6_RX = /\b(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}\b|\b(?:[0-9a-fA-F]{1,4}:){1,7}:|\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b/g
 
 /** Distinguishes real IPv6 addresses from look-alikes the broad
  *  regex above also accepts. Timestamps like `12:22:57` and other
@@ -169,28 +187,134 @@ const ABSOLUTE_PATH_RX = /(?:\/Users\/|\/home\/|\/var\/|\/etc\/|\/opt\/|[A-Z]:\\
 // `.home`, `.prod.*`, `.stg.*`) are unambiguous internal-DNS markers.
 const INTERNAL_HOST_RX = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:internal|corp|lan|intra|home|prod\.[a-z0-9]+|stg\.[a-z0-9]+)\b/gi
 
+// ── Per-rule validators (false-positive filters) ─────────────────
+//
+// Each validator runs after the regex matches. Returning false drops
+// the match before it becomes a finding. Composed from the shared
+// helpers in validators.ts; per-rule logic stays local to capture
+// the kind-specific shape (e.g. env-var has NAME=VALUE structure
+// that needs splitting before checking the value).
+
+/** env-var: NAME=VALUE assignment. Reject when name is a
+ *  public-by-convention prefix, value is a placeholder or already
+ *  redacted, value is a shell substitution (not a literal), or value
+ *  is a short JS string constant (`const FOO_KEY = 'app.storage.x'`,
+ *  not an env assignment). */
+function envVarLooksReal(value: string): boolean {
+  const eqIdx = value.indexOf('=')
+  if (eqIdx < 0) return false
+  const name = value.slice(0, eqIdx).trim()
+  if (hasPublicEnvPrefix(name)) return false
+  const raw = value.slice(eqIdx + 1).trim()
+  if (isObviouslyNonSecretValue(raw)) return false
+  // Strip outer quotes / backticks so the value-only checks aren't
+  // fooled by `=""` or `='...'`.
+  const stripped = raw.replace(/^[`'"]+|[`'"]+$/g, '').trim()
+  if (stripped.length < 8) return false
+  // Shell substitution / variable reference — value is computed at
+  // runtime, the literal isn't actually leaked.
+  if (/^\$[({]|^\$\w/.test(stripped)) return false
+  // Looks like a JS storage-key string constant: pure letters
+  // (any case, supports camelCase / SCREAMING_CASE keys) with
+  // dots/underscores/hyphens, NO digits, ≤ 28 chars. Real secrets
+  // have digits OR ≥ 32 chars, so the disjoint shape catches values
+  // like `'spool.shares.skeletonCount'` / `'theme_editor'` without
+  // rejecting a Stripe-style live key (has digits + ≥ 32 chars).
+  if (/^[a-zA-Z][a-zA-Z._\-]*$/.test(stripped) && stripped.length < 28) return false
+  return true
+}
+
+/** email: reject filenames (icon_16x16@2x.png), reserved/test
+ *  domains (example.com, RFC 2606). */
+function emailLooksReal(value: string): boolean {
+  if (looksLikeImageAsset(value)) return false
+  const atIdx = value.lastIndexOf('@')
+  if (atIdx < 0) return false
+  const domain = value.slice(atIdx + 1)
+  if (isReservedDomain(domain)) return false
+  return true
+}
+
+/** phone: country code can't start with 0 (ITU E.164). Digit count
+ *  in valid E.164 range. Also reject when the digit sequence is just
+ *  a year (4 digits at the end with year-like prefix). */
+function phoneLooksReal(value: string): boolean {
+  if (/^\+0/.test(value)) return false
+  const digits = value.replace(/\D/g, '')
+  if (digits.length < 7 || digits.length > 15) return false
+  return true
+}
+
+/** ip: reject loopback, RFC 5737 docs ranges, RFC 3849 IPv6 doc
+ *  range, unspecified address, link-local. */
+function ipLooksReal(value: string): boolean {
+  return !isReservedIp(value)
+}
+
+/** internal-host: reject JS property chains the regex inadvertently
+ *  matches (`process.env.HOME`, `import.meta.home`). */
+function internalHostLooksReal(value: string): boolean {
+  if (/^process\.env\./i.test(value)) return false
+  if (/^import\.meta\./i.test(value)) return false
+  if (/^window\.location\./i.test(value)) return false
+  return true
+}
+
+/** Vendor api-key: AWS docs ship `AKIAIOSFODNN7EXAMPLE` literally —
+ *  block anything ending in EXAMPLE/SAMPLE/etc. */
+function apiKeyLooksReal(value: string): boolean {
+  return !isVendorExampleKey(value)
+}
+
+/** Multi-line credential blobs (cloud-cred-ini, kubeconfig, netrc,
+ *  connection-string, url-creds, basic-auth, bearer) get the
+ *  generic "obviously non-secret" guard: rejects when the matched
+ *  block contains a redaction marker, ellipsis, or placeholder. */
+function credentialBlockLooksReal(value: string): boolean {
+  if (isObviouslyNonSecretValue(value)) return false
+  // AWS docs example key inside an ini block.
+  if (/AKIAIOSFODNN7EXAMPLE|wJalrXUtnFEMI/.test(value)) return false
+  return true
+}
+
+/** kubeconfig: token value should be high-entropy. The regex
+ *  captures `<field>: <value>` — the value is everything after the
+ *  colon. Reject if entropy is below ~3.5 (placeholder alphabets
+ *  like `abcdefghi…` clock in around 4.7 BUT have all-distinct chars
+ *  in a sequence — the entropy floor isn't enough alone). Also
+ *  block sequential alphabet / numeric placeholder values. */
+function kubeconfigTokenLooksReal(value: string): boolean {
+  if (!credentialBlockLooksReal(value)) return false
+  const colonIdx = value.indexOf(':')
+  if (colonIdx < 0) return true
+  const tokenValue = value.slice(colonIdx + 1).trim()
+  if (looksLikePlaceholder(tokenValue)) return false
+  if (shannon(tokenValue) < 3.0) return false
+  return true
+}
+
 const RULES: Rule[] = [
   { kind: 'private-key', rx: PEM_RX, confidence: 1.0 },
   { kind: 'ssh-key', rx: SSH_KEY_BODY_RX, confidence: 0.95 },
-  { kind: 'cloud-cred-ini', rx: AWS_INI_RX, confidence: 0.95 },
-  { kind: 'cloud-cred-ini', rx: GCLOUD_JSON_RX, confidence: 0.9 },
-  { kind: 'kubeconfig-token', rx: KUBECONFIG_RX, confidence: 0.85 },
-  { kind: 'netrc', rx: NETRC_RX, confidence: 0.95 },
-  { kind: 'connection-string', rx: CONN_STRING_RX, confidence: 0.9 },
-  { kind: 'url-creds', rx: URL_CREDS_RX, confidence: 0.95 },
-  { kind: 'basic-auth', rx: BASIC_AUTH_RX, confidence: 0.9 },
-  { kind: 'env-var', rx: ENV_VAR_RX, confidence: 0.9 },
+  { kind: 'cloud-cred-ini', rx: AWS_INI_RX, confidence: 0.95, validate: credentialBlockLooksReal },
+  { kind: 'cloud-cred-ini', rx: GCLOUD_JSON_RX, confidence: 0.9, validate: credentialBlockLooksReal },
+  { kind: 'kubeconfig-token', rx: KUBECONFIG_RX, confidence: 0.85, validate: kubeconfigTokenLooksReal },
+  { kind: 'netrc', rx: NETRC_RX, confidence: 0.95, validate: credentialBlockLooksReal },
+  { kind: 'connection-string', rx: CONN_STRING_RX, confidence: 0.9, validate: credentialBlockLooksReal },
+  { kind: 'url-creds', rx: URL_CREDS_RX, confidence: 0.95, validate: credentialBlockLooksReal },
+  { kind: 'basic-auth', rx: BASIC_AUTH_RX, confidence: 0.9, validate: credentialBlockLooksReal },
+  { kind: 'env-var', rx: ENV_VAR_RX, confidence: 0.9, validate: envVarLooksReal },
   { kind: 'generic-secret', rx: GENERIC_SECRET_RX, confidence: 0.6, validate: hasQuotedEntropy(4.0) },
   { kind: 'jwt', rx: JWT_RX, confidence: 0.95 },
-  { kind: 'api-key', rx: VENDOR_API_KEY_RX, confidence: 0.98 },
-  { kind: 'bearer', rx: BEARER_RX, confidence: 0.85 },
+  { kind: 'api-key', rx: VENDOR_API_KEY_RX, confidence: 0.98, validate: apiKeyLooksReal },
+  { kind: 'bearer', rx: BEARER_RX, confidence: 0.85, validate: credentialBlockLooksReal },
   { kind: 'credit-card', rx: CC_RX, confidence: 0.95, validate: luhnOk },
   { kind: 'ssn', rx: SSN_RX, confidence: 0.85 },
-  { kind: 'email', rx: EMAIL_RX, confidence: 0.85 },
-  { kind: 'phone', rx: PHONE_RX, confidence: 0.7 },
-  { kind: 'ip', rx: IPV4_RX, confidence: 0.55 },
-  { kind: 'ip', rx: IPV6_RX, confidence: 0.6, validate: validIPv6 },
-  { kind: 'internal-host', rx: INTERNAL_HOST_RX, confidence: 0.55 },
+  { kind: 'email', rx: EMAIL_RX, confidence: 0.85, validate: emailLooksReal },
+  { kind: 'phone', rx: PHONE_RX, confidence: 0.7, validate: phoneLooksReal },
+  { kind: 'ip', rx: IPV4_RX, confidence: 0.55, validate: ipLooksReal },
+  { kind: 'ip', rx: IPV6_RX, confidence: 0.6, validate: (v) => validIPv6(v) && ipLooksReal(v) },
+  { kind: 'internal-host', rx: INTERNAL_HOST_RX, confidence: 0.55, validate: internalHostLooksReal },
   { kind: 'absolute-path', rx: ABSOLUTE_PATH_RX, confidence: 0.75 },
 ]
 
