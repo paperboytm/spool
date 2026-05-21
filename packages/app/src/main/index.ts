@@ -111,7 +111,7 @@ let acpManager: AcpManager
 let isSyncActive = false
 let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
-const pfRuntime = makePfRuntime()
+const pfRuntime = makePfRuntime({ run: runWithObservability })
 // Lazily resolved on first access — pfModelsRoot() reads app.getPath
 // which throws before app.ready, but this module evaluates at boot.
 let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null
@@ -227,42 +227,54 @@ async function shutdownScanWorker(): Promise<void> {
  *  needs to drop the moment the runtime + backfill have settled
  *  (success or fail). The ScanBanner then takes over visually. */
 async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
-  try {
-    if (pfEnabled && pfModelInstalled()) {
-      await pfRuntime.start()
-      // pfRuntime.start() resolves even when the handshake failed —
-      // the hidden window might be up but transformers.js / ONNX
-      // crashed during model load. Check the actual runtime state
-      // before telling the scan worker pf is online: otherwise
-      // currentProfile drifts to `regex@4,pf@1.5b-q4`, every analyze
-      // round-trips to a dead host that returns [], and the user
-      // sees regex-only findings tagged with a profile string that
-      // lies about what scanned them.
-      const state = await pfRuntime.getState()
-      if (state?.status === 'ready') {
-        scanWorker?.notifyPfOnline()
+  await runWithObservability(
+    Effect.gen(function* () {
+      yield* Effect.annotateCurrentSpan('pf.enabled', pfEnabled)
+      if (pfEnabled && pfModelInstalled()) {
+        yield* Effect.promise(() => pfRuntime.start())
+        // pfRuntime.start() resolves even when the handshake failed —
+        // the hidden window might be up but transformers.js / ONNX
+        // crashed during model load. Check the actual runtime state
+        // before telling the scan worker pf is online: otherwise
+        // currentProfile drifts to `regex@4,pf@1.5b-q4`, every analyze
+        // round-trips to a dead host that returns [], and the user
+        // sees regex-only findings tagged with a profile string that
+        // lies about what scanned them.
+        const state = yield* Effect.promise(() => pfRuntime.getState())
+        yield* Effect.annotateCurrentSpan('pf.runtime.status', state?.status ?? 'null')
+        if (state?.runtime) yield* Effect.annotateCurrentSpan('pf.runtime.kind', state.runtime)
+        if (state?.error) yield* Effect.annotateCurrentSpan('pf.runtime.error', state.error)
+        if (state?.status === 'ready') {
+          yield* Effect.sync(() => scanWorker?.notifyPfOnline())
+          yield* Effect.annotateCurrentSpan('pf.notified', 'online')
+        } else {
+          yield* Effect.logError(
+            `[security] pf runtime failed to reach ready (status=${state?.status ?? 'unknown'}, error=${state?.error ?? 'unknown'})`,
+          )
+          yield* Effect.sync(() => scanWorker?.notifyPfOffline())
+          yield* Effect.annotateCurrentSpan('pf.notified', 'offline')
+        }
       } else {
-        console.error(
-          '[security] pf runtime failed to reach ready (status=%s, error=%s) — keeping worker pfOnline=false',
-          state?.status ?? 'unknown',
-          state?.error ?? 'unknown',
-        )
-        scanWorker?.notifyPfOffline()
+        yield* Effect.sync(() => scanWorker?.notifyPfOffline())
+        yield* Effect.promise(() => pfRuntime.stop())
       }
-    } else {
-      scanWorker?.notifyPfOffline()
-      await pfRuntime.stop()
-    }
-    if (scanWorker) {
-      await runWithObservability(scanWorker.backfill())
-    }
-  } finally {
-    const cur = loadSecurityPreferences()
-    if (cur.pfActivationPending) {
-      const next = saveSecurityPreferences({ pfActivationPending: false })
-      mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
-    }
-  }
+      if (scanWorker) {
+        yield* scanWorker.backfill()
+      }
+    }).pipe(
+      // pfActivationPending clears on the way out (success OR fail) so
+      // the callout's "Activating…" state stops hanging on a permanent
+      // failure. ScanBanner takes over visually once backfill enqueues.
+      Effect.ensuring(Effect.sync(() => {
+        const cur = loadSecurityPreferences()
+        if (cur.pfActivationPending) {
+          const next = saveSecurityPreferences({ pfActivationPending: false })
+          mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+        }
+      })),
+      Effect.withSpan('pf.sync_runtime'),
+    ),
+  )
 }
 
 function createWindow(): BrowserWindow {
@@ -467,6 +479,7 @@ app.whenReady().then(async () => {
     pfCoordinator = makePfCoordinator({
       modelDir: pfModelDir(),
       fetch: ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch,
+      run: runWithObservability,
     })
     // When a download initiated from the callout completes, finish
     // the activation handshake on the user's behalf — flip pfEnabled

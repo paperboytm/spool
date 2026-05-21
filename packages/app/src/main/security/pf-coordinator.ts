@@ -3,6 +3,7 @@
 // so the renderer's `evt-pf-state` always agrees with what the user
 // can act on. ModelHost spawn/unload lands in PR 5c.
 
+import { Effect } from 'effect'
 import { downloadModel, type DownloadProgress } from './model-download.js'
 import { MODEL_MANIFEST, manifestTotalBytes } from './model-manifest.js'
 import { pfInstallStatus } from './model-state.js'
@@ -31,6 +32,11 @@ export interface PfCoordinator {
 export interface PfCoordinatorDeps {
   modelDir: string
   fetch?: typeof globalThis.fetch
+  /** Effect runner that carries the main-process observability
+   *  layer. Defaults to bare `Effect.runPromise` for tests; main
+   *  passes `runWithObservability` so `pf.coordinator.download`
+   *  spans land in the same OTel pipeline as the rest of Spool. */
+  run?: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
 }
 
 export function makePfCoordinator(deps: PfCoordinatorDeps): PfCoordinator {
@@ -38,6 +44,7 @@ export function makePfCoordinator(deps: PfCoordinatorDeps): PfCoordinator {
   const totalBytes = manifestTotalBytes(MODEL_MANIFEST)
   let abortController: AbortController | null = null
   let state = initialState(deps.modelDir)
+  const run = (deps.run ?? Effect.runPromise) as <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
 
   function publish(): void {
     for (const fn of subscribers) {
@@ -54,39 +61,56 @@ export function makePfCoordinator(deps: PfCoordinatorDeps): PfCoordinator {
       bytesTotal: state.bytesTotal,
     }
     publish()
-    try {
-      await downloadModel({
-        modelDir: deps.modelDir,
-        manifest: MODEL_MANIFEST,
-        ...(deps.fetch ? { fetch: deps.fetch } : {}),
-        signal: abortController.signal,
-        onProgress: (p: DownloadProgress) => {
-          state = {
-            phase: 'downloading',
-            bytesDownloaded: p.bytesDownloaded,
-            bytesTotal: p.bytesTotal,
+    await run(
+      Effect.tryPromise({
+        try: () => downloadModel({
+          modelDir: deps.modelDir,
+          manifest: MODEL_MANIFEST,
+          ...(deps.fetch ? { fetch: deps.fetch } : {}),
+          signal: abortController!.signal,
+          onProgress: (p: DownloadProgress) => {
+            state = {
+              phase: 'downloading',
+              bytesDownloaded: p.bytesDownloaded,
+              bytesTotal: p.bytesTotal,
+            }
+            publish()
+          },
+        }),
+        catch: (err) => err,
+      }).pipe(
+        Effect.tap(() => Effect.sync(() => {
+          state = { phase: 'installed', bytesDownloaded: totalBytes, bytesTotal: totalBytes }
+        })),
+        Effect.tap(() => Effect.annotateCurrentSpan('pf.download.outcome', 'installed')),
+        Effect.catchAll((err) => Effect.sync(() => {
+          const aborted = (err as { name?: string } | undefined)?.name === 'AbortError'
+          if (aborted) {
+            state = initialState(deps.modelDir)
+          } else {
+            state = {
+              phase: 'failed',
+              bytesDownloaded: state.bytesDownloaded,
+              bytesTotal: state.bytesTotal,
+              error: err instanceof Error ? err.message : String(err),
+            }
           }
+        }).pipe(Effect.tap(() => Effect.annotateCurrentSpan(
+          'pf.download.outcome',
+          (err as { name?: string } | undefined)?.name === 'AbortError' ? 'cancelled' : 'failed',
+        )))),
+        Effect.ensuring(Effect.sync(() => {
+          abortController = null
           publish()
-        },
-      })
-      state = { phase: 'installed', bytesDownloaded: totalBytes, bytesTotal: totalBytes }
-    } catch (err) {
-      const aborted = (err as { name?: string } | undefined)?.name === 'AbortError'
-      if (aborted) {
-        // Cancel → drop back to whatever the filesystem says now.
-        state = initialState(deps.modelDir)
-      } else {
-        state = {
-          phase: 'failed',
-          bytesDownloaded: state.bytesDownloaded,
-          bytesTotal: state.bytesTotal,
-          error: err instanceof Error ? err.message : String(err),
-        }
-      }
-    } finally {
-      abortController = null
-      publish()
-    }
+        })),
+        Effect.withSpan('pf.coordinator.download', {
+          attributes: {
+            'pf.download.total_bytes': totalBytes,
+            'pf.download.files': MODEL_MANIFEST.files.length,
+          },
+        }),
+      ),
+    )
   }
 
   function cancelDownload(): void {

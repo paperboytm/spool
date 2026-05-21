@@ -33,6 +33,11 @@ export interface PfRuntimeDeps {
   spawnWindow?: () => Promise<BrowserWindow>
   /** Override `ipcMain` for tests. */
   ipc?: ModelHostDeps['ipc']
+  /** Effect runner that carries the main-process observability
+   *  layer. Defaults to bare `Effect.runPromise` for tests; main
+   *  passes `runWithObservability` so PF spans land in the same
+   *  OTel pipeline as scan-worker / sync-worker / IPC spans. */
+  run?: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
 }
 
 export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
@@ -42,22 +47,29 @@ export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
 
   const spawnWindow = deps.spawnWindow ?? defaultSpawnWindow
   const ipc = deps.ipc ?? ipcMain
+  // Cast: Effect.runPromise's generic shape is wider than what we
+  // need (it also accepts a Scope.Scope requirement). The override
+  // pin to <A, E> matches what main supplies.
+  const run = (deps.run ?? Effect.runPromise) as <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
 
   async function start(): Promise<void> {
     if (host) return
     if (starting) return starting
-    starting = (async () => {
-      const fresh = await Effect.runPromise(Scope.make())
-      const builtHost = await Effect.runPromise(
-        Effect.provideService(
-          makeModelHost({ spawnWindow, ipc }),
-          Scope.Scope,
-          fresh,
-        ),
-      )
-      host = builtHost
-      scope = fresh
-    })().finally(() => { starting = null })
+    starting = run(
+      Effect.gen(function* () {
+        const fresh = yield* Scope.make()
+        const builtHost = yield* Effect.provideService(makeModelHost({ spawnWindow, ipc }), Scope.Scope, fresh)
+        host = builtHost
+        scope = fresh
+        // Annotate after we have a state — useful when scrolling OTel
+        // for "what runtime did we land on this start cycle".
+        const settled = yield* builtHost.getState
+        yield* Effect.annotateCurrentSpan('pf.status', settled.status)
+        if (settled.runtime) yield* Effect.annotateCurrentSpan('pf.runtime', settled.runtime)
+        if (settled.adapterLabel) yield* Effect.annotateCurrentSpan('pf.adapter', settled.adapterLabel)
+        if (settled.error) yield* Effect.annotateCurrentSpan('pf.error', settled.error)
+      }).pipe(Effect.withSpan('pf.runtime.start')),
+    ).finally(() => { starting = null })
     await starting
   }
 
@@ -65,18 +77,28 @@ export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
     const s = scope
     host = null
     scope = null
-    if (s) await Effect.runPromise(Scope.close(s, Exit.void))
+    if (s) {
+      await run(Scope.close(s, Exit.void).pipe(Effect.withSpan('pf.runtime.stop')))
+    }
   }
 
   async function getState(): Promise<PfState | null> {
     if (!host) return null
-    return Effect.runPromise(host.getState)
+    return run(host.getState)
   }
 
   async function analyze(text: string): Promise<unknown[]> {
     if (!host) return []
-    return Effect.runPromise(
-      host.analyze(text).pipe(Effect.catchAll(() => Effect.succeed<unknown[]>([]))),
+    return run(
+      host.analyze(text).pipe(
+        Effect.tap((matches) =>
+          Effect.annotateCurrentSpan('pf.matches', matches.length)),
+        Effect.catchAll((err) =>
+          Effect.annotateCurrentSpan('pf.error', String(err.cause)).pipe(
+            Effect.as<unknown[]>([]),
+          )),
+        Effect.withSpan('pf.analyze', { attributes: { text_len: text.length } }),
+      ),
     )
   }
 
