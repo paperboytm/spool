@@ -172,7 +172,16 @@ async function bootScanWorker(): Promise<void> {
     // window drag, foreground IPC, and renderer-driven queries
     // responsive even mid-backfill. WAL mode lets the main-process
     // read handle coexist with the worker's write handle.
-    scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.js'))
+    //
+    // The pfBridge proxies the worker's pf-analyze-req messages
+    // through pfRuntime.analyze → hidden inference window. When
+    // pfRuntime isn't active, analyze() returns [] so the worker
+    // gets an empty result quickly instead of blocking.
+    scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.js'), {
+      analyze: (text) => pfRuntime.analyze(text) as Promise<Array<{
+        class: string; value: string; start: number; end: number; score: number
+      }>>,
+    })
   } catch (err) {
     console.error('[security] scan worker failed to boot:', err)
     scanWorker = null
@@ -194,15 +203,27 @@ async function shutdownScanWorker(): Promise<void> {
 }
 
 /** Bring the Privacy Filter inference window up or down to match the
- *  user's pfEnabled preference. We refuse to start the runtime if the
+ *  user's pfEnabled preference. Refuses to start the runtime if the
  *  ONNX weights aren't installed yet — flipping the toggle on while
  *  the download hasn't finished would just spawn a window with
- *  nothing to load. */
+ *  nothing to load. Tells the scan worker about the transition so its
+ *  pfProvider.available() agrees with reality and `scan_profile`
+ *  drifts (triggering a backfill rescan via worker.backfill()). */
 async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
   if (pfEnabled && pfModelInstalled()) {
     await pfRuntime.start()
+    scanWorker?.notifyPfOnline()
   } else {
+    scanWorker?.notifyPfOffline()
     await pfRuntime.stop()
+  }
+  // The profile string changes on every transition — kick a backfill
+  // so sessions whose stored scan_profile no longer matches get
+  // re-enqueued.
+  if (scanWorker) {
+    runWithObservability(scanWorker.backfill()).catch((err) => {
+      console.error('[security] pf-driven backfill failed:', err)
+    })
   }
 }
 

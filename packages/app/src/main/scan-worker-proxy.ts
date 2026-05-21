@@ -15,6 +15,17 @@ import type { FromWorker, ScanCommand, ToWorker } from './scan-worker-thread.js'
 export interface ScanWorkerProxy extends ScanWorker {
   /** Asks the worker thread to drain cleanly and waits for `exit`. */
   shutdown: () => Promise<void>
+  /** Tells the worker the PF inference window is up so the pfProvider
+   *  can start contributing findings. No-op when already online. */
+  notifyPfOnline: () => void
+  notifyPfOffline: () => void
+}
+
+export interface PfAnalyzeBridge {
+  /** Run the inference round-trip for one chunk of text. Returning []
+   *  is fine — the worker will treat it as "no PF matches". Errors get
+   *  bubbled back to the worker as pf-analyze-res ok:false. */
+  analyze: (text: string) => Promise<Array<{ class: string; value: string; start: number; end: number; score: number }>>
 }
 
 interface PendingCommand {
@@ -31,7 +42,10 @@ interface PendingCommand {
  *  disk Spotlight-indexing migrations on a fresh install. */
 const BOOT_TIMEOUT_MS = 10_000
 
-export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerProxy> {
+export async function spawnScanWorker(
+  workerPath: string,
+  pfBridge?: PfAnalyzeBridge,
+): Promise<ScanWorkerProxy> {
   const worker = new Worker(workerPath)
   const pending = new Map<number, PendingCommand>()
   let nextReqId = 1
@@ -134,6 +148,30 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
         seenFirstStatus = true
         Effect.runFork(PubSub.publish(statusChanges, msg.status))
         return
+      case 'pf-analyze-req': {
+        const { reqId, text } = msg
+        // No bridge wired (e.g. PF runtime not booted) → answer
+        // immediately with empty matches so the worker unblocks.
+        if (!pfBridge) {
+          try {
+            worker.postMessage({ type: 'pf-analyze-res', reqId, ok: true, matches: [] } satisfies ToWorker)
+          } catch { /* worker gone */ }
+          return
+        }
+        pfBridge.analyze(text)
+          .then((matches) => {
+            try {
+              worker.postMessage({ type: 'pf-analyze-res', reqId, ok: true, matches } satisfies ToWorker)
+            } catch { /* worker gone */ }
+          })
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err)
+            try {
+              worker.postMessage({ type: 'pf-analyze-res', reqId, ok: false, message } satisfies ToWorker)
+            } catch { /* worker gone */ }
+          })
+        return
+      }
       case 'fatal':
         // Surfaces in console; pending commands fail via 'exit' below.
         console.error('[security] scan worker thread fatal:', msg.error)
@@ -182,5 +220,13 @@ export async function spawnScanWorker(workerPath: string): Promise<ScanWorkerPro
           resolve()
         }
       }),
+    notifyPfOnline: () => {
+      try { worker.postMessage({ type: 'pf-online' } satisfies ToWorker) }
+      catch { /* worker gone */ }
+    },
+    notifyPfOffline: () => {
+      try { worker.postMessage({ type: 'pf-offline' } satisfies ToWorker) }
+      catch { /* worker gone */ }
+    },
   }
 }
