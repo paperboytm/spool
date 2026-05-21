@@ -108,8 +108,12 @@ export default function PfDownloadCard() {
                   style={{ width: `${percent}%` }}
                 />
               </div>
-              <p className="mt-1 font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums">
-                {formatBytes(state.bytesDownloaded)} / {formatBytes(state.bytesTotal)} · {percent}%
+              <p className="mt-1 font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
+                <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesDownloaded)}</span>
+                {' / '}
+                <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesTotal)}</span>
+                {' · '}
+                <span className="inline-block w-[3em] text-right">{percent}%</span>
               </p>
             </div>
           )}

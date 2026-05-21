@@ -83,8 +83,15 @@ export default function PfCallout() {
           <span className="text-[13px] font-medium text-warm-text dark:text-dark-text">
             {t('security.pf_callout_downloading', { defaultValue: 'Downloading Privacy Filter' })}
           </span>
-          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
-            {formatBytes(state.bytesDownloaded)} / {formatBytes(state.bytesTotal)} · {percent}%
+          {/* Each value lives in a right-aligned fixed-width slot so
+            * digit-count changes (47.3 MB → 100 MB; 5% → 10% → 100%)
+            * don't reflow the row width on every progress tick. */}
+          <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
+            <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesDownloaded)}</span>
+            {' / '}
+            <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesTotal)}</span>
+            {' · '}
+            <span className="inline-block w-[3em] text-right">{percent}%</span>
           </span>
         </div>
         <button
