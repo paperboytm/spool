@@ -8,6 +8,7 @@ import type {
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
   AllowlistEntryRow,
   Page,
+  CleanBackupsResult, VacuumDbResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 
@@ -282,6 +283,11 @@ const api = {
       sessionUuid?: string
     }): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:remove-allowlist-entry', args),
+
+    cleanBackups: (args: { keep: number }): Promise<CleanBackupsResult> =>
+      ipcRenderer.invoke('security:clean-backups', args),
+    vacuumDb: (): Promise<VacuumDbResult> =>
+      ipcRenderer.invoke('security:vacuum-db'),
   },
 }
 

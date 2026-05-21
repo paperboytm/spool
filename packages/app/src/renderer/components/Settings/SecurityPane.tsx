@@ -12,7 +12,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RotateCw, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  RotateCw, ArrowRight, ChevronDown, ChevronRight,
+  Archive, HardDrive,
+} from 'lucide-react'
 import type { ScanStatus, AllowlistEntryRow } from '@spool-lab/core'
 import {
   SENSITIVE_KIND_ORDER,
@@ -271,6 +274,63 @@ function SecurityPaneInner() {
         />
       </Section>
 
+      {/* Maintenance — manual, UI-triggered DB hygiene. Never runs on
+       *  app startup. Each row uses a click-twice in-place confirm
+       *  matching the allowlist remove pattern (see
+       *  AllowlistManageModal); we deliberately don't introduce a new
+       *  confirmation modal framework for these two narrow actions. */}
+      <Section title={t('settings.security.maintenance_title', { defaultValue: 'Maintenance' })}>
+        <div className="space-y-4">
+          <MaintenanceRow
+            testId="settings-clean-backups"
+            icon={<Archive size={13} strokeWidth={1.7} aria-hidden />}
+            label={t('settings.security.clean_backups_label', { defaultValue: 'Clean SQLite backups' })}
+            description={t('settings.security.clean_backups_sub', {
+              defaultValue: 'Spool snapshots the DB before destructive migrations into ~/.spool/backups/. Keeps the 3 most recent and deletes the rest.',
+            })}
+            actionIdle={t('settings.security.clean_backups_idle', { defaultValue: 'Clean' })}
+            actionConfirm={t('settings.security.clean_backups_confirm', { defaultValue: 'Confirm' })}
+            actionBusy={t('settings.security.clean_backups_busy', { defaultValue: 'Cleaning…' })}
+            run={async () => {
+              const res = await securityApi.cleanBackups(MAINTENANCE_BACKUPS_KEEP)
+              if (res.removed === 0) {
+                return t('settings.security.clean_backups_result_none', {
+                  defaultValue: 'No older backups to remove.',
+                })
+              }
+              return t('settings.security.clean_backups_result_count', {
+                count: res.removed,
+                size: formatBytes(res.bytesFreed),
+                defaultValue: 'Removed {{count}} backup files · freed {{size}}.',
+              })
+            }}
+          />
+          <MaintenanceRow
+            testId="settings-vacuum-db"
+            icon={<HardDrive size={13} strokeWidth={1.7} aria-hidden />}
+            label={t('settings.security.vacuum_db_label', { defaultValue: 'Vacuum database' })}
+            description={t('settings.security.vacuum_db_sub', {
+              defaultValue: 'Rebuilds the SQLite file in place to reclaim fragmented space. Takes a few seconds on large archives.',
+            })}
+            actionIdle={t('settings.security.vacuum_db_idle', { defaultValue: 'Vacuum' })}
+            actionConfirm={t('settings.security.vacuum_db_confirm', { defaultValue: 'Confirm' })}
+            actionBusy={t('settings.security.vacuum_db_busy', { defaultValue: 'Compacting…' })}
+            run={async () => {
+              const res = await securityApi.vacuumDb()
+              if (res.bytesFreed <= 0) {
+                return t('settings.security.vacuum_db_result_clean', {
+                  defaultValue: 'Database compacted. Already optimal — nothing to reclaim.',
+                })
+              }
+              return t('settings.security.vacuum_db_result_freed', {
+                size: formatBytes(res.bytesFreed),
+                defaultValue: 'Database compacted · freed {{size}}.',
+              })
+            }}
+          />
+        </div>
+      </Section>
+
       {allowlistOpen && (
         <AllowlistManageModal
           onClose={() => {
@@ -502,4 +562,139 @@ function MutedKindsGroup({ label, kinds, muted, onToggle, tone }: MutedKindsGrou
       </div>
     </div>
   )
+}
+
+/** How many DB backup snapshots to keep when the user clicks "Clean".
+ *  Snapshots are written by `backupBeforeDestructive` in
+ *  packages/core/src/db/db.ts; 3 covers ~3 destructive migrations
+ *  of history without ballooning ~/.spool/backups/. */
+const MAINTENANCE_BACKUPS_KEEP = 3
+
+interface MaintenanceRowProps {
+  testId: string
+  icon: ReactNode
+  label: string
+  description: string
+  actionIdle: string
+  actionConfirm: string
+  actionBusy: string
+  /** Side-effecting work; returns a human-readable result string for
+   *  inline display after success. */
+  run: () => Promise<string>
+}
+
+/** Two-step destructive button row. Idle → Confirm (second click) →
+ *  Busy → Result. Mirrors the click-twice pattern used in
+ *  AllowlistManageModal so we don't need to wire a separate
+ *  confirmation modal for these narrow administrative actions. */
+function MaintenanceRow({
+  testId,
+  icon,
+  label,
+  description,
+  actionIdle,
+  actionConfirm,
+  actionBusy,
+  run,
+}: MaintenanceRowProps) {
+  const { t } = useTranslation()
+  const [phase, setPhase] = useState<'idle' | 'confirm' | 'busy'>('idle')
+  const [result, setResult] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onClick() {
+    if (phase === 'busy') return
+    if (phase === 'idle') {
+      setPhase('confirm')
+      setResult(null)
+      setError(null)
+      return
+    }
+    // phase === 'confirm' → execute
+    setPhase('busy')
+    try {
+      const message = await run()
+      setResult(message)
+      setPhase('idle')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setPhase('idle')
+    }
+  }
+
+  const buttonLabel =
+    phase === 'busy' ? actionBusy
+    : phase === 'confirm' ? actionConfirm
+    : actionIdle
+
+  const confirming = phase === 'confirm'
+
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <span className="text-xs text-warm-muted dark:text-dark-muted inline-flex items-center gap-1.5">
+          <span className="text-warm-faint dark:text-dark-muted">{icon}</span>
+          {label}
+        </span>
+        <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">{description}</p>
+        {result && (
+          <p
+            data-testid={`${testId}-result`}
+            className="text-[11px] text-accent dark:text-accent-dark mt-1"
+          >
+            {result}
+          </p>
+        )}
+        {error && (
+          <p
+            data-testid={`${testId}-error`}
+            className="text-[11px] text-accent dark:text-accent-dark mt-1"
+          >
+            {t('settings.security.maintenance_error', {
+              defaultValue: 'Something went wrong: {{message}}',
+              message: error,
+            })}
+          </p>
+        )}
+      </div>
+      <div className="shrink-0 pt-0.5">
+        <button
+          type="button"
+          data-testid={testId}
+          data-phase={phase}
+          onClick={() => { void onClick() }}
+          disabled={phase === 'busy'}
+          className={`inline-flex items-center gap-1.5 h-7 rounded-[6px] border px-2.5 text-[12px] disabled:opacity-60 transition-colors ${
+            confirming
+              ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark'
+              : 'border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 text-warm-text dark:text-dark-text'
+          }`}
+        >
+          {phase === 'busy' && (
+            <RotateCw size={11} strokeWidth={1.8} aria-hidden className="animate-spin" />
+          )}
+          {buttonLabel}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Compact byte → human string. Values come from VACUUM result +
+ *  cleanBackups bytesFreed sums — kept narrow on purpose; no need
+ *  for full Intl.NumberFormat machinery for what's effectively a
+ *  KB/MB/GB readout. */
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  const formatted = value >= 100 || unit === 0
+    ? Math.round(value).toString()
+    : value.toFixed(1).replace(/\.0$/, '')
+  return `${formatted} ${units[unit]}`
 }

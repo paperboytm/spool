@@ -15,6 +15,8 @@ import type {
   ScanStatus,
   AllowlistEntryRow,
   Page,
+  CleanBackupsResult,
+  VacuumDbResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 import type { SecurityPreferences } from '../../preload/index.js'
@@ -75,6 +77,11 @@ export const securityApi = {
     valueHash: string
     sessionUuid?: string
   }) => window.spool.security.removeAllowlistEntry(args),
+
+  cleanBackups: (keep: number): Promise<CleanBackupsResult> =>
+    window.spool.security.cleanBackups({ keep }),
+  vacuumDb: (): Promise<VacuumDbResult> =>
+    window.spool.security.vacuumDb(),
 }
 
 export type SecurityApi = typeof securityApi

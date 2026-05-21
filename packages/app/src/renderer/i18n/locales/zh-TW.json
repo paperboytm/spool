@@ -247,7 +247,24 @@
       "rescan_button": "重新掃描全部會話",
       "rescan_sub": "將當前設定重新套用到全部會話。通常只在切換檢測器後才需要。",
       "rescan_busy": "重新掃描中…",
-      "rescan_idle": "重掃"
+      "rescan_idle": "重掃",
+      "_pendingNativeReview_maintenance": "Maintenance keys below are EN copies awaiting native review.",
+      "maintenance_title": "Maintenance",
+      "maintenance_error": "Something went wrong: {{message}}",
+      "clean_backups_label": "Clean SQLite backups",
+      "clean_backups_sub": "Spool snapshots the DB before destructive migrations into ~/.spool/backups/. Keeps the 3 most recent and deletes the rest.",
+      "clean_backups_idle": "Clean",
+      "clean_backups_confirm": "Confirm",
+      "clean_backups_busy": "Cleaning…",
+      "clean_backups_result_none": "No older backups to remove.",
+      "clean_backups_result_count_other": "Removed {{count}} backup files · freed {{size}}.",
+      "vacuum_db_label": "Vacuum database",
+      "vacuum_db_sub": "Rebuilds the SQLite file in place to reclaim fragmented space. Takes a few seconds on large archives.",
+      "vacuum_db_idle": "Vacuum",
+      "vacuum_db_confirm": "Confirm",
+      "vacuum_db_busy": "Compacting…",
+      "vacuum_db_result_clean": "Database compacted. Already optimal — nothing to reclaim.",
+      "vacuum_db_result_freed": "Database compacted · freed {{size}}."
     }
   },
   "security": {
