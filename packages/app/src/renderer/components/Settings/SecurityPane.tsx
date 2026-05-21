@@ -274,11 +274,6 @@ function SecurityPaneInner() {
         />
       </Section>
 
-      {/* Maintenance — manual, UI-triggered DB hygiene. Never runs on
-       *  app startup. Each row uses a click-twice in-place confirm
-       *  matching the allowlist remove pattern (see
-       *  AllowlistManageModal); we deliberately don't introduce a new
-       *  confirmation modal framework for these two narrow actions. */}
       <Section title={t('settings.security.maintenance_title', { defaultValue: 'Maintenance' })}>
         <div className="space-y-4">
           <MaintenanceRow
@@ -564,10 +559,6 @@ function MutedKindsGroup({ label, kinds, muted, onToggle, tone }: MutedKindsGrou
   )
 }
 
-/** How many DB backup snapshots to keep when the user clicks "Clean".
- *  Snapshots are written by `backupBeforeDestructive` in
- *  packages/core/src/db/db.ts; 3 covers ~3 destructive migrations
- *  of history without ballooning ~/.spool/backups/. */
 const MAINTENANCE_BACKUPS_KEEP = 3
 
 interface MaintenanceRowProps {
@@ -578,15 +569,9 @@ interface MaintenanceRowProps {
   actionIdle: string
   actionConfirm: string
   actionBusy: string
-  /** Side-effecting work; returns a human-readable result string for
-   *  inline display after success. */
   run: () => Promise<string>
 }
 
-/** Two-step destructive button row. Idle → Confirm (second click) →
- *  Busy → Result. Mirrors the click-twice pattern used in
- *  AllowlistManageModal so we don't need to wire a separate
- *  confirmation modal for these narrow administrative actions. */
 function MaintenanceRow({
   testId,
   icon,
@@ -610,7 +595,6 @@ function MaintenanceRow({
       setError(null)
       return
     }
-    // phase === 'confirm' → execute
     setPhase('busy')
     try {
       const message = await run()
@@ -680,10 +664,6 @@ function MaintenanceRow({
   )
 }
 
-/** Compact byte → human string. Values come from VACUUM result +
- *  cleanBackups bytesFreed sums — kept narrow on purpose; no need
- *  for full Intl.NumberFormat machinery for what's effectively a
- *  KB/MB/GB readout. */
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
