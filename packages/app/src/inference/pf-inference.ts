@@ -67,6 +67,14 @@ async function main(): Promise<void> {
     tx.env.allowRemoteModels = false
     tx.env.localModelPath = 'pf-model:///'
     tx.env.useBrowserCache = false
+    // ORT Runtime Web defaults to fetching its WASM / JS runtime
+    // from cdn.jsdelivr.net — incompatible with the offline guarantee
+    // + blocked by our strict CSP. Point it at our protocol's `ort/`
+    // subpath; main serves those files out of onnxruntime-web's dist.
+    // The wasm field is loosely typed via `?` — guard the assignment.
+    if (tx.env.backends.onnx.wasm) {
+      tx.env.backends.onnx.wasm.wasmPaths = 'pf-model:///ort/'
+    }
     const built = await tx.pipeline('token-classification', PF_MODEL_ID, {
       device: runtime === 'webgpu' ? 'webgpu' : 'wasm',
       dtype: 'q4',

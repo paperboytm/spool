@@ -13,9 +13,36 @@
 import { protocol } from 'electron'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { resolve, sep } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import { pfModelsRoot } from './model-paths.js'
+
+/** ORT WASM/JS files are loaded by the inference renderer at runtime
+ *  — by default ORT fetches them from cdn.jsdelivr.net, which the
+ *  Privacy-Filter-on-device promise won't allow. Resolve onnxruntime-web's
+ *  bundled `dist/` and serve those files through this protocol under
+ *  the `ort/` prefix instead. transformers.js's
+ *  `env.backends.onnx.wasm.wasmPaths` points back at us.
+ *
+ *  Lazy + memoised — `app.getPath('userData')` isn't safe pre-ready,
+ *  but createRequire is. Throws if onnxruntime-web isn't in the
+ *  resolution scope (would only happen if @huggingface/transformers
+ *  was uninstalled). */
+let ortDistRoot: string | null = null
+function getOrtDistRoot(): string {
+  if (ortDistRoot) return ortDistRoot
+  // onnxruntime-web is a TRANSITIVE dep of @huggingface/transformers,
+  // so it doesn't sit in main's direct resolution scope under pnpm
+  // (which doesn't hoist by default). Resolve transformers first,
+  // then resolve onnxruntime-web from transformers' own scope — that
+  // path always sees it because transformers depends on it directly.
+  const reqFromMain = createRequire(__filename)
+  const txEntry = reqFromMain.resolve('@huggingface/transformers')
+  const reqFromTx = createRequire(txEntry)
+  ortDistRoot = dirname(reqFromTx.resolve('onnxruntime-web'))
+  return ortDistRoot
+}
 
 const MIME_BY_EXT: Record<string, string> = {
   '.json': 'application/json',
@@ -23,6 +50,12 @@ const MIME_BY_EXT: Record<string, string> = {
   '.onnx_data': 'application/octet-stream',
   '.bin': 'application/octet-stream',
   '.txt': 'text/plain',
+  // ORT Runtime Web ships its WASM glue as ESM; dynamic import() in
+  // the renderer needs the response MIME to be a recognised JS type
+  // or Chromium refuses to evaluate it as a module.
+  '.mjs': 'text/javascript',
+  '.js': 'text/javascript',
+  '.wasm': 'application/wasm',
 }
 
 function mimeForPath(path: string): string {
@@ -47,9 +80,21 @@ export function registerPfModelProtocol(): void {
     // sits under "Application Support") don't mis-resolve.
     const combined = (url.host ? `/${url.host}` : '') + url.pathname
     const relPath = decodeURIComponent(combined).replace(/^\/+/, '')
-    const root = pfModelsRoot()
-    const target = resolve(root, relPath)
-    // Refuse anything that escapes the models parent directory.
+    // Two distinct subspaces share this protocol:
+    //   ort/<file>  → onnxruntime-web's dist (runtime binaries)
+    //   <anything>  → model bundle (weights, tokenizer, config)
+    // The `ort/` prefix is stripped before resolve so the join lands
+    // directly inside onnxruntime-web/dist/.
+    let root: string
+    let target: string
+    if (relPath === 'ort' || relPath.startsWith('ort/')) {
+      root = getOrtDistRoot()
+      target = resolve(root, relPath.slice('ort/'.length))
+    } else {
+      root = pfModelsRoot()
+      target = resolve(root, relPath)
+    }
+    // Refuse anything that escapes the resolved root.
     if (target !== root && !target.startsWith(root + sep)) {
       return new Response('forbidden', { status: 403 })
     }
