@@ -44,7 +44,13 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] })],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          // Hidden Privacy Filter inference window has its own preload —
+          // exposes a narrow `pfBridge` (no Spool app surface) so the
+          // inference renderer can't reach the main app's IPC channels.
+          inference: resolve(__dirname, 'src/preload/inference.ts'),
+        },
       },
     },
     resolve: { alias: coreAlias },
@@ -53,7 +59,14 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') },
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          // Inference window lives under src/inference/ but emits next
+          // to the main renderer so model-host.ts can `loadFile` it
+          // with a fixed relative path. electron-vite will produce
+          // out/renderer/pf-inference.html alongside index.html.
+          'pf-inference': resolve(__dirname, 'src/inference/pf-inference.html'),
+        },
       },
     },
     resolve: { alias: coreAlias },
