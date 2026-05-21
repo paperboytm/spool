@@ -12,9 +12,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   RotateCw, ArrowRight, ChevronDown, ChevronRight,
-  Archive, HardDrive,
+  Archive, Trash2, Check, Minus,
 } from 'lucide-react'
 import type { ScanStatus, AllowlistEntryRow } from '@spool-lab/core'
 import {
@@ -24,7 +25,7 @@ import {
   INFO_SEVERITY_KINDS,
   type SensitiveKind,
 } from '@spool-lab/redact'
-import { securityApi, type SecurityPreferences } from '../../api/security.js'
+import { securityApi, type SecurityPreferences, type BackupFileInfo } from '../../api/security.js'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
@@ -275,55 +276,7 @@ function SecurityPaneInner() {
       </Section>
 
       <Section title={t('settings.security.maintenance_title', { defaultValue: 'Maintenance' })}>
-        <div className="space-y-4">
-          <MaintenanceRow
-            testId="settings-clean-backups"
-            icon={<Archive size={13} strokeWidth={1.7} aria-hidden />}
-            label={t('settings.security.clean_backups_label', { defaultValue: 'Clean SQLite backups' })}
-            description={t('settings.security.clean_backups_sub', {
-              defaultValue: 'Spool snapshots the DB before destructive migrations into ~/.spool/backups/. Keeps the 3 most recent and deletes the rest.',
-            })}
-            actionIdle={t('settings.security.clean_backups_idle', { defaultValue: 'Clean' })}
-            actionConfirm={t('settings.security.clean_backups_confirm', { defaultValue: 'Confirm' })}
-            actionBusy={t('settings.security.clean_backups_busy', { defaultValue: 'Cleaning…' })}
-            run={async () => {
-              const res = await securityApi.cleanBackups(MAINTENANCE_BACKUPS_KEEP)
-              if (res.removed === 0) {
-                return t('settings.security.clean_backups_result_none', {
-                  defaultValue: 'No older backups to remove.',
-                })
-              }
-              return t('settings.security.clean_backups_result_count', {
-                count: res.removed,
-                size: formatBytes(res.bytesFreed),
-                defaultValue: 'Removed {{count}} backup files · freed {{size}}.',
-              })
-            }}
-          />
-          <MaintenanceRow
-            testId="settings-vacuum-db"
-            icon={<HardDrive size={13} strokeWidth={1.7} aria-hidden />}
-            label={t('settings.security.vacuum_db_label', { defaultValue: 'Vacuum database' })}
-            description={t('settings.security.vacuum_db_sub', {
-              defaultValue: 'Rebuilds the SQLite file in place to reclaim fragmented space. Takes a few seconds on large archives.',
-            })}
-            actionIdle={t('settings.security.vacuum_db_idle', { defaultValue: 'Vacuum' })}
-            actionConfirm={t('settings.security.vacuum_db_confirm', { defaultValue: 'Confirm' })}
-            actionBusy={t('settings.security.vacuum_db_busy', { defaultValue: 'Compacting…' })}
-            run={async () => {
-              const res = await securityApi.vacuumDb()
-              if (res.bytesFreed <= 0) {
-                return t('settings.security.vacuum_db_result_clean', {
-                  defaultValue: 'Database compacted. Already optimal — nothing to reclaim.',
-                })
-              }
-              return t('settings.security.vacuum_db_result_freed', {
-                size: formatBytes(res.bytesFreed),
-                defaultValue: 'Database compacted · freed {{size}}.',
-              })
-            }}
-          />
-        </div>
+        <BackupsManager />
       </Section>
 
       {allowlistOpen && (
@@ -559,109 +512,399 @@ function MutedKindsGroup({ label, kinds, muted, onToggle, tone }: MutedKindsGrou
   )
 }
 
-const MAINTENANCE_BACKUPS_KEEP = 3
-
-interface MaintenanceRowProps {
-  testId: string
-  icon: ReactNode
-  label: string
-  description: string
-  actionIdle: string
-  actionConfirm: string
-  actionBusy: string
-  run: () => Promise<string>
-}
-
-function MaintenanceRow({
-  testId,
-  icon,
-  label,
-  description,
-  actionIdle,
-  actionConfirm,
-  actionBusy,
-  run,
-}: MaintenanceRowProps) {
+function BackupsManager() {
   const { t } = useTranslation()
+  const [backups, setBackups] = useState<BackupFileInfo[] | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [phase, setPhase] = useState<'idle' | 'confirm' | 'busy'>('idle')
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // Initial-load error is kept inline so it stays visible until the user
+  // retries; delete success/failure goes through sonner toasts.
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  async function onClick() {
-    if (phase === 'busy') return
-    if (phase === 'idle') {
-      setPhase('confirm')
-      setResult(null)
-      setError(null)
-      return
-    }
-    setPhase('busy')
+  async function refresh() {
     try {
-      const message = await run()
-      setResult(message)
-      setPhase('idle')
+      const list = await securityApi.listBackups()
+      setBackups(list)
+      setLoadError(null)
+      // Drop any selection entries that no longer exist on disk.
+      setSelected(prev => {
+        const next = new Set<string>()
+        for (const b of list) if (prev.has(b.name)) next.add(b.name)
+        return next
+      })
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setPhase('idle')
+      setLoadError(e instanceof Error ? e.message : String(e))
+      // Leave backups as-is (null on first load, prior list on refresh) so
+      // we don't paint a misleading "No backups" message in place of the
+      // actual error.
     }
   }
 
-  const buttonLabel =
-    phase === 'busy' ? actionBusy
-    : phase === 'confirm' ? actionConfirm
-    : actionIdle
+  useEffect(() => { void refresh() }, [])
 
-  const confirming = phase === 'confirm'
+  const toggle = (name: string) => {
+    if (phase === 'busy') return
+    setPhase('idle')
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  const totalSize = (backups ?? []).reduce((a, b) => a + b.sizeBytes, 0)
+  const selectedSize = (backups ?? [])
+    .filter(b => selected.has(b.name))
+    .reduce((a, b) => a + b.sizeBytes, 0)
+
+  const autoBackups = (backups ?? []).filter(b => b.kind === 'auto')
+
+  const selectAuto = () => {
+    if (phase === 'busy' || autoBackups.length === 0) return
+    setPhase('idle')
+    setSelected(new Set(autoBackups.map(b => b.name)))
+  }
+
+  const selectAllButNewest = () => {
+    if (phase === 'busy' || !backups || backups.length <= 1) return
+    setPhase('idle')
+    // backups is already mtime-desc; skip [0].
+    setSelected(new Set(backups.slice(1).map(b => b.name)))
+  }
+
+  const toggleSelectAll = () => {
+    if (phase === 'busy' || !backups) return
+    setPhase('idle')
+    // All selected → clear; otherwise (none or partial) → select all.
+    if (selected.size === backups.length) setSelected(new Set())
+    else setSelected(new Set(backups.map(b => b.name)))
+  }
+
+  async function onDeleteClick() {
+    if (phase === 'busy' || selected.size === 0) return
+    if (phase === 'idle') {
+      setPhase('confirm')
+      return
+    }
+    setPhase('busy')
+    const requested = selected.size
+    try {
+      const res = await securityApi.deleteBackups([...selected])
+      setSelected(new Set())
+      setPhase('idle')
+      await refresh()
+      // Partial-delete case: some names couldn't be removed (raced with
+      // another process, perms, etc.). Surface it instead of pretending
+      // everything succeeded.
+      if (res.deleted < requested) {
+        toast.warning(t('settings.security.backups_delete_partial_title', {
+          deleted: res.deleted,
+          requested,
+          defaultValue: 'Deleted {{deleted}} of {{requested}} backups',
+        }), {
+          description: t('settings.security.backups_delete_partial_desc', {
+            size: formatBytes(res.bytesFreed),
+            defaultValue: 'Freed {{size}}. Some files could not be removed — they may have been deleted by another process.',
+          }),
+        })
+      } else {
+        toast.success(t('settings.security.backups_delete_result', {
+          count: res.deleted,
+          size: formatBytes(res.bytesFreed),
+          defaultValue: 'Deleted {{count}} backup files · freed {{size}}.',
+        }))
+      }
+    } catch (e) {
+      setPhase('idle')
+      toast.error(t('settings.security.backups_delete_failed_title', {
+        defaultValue: 'Could not delete backups',
+      }), {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
 
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <span className="text-xs text-warm-muted dark:text-dark-muted inline-flex items-center gap-1.5">
-          <span className="text-warm-faint dark:text-dark-muted">{icon}</span>
-          {label}
-        </span>
-        <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">{description}</p>
-        {result && (
-          <p
-            data-testid={`${testId}-result`}
-            className="text-[11px] text-accent dark:text-accent-dark mt-1"
-          >
-            {result}
-          </p>
-        )}
-        {error && (
-          <p
-            data-testid={`${testId}-error`}
-            className="text-[11px] text-accent dark:text-accent-dark mt-1"
-          >
-            {t('settings.security.maintenance_error', {
-              defaultValue: 'Something went wrong: {{message}}',
-              message: error,
-            })}
-          </p>
-        )}
+    <div data-testid="settings-backups">
+      <div className="flex items-center gap-1.5 text-xs text-warm-muted dark:text-dark-muted">
+        <Archive size={13} strokeWidth={1.7} aria-hidden className="text-warm-faint dark:text-dark-muted" />
+        {t('settings.security.backups_label', { defaultValue: 'SQLite backups' })}
       </div>
-      <div className="shrink-0 pt-0.5">
-        <button
-          type="button"
-          data-testid={testId}
-          data-phase={phase}
-          onClick={() => { void onClick() }}
-          disabled={phase === 'busy'}
-          className={`inline-flex items-center gap-1.5 h-7 rounded-[6px] border px-2.5 text-[12px] disabled:opacity-60 transition-colors ${
-            confirming
-              ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark'
-              : 'border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 text-warm-text dark:text-dark-text'
-          }`}
+      <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">
+        {t('settings.security.backups_sub', {
+          defaultValue: 'Snapshots Spool writes before destructive migrations or manual rollbacks. Pick which to delete.',
+        })}
+      </p>
+
+      {backups === null && loadError ? (
+        // Initial load failed — error message renders below.
+        null
+      ) : backups === null ? (
+        <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
+          {t('settings.security.backups_loading', { defaultValue: 'Loading…' })}
+        </p>
+      ) : backups.length === 0 ? (
+        <p className="text-[11px] text-warm-faint dark:text-dark-muted mt-2">
+          {t('settings.security.backups_empty', {
+            defaultValue: 'No backups in ~/.spool/backups/.',
+          })}
+        </p>
+      ) : (
+        <>
+          <div
+            data-testid="settings-backups-list"
+            className="mt-2 rounded-[6px] border border-warm-border dark:border-dark-border overflow-hidden"
+          >
+            <BackupsListHeader
+              total={backups.length}
+              totalSize={formatBytes(totalSize)}
+              selectedCount={selected.size}
+              selectedSize={formatBytes(selectedSize)}
+              phase={phase}
+              disabled={phase === 'busy'}
+              onToggleAll={toggleSelectAll}
+              onDeleteClick={() => { void onDeleteClick() }}
+            />
+            <ul className="max-h-72 overflow-y-auto divide-y divide-warm-border dark:divide-dark-border">
+              {backups.map(b => (
+                <BackupRow
+                  key={b.name}
+                  info={b}
+                  checked={selected.has(b.name)}
+                  disabled={phase === 'busy'}
+                  onToggle={() => toggle(b.name)}
+                />
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <BackupsChip
+              label={t('settings.security.backups_select_auto', {
+                count: autoBackups.length,
+                defaultValue: 'Select auto ({{count}})',
+              })}
+              disabled={autoBackups.length === 0 || phase === 'busy'}
+              onClick={selectAuto}
+            />
+            <BackupsChip
+              label={t('settings.security.backups_select_but_newest', {
+                defaultValue: 'Select all but newest',
+              })}
+              disabled={backups.length <= 1 || phase === 'busy'}
+              onClick={selectAllButNewest}
+            />
+          </div>
+        </>
+      )}
+
+      {loadError && (
+        <p
+          data-testid="settings-backups-load-error"
+          className="mt-2 text-[11px] text-accent dark:text-accent-dark"
         >
-          {phase === 'busy' && (
-            <RotateCw size={11} strokeWidth={1.8} aria-hidden className="animate-spin" />
-          )}
-          {buttonLabel}
-        </button>
-      </div>
+          {t('settings.security.backups_load_failed', {
+            defaultValue: 'Could not load backups: {{message}}',
+            message: loadError,
+          })}
+        </p>
+      )}
     </div>
   )
+}
+
+function BackupsListHeader({
+  total,
+  totalSize,
+  selectedCount,
+  selectedSize,
+  phase,
+  disabled,
+  onToggleAll,
+  onDeleteClick,
+}: {
+  total: number
+  totalSize: string
+  selectedCount: number
+  selectedSize: string
+  phase: 'idle' | 'confirm' | 'busy'
+  disabled: boolean
+  onToggleAll: () => void
+  onDeleteClick: () => void
+}) {
+  const { t } = useTranslation()
+  const state: 'none' | 'partial' | 'all' =
+    selectedCount === 0 ? 'none'
+    : selectedCount === total ? 'all'
+    : 'partial'
+  return (
+    <div
+      className={`flex items-center gap-2.5 h-8 px-2.5 text-[11px] border-b border-warm-border dark:border-dark-border bg-warm-surface2/40 dark:bg-dark-surface2/40 ${
+        disabled ? 'opacity-60' : ''
+      }`}
+    >
+      <label className={`flex items-center gap-2.5 min-w-0 flex-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+        <span
+          className={`relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-[3px] border transition-colors shrink-0 ${
+            state === 'none'
+              ? 'border-warm-border2 dark:border-dark-border2 bg-warm-surface dark:bg-dark-surface'
+              : 'bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={state === 'all'}
+            disabled={disabled}
+            onChange={onToggleAll}
+            aria-checked={state === 'partial' ? 'mixed' : state === 'all'}
+            className="sr-only"
+          />
+          {state === 'all' && <Check size={10} strokeWidth={2.5} className="text-white dark:text-warm-bg" aria-hidden />}
+          {state === 'partial' && <Minus size={10} strokeWidth={3} className="text-white dark:text-warm-bg" aria-hidden />}
+        </span>
+        <span className="min-w-0 truncate text-warm-muted dark:text-dark-muted font-medium">
+          {selectedCount === 0
+            ? t('settings.security.backups_header_all', { defaultValue: 'All' })
+            : t('settings.security.backups_header_selected_size', {
+                count: selectedCount,
+                size: selectedSize,
+                defaultValue: '{{count}} selected · {{size}}',
+              })}
+        </span>
+      </label>
+
+      {selectedCount === 0 ? (
+        <span className="shrink-0 font-mono tabular-nums text-warm-faint dark:text-dark-muted">
+          {t('settings.security.backups_summary', {
+            count: total,
+            size: totalSize,
+            defaultValue: '{{count}} files · {{size}} total',
+          })}
+        </span>
+      ) : (
+        <button
+          type="button"
+          data-testid="settings-backups-delete"
+          data-phase={phase}
+          onClick={onDeleteClick}
+          disabled={phase === 'busy'}
+          className={`shrink-0 inline-flex items-center gap-1 h-5 rounded-[4px] border px-1.5 text-[11px] font-medium disabled:opacity-50 transition-colors ${
+            phase === 'confirm'
+              ? 'border-accent dark:border-accent-dark bg-accent dark:bg-accent-dark text-white dark:text-warm-bg'
+              : 'border-accent/40 dark:border-accent-dark/40 bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark hover:border-accent dark:hover:border-accent-dark'
+          }`}
+        >
+          {phase === 'busy' ? (
+            <RotateCw size={11} strokeWidth={1.8} aria-hidden className="animate-spin" />
+          ) : (
+            <Trash2 size={11} strokeWidth={1.8} aria-hidden />
+          )}
+          {phase === 'busy'
+            ? t('settings.security.backups_deleting', { defaultValue: 'Deleting…' })
+            : phase === 'confirm'
+              ? t('settings.security.backups_confirm_delete_short', {
+                  defaultValue: 'Click again to delete',
+                })
+              : t('settings.security.backups_delete_short', {
+                  defaultValue: 'Delete',
+                })}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function BackupRow({
+  info,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  info: BackupFileInfo
+  checked: boolean
+  disabled: boolean
+  onToggle: () => void
+}) {
+  const { t } = useTranslation()
+  const age = formatAge(info.mtimeMs, t as unknown as (k: string, o?: Record<string, unknown>) => string)
+  return (
+    <li>
+      <label
+        className={`flex items-center gap-2.5 px-2.5 py-1.5 text-[11px] cursor-pointer transition-colors ${
+          checked
+            ? 'bg-accent-bg/40 dark:bg-accent-bg-dark/40'
+            : 'hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60'
+        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+      >
+        <span
+          className={`relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-[3px] border transition-colors shrink-0 ${
+            checked
+              ? 'bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark'
+              : 'border-warm-border2 dark:border-dark-border2 bg-warm-surface dark:bg-dark-surface'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={disabled}
+            onChange={onToggle}
+            className="sr-only"
+          />
+          {checked && <Check size={10} strokeWidth={2.5} className="text-white dark:text-warm-bg" aria-hidden />}
+        </span>
+        <span className="min-w-0 flex-1 font-mono truncate text-warm-text dark:text-dark-text">{info.name}</span>
+        <span className={`shrink-0 text-[10px] uppercase tracking-wide px-1 py-px rounded-sm ${
+          info.kind === 'auto'
+            ? 'bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark'
+            : 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-muted dark:text-dark-muted'
+        }`}>
+          {info.kind === 'auto'
+            ? t('settings.security.backups_kind_auto', { defaultValue: 'auto' })
+            : t('settings.security.backups_kind_manual', { defaultValue: 'manual' })}
+        </span>
+        <span className="shrink-0 font-mono tabular-nums text-warm-faint dark:text-dark-muted w-16 text-right">
+          {formatBytes(info.sizeBytes)}
+        </span>
+        <span className="shrink-0 text-warm-faint dark:text-dark-muted w-20 text-right">{age}</span>
+      </label>
+    </li>
+  )
+}
+
+function BackupsChip({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-2 text-[11px] text-warm-muted dark:text-dark-muted hover:border-warm-border2 dark:hover:border-dark-border2 hover:text-warm-text dark:hover:text-dark-text disabled:opacity-50 disabled:hover:border-warm-border dark:disabled:hover:border-dark-border disabled:cursor-not-allowed transition-colors"
+    >
+      {label}
+    </button>
+  )
+}
+
+function formatAge(mtimeMs: number, t: (k: string, o?: Record<string, unknown>) => string): string {
+  const diffMs = Date.now() - mtimeMs
+  if (diffMs < 0) return t('settings.security.backups_age_now', { defaultValue: 'just now' })
+  const min = Math.floor(diffMs / 60_000)
+  if (min < 1) return t('settings.security.backups_age_now', { defaultValue: 'just now' })
+  if (min < 60) return t('settings.security.backups_age_min', { count: min, defaultValue: '{{count}}m ago' })
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return t('settings.security.backups_age_hr', { count: hr, defaultValue: '{{count}}h ago' })
+  const day = Math.floor(hr / 24)
+  if (day < 30) return t('settings.security.backups_age_day', { count: day, defaultValue: '{{count}}d ago' })
+  const mo = Math.floor(day / 30)
+  return t('settings.security.backups_age_mo', { count: mo, defaultValue: '{{count}}mo ago' })
 }
 
 function formatBytes(bytes: number): string {

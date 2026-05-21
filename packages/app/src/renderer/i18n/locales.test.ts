@@ -98,6 +98,18 @@ describe('locale key parity vs en.json', () => {
     // interpolated values. Inflecting would require dropping the
     // multi-arg form.
     'security.chip_aria',
+    // Backups manager — {{count}} is shown as a bare number inside
+    // chip labels / age-suffix strings / result lines. None of the
+    // surrounding words inflect in the locales we ship; pluralising
+    // would just add noise.
+    'settings.security.backups_summary',
+    'settings.security.backups_select_auto',
+    'settings.security.backups_age_min',
+    'settings.security.backups_age_hr',
+    'settings.security.backups_age_day',
+    'settings.security.backups_age_mo',
+    'settings.security.backups_delete_result',
+    'settings.security.backups_header_selected_size',
   ]
 
   it('every {{count}} interpolation in en.json either has _other or is in the allow-list snapshot', () => {

@@ -23,14 +23,14 @@ import {
   listAllowlistEntries,
   removeAllowlistSession,
   removeAllowlistGlobal,
-  cleanBackups,
-  vacuumDb,
+  listBackups,
+  deleteBackups,
   type FindingFilter,
   type SessionFindingFilter,
   type ScanWorker,
   type PurgeResult,
-  type CleanBackupsResult,
-  type VacuumDbResult,
+  type BackupFileInfo,
+  type DeleteBackupsResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 import type Database from 'better-sqlite3'
@@ -71,8 +71,8 @@ export const SECURITY_IPC_CHANNELS = {
   REMOVE_ALLOWLIST_ENTRY:      'security:remove-allowlist-entry',
 
   // maintenance
-  CLEAN_BACKUPS:               'security:clean-backups',
-  VACUUM_DB:                   'security:vacuum-db',
+  LIST_BACKUPS:                'security:list-backups',
+  DELETE_BACKUPS:              'security:delete-backups',
 
   // events (push: main → renderer via webContents.send)
   EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
@@ -189,12 +189,12 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
 
   ipcMain.handle(
-    SECURITY_IPC_CHANNELS.CLEAN_BACKUPS,
-    (_e, args: { keep: number }): CleanBackupsResult => cleanBackups(db, { keep: args.keep }),
+    SECURITY_IPC_CHANNELS.LIST_BACKUPS,
+    (): BackupFileInfo[] => listBackups(db),
   )
   ipcMain.handle(
-    SECURITY_IPC_CHANNELS.VACUUM_DB,
-    (): VacuumDbResult => vacuumDb(db),
+    SECURITY_IPC_CHANNELS.DELETE_BACKUPS,
+    (_e, args: { names: string[] }): DeleteBackupsResult => deleteBackups(db, args.names),
   )
 
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES, () => listAllowlistEntries(db))

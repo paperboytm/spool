@@ -62,9 +62,8 @@ export type { PurgeResult, PurgeDeps } from './purge.js'
 export { makeScanWorker, waitForIdle } from './worker.js'
 export type { ScanWorker, WorkerConfig } from './worker.js'
 
-export { cleanBackups, vacuumDb, backupDirFor } from './maintenance.js'
+export { listBackups, deleteBackups, backupDirFor } from './maintenance.js'
 export type {
-  CleanBackupsOpts,
-  CleanBackupsResult,
-  VacuumDbResult,
+  BackupFileInfo,
+  DeleteBackupsResult,
 } from './maintenance.js'

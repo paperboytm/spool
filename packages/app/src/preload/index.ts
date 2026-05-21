@@ -8,7 +8,7 @@ import type {
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
   AllowlistEntryRow,
   Page,
-  CleanBackupsResult, VacuumDbResult,
+  BackupFileInfo, DeleteBackupsResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 
@@ -284,10 +284,10 @@ const api = {
     }): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:remove-allowlist-entry', args),
 
-    cleanBackups: (args: { keep: number }): Promise<CleanBackupsResult> =>
-      ipcRenderer.invoke('security:clean-backups', args),
-    vacuumDb: (): Promise<VacuumDbResult> =>
-      ipcRenderer.invoke('security:vacuum-db'),
+    listBackups: (): Promise<BackupFileInfo[]> =>
+      ipcRenderer.invoke('security:list-backups'),
+    deleteBackups: (args: { names: string[] }): Promise<DeleteBackupsResult> =>
+      ipcRenderer.invoke('security:delete-backups', args),
   },
 }
 
