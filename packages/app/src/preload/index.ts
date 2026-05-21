@@ -32,6 +32,14 @@ export interface PfDownloadState {
   bytesTotal: number
   error?: string
 }
+
+export interface PfRuntimeInfo {
+  status: 'idle' | 'loading' | 'ready' | 'failed'
+  runtime: 'webgpu' | 'wasm' | null
+  adapterLabel?: string
+  detectionMs?: number
+  error?: string
+}
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
@@ -311,6 +319,8 @@ const api = {
       ipcRenderer.invoke('security:pf-download-start'),
     pfDownloadCancel: (): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:pf-download-cancel'),
+    pfGetRuntimeInfo: (): Promise<PfRuntimeInfo | null> =>
+      ipcRenderer.invoke('security:pf-get-runtime-info'),
     onPfState: (cb: (state: PfDownloadState) => void) => {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as PfDownloadState)
       ipcRenderer.on('security:evt-pf-state', handler)

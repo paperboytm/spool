@@ -104,13 +104,9 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
       nodeIntegration: false,
     },
   })
-  // Prod: electron-vite emits `pf-inference.html` next to the main
-  // renderer's `index.html` under `out/renderer/` (see the rollup
-  // `input` map in electron.vite.config.ts).
-  // Dev: ELECTRON_RENDERER_URL points at the renderer dev server
-  // rooted at `src/renderer/`; the inference HTML source lives at
-  // `src/inference/pf-inference.html`, so we climb one level up
-  // through the dev server to reach it.
+  // Prod: electron-vite emits pf-inference.html under out/renderer/.
+  // Dev: ELECTRON_RENDERER_URL points at src/renderer/, so climb one
+  // level up to reach src/inference/pf-inference.html.
   const rendererBase = process.env['ELECTRON_RENDERER_URL']
   if (rendererBase) {
     await win.loadURL(`${rendererBase}/../inference/pf-inference.html`)

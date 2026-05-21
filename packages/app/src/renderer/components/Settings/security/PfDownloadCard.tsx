@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, X, RotateCw, AlertTriangle } from 'lucide-react'
-import { securityApi, type PfDownloadState, type SecurityPreferences } from '../../../api/security.js'
+import { securityApi, type PfDownloadState, type PfRuntimeInfo, type SecurityPreferences } from '../../../api/security.js'
 import { formatBytes } from '../../security/format.js'
 import Toggle from '../../Toggle.js'
 
@@ -15,6 +15,7 @@ export default function PfDownloadCard() {
   const [state, setState] = useState<PfDownloadState>(INITIAL)
   const [busy, setBusy] = useState(false)
   const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
+  const [runtime, setRuntime] = useState<PfRuntimeInfo | null>(null)
 
   useEffect(() => {
     void securityApi.pfGetState().then(setState).catch(() => setState(INITIAL))
@@ -23,6 +24,25 @@ export default function PfDownloadCard() {
     const offPrefs = securityApi.onPrefsChanged(setPrefs)
     return () => { offState(); offPrefs() }
   }, [])
+
+  // Poll runtime info while pfEnabled is on. ModelHost handshake can
+  // take up to 90 s on cold WASM; 2 s lets the badge update without
+  // spamming the IPC.
+  useEffect(() => {
+    if (!prefs?.pfEnabled || state.phase !== 'installed') {
+      setRuntime(null)
+      return
+    }
+    let cancelled = false
+    const tick = () => {
+      securityApi.pfGetRuntimeInfo()
+        .catch(() => null)
+        .then((info) => { if (!cancelled) setRuntime(info) })
+    }
+    tick()
+    const id = setInterval(tick, 2000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [prefs?.pfEnabled, state.phase])
 
   const startDownload = async () => {
     setBusy(true)
@@ -66,6 +86,19 @@ export default function PfDownloadCard() {
               defaultValue: 'OpenAI Privacy Filter · Apache 2.0 · runs on-device',
             })}
           </p>
+
+          {runtime?.status === 'ready' && runtime.runtime && (
+            <p
+              data-testid="settings-pf-runtime"
+              data-runtime={runtime.runtime}
+              className="mt-1.5 font-mono text-[10px] text-accent dark:text-accent-dark"
+            >
+              {runtime.runtime === 'webgpu'
+                ? t('settings.security.detector_pf_runtime_webgpu', { defaultValue: 'WebGPU' })
+                : t('settings.security.detector_pf_runtime_wasm', { defaultValue: 'WASM (CPU)' })}
+              {runtime.adapterLabel ? ` · ${runtime.adapterLabel}` : ''}
+            </p>
+          )}
 
           {state.phase === 'downloading' && (
             <div className="mt-2.5" data-testid="settings-pf-progress">

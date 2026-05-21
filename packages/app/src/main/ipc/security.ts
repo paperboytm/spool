@@ -40,6 +40,7 @@ import {
   type SecurityPreferences,
 } from '../securityPreferences.js'
 import type { PfCoordinator } from '../security/pf-coordinator.js'
+import type { PfRuntime } from '../security/pf-runtime.js'
 
 /** Channel name table. Shared via type only with the renderer adapter
  *  (no runtime import — preload uses the strings literally). */
@@ -79,6 +80,9 @@ export const SECURITY_IPC_CHANNELS = {
   PF_GET_STATE:                'security:pf-get-state',
   PF_DOWNLOAD_START:           'security:pf-download-start',
   PF_DOWNLOAD_CANCEL:          'security:pf-download-cancel',
+  /** Returns the inference runtime info — null when the ModelHost
+   *  isn't running. Polled by PfDownloadCard for the runtime badge. */
+  PF_GET_RUNTIME_INFO:         'security:pf-get-runtime-info',
 
   // events (push: main → renderer via webContents.send)
   EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
@@ -103,13 +107,17 @@ export interface SecurityIpcDeps {
    *  this to pfRuntime.start() / stop() so the inference window only
    *  exists when the user actually wants ML detection on. */
   onPfEnabledChanged?: (enabled: boolean) => void
+  /** The live ModelHost lifecycle. Exposed via PF_GET_RUNTIME_INFO
+   *  so the renderer can display "WebGPU · Apple M2 Pro" once the
+   *  hidden window has finished its handshake. */
+  pfRuntime?: PfRuntime | null
 }
 
 /** Register every Security Scan ipcMain.handle and start a background
  *  fiber that forwards worker change events to the main window. The
  *  returned disposer interrupts the forwarding fiber. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
-  const { db, worker, runPromise, getMainWindow, pfCoordinator, onPfEnabledChanged } = deps
+  const { db, worker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged } = deps
 
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS, (_e, filter: FindingFilter) =>
     listFindings(db, filter),
@@ -230,6 +238,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   ipcMain.handle(SECURITY_IPC_CHANNELS.PF_DOWNLOAD_CANCEL, () => {
     pfCoordinator?.cancelDownload()
     return { ok: true as const }
+  })
+  ipcMain.handle(SECURITY_IPC_CHANNELS.PF_GET_RUNTIME_INFO, async () => {
+    if (!hostRuntime?.isActive()) return null
+    return hostRuntime.getState()
   })
   const unsubscribePf = pfCoordinator?.subscribe((s) => {
     getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PF_STATE, s)

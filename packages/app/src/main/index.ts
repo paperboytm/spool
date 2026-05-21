@@ -443,6 +443,7 @@ app.whenReady().then(async () => {
         runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
         pfCoordinator,
+        pfRuntime,
         onPfEnabledChanged: (enabled) => {
           void syncPfRuntime(enabled).catch((err) => {
             console.error('[security] pf runtime transition failed:', err)
