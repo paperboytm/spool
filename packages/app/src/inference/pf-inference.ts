@@ -104,16 +104,23 @@ async function analyzeOne(
 ): Promise<void> {
   try {
     const output = await pipe(req.text, { aggregation_strategy: 'simple' })
-    const matches: PfMatch[] = output.map((m) => ({
-      // openai/privacy-filter emits `private_person`, `private_email`,
-      // etc. The class-mapping module operates on the short form so
-      // the same code works for future models without the prefix.
-      class: m.entity_group.toLowerCase().replace(/^private_/, ''),
-      value: m.word,
-      start: m.start,
-      end: m.end,
-      score: m.score,
-    }))
+    const matches: PfMatch[] = output
+      // Drop entries the tokenizer couldn't anchor back to the source
+      // text — start_offset / end_offset are NOT NULL in the findings
+      // schema and we'd just trigger SQLITE_CONSTRAINT_NOTNULL on
+      // insert otherwise. Span without offsets is useless anyway
+      // (can't be highlighted / purged / hover-revealed).
+      .filter((m) => Number.isFinite(m.start) && Number.isFinite(m.end))
+      .map((m) => ({
+        // openai/privacy-filter emits `private_person`, `private_email`,
+        // etc. The class-mapping module operates on the short form so
+        // the same code works for future models without the prefix.
+        class: m.entity_group.toLowerCase().replace(/^private_/, ''),
+        value: m.word,
+        start: m.start,
+        end: m.end,
+        score: m.score,
+      }))
     bridge.sendAnalyzeResult({ reqId: req.reqId, ok: true, matches })
   } catch (err) {
     bridge.sendAnalyzeResult({
