@@ -104,11 +104,26 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
       nodeIntegration: false,
     },
   })
+  // The inference renderer is hidden, so its console + uncaught
+  // exceptions never surface otherwise. Without this forward,
+  // transformers.js / ONNX failures look like a stuck handshake from
+  // main's POV. Production logs land in the same OTel pipeline that
+  // captures other main-side console output.
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const tag = level >= 2 ? 'ERR' : level === 1 ? 'WARN' : 'LOG'
+    console.log(`[pf-inference ${tag}]`, message, sourceId ? `(${sourceId}:${line})` : '')
+  })
+  win.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[pf-inference] render process gone:', details.reason, details.exitCode)
+  })
   // Prod: electron-vite emits pf-inference.html under out/renderer/.
   // Dev: ELECTRON_RENDERER_URL points at src/renderer/, so climb one
-  // level up to reach src/inference/pf-inference.html.
+  // level up to reach src/inference/pf-inference.html. Open devtools
+  // detached in dev so a failed model load is immediately
+  // inspectable without manually invoking webContents.openDevTools.
   const rendererBase = process.env['ELECTRON_RENDERER_URL']
   if (rendererBase) {
+    win.webContents.openDevTools({ mode: 'detach' })
     await win.loadURL(`${rendererBase}/../inference/pf-inference.html`)
   } else {
     await win.loadFile(join(app.getAppPath(), 'out/renderer/pf-inference.html'))
