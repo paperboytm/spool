@@ -42,6 +42,9 @@ import { Effect } from 'effect'
 import { registerSecurityIpc } from './ipc/security.js'
 import { loadSecurityPreferences } from './securityPreferences.js'
 import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
+import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
+import { makePfCoordinator } from './security/pf-coordinator.js'
+import { pfModelDir } from './security/model-paths.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
@@ -57,6 +60,12 @@ import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
+
+// Privilege the `pf-model://` scheme before app.ready so the hidden
+// inference renderer can fetch model files through it. Has to happen
+// here (module top-level) because protocol.registerSchemesAsPrivileged
+// is a no-op once Electron has finished initialising.
+registerPfModelScheme()
 
 // Start the main-process event-loop lag monitor before any other module
 // has a chance to do work. Cheap (a C++ histogram in node:perf_hooks).
@@ -103,6 +112,9 @@ let isSyncActive = false
 let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
 const pfRuntime = makePfRuntime()
+// Lazily resolved on first access — pfModelsRoot() reads app.getPath
+// which throws before app.ready, but this module evaluates at boot.
+let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null
 
 type CachedSearchValue = FragmentResult[]
 
@@ -420,6 +432,9 @@ app.whenReady().then(async () => {
   // Gated by VITE_FEATURE_SECURITY so production builds (where the
   // env var stays unset) never start the scanner.
   if (securityFeatureEnabled()) {
+    // Has to happen post-ready (uses protocol.handle + app.getPath).
+    registerPfModelProtocol()
+    pfCoordinator = makePfCoordinator({ modelDir: pfModelDir() })
     void bootScanWorker().then(() => {
       if (!scanWorker) return
       disposeSecurityIpc = registerSecurityIpc({
@@ -427,6 +442,7 @@ app.whenReady().then(async () => {
         worker: scanWorker,
         runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
+        pfCoordinator,
         onPfEnabledChanged: (enabled) => {
           void syncPfRuntime(enabled).catch((err) => {
             console.error('[security] pf runtime transition failed:', err)

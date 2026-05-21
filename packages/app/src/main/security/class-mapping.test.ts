@@ -6,7 +6,7 @@ const regex = (kind: SensitiveMatch['kind'], start: number, end: number): Sensit
   kind, value: '', start, end, confidence: 0.95, provider: 'regex',
 })
 
-describe('class mapping — direct mappings', () => {
+describe('class mapping — direct mappings (openai/privacy-filter classes)', () => {
   it('person → person-name', () => {
     const pf: PfRawMatch = { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 }
     const out = mapPfMatch(pf, { regexMatches: [], fullText: 'Maya' })
@@ -81,6 +81,11 @@ describe('class mapping — suppression rules', () => {
       fullText: 'DOB: 2002-11-09',
     })
     expect(out?.kind).toBe('date-of-birth')
+  })
+
+  it('unknown labels are dropped without throwing', () => {
+    const pf: PfRawMatch = { class: 'wat-is-this', value: 'x', start: 0, end: 1, score: 0.8 }
+    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'x' })).toBeNull()
   })
 })
 

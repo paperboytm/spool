@@ -1,18 +1,31 @@
-// Filesystem paths + version constants for the OpenAI Privacy Filter
-// model bundle. Centralised so the download / load / unload code
-// agrees, and so the path appears in one place in Settings.
+// Filesystem paths + version constants for the Privacy Filter ONNX
+// model bundle. Centralised so download / load / unload code agrees
+// and the directory shows up in one place in Settings.
 
 import { app } from 'electron'
 import { join } from 'node:path'
 
+/** Directory name under userData/models/. Bumped any time the model
+ *  changes — the scan profile string keys off PF_PROFILE_VERSION so
+ *  a model swap forces a full rescan. */
 export const PF_MODEL_ID = 'openai-privacy-filter-q4'
 export const PF_MODEL_VERSION = '1.5b-q4'
 /** HuggingFace repository — pinned to a specific commit at download
- *  time. Source of truth is `manifest.json` colocated with the bundle. */
+ *  time. transformers.js loads the model files via the pf-model://
+ *  protocol against the local copy; this URL is only used by the
+ *  downloader, never by the inference renderer. */
 export const PF_HF_REPO = 'openai/privacy-filter'
 
+/** Parent directory for all model bundles. transformers.js fetches
+ *  files at `${env.localModelPath}/${modelId}/${file}`, so the
+ *  protocol resolves relative to this and not to the model-specific
+ *  subdirectory. */
+export function pfModelsRoot(): string {
+  return join(app.getPath('userData'), 'models')
+}
+
 export function pfModelDir(): string {
-  return join(app.getPath('userData'), 'models', PF_MODEL_ID)
+  return join(pfModelsRoot(), PF_MODEL_ID)
 }
 
 export function pfManifestPath(): string {

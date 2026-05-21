@@ -31,6 +31,7 @@
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
+    "@huggingface/transformers": "^4.2.0",
     "@spool-lab/core": "workspace:*",
     "@spool-lab/redact": "workspace:^",
     "@spool/share-kit": "workspace:*",
