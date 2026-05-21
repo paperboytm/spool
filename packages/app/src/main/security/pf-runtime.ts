@@ -117,14 +117,21 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
     console.error('[pf-inference] render process gone:', details.reason, details.exitCode)
   })
   // Prod: electron-vite emits pf-inference.html under out/renderer/.
-  // Dev: ELECTRON_RENDERER_URL points at src/renderer/, so climb one
-  // level up to reach src/inference/pf-inference.html. Open devtools
-  // detached in dev so a failed model load is immediately
-  // inspectable without manually invoking webContents.openDevTools.
+  // Dev: Vite roots the renderer at src/renderer/, but our HTML lives
+  // at src/inference/pf-inference.html — outside that root. A relative
+  // `/../inference/...` URL gets normalised by the URL parser and ends
+  // up hitting Vite's SPA fallback, which silently serves the main
+  // renderer's index.html into the hidden window (the symptom: a
+  // bunch of Sidebar / LibraryLanding "undefined" errors and pf:ready
+  // never arrives). Use Vite's @fs/<abs-path> escape hatch, paired
+  // with server.fs.allow in electron.vite.config.ts. Devtools opens
+  // detached in dev so a failed model load is immediately inspectable.
   const rendererBase = process.env['ELECTRON_RENDERER_URL']
   if (rendererBase) {
     win.webContents.openDevTools({ mode: 'detach' })
-    await win.loadURL(`${rendererBase}/../inference/pf-inference.html`)
+    // __dirname in dev = packages/app/out/main → ../.. = packages/app
+    const inferenceHtml = join(__dirname, '../../src/inference/pf-inference.html')
+    await win.loadURL(`${rendererBase.replace(/\/$/, '')}/@fs${inferenceHtml}`)
   } else {
     await win.loadFile(join(app.getAppPath(), 'out/renderer/pf-inference.html'))
   }
