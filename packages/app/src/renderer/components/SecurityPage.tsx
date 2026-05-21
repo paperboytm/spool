@@ -36,6 +36,7 @@ import {
 import { securityApi } from '../api/security.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
+import PfCallout from './security/PfCallout.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
 import { truncateValue } from './security/truncate-value.js'
 import {
@@ -523,6 +524,13 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
               result={scanResult}
               onDismiss={() => setScanResult(null)}
             />
+          )}
+          {/* PF discovery callout — sits below any transient scan
+           *  banner so the active-scan signal always wins for
+           *  attention. Self-gates on pfCalloutDismissed + pfEnabled;
+           *  parent doesn't need to know the state. */}
+          {!shouldShowScanBanner(scanStatus, displayBusy) && !scanResult && (
+            <PfCallout />
           )}
           {loading ? null : error ? (
             <p className="text-sm text-warm-muted dark:text-dark-muted py-4">

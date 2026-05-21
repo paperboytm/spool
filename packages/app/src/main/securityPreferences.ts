@@ -43,6 +43,12 @@ export interface SecurityPreferences {
    *  The provider is a stub today; this preference is the toggle UI
    *  state so the user's choice survives a restart once ML lands. */
   pfEnabled: boolean
+  /** True once the user has dismissed the in-page PF discovery callout
+   *  on the Security page. Permanent — the Settings card stays as the
+   *  ongoing management surface, the callout is only an acquisition
+   *  prompt. Auto-set to true the moment pfEnabled flips on so users
+   *  who came in through Settings never see a redundant nudge. */
+  pfCalloutDismissed: boolean
 }
 
 const DEFAULTS: SecurityPreferences = {
@@ -51,6 +57,7 @@ const DEFAULTS: SecurityPreferences = {
   rescanAfterSync: 'auto',
   revealValuesOnHoverOnly: false,
   pfEnabled: false,
+  pfCalloutDismissed: false,
 }
 
 interface SecurityConfigFile {
@@ -59,6 +66,7 @@ interface SecurityConfigFile {
   rescanAfterSync?: unknown
   revealValuesOnHoverOnly?: unknown
   pfEnabled?: unknown
+  pfCalloutDismissed?: unknown
   [key: string]: unknown
 }
 
@@ -93,6 +101,7 @@ export function loadSecurityPreferences(): SecurityPreferences {
     rescanAfterSync: normalizeRescan(c.rescanAfterSync),
     revealValuesOnHoverOnly: c.revealValuesOnHoverOnly === true,
     pfEnabled: c.pfEnabled === true,
+    pfCalloutDismissed: c.pfCalloutDismissed === true,
   }
 }
 
@@ -104,7 +113,14 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
   if (next.infoDefaultVisible !== undefined) merged.infoDefaultVisible = next.infoDefaultVisible === true
   if (next.rescanAfterSync !== undefined) merged.rescanAfterSync = normalizeRescan(next.rescanAfterSync)
   if (next.revealValuesOnHoverOnly !== undefined) merged.revealValuesOnHoverOnly = next.revealValuesOnHoverOnly === true
-  if (next.pfEnabled !== undefined) merged.pfEnabled = next.pfEnabled === true
+  if (next.pfEnabled !== undefined) {
+    merged.pfEnabled = next.pfEnabled === true
+    // Enabling pf supersedes the in-page nudge — once a user actually
+    // turns it on (via Settings or the callout itself) the callout
+    // becomes redundant and should never appear again.
+    if (next.pfEnabled === true) merged.pfCalloutDismissed = true
+  }
+  if (next.pfCalloutDismissed !== undefined) merged.pfCalloutDismissed = next.pfCalloutDismissed === true
   writeFile(merged)
   return loadSecurityPreferences()
 }

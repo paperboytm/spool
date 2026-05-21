@@ -45,6 +45,7 @@ describe('loadSecurityPreferences', () => {
       rescanAfterSync: 'auto',
       revealValuesOnHoverOnly: false,
       pfEnabled: false,
+      pfCalloutDismissed: false,
     })
   })
 
@@ -191,7 +192,24 @@ describe('saveSecurityPreferences', () => {
       rescanAfterSync: 'manual',
       revealValuesOnHoverOnly: true,
       pfEnabled: true,
+      // Side-effect of saveSecurityPreferences: flipping pfEnabled on
+      // also auto-sets pfCalloutDismissed so the in-page discovery
+      // banner doesn't re-appear after the user opts in.
+      pfCalloutDismissed: true,
     })
+  })
+
+  it('flipping pfEnabled off does NOT touch pfCalloutDismissed', () => {
+    mod.saveSecurityPreferences({ pfCalloutDismissed: true })
+    mod.saveSecurityPreferences({ pfEnabled: false })
+    expect(mod.loadSecurityPreferences().pfCalloutDismissed).toBe(true)
+  })
+
+  it('explicit pfCalloutDismissed:false can re-arm the callout', () => {
+    mod.saveSecurityPreferences({ pfEnabled: true })  // also flips dismissed to true
+    expect(mod.loadSecurityPreferences().pfCalloutDismissed).toBe(true)
+    mod.saveSecurityPreferences({ pfEnabled: false, pfCalloutDismissed: false })
+    expect(mod.loadSecurityPreferences().pfCalloutDismissed).toBe(false)
   })
 
   // Filesystem-error path is exercised on platforms where chmod is
