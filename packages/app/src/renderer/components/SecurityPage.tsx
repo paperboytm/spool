@@ -737,9 +737,26 @@ function ScanBanner({ status }: { status: ScanStatus }) {
         <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
           {t('security.scanning', { defaultValue: 'Scanning' })}
         </span>
-        <span className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums">
-          {status.currentProfile}
-        </span>
+        {/* Burst-scoped progress count: "23 of 145 rescans" makes it
+         *  obvious this is the active re-scan batch (sessions whose
+         *  scan_profile drifted from current), not the library total.
+         *  Without the verb "rescans" the slash format invites
+         *  comparison with the sidebar's total-sessions number — which
+         *  is a different denominator and would feel inconsistent.
+         *  Only show once we have a stable total; suppress while
+         *  inFlight=0 (terminal moment before the banner hides). */}
+        {total > 0 && (
+          <span
+            data-testid="security-scan-banner-progress"
+            className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums whitespace-nowrap"
+          >
+            {t('security.scanning_progress', {
+              done,
+              total,
+              defaultValue: '{{done}} of {{total}} rescans',
+            })}
+          </span>
+        )}
       </div>
       <span aria-hidden />
       {/* Deterministic progress strip. The pct read here is fine
