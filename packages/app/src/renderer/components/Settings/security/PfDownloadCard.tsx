@@ -78,12 +78,12 @@ export default function PfDownloadCard() {
           </div>
           <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">
             {t('settings.security.detector_pf_body', {
-              defaultValue: 'Catches obfuscated emails, phone numbers, DOB, and novel secrets hidden in code blocks, quotes, or non-standard formats — the cases regex skips. Names, addresses, URLs, and account numbers are disabled (FP rate on code-heavy content too high).',
+              defaultValue: 'Fills regex blind spots: emails, phones, DOB, novel secrets. Names / addresses / URLs / accounts disabled.',
             })}
           </p>
           <p className="font-mono text-[10px] text-warm-faint dark:text-dark-muted/70">
             {t('settings.security.detector_pf_footer', {
-              defaultValue: 'OpenAI Privacy Filter · Apache 2.0 · ~5-30s per session (WebGPU) · runs on-device',
+              defaultValue: 'OpenAI · Apache 2.0 · ~5-30s per session · on-device',
             })}
           </p>
 
