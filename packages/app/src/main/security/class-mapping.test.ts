@@ -42,11 +42,6 @@ describe('class mapping — confidence floor', () => {
 })
 
 describe('class mapping — suppression rules', () => {
-  it('secret with no regex generic-secret nearby is suppressed', () => {
-    const pf: PfRawMatch = { class: 'secret', value: 'abc', start: 0, end: 3, score: 0.9 }
-    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'abc' })).toBeNull()
-  })
-
   it('secret overlapping a regex generic-secret → generic-secret (boost)', () => {
     const pf: PfRawMatch = { class: 'secret', value: 'xyz', start: 5, end: 8, score: 0.9 }
     const out = mapPfMatch(pf, {
@@ -54,6 +49,30 @@ describe('class mapping — suppression rules', () => {
       fullText: 'token = "xyz" plus extra',
     })
     expect(out?.kind).toBe('generic-secret')
+  })
+
+  describe('secret standalone (no regex overlap) safety net', () => {
+    // Real-shape standalone secret — high score, ≥16 chars, high entropy.
+    // Should land as generic-secret since regex doesn't know this prefix.
+    it('high-confidence high-entropy ≥16 chars passes', () => {
+      const value = 'j82H1xK9pQrSt7VwYzA3bC5dF8gJ'  // 28 random mixed chars
+      const pf: PfRawMatch = { class: 'secret', value, start: 0, end: value.length, score: 0.97 }
+      expect(mapPfMatch(pf, { regexMatches: [], fullText: value })?.kind).toBe('generic-secret')
+    })
+    it('drops below confidence 0.95', () => {
+      const value = 'j82H1xK9pQrSt7VwYzA3bC5dF8gJ'
+      const pf: PfRawMatch = { class: 'secret', value, start: 0, end: value.length, score: 0.94 }
+      expect(mapPfMatch(pf, { regexMatches: [], fullText: value })).toBeNull()
+    })
+    it('drops below 16 chars even at high confidence', () => {
+      const pf: PfRawMatch = { class: 'secret', value: 'shortpw1234', start: 0, end: 11, score: 0.99 }
+      expect(mapPfMatch(pf, { regexMatches: [], fullText: 'shortpw1234' })).toBeNull()
+    })
+    it('drops low-entropy strings (placeholder passwords)', () => {
+      const value = 'changemechangeme'  // 16 chars but repetitive — low entropy
+      const pf: PfRawMatch = { class: 'secret', value, start: 0, end: value.length, score: 0.99 }
+      expect(mapPfMatch(pf, { regexMatches: [], fullText: value })).toBeNull()
+    })
   })
 
   it('date alone is suppressed', () => {
