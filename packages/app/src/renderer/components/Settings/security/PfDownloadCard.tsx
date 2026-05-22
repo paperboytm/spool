@@ -64,11 +64,15 @@ export default function PfDownloadCard() {
     <div
       data-testid="settings-detector-pf"
       data-phase={state.phase}
-      className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface/40 dark:bg-dark-surface/40 px-3.5 py-3"
+      className="relative rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface/40 dark:bg-dark-surface/40 px-3.5 py-3"
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="min-w-0">
+        {/* Title row reserves right-space so the absolute-positioned
+         *  action (Download / Cancel / Toggle / Retry) doesn't run
+         *  under "Privacy Filter · 945 MB". Body + footer below get
+         *  full card width — was wrapping into 2-3 lines when the
+         *  button competed for horizontal space in a flex row. */}
+        <div className="flex items-center gap-2 mb-1 pr-20">
             <span className="text-xs font-medium text-warm-text dark:text-dark-text">
               {t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
             </span>
@@ -124,9 +128,9 @@ export default function PfDownloadCard() {
               {state.error}
             </p>
           )}
-        </div>
+      </div>
 
-        <div className="shrink-0 flex items-center gap-2">
+      <div className="absolute top-3 right-3.5 flex items-center gap-2">
           {state.phase === 'not-installed' && (
             <button
               type="button"
@@ -169,7 +173,6 @@ export default function PfDownloadCard() {
               {t('settings.security.detector_pf_retry', { defaultValue: 'Retry' })}
             </button>
           )}
-        </div>
       </div>
     </div>
   )
