@@ -141,14 +141,14 @@ export default function SettingsPanel({
   return (
     <div
       data-testid="settings-panel"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-warm-text/30 dark:bg-black/45 backdrop-blur-[2px]"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-[720px] h-[560px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
+      <div className="w-[960px] h-[680px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-48px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar */}
-        <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col py-3">
-          <div className="px-4 mb-3">
-            <h2 className="text-sm font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
+        <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-8 pb-3">
+          <div className="px-5 mb-3">
+            <h2 className="text-xl font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-0.5">
             {TAB_DEFS.filter(def => def.id !== 'security' || securityFeatureEnabled()).map(def => (
@@ -157,7 +157,7 @@ export default function SettingsPanel({
                 type="button"
                 aria-pressed={tab === def.id}
                 onClick={() => setTab(def.id)}
-                className={`flex w-full items-center gap-2 rounded-[6px] px-3 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
+                className={`flex w-full items-center gap-2 rounded-[6px] px-3 py-2 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
                   tab === def.id
                     ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
                     : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg/70 dark:hover:bg-dark-bg/60'
@@ -174,8 +174,8 @@ export default function SettingsPanel({
 
         {/* Content */}
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-warm-border dark:border-dark-border">
-            <h3 className="text-sm font-medium text-warm-text dark:text-dark-text">
+          <div className="flex items-center justify-between px-16 pt-8 pb-2">
+            <h3 className="text-xl font-semibold text-warm-text dark:text-dark-text">
               {t(TAB_DEFS.find(def => def.id === tab)?.labelKey ?? 'settings.tab_general')}
             </h3>
             <button
@@ -186,8 +186,8 @@ export default function SettingsPanel({
             >
               <svg
                 aria-hidden="true"
-                width="14"
-                height="14"
+                width="18"
+                height="18"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -199,7 +199,7 @@ export default function SettingsPanel({
               </svg>
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex-1 overflow-y-auto px-16 pb-8 pt-4">
             {tab === 'general' && <GeneralTab language={language} onLanguageChange={onLanguageChange} />}
             {tab === 'appearance' && (
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />

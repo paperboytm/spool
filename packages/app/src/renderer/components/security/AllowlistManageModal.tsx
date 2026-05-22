@@ -66,11 +66,11 @@ export default function AllowlistManageModal({ onClose }: Props) {
       data-testid="allowlist-manage"
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-warm-text/30 dark:bg-black/40"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-text/50 dark:bg-black/65 backdrop-blur-md pt-[15vh]"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[560px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden border border-warm-border dark:border-dark-border"
+        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[720px] max-w-[calc(100vw-64px)] max-h-[70vh] flex flex-col overflow-hidden border border-warm-border dark:border-dark-border"
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-warm-border dark:border-dark-border">
