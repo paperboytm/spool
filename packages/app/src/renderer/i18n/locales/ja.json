@@ -216,7 +216,7 @@
       "detector_pattern_footer": "13 個の検出器 · セッションあたり 100ms 未満",
       "detector_always_on": "常時オン",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "Markdownのコードブロック、引用、非標準形式に隠れたメール、電話番号、生年月日を検出します — 正規表現が意図的に飛ばす箇所です。氏名・住所・URL・口座番号類は意図的に無効化しています：コード中心のコンテンツでの誤検出率が許容できないためです。",
+      "detector_pf_body": "Markdownのコードブロック、引用、非標準形式に隠れたメール、電話番号、生年月日、および正規表現が知らない新形式のsecretを検出します — 正規表現が意図的に飛ばす箇所です。氏名・住所・URL・口座番号類は意図的に無効化しています:コード中心のコンテンツでの誤検出率が許容できないためです。",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · デバイス内で実行",
       "detector_pf_download": "Download",
       "detector_pf_cancel": "Cancel",
