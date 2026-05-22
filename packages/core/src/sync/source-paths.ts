@@ -70,7 +70,7 @@ export function detectSessionSource(
   },
 ): SessionSource | undefined {
   for (const source of ['claude', 'codex', 'gemini', 'opencode'] as const) {
-    if (sourceRoots[source].some(root => isSessionFileForSource(source, filePath, root))) {
+    if (sourceRoots[source]?.some(root => isSessionFileForSource(source, filePath, root))) {
       return source
     }
   }
