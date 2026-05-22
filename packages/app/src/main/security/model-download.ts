@@ -43,9 +43,39 @@ export class DownloadError extends Error {
 export async function downloadModel(opts: DownloadOptions): Promise<void> {
   const fetcher = opts.fetch ?? globalThis.fetch
   const bytesTotal = manifestTotalBytes(opts.manifest)
-  let bytesDownloaded = 0
 
   mkdirSync(opts.modelDir, { recursive: true })
+
+  // Account for the bytes already on disk BEFORE we touch a single
+  // file. Without this, restarting a cancelled download made the
+  // progress bar visibly drop from the resume point back to 0 and
+  // climb up again file-by-file (the old per-file `bytesDownloaded
+  // += file.sizeBytes` only fired AFTER inspecting each file). With
+  // initialBytes pre-computed, the first onProgress emit is the
+  // accurate resume baseline; subsequent emits add only newly-
+  // fetched bytes on top.
+  let initialBytes = 0
+  for (const f of opts.manifest.files) {
+    const finalPath = join(opts.modelDir, f.path)
+    const partPath = `${finalPath}.part`
+    if (existsSync(finalPath) && fileMatches(finalPath, f)) {
+      initialBytes += f.sizeBytes
+    } else if (existsSync(partPath)) {
+      const partSize = statSync(partPath).size
+      initialBytes += Math.min(partSize, f.sizeBytes)
+    }
+  }
+  let newBytes = 0
+  const emitProgress = (currentFile: string, fileIndex: number) =>
+    opts.onProgress?.({
+      bytesDownloaded: initialBytes + newBytes,
+      bytesTotal,
+      currentFile,
+      fileIndex,
+    })
+  // Emit baseline immediately so subscribers reflect the resume
+  // point before any fetch latency.
+  emitProgress(opts.manifest.files[0]?.path ?? '', 0)
 
   for (let i = 0; i < opts.manifest.files.length; i++) {
     const file = opts.manifest.files[i]!
@@ -54,18 +84,20 @@ export async function downloadModel(opts: DownloadOptions): Promise<void> {
     mkdirSync(dirname(finalPath), { recursive: true })
 
     if (existsSync(finalPath) && fileMatches(finalPath, file)) {
-      bytesDownloaded += file.sizeBytes
-      opts.onProgress?.({ bytesDownloaded, bytesTotal, currentFile: file.path, fileIndex: i })
+      // Already counted in initialBytes — nothing to do.
+      emitProgress(file.path, i)
       continue
     }
 
     let startOffset = existsSync(partPath) ? statSync(partPath).size : 0
     if (startOffset > file.sizeBytes) {
-      // Corrupt resume — start over.
+      // Corrupt resume — start over. Reset initialBytes too: we
+      // counted these bytes during pre-scan but they're going away.
+      initialBytes -= Math.min(startOffset, file.sizeBytes)
       unlinkSync(partPath)
       startOffset = 0
+      emitProgress(file.path, i)
     }
-    bytesDownloaded += startOffset
 
     await fetchAndAppend({
       url: manifestFileUrl(opts.manifest, file),
@@ -75,8 +107,8 @@ export async function downloadModel(opts: DownloadOptions): Promise<void> {
       fetcher,
       ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
       onChunk: (n) => {
-        bytesDownloaded += n
-        opts.onProgress?.({ bytesDownloaded, bytesTotal, currentFile: file.path, fileIndex: i })
+        newBytes += n
+        emitProgress(file.path, i)
       },
     })
 
