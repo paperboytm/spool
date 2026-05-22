@@ -16,13 +16,18 @@ export function friendlyMaskName(kind: string): string {
   return SENSITIVE_KIND_LABEL[kind as SensitiveKind] ?? kind
 }
 
+/** SI / decimal base (1000) — matches what users see in macOS Finder,
+ *  Chrome's download UI, network-speed reports (Mbps), and the bytes
+ *  reported by HTTP Content-Length headers. Using 1024-base here
+ *  would show 901 MB for a 945 MB SI download — confusing because
+ *  the network/system progress will read 945. */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
   let value = bytes
   let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000
     unit += 1
   }
   const formatted = value >= 100 || unit === 0
