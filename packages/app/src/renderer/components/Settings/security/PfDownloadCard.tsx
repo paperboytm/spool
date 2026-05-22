@@ -104,16 +104,17 @@ export default function PfDownloadCard() {
             </p>
           )}
 
-          {(state.phase === 'downloading' || (state.phase === 'not-installed' && state.bytesDownloaded > 0)) && (
+          {(state.phase === 'downloading' || ((state.phase === 'not-installed' || state.phase === 'failed') && state.bytesDownloaded > 0)) && (
             <div className="mt-2.5" data-testid="settings-pf-progress">
               <div className="h-1.5 rounded-full bg-warm-surface dark:bg-dark-surface overflow-hidden">
                 <div
                   className={`h-full transition-[width] duration-200 ease-out ${
                     state.phase === 'downloading'
                       ? 'bg-accent dark:bg-accent-dark'
-                      // Paused (cancelled mid-flight) — show the resume
-                      // point in a dimmer tone so the user sees how far
-                      // they got without confusing it for active download.
+                      // Cancelled or failed mid-flight — show the
+                      // resume point in a dimmer tone so the user
+                      // sees how far they got without confusing it
+                      // for an active download.
                       : 'bg-accent/50 dark:bg-accent-dark/50'
                   }`}
                   style={{ width: `${percent}%` }}
