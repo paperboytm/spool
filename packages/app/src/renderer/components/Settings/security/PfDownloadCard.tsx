@@ -108,16 +108,21 @@ export default function PfDownloadCard() {
             <div className="mt-2.5" data-testid="settings-pf-progress">
               <div className="h-1.5 rounded-full bg-warm-surface dark:bg-dark-surface overflow-hidden">
                 <div
-                  className="h-full bg-accent dark:bg-accent-dark transition-all"
+                  className="h-full bg-accent dark:bg-accent-dark transition-[width] duration-200 ease-out"
                   style={{ width: `${percent}%` }}
                 />
               </div>
               <p className="mt-1 font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
-                <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesDownloaded)}</span>
+                {/* Width pinned per-segment so the digit count flipping
+                 *  (e.g. 99 → 100, 9.9 → 10) doesn't shift the slashes
+                 *  or the percent column. text-left so the value sits
+                 *  flush against the slash with one ' ' separator,
+                 *  matching how you'd read it aloud. */}
+                <span className="inline-block w-[4.5em] text-left">{formatBytes(state.bytesDownloaded)}</span>
                 {' / '}
-                <span className="inline-block w-[5.5em] text-right">{formatBytes(state.bytesTotal)}</span>
+                <span className="inline-block w-[4.5em] text-left">{formatBytes(state.bytesTotal)}</span>
                 {' · '}
-                <span className="inline-block w-[3em] text-right">{percent}%</span>
+                <span className="inline-block w-[2.5em] text-left">{percent}%</span>
               </p>
             </div>
           )}
@@ -148,7 +153,7 @@ export default function PfDownloadCard() {
               type="button"
               data-testid="settings-pf-cancel"
               onClick={cancelDownload}
-              className="inline-flex items-center gap-1 h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-1.5 text-[10.5px] text-warm-text dark:text-dark-text transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-accent dark:text-accent-dark hover:underline underline-offset-2 transition-colors"
             >
               <X size={10} strokeWidth={1.8} aria-hidden />
               {t('settings.security.detector_pf_cancel', { defaultValue: 'Cancel' })}
@@ -167,7 +172,7 @@ export default function PfDownloadCard() {
               type="button"
               data-testid="settings-pf-retry"
               onClick={() => { void startDownload() }}
-              className="inline-flex items-center gap-1 h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-1.5 text-[10.5px] text-warm-text dark:text-dark-text transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-accent dark:text-accent-dark hover:underline underline-offset-2 transition-colors"
             >
               <RotateCw size={10} strokeWidth={1.8} aria-hidden />
               {t('settings.security.detector_pf_retry', { defaultValue: 'Retry' })}
