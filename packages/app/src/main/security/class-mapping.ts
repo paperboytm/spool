@@ -17,7 +17,7 @@
 // ~/Documents/dev-docs/spool/2026-05-18-security-scan-design.md
 // §"Class mapping".
 
-import type { SensitiveKind, SensitiveMatch } from '@spool-lab/redact'
+import { shannon, type SensitiveKind, type SensitiveMatch } from '@spool-lab/redact'
 
 /** Short-form class label emitted by pf-inference.ts after the
  *  `private_` prefix is stripped. */
@@ -88,7 +88,9 @@ function mapClass(pf: PfRawMatch, ctx: MappingContext): SensitiveKind | null {
   //   email  (P=0.97 even without contextual clues)
   //   phone  (P=0.92, catches digit-word + spacing variants regex misses)
   //   date   (P=1.00 — but only paired with a DOB context)
-  //   secret (P=1.00 — only as a regex-hit boost)
+  //   secret (P=1.00 — standalone allowed with confidence/entropy/
+  //          length safety net; this is where ML *can* meaningfully
+  //          beat regex on novel custom-token formats)
   // We DROP person / address / url / account_number entirely. On the
   // model card's "PII only" (no clue) numbers — which is Spool's
   // actual setting — those four sit at P=0.62-0.82, i.e. 18-38% false
@@ -109,9 +111,22 @@ function mapClass(pf: PfRawMatch, ctx: MappingContext): SensitiveKind | null {
       return looksLikeDob(pf, ctx.fullText) ? 'date-of-birth' : null
 
     case 'secret':
-      // Regex is authoritative for known credential prefixes. PF's
-      // `secret` only fires as a boost on existing regex hits.
-      return overlapsRegexKind(pf, ctx.regexMatches, 'generic-secret') ? 'generic-secret' : null
+      // Layered safety net because Spool content has plenty of
+      // commit SHAs / hex hashes / vendor tokens that look secret-
+      // shaped to the model:
+      //   1) regex-overlap → trust regex (already credential-shaped)
+      //   2) confidence ≥ 0.95 (model card P=1.00 in best case, but
+      //      OOD content demands explicit high score)
+      //   3) length ≥ 16 (real credentials are at least this)
+      //   4) Shannon entropy ≥ 4.0 (real secrets are random; a
+      //      placeholder like 'changemechangeme' clocks in lower)
+      if (overlapsRegexKind(pf, ctx.regexMatches, 'generic-secret')) {
+        return 'generic-secret'
+      }
+      if (pf.score < 0.95) return null
+      if (pf.value.length < 16) return null
+      if (shannon(pf.value) < 4.0) return null
+      return 'generic-secret'
 
     case 'person':
     case 'address':
