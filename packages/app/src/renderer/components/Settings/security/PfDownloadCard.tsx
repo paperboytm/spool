@@ -72,7 +72,7 @@ export default function PfDownloadCard() {
          *  under "Privacy Filter · 945 MB". Body + footer below get
          *  full card width — was wrapping into 2-3 lines when the
          *  button competed for horizontal space in a flex row. */}
-        <div className="flex items-center gap-2 mb-1 pr-20">
+        <div className="flex items-center gap-2 mb-1 pr-16">
             <span className="text-xs font-medium text-warm-text dark:text-dark-text">
               {t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
             </span>
@@ -137,9 +137,9 @@ export default function PfDownloadCard() {
               data-testid="settings-pf-download"
               disabled={busy}
               onClick={() => { void startDownload() }}
-              className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text disabled:opacity-60 transition-colors"
+              className="inline-flex items-center gap-1 h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-1.5 text-[10.5px] text-warm-text dark:text-dark-text disabled:opacity-60 transition-colors"
             >
-              <Download size={11} strokeWidth={1.8} aria-hidden />
+              <Download size={10} strokeWidth={1.8} aria-hidden />
               {t('settings.security.detector_pf_download', { defaultValue: 'Download' })}
             </button>
           )}
@@ -148,9 +148,9 @@ export default function PfDownloadCard() {
               type="button"
               data-testid="settings-pf-cancel"
               onClick={cancelDownload}
-              className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text transition-colors"
+              className="inline-flex items-center gap-1 h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-1.5 text-[10.5px] text-warm-text dark:text-dark-text transition-colors"
             >
-              <X size={11} strokeWidth={1.8} aria-hidden />
+              <X size={10} strokeWidth={1.8} aria-hidden />
               {t('settings.security.detector_pf_cancel', { defaultValue: 'Cancel' })}
             </button>
           )}
@@ -167,9 +167,9 @@ export default function PfDownloadCard() {
               type="button"
               data-testid="settings-pf-retry"
               onClick={() => { void startDownload() }}
-              className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text transition-colors"
+              className="inline-flex items-center gap-1 h-6 rounded-[5px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-1.5 text-[10.5px] text-warm-text dark:text-dark-text transition-colors"
             >
-              <RotateCw size={11} strokeWidth={1.8} aria-hidden />
+              <RotateCw size={10} strokeWidth={1.8} aria-hidden />
               {t('settings.security.detector_pf_retry', { defaultValue: 'Retry' })}
             </button>
           )}
