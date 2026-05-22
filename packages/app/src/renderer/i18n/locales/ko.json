@@ -280,7 +280,9 @@
       "backups_load_failed": "Could not load backups: {{message}}",
       "backups_delete_failed_title": "Could not delete backups",
       "backups_delete_partial_title": "Deleted {{deleted}} of {{requested}} backups",
-      "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process."
+      "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
+      "experimental_title": "실험적 기능",
+      "experimental_intro": "옵트인 감지기. 일상적 사용은 아직 권장되지 않습니다. 코드 중심 콘텐츠에서는 거짓 양성 비율이 높을 수 있습니다."
     }
   },
   "security": {

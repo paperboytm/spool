@@ -289,7 +289,9 @@
       "backups_load_failed": "Could not load backups: {{message}}",
       "backups_delete_failed_title": "Could not delete backups",
       "backups_delete_partial_title": "Deleted {{deleted}} of {{requested}} backups",
-      "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process."
+      "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
+      "experimental_title": "Experimental",
+      "experimental_intro": "Opt-in detectors that are not yet recommended for daily use. False-positive rates may be high on code-heavy content."
     }
   },
   "security": {

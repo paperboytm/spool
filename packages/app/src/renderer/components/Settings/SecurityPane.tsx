@@ -117,10 +117,6 @@ function SecurityPaneInner() {
           </div>
         </div>
 
-        {/* Privacy Filter card — download surface lives in its own
-            component. The toggle that actually flips pfEnabled lands
-            in PR 5c once the model can be loaded into ModelHost. */}
-        <PfDownloadCard />
       </Section>
 
       {/* Defaults */}
@@ -227,6 +223,19 @@ function SecurityPaneInner() {
             </button>
           }
         />
+      </Section>
+
+      {/* Experimental — opt-in ML detection. Empirical FP rate on
+          mixed code+chat content makes this unsuitable as a default;
+          keep it gated behind explicit user enable so curious users
+          can still try it on their own data. */}
+      <Section title={t('settings.security.experimental_title', { defaultValue: 'Experimental' })}>
+        <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-3">
+          {t('settings.security.experimental_intro', {
+            defaultValue: 'Opt-in detectors that are not yet recommended for daily use. False-positive rates may be high on code-heavy content.',
+          })}
+        </p>
+        <PfDownloadCard />
       </Section>
 
       <Section title={t('settings.security.maintenance_title', { defaultValue: 'Maintenance' })}>
