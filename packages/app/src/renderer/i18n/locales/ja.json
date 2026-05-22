@@ -281,7 +281,8 @@
       "backups_delete_partial_title": "Deleted {{deleted}} of {{requested}} backups",
       "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
       "experimental_title": "実験的機能",
-      "experimental_intro": "オプトインの検出器。日常的な使用はまだ推奨されません。コード中心のコンテンツでは誤検出率が高くなる可能性があります。"
+      "experimental_intro": "オプトインの検出器。日常的な使用はまだ推奨されません。コード中心のコンテンツでは誤検出率が高くなる可能性があります。",
+      "detector_pf_resume": "再開"
     }
   },
   "security": {

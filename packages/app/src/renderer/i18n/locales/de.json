@@ -289,7 +289,8 @@
       "backups_delete_partial_title": "Deleted {{deleted}} of {{requested}} backups",
       "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
       "experimental_title": "Experimentell",
-      "experimental_intro": "Opt-in-Detektoren, die noch nicht für den täglichen Einsatz empfohlen werden. Bei code-lastigen Inhalten können Falsch-Positiv-Raten hoch sein."
+      "experimental_intro": "Opt-in-Detektoren, die noch nicht für den täglichen Einsatz empfohlen werden. Bei code-lastigen Inhalten können Falsch-Positiv-Raten hoch sein.",
+      "detector_pf_resume": "Fortsetzen"
     }
   },
   "security": {

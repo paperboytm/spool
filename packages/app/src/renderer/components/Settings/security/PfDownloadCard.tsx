@@ -104,25 +104,32 @@ export default function PfDownloadCard() {
             </p>
           )}
 
-          {state.phase === 'downloading' && (
+          {(state.phase === 'downloading' || (state.phase === 'not-installed' && state.bytesDownloaded > 0)) && (
             <div className="mt-2.5" data-testid="settings-pf-progress">
               <div className="h-1.5 rounded-full bg-warm-surface dark:bg-dark-surface overflow-hidden">
                 <div
-                  className="h-full bg-accent dark:bg-accent-dark transition-[width] duration-200 ease-out"
+                  className={`h-full transition-[width] duration-200 ease-out ${
+                    state.phase === 'downloading'
+                      ? 'bg-accent dark:bg-accent-dark'
+                      // Paused (cancelled mid-flight) — show the resume
+                      // point in a dimmer tone so the user sees how far
+                      // they got without confusing it for active download.
+                      : 'bg-accent/50 dark:bg-accent-dark/50'
+                  }`}
                   style={{ width: `${percent}%` }}
                 />
               </div>
+              {/* tabular-nums keeps digit POSITIONS stable inside each
+               *  value; explicit widths are unnecessary because the
+               *  whole line uses mono + nowrap, so the only layout
+               *  shift would be on a char-count flip (e.g. 99 → 100),
+               *  rare enough to not justify the visible gap. */}
               <p className="mt-1 font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums whitespace-nowrap">
-                {/* Width pinned per-segment so the digit count flipping
-                 *  (e.g. 99 → 100, 9.9 → 10) doesn't shift the slashes
-                 *  or the percent column. text-left so the value sits
-                 *  flush against the slash with one ' ' separator,
-                 *  matching how you'd read it aloud. */}
-                <span className="inline-block w-[4.5em] text-left">{formatBytes(state.bytesDownloaded)}</span>
+                {formatBytes(state.bytesDownloaded)}
                 {' / '}
-                <span className="inline-block w-[4.5em] text-left">{formatBytes(state.bytesTotal)}</span>
+                {formatBytes(state.bytesTotal)}
                 {' · '}
-                <span className="inline-block w-[2.5em] text-left">{percent}%</span>
+                {percent}%
               </p>
             </div>
           )}
@@ -145,7 +152,9 @@ export default function PfDownloadCard() {
               className="inline-flex items-center gap-1 text-[11px] font-medium text-accent dark:text-accent-dark hover:underline underline-offset-2 disabled:opacity-60 transition-colors"
             >
               <Download size={10} strokeWidth={1.8} aria-hidden />
-              {t('settings.security.detector_pf_download', { defaultValue: 'Download' })}
+              {state.bytesDownloaded > 0
+                ? t('settings.security.detector_pf_resume', { defaultValue: 'Resume' })
+                : t('settings.security.detector_pf_download', { defaultValue: 'Download' })}
             </button>
           )}
           {state.phase === 'downloading' && (

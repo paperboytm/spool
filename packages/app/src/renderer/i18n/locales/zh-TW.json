@@ -281,7 +281,8 @@
       "backups_delete_partial_title": "已刪除 {{requested}} 個中的 {{deleted}} 個備份",
       "backups_delete_partial_desc": "已釋放 {{size}}。部分檔案無法刪除——可能已被其他程序清理。",
       "experimental_title": "實驗性",
-      "experimental_intro": "可選啟用的檢測器，目前不推薦日常使用。在程式碼密集型內容上誤報率可能較高。"
+      "experimental_intro": "可選啟用的檢測器，目前不推薦日常使用。在程式碼密集型內容上誤報率可能較高。",
+      "detector_pf_resume": "繼續下載"
     }
   },
   "security": {
