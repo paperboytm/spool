@@ -279,7 +279,9 @@
       "backups_load_failed": "无法加载备份：{{message}}",
       "backups_delete_failed_title": "无法删除备份",
       "backups_delete_partial_title": "已删除 {{requested}} 个中的 {{deleted}} 个备份",
-      "backups_delete_partial_desc": "已释放 {{size}}。部分文件无法删除——可能已被其他进程清理。"
+      "backups_delete_partial_desc": "已释放 {{size}}。部分文件无法删除——可能已被其他进程清理。",
+      "experimental_title": "实验性",
+      "experimental_intro": "可选启用的检测器，目前不推荐日常使用。在代码密集型内容上误报率可能较高。"
     }
   },
   "security": {
