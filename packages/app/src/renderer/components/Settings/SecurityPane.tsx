@@ -127,6 +127,8 @@ function SecurityPaneInner() {
       {/* Defaults */}
       <Section title={t('settings.security.defaults_title', { defaultValue: 'Defaults' })}>
         <div className="space-y-4">
+          {/* Two toggles grouped first, the dropdown last — same-shape
+              controls read better adjacent than interleaved. */}
           <DefaultsRow
             label={t('settings.security.info_default_label', { defaultValue: 'Informational signals' })}
             description={t('settings.security.info_default_sub', {
@@ -138,6 +140,20 @@ function SecurityPaneInner() {
                 onChange={(v) => { void update({ infoDefaultVisible: v }) }}
                 ariaLabel={t('settings.security.info_default_label', { defaultValue: 'Informational signals' })}
                 testId="settings-info-default"
+              />
+            }
+          />
+          <DefaultsRow
+            label={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
+            description={t('settings.security.reveal_hover_sub', {
+              defaultValue: 'In the strip and Security page, blur finding values until you hover. Off = always visible.',
+            })}
+            control={
+              <Toggle
+                checked={prefs?.revealValuesOnHoverOnly ?? false}
+                onChange={(v) => { void update({ revealValuesOnHoverOnly: v }) }}
+                ariaLabel={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
+                testId="settings-reveal-hover"
               />
             }
           />
@@ -155,20 +171,6 @@ function SecurityPaneInner() {
                   { value: 'manual', label: t('settings.security.rescan_after_sync_manual', { defaultValue: 'Manual' }) },
                 ]}
                 testid="settings-rescan-after-sync"
-              />
-            }
-          />
-          <DefaultsRow
-            label={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
-            description={t('settings.security.reveal_hover_sub', {
-              defaultValue: 'In the strip and Security page, blur finding values until you hover. Off = always visible.',
-            })}
-            control={
-              <Toggle
-                checked={prefs?.revealValuesOnHoverOnly ?? false}
-                onChange={(v) => { void update({ revealValuesOnHoverOnly: v }) }}
-                ariaLabel={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
-                testId="settings-reveal-hover"
               />
             }
           />
