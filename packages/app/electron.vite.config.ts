@@ -57,15 +57,26 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    server: {
+      fs: {
+        // The HTML at src/renderer/pf-inference.html references
+        // ../inference/pf-inference.ts. Whitelist the sibling source
+        // dir so Vite's dev server serves the TS entry; without this
+        // Vite refuses to read outside its root and silently falls
+        // back to index.html, leaving pf:ready never fired.
+        allow: [resolve(__dirname, 'src/inference'), resolve(__dirname, 'src/renderer')],
+      },
+    },
     build: {
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
-          // Inference window lives under src/inference/ but emits next
-          // to the main renderer so model-host.ts can `loadFile` it
-          // with a fixed relative path. electron-vite will produce
-          // out/renderer/pf-inference.html alongside index.html.
-          'pf-inference': resolve(__dirname, 'src/inference/pf-inference.html'),
+          // Inference HTML sits inside the renderer root — Rollup 4
+          // rejects build inputs whose path resolves outside the root
+          // (it can't compute a bare emit filename for them). The TS
+          // it loads is referenced relatively (`../inference/...`) so
+          // logic still lives next to the rest of the inference code.
+          'pf-inference': resolve(__dirname, 'src/renderer/pf-inference.html'),
         },
       },
     },
