@@ -1,7 +1,7 @@
 // Inline detector summary for the Security page meta row.
 //
 // Surfaces what's actively producing findings — not just the opaque
-// `regex@4,pf@1.5b-q4` profile string, but a human-readable list with
+// `regex@1,pf@1.5b-q4.r2` profile string, but a human-readable list with
 // each detector's live status. The PF runtime can fail silently
 // (model load throw, GPU adapter rejection) and the only signal used
 // to be in Settings → Security. With this chip the user sees

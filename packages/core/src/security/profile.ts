@@ -4,9 +4,9 @@
 // Persisted on `sessions.scan_profile`. Compare to the worker's
 // current profile string at startup to detect rescan candidates:
 //
-//   stored = NULL                  → never scanned, enqueue
-//   stored = 'regex@3'             → matches current 'regex@3', skip
-//   stored = 'regex@3,pf@1.5b-q4'  → user disabled pf, enqueue rescan
+//   stored = NULL                     → never scanned, enqueue
+//   stored = 'regex@1'                → matches current 'regex@1', skip
+//   stored = 'regex@1,pf@1.5b-q4.r2'  → user disabled pf, enqueue rescan
 //
 // Provider versions are bumped manually when detection logic changes.
 // REDACT_DETECTOR_VERSION lives next to the regex detector in

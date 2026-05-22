@@ -149,13 +149,7 @@ void (async () => {
       // the scan engine already ran regex over upstream, but we don't
       // have access to those matches here.
       const regexMatches = detectWithRegex(text, 'regex')
-      const mapped = mapPfMatches(raw as PfRawMatch[], { regexMatches, fullText: text })
-      // Diagnostic: see at a glance what % of raw matches survive
-      // class-mapping suppression. raw=N → mapped=M tells us if
-      // suppression rules are too aggressive or if labels are landing
-      // in the default-drop branch.
-      console.log(`[pf provider] raw=${raw.length} mapped=${mapped.length} kinds=${raw.map(m => m.class).join(',')}`)
-      return mapped
+      return mapPfMatches(raw as PfRawMatch[], { regexMatches, fullText: text })
     },
   }
 
