@@ -77,7 +77,65 @@ describe('OpenCode parser', () => {
       makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'),
     ])
     expect(getOpenCodeSessionIndexedMtime(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123')))
-      .toBe('1779152404000::opencode-v1-sqlite-session-search-fts')
+      .toBe('1779152404000::opencode-v2-sqlite-parent-subagents')
+  })
+
+  it('folds OpenCode child sessions into the parent as sidechain messages', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      seedOpenCodeSession(db)
+      seedOpenCodeSubagent(db)
+    } finally {
+      db.close()
+    }
+
+    expect(listOpenCodeSessionFilePaths(dbPath)).toEqual([
+      makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'),
+    ])
+    expect(getOpenCodeSessionIndexedMtime(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123')))
+      .toBe('1779152410000::opencode-v2-sqlite-parent-subagents')
+
+    const childPath = makeOpenCodeSessionFilePath(dbPath, 'ses_child_explore')
+    expect(loadOpenCodeSession(childPath)).toEqual({ kind: 'filtered' })
+
+    const result = loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'))
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+
+    expect(result.session.endedAt).toBe('2026-05-19T01:00:10.000Z')
+    expect(result.session.messages).toEqual([
+      expect.objectContaining({
+        uuid: 'msg_user',
+        role: 'user',
+        isSidechain: false,
+      }),
+      expect.objectContaining({
+        uuid: 'msg_assistant',
+        role: 'assistant',
+        isSidechain: false,
+      }),
+      expect.objectContaining({
+        uuid: 'ses_child_explore:header',
+        role: 'system',
+        parentUuid: 'opencode-subagent:ses_child_explore',
+        contentText: 'OpenCode subagent: @explore · Explore auth routes',
+        isSidechain: true,
+      }),
+      expect.objectContaining({
+        uuid: 'ses_child_explore:msg_child_user',
+        role: 'user',
+        parentUuid: 'opencode-subagent:ses_child_explore',
+        contentText: 'Inspect route files',
+        isSidechain: true,
+      }),
+      expect.objectContaining({
+        uuid: 'ses_child_explore:msg_child_assistant',
+        role: 'assistant',
+        parentUuid: 'opencode-subagent:ses_child_explore',
+        contentText: 'The route is in auth.ts.',
+        isSidechain: true,
+      }),
+    ])
   })
 })
 
@@ -190,5 +248,53 @@ function seedOpenCodeSession(db: Database.Database): void {
     start + 2500,
     start + 2500,
     JSON.stringify({ type: 'tool', tool: 'grep', state: { status: 'completed' } }),
+  )
+}
+
+function seedOpenCodeSubagent(db: Database.Database): void {
+  const start = Date.UTC(2026, 4, 19, 1, 0, 6)
+  db.prepare(`
+    INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, model, agent)
+    VALUES ('ses_child_explore', 'proj_1', 'ses_abc123', 'explore-auth-routes', '/work/api', 'Explore auth routes', '1.0.0', ?, ?, 'opencode/gpt-5.4', 'explore')
+  `).run(start, start + 4000)
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, 'ses_child_explore', ?, ?, ?)
+  `).run(
+    'msg_child_user',
+    start + 1000,
+    start + 1000,
+    JSON.stringify({ role: 'user' }),
+  )
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, 'ses_child_explore', ?, ?, ?)
+  `).run(
+    'part_child_user_text',
+    'msg_child_user',
+    start + 1000,
+    start + 1000,
+    JSON.stringify({ type: 'text', text: 'Inspect route files' }),
+  )
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, 'ses_child_explore', ?, ?, ?)
+  `).run(
+    'msg_child_assistant',
+    start + 2000,
+    start + 2000,
+    JSON.stringify({ role: 'assistant' }),
+  )
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, 'ses_child_explore', ?, ?, ?)
+  `).run(
+    'part_child_assistant_text',
+    'msg_child_assistant',
+    start + 2000,
+    start + 2000,
+    JSON.stringify({ type: 'text', text: 'The route is in auth.ts.' }),
   )
 }

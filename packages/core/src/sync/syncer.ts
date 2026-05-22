@@ -11,6 +11,7 @@ import {
   listOpenCodeSessionFilePaths,
   loadOpenCodeSession,
   OPENCODE_INDEX_VERSION,
+  parseOpenCodeSessionFilePath,
 } from '../parsers/opencode.js'
 import type { SessionSource } from '../types.js'
 import { getSessionRoots, isSessionFileForSource } from './source-paths.js'
@@ -68,6 +69,8 @@ export class Syncer {
         try { addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source)) } catch { /* dir may not exist */ }
       }
     }
+
+    cleanupStaleOpenCodeSessions(this.db, files)
 
     const knownMtimes = getAllSessionMtimes(this.db)
     this.codexTitleIndex = loadCodexSessionIndex()
@@ -301,10 +304,51 @@ export class Syncer {
       else if (result === 'error') hadError = true
     }
 
+    const stalePaths = listIndexedOpenCodeSessionPaths(this.db)
+      .filter(path => parseOpenCodeSessionFilePath(path)?.dbPath === dbPath)
+      .filter(path => !sessionPaths.includes(path))
+    for (const stalePath of stalePaths) {
+      if (deleteSessionByFilePath(this.db, stalePath)) changed = true
+    }
+
     if (changed) return 'updated'
     if (hadError) return 'error'
     return 'skipped'
   }
+}
+
+function cleanupStaleOpenCodeSessions(
+  db: Database.Database,
+  files: Array<{ path: string; source: SessionSource }>,
+): void {
+  const activePathsByDb = new Map<string, Set<string>>()
+  for (const file of files) {
+    if (file.source !== 'opencode') continue
+    const parsed = parseOpenCodeSessionFilePath(file.path)
+    if (!parsed) continue
+    const paths = activePathsByDb.get(parsed.dbPath) ?? new Set<string>()
+    paths.add(file.path)
+    activePathsByDb.set(parsed.dbPath, paths)
+  }
+  if (activePathsByDb.size === 0) return
+
+  for (const indexedPath of listIndexedOpenCodeSessionPaths(db)) {
+    const parsed = parseOpenCodeSessionFilePath(indexedPath)
+    if (!parsed) continue
+    const activePaths = activePathsByDb.get(parsed.dbPath)
+    if (!activePaths || activePaths.has(indexedPath)) continue
+    deleteSessionByFilePath(db, indexedPath)
+  }
+}
+
+function listIndexedOpenCodeSessionPaths(db: Database.Database): string[] {
+  const rows = db.prepare(`
+    SELECT s.file_path AS filePath
+    FROM sessions s
+    JOIN sources src ON src.id = s.source_id
+    WHERE src.name = 'opencode'
+  `).all() as Array<{ filePath: string }>
+  return rows.map(row => row.filePath)
 }
 
 function addUniqueFiles(

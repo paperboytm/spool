@@ -1,5 +1,6 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import type { Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
@@ -29,6 +30,7 @@ interface Props {
 /** A virtualised row is either an actual message or a day-divider header. */
 type Row =
   | { kind: 'msg'; msg: Message; showAvatar: boolean }
+  | { kind: 'sidechain'; key: string; label: string; timestamp: string; messages: Message[] }
   | { kind: 'divider'; key: string; isoDay: string; label: string }
 
 /** Stable per-local-day key used for divider grouping + dedup. */
@@ -59,6 +61,38 @@ function makeDividerLabel(today: string, yesterday: string, locale: string | und
   }
 }
 
+const OPENCODE_SUBAGENT_HEADER_PREFIX = 'OpenCode subagent:'
+
+function sidechainKey(message: Message): string {
+  return message.parentUuid ?? `sidechain:${message.id}`
+}
+
+function isSubagentHeader(message: Message): boolean {
+  return message.role === 'system' && message.contentText.startsWith(OPENCODE_SUBAGENT_HEADER_PREFIX)
+}
+
+function makeSidechainLabel(messages: Message[]): string {
+  const header = messages.find(isSubagentHeader)
+  if (!header) return 'Subagent'
+  return header.contentText.slice(OPENCODE_SUBAGENT_HEADER_PREFIX.length).trim() || 'Subagent'
+}
+
+function visibleSidechainMessages(messages: Message[]): Message[] {
+  return messages.filter(message => !isSubagentHeader(message))
+}
+
+function groupSidechainMessages(messages: Message[]): Map<string, Message[]> {
+  const groups = new Map<string, Message[]>()
+  for (const message of messages) {
+    if (!message.isSidechain) continue
+    const key = sidechainKey(message)
+    const group = groups.get(key) ?? []
+    group.push(message)
+    groups.set(key, group)
+  }
+  return groups
+}
+
 /** Build the virtualised row list. A divider is inserted whenever the
  *  message's local day differs from the previous row — except before the
  *  very first message, since the session header already shows the start
@@ -68,6 +102,8 @@ function makeDividerLabel(today: string, yesterday: string, locale: string | und
  *  a divider always shows its avatar). */
 function buildRows(messages: Message[], label: DividerLabel): Row[] {
   const rows: Row[] = []
+  const sidechainGroups = groupSidechainMessages(messages)
+  const emittedSidechains = new Set<string>()
   // Seed prevDay with the first message's day so the divider branch
   // only fires on actual day transitions — the leading divider above
   // the very first message is suppressed without a separate guard.
@@ -75,23 +111,60 @@ function buildRows(messages: Message[], label: DividerLabel): Row[] {
   let prevMsg: Message | null = null
   const now = new Date()
   for (const msg of messages) {
-    const day = localDayKey(msg.timestamp)
+    let row: Row
+    if (msg.isSidechain) {
+      const key = sidechainKey(msg)
+      if (emittedSidechains.has(key)) continue
+      emittedSidechains.add(key)
+      const group = sidechainGroups.get(key) ?? [msg]
+      row = {
+        kind: 'sidechain',
+        key,
+        label: makeSidechainLabel(group),
+        timestamp: group[0]?.timestamp ?? msg.timestamp,
+        messages: visibleSidechainMessages(group),
+      }
+    } else {
+      const showAvatar =
+        !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
+      row = { kind: 'msg', msg, showAvatar }
+    }
+
+    const rowTimestamp = row.kind === 'msg' ? row.msg.timestamp : row.timestamp
+    const day = localDayKey(rowTimestamp)
     if (day !== prevDay) {
       rows.push({
         kind: 'divider',
         key: `div-${day}`,
         isoDay: day,
-        label: label(msg.timestamp, now),
+        label: label(rowTimestamp, now),
       })
       prevDay = day
       prevMsg = null
     }
-    const showAvatar =
-      !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
-    rows.push({ kind: 'msg', msg, showAvatar })
-    prevMsg = msg
+
+    rows.push(row)
+    prevMsg = row.kind === 'msg' ? msg : null
   }
   return rows
+}
+
+function shouldShowAvatarInGroup(messages: Message[], index: number): boolean {
+  const message = messages[index]
+  const previous = index > 0 ? messages[index - 1] : null
+  return !message || !previous || previous.role !== message.role || previous.role === 'system'
+}
+
+function hasFindMatch(messages: Message[], messageFindRanges: Map<number, MatchState>): boolean {
+  return messages.some(message => messageFindRanges.has(message.id))
+}
+
+function formatRowTime(iso: string, locale: string | undefined): string {
+  try {
+    return new Date(iso).toLocaleTimeString(locale)
+  } catch {
+    return ''
+  }
 }
 
 const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
@@ -100,6 +173,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
 ) {
   const { t, i18n } = useTranslation()
   const virtuosoRef = useRef<VirtuosoHandle | null>(null)
+  const [expandedSidechains, setExpandedSidechains] = useState<Set<string>>(() => new Set())
 
   const dividerLabel = useMemo(
     () => makeDividerLabel(t('session.divider_today'), t('session.divider_yesterday'), i18n.language),
@@ -114,6 +188,9 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
     const map = new Map<number, number>()
     rows.forEach((row, i) => {
       if (row.kind === 'msg') map.set(row.msg.id, i)
+      else if (row.kind === 'sidechain') {
+        for (const message of row.messages) map.set(message.id, i)
+      }
     })
     return map
   }, [rows])
@@ -171,6 +248,74 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
                 {row.label}
               </span>
               <span className="flex-1 h-px bg-warm-border dark:bg-dark-border" />
+            </div>
+          )
+        }
+        if (row.kind === 'sidechain') {
+          const rowHasFindMatch = showFindBar && hasFindMatch(row.messages, messageFindRanges)
+          const rowHasTarget = targetMessageId != null && row.messages.some(message => message.id === targetMessageId)
+          const expanded = expandedSidechains.has(row.key) || rowHasFindMatch || rowHasTarget
+          const rowTime = formatRowTime(row.timestamp, i18n.language)
+
+          return (
+            <div data-index={index} className="px-6 py-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setExpandedSidechains((current) => {
+                    const next = new Set(current)
+                    if (next.has(row.key)) next.delete(row.key)
+                    else next.add(row.key)
+                    return next
+                  })
+                }}
+                className="w-full min-w-0 flex items-center gap-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface/70 dark:bg-dark-surface/70 px-3 py-2 text-left hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors"
+              >
+                {expanded ? (
+                  <ChevronDown size={14} strokeWidth={1.8} className="flex-none text-warm-faint dark:text-dark-muted" aria-hidden />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={1.8} className="flex-none text-warm-faint dark:text-dark-muted" aria-hidden />
+                )}
+                <span className="flex-1 min-w-0 truncate text-xs font-medium text-warm-muted dark:text-dark-muted">
+                  {row.label}
+                </span>
+                <span className="flex-none text-[10px] font-mono text-warm-faint dark:text-dark-muted">
+                  {t('session.messages_other', { count: row.messages.length })}
+                  {rowTime ? ` · ${rowTime}` : ''}
+                </span>
+              </button>
+
+              {expanded && (
+                <div className="mt-2 ml-2 border-l border-warm-border dark:border-dark-border">
+                  {row.messages.map((message, messageIndex) => {
+                    const matchState = showFindBar ? messageFindRanges.get(message.id) : undefined
+                    const containsActive = matchState != null
+                      && activeMatchIndex >= matchState.offset
+                      && activeMatchIndex < matchState.offset + matchState.ranges.length
+                    const isTarget = message.id === targetMessageId
+
+                    return (
+                      <div
+                        key={message.id}
+                        {...(isTarget ? { 'data-testid': 'target-message' } : {})}
+                        {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
+                        className={`transition-colors duration-700 ${
+                          isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
+                        }`}
+                      >
+                        <MessageBubble
+                          message={message}
+                          isDark={isDark}
+                          showAvatar={shouldShowAvatarInGroup(row.messages, messageIndex)}
+                          {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
+                          activeMatchIndex={containsActive ? activeMatchIndex : -1}
+                          {...(containsActive ? { onActiveMatchRef } : {})}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         }

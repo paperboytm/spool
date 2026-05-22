@@ -268,7 +268,8 @@ export function getSessionWithMessages(
            parent_uuid AS parentUuid, role, content_text AS contentText,
            timestamp, is_sidechain AS isSidechain, tool_names AS toolNames, seq
     FROM messages
-    WHERE session_id = ? AND is_sidechain = 0
+    WHERE session_id = ?
+      AND (is_sidechain = 0 OR parent_uuid LIKE 'opencode-subagent:%')
     ORDER BY seq
   `).all(session.id) as Array<Record<string, unknown>>
 

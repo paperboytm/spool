@@ -319,6 +319,77 @@ describe('Syncer', () => {
       }),
     ])
   })
+
+  it('folds OpenCode subagent sessions into the parent and removes stale standalone child rows', async () => {
+    const baseDir = makeTempDir('spool-syncer-opencode-subagents-')
+    const opencodeDir = join(baseDir, 'opencode')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(opencodeDir, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('SPOOL_CLAUDE_DIR', join(baseDir, 'missing-claude'))
+    vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
+    vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
+    vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
+
+    const dbPath = join(opencodeDir, 'opencode.db')
+    const openCodeDb = new Database(dbPath)
+    openDbs.push(openCodeDb)
+    createOpenCodeSchema(openCodeDb)
+    seedOpenCodeSession(openCodeDb, {
+      id: 'ses_parent_1',
+      directory: '/tmp/opencode-project',
+      title: 'Parent session',
+      userText: 'Parent visible prompt',
+      assistantText: 'Parent visible response',
+    })
+    seedOpenCodeSession(openCodeDb, {
+      id: 'ses_child_1',
+      parentId: 'ses_parent_1',
+      directory: '/tmp/opencode-project',
+      title: 'Explore parent implementation',
+      userText: 'CHILD_ONLY_SUBAGENT_NEEDLE',
+      assistantText: 'Child-only subagent answer',
+      agent: 'explore',
+    })
+
+    const { getDB, Syncer, searchFragments, getSessionWithMessages, makeOpenCodeSessionFilePath } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    const syncer = new Syncer(db)
+
+    expect(syncer.syncAll()).toMatchObject({ added: 1, updated: 0, errors: 0 })
+    expect(searchFragments(db, 'Parent visible prompt', { limit: 5 })).toHaveLength(1)
+    expect(searchFragments(db, 'CHILD_ONLY_SUBAGENT_NEEDLE', { limit: 5 })).toEqual([])
+
+    const parent = getSessionWithMessages(db, 'ses_parent_1')
+    expect(parent?.session.messageCount).toBe(2)
+    expect(parent?.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        contentText: 'CHILD_ONLY_SUBAGENT_NEEDLE',
+        isSidechain: true,
+      }),
+    ]))
+    expect(db.prepare('SELECT session_uuid FROM sessions ORDER BY session_uuid').all())
+      .toEqual([{ session_uuid: 'ses_parent_1' }])
+
+    const parentRow = db.prepare(
+      'SELECT project_id AS projectId, source_id AS sourceId FROM sessions WHERE session_uuid = ?',
+    ).get('ses_parent_1') as { projectId: number; sourceId: number }
+    const staleChildPath = makeOpenCodeSessionFilePath(dbPath, 'ses_child_1')
+    db.prepare(`
+      INSERT INTO sessions
+        (project_id, source_id, session_uuid, file_path, title,
+         started_at, ended_at, message_count, has_tool_use, cwd, model, raw_file_mtime)
+      VALUES (?, ?, 'ses_child_1', ?, 'Stale child row',
+              '2026-05-19T01:00:00.000Z', '2026-05-19T01:00:01.000Z',
+              1, 0, '/tmp/opencode-project', 'opencode/gpt-5.4', 'old')
+    `).run(parentRow.projectId, parentRow.sourceId, staleChildPath)
+
+    expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeTruthy()
+    expect(syncer.syncFile(dbPath, 'opencode')).toBe('updated')
+    expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeUndefined()
+  })
 })
 
 async function loadCoreModules() {
@@ -326,11 +397,14 @@ async function loadCoreModules() {
   const dbModule = await import('../db/db.js')
   const syncerModule = await import('./syncer.js')
   const queryModule = await import('../db/queries.js')
+  const openCodeModule = await import('../parsers/opencode.js')
   return {
     getDB: dbModule.getDB,
     Syncer: syncerModule.Syncer,
     getStatus: queryModule.getStatus,
+    getSessionWithMessages: queryModule.getSessionWithMessages,
     searchFragments: queryModule.searchFragments,
+    makeOpenCodeSessionFilePath: openCodeModule.makeOpenCodeSessionFilePath,
   }
 }
 
@@ -350,6 +424,7 @@ function createOpenCodeSchema(db: Database.Database): void {
     CREATE TABLE session (
       id text PRIMARY KEY,
       project_id text NOT NULL,
+      parent_id text,
       slug text NOT NULL,
       directory text NOT NULL,
       title text NOT NULL,
@@ -388,13 +463,15 @@ function seedOpenCodeSession(
     title: string
     userText: string
     assistantText: string
+    parentId?: string | null
+    agent?: string
   },
 ): void {
   const created = Date.UTC(2026, 4, 19, 1, 0, 0) + Number(input.id.replace(/\D/g, '') || 0) * 1000
   db.prepare(`
-    INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated, model, agent)
-    VALUES (?, 'proj_1', ?, ?, ?, '1.0.0', ?, ?, 'opencode/gpt-5.4', 'build')
-  `).run(input.id, input.id, input.directory, input.title, created, created + 3000)
+    INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, model, agent)
+    VALUES (?, 'proj_1', ?, ?, ?, ?, '1.0.0', ?, ?, 'opencode/gpt-5.4', ?)
+  `).run(input.id, input.parentId ?? null, input.id, input.directory, input.title, created, created + 3000, input.agent ?? 'build')
 
   db.prepare(`
     INSERT INTO message (id, session_id, time_created, time_updated, data)
