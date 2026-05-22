@@ -79,7 +79,12 @@ function SecurityPaneInner() {
 
   const globalCount = allowlistEntries.filter(e => e.scope === 'global').length
   const sessionCount = allowlistEntries.filter(e => e.scope === 'session').length
-  const profile = status?.currentProfile ?? 'regex@4'
+  // The Pattern matching card describes only the regex detector,
+  // so strip any other provider segments (pf@…, allow@…) from the
+  // displayed profile string — otherwise the chip leaks "pf is on"
+  // info next to a card whose body talks about regex-only behaviour.
+  const fullProfile = status?.currentProfile ?? 'regex@1'
+  const regexProfile = fullProfile.match(/regex@\d+/)?.[0] ?? 'regex@1'
 
   return (
     <div className="space-y-6">
@@ -97,7 +102,7 @@ function SecurityPaneInner() {
                   {t('settings.security.detector_pattern_title', { defaultValue: 'Pattern matching' })}
                 </span>
                 <code className="font-mono text-[10px] text-accent dark:text-accent-dark">
-                  {profile}
+                  {regexProfile}
                 </code>
               </div>
               <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">
