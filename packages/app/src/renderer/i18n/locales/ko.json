@@ -217,7 +217,7 @@
       "detector_pattern_footer": "13개 탐지기 · 세션당 100ms 미만",
       "detector_always_on": "항상 켜짐",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "마크다운 코드 블록、인용、비표준 형식에 숨겨진 이메일・전화번호・생년월일을 감지합니다 — 정규식이 의도적으로 건너뛰는 부분입니다. 이름・주소・URL・계좌번호 부류는 의도적으로 비활성화되어 있습니다: 코드 중심 콘텐츠에서 거짓 양성률이 허용 불가하기 때문입니다.",
+      "detector_pf_body": "마크다운 코드 블록、인용、비표준 형식에 숨겨진 이메일・전화번호・생년월일、그리고 정규식이 모르는 새로운 형식의 secret을 감지합니다 — 정규식이 의도적으로 건너뛰는 부분입니다. 이름・주소・URL・계좌번호 부류는 의도적으로 비활성화되어 있습니다:코드 중심 콘텐츠에서 거짓 양성률이 허용 불가하기 때문입니다.",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · 기기 내 실행",
       "detector_pf_download": "Download",
       "detector_pf_cancel": "Cancel",

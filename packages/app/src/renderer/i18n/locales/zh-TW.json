@@ -217,7 +217,7 @@
       "detector_pattern_footer": "13 個檢測器 · 單會話 < 100ms",
       "detector_always_on": "始終啟用",
       "detector_pf_title": "Privacy Filter",
-      "detector_pf_body": "抓取藏在 markdown 程式碼區塊、引號、非標準格式裡的郵箱、電話號碼和出生日期——正則會主動跳過這些。人名、地址、URL、帳號類已被禁用：在程式碼密集型內容上誤報率不可接受。",
+      "detector_pf_body": "抓取藏在 markdown 程式碼區塊、引號、非標準格式裡的郵箱、電話號碼、出生日期，以及正則規則不認識的新型 secret 格式——這些都是正則會主動跳過的。人名、地址、URL、帳號類已被禁用:在程式碼密集型內容上誤報率不可接受。",
       "detector_pf_footer": "OpenAI Privacy Filter · Apache 2.0 · 本地執行",
       "detector_pf_download": "下載",
       "detector_pf_cancel": "取消",

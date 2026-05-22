@@ -78,7 +78,7 @@ export default function PfDownloadCard() {
           </div>
           <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted mb-1.5">
             {t('settings.security.detector_pf_body', {
-              defaultValue: 'Catches obfuscated emails, phone numbers, and DOB hidden inside markdown code blocks, quotes, or non-standard formats — the cases regex deliberately skips. Names, addresses, URLs, and account numbers are intentionally disabled: false-positive rate on code-heavy content was unacceptable.',
+              defaultValue: 'Catches obfuscated emails, phone numbers, DOB, and novel-format secrets hidden inside markdown code blocks, quotes, or non-standard formats — the cases regex deliberately skips. Names, addresses, URLs, and account numbers are intentionally disabled: false-positive rate on code-heavy content was unacceptable.',
             })}
           </p>
           <p className="font-mono text-[10px] text-warm-faint dark:text-dark-muted/70">
