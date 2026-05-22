@@ -42,6 +42,8 @@ import { Effect } from 'effect'
 import { registerSecurityIpc } from './ipc/security.js'
 import { loadSecurityPreferences } from './securityPreferences.js'
 import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
+import { makePfCoordinator } from './security/pf-coordinator.js'
+import { pfModelDir } from './security/model-paths.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
   ShareDraftRow, UpsertShareDraftInput,
@@ -103,6 +105,9 @@ let isSyncActive = false
 let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
 const pfRuntime = makePfRuntime()
+// Resolved lazily on first boot — pfModelDir() reads app.getPath
+// which throws before app.ready, but this module evaluates earlier.
+let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null
 
 type CachedSearchValue = FragmentResult[]
 
@@ -422,11 +427,13 @@ app.whenReady().then(async () => {
   if (securityFeatureEnabled()) {
     void bootScanWorker().then(() => {
       if (!scanWorker) return
+      pfCoordinator = makePfCoordinator({ modelDir: pfModelDir() })
       disposeSecurityIpc = registerSecurityIpc({
         db,
         worker: scanWorker,
         runPromise: runWithObservability,
         getMainWindow: () => mainWindow,
+        pfCoordinator,
         onPfEnabledChanged: (enabled) => {
           void syncPfRuntime(enabled).catch((err) => {
             console.error('[security] pf runtime transition failed:', err)
