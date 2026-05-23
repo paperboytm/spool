@@ -22,3 +22,4 @@ export {
 export * from './doctor/index.js'
 export * from './security/index.js'
 export * from './observability/index.js'
+export * from './replay/index.js'
