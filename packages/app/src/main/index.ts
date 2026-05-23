@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, net, shell } from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 
@@ -77,6 +78,7 @@ if (process.env['SPOOL_E2E_TEST'] === '1') {
 }
 
 const isDevMode = Boolean(process.env['ELECTRON_RENDERER_URL'])
+const isMac = process.platform === 'darwin'
 const customUserDataDir = process.env['SPOOL_ELECTRON_USER_DATA_DIR']?.trim()
 if (customUserDataDir) {
   app.setPath('userData', customUserDataDir)
@@ -285,6 +287,7 @@ function createWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 520,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141410' : '#FAFAF8',
+    autoHideMenuBar: !isMac,
     // hiddenInset keeps the traffic lights but lets the renderer paint
     // up to y=0, so the app's top bar sits flush with the close/min/max
     // buttons instead of stacking under a separate OS-rendered title bar.
@@ -296,6 +299,10 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   })
+
+  if (!isMac) {
+    win.setMenuBarVisibility(false)
+  }
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -329,6 +336,41 @@ function createWindow(): BrowserWindow {
   })
 
   return win
+}
+
+function buildApplicationMenu(): Menu {
+  const platformMenus: MenuItemConstructorOptions[] = isMac
+    ? [
+        {
+          label: 'Spool',
+          submenu: [
+            { role: 'about', label: 'About Spool' },
+            { type: 'separator' },
+            { role: 'hide', label: 'Hide Spool' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit', label: 'Quit Spool' },
+          ],
+        },
+      ]
+    : [
+        {
+          label: 'Spool',
+          submenu: [
+            { role: 'about', label: 'About Spool' },
+            { type: 'separator' },
+            { role: 'quit', label: 'Quit Spool' },
+          ],
+        },
+      ]
+
+  return Menu.buildFromTemplate([
+    ...platformMenus,
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ])
 }
 
 let activeSyncPromise: Promise<{ added: number; updated: number; errors: number }> | null = null
@@ -376,25 +418,7 @@ app.whenReady().then(async () => {
   const dockIconPath = join(__dirname, '../../resources/icon.icns')
   try { app.dock?.setIcon(nativeImage.createFromPath(dockIconPath)) } catch {}
 
-  // Override the default "Electron" menu bar label on macOS
-  const appMenu = Menu.buildFromTemplate([
-    {
-      label: 'Spool',
-      submenu: [
-        { role: 'about', label: 'About Spool' },
-        { type: 'separator' },
-        { role: 'hide', label: 'Hide Spool' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit', label: 'Quit Spool' },
-      ],
-    },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    { role: 'windowMenu' },
-  ])
-  Menu.setApplicationMenu(appMenu)
+  Menu.setApplicationMenu(buildApplicationMenu())
 
   db = getDB()
   acpManager = new AcpManager()
@@ -887,4 +911,3 @@ ipcMain.handle(
     }
   },
 )
-
