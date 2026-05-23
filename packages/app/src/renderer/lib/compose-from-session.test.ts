@@ -48,6 +48,28 @@ describe('composeFromSession', () => {
     ])
   })
 
+  it('preserves tool names as replay metadata', () => {
+    const convo = composeFromSession(baseSession, [
+      msg(0, 'assistant', 'checking files', { toolNames: ['Read', 'Grep'] }),
+      msg(1, 'assistant', '', { toolNames: ['Bash'] }),
+    ])
+
+    expect(convo.turns).toEqual([
+      {
+        role: 'assistant',
+        body: 'checking files',
+        replay: { toolNames: ['Read', 'Grep'] },
+        timestamp: '2026-04-18T10:00:00Z',
+      },
+      {
+        role: 'assistant',
+        body: '',
+        replay: { toolNames: ['Bash'] },
+        timestamp: '2026-04-18T10:00:00Z',
+      },
+    ])
+  })
+
   it('drops sidechain messages', () => {
     const convo = composeFromSession(baseSession, [
       msg(0, 'user', 'main question'),

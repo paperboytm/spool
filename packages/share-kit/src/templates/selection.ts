@@ -43,7 +43,7 @@ export function selectSegments(convo: Conversation, opts: EditorOpts): SelectedS
       gap++
       continue
     }
-    if (hideEmpty && all[i]!.body.trim() === '') {
+    if (hideEmpty && all[i]!.body.trim() === '' && !hasReplaySignal(all[i]!)) {
       gap++
       continue
     }
@@ -59,4 +59,8 @@ export function selectSegments(convo: Conversation, opts: EditorOpts): SelectedS
     total: all.length,
     isExcerpt: turns.length !== all.length,
   }
+}
+
+function hasReplaySignal(turn: Turn): boolean {
+  return (turn.replay?.toolNames?.length ?? 0) > 0
 }
