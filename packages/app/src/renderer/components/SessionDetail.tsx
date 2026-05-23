@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check } from 'lucide-react'
-import type { Session, Message } from '@spool-lab/core'
+import { GitBranch, MessagesSquare, SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check } from 'lucide-react'
+import type { Session, Message, ReplayGraph } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
@@ -17,6 +17,9 @@ import { useIsDark } from '../hooks/useIsDark.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useDraftCountForSession } from '../hooks/useShareDrafts.js'
 import { extractRenderedText } from '../markdown/extractRenderedText.js'
+import SessionReplayView from './SessionReplayView.js'
+
+type DetailPanel = 'messages' | 'replay'
 
 type Props = {
   sessionUuid: string
@@ -30,6 +33,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const { t } = useTranslation()
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [replayGraph, setReplayGraph] = useState<ReplayGraph | null>(null)
+  const [replayLoading, setReplayLoading] = useState(false)
+  const [detailPanel, setDetailPanel] = useState<DetailPanel>('messages')
   const [loading, setLoading] = useState(true)
   const [pinned, setPinned] = useState(false)
   // Findings strip is collapsed by default — only the risk pill in the
@@ -109,6 +115,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   useEffect(() => {
     setLoading(true)
+    setReplayGraph(null)
     window.spool.getSession(sessionUuid).then((result) => {
       if (result) {
         setSession(result.session)
@@ -117,6 +124,23 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [sessionUuid])
+
+  useEffect(() => {
+    if (detailPanel !== 'replay') return
+    let cancelled = false
+    setReplayLoading(true)
+    window.spool.getSessionReplayGraph(sessionUuid)
+      .then((graph) => {
+        if (!cancelled) setReplayGraph(graph)
+      })
+      .catch(() => {
+        if (!cancelled) setReplayGraph(null)
+      })
+      .finally(() => {
+        if (!cancelled) setReplayLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [detailPanel, sessionUuid])
 
   // Re-fetch the session record on security mutations so the
   // meta-row pill (which reads session.scanFindingCount /
@@ -176,6 +200,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     setFindFocusNonce(0)
     setFindResultNonce(0)
     clearFind()
+    setDetailPanel('messages')
   }, [sessionUuid, clearFind])
 
   useEffect(() => {
@@ -386,19 +411,93 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
       <FindingsStrip session={session} open={stripOpen} onClose={() => setStripOpen(false)} />
 
-      {/* Messages */}
-      <MessageList
-        key={session.sessionUuid}
-        ref={listRef}
-        messages={messages}
-        isDark={isDark}
-        showFindBar={showFindBar}
-        messageFindRanges={messageFindRanges}
-        activeMatchIndex={activeMatchIndex}
-        onActiveMatchRef={bindActiveFindMatch}
-        targetMessageId={targetMessageId ?? null}
-        showTargetHighlight={showTargetHighlight}
-      />
+      <div className="flex-none px-6 pb-2">
+        <SessionPanelTabs
+          value={detailPanel}
+          onChange={setDetailPanel}
+          messagesLabel={t('session.panel_messages')}
+          replayLabel={t('session.panel_replay')}
+          ariaLabel={t('session.panel_aria')}
+        />
+      </div>
+
+      {detailPanel === 'messages' ? (
+        <MessageList
+          key={session.sessionUuid}
+          ref={listRef}
+          messages={messages}
+          isDark={isDark}
+          showFindBar={showFindBar}
+          messageFindRanges={messageFindRanges}
+          activeMatchIndex={activeMatchIndex}
+          onActiveMatchRef={bindActiveFindMatch}
+          targetMessageId={targetMessageId ?? null}
+          showTargetHighlight={showTargetHighlight}
+        />
+      ) : (
+        <SessionReplayView graph={replayGraph} loading={replayLoading} />
+      )}
+    </div>
+  )
+}
+
+function SessionPanelTabs({
+  value,
+  onChange,
+  messagesLabel,
+  replayLabel,
+  ariaLabel,
+}: {
+  value: DetailPanel
+  onChange: (value: DetailPanel) => void
+  messagesLabel: string
+  replayLabel: string
+  ariaLabel: string
+}) {
+  const options: Array<{ value: DetailPanel; label: string; icon: React.ReactNode; testId: string }> = [
+    {
+      value: 'messages',
+      label: messagesLabel,
+      icon: <MessagesSquare size={12} strokeWidth={1.5} aria-hidden />,
+      testId: 'session-panel-messages',
+    },
+    {
+      value: 'replay',
+      label: replayLabel,
+      icon: <GitBranch size={12} strokeWidth={1.5} aria-hidden />,
+      testId: 'session-panel-replay',
+    },
+  ]
+
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="inline-flex items-center rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface p-px"
+    >
+      {options.map((option) => {
+        const active = option.value === value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            data-testid={option.testId}
+            onClick={() => onChange(option.value)}
+            className={[
+              'inline-flex h-6 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0',
+              active
+                ? 'bg-warm-bg dark:bg-dark-bg text-accent dark:text-accent-dark'
+                : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text',
+            ].join(' ')}
+          >
+            {option.icon}
+            <span>{option.label}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
