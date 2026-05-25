@@ -716,11 +716,11 @@ export function dismissFinding(
   db: Database.Database,
   findingId: number,
   scope: 'session' | 'global',
-): void {
+): number | null {
   const f = db.prepare(
     'SELECT session_id, kind, value_hash FROM findings WHERE id = ?',
   ).get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
-  if (!f) return
+  if (!f) return null
   db.prepare(
     `UPDATE findings
         SET state = 'dismissed',
@@ -733,15 +733,16 @@ export function dismissFinding(
     addAllowlistGlobal(db, f.kind as SensitiveKind, f.value_hash)
   }
   updateSessionCounts(db, f.session_id)
+  return f.session_id
 }
 
 /** Re-activate a dismissed finding and remove the allowlist entry
  *  that pinned it (both scopes, since UI doesn't always know which). */
-export function undismissFinding(db: Database.Database, findingId: number): void {
+export function undismissFinding(db: Database.Database, findingId: number): number | null {
   const f = db.prepare(
     'SELECT session_id, kind, value_hash FROM findings WHERE id = ?',
   ).get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
-  if (!f) return
+  if (!f) return null
   db.prepare(
     `UPDATE findings
         SET state = 'active',
@@ -751,4 +752,5 @@ export function undismissFinding(db: Database.Database, findingId: number): void
   removeAllowlistSession(db, f.session_id, f.kind as SensitiveKind, f.value_hash)
   removeAllowlistGlobal(db, f.kind as SensitiveKind, f.value_hash)
   updateSessionCounts(db, f.session_id)
+  return f.session_id
 }

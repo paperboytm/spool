@@ -203,14 +203,24 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DISMISS_FINDING,
     (_e, args: { findingId: number; scope: 'session' | 'global' }) => {
-      dismissFinding(db, args.findingId, args.scope)
+      const sessionId = dismissFinding(db, args.findingId, args.scope)
+      if (sessionId != null) {
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
+          type: 'state-changed', sessionId, findingId: args.findingId, state: 'dismissed',
+        })
+      }
       return { ok: true }
     },
   )
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.UNDISMISS_FINDING,
     (_e, args: { findingId: number }) => {
-      undismissFinding(db, args.findingId)
+      const sessionId = undismissFinding(db, args.findingId)
+      if (sessionId != null) {
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
+          type: 'state-changed', sessionId, findingId: args.findingId, state: 'active',
+        })
+      }
       return { ok: true }
     },
   )

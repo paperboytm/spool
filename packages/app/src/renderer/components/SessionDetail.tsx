@@ -472,7 +472,7 @@ function RiskPill({
 
   // Clickable variant drops the strip; static variant is a status
   // indicator only (the cleared/resolved state has nothing to expand).
-  const cls = `flex-none inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono tabular-nums text-[11px] ${tone}`
+  const cls = `flex-none inline-flex items-center gap-1 px-1.5 h-[18px] rounded font-mono tabular-nums text-[11px] leading-none ${tone}`
   return (
     <>
       <span aria-hidden>·</span>

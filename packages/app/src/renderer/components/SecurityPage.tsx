@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Trash2, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import type {
@@ -461,7 +461,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   const activeKindSet = useMemo(() => new Set(activeKinds), [activeKinds])
 
   async function openBulkPurge(kind: string) {
-    setBulkPurgeKind(kind)
+    // Fetch the sample rows BEFORE opening — opening first then filling
+    // `bulkSamples` async makes the modal pop in short and grow as the
+    // samples block lands, a visible height jitter. Local sqlite IPC is
+    // fast enough that loading first adds no perceptible delay.
     const rows = await securityApi.listFindings({
       kind: kind as NonNullable<FindingFilter['kind']>,
       state: 'active',
@@ -475,6 +478,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
       return [{ value: truncateValue(v), sessionTitle: session?.title?.trim() || '(no title)' }]
     })
     setBulkPurgeSamples(samples)
+    setBulkPurgeKind(kind)
   }
 
   async function confirmBulkPurgeKind() {
@@ -1088,7 +1092,7 @@ function KindTile({
         onClick={(e) => { e.stopPropagation(); onBulkPurge() }}
         className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded inline-flex items-center justify-center text-warm-faint dark:text-dark-muted opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 hover:text-accent dark:hover:text-accent-dark transition-opacity"
       >
-        <Trash2 size={12} strokeWidth={1.5} aria-hidden />
+        <Eraser size={12} strokeWidth={1.5} aria-hidden />
       </button>
     </div>
   )
@@ -1119,6 +1123,7 @@ function SessionCard({
   // sees what's inside each card; can fold shut once they've reviewed.
   const [collapsed, setCollapsed] = useState(false)
   const [resuming, setResuming] = useState(false)
+  const [purgeAllPending, setPurgeAllPending] = useState(false)
   const LIMIT = 3
   const [values, setValues] = useState<Record<number, string | null>>({})
 
@@ -1192,6 +1197,29 @@ function SessionCard({
     try { await navigator.clipboard.writeText(resumeCommand) } catch { /* clipboard blocked */ }
   }
 
+  // Session-scoped bulk — the same unit the FindingsStrip acts on, so
+  // both surfaces expose it identically (in the ⋯ menu). Re-fetch the
+  // full active set rather than trusting the paginated `findings` so a
+  // card showing only the first page still purges/dismisses everything.
+  async function sessionReportableIds(): Promise<number[]> {
+    const rows = await securityApi.listFindings({ sessionId: session.id, state: 'active' })
+    return rows.filter(r => !INFO_SEVERITY_KINDS.has(r.kind as SensitiveKind)).map(r => r.id)
+  }
+  async function handleDismissAll() {
+    const ids = await sessionReportableIds()
+    if (ids.length === 0) return
+    try { await Promise.all(ids.map(id => securityApi.dismissFinding(id, 'session'))) }
+    catch { /* surfaces via reload */ }
+    await load(); onRefresh()
+  }
+  async function handlePurgeAll() {
+    const ids = await sessionReportableIds()
+    if (ids.length === 0) return
+    try { await securityApi.purgeFindings(ids) }
+    catch { /* surfaces via reload */ }
+    await load(); onRefresh()
+  }
+
   if (findings === null) {
     return (
       <article className="py-2" />
@@ -1235,7 +1263,7 @@ function SessionCard({
           aria-label={collapsed
             ? t('common.expand', { defaultValue: 'Expand' })
             : t('common.collapse', { defaultValue: 'Collapse' })}
-          className="flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded text-left cursor-default hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+          className="flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded text-left cursor-default transition-colors"
         >
           <SourceBadge source={session.source} />
           <span className="flex-1 min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate">
@@ -1289,6 +1317,19 @@ function SessionCard({
               </button>
             )}
             items={[
+              ...(high + low > 0 ? [
+                {
+                  label: t('security.dismiss_all', { defaultValue: 'Dismiss all' }),
+                  icon: <Check size={14} strokeWidth={1.6} aria-hidden />,
+                  onSelect: () => { void handleDismissAll() },
+                },
+                {
+                  label: t('security.strip_purge_all', { defaultValue: 'Purge all' }),
+                  icon: <Eraser size={14} strokeWidth={1.6} aria-hidden />,
+                  onSelect: () => setPurgeAllPending(true),
+                },
+                { separator: true as const },
+              ] : []),
               {
                 label: t('security.view_session_detail', { defaultValue: 'View session detail' }),
                 icon: <Eye size={14} strokeWidth={1.6} aria-hidden />,
@@ -1357,7 +1398,7 @@ function SessionCard({
               {/* Chevron sits in the same 14px centred slot the finding
                *  bullets use, so it lines up under the dots and the
                *  label aligns with the kind column. */}
-              <span className="flex justify-center w-3.5">
+              <span className="inline-flex items-center justify-center w-3.5">
                 <ChevronDown size={11} strokeWidth={1.7} aria-hidden />
               </span>
               {t('security.show_more', { count: hidden, defaultValue: 'show {{count}} more' })}
@@ -1375,6 +1416,15 @@ function SessionCard({
           )}
         </div>
       )}
+      <PurgeConfirmDialog
+        open={purgeAllPending}
+        count={high + low}
+        kind={reportable[0]?.kind ?? 'mixed'}
+        bulk
+        hasCredential={high > 0}
+        onConfirm={() => { setPurgeAllPending(false); void handlePurgeAll() }}
+        onCancel={() => setPurgeAllPending(false)}
+      />
     </article>
   )
 }
@@ -1486,46 +1536,62 @@ function FindingItem({
        *  spans the row and a gradient mask matching the hover surface
        *  fades it out beneath the buttons so the two never collide. */}
       {isActive ? (
-        <span className="absolute inset-y-0 right-0 z-10 flex items-stretch opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="absolute inset-y-0 right-0 z-10 flex items-stretch opacity-0 group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity">
           {/* A short fade blends the value's tail into the surface
-           *  right before a SOLID button block. The earlier single
-           *  gradient put the buttons on a still-transparent stretch,
-           *  so a long value showed straight through them; the solid
-           *  block (same colour as the hovered row) guarantees the
-           *  value is fully masked behind the controls. */}
+           *  right before an opaque block that carries the controls.
+           *  The block colour matches the hovered row, so it's
+           *  invisible against it — its only job is to mask the value
+           *  beneath. `has-[aria-expanded]` keeps the whole group (and
+           *  thus the menu's anchor) visible while the scope menu is
+           *  open even after the pointer leaves the row. */}
           <span aria-hidden className="w-10 bg-gradient-to-r from-transparent to-warm-surface dark:to-dark-surface" />
-          <span className="flex items-center gap-0.5 pr-2 rounded-r bg-warm-surface dark:bg-dark-surface">
-            <button
-              type="button"
-              data-testid="dismiss-in-session"
-              onClick={() => { void dismiss('session') }}
-              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-              title={t('security.dismiss_session', { defaultValue: 'Dismiss in this session' })}
-            >
-              {t('security.dismiss', { defaultValue: 'Dismiss' })}
-            </button>
-            <button
-              type="button"
-              data-testid="dismiss-everywhere"
-              onClick={() => { void dismiss('global') }}
-              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-              title={t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' })}
-            >
-              {t('security.everywhere', { defaultValue: 'Everywhere' })}
-            </button>
-            {/* Hairline divider groups the two dismiss scopes apart from
-             *  the destructive Purge, so "Everywhere" reads as a scope
-             *  of Dismiss rather than a third peer action. */}
-            <span className="mx-1 h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
+          <span className="flex items-center gap-2 pr-2 bg-warm-surface dark:bg-dark-surface">
+            {/* Dismiss is a single trigger that opens the scope menu —
+             *  no implicit default action, since "session" vs "everywhere"
+             *  is a real choice the user should make deliberately. Label +
+             *  caret live in one button so they stay baseline-aligned. */}
+            <Menu
+              align="right"
+              testId="dismiss-scope-menu"
+              trigger={({ open, toggle }) => (
+                <button
+                  type="button"
+                  data-testid="dismiss-button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={toggle}
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                  className="inline-flex items-center gap-0.5 h-[18px] font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                  title={t('security.dismiss', { defaultValue: 'Dismiss' })}
+                >
+                  {t('security.dismiss', { defaultValue: 'Dismiss' })}
+                  <ChevronDown size={12} strokeWidth={1.7} aria-hidden className="-mr-0.5" />
+                </button>
+              )}
+              items={[
+                {
+                  label: t('security.dismiss_session', { defaultValue: 'Dismiss in this session' }),
+                  onSelect: () => { void dismiss('session') },
+                },
+                {
+                  label: t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' }),
+                  onSelect: () => { void dismiss('global') },
+                },
+              ]}
+            />
+            {/* Hairline keeps the destructive Purge visually apart from
+             *  the dismiss group. */}
+            <span className="h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
+            {/* Purge = scrub the value from the local archive, so an
+             *  eraser (not a trash can) + its confirm dialog. */}
             <button
               type="button"
               data-testid="purge-button"
               onClick={() => setPurgePending(true)}
-              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex items-center gap-1 transition-colors"
+              className="inline-flex items-center justify-center h-[18px] w-4 text-warm-faint dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors"
               title={t('security.purge', { defaultValue: 'Purge from local archive' })}
             >
-              <Trash2 size={10} strokeWidth={1.7} aria-hidden />
-              {t('security.purge', { defaultValue: 'Purge' })}
+              <Eraser size={12} strokeWidth={1.7} aria-hidden />
             </button>
           </span>
         </span>

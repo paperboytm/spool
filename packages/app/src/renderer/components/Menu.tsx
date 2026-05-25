@@ -2,13 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { createPortal } from 'react-dom'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 
-type MenuItem = {
-  label: string
-  icon?: ReactNode
-  onSelect: () => void
-  active?: boolean
-  disabled?: boolean
-}
+type MenuItem =
+  | { separator: true }
+  | {
+      label: string
+      icon?: ReactNode
+      onSelect: () => void
+      active?: boolean
+      disabled?: boolean
+    }
 
 type Props = {
   trigger: (params: { open: boolean; toggle: () => void }) => ReactNode
@@ -95,6 +97,9 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
           onClick={(event) => event.stopPropagation()}
         >
           {items.map((item, index) => (
+            'separator' in item ? (
+              <div key={index} role="separator" className="my-1 h-px bg-warm-border dark:bg-dark-border" />
+            ) : (
             <button
               key={index}
               type="button"
@@ -125,6 +130,7 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
               )}
               <span className="flex-1 truncate">{item.label}</span>
             </button>
+            )
           ))}
         </div>,
         document.body,

@@ -4,9 +4,10 @@
 // about to happen, not a red banner. The modal shows the exact mask
 // rewrite in monospace.
 
-import { AlertTriangle, Trash2 } from 'lucide-react'
+import { AlertTriangle, Eraser, KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef } from 'react'
+import { HIGH_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { truncateValue } from './truncate-value.js'
 import { friendlyMaskName } from './format.js'
@@ -30,6 +31,11 @@ interface Props {
   /** Up to 4 sample rows shown in the bulk variant; the rest collapse into
    *  a "+ N more" footer. Optional — the modal still renders without them. */
   bulkSamples?: BulkSample[]
+  /** Whether the purge set contains a credential-tier finding, driving
+   *  the rotate-reminder. For single-kind purges leave it undefined and
+   *  the dialog derives it from `kind`; mixed/bulk callers must pass it
+   *  explicitly since `kind` is then only a representative label. */
+  hasCredential?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -41,6 +47,7 @@ export default function PurgeConfirmDialog({
   before,
   bulk,
   bulkSamples,
+  hasCredential,
   onConfirm,
   onCancel,
 }: Props) {
@@ -58,6 +65,15 @@ export default function PurgeConfirmDialog({
   const afterValue = `[redacted: ${friendly}]`
   const beforePreview = before ? truncateValue(before) : undefined
   const showBeforeRow = Boolean(beforePreview && !bulk)
+  // Credentials (api-key, token, connection-string, private-key, …) can
+  // still be live. Purging only masks Spool's copy — the original
+  // session file is untouched and the value may already be exposed — so
+  // for these kinds the only action that actually closes the leak is
+  // rotating/revoking at the source. Identity-tier kinds (email, phone)
+  // can't be "rotated", so the reminder is scoped to high severity.
+  // Single-kind purges derive this from `kind`; mixed/bulk callers pass
+  // `hasCredential` explicitly because `kind` is then just a label.
+  const isCredential = hasCredential ?? HIGH_SEVERITY_KINDS.has(kind as SensitiveKind)
 
   return (
     <div
@@ -68,7 +84,7 @@ export default function PurgeConfirmDialog({
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div
-        className={`bg-warm-bg dark:bg-dark-bg rounded-[10px] ${bulk ? 'w-[520px]' : 'w-[460px]'} max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border`}
+        className={`font-sans bg-warm-bg dark:bg-dark-bg rounded-[10px] ${bulk ? 'w-[520px]' : 'w-[460px]'} max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border`}
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
         <div className="px-6 pt-5 pb-4">
@@ -143,6 +159,17 @@ export default function PurgeConfirmDialog({
             </div>
           )}
 
+          {isCredential && (
+            <div className="mt-4 flex gap-2.5 rounded-lg border border-accent/20 dark:border-accent-dark/20 bg-accent/[0.06] dark:bg-accent-dark/[0.07] px-3 py-2.5">
+              <KeyRound size={14} strokeWidth={1.7} className="flex-none mt-[1px] text-accent dark:text-accent-dark" aria-hidden />
+              <p className="m-0 text-[12px] leading-[17px] text-warm-text dark:text-dark-text">
+                {t('security.purge_rotate_reminder', {
+                  defaultValue: 'This only masks Spool’s copy. If it’s a live secret, rotate or revoke it at the source — it may already be exposed elsewhere.',
+                })}
+              </p>
+            </div>
+          )}
+
           <div className="mt-3.5 flex flex-col gap-1.5">
             <Fact>
               {t('security.purge_fact_originals', {
@@ -180,7 +207,7 @@ export default function PurgeConfirmDialog({
             onClick={onConfirm}
             className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-accent dark:bg-accent-dark border border-accent dark:border-accent-dark text-[12px] font-medium text-white hover:bg-accent/90 dark:hover:bg-accent-dark/90 transition-colors"
           >
-            <Trash2 size={12} strokeWidth={1.7} aria-hidden />
+            <Eraser size={12} strokeWidth={1.7} aria-hidden />
             {t('security.purge_confirm', { defaultValue: 'Purge' })}
           </button>
         </div>
