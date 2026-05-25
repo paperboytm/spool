@@ -49,7 +49,7 @@ const port = parentPort
 export type ScanCommand =
   | { cmd: 'enqueue'; sessionId: number }
   | { cmd: 'rescanAll' }
-  | { cmd: 'backfill' }
+  | { cmd: 'backfill'; userInitiated?: boolean }
   | { cmd: 'getStatus' }
 
 export interface PfRawMatchWire {
@@ -246,7 +246,7 @@ void (async () => {
             result = await runEff(worker.rescanAll())
             break
           case 'backfill':
-            result = await runEff(worker.backfill())
+            result = await runEff(worker.backfill({ userInitiated: payload.userInitiated === true }))
             break
           case 'getStatus':
             result = await runEff(worker.getStatus)

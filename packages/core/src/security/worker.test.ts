@@ -300,6 +300,125 @@ describe('ScanWorker', () => {
     })
   })
 
+  // Regression: backfill({ userInitiated: true }) sets the manual
+  // burst marker so the renderer's busy→idle edge surfaces a "Scan
+  // complete" result banner for user-driven pref changes (mute kind,
+  // toggle PF). Default backfill (boot, post-sync) stays silent.
+  it('backfill({ userInitiated: true }) raises manualBurstInFlight', async () => {
+    const multiDb = setupDb(3)
+    await withWorker(multiDb, async (worker) => {
+      const collectFiber = Effect.runFork(
+        Stream.takeUntil(worker.statusChanges, (s) =>
+          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        ).pipe(Stream.runCollect),
+      )
+      await new Promise<void>((r) => setTimeout(r, 20))
+      await Effect.runPromise(worker.backfill({ userInitiated: true }))
+      await Effect.runPromise(waitForIdle(worker))
+      const collected = Chunk.toReadonlyArray(
+        await Effect.runPromise(Fiber.join(collectFiber)),
+      )
+      expect(collected.some(s =>
+        s.manualBurstInFlight === true &&
+        (s.backfillRemaining > 0 || s.scanning !== null || s.queued > 0),
+      )).toBe(true)
+      expect(collected[collected.length - 1]!.manualBurstInFlight).toBe(false)
+    })
+  })
+
+  it('backfill() default does NOT raise manualBurstInFlight', async () => {
+    const multiDb = setupDb(3)
+    await withWorker(multiDb, async (worker) => {
+      const collectFiber = Effect.runFork(
+        Stream.takeUntil(worker.statusChanges, (s) =>
+          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        ).pipe(Stream.runCollect),
+      )
+      await new Promise<void>((r) => setTimeout(r, 20))
+      await Effect.runPromise(worker.backfill())
+      await Effect.runPromise(waitForIdle(worker))
+      const collected = Chunk.toReadonlyArray(
+        await Effect.runPromise(Fiber.join(collectFiber)),
+      )
+      expect(collected.every(s => s.manualBurstInFlight === false)).toBe(true)
+    })
+  })
+
+  // Regression for the "toggle PF off mid-scan leaves progress bar
+  // pinned at 100% for seconds" bug. The wrapper's sticky-max guard
+  // (Math.max(prev.backfillTotal, after.backfillRemaining)) was
+  // designed to keep total monotonic during a SINGLE burst — but
+  // when a new burst arrives mid-flight (kindAllowlist toggle, PF
+  // toggle), it bled the OLD burst's total into the new burst's
+  // progress display. backfill() now goes through resetBurst, which
+  // bypasses the guard and sets backfillTotal directly from the
+  // freshly-computed stale set.
+  it('successive backfill() does not carry the prior burst total into the new one', async () => {
+    const multiDb = setupDb(5)
+    await withWorker(multiDb, async (worker) => {
+      // First burst: 5 stale, fully drains.
+      await Effect.runPromise(worker.backfill())
+      await Effect.runPromise(waitForIdle(worker))
+      const afterFirst = await Effect.runPromise(worker.getStatus)
+      // After full drain the wrapper resets total to 0 — sanity check.
+      expect(afterFirst.backfillTotal).toBe(0)
+      expect(afterFirst.backfillRemaining).toBe(0)
+
+      // Second burst against the same DB with the SAME profile finds
+      // no stale work. The OLD bug would leave backfillTotal sticky
+      // at 5 because Math.max(prev=5, 0) = 5 — even though there is
+      // nothing to do. With resetBurst the new burst owns the total
+      // directly: 0 in, 0 out.
+      const count = await Effect.runPromise(worker.backfill())
+      expect(count).toBe(0)
+      const afterSecond = await Effect.runPromise(worker.getStatus)
+      expect(afterSecond.backfillTotal).toBe(0)
+      expect(afterSecond.backfillRemaining).toBe(0)
+      expect(afterSecond.queued).toBe(0)
+    })
+  })
+
+  // Tighter regression for the exact toggle-PF-off scenario: a
+  // backfill arrives while a previous burst is still mid-flight, and
+  // the new stale set is strictly smaller than what was already
+  // scheduled. Pre-fix: backfillTotal stayed at the OLD burst's max
+  // and the progress bar visually pinned at ~100%. Post-fix:
+  // backfillTotal tracks the new burst's stale count.
+  it('backfill() mid-burst with a smaller stale set resets backfillTotal downward', async () => {
+    const multiDb = setupDb(5)
+    await withWorker(multiDb, async (worker) => {
+      // Kick off the first burst: 5 stale sessions.
+      await Effect.runPromise(worker.backfill())
+      // Wait until enough sessions have finished that the next
+      // `listSessionsNeedingScan` returns a smaller set. The 50ms
+      // sleep between scanOne calls (in worker.ts drain) gives us
+      // discrete status events to watch.
+      await Effect.runPromise(
+        Stream.takeUntil(worker.statusChanges, (s) =>
+          s.backfillRemaining <= 2,
+        ).pipe(Stream.runDrain),
+      )
+      const midSnap = await Effect.runPromise(worker.getStatus)
+      // Confirm we're observing the sticky-max in action: total still
+      // says 5 while remaining has shrunk.
+      expect(midSnap.backfillTotal).toBe(5)
+
+      // Now trigger a fresh backfill. The stale set is whatever the
+      // DB currently reports (the in-flight session is mid-scan, so
+      // scan_profile is still NULL or matches depending on timing).
+      // Either way it MUST be ≤ midSnap.backfillRemaining + 1 (the
+      // worst case of including the in-flight session). The key
+      // assertion: backfillTotal is the freshly-computed count, NOT
+      // the old burst's 5.
+      await Effect.runPromise(worker.backfill())
+      const afterReset = await Effect.runPromise(worker.getStatus)
+      expect(afterReset.backfillTotal).toBeLessThan(5)
+      expect(afterReset.backfillTotal).toBe(afterReset.backfillRemaining)
+
+      await Effect.runPromise(waitForIdle(worker))
+    })
+  })
+
   // Regression for the "progress bar rewinds when switching back
   // mid-scan" bug. Anchoring backfillTotal to backfillRemaining
   // (which only ever decrements at scanOne end) — instead of to

@@ -257,7 +257,11 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
         [...prevKinds].some(k => !nextKinds.has(k)) ||
         [...nextKinds].some(k => !prevKinds.has(k))
       if (changed) {
-        await runPromise(worker.backfill())
+        // User clicked a kind-mute toggle — propagate the
+        // user-initiated marker so the renderer's busy→idle edge
+        // surfaces a "Scan complete" result banner instead of
+        // silently letting the progress banner vanish.
+        await runPromise(worker.backfill({ userInitiated: true }))
       }
       if (prev.pfEnabled !== saved.pfEnabled) {
         try { onPfEnabledChanged?.(saved.pfEnabled) }

@@ -266,7 +266,11 @@ async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
         yield* Effect.promise(() => pfRuntime.stop())
       }
       if (scanWorker) {
-        yield* scanWorker.backfill()
+        // User flipped the PF toggle (or completed the callout's
+        // "Activate" flow) — mark this backfill as user-initiated so
+        // the renderer shows a result banner on busy→idle, instead
+        // of treating it as background work.
+        yield* scanWorker.backfill({ userInitiated: true })
       }
     }).pipe(
       // pfActivationPending clears on the way out (success OR fail) so

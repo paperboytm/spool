@@ -192,7 +192,7 @@ export async function spawnScanWorker(
   return {
     enqueue: (sessionId) => Effect.promise(() => send<void>({ cmd: 'enqueue', sessionId })),
     rescanAll: () => Effect.promise(() => send<number>({ cmd: 'rescanAll' })),
-    backfill: () => Effect.promise(() => send<number>({ cmd: 'backfill' })),
+    backfill: (opts) => Effect.promise(() => send<number>({ cmd: 'backfill', userInitiated: opts?.userInitiated === true })),
     // getStatus uses the last pushed status when available — saves a
     // round-trip on every renderer mount. Falls back to a real call
     // before the first push lands (boolean sentinel because an empty

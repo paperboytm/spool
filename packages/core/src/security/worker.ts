@@ -53,8 +53,22 @@ export interface ScanWorker {
    *  "Rescan all" and by provider-set changes. */
   rescanAll: () => Effect.Effect<number>
   /** Enqueue every session whose scan_profile != currentProfile.
-   *  Called once on boot. */
-  backfill: () => Effect.Effect<number>
+   *  Called on boot AND on every profile-affecting pref change
+   *  (kindAllowlist toggle, PF on/off, etc.).
+   *
+   *  Treated as a fresh burst: any leftover items still in the queue
+   *  from the previous burst are discarded (they were enqueued against
+   *  an outdated profile; the current `listSessionsNeedingScan` call
+   *  is the authoritative new work set). `backfillTotal` resets to the
+   *  new stale-set size instead of sticky-maxing with the old burst's
+   *  value, so the renderer's progress bar reflects the new work
+   *  rather than the union of the two.
+   *
+   *  Pass `userInitiated: true` when the caller is a SET_PREFS / PF
+   *  toggle handler so the renderer's busy→idle edge surfaces a
+   *  "Scan complete" result banner the same way it does for the
+   *  Rescan-all button. */
+  backfill: (opts?: { userInitiated?: boolean }) => Effect.Effect<number>
   /** Stream of finding change events. Translator in main process
    *  subscribes and forwards over IPC. */
   changes: Stream.Stream<FindingsChange>
@@ -132,6 +146,43 @@ export function makeScanWorker(
         Effect.flatMap((s) => PubSub.publish(statusEvents, s)),
         Effect.asVoid,
       )
+
+    // Burst-reset variant for backfill() (and any future caller that
+    // means "start a fresh burst, discard whatever the previous one
+    // had queued"). Two differences from updateStatus:
+    //
+    //   1. The `Math.max(prev.backfillTotal, after.backfillRemaining)`
+    //      sticky guard is BYPASSED — the caller is declaring a brand-
+    //      new burst, so its new `backfillRemaining` becomes the
+    //      authoritative `backfillTotal`. Without this, a toggle-pref
+    //      mid-scan would leave the renderer showing the OLD burst's
+    //      total while the new burst's much smaller stale set drives
+    //      the remaining count → progress bar visually pinned at
+    //      ~100% for as long as the queue takes to drain.
+    //
+    //   2. The Effect Queue is drained synchronously. Items left in
+    //      it were enqueued against the previous profile and were
+    //      already accounted for in the OLD burst's
+    //      backfillRemaining. With the new totals in force they'd
+    //      keep `nowBusy = queued > 0` true (banner-stuck-at-100%
+    //      problem) and waste regex-only scans on sessions whose
+    //      profile already matches the current one.
+    const resetBurst = (f: (s: ScanStatus) => ScanStatus) =>
+      Effect.gen(function* () {
+        yield* Queue.takeAll(queue)
+        yield* Ref.update(statusRef, (prev) => {
+          const after = f(prev)
+          const fullyIdle =
+            after.backfillRemaining === 0 &&
+            after.queued === 0 &&
+            after.scanning === null
+          const backfillTotal = fullyIdle ? 0 : after.backfillRemaining
+          const manualBurstInFlight = fullyIdle ? false : after.manualBurstInFlight
+          return { ...after, backfillTotal, manualBurstInFlight }
+        })
+        const snap = yield* Ref.get(statusRef)
+        yield* PubSub.publish(statusEvents, snap)
+      })
 
     const scanOne = (sessionId: number) =>
       Effect.gen(function* () {
@@ -223,21 +274,33 @@ export function makeScanWorker(
         return all.length
       }).pipe(Effect.withSpan('security.worker.rescan_all'))
 
-    const backfill = () =>
+    const backfill = (opts?: { userInitiated?: boolean }) =>
       Effect.gen(function* () {
         // Re-resolve the profile each call so a SET_PREFS handler that
         // changed kindAllowlist sees the updated hash before invoking
-        // backfill. Keep the per-call status snapshot in sync too.
+        // backfill.
         const profile = resolveProfile(config)
-        yield* updateStatus((s) => ({ ...s, currentProfile: profile }))
         const stale = yield* Effect.sync(() =>
           listSessionsNeedingScan(config.db, profile),
         )
-        yield* updateStatus((s) => ({ ...s, backfillRemaining: stale.length }))
+        // Fresh burst: drain any leftover queue items (they belong to
+        // a previous profile snapshot — see `resetBurst` notes), reset
+        // queued/backfillRemaining/backfillTotal to this burst's stale
+        // count, and stamp the user-initiated flag if applicable. The
+        // wrapper bypasses the sticky-max guard so the renderer's
+        // progress bar tracks the new burst, not the old.
+        yield* resetBurst((s) => ({
+          ...s,
+          currentProfile: profile,
+          queued: 0,
+          backfillRemaining: stale.length,
+          manualBurstInFlight: opts?.userInitiated === true,
+        }))
         for (const id of stale) {
           yield* enqueue(id)
         }
         yield* Effect.annotateCurrentSpan('enqueued', stale.length)
+        yield* Effect.annotateCurrentSpan('userInitiated', opts?.userInitiated === true)
         return stale.length
       }).pipe(Effect.withSpan('security.worker.backfill'))
 
