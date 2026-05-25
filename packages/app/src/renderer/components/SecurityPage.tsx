@@ -1261,7 +1261,7 @@ function SessionCard({
           )}
           {low > 0 && (
             <span className="inline-flex items-center gap-[3px] font-mono tabular-nums text-[11px] text-warm-muted dark:text-dark-muted">
-              <span className="w-1 h-1 rounded-full bg-warm-muted dark:bg-dark-muted" />
+              <span className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted" />
               {low}
             </span>
           )}
@@ -1345,8 +1345,9 @@ function SessionCard({
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text inline-flex items-center gap-1 transition-colors"
             >
+              <ChevronDown size={11} strokeWidth={1.7} aria-hidden />
               {t('security.show_more', { count: hidden, defaultValue: 'show {{count}} more' })}
             </button>
           )}
@@ -1451,25 +1452,34 @@ function FindingItem({
       data-kind={finding.kind}
       data-state={finding.state}
       data-blurred={!isPurged && !revealed ? '1' : '0'}
-      className="group grid items-center gap-3 pl-6 pr-2 py-0.5 rounded font-mono text-[11px] hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
-      style={{ gridTemplateColumns: '14px 110px 1fr auto', opacity: finding.state === 'dismissed' ? 0.5 : 1 }}
+      className="group relative grid items-center gap-3 pl-6 pr-2 py-0.5 rounded font-mono text-[11px] hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      style={{ gridTemplateColumns: '14px 110px 1fr', opacity: finding.state === 'dismissed' ? 0.5 : 1 }}
     >
       <span className={`justify-self-center w-1 h-1 rounded-full ${bulletClass}`} />
       <span className="text-warm-muted dark:text-dark-muted truncate">{finding.kind}</span>
       <span
-        className={`truncate transition-[filter] duration-100 ${valueClass}`}
+        data-testid="finding-value"
+        className={`truncate transition-[filter] duration-100 ${!isActive ? 'pr-20' : ''} ${valueClass}`}
+        title={revealed && value ? value : undefined}
         onMouseEnter={() => valuesHidden && !isPurged && setLocalReveal(true)}
         onClick={() => valuesHidden && !isPurged && setLocalReveal(true)}
       >
         {displayValue}
       </span>
+      {/* Actions (active) / state label (otherwise) float over the
+       *  value's right edge instead of holding a grid column. An
+       *  always-present `auto` column reserved the full button-cluster
+       *  width even while the buttons were invisible, so the value
+       *  truncated ~200px short of the real right edge. Now the value
+       *  spans the row and a gradient mask matching the hover surface
+       *  fades it out beneath the buttons so the two never collide. */}
       {isActive ? (
-        <span className="inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 pl-12 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-transparent via-warm-surface to-warm-surface dark:via-dark-surface dark:to-dark-surface">
           <button
             type="button"
             data-testid="dismiss-in-session"
             onClick={() => { void dismiss('session') }}
-            className="h-5 px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
             title={t('security.dismiss_session', { defaultValue: 'Dismiss in this session' })}
           >
             {t('security.dismiss', { defaultValue: 'Dismiss' })}
@@ -1478,35 +1488,39 @@ function FindingItem({
             type="button"
             data-testid="dismiss-everywhere"
             onClick={() => { void dismiss('global') }}
-            className="h-5 px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
             title={t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' })}
           >
             {t('security.everywhere', { defaultValue: 'Everywhere' })}
           </button>
+          {/* Hairline divider groups the two dismiss scopes apart from
+           *  the destructive Purge, so "Everywhere" reads as a scope of
+           *  Dismiss rather than a third peer action. */}
+          <span className="mx-1 h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
           <button
             type="button"
             data-testid="purge-button"
             onClick={() => setPurgePending(true)}
-            className="h-5 px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex items-center gap-1 transition-colors"
+            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex items-center gap-1 transition-colors"
             title={t('security.purge', { defaultValue: 'Purge from local archive' })}
           >
             <Trash2 size={10} strokeWidth={1.7} aria-hidden />
             {t('security.purge', { defaultValue: 'Purge' })}
           </button>
-          <PurgeConfirmDialog
-            open={purgePending}
-            count={1}
-            kind={finding.kind}
-            {...(value !== null ? { before: value } : {})}
-            onConfirm={() => { void purge() }}
-            onCancel={() => setPurgePending(false)}
-          />
         </span>
       ) : (
-        <span className="font-sans text-[10px] uppercase tracking-[0.08em] font-semibold text-warm-faint dark:text-dark-muted">
+        <span className="absolute inset-y-0 right-2 flex items-center font-sans text-[10px] uppercase tracking-[0.08em] font-semibold text-warm-faint dark:text-dark-muted">
           {finding.state}
         </span>
       )}
+      <PurgeConfirmDialog
+        open={purgePending}
+        count={1}
+        kind={finding.kind}
+        {...(value !== null ? { before: value } : {})}
+        onConfirm={() => { void purge() }}
+        onCancel={() => setPurgePending(false)}
+      />
     </div>
   )
 }
