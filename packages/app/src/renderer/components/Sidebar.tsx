@@ -146,15 +146,6 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             onClick={onSelectHome}
           />
         )}
-        {onSelectShares && (
-          <NavRow
-            testId="sidebar-shares"
-            icon={<SharesIcon size={14} strokeWidth={1.75} />}
-            label={t('sidebar.shares')}
-            active={isSharesActive}
-            onClick={onSelectShares}
-          />
-        )}
         {onSelectSecurity && securityFeatureEnabled() && (
           <NavRow
             testId="sidebar-security"
@@ -162,6 +153,15 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             label={t('sidebar.security')}
             active={isSecurityActive}
             onClick={onSelectSecurity}
+          />
+        )}
+        {onSelectShares && (
+          <NavRow
+            testId="sidebar-shares"
+            icon={<SharesIcon size={14} strokeWidth={1.75} />}
+            label={t('sidebar.shares')}
+            active={isSharesActive}
+            onClick={onSelectShares}
           />
         )}
         {onOpenSearch && (
