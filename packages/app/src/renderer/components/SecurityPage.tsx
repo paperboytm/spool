@@ -512,35 +512,14 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
               {t('security.summary_info', { count: infoCount, defaultValue: '{{count}} info' })}
             </span>
           )}
-          {/* Always show "scanned X ago" — the text is stable, only a
-           *  tiny pulse dot fades in/out next to it when work is
-           *  happening in the background. Previously the slot flipped
-           *  between the dot-+-text and the timestamp, which read as a
-           *  flicker even after the underlying state was debounced.
-           *  Stable text + a small inline indicator is the standard
-           *  ambient pattern (Gmail's "saved", VS Code's status-bar
-           *  spinner — none of them swap text for the active state). */}
-          {/* Suppress the inline "scanned X ago" + dot while a full
-           *  ScanBanner is shown — they'd otherwise duplicate the
-           *  scan-in-flight signal in two places at once. */}
-          {lastScanCompletedAt && !shouldShowScanBanner(scanStatus, displayBusy) && (
+          {/* Detectors chip qualifies the counts above (which engine
+           *  produced them), so it sits next to them — and, being the
+           *  most static element, anchors the left of the row while the
+           *  width-volatile "scanned X ago" trails at the end. */}
+          {scanStatus?.currentProfile && (
             <>
               {' · '}
-              <span data-testid="security-scan-state" className="inline-flex items-center gap-1 align-baseline">
-                {displayBusy && (
-                  <span
-                    data-testid="security-ambient-dot"
-                    aria-hidden
-                    className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted animate-pulse"
-                  />
-                )}
-                <span>
-                  {t('security.scanned_ago', {
-                    ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
-                    defaultValue: 'scanned {{ago}}',
-                  })}
-                </span>
-              </span>
+              <DetectorsChip profile={scanStatus.currentProfile} />
             </>
           )}
           {activeKinds.length > 0 && (
@@ -561,10 +540,29 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
               </button>
             </>
           )}
-          {scanStatus?.currentProfile && (
+          {/* "scanned X ago" is the row's only width-volatile text, so
+           *  it trails last: its width changes can't shove the static
+           *  counts/chip to its left. Pairing it with the ↻ button
+           *  also reads as "last scanned · refresh", giving the bare
+           *  icon a label by adjacency.
+           *  Plain inline text (no flex wrapper, no inline indicator)
+           *  so it shares the surrounding mono baseline exactly and
+           *  never reflows the ↻ button. It's a stable "last
+           *  completed" fact, NOT a scan-in-flight signal, so it stays
+           *  put even under a full ScanBanner — removing it mid-scan
+           *  collapsed the row width and shoved the controls sideways,
+           *  then back. In-progress scanning is signalled by the
+           *  ScanBanner below (≥5 sessions) and by this stamp ticking
+           *  to "just now" when a scan settles. */}
+          {lastScanCompletedAt && (
             <>
               {' · '}
-              <DetectorsChip profile={scanStatus.currentProfile} />
+              <span data-testid="security-scan-state">
+                {t('security.scanned_ago', {
+                  ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
+                  defaultValue: 'scanned {{ago}}',
+                })}
+              </span>
             </>
           )}
         </span>
