@@ -645,9 +645,9 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                         onToggle={toggleKindFilter}
                         onBulkPurge={(k) => void openBulkPurge(k)}
                       />
-                      <p className="mt-2 text-[11px] text-warm-faint dark:text-dark-muted">
+                      <p className="mt-2 text-[11px] text-warm-faint dark:text-dark-muted" data-testid="security-info-footnote">
                         {t('security.info_footnote', {
-                          defaultValue: 'Signals are kept as audit records but never surfaced as standalone findings. Click a tile to add it to the filter; the chip will light up and the sessions list will include matching findings.',
+                          defaultValue: 'Kept as audit records, not surfaced as standalone findings.',
                         })}
                       </p>
                     </>
@@ -1479,13 +1479,23 @@ function EmptyState({
         <ShieldAlert size={18} strokeWidth={1.5} aria-hidden />
       </span>
       <div className="flex flex-col gap-2.5 flex-1 min-w-0">
-        <h2 className="text-[15px] font-semibold text-warm-text dark:text-dark-text leading-5 tracking-[-0.005em]">
-          {t('security.empty_title', { defaultValue: 'Nothing to review.' })}
+        <h2
+          data-testid="security-empty-title"
+          data-scan-state={lastScan === null ? 'never' : 'clean'}
+          className="text-[15px] font-semibold text-warm-text dark:text-dark-text leading-5 tracking-[-0.005em]"
+        >
+          {lastScan === null
+            ? t('security.empty_title_never', { defaultValue: "Scan hasn't run yet." })
+            : t('security.empty_title', { defaultValue: 'Nothing to review.' })}
         </h2>
         <p className="text-[13px] text-warm-muted dark:text-dark-muted leading-[18px] max-w-[480px]">
-          {t('security.empty_body', {
-            defaultValue: "We scanned your sessions and found nothing high-risk. Spool re-scans whenever new sessions sync.",
-          })}
+          {lastScan === null
+            ? t('security.empty_body_never', {
+                defaultValue: 'Click Rescan all to begin.',
+              })
+            : t('security.empty_body', {
+                defaultValue: "We scanned your sessions and found nothing high-risk. Spool re-scans whenever new sessions sync.",
+              })}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
           <button
