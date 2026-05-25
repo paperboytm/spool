@@ -35,6 +35,7 @@ import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
 import { useFeature, securityFeatureEnabled } from './featureFlags.js'
+import { primeSecurityPrefsCache } from './api/securityPrefsCache.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs' | 'security'
@@ -280,6 +281,17 @@ export default function App() {
     window.spool.getSidebarCollapsed()
       .then(setSidebarCollapsed)
       .catch(console.error)
+  }, [])
+
+  // Warm the SecurityPreferences cache at app boot so every Toggle in
+  // Settings → Security renders with its persisted state from frame 1.
+  // Without this, opening the tab cold would trigger a fetch on mount
+  // and the controls would pop in (or, before the toggle gate, flash
+  // off → on). When the feature flag is off the prime resolves to null
+  // and nothing renders — harmless.
+  useEffect(() => {
+    if (!securityFeatureEnabled()) return
+    void primeSecurityPrefsCache()
   }, [])
 
   // Restore the pre-editor sidebar state when the user leaves the

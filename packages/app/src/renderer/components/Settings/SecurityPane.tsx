@@ -26,6 +26,7 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi, type SecurityPreferences, type BackupFileInfo } from '../../api/security.js'
+import { useCachedSecurityPrefs, primeSecurityPrefsCache, patchSecurityPrefs } from '../../api/securityPrefsCache.js'
 import { formatBytes } from '../security/format.js'
 import { securityFeatureEnabled } from '../../featureFlags.js'
 import Toggle from '../Toggle.js'
@@ -90,17 +91,24 @@ function SecurityUnavailableNotice({
 function SecurityPaneInner() {
   const { t } = useTranslation()
   const [status, setStatus] = useState<ScanStatus | null>(null)
-  const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
+  // Subscribe to the shared prefs cache. Returns the cached value
+  // synchronously when warm (the typical case — App.tsx primes at
+  // mount, so by the time a user can click Settings the cache is
+  // populated). Returns null on cold-start; the controls below render
+  // null in their slot and the layout stays stable until the prime
+  // resolves and useSyncExternalStore re-renders us.
+  const prefs = useCachedSecurityPrefs()
   const [busy, setBusy] = useState(false)
   const [allowlistOpen, setAllowlistOpen] = useState(false)
   const [allowlistEntries, setAllowlistEntries] = useState<AllowlistEntryRow[]>([])
 
   useEffect(() => {
     void securityApi.getScanStatus().then(setStatus).catch(() => setStatus(null))
-    void securityApi.getPrefs().then(setPrefs).catch(() => setPrefs(null))
     void refreshAllowlist()
-    const off = securityApi.onPrefsChanged((next) => setPrefs(next))
-    return () => off()
+    if (prefs === null) {
+      void primeSecurityPrefsCache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function refreshAllowlist() {
@@ -108,11 +116,10 @@ function SecurityPaneInner() {
     setAllowlistEntries(rows)
   }
 
+
   async function update(next: Partial<SecurityPreferences>) {
     if (!prefs) return
-    setPrefs({ ...prefs, ...next })
-    const saved = await securityApi.setPrefs(next)
-    setPrefs(saved)
+    await patchSecurityPrefs(next)
   }
 
   async function rescanAll() {
@@ -183,14 +190,14 @@ function SecurityPaneInner() {
             description={t('settings.security.info_default_sub', {
               defaultValue: 'Show absolute-path, ip, and internal-host in the Security page by default. Audit showed ~98% false-positive rate.',
             })}
-            control={
+            control={prefs && (
               <Toggle
-                checked={prefs?.infoDefaultVisible ?? false}
+                checked={prefs.infoDefaultVisible}
                 onChange={(v) => { void update({ infoDefaultVisible: v }) }}
                 ariaLabel={t('settings.security.info_default_label', { defaultValue: 'Informational signals' })}
                 testId="settings-info-default"
               />
-            }
+            )}
           />
           {/* Blur defaults are split per surface so the at-a-glance
               strip (session detail) and the dedicated review page can
@@ -202,37 +209,37 @@ function SecurityPaneInner() {
             description={t('settings.security.blur_page_sub', {
               defaultValue: 'Finding values render blurred on the Security page; hover or click a row to reveal. Off = always visible.',
             })}
-            control={
+            control={prefs && (
               <Toggle
-                checked={prefs?.securityPageValuesBlurred ?? false}
+                checked={prefs.securityPageValuesBlurred}
                 onChange={(v) => { void update({ securityPageValuesBlurred: v }) }}
                 ariaLabel={t('settings.security.blur_page_label', { defaultValue: 'Blur values on the Security page' })}
                 testId="settings-blur-page"
               />
-            }
+            )}
           />
           <DefaultsRow
             label={t('settings.security.blur_strip_label', { defaultValue: 'Blur values in the session strip' })}
             description={t('settings.security.blur_strip_sub', {
               defaultValue: 'Finding values render blurred in the session-detail Findings strip; hover or click to reveal. Off = always visible.',
             })}
-            control={
+            control={prefs && (
               <Toggle
-                checked={prefs?.findingsStripValuesBlurred ?? false}
+                checked={prefs.findingsStripValuesBlurred}
                 onChange={(v) => { void update({ findingsStripValuesBlurred: v }) }}
                 ariaLabel={t('settings.security.blur_strip_label', { defaultValue: 'Blur values in the session strip' })}
                 testId="settings-blur-strip"
               />
-            }
+            )}
           />
           <DefaultsRow
             label={t('settings.security.rescan_after_sync_label', { defaultValue: 'Rescan after sync' })}
             description={t('settings.security.rescan_after_sync_sub', {
               defaultValue: 'When new sessions land, automatically re-run detectors on the affected sessions in the background.',
             })}
-            control={
+            control={prefs && (
               <SmallSelect
-                value={prefs?.rescanAfterSync ?? 'auto'}
+                value={prefs.rescanAfterSync}
                 onChange={(v) => { void update({ rescanAfterSync: v as 'auto' | 'manual' }) }}
                 options={[
                   { value: 'auto', label: t('settings.security.rescan_after_sync_auto', { defaultValue: 'Auto' }) },
@@ -240,17 +247,19 @@ function SecurityPaneInner() {
                 ]}
                 testid="settings-rescan-after-sync"
               />
-            }
+            )}
           />
         </div>
       </Section>
 
       {/* Muted kinds — entire categories silently dismissed at scan time */}
       <Section title={t('settings.security.muted_kinds_title', { defaultValue: 'Muted kinds' })}>
-        <MutedKindsRow
-          value={prefs?.kindAllowlist ?? []}
-          onChange={(kinds) => { void update({ kindAllowlist: kinds }) }}
-        />
+        {prefs && (
+          <MutedKindsRow
+            value={prefs.kindAllowlist}
+            onChange={(kinds) => { void update({ kindAllowlist: kinds }) }}
+          />
+        )}
       </Section>
 
       {/* Allowlist */}

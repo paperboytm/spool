@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, X, RotateCw, AlertTriangle } from 'lucide-react'
-import { securityApi, type PfDownloadState, type PfRuntimeInfo, type SecurityPreferences } from '../../../api/security.js'
+import { securityApi, type PfDownloadState, type PfRuntimeInfo } from '../../../api/security.js'
+import { useCachedSecurityPrefs, primeSecurityPrefsCache, patchSecurityPrefs } from '../../../api/securityPrefsCache.js'
 import { formatBytes } from '../../security/format.js'
 import Toggle from '../../Toggle.js'
 
@@ -14,15 +15,17 @@ export default function PfDownloadCard() {
   const { t } = useTranslation()
   const [state, setState] = useState<PfDownloadState>(INITIAL)
   const [busy, setBusy] = useState(false)
-  const [prefs, setPrefs] = useState<SecurityPreferences | null>(null)
+  const prefs = useCachedSecurityPrefs()
   const [runtime, setRuntime] = useState<PfRuntimeInfo | null>(null)
 
   useEffect(() => {
     void securityApi.pfGetState().then(setState).catch(() => setState(INITIAL))
-    void securityApi.getPrefs().then(setPrefs).catch(() => setPrefs(null))
+    if (prefs === null) {
+      void primeSecurityPrefsCache()
+    }
     const offState = securityApi.onPfState(setState)
-    const offPrefs = securityApi.onPrefsChanged(setPrefs)
-    return () => { offState(); offPrefs() }
+    return () => { offState() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Poll runtime info while pfEnabled is on. ModelHost handshake can
@@ -51,9 +54,7 @@ export default function PfDownloadCard() {
   const cancelDownload = () => { void securityApi.pfDownloadCancel() }
   const togglePf = async (next: boolean) => {
     if (!prefs) return
-    setPrefs({ ...prefs, pfEnabled: next })
-    const saved = await securityApi.setPrefs({ pfEnabled: next })
-    setPrefs(saved)
+    await patchSecurityPrefs({ pfEnabled: next })
   }
 
   const percent = state.bytesTotal > 0
@@ -169,9 +170,9 @@ export default function PfDownloadCard() {
               {t('settings.security.detector_pf_cancel', { defaultValue: 'Cancel' })}
             </button>
           )}
-          {state.phase === 'installed' && (
+          {state.phase === 'installed' && prefs && (
             <Toggle
-              checked={prefs?.pfEnabled ?? false}
+              checked={prefs.pfEnabled}
               onChange={(v) => { void togglePf(v) }}
               ariaLabel={t('settings.security.detector_pf_title', { defaultValue: 'Privacy Filter' })}
               testId="settings-pf-toggle"
