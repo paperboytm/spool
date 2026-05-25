@@ -43,7 +43,8 @@ describe('loadSecurityPreferences', () => {
       kindAllowlist: [],
       infoDefaultVisible: false,
       rescanAfterSync: 'auto',
-      revealValuesOnHoverOnly: false,
+      securityPageValuesBlurred: false,
+      findingsStripValuesBlurred: false,
       pfEnabled: false,
       pfCalloutDismissed: false,
       pfActivationPending: false,
@@ -68,14 +69,16 @@ describe('loadSecurityPreferences', () => {
       kindAllowlist: ['email', 'phone'],
       infoDefaultVisible: true,
       rescanAfterSync: 'manual',
-      revealValuesOnHoverOnly: true,
+      securityPageValuesBlurred: true,
+      findingsStripValuesBlurred: false,
       pfEnabled: true,
     }))
     const prefs = mod.loadSecurityPreferences()
     expect(prefs.kindAllowlist).toEqual(['email', 'phone'])
     expect(prefs.infoDefaultVisible).toBe(true)
     expect(prefs.rescanAfterSync).toBe('manual')
-    expect(prefs.revealValuesOnHoverOnly).toBe(true)
+    expect(prefs.securityPageValuesBlurred).toBe(true)
+    expect(prefs.findingsStripValuesBlurred).toBe(false)
     expect(prefs.pfEnabled).toBe(true)
   })
 
@@ -85,13 +88,49 @@ describe('loadSecurityPreferences', () => {
     // silently flipping screen-share mode etc.
     writeFileSync(configPath, JSON.stringify({
       infoDefaultVisible: 'true',
-      revealValuesOnHoverOnly: 1,
+      securityPageValuesBlurred: 1,
+      findingsStripValuesBlurred: 'yes',
       pfEnabled: 'yes',
     }))
     const prefs = mod.loadSecurityPreferences()
     expect(prefs.infoDefaultVisible).toBe(false)
-    expect(prefs.revealValuesOnHoverOnly).toBe(false)
+    expect(prefs.securityPageValuesBlurred).toBe(false)
+    expect(prefs.findingsStripValuesBlurred).toBe(false)
     expect(prefs.pfEnabled).toBe(false)
+  })
+
+  // Migration coverage: pre-2026-05 builds wrote a single
+  // `revealValuesOnHoverOnly` flag covering both surfaces. The split
+  // must carry that posture forward exactly once, then defer to the
+  // new fields on every subsequent read.
+  describe('migration from legacy revealValuesOnHoverOnly', () => {
+    it('seeds both new fields when only the legacy flag is present (true)', () => {
+      writeFileSync(configPath, JSON.stringify({ revealValuesOnHoverOnly: true }))
+      const prefs = mod.loadSecurityPreferences()
+      expect(prefs.securityPageValuesBlurred).toBe(true)
+      expect(prefs.findingsStripValuesBlurred).toBe(true)
+    })
+
+    it('seeds both to false when the legacy flag is absent / false', () => {
+      writeFileSync(configPath, JSON.stringify({ revealValuesOnHoverOnly: false }))
+      const prefs = mod.loadSecurityPreferences()
+      expect(prefs.securityPageValuesBlurred).toBe(false)
+      expect(prefs.findingsStripValuesBlurred).toBe(false)
+    })
+
+    it('ignores the legacy flag once either new field is present', () => {
+      // The user has already migrated and explicitly turned the page
+      // blur off — the stale legacy flag must NOT override.
+      writeFileSync(configPath, JSON.stringify({
+        revealValuesOnHoverOnly: true,
+        securityPageValuesBlurred: false,
+      }))
+      const prefs = mod.loadSecurityPreferences()
+      expect(prefs.securityPageValuesBlurred).toBe(false)
+      // Strip field absent → still treated as false because the new-
+      // field schema is in force.
+      expect(prefs.findingsStripValuesBlurred).toBe(false)
+    })
   })
 
   it('filters non-string entries out of kindAllowlist', () => {
@@ -119,7 +158,8 @@ describe('saveSecurityPreferences', () => {
       kindAllowlist: ['email'],
       infoDefaultVisible: true,
       rescanAfterSync: 'manual',
-      revealValuesOnHoverOnly: true,
+      securityPageValuesBlurred: true,
+      findingsStripValuesBlurred: true,
       pfEnabled: true,
     }))
     // Update only one field.
@@ -129,7 +169,8 @@ describe('saveSecurityPreferences', () => {
     // Other fields preserved.
     expect(onDisk['infoDefaultVisible']).toBe(true)
     expect(onDisk['rescanAfterSync']).toBe('manual')
-    expect(onDisk['revealValuesOnHoverOnly']).toBe(true)
+    expect(onDisk['securityPageValuesBlurred']).toBe(true)
+    expect(onDisk['findingsStripValuesBlurred']).toBe(true)
     expect(onDisk['pfEnabled']).toBe(true)
   })
 
@@ -184,14 +225,16 @@ describe('saveSecurityPreferences', () => {
       kindAllowlist: ['email', 'phone'],
       infoDefaultVisible: true,
       rescanAfterSync: 'manual',
-      revealValuesOnHoverOnly: true,
+      securityPageValuesBlurred: true,
+      findingsStripValuesBlurred: false,
       pfEnabled: true,
     })
     expect(mod.loadSecurityPreferences()).toEqual({
       kindAllowlist: ['email', 'phone'],
       infoDefaultVisible: true,
       rescanAfterSync: 'manual',
-      revealValuesOnHoverOnly: true,
+      securityPageValuesBlurred: true,
+      findingsStripValuesBlurred: false,
       pfEnabled: true,
       // Side-effect of saveSecurityPreferences: flipping pfEnabled on
       // also auto-sets pfCalloutDismissed so the in-page discovery

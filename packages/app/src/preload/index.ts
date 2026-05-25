@@ -16,7 +16,8 @@ export interface SecurityPreferences {
   kindAllowlist: SensitiveKind[]
   infoDefaultVisible: boolean
   rescanAfterSync: 'auto' | 'manual'
-  revealValuesOnHoverOnly: boolean
+  securityPageValuesBlurred: boolean
+  findingsStripValuesBlurred: boolean
   pfEnabled: boolean
   pfCalloutDismissed: boolean
   pfActivationPending: boolean

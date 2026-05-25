@@ -54,6 +54,10 @@ interface Props {
   /** Optional share-draft starter; rendered as a menu item when share
    *  feature is enabled. App.tsx wires this only when shareEnabled. */
   onShareSession?: (sessionUuid: string) => void
+  /** Open Settings panel pre-focused on the Security tab. Wired from
+   *  App.tsx; used by the EmptyState "Detector settings" affordance so
+   *  a clean archive isn't a dead end. */
+  onOpenSettings?: () => void
 }
 
 type Sess = SessionWithFindingCounts & { source: Session['source'] }
@@ -67,7 +71,7 @@ export default function SecurityPage(props: Props) {
   return <SecurityPageInner {...props} />
 }
 
-function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
+function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Props) {
   const { t } = useTranslation()
   const [risk, setRisk] = useState<RiskByCategoryRow[]>([])
   const [sessions, setSessions] = useState<Sess[]>([])
@@ -87,10 +91,24 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
   const [showInfo, setShowInfo] = useState(false)
   const [bulkPurgeKind, setBulkPurgeKind] = useState<string | null>(null)
   const [bulkPurgeSamples, setBulkPurgeSamples] = useState<Array<{ value: string; sessionTitle: string }>>([])
-  // Default: reveal values. The page exists so the user can review
-  // what got captured — hiding the very thing they came to read is
-  // anti-UX. The eye-off toggle is for screen-share / step-away moments.
+  // `securityPageValuesBlurred` is the single source of truth for
+  // page-level value visibility. The Eye/EyeOff button writes
+  // directly to the pref via setPrefs (no ephemeral override), so the
+  // Settings row and the header icon are two surfaces of the same
+  // control — clicking either reflects everywhere. The default is
+  // false (revealed); the page exists so users can read what was
+  // captured.
   const [valuesHidden, setValuesHidden] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void securityApi.getPrefs().then(p => {
+      if (!cancelled) setValuesHidden(p.securityPageValuesBlurred === true)
+    }).catch(() => { /* fall back to default-reveal */ })
+    const off = securityApi.onPrefsChanged(p => {
+      setValuesHidden(p.securityPageValuesBlurred === true)
+    })
+    return () => { cancelled = true; off() }
+  }, [])
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null)
   // True between the click on Rescan and the moment the worker reports
   // queued/scanning/backfillRemaining > 0. Gives the button + banner an
@@ -553,7 +571,12 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
               {t('common.error')}: {error}
             </p>
           ) : risk.length === 0 && !isScanning ? (
-            <EmptyState onRescan={handleRescanAll} lastScan={lastScanCompletedAt} currentProfile={scanStatus?.currentProfile ?? null} />
+            <EmptyState
+              onRescan={handleRescanAll}
+              {...(onOpenSettings ? { onOpenSettings } : {})}
+              lastScan={lastScanCompletedAt}
+              currentProfile={scanStatus?.currentProfile ?? null}
+            />
           ) : (
             <>
               {highCats.length > 0 && (
@@ -652,7 +675,11 @@ function SecurityPageInner({ onOpenSession, onShareSession }: Props) {
                     <button
                       type="button"
                       data-testid="security-toggle-values"
-                      onClick={() => setValuesHidden(v => !v)}
+                      onClick={() => {
+                        const next = !valuesHidden
+                        setValuesHidden(next)  // optimistic — pref subscription will mirror
+                        void securityApi.setPrefs({ securityPageValuesBlurred: next })
+                      }}
                       aria-pressed={valuesHidden}
                       aria-label={valuesHidden
                         ? t('security.show_values_full', { defaultValue: 'Show values' })
@@ -1373,6 +1400,7 @@ function FindingItem({
       data-finding-id={finding.id}
       data-kind={finding.kind}
       data-state={finding.state}
+      data-blurred={!isPurged && !revealed ? '1' : '0'}
       className="group grid items-center gap-3 pl-6 pr-2 py-0.5 rounded font-mono text-[11px] hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
       style={{ gridTemplateColumns: '14px 110px 1fr auto', opacity: finding.state === 'dismissed' ? 0.5 : 1 }}
     >
@@ -1435,10 +1463,12 @@ function FindingItem({
 
 function EmptyState({
   onRescan,
+  onOpenSettings,
   lastScan,
   currentProfile,
 }: {
   onRescan: () => void
+  onOpenSettings?: () => void
   lastScan: string | null
   currentProfile: string | null
 }) {
@@ -1466,13 +1496,17 @@ function EmptyState({
             <RotateCw size={12} strokeWidth={1.6} aria-hidden />
             {t('security.rescanAll', { defaultValue: 'Rescan all' })}
           </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-          >
-            <SettingsIcon size={12} strokeWidth={1.6} aria-hidden />
-            {t('security.detector_settings', { defaultValue: 'Detector settings' })}
-          </button>
+          {onOpenSettings && (
+            <button
+              type="button"
+              data-testid="security-empty-detector-settings"
+              onClick={onOpenSettings}
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              <SettingsIcon size={12} strokeWidth={1.6} aria-hidden />
+              {t('security.detector_settings', { defaultValue: 'Detector settings' })}
+            </button>
+          )}
         </div>
 
         {(lastScan || currentProfile) && (

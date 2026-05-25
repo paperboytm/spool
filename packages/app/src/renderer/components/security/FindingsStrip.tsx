@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Trash2, X } from 'lucide-react'
+import { Check, Eye, EyeOff, Trash2, X } from 'lucide-react'
 import type { Session, FindingRow } from '@spool-lab/core'
 import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from '@spool-lab/redact'
 import { securityFeatureEnabled } from '../../featureFlags.js'
@@ -41,6 +41,22 @@ function FindingsStripInner({ session, open, onClose }: Props) {
   const total = session.scanFindingCount ?? 0
   const low = Math.max(0, total - high)
   const [purgePending, setPurgePending] = useState(false)
+  // `findingsStripValuesBlurred` is the single source of truth for
+  // the strip's value visibility — independent of the Security page
+  // so users can keep an at-a-glance strip hidden while the dedicated
+  // review surface stays revealed (or vice versa). The Eye/EyeOff
+  // button in the strip header writes directly to setPrefs.
+  const [valuesHidden, setValuesHidden] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void securityApi.getPrefs().then(p => {
+      if (!cancelled) setValuesHidden(p.findingsStripValuesBlurred === true)
+    }).catch(() => { /* fall back to default-reveal */ })
+    const off = securityApi.onPrefsChanged(p => {
+      setValuesHidden(p.findingsStripValuesBlurred === true)
+    })
+    return () => { cancelled = true; off() }
+  }, [])
 
   const refresh = useCallback(async () => {
     const rows = await securityApi.listFindings({ sessionId: session.id, state: 'active' })
@@ -151,6 +167,31 @@ function FindingsStripInner({ session, open, onClose }: Props) {
             <>
               <button
                 type="button"
+                data-testid="strip-toggle-values"
+                onClick={() => {
+                  const next = !valuesHidden
+                  setValuesHidden(next)
+                  void securityApi.setPrefs({ findingsStripValuesBlurred: next })
+                }}
+                aria-pressed={valuesHidden}
+                aria-label={valuesHidden
+                  ? t('security.show_values_full', { defaultValue: 'Show values' })
+                  : t('security.hide_values_full', { defaultValue: 'Hide values for screen-share' })}
+                title={valuesHidden
+                  ? t('security.show_values_full', { defaultValue: 'Show values' })
+                  : t('security.hide_values_full', { defaultValue: 'Hide values for screen-share' })}
+                className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors duration-75 ${
+                  valuesHidden
+                    ? 'text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/15'
+                    : 'text-warm-muted dark:text-dark-muted hover:bg-accent/10 dark:hover:bg-accent-dark/15 hover:text-warm-text dark:hover:text-dark-text'
+                }`}
+              >
+                {valuesHidden
+                  ? <EyeOff size={13} strokeWidth={1.75} aria-hidden />
+                  : <Eye size={13} strokeWidth={1.75} aria-hidden />}
+              </button>
+              <button
+                type="button"
                 data-testid="strip-purge-all"
                 onClick={() => setPurgePending(true)}
                 className="text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded text-warm-text dark:text-dark-text hover:bg-accent/10 dark:hover:bg-accent-dark/15 transition-colors"
@@ -193,7 +234,7 @@ function FindingsStripInner({ session, open, onClose }: Props) {
             hover:[&::-webkit-scrollbar-thumb]:bg-warm-muted/40
             dark:hover:[&::-webkit-scrollbar-thumb]:bg-dark-muted/40">
             {visibleFindings.map(f => (
-              <StripFindingRow key={f.id} finding={f} value={values[f.id] ?? null} />
+              <StripFindingRow key={f.id} finding={f} value={values[f.id] ?? null} valuesHidden={valuesHidden} />
             ))}
           </ul>
         )}
@@ -202,26 +243,39 @@ function FindingsStripInner({ session, open, onClose }: Props) {
   )
 }
 
-function StripFindingRow({ finding, value }: { finding: FindingRow; value: string | null }) {
+function StripFindingRow({ finding, value, valuesHidden }: { finding: FindingRow; value: string | null; valuesHidden: boolean }) {
   const { t } = useTranslation()
-  // Match SecurityPage's value-display convention: default revealed,
-  // never auto-blurred. A future Eye/EyeOff toggle can opt the user
-  // into the screen-share-safe blurred mode (with hover-to-reveal),
-  // but the default is to show what was captured — hiding what the
-  // user came here to read is anti-UX.
+  // Default revealed — the user opens the strip to read what got
+  // captured. Settings → Security → "Reveal values on hover only"
+  // opts in to screen-share-safe blur with per-row hover reveal;
+  // that flips `valuesHidden` on, matching SecurityPage's
+  // FindingItem convention.
+  const [localReveal, setLocalReveal] = useState(false)
+  const revealed = !valuesHidden || localReveal
+  const hasValue = value !== null && value !== undefined
+  const valueClass = !hasValue
+    ? ''
+    : revealed
+      ? 'text-warm-text dark:text-dark-text select-text cursor-text'
+      : 'text-warm-text dark:text-dark-text blur-[3.5px] cursor-pointer select-none'
   return (
     <li
       data-testid="strip-finding"
       data-kind={finding.kind}
       data-state={finding.state}
+      data-blurred={hasValue && !revealed ? '1' : '0'}
       className="flex items-center gap-4 text-xs pl-3"
     >
       <span aria-hidden className="text-warm-muted/60 dark:text-dark-muted/60 select-none">•</span>
       <span className="font-mono text-warm-muted dark:text-dark-muted w-24 shrink-0 truncate">
         {finding.kind}
       </span>
-      <span className="font-mono flex-1 truncate text-warm-text dark:text-dark-text select-text cursor-text">
-        {value ?? <em className="text-warm-faint dark:text-dark-faint">{t('security.value_unavailable', { defaultValue: '(value unavailable)' })}</em>}
+      <span
+        className={`font-mono flex-1 truncate transition-[filter] duration-100 ${valueClass}`}
+        onMouseEnter={() => valuesHidden && hasValue && setLocalReveal(true)}
+        onClick={() => valuesHidden && hasValue && setLocalReveal(true)}
+      >
+        {hasValue ? value : <em className="text-warm-faint dark:text-dark-faint">{t('security.value_unavailable', { defaultValue: '(value unavailable)' })}</em>}
       </span>
     </li>
   )

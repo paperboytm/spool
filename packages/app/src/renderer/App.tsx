@@ -37,7 +37,7 @@ import type { LanguagePreference } from '../preload/index.js'
 import { useFeature, securityFeatureEnabled } from './featureFlags.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs' | 'security'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -894,6 +894,7 @@ export default function App() {
         ) : isSecurityView ? (
           <SecurityPage
             onOpenSession={handleOpenSession}
+            onOpenSettings={() => { setSettingsTab('security'); setShowSettings(true) }}
             {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
           />
         ) : isHomeMode ? (

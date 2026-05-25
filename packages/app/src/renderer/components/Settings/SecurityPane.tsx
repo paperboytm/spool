@@ -143,17 +143,36 @@ function SecurityPaneInner() {
               />
             }
           />
+          {/* Blur defaults are split per surface so the at-a-glance
+              strip (session detail) and the dedicated review page can
+              be tuned independently. Each row mirrors the Eye/EyeOff
+              icon on its corresponding surface — flipping either one
+              updates the other. */}
           <DefaultsRow
-            label={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
-            description={t('settings.security.reveal_hover_sub', {
-              defaultValue: 'In the strip and Security page, blur finding values until you hover. Off = always visible.',
+            label={t('settings.security.blur_page_label', { defaultValue: 'Blur values on the Security page' })}
+            description={t('settings.security.blur_page_sub', {
+              defaultValue: 'Finding values render blurred on the Security page; hover or click a row to reveal. Off = always visible.',
             })}
             control={
               <Toggle
-                checked={prefs?.revealValuesOnHoverOnly ?? false}
-                onChange={(v) => { void update({ revealValuesOnHoverOnly: v }) }}
-                ariaLabel={t('settings.security.reveal_hover_label', { defaultValue: 'Reveal values on hover only' })}
-                testId="settings-reveal-hover"
+                checked={prefs?.securityPageValuesBlurred ?? false}
+                onChange={(v) => { void update({ securityPageValuesBlurred: v }) }}
+                ariaLabel={t('settings.security.blur_page_label', { defaultValue: 'Blur values on the Security page' })}
+                testId="settings-blur-page"
+              />
+            }
+          />
+          <DefaultsRow
+            label={t('settings.security.blur_strip_label', { defaultValue: 'Blur values in the session strip' })}
+            description={t('settings.security.blur_strip_sub', {
+              defaultValue: 'Finding values render blurred in the session-detail Findings strip; hover or click to reveal. Off = always visible.',
+            })}
+            control={
+              <Toggle
+                checked={prefs?.findingsStripValuesBlurred ?? false}
+                onChange={(v) => { void update({ findingsStripValuesBlurred: v }) }}
+                ariaLabel={t('settings.security.blur_strip_label', { defaultValue: 'Blur values in the session strip' })}
+                testId="settings-blur-strip"
               />
             }
           />

@@ -34,11 +34,17 @@ export interface SecurityPreferences {
    *  event. 'auto' = re-enqueue immediately; 'manual' = leave
    *  scan_profile dirty so the user can choose when to rescan. */
   rescanAfterSync: 'auto' | 'manual'
-  /** Screen-share mode: when true, finding values are blurred until
-   *  hover everywhere they're rendered (Security page session card +
-   *  Findings strip). Off by default — the user is here to read the
-   *  values, see ../renderer/components/SecurityPage.tsx. */
-  revealValuesOnHoverOnly: boolean
+  /** Whether finding values on the Security page render blurred by
+   *  default, with per-row hover to reveal. The Eye/EyeOff button in
+   *  the page header writes directly to this pref, so the toggle is
+   *  the same control as the Settings row — there is no ephemeral
+   *  override layer. Off by default. */
+  securityPageValuesBlurred: boolean
+  /** Same as above for the session-detail Findings strip. Independent
+   *  from the page setting so users can keep an at-a-glance strip
+   *  hidden while the dedicated review page stays revealed (or vice
+   *  versa). */
+  findingsStripValuesBlurred: boolean
   /** Whether the user has opted into the Privacy Filter ML provider.
    *  The provider is a stub today; this preference is the toggle UI
    *  state so the user's choice survives a restart once ML lands. */
@@ -60,7 +66,8 @@ const DEFAULTS: SecurityPreferences = {
   kindAllowlist: [],
   infoDefaultVisible: false,
   rescanAfterSync: 'auto',
-  revealValuesOnHoverOnly: false,
+  securityPageValuesBlurred: false,
+  findingsStripValuesBlurred: false,
   pfEnabled: false,
   pfCalloutDismissed: false,
   pfActivationPending: false,
@@ -70,7 +77,11 @@ interface SecurityConfigFile {
   kindAllowlist?: unknown
   infoDefaultVisible?: unknown
   rescanAfterSync?: unknown
+  /** Legacy single-flag predecessor of the per-surface blur prefs.
+   *  Read for migration only; never written by current builds. */
   revealValuesOnHoverOnly?: unknown
+  securityPageValuesBlurred?: unknown
+  findingsStripValuesBlurred?: unknown
   pfEnabled?: unknown
   pfCalloutDismissed?: unknown
   pfActivationPending?: unknown
@@ -102,11 +113,26 @@ function normalizeRescan(raw: unknown): 'auto' | 'manual' {
 
 export function loadSecurityPreferences(): SecurityPreferences {
   const c = readFile()
+  // Per-surface blur prefs are split from the legacy single-flag
+  // `revealValuesOnHoverOnly` (introduced 2026-04 in PR #262, replaced
+  // 2026-05). When the new fields are absent on disk we treat the
+  // legacy flag as the seed for BOTH surfaces so a user who already
+  // opted into hover-blur keeps that posture after upgrading. Once
+  // either new field has been written, the legacy value is ignored.
+  const hasNewBlurFields =
+    c.securityPageValuesBlurred !== undefined
+    || c.findingsStripValuesBlurred !== undefined
+  const legacyBlurred = c.revealValuesOnHoverOnly === true
   return {
     kindAllowlist: normalizeKinds(c.kindAllowlist),
     infoDefaultVisible: c.infoDefaultVisible === true,
     rescanAfterSync: normalizeRescan(c.rescanAfterSync),
-    revealValuesOnHoverOnly: c.revealValuesOnHoverOnly === true,
+    securityPageValuesBlurred: hasNewBlurFields
+      ? c.securityPageValuesBlurred === true
+      : legacyBlurred,
+    findingsStripValuesBlurred: hasNewBlurFields
+      ? c.findingsStripValuesBlurred === true
+      : legacyBlurred,
     pfEnabled: c.pfEnabled === true,
     pfCalloutDismissed: c.pfCalloutDismissed === true,
     pfActivationPending: c.pfActivationPending === true,
@@ -120,7 +146,8 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
   if (next.kindAllowlist !== undefined) merged.kindAllowlist = normalizeKinds(next.kindAllowlist)
   if (next.infoDefaultVisible !== undefined) merged.infoDefaultVisible = next.infoDefaultVisible === true
   if (next.rescanAfterSync !== undefined) merged.rescanAfterSync = normalizeRescan(next.rescanAfterSync)
-  if (next.revealValuesOnHoverOnly !== undefined) merged.revealValuesOnHoverOnly = next.revealValuesOnHoverOnly === true
+  if (next.securityPageValuesBlurred !== undefined) merged.securityPageValuesBlurred = next.securityPageValuesBlurred === true
+  if (next.findingsStripValuesBlurred !== undefined) merged.findingsStripValuesBlurred = next.findingsStripValuesBlurred === true
   if (next.pfEnabled !== undefined) {
     merged.pfEnabled = next.pfEnabled === true
     // Enabling pf supersedes the in-page discovery nudge — once a user
