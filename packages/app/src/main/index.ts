@@ -39,7 +39,7 @@ import {
 } from '@spool-lab/core'
 import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
 import { Effect } from 'effect'
-import { registerSecurityIpc, SECURITY_IPC_CHANNELS } from './ipc/security.js'
+import { registerSecurityIpc, registerSecurityReadinessIpc, SECURITY_IPC_CHANNELS, type SecurityReadiness } from './ipc/security.js'
 import { loadSecurityPreferences, saveSecurityPreferences } from './securityPreferences.js'
 import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
 import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
@@ -111,6 +111,8 @@ let acpManager: AcpManager
 let isSyncActive = false
 let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
+let setSecurityReadiness: ((next: SecurityReadiness) => void) | null = null
+let disposeSecurityReadinessIpc: (() => void) | null = null
 const pfRuntime = makePfRuntime({ run: runWithObservability })
 // Lazily resolved on first access — pfModelsRoot() reads app.getPath
 // which throws before app.ready, but this module evaluates at boot.
@@ -204,6 +206,11 @@ async function shutdownScanWorker(): Promise<void> {
   if (disposeSecurityIpc) {
     try { disposeSecurityIpc() } catch { /* best effort */ }
     disposeSecurityIpc = null
+  }
+  if (disposeSecurityReadinessIpc) {
+    try { disposeSecurityReadinessIpc() } catch { /* best effort */ }
+    disposeSecurityReadinessIpc = null
+    setSecurityReadiness = null
   }
   if (scanWorker) {
     try {
@@ -470,6 +477,15 @@ app.whenReady().then(async () => {
   // Gated by VITE_FEATURE_SECURITY so production builds (where the
   // env var stays unset) never start the scanner.
   if (securityFeatureEnabled()) {
+    // Register the readiness IPC eagerly so the renderer can wait for
+    // (or banner against) the worker boot. Without this, any Settings
+    // → Security or SecurityPage mount during the boot window hit
+    // unregistered handlers and surfaced as raw "No handler registered
+    // for security:..." errors.
+    const readiness = registerSecurityReadinessIpc(() => mainWindow)
+    setSecurityReadiness = readiness.setReadiness
+    disposeSecurityReadinessIpc = readiness.dispose
+
     // Has to happen post-ready (uses protocol.handle + app.getPath).
     registerPfModelProtocol()
     // Electron's `net.fetch` honours system proxy + custom CA bundle;
@@ -513,7 +529,10 @@ app.whenReady().then(async () => {
       })()
     })
     void bootScanWorker().then(() => {
-      if (!scanWorker) return
+      if (!scanWorker) {
+        setSecurityReadiness?.({ ready: false, reason: 'scanner-unavailable' })
+        return
+      }
       disposeSecurityIpc = registerSecurityIpc({
         db,
         worker: scanWorker,
@@ -527,6 +546,7 @@ app.whenReady().then(async () => {
           })
         },
       })
+      setSecurityReadiness?.({ ready: true })
       runWithObservability(scanWorker.backfill()).catch((err) => {
         console.error('[security] boot backfill failed:', err)
       })

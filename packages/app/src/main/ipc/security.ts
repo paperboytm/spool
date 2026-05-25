@@ -84,12 +84,65 @@ export const SECURITY_IPC_CHANNELS = {
    *  isn't running. Polled by PfDownloadCard for the runtime badge. */
   PF_GET_RUNTIME_INFO:         'security:pf-get-runtime-info',
 
+  // readiness — eagerly registered so the renderer can wait for the
+  // scan worker without bumping into "No handler registered" errors
+  // when Settings → Security opens during boot, and so a worker-boot
+  // failure surfaces as a "Scanner unavailable" banner instead of a
+  // dead UI.
+  GET_READINESS:               'security:get-readiness',
+
   // events (push: main → renderer via webContents.send)
   EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
   EVT_SCAN_STATUS:             'security:evt-scan-status',
   EVT_PREFS_CHANGED:           'security:evt-prefs-changed',
   EVT_PF_STATE:                'security:evt-pf-state',
+  EVT_READINESS_CHANGED:       'security:evt-readiness-changed',
 } as const
+
+export type SecurityReadiness =
+  | { ready: true }
+  | { ready: false; reason: 'booting' | 'scanner-unavailable' }
+
+/** Register the readiness handler + return a setter the boot sequence
+ *  calls when the scan worker either comes up (`{ ready: true }`) or
+ *  fails to spawn (`{ ready: false, reason: 'scanner-unavailable' }`).
+ *
+ *  Registered eagerly (before `bootScanWorker()` resolves) so the
+ *  renderer can ALWAYS query readiness — opening Settings → Security
+ *  the millisecond the window appears no longer races the worker
+ *  boot, which used to produce "No handler registered for
+ *  security:list-backups" errors. */
+export function registerSecurityReadinessIpc(
+  getMainWindow: () => BrowserWindow | null,
+): {
+  setReadiness: (next: SecurityReadiness) => void
+  dispose: () => void
+} {
+  let current: SecurityReadiness = { ready: false, reason: 'booting' }
+  ipcMain.handle(SECURITY_IPC_CHANNELS.GET_READINESS, () => current)
+  return {
+    setReadiness: (next) => {
+      // Same-value transitions are a no-op so the renderer doesn't
+      // re-render its skeleton on every boot retry.
+      if (next.ready === current.ready &&
+        (next.ready || next.reason === (current as { reason: string }).reason)) {
+        return
+      }
+      current = next
+      try {
+        getMainWindow()?.webContents.send(
+          SECURITY_IPC_CHANNELS.EVT_READINESS_CHANGED,
+          next,
+        )
+      } catch (err) {
+        console.error('[security] readiness broadcast failed:', err)
+      }
+    },
+    dispose: () => {
+      ipcMain.removeHandler(SECURITY_IPC_CHANNELS.GET_READINESS)
+    },
+  }
+}
 
 export interface SecurityIpcDeps {
   db: Database.Database

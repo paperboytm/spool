@@ -21,9 +21,9 @@ import type {
 
 export type { BackupFileInfo }
 import type { SensitiveKind } from '@spool-lab/redact'
-import type { SecurityPreferences, PfDownloadState, PfRuntimeInfo } from '../../preload/index.js'
+import type { SecurityPreferences, PfDownloadState, PfRuntimeInfo, SecurityReadiness } from '../../preload/index.js'
 
-export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState, PfRuntimeInfo }
+export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState, PfRuntimeInfo, SecurityReadiness }
 
 /** Single source of truth for the renderer-side adapter. Components
  *  hold this object, not `window.spool.security` — keeps replaceability
@@ -95,6 +95,11 @@ export const securityApi = {
     window.spool.security.pfGetRuntimeInfo(),
   onPfState: (handler: (s: PfDownloadState) => void): (() => void) =>
     window.spool.security.onPfState(handler),
+
+  getReadiness: (): Promise<SecurityReadiness> =>
+    window.spool.security.getReadiness(),
+  onReadinessChanged: (handler: (s: SecurityReadiness) => void): (() => void) =>
+    window.spool.security.onReadinessChanged(handler),
 }
 
 export type SecurityApi = typeof securityApi

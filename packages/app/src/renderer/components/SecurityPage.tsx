@@ -35,6 +35,7 @@ import {
 } from '@spool-lab/redact'
 import { securityApi } from '../api/security.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import DetectorsChip from './security/DetectorsChip.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
@@ -68,7 +69,56 @@ export default function SecurityPage(props: Props) {
   // return ABOVE the hooks would violate Rules of Hooks the moment
   // the flag becomes anything other than a build-time constant.
   if (!securityFeatureEnabled()) return null
+  return <SecurityPageGate {...props} />
+}
+
+function SecurityPageGate(props: Props) {
+  const { t } = useTranslation()
+  const readiness = useSecurityReadiness()
+  if (!readiness.ready) {
+    return <SecurityPageNotice reason={readiness.reason} t={t} />
+  }
   return <SecurityPageInner {...props} />
+}
+
+function SecurityPageNotice({
+  reason,
+  t,
+}: {
+  reason: 'booting' | 'scanner-unavailable'
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  if (reason === 'booting') {
+    return (
+      <div
+        data-testid="security-readiness-booting"
+        className="p-6 space-y-3 animate-pulse"
+        aria-busy="true"
+      >
+        <div className="h-3 w-40 rounded bg-warm-border/60 dark:bg-dark-border/60" />
+        <div className="h-20 rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface" />
+        <div className="h-3 w-32 rounded bg-warm-border/60 dark:bg-dark-border/60" />
+      </div>
+    )
+  }
+  return (
+    <div className="p-6">
+      <div
+        data-testid="security-unavailable"
+        role="alert"
+        className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-4 py-3.5 max-w-2xl"
+      >
+        <p className="text-sm font-medium text-warm-text dark:text-dark-text mb-1">
+          {t('security.unavailable_title', { defaultValue: 'Scanner unavailable' })}
+        </p>
+        <p className="text-[12px] leading-[18px] text-warm-faint dark:text-dark-muted">
+          {t('security.unavailable_body', {
+            defaultValue: 'Spool could not start the security scan worker. Findings cannot be loaded until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.',
+          })}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Props) {

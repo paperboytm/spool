@@ -43,6 +43,10 @@ export interface PfRuntimeInfo {
   detectionMs?: number
   error?: string
 }
+
+export type SecurityReadiness =
+  | { ready: true }
+  | { ready: false; reason: 'booting' | 'scanner-unavailable' }
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
@@ -328,6 +332,14 @@ const api = {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as PfDownloadState)
       ipcRenderer.on('security:evt-pf-state', handler)
       return () => ipcRenderer.removeListener('security:evt-pf-state', handler)
+    },
+
+    getReadiness: (): Promise<SecurityReadiness> =>
+      ipcRenderer.invoke('security:get-readiness'),
+    onReadinessChanged: (cb: (state: SecurityReadiness) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as SecurityReadiness)
+      ipcRenderer.on('security:evt-readiness-changed', handler)
+      return () => ipcRenderer.removeListener('security:evt-readiness-changed', handler)
     },
   },
 }

@@ -284,7 +284,9 @@
       "backups_delete_partial_desc": "已釋放 {{size}}。部分檔案無法刪除——可能已被其他程序清理。",
       "experimental_title": "實驗性",
       "experimental_intro": "可選啟用的檢測器，目前不推薦日常使用。在程式碼密集型內容上誤報率可能較高。",
-      "detector_pf_resume": "繼續下載"
+      "detector_pf_resume": "繼續下載",
+      "unavailable_title": "掃描器無法使用",
+      "unavailable_body": "Spool 無法啟動安全掃描工作行程。在它恢復前，此處的設定無效。通常重新啟動應用程式即可解決；若問題持續，請查看開發者主控台中的啟動錯誤。"
     }
   },
   "security": {
@@ -367,7 +369,9 @@
     "diff_becomes": "變為",
     "diff_pattern": "模式",
     "scanning_ambient": "掃描中…",
-    "scan_toast_new_findings_other": "發現 {{count}} 項新的高風險"
+    "scan_toast_new_findings_other": "發現 {{count}} 項新的高風險",
+    "unavailable_title": "掃描器無法使用",
+    "unavailable_body": "Spool 無法啟動安全掃描工作行程。在它恢復前，無法載入發現項目。通常重新啟動應用程式即可解決；若問題持續，請查看開發者主控台中的啟動錯誤。"
   },
   "shares": {
     "title": "草稿",

@@ -42,6 +42,7 @@ vi.mock('electron', () => ({
 
 // Imported AFTER vi.mock so the stub is the one electron resolves to.
 let registerSecurityIpc: typeof import('./security.js')['registerSecurityIpc']
+let registerSecurityReadinessIpc: typeof import('./security.js')['registerSecurityReadinessIpc']
 let SECURITY_IPC_CHANNELS: typeof import('./security.js')['SECURITY_IPC_CHANNELS']
 
 let tmp: string
@@ -54,6 +55,7 @@ beforeAll(async () => {
   process.env['SPOOL_DATA_DIR'] = tmp
   const mod = await import('./security.js')
   registerSecurityIpc = mod.registerSecurityIpc
+  registerSecurityReadinessIpc = mod.registerSecurityReadinessIpc
   SECURITY_IPC_CHANNELS = mod.SECURITY_IPC_CHANNELS
 })
 
@@ -161,7 +163,10 @@ describe('registerSecurityIpc', () => {
   describe('channel registration', () => {
     it('registers every channel in SECURITY_IPC_CHANNELS that is not an EVT_*', () => {
       const expected = Object.entries(SECURITY_IPC_CHANNELS)
-        .filter(([key]) => !key.startsWith('EVT_'))
+        // GET_READINESS is owned by registerSecurityReadinessIpc and
+        // registered eagerly before bootScanWorker resolves; it does
+        // not live in this surface.
+        .filter(([key]) => !key.startsWith('EVT_') && key !== 'GET_READINESS')
         .map(([, value]) => value)
       for (const ch of expected) {
         expect(handlers.has(ch), `missing handler for ${ch}`).toBe(true)
@@ -379,5 +384,79 @@ describe('registerSecurityIpc', () => {
       )
       expect(leaked).toBeUndefined()
     })
+  })
+})
+
+// Regression guard for the two reliability issues this commit fixes:
+//   - IPC boot race: GET_READINESS must be registered the moment
+//     readiness IPC is wired (i.e. eagerly, before bootScanWorker
+//     resolves) so the renderer never hits "No handler registered for
+//     security:get-readiness" during the boot window.
+//   - scan-worker silent failure: the boot success/failure transition
+//     must broadcast a readiness event so the renderer can switch
+//     from skeleton → ready or → "Scanner unavailable" banner instead
+//     of swallowing IPC errors.
+describe('registerSecurityReadinessIpc', () => {
+  let fakeWin: { sent: Array<{ channel: string; payload: unknown }> }
+  let getWindow: () => import('electron').BrowserWindow | null
+  beforeEach(() => {
+    handlers.clear()
+    sentEvents.length = 0
+    fakeWin = { sent: [] }
+    const win = {
+      webContents: {
+        send: (channel: string, payload: unknown) => {
+          fakeWin.sent.push({ channel, payload })
+        },
+      },
+    } as unknown as import('electron').BrowserWindow
+    getWindow = () => win
+  })
+
+  it('registers GET_READINESS handler immediately and reports booting state', async () => {
+    registerSecurityReadinessIpc(getWindow)
+    const state = await invoke<{ ready: boolean; reason?: string }>(
+      SECURITY_IPC_CHANNELS.GET_READINESS,
+    )
+    expect(state).toEqual({ ready: false, reason: 'booting' })
+  })
+
+  it('setReadiness(ready=true) flips state and broadcasts EVT_READINESS_CHANGED', async () => {
+    const { setReadiness } = registerSecurityReadinessIpc(getWindow)
+    setReadiness({ ready: true })
+    expect(fakeWin.sent.at(-1)).toEqual({
+      channel: SECURITY_IPC_CHANNELS.EVT_READINESS_CHANGED,
+      payload: { ready: true },
+    })
+    const after = await invoke<{ ready: boolean }>(SECURITY_IPC_CHANNELS.GET_READINESS)
+    expect(after).toEqual({ ready: true })
+  })
+
+  it('setReadiness(scanner-unavailable) surfaces the failure state to the renderer', async () => {
+    const { setReadiness } = registerSecurityReadinessIpc(getWindow)
+    setReadiness({ ready: false, reason: 'scanner-unavailable' })
+    expect(fakeWin.sent.at(-1)).toEqual({
+      channel: SECURITY_IPC_CHANNELS.EVT_READINESS_CHANGED,
+      payload: { ready: false, reason: 'scanner-unavailable' },
+    })
+    const after = await invoke<{ ready: boolean; reason: string }>(
+      SECURITY_IPC_CHANNELS.GET_READINESS,
+    )
+    expect(after).toEqual({ ready: false, reason: 'scanner-unavailable' })
+  })
+
+  it('does not re-broadcast when readiness state is unchanged', () => {
+    const { setReadiness } = registerSecurityReadinessIpc(getWindow)
+    setReadiness({ ready: true })
+    const after = fakeWin.sent.length
+    setReadiness({ ready: true })
+    expect(fakeWin.sent.length).toBe(after)
+  })
+
+  it('dispose() removes the GET_READINESS handler', () => {
+    const { dispose } = registerSecurityReadinessIpc(getWindow)
+    expect(handlers.has(SECURITY_IPC_CHANNELS.GET_READINESS)).toBe(true)
+    dispose()
+    expect(handlers.has(SECURITY_IPC_CHANNELS.GET_READINESS)).toBe(false)
   })
 })

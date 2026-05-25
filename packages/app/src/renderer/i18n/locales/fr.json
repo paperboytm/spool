@@ -292,7 +292,9 @@
       "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
       "experimental_title": "Expérimental",
       "experimental_intro": "Détecteurs facultatifs non encore recommandés pour un usage quotidien. Les taux de faux positifs peuvent être élevés sur du contenu riche en code.",
-      "detector_pf_resume": "Reprendre"
+      "detector_pf_resume": "Reprendre",
+      "unavailable_title": "Scanner indisponible",
+      "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les paramètres ici sont inactifs jusqu'à sa reprise. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage."
     }
   },
   "security": {
@@ -393,7 +395,9 @@
     "diff_pattern": "motif",
     "scanning_ambient": "analyse…",
     "scan_toast_new_findings_one": "{{count}} nouvelle découverte à haut risque",
-    "scan_toast_new_findings_other": "{{count}} nouvelles découvertes à haut risque"
+    "scan_toast_new_findings_other": "{{count}} nouvelles découvertes à haut risque",
+    "unavailable_title": "Scanner indisponible",
+    "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les découvertes ne peuvent pas être chargées tant qu'il ne fonctionne pas. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage."
   },
   "shares": {
     "title": "Brouillons",

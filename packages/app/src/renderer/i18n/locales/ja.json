@@ -284,7 +284,9 @@
       "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
       "experimental_title": "実験的機能",
       "experimental_intro": "オプトインの検出器。日常的な使用はまだ推奨されません。コード中心のコンテンツでは誤検出率が高くなる可能性があります。",
-      "detector_pf_resume": "再開"
+      "detector_pf_resume": "再開",
+      "unavailable_title": "スキャナーを利用できません",
+      "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまでこの設定は無効です。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。"
     }
   },
   "security": {
@@ -367,7 +369,9 @@
     "diff_becomes": "結果",
     "diff_pattern": "パターン",
     "scanning_ambient": "スキャン中…",
-    "scan_toast_new_findings_other": "新たに {{count}} 件の高リスクを検出"
+    "scan_toast_new_findings_other": "新たに {{count}} 件の高リスクを検出",
+    "unavailable_title": "スキャナーを利用できません",
+    "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまで検出結果を読み込めません。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。"
   },
   "shares": {
     "title": "下書き",

@@ -32,10 +32,59 @@ import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
 import AllowlistManageModal from '../security/AllowlistManageModal.js'
 import PfDownloadCard from './security/PfDownloadCard.js'
+import { useSecurityReadiness } from '../../hooks/useSecurityReadiness.js'
 
 export default function SecurityPane() {
   if (!securityFeatureEnabled()) return null
+  return <SecurityPaneGate />
+}
+
+function SecurityPaneGate() {
+  const { t } = useTranslation()
+  const readiness = useSecurityReadiness()
+  if (!readiness.ready) {
+    return <SecurityUnavailableNotice reason={readiness.reason} t={t} />
+  }
   return <SecurityPaneInner />
+}
+
+function SecurityUnavailableNotice({
+  reason,
+  t,
+}: {
+  reason: 'booting' | 'scanner-unavailable'
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  if (reason === 'booting') {
+    return (
+      <div
+        data-testid="security-readiness-booting"
+        className="space-y-3 animate-pulse"
+        aria-busy="true"
+      >
+        <div className="h-3 w-32 rounded bg-warm-border/60 dark:bg-dark-border/60" />
+        <div className="h-16 rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface" />
+        <div className="h-3 w-20 rounded bg-warm-border/60 dark:bg-dark-border/60" />
+        <div className="h-24 rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface" />
+      </div>
+    )
+  }
+  return (
+    <div
+      data-testid="security-unavailable"
+      role="alert"
+      className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3.5 py-3"
+    >
+      <p className="text-xs font-medium text-warm-text dark:text-dark-text mb-1">
+        {t('settings.security.unavailable_title', { defaultValue: 'Scanner unavailable' })}
+      </p>
+      <p className="text-[11px] leading-[16px] text-warm-faint dark:text-dark-muted">
+        {t('settings.security.unavailable_body', {
+          defaultValue: 'Spool could not start the security scan worker. Settings here are inactive until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.',
+        })}
+      </p>
+    </div>
+  )
 }
 
 function SecurityPaneInner() {

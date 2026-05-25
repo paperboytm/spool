@@ -292,7 +292,9 @@
       "backups_delete_partial_desc": "Freed {{size}}. Some files could not be removed — they may have been deleted by another process.",
       "experimental_title": "Experimentell",
       "experimental_intro": "Opt-in-Detektoren, die noch nicht für den täglichen Einsatz empfohlen werden. Bei code-lastigen Inhalten können Falsch-Positiv-Raten hoch sein.",
-      "detector_pf_resume": "Fortsetzen"
+      "detector_pf_resume": "Fortsetzen",
+      "unavailable_title": "Scanner nicht verfügbar",
+      "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft sind die Einstellungen hier inaktiv. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler."
     }
   },
   "security": {
@@ -393,7 +395,9 @@
     "diff_pattern": "Muster",
     "scanning_ambient": "Scan läuft…",
     "scan_toast_new_findings_one": "{{count}} neuer Hochrisiko-Fund",
-    "scan_toast_new_findings_other": "{{count}} neue Hochrisiko-Funde"
+    "scan_toast_new_findings_other": "{{count}} neue Hochrisiko-Funde",
+    "unavailable_title": "Scanner nicht verfügbar",
+    "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft können Funde nicht geladen werden. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler."
   },
   "shares": {
     "title": "Entwürfe",
