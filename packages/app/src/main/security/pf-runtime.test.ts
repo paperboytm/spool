@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { BrowserWindow } from 'electron'
 import { makePfRuntime } from './pf-runtime.js'
-import { PF_IPC } from '../../inference/types.js'
+import { PF_IPC } from '../../renderer/inference/types.js'
 
 type FakeWindow = BrowserWindow & { destroyed: boolean }
 

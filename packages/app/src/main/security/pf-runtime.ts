@@ -13,6 +13,11 @@ import { join } from 'node:path'
 import { makeModelHost, type ModelHost, type ModelHostDeps, type PfState } from './model-host.js'
 import { MODEL_MANIFEST } from './model-manifest.js'
 import { pfInstallStatus } from './model-state.js'
+
+/** Document title set by `src/renderer/pf-inference.html` — used as a
+ *  runtime invariant after dev loadURL, to detect Vite SPA fallback
+ *  (would deliver main renderer's index.html with title "Spool"). */
+export const INFERENCE_DOC_TITLE = 'Spool · PF inference'
 import { pfModelDir } from './model-paths.js'
 
 export interface PfRuntime {
@@ -139,14 +144,17 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
     console.error('[pf-inference] render process gone:', details.reason, details.exitCode)
   })
   // Prod: electron-vite emits pf-inference.html under out/renderer/.
-  // Dev: Vite roots the renderer at src/renderer/, but our HTML lives
-  // at src/inference/pf-inference.html — outside that root. A relative
-  // `/../inference/...` URL gets normalised by the URL parser and ends
-  // up hitting Vite's SPA fallback, which silently serves the main
-  // renderer's index.html into the hidden window (the symptom: a
-  // bunch of Sidebar / LibraryLanding "undefined" errors and pf:ready
-  // never arrives). Use Vite's @fs/<abs-path> escape hatch, paired
-  // with server.fs.allow in electron.vite.config.ts.
+  // Dev: Vite roots the renderer at src/renderer/, where the HTML
+  // also actually lives — `src/renderer/pf-inference.html`. Earlier
+  // revisions of this file pointed at `src/inference/...` (where the
+  // companion .ts entry lives), but no such HTML exists; Vite would
+  // silently fall through to its SPA fallback and serve the main
+  // renderer's index.html into this hidden window. The symptom: the
+  // window booted as a second copy of the main App (Sidebar /
+  // LibraryLanding `Cannot read properties of undefined`), the
+  // `pf:ready` handshake never fired, `pfRuntime.start()` hung, and
+  // every Security rescan silently downgraded to regex-only.
+  //
   // Devtools are opt-in via SPOOL_PF_DEVTOOLS=1 — the console-message
   // forwarder above already pipes pf-inference logs into main's
   // stdout, so a detached devtools window every restart is just noise
@@ -156,9 +164,27 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
     if (process.env['SPOOL_PF_DEVTOOLS']) {
       win.webContents.openDevTools({ mode: 'detach' })
     }
-    // __dirname in dev = packages/app/out/main → ../.. = packages/app
-    const inferenceHtml = join(__dirname, '../../src/inference/pf-inference.html')
-    await win.loadURL(`${rendererBase.replace(/\/$/, '')}/@fs${inferenceHtml}`)
+    await win.loadURL(`${rendererBase.replace(/\/$/, '')}/pf-inference.html`)
+    // Runtime invariant — catches a class of silent failures that bit
+    // us through PR #294 / #296 squashes: if the URL above resolves to
+    // anything Vite can't serve (file moved, vite config out of sync,
+    // path typo'd), the dev server's SPA fallback returns the main
+    // renderer's index.html instead. The hidden window then mounts the
+    // entire main App, fails fast inside <Sidebar>/<LibraryLanding>
+    // (no `window.spool` in this preload), and pf:ready never fires —
+    // pfRuntime.start() hangs and every Security rescan silently
+    // downgrades to regex-only. Checking the loaded document title is
+    // O(1), unambiguous, and surfaces the issue at boot instead of
+    // weeks later when someone notices the missing PF pill.
+    const title = (await win.webContents.executeJavaScript('document.title')) as string
+    if (title !== INFERENCE_DOC_TITLE) {
+      throw new Error(
+        `[pf-runtime] dev loadURL returned wrong document (title=${JSON.stringify(title)}; ` +
+        `expected ${JSON.stringify(INFERENCE_DOC_TITLE)}). The Vite dev server probably hit ` +
+        `its SPA fallback — check src/renderer/pf-inference.html exists and that the load URL ` +
+        `points at it.`,
+      )
+    }
   } else {
     await win.loadFile(join(app.getAppPath(), 'out/renderer/pf-inference.html'))
   }

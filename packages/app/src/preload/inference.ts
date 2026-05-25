@@ -9,7 +9,7 @@ import {
   type PfFailedMessage,
   type PfAnalyzeRequest,
   type PfAnalyzeResult,
-} from '../inference/types.js'
+} from '../renderer/inference/types.js'
 
 contextBridge.exposeInMainWorld('pfBridge', {
   ready: (payload: PfReadyMessage) => ipcRenderer.send(PF_IPC.READY, payload),

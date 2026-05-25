@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { Effect } from 'effect'
 import type { BrowserWindow, IpcMainEvent } from 'electron'
 import { makeModelHost, type ModelHostDeps } from './model-host.js'
-import { PF_IPC, type PfReadyMessage } from '../../inference/types.js'
+import { PF_IPC, type PfReadyMessage } from '../../renderer/inference/types.js'
 
 type FakeWindow = BrowserWindow & { destroyed: boolean }
 

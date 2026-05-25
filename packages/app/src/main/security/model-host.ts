@@ -12,7 +12,7 @@ import {
   PF_IPC,
   type PfReadyMessage, type PfFailedMessage, type PfRuntime,
   type PfAnalyzeRequest, type PfAnalyzeResult,
-} from '../../inference/types.js'
+} from '../../renderer/inference/types.js'
 
 export type { PfRuntime }
 

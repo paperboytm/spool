@@ -57,25 +57,18 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    server: {
-      fs: {
-        // The HTML at src/renderer/pf-inference.html references
-        // ../inference/pf-inference.ts. Whitelist the sibling source
-        // dir so Vite's dev server serves the TS entry; without this
-        // Vite refuses to read outside its root and silently falls
-        // back to index.html, leaving pf:ready never fired.
-        allow: [resolve(__dirname, 'src/inference'), resolve(__dirname, 'src/renderer')],
-      },
-    },
     build: {
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
-          // Inference HTML sits inside the renderer root — Rollup 4
-          // rejects build inputs whose path resolves outside the root
-          // (it can't compute a bare emit filename for them). The TS
-          // it loads is referenced relatively (`../inference/...`) so
-          // logic still lives next to the rest of the inference code.
+          // Hidden PF inference window. Both the HTML and its TS entry
+          // (`src/renderer/inference/pf-inference.ts`) live inside the
+          // renderer root, so the dev server resolves the script src
+          // via a normal URL — no `@fs/` escape hatch, no fs.allow
+          // whitelist needed. Earlier revisions split HTML and TS
+          // across `src/renderer/` and `src/inference/`; the seam in
+          // the middle silently SPA-fallbacked into the main app on
+          // every dev start, hanging pf:ready forever.
           'pf-inference': resolve(__dirname, 'src/renderer/pf-inference.html'),
         },
       },

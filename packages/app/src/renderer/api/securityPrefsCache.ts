@@ -64,8 +64,10 @@ export async function patchSecurityPrefs(patch: Partial<SecurityPreferences>): P
 }
 
 /** Idempotent prefetch. Call once at app boot (from an App-level
- *  useEffect). Subsequent calls return the cached value. */
+ *  useEffect). Subsequent calls return the cached value. Also lazily
+ *  attaches the upstream onPrefsChanged listener — see comment below. */
 export async function primeSecurityPrefsCache(): Promise<SecurityPreferences | null> {
+  ensureUpstreamSubscription()
   if (cached) return cached
   if (inflight) return inflight
   inflight = securityApi.getPrefs()
@@ -85,12 +87,26 @@ export async function primeSecurityPrefsCache(): Promise<SecurityPreferences | n
 // Keep the cache live across the app session. The main-process side
 // broadcasts EVT_PREFS_CHANGED on every saveSecurityPreferences, so
 // any toggle flipped from another window or from main itself updates
-// every subscriber here. This subscription is the one piece of
-// implicit module-level behaviour we accept: it's a single static
-// listener that never grows, and removing it would silently break
-// "open Settings, change pref, immediately switch tabs without
-// closing Settings".
-securityApi.onPrefsChanged((next) => {
-  cached = next
-  emit()
-})
+// every subscriber here.
+//
+// CRITICAL: do NOT call `securityApi.onPrefsChanged` (or any window.spool.*
+// accessor) at module top level. Spool runs a hidden PF inference
+// window with its own minimal preload that does NOT expose
+// `window.spool`; in dev, Vite HMR rebroadcasts module evaluations
+// across every connected client, so a top-level access here would
+// crash the inference window on every renderer HMR — which in turn
+// stalls `pfRuntime.start()`, leaves `pfOnline = false`, and silently
+// downgrades every Security rescan to regex-only. Subscribing inside
+// `primeSecurityPrefsCache` (called from the main window's App.tsx)
+// keeps the listener scoped to a window that actually has the
+// security IPC bridge.
+let subscriptionAttached = false
+function ensureUpstreamSubscription(): void {
+  if (subscriptionAttached) return
+  if (typeof window === 'undefined' || !window.spool?.security?.onPrefsChanged) return
+  subscriptionAttached = true
+  securityApi.onPrefsChanged((next) => {
+    cached = next
+    emit()
+  })
+}
