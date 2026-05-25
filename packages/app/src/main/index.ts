@@ -476,9 +476,23 @@ app.whenReady().then(async () => {
     // globalThis.fetch (undici) bypasses both. Per bug_electron_proxy
     // memory: stealer logs / corp proxies / mainland China all need
     // this for outbound HF traffic.
+    //
+    // E2E exception: when SPOOL_E2E_TEST is set, replace the fetch
+    // with an immediate-503 fake. The PF download e2e wants to
+    // verify the click → IPC → state-machine wiring, not network
+    // behaviour — the state machine's logic itself is fully covered
+    // by pf-coordinator.test.ts with injected fakes. Going to a real
+    // HF URL made the e2e flaky because the failure path waits on a
+    // network roundtrip whose latency we don't control. The fake
+    // resolves synchronously, so the state machine transitions
+    // not-installed → downloading → failed in milliseconds and the
+    // wiring assertion becomes deterministic.
+    const pfFetchImpl: typeof globalThis.fetch = process.env['SPOOL_E2E_TEST'] === '1'
+      ? (async () => new Response(null, { status: 503, statusText: 'e2e-fake' })) as typeof globalThis.fetch
+      : ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch
     pfCoordinator = makePfCoordinator({
       modelDir: pfModelDir(),
-      fetch: ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch,
+      fetch: pfFetchImpl,
       run: runWithObservability,
     })
     // When a download initiated from the callout completes, finish
