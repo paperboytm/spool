@@ -1259,9 +1259,16 @@ function SessionCard({
               {high}
             </span>
           )}
+          {/* Low count: a quiet dot beside the high triangle (it's the
+           *  secondary signal), but when there's NO high triangle to
+           *  anchor it the bare dot reads weak — so a lone low count
+           *  borrows the same triangle in the muted low colour, so the
+           *  cluster keeps a consistent icon weight either way. */}
           {low > 0 && (
             <span className="inline-flex items-center gap-[3px] font-mono tabular-nums text-[11px] text-warm-muted dark:text-dark-muted">
-              <span className="w-1.5 h-1.5 rounded-full bg-warm-muted dark:bg-dark-muted" />
+              {high > 0
+                ? <span className="w-1 h-1 rounded-full bg-warm-muted dark:bg-dark-muted" />
+                : <AlertTriangle size={12} strokeWidth={1.7} aria-hidden />}
               {low}
             </span>
           )}
@@ -1345,9 +1352,14 @@ function SessionCard({
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text inline-flex items-center gap-1 transition-colors"
+              className="self-start mt-0.5 h-[22px] pl-6 pr-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text inline-flex items-center gap-3 transition-colors"
             >
-              <ChevronDown size={11} strokeWidth={1.7} aria-hidden />
+              {/* Chevron sits in the same 14px centred slot the finding
+               *  bullets use, so it lines up under the dots and the
+               *  label aligns with the kind column. */}
+              <span className="flex justify-center w-3.5">
+                <ChevronDown size={11} strokeWidth={1.7} aria-hidden />
+              </span>
               {t('security.show_more', { count: hidden, defaultValue: 'show {{count}} more' })}
             </button>
           )}
@@ -1474,39 +1486,48 @@ function FindingItem({
        *  spans the row and a gradient mask matching the hover surface
        *  fades it out beneath the buttons so the two never collide. */}
       {isActive ? (
-        <span className="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 pl-12 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-transparent via-warm-surface to-warm-surface dark:via-dark-surface dark:to-dark-surface">
-          <button
-            type="button"
-            data-testid="dismiss-in-session"
-            onClick={() => { void dismiss('session') }}
-            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-            title={t('security.dismiss_session', { defaultValue: 'Dismiss in this session' })}
-          >
-            {t('security.dismiss', { defaultValue: 'Dismiss' })}
-          </button>
-          <button
-            type="button"
-            data-testid="dismiss-everywhere"
-            onClick={() => { void dismiss('global') }}
-            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-            title={t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' })}
-          >
-            {t('security.everywhere', { defaultValue: 'Everywhere' })}
-          </button>
-          {/* Hairline divider groups the two dismiss scopes apart from
-           *  the destructive Purge, so "Everywhere" reads as a scope of
-           *  Dismiss rather than a third peer action. */}
-          <span className="mx-1 h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
-          <button
-            type="button"
-            data-testid="purge-button"
-            onClick={() => setPurgePending(true)}
-            className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex items-center gap-1 transition-colors"
-            title={t('security.purge', { defaultValue: 'Purge from local archive' })}
-          >
-            <Trash2 size={10} strokeWidth={1.7} aria-hidden />
-            {t('security.purge', { defaultValue: 'Purge' })}
-          </button>
+        <span className="absolute inset-y-0 right-0 z-10 flex items-stretch opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* A short fade blends the value's tail into the surface
+           *  right before a SOLID button block. The earlier single
+           *  gradient put the buttons on a still-transparent stretch,
+           *  so a long value showed straight through them; the solid
+           *  block (same colour as the hovered row) guarantees the
+           *  value is fully masked behind the controls. */}
+          <span aria-hidden className="w-10 bg-gradient-to-r from-transparent to-warm-surface dark:to-dark-surface" />
+          <span className="flex items-center gap-0.5 pr-2 rounded-r bg-warm-surface dark:bg-dark-surface">
+            <button
+              type="button"
+              data-testid="dismiss-in-session"
+              onClick={() => { void dismiss('session') }}
+              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              title={t('security.dismiss_session', { defaultValue: 'Dismiss in this session' })}
+            >
+              {t('security.dismiss', { defaultValue: 'Dismiss' })}
+            </button>
+            <button
+              type="button"
+              data-testid="dismiss-everywhere"
+              onClick={() => { void dismiss('global') }}
+              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              title={t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' })}
+            >
+              {t('security.everywhere', { defaultValue: 'Everywhere' })}
+            </button>
+            {/* Hairline divider groups the two dismiss scopes apart from
+             *  the destructive Purge, so "Everywhere" reads as a scope
+             *  of Dismiss rather than a third peer action. */}
+            <span className="mx-1 h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
+            <button
+              type="button"
+              data-testid="purge-button"
+              onClick={() => setPurgePending(true)}
+              className="h-[18px] px-1.5 rounded font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex items-center gap-1 transition-colors"
+              title={t('security.purge', { defaultValue: 'Purge from local archive' })}
+            >
+              <Trash2 size={10} strokeWidth={1.7} aria-hidden />
+              {t('security.purge', { defaultValue: 'Purge' })}
+            </button>
+          </span>
         </span>
       ) : (
         <span className="absolute inset-y-0 right-2 flex items-center font-sans text-[10px] uppercase tracking-[0.08em] font-semibold text-warm-faint dark:text-dark-muted">
