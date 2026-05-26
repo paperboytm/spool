@@ -46,21 +46,13 @@ export default function AllowlistManageModal({ onClose }: Props) {
   const [filter, setFilter] = useState('')
   const [kindFilter, setKindFilter] = useState<string | null>(null)
   const [scopeFilter, setScopeFilter] = useState<'all' | 'global' | 'session'>('all')
-  const [valuesBlurred, setValuesBlurred] = useState(false)
 
   useEffect(() => {
     void securityApi.listAllowlistEntries().then(setEntries).catch(() => setEntries([]))
   }, [])
-  useEffect(() => {
-    let cancelled = false
-    void securityApi.getPrefs().then((p) => {
-      if (!cancelled) setValuesBlurred(p.securityPageValuesBlurred === true)
-    }).catch(() => { /* default-reveal */ })
-    const off = securityApi.onPrefsChanged((p) => {
-      setValuesBlurred(p.securityPageValuesBlurred === true)
-    })
-    return () => { cancelled = true; off() }
-  }, [])
+  // Clear a pending in-place confirm when the filters change, so a row
+  // that's filtered out and later reappears doesn't come back mid-confirm.
+  useEffect(() => { setConfirmKey(null) }, [filter, kindFilter, scopeFilter])
   useHotkeys({ Escape: onClose }, { modal: true })
 
   const total = entries?.length ?? 0
@@ -193,7 +185,6 @@ export default function AllowlistManageModal({ onClose }: Props) {
                   entry={entry}
                   isConfirming={confirmKey === rowKey(entry)}
                   isBusy={busyKey === rowKey(entry)}
-                  valuesBlurred={valuesBlurred}
                   onStopIgnoring={stopIgnoring}
                 />
               ))}
@@ -209,10 +200,9 @@ interface RowProps {
   entry: AllowlistEntryRow
   isConfirming: boolean
   isBusy: boolean
-  valuesBlurred: boolean
   onStopIgnoring: (e: AllowlistEntryRow) => void
 }
-function IgnoredRow({ entry, isConfirming, isBusy, valuesBlurred, onStopIgnoring }: RowProps) {
+function IgnoredRow({ entry, isConfirming, isBusy, onStopIgnoring }: RowProps) {
   const { t } = useTranslation()
   const kindLabel = SENSITIVE_KIND_LABEL[entry.kind as SensitiveKind] ?? entry.kind
   const hasValue = entry.value !== null && entry.value !== undefined
@@ -230,7 +220,7 @@ function IgnoredRow({ entry, isConfirming, isBusy, valuesBlurred, onStopIgnoring
     >
       <div className="min-w-0 flex-1">
         {hasValue
-          ? <IgnoredValue value={entry.value as string} valuesBlurred={valuesBlurred} />
+          ? <IgnoredValue value={entry.value as string} />
           : <span className="block text-[13px] text-warm-muted dark:text-dark-muted truncate">{kindLabel}</span>}
         <div className="text-[11px] text-warm-faint dark:text-dark-faint truncate mt-0.5">{subtitle}</div>
       </div>
@@ -317,25 +307,16 @@ function scopeLabel(entry: AllowlistEntryRow, t: TFunction): string {
     : t('settings.security.allowlist_in_one_session', { defaultValue: 'in one session' })
 }
 
-// Live value cell — mirrors FindingsStrip's value treatment: blurred
-// when `valuesBlurred` (the canonical securityPageValuesBlurred pref),
-// with per-row hover/click reveal.
-function IgnoredValue({ value, valuesBlurred }: { value: string; valuesBlurred: boolean }) {
-  const [localReveal, setLocalReveal] = useState(false)
-  const revealed = !valuesBlurred || localReveal
+// Live value cell. These are values the user explicitly chose to
+// ignore, so the management list shows them in the clear (no blur) —
+// the value is reconstructed read-time from the source message, never
+// persisted.
+function IgnoredValue({ value }: { value: string }) {
   return (
     <span
       data-testid="ignored-value"
-      data-value="1"
-      data-blurred={revealed ? '0' : '1'}
-      title={revealed ? value : undefined}
-      onMouseEnter={() => valuesBlurred && setLocalReveal(true)}
-      onClick={() => valuesBlurred && setLocalReveal(true)}
-      className={`block font-mono text-xs truncate text-warm-text dark:text-dark-text transition-[filter] duration-100 ${
-        revealed
-          ? 'select-text cursor-text'
-          : 'blur-[3.5px] cursor-pointer select-none'
-      }`}
+      title={value}
+      className="block font-mono text-xs truncate text-warm-text dark:text-dark-text select-text"
     >
       {truncateValue(value)}
     </span>
