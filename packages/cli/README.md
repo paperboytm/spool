@@ -49,6 +49,16 @@ spool sync                     # Index new AI sessions (Claude, Codex, Gemini)
 spool sync --watch             # Keep watching for new sessions
 ```
 
+### Doctor
+
+```bash
+spool doctor                   # Diagnose your environment, database, and config
+spool doctor db.integrity      # Run a single check by id
+spool doctor --json            # Machine-readable output
+spool doctor --fix             # Apply safe fixes for failing checks
+spool doctor --fix --force     # Also apply destructive fixes
+```
+
 ## Data location
 
 All data is stored locally in `~/.spool/`:
