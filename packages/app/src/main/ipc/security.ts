@@ -13,6 +13,7 @@ import {
   listSessionsWithFindings,
   listSessionsWithFindingsPage,
   countSessionsWithFindings,
+  occurrencesByValueHash,
   riskByCategory,
   lastScanCompletedAt,
   getFindingValue,
@@ -54,6 +55,7 @@ export const SECURITY_IPC_CHANNELS = {
   LIST_SESSIONS_WITH_FINDINGS: 'security:list-sessions-with-findings',
   LIST_SESSIONS_WITH_FINDINGS_PAGE: 'security:list-sessions-with-findings-page',
   COUNT_SESSIONS_WITH_FINDINGS: 'security:count-sessions-with-findings',
+  OCCURRENCES_BY_VALUE_HASH:   'security:occurrences-by-value-hash',
   RISK_BY_CATEGORY:            'security:risk-by-category',
   LAST_SCAN_COMPLETED_AT:      'security:last-scan-completed-at',
   GET_FINDING_VALUE:           'security:get-finding-value',
@@ -192,6 +194,11 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.COUNT_SESSIONS_WITH_FINDINGS, (_e, filter: SessionFindingFilter) =>
     countSessionsWithFindings(db, filter),
+  )
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.OCCURRENCES_BY_VALUE_HASH,
+    (_e, args: { kind: SensitiveKind; valueHash: string }) =>
+      occurrencesByValueHash(db, args.kind, args.valueHash),
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY, () =>
     riskByCategory(db),

@@ -20,6 +20,7 @@ import {
 import type {
   FindingRow,
   FindingState,
+  OccurrenceBySession,
   RiskByCategoryRow,
   SessionWithFindingCounts,
 } from './types.js'
@@ -518,6 +519,57 @@ export function riskByCategory(db: Database.Database): RiskByCategoryRow[] {
     severity: severityOf(r.kind as SensitiveKind),
     count: r.count,
     sessions: r.sessions,
+  }))
+}
+
+/** Cross-session blast radius for one leaked value. Returns every
+ *  session that has ≥ 1 ACTIVE finding sharing the given
+ *  `(kind, valueHash)`, with the per-session occurrence count, project,
+ *  and most-recent detection time. Ordered most-recent-first.
+ *
+ *  Spool already collapses repeated occurrences of a value WITHIN a
+ *  session into one row (×N); this extends that view across the whole
+ *  archive so the user can see "this same key also leaked in 4 other
+ *  sessions". Dismissed/purged occurrences are excluded — they no
+ *  longer expose the value through search / AI / browse. */
+export function occurrencesByValueHash(
+  db: Database.Database,
+  kind: SensitiveKind,
+  valueHash: string,
+): OccurrenceBySession[] {
+  const rows = db.prepare(
+    `SELECT
+        s.id            AS session_id,
+        s.session_uuid  AS session_uuid,
+        s.title         AS session_title,
+        src.name        AS source,
+        p.display_name  AS project,
+        COUNT(*)        AS count,
+        MAX(f.detected_at) AS last_seen
+       FROM findings f
+       JOIN sessions s ON s.id = f.session_id
+       JOIN sources  src ON src.id = s.source_id
+       JOIN projects p ON p.id = s.project_id
+      WHERE f.kind = ? AND f.value_hash = ? AND f.state = 'active'
+      GROUP BY s.id
+      ORDER BY last_seen DESC, s.id DESC`,
+  ).all(kind, valueHash) as Array<{
+    session_id: number
+    session_uuid: string
+    session_title: string | null
+    source: string
+    project: string | null
+    count: number
+    last_seen: string
+  }>
+  return rows.map(r => ({
+    sessionId: r.session_id,
+    sessionUuid: r.session_uuid,
+    sessionTitle: r.session_title,
+    source: r.source,
+    project: r.project,
+    count: r.count,
+    lastSeen: r.last_seen,
   }))
 }
 

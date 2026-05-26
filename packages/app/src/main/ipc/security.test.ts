@@ -205,6 +205,32 @@ describe('registerSecurityIpc', () => {
       expect(rows[0]!.findingCount).toBe(1)
     })
 
+    it('OCCURRENCES_BY_VALUE_HASH aggregates the leak across sessions', async () => {
+      // Add a second session in the same project sharing one value.
+      fixture.db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (2, 1, 1, 's-2', '/p/s-2', 'Session 2', '2026-01-02', '2026-01-02', 1)`,
+      ).run()
+      fixture.db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (20, 2, 1, 'user', 'same leak AKIAIOSFODNN7EXAMPLE', '2026-01-02', 0)`,
+      ).run()
+      insertFindings(fixture.db, [
+        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 6, endOffset: 11, state: 'active' },
+        { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+      ])
+      const rows = await invoke<Array<{ sessionId: number; count: number; project: string | null }>>(
+        SECURITY_IPC_CHANNELS.OCCURRENCES_BY_VALUE_HASH,
+        { kind: 'api-key', valueHash: 'shared' },
+      )
+      expect(rows).toHaveLength(2)
+      const bySession = new Map(rows.map(r => [r.sessionId, r]))
+      expect(bySession.get(1)!.count).toBe(2)
+      expect(bySession.get(2)!.count).toBe(1)
+      expect(bySession.get(1)!.project).toBe('p')
+    })
+
     it('RISK_BY_CATEGORY groups by kind with severity + sessions', async () => {
       insertFindings(fixture.db, [
         { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 20, state: 'active' },

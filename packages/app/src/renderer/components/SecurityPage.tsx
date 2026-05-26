@@ -38,6 +38,7 @@ import { securityFeatureEnabled } from '../featureFlags.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import AllowlistManageModal from './security/AllowlistManageModal.js'
+import BlastRadius from './security/BlastRadius.js'
 import DetectorsChip from './security/DetectorsChip.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
 import { truncateValue } from './security/truncate-value.js'
@@ -520,7 +521,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
          *  Ignored entry lines up with the cards' right-edge controls
          *  instead of overhanging them. */}
         <div className="max-w-[720px] pr-3 flex items-center gap-3">
-        <span className="font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
           {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
           {infoCount > 0 && (
             <span className="opacity-70">
@@ -612,7 +613,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             onClick={() => setIgnoredOpen(true)}
             title={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
             aria-label={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
-            className="ml-auto flex-none inline-flex items-center gap-1.5 h-5 px-1.5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+            className="flex-none inline-flex items-center gap-1.5 h-5 px-1.5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
           >
             <CircleSlash size={13} strokeWidth={1.75} aria-hidden />
             <span className="font-mono text-[11px]">
@@ -1553,6 +1554,7 @@ function FindingItem({
       : value
 
   return (
+    <div data-testid="finding-row-wrap" data-finding-id={finding.id}>
     <div
       data-testid="finding-row"
       data-finding-id={finding.id}
@@ -1653,6 +1655,19 @@ function FindingItem({
         onConfirm={() => { void purge() }}
         onCancel={() => setPurgePending(false)}
       />
+    </div>
+    {/* Cross-session blast radius — credentials only, active rows only.
+     *  Identity/PII kinds can't be "rotated" and a contact recurring
+     *  across sessions is expected, so the radius is reserved for the
+     *  high-severity (credential) tier where multi-session exposure is
+     *  the actionable signal. */}
+    {isActive && high && (
+      <div className="grid items-center gap-3 pl-6 pr-2 -mt-1" style={{ gridTemplateColumns: '14px 110px 1fr' }}>
+        <div className="col-start-3 min-w-0">
+          <BlastRadius kind={finding.kind as SensitiveKind} valueHash={finding.valueHash} currentSessionId={finding.sessionId} />
+        </div>
+      </div>
+    )}
     </div>
   )
 }

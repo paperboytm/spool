@@ -11,6 +11,7 @@ import type {
   FindingRow,
   SessionWithFindingCounts,
   RiskByCategoryRow,
+  OccurrenceBySession,
   FindingsChange,
   ScanStatus,
   AllowlistEntryRow,
@@ -18,6 +19,8 @@ import type {
   BackupFileInfo,
   DeleteBackupsResult,
 } from '@spool-lab/core'
+
+export type { OccurrenceBySession }
 
 export type { BackupFileInfo }
 import type { SensitiveKind } from '@spool-lab/redact'
@@ -39,6 +42,8 @@ export const securityApi = {
     window.spool.security.listSessionsWithFindingsPage(filter),
   countSessionsWithFindings: (filter: SessionFindingFilter = {}): Promise<number> =>
     window.spool.security.countSessionsWithFindings(filter),
+  occurrencesByValueHash: (kind: SensitiveKind, valueHash: string): Promise<OccurrenceBySession[]> =>
+    window.spool.security.occurrencesByValueHash(kind, valueHash),
   riskByCategory: (): Promise<RiskByCategoryRow[]> =>
     window.spool.security.riskByCategory(),
   lastScanCompletedAt: (): Promise<string | null> =>

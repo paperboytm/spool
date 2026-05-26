@@ -4,7 +4,7 @@ import type {
   ListSessionsByIdentityOptions, ProjectSessionSortOrder, SessionsCursor, SessionsPage, DirectoryCount,
   ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
   SessionSource,
-  FindingRow, SessionWithFindingCounts, RiskByCategoryRow,
+  FindingRow, SessionWithFindingCounts, RiskByCategoryRow, OccurrenceBySession,
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
   AllowlistEntryRow,
   Page,
@@ -264,6 +264,8 @@ const api = {
       ipcRenderer.invoke('security:list-sessions-with-findings-page', filter),
     countSessionsWithFindings: (filter: SessionFindingFilter): Promise<number> =>
       ipcRenderer.invoke('security:count-sessions-with-findings', filter),
+    occurrencesByValueHash: (kind: SensitiveKind, valueHash: string): Promise<OccurrenceBySession[]> =>
+      ipcRenderer.invoke('security:occurrences-by-value-hash', { kind, valueHash }),
     riskByCategory: (): Promise<RiskByCategoryRow[]> =>
       ipcRenderer.invoke('security:risk-by-category'),
     lastScanCompletedAt: (): Promise<string | null> =>

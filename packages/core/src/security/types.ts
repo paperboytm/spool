@@ -82,6 +82,25 @@ export interface RiskByCategoryRow {
   sessions: number
 }
 
+/** One session in which a given `(kind, valueHash)` secret appears —
+ *  the cross-session "blast radius" of a single leaked value. Counts
+ *  only ACTIVE findings (dismissed/purged occurrences don't expose the
+ *  value through Spool's surfaces). */
+export interface OccurrenceBySession {
+  sessionId: number
+  sessionUuid: string
+  sessionTitle: string | null
+  /** Agent source (claude / codex / gemini / opencode) — drives the
+   *  source badge so each row reads as a session, not loose text. */
+  source: string
+  /** Project display name, null for the Loose bucket. */
+  project: string | null
+  /** Active occurrences of this value in this session. */
+  count: number
+  /** Most recent detected_at across this session's occurrences (ISO). */
+  lastSeen: string
+}
+
 /** Scope of a Dismiss action.
  *   session — add to allowlist_session for this finding's session
  *   global  — add to allowlist_global; all matching findings across
