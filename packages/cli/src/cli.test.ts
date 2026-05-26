@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { resolve, join } from 'node:path'
 import { existsSync, statSync, rmSync, mkdtempSync } from 'node:fs'
@@ -334,6 +334,61 @@ describe('search', () => {
   it('exits with error when query is missing', () => {
     const out = runFail(['search'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain("missing required argument")
+  })
+})
+
+describe('pin / unpin / pinned', () => {
+  let seeded: ReturnType<typeof createSeededDir>
+  beforeEach(() => { seeded = createSeededDir() })
+  afterEach(() => { seeded.cleanup() })
+
+  it('pins a session and pinned lists it', () => {
+    const pinOut = run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    expect(pinOut).toContain('Pinned')
+    expect(pinOut).toContain('Debugging authentication flow')
+
+    const listed = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(listed).toContain('Debugging authentication flow')
+    expect(listed).not.toContain('Refactoring database queries')
+  })
+
+  it('is idempotent when already pinned', () => {
+    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    const again = run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    expect(again).toContain('Already pinned')
+  })
+
+  it('unpin removes a session from the pinned list', () => {
+    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    const unpinOut = run(['unpin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    expect(unpinOut).toContain('Unpinned')
+
+    const listed = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(listed).toContain('No pinned sessions')
+  })
+
+  it('pin exits with error for unknown UUID', () => {
+    const out = runFail(['pin', 'nonexistent-uuid'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('not found')
+  })
+
+  it('unpin reports when a session was not pinned', () => {
+    const out = run(['unpin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Not pinned')
+  })
+
+  it('pinned outputs JSON', () => {
+    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['pinned', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const parsed = JSON.parse(out)
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0].sessionUuid).toBe(SESSION_UUID_1)
+  })
+
+  it('pinned prints empty message when nothing pinned', () => {
+    const out = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('No pinned sessions')
   })
 })
 

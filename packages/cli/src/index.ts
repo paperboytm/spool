@@ -7,6 +7,7 @@ import { syncCommand } from './commands/sync.js'
 import { listCommand } from './commands/list.js'
 import { statusCommand } from './commands/status.js'
 import { showCommand } from './commands/show.js'
+import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
 import { doctorCommand } from './commands/doctor.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -22,6 +23,9 @@ program.addCommand(syncCommand)
 program.addCommand(listCommand)
 program.addCommand(statusCommand)
 program.addCommand(showCommand)
+program.addCommand(pinCommand)
+program.addCommand(unpinCommand)
+program.addCommand(pinnedCommand)
 program.addCommand(doctorCommand)
 
 program.parse()
