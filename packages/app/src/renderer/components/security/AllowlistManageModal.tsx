@@ -32,6 +32,7 @@ import { securityApi } from '../../api/security.js'
 import Menu from '../Menu.js'
 import { formatScanAgo } from './page-helpers.js'
 import { truncateValue } from './truncate-value.js'
+import { filterIgnoredEntries } from './filter-ignored.js'
 
 interface Props {
   onClose: () => void
@@ -79,19 +80,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
 
   const visible = useMemo(() => {
     if (!entries) return []
-    const q = filter.trim().toLowerCase()
-    const match = (e: AllowlistEntryRow): boolean => {
-      if (scopeFilter !== 'all' && e.scope !== scopeFilter) return false
-      if (kindFilter !== null && e.kind !== kindFilter) return false
-      if (!q) return true
-      const kindLabel = (SENSITIVE_KIND_LABEL[e.kind as SensitiveKind] ?? e.kind).toLowerCase()
-      return (
-        kindLabel.includes(q) ||
-        (e.value ?? '').toLowerCase().includes(q) ||
-        (e.sessionTitle ?? '').toLowerCase().includes(q)
-      )
-    }
-    return entries.filter(match).slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+    return filterIgnoredEntries(entries, { scope: scopeFilter, kind: kindFilter, query: filter })
   }, [entries, filter, kindFilter, scopeFilter])
 
   async function stopIgnoring(entry: AllowlistEntryRow) {

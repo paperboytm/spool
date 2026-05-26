@@ -255,11 +255,8 @@
       "allowlist_stats": "{{global}} überall ignoriert · {{session}} in einer einzelnen Sitzung ignoriert.",
       "allowlist_manage": "Ansehen",
       "allowlist_modal_title": "Ignorierte Einträge",
-      "allowlist_modal_sub": "Dinge, die Spool nicht mehr melden soll. Hebst du das Ignorieren auf, meldet der nächste Scan sie erneut.",
       "allowlist_empty": "Noch nichts ignoriert. Treffer, die du ignorierst, erscheinen hier.",
-      "allowlist_bucket_global": "Überall",
       "allowlist_bucket_session": "Diese Sitzung",
-      "allowlist_in_every_session": "in jeder Sitzung",
       "allowlist_in_session": "in {{title}}",
       "allowlist_in_one_session": "in einer Sitzung",
       "allowlist_remove": "Nicht mehr ignorieren",
@@ -301,14 +298,16 @@
       "experimental_intro": "Opt-in-Detektoren, die noch nicht für den täglichen Einsatz empfohlen werden. Bei code-lastigen Inhalten können Falsch-Positiv-Raten hoch sein.",
       "detector_pf_resume": "Fortsetzen",
       "unavailable_title": "Scanner nicht verfügbar",
-      "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft sind die Einstellungen hier inaktiv. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler."
+      "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft sind die Einstellungen hier inaktiv. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler.",
+      "allowlist_all_scopes": "Alle Bereiche",
+      "allowlist_all_types": "Alle Arten",
+      "allowlist_scope_everywhere": "Überall"
     }
   },
   "security": {
     "summary": "{{findings}} aktiv",
     "rescanAll": "Alle neu prüfen",
     "ignored_manage": "Ignorierte Einträge",
-    "ignored_count": "Ignoriert · {{n}}",
     "severity_high": "Hoch",
     "severity_low": "Niedrig",
     "info_toggle": "Hinweissignale · {{items}} (Pfade, IPs, interne Hosts — hohe Falsch-positiv-Rate)",
@@ -412,7 +411,8 @@
     "scan_toast_new_findings_one": "{{count}} neuer Hochrisiko-Fund",
     "scan_toast_new_findings_other": "{{count}} neue Hochrisiko-Funde",
     "unavailable_title": "Scanner nicht verfügbar",
-    "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft können Funde nicht geladen werden. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler."
+    "unavailable_body": "Spool konnte den Security-Scan-Worker nicht starten. Bis er wieder läuft können Funde nicht geladen werden. Ein Neustart der App behebt das meist; bleibt das Problem bestehen, prüfe die Entwicklerkonsole auf den Boot-Fehler.",
+    "ignored_label": "Ignoriert"
   },
   "shares": {
     "title": "Entwürfe",

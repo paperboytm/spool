@@ -255,11 +255,8 @@
       "allowlist_stats": "{{global}} ignored everywhere · {{session}} ignored in a single session.",
       "allowlist_manage": "Review",
       "allowlist_modal_title": "Ignored items",
-      "allowlist_modal_sub": "Things you told Spool to stop flagging.",
       "allowlist_empty": "Nothing ignored yet. Findings you choose to ignore will appear here.",
-      "allowlist_bucket_global": "Everywhere",
       "allowlist_bucket_session": "Per session",
-      "allowlist_in_every_session": "in every session",
       "allowlist_in_session": "in {{title}}",
       "allowlist_in_one_session": "in one session",
       "allowlist_remove": "Stop ignoring",
@@ -301,7 +298,10 @@
       "experimental_intro": "Opt-in detectors that are not yet recommended for daily use. False-positive rates may be high on code-heavy content.",
       "detector_pf_resume": "Resume",
       "unavailable_title": "Scanner unavailable",
-      "unavailable_body": "Spool could not start the security scan worker. Settings here are inactive until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error."
+      "unavailable_body": "Spool could not start the security scan worker. Settings here are inactive until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.",
+      "allowlist_all_scopes": "All scopes",
+      "allowlist_all_types": "All types",
+      "allowlist_scope_everywhere": "Everywhere"
     }
   },
   "security": {
@@ -309,7 +309,6 @@
     "summary_info": "{{count}} info",
     "rescanAll": "Rescan all",
     "ignored_manage": "Ignored items",
-    "ignored_count": "Ignored · {{n}}",
     "severity_high": "High",
     "severity_low": "Low",
     "info_toggle": "Informational signals · {{items}} (paths, IPs, internal hosts — high false-positive rate)",
@@ -412,7 +411,8 @@
     "scan_toast_new_findings_one": "Found {{count}} new high-risk finding",
     "scan_toast_new_findings_other": "Found {{count}} new high-risk findings",
     "unavailable_title": "Scanner unavailable",
-    "unavailable_body": "Spool could not start the security scan worker. Findings cannot be loaded until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error."
+    "unavailable_body": "Spool could not start the security scan worker. Findings cannot be loaded until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.",
+    "ignored_label": "Ignored"
   },
   "shares": {
     "title": "Drafts",

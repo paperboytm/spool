@@ -248,11 +248,8 @@
       "allowlist_stats": "{{global}} 项在所有会话中忽略 · {{session}} 项仅在单个会话内忽略。",
       "allowlist_manage": "查看",
       "allowlist_modal_title": "已忽略的项",
-      "allowlist_modal_sub": "你让 Spool 不再标记的内容。停止忽略某项后，下次扫描会再次标记它。",
       "allowlist_empty": "暂无已忽略的项。你选择忽略的检测会出现在这里。",
-      "allowlist_bucket_global": "所有会话",
       "allowlist_bucket_session": "本会话",
-      "allowlist_in_every_session": "在每个会话中",
       "allowlist_in_session": "在「{{title}}」中",
       "allowlist_in_one_session": "在某个会话中",
       "allowlist_remove": "停止忽略",
@@ -294,7 +291,10 @@
       "experimental_intro": "可选启用的检测器，目前不推荐日常使用。在代码密集型内容上误报率可能较高。",
       "detector_pf_resume": "继续下载",
       "unavailable_title": "扫描器不可用",
-      "unavailable_body": "Spool 无法启动安全扫描工作进程。在它恢复前，此处的设置无效。通常重启应用即可解决；若问题持续，请查看开发者控制台中的启动错误。"
+      "unavailable_body": "Spool 无法启动安全扫描工作进程。在它恢复前，此处的设置无效。通常重启应用即可解决；若问题持续，请查看开发者控制台中的启动错误。",
+      "allowlist_all_scopes": "所有范围",
+      "allowlist_all_types": "所有类型",
+      "allowlist_scope_everywhere": "全局"
     }
   },
   "security": {
@@ -302,7 +302,6 @@
     "summary_info": "{{count}} 项信息",
     "rescanAll": "全部重扫",
     "ignored_manage": "已忽略项",
-    "ignored_count": "已忽略 · {{n}}",
     "severity_high": "高风险",
     "severity_low": "低风险",
     "info_toggle": "提示信号 · {{items}}（路径 / IP / 内网域名，误报率高）",
@@ -386,7 +385,8 @@
     "scanning_ambient": "扫描中…",
     "scan_toast_new_findings_other": "发现 {{count}} 项新的高风险",
     "unavailable_title": "扫描器不可用",
-    "unavailable_body": "Spool 无法启动安全扫描工作进程。在它恢复前，无法加载发现项。通常重启应用即可解决；若问题持续，请查看开发者控制台中的启动错误。"
+    "unavailable_body": "Spool 无法启动安全扫描工作进程。在它恢复前，无法加载发现项。通常重启应用即可解决；若问题持续，请查看开发者控制台中的启动错误。",
+    "ignored_label": "已忽略"
   },
   "shares": {
     "title": "草稿",

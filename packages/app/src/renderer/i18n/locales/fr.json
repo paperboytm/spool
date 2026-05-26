@@ -255,11 +255,8 @@
       "allowlist_stats": "{{global}} ignorés partout · {{session}} ignorés dans une seule session.",
       "allowlist_manage": "Examiner",
       "allowlist_modal_title": "Éléments ignorés",
-      "allowlist_modal_sub": "Ce que tu as demandé à Spool de ne plus signaler. Arrête d'en ignorer un et le prochain scan le signalera à nouveau.",
       "allowlist_empty": "Rien d'ignoré pour le moment. Les détections que tu choisis d'ignorer apparaîtront ici.",
-      "allowlist_bucket_global": "Partout",
       "allowlist_bucket_session": "Cette session",
-      "allowlist_in_every_session": "dans chaque session",
       "allowlist_in_session": "dans {{title}}",
       "allowlist_in_one_session": "dans une session",
       "allowlist_remove": "Arrêter d'ignorer",
@@ -301,14 +298,16 @@
       "experimental_intro": "Détecteurs facultatifs non encore recommandés pour un usage quotidien. Les taux de faux positifs peuvent être élevés sur du contenu riche en code.",
       "detector_pf_resume": "Reprendre",
       "unavailable_title": "Scanner indisponible",
-      "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les paramètres ici sont inactifs jusqu'à sa reprise. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage."
+      "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les paramètres ici sont inactifs jusqu'à sa reprise. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage.",
+      "allowlist_all_scopes": "Toutes les portées",
+      "allowlist_all_types": "Tous les types",
+      "allowlist_scope_everywhere": "Partout"
     }
   },
   "security": {
     "summary": "{{findings}} actifs",
     "rescanAll": "Tout rescanner",
     "ignored_manage": "Éléments ignorés",
-    "ignored_count": "Ignorés · {{n}}",
     "severity_high": "Élevé",
     "severity_low": "Faible",
     "info_toggle": "Signaux informationnels · {{items}} (chemins, IPs, hôtes internes — taux élevé de faux positifs)",
@@ -412,7 +411,8 @@
     "scan_toast_new_findings_one": "{{count}} nouvelle découverte à haut risque",
     "scan_toast_new_findings_other": "{{count}} nouvelles découvertes à haut risque",
     "unavailable_title": "Scanner indisponible",
-    "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les découvertes ne peuvent pas être chargées tant qu'il ne fonctionne pas. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage."
+    "unavailable_body": "Spool n'a pas pu démarrer le worker d'analyse de sécurité. Les découvertes ne peuvent pas être chargées tant qu'il ne fonctionne pas. Redémarrer l'application résout généralement ce problème ; s'il persiste, consultez la console développeur pour l'erreur de démarrage.",
+    "ignored_label": "Ignorés"
   },
   "shares": {
     "title": "Brouillons",

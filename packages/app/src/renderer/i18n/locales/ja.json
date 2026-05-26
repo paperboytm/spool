@@ -248,11 +248,8 @@
       "allowlist_stats": "{{global}} 件をすべてのセッションで無視 · {{session}} 件を単一セッションで無視。",
       "allowlist_manage": "確認",
       "allowlist_modal_title": "無視した項目",
-      "allowlist_modal_sub": "Spool に今後フラグを付けないよう指示した項目です。無視を解除すると、次回のスキャンで再びフラグが付きます。",
       "allowlist_empty": "無視した項目はまだありません。無視を選んだ検出がここに表示されます。",
-      "allowlist_bucket_global": "すべてのセッション",
       "allowlist_bucket_session": "このセッション",
-      "allowlist_in_every_session": "すべてのセッションで",
       "allowlist_in_session": "{{title}} で",
       "allowlist_in_one_session": "あるセッションで",
       "allowlist_remove": "無視を解除",
@@ -294,14 +291,16 @@
       "experimental_intro": "オプトインの検出器。日常的な使用はまだ推奨されません。コード中心のコンテンツでは誤検出率が高くなる可能性があります。",
       "detector_pf_resume": "再開",
       "unavailable_title": "スキャナーを利用できません",
-      "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまでこの設定は無効です。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。"
+      "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまでこの設定は無効です。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。",
+      "allowlist_all_scopes": "すべての範囲",
+      "allowlist_all_types": "すべての種類",
+      "allowlist_scope_everywhere": "全体"
     }
   },
   "security": {
     "summary": "{{findings}} 件",
     "rescanAll": "すべて再スキャン",
     "ignored_manage": "無視した項目",
-    "ignored_count": "無視 · {{n}}",
     "severity_high": "高",
     "severity_low": "低",
     "info_toggle": "参考信号 · {{items}}（パス / IP / 内部ホスト — 誤検出が多め）",
@@ -386,7 +385,8 @@
     "scanning_ambient": "スキャン中…",
     "scan_toast_new_findings_other": "新たに {{count}} 件の高リスクを検出",
     "unavailable_title": "スキャナーを利用できません",
-    "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまで検出結果を読み込めません。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。"
+    "unavailable_body": "Spool はセキュリティスキャンワーカーを起動できませんでした。復旧するまで検出結果を読み込めません。通常はアプリを再起動すると解決します。再発する場合は開発者コンソールで起動エラーを確認してください。",
+    "ignored_label": "無視"
   },
   "shares": {
     "title": "下書き",

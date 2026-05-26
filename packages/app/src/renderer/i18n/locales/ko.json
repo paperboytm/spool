@@ -248,11 +248,8 @@
       "allowlist_stats": "{{global}}개 모든 세션에서 무시 · {{session}}개 단일 세션에서만 무시.",
       "allowlist_manage": "확인",
       "allowlist_modal_title": "무시한 항목",
-      "allowlist_modal_sub": "Spool이 더 이상 표시하지 않도록 설정한 항목입니다. 무시를 해제하면 다음 검사에서 다시 표시됩니다.",
       "allowlist_empty": "무시한 항목이 아직 없습니다. 무시하기로 선택한 검출이 여기에 표시됩니다.",
-      "allowlist_bucket_global": "모든 세션",
       "allowlist_bucket_session": "이 세션",
-      "allowlist_in_every_session": "모든 세션에서",
       "allowlist_in_session": "{{title}}에서",
       "allowlist_in_one_session": "한 세션에서",
       "allowlist_remove": "무시 해제",
@@ -294,14 +291,16 @@
       "experimental_intro": "옵트인 감지기. 일상적 사용은 아직 권장되지 않습니다. 코드 중심 콘텐츠에서는 거짓 양성 비율이 높을 수 있습니다.",
       "detector_pf_resume": "계속",
       "unavailable_title": "스캐너를 사용할 수 없습니다",
-      "unavailable_body": "Spool이 보안 스캔 워커를 시작하지 못했습니다. 복구되기 전까지 이 설정은 적용되지 않습니다. 보통 앱을 재시작하면 해결됩니다. 계속되면 개발자 콘솔에서 부팅 오류를 확인하세요."
+      "unavailable_body": "Spool이 보안 스캔 워커를 시작하지 못했습니다. 복구되기 전까지 이 설정은 적용되지 않습니다. 보통 앱을 재시작하면 해결됩니다. 계속되면 개발자 콘솔에서 부팅 오류를 확인하세요.",
+      "allowlist_all_scopes": "모든 범위",
+      "allowlist_all_types": "모든 종류",
+      "allowlist_scope_everywhere": "모든 곳"
     }
   },
   "security": {
     "summary": "{{findings}}개",
     "rescanAll": "모두 다시 스캔",
     "ignored_manage": "무시한 항목",
-    "ignored_count": "무시함 · {{n}}",
     "severity_high": "높음",
     "severity_low": "낮음",
     "info_toggle": "참고 신호 · {{items}} (경로 / IP / 내부 호스트 — 오탐 비율 높음)",
@@ -386,7 +385,8 @@
     "scanning_ambient": "스캔 중…",
     "scan_toast_new_findings_other": "높은 위험 항목 {{count}}건 새로 발견",
     "unavailable_title": "스캐너를 사용할 수 없습니다",
-    "unavailable_body": "Spool이 보안 스캔 워커를 시작하지 못했습니다. 복구되기 전까지 발견 항목을 불러올 수 없습니다. 보통 앱을 재시작하면 해결됩니다. 계속되면 개발자 콘솔에서 부팅 오류를 확인하세요."
+    "unavailable_body": "Spool이 보안 스캔 워커를 시작하지 못했습니다. 복구되기 전까지 발견 항목을 불러올 수 없습니다. 보통 앱을 재시작하면 해결됩니다. 계속되면 개발자 콘솔에서 부팅 오류를 확인하세요.",
+    "ignored_label": "무시함"
   },
   "shares": {
     "title": "초안",
