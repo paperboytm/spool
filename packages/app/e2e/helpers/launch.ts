@@ -1,6 +1,6 @@
 import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { mkdtempSync, cpSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, cpSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -20,18 +20,26 @@ export async function launchApp(opts: {
   mockAgent?: 'success' | 'error'
   /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
    * have been copied and before Electron starts. Receives the resolved dirs. */
-  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string }) => void
+  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string; opencodeDir: string }) => void
 } = {}): Promise<AppContext> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-e2e-'))
 
   const claudeDir = join(tmpDir, 'claude', 'projects')
   const codexDir = join(tmpDir, 'codex', 'sessions')
   const geminiCliHome = join(tmpDir, 'gemini-cli-home')
+  // OpenCode has no base fixture, but it MUST be isolated: when
+  // SPOOL_OPENCODE_DIR is unset the source resolver falls back to the
+  // real `~/.local/share/opencode`, so the developer's actual OpenCode
+  // sessions bleed into the test DB — non-deterministically shifting
+  // ordering/counts and stalling first-launch sync (the "30s timeout"
+  // flake that only reproduced on machines with real OpenCode data).
+  const opencodeDir = join(tmpDir, 'opencode')
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'gemini-cli-home'), geminiCliHome, { recursive: true })
+  mkdirSync(opencodeDir, { recursive: true })
 
-  opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome })
+  opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome, opencodeDir })
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
@@ -42,6 +50,7 @@ export async function launchApp(opts: {
     SPOOL_CODEX_DIR: codexDir,
     SPOOL_GEMINI_DIR: geminiCliHome,
     GEMINI_CLI_HOME: geminiCliHome,
+    SPOOL_OPENCODE_DIR: opencodeDir,
     ELECTRON_DISABLE_GPU: '1',
     SPOOL_E2E_TEST: '1',
   }
