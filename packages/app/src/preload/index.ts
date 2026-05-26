@@ -311,6 +311,8 @@ const api = {
 
     listAllowlistEntries: (): Promise<AllowlistEntryRow[]> =>
       ipcRenderer.invoke('security:list-allowlist-entries'),
+    countAllowlistEntries: (): Promise<number> =>
+      ipcRenderer.invoke('security:count-allowlist-entries'),
     removeAllowlistEntry: (args: {
       scope: 'session' | 'global'
       kind: SensitiveKind

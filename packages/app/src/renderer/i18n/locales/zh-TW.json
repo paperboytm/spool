@@ -258,6 +258,8 @@
       "allowlist_remove": "停止忽略",
       "allowlist_confirm": "確認",
       "allowlist_value_unavailable": "原始值已不可用",
+      "allowlist_filter_placeholder": "依值、類型或工作階段篩選…",
+      "allowlist_no_matches": "沒有符合篩選條件的已忽略項目。",
       "actions_title": "操作",
       "rescan_button": "重新掃描全部會話",
       "rescan_sub": "將當前設定重新套用到全部會話。通常只在切換檢測器後才需要。",
@@ -298,6 +300,8 @@
   "security": {
     "summary": "{{findings}} 項",
     "rescanAll": "全部重掃",
+    "ignored_manage": "已忽略項目",
+    "ignored_count": "已忽略 · {{n}}",
     "severity_high": "高風險",
     "severity_low": "低風險",
     "info_toggle": "提示訊號 · {{items}}（路徑 / IP / 內網網域，誤報率高）",

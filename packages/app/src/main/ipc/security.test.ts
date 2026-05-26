@@ -386,6 +386,26 @@ describe('registerSecurityIpc', () => {
       const afterRemove = await invoke<Array<{ scope: string }>>(SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES)
       expect(afterRemove.find((e) => e.scope === 'global')).toBeUndefined()
     })
+
+    it('COUNT_ALLOWLIST_ENTRIES reflects dismiss + remove', async () => {
+      const before = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
+
+      insertFindings(fixture.db, [{
+        sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'hCount',
+        confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active',
+      }])
+      const fid = listFindings(fixture.db, { sessionId: 1 }).find((f) => f.valueHash === 'hCount')!.id
+      await invoke(SECURITY_IPC_CHANNELS.DISMISS_FINDING, { findingId: fid, scope: 'global' })
+
+      const after = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
+      expect(after).toBe(before + 1)
+
+      await invoke(SECURITY_IPC_CHANNELS.REMOVE_ALLOWLIST_ENTRY, {
+        scope: 'global', kind: 'api-key', valueHash: 'hCount',
+      })
+      const afterRemove = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
+      expect(afterRemove).toBe(before)
+    })
   })
 
   describe('change-event forwarder', () => {

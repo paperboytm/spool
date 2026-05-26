@@ -1,32 +1,35 @@
 // "Ignored items" modal (formerly "Manage allowlist").
 //
-// Lists every finding the user told Spool to stop flagging — per-
-// session and global scopes. The allowlist stores only a non-crypto
-// hash of the value for rescan matching (never plaintext), so a hash
-// slice is meaningless to a human. Each row shows the LIVE value,
-// reconstructed at read time from the source message — exactly the
-// plaintext the findings view displays — rendered with the same blur
-// + hover/click reveal so screen-share safety is preserved. The blur
-// is driven by the canonical `securityPageValuesBlurred` pref. Plus
-// where the decision applies + how long ago it was ignored.
+// Lists every finding the user told Spool to stop flagging. The
+// allowlist stores only a non-crypto hash of the value for rescan
+// matching (never plaintext), so a hash slice is meaningless to a
+// human. Each row LEADS with the live value, reconstructed at read
+// time from the source message — exactly the plaintext the findings
+// view displays — with the same blur + hover/click reveal (driven by
+// `securityPageValuesBlurred`). Kind is a muted subtitle; scope + time
+// sit on the right and swap to the "Stop ignoring" action on hover.
 //
-// "Stop ignoring" un-ignores a value (removes the allowlist row) so
-// the next scan surfaces it again. It is NOT destructive — no data is
-// deleted, the historical dismissed finding is untouched — hence a
-// non-trash icon and the click-twice in-place confirm (no modal).
+// Layout borrows the calm list-row pattern from Linear / Raycast:
+// borderless rows, full-row hover highlight, primary value + secondary
+// subtitle on the left, right-aligned meta that yields to an on-hover
+// action — and a macOS-Settings-style search tucked into the header
+// rather than a floating box. One flat recency list, not scope-grouped
+// (two stacked groups bury the smaller once the larger grows); scope is
+// a per-row label and the filter narrows by value / kind / session.
 //
-// Grouping: rows bucket by scope. "Everywhere" (global) renders first
-// because those decisions affect every session; "This session"
-// per-session entries second.
+// "Stop ignoring" un-ignores a value (removes the allowlist row) so the
+// next scan surfaces it again. NOT destructive — click-twice in-place
+// confirm, no trash icon, hidden until hover.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentProps } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { X, EyeOff } from 'lucide-react'
+import { X, Search, ChevronDown } from 'lucide-react'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import type { AllowlistEntryRow } from '@spool-lab/core'
 import { SENSITIVE_KIND_LABEL, type SensitiveKind } from '@spool-lab/redact'
 import { securityApi } from '../../api/security.js'
+import Menu from '../Menu.js'
 import { formatScanAgo } from './page-helpers.js'
 import { truncateValue } from './truncate-value.js'
 
@@ -39,10 +42,9 @@ export default function AllowlistManageModal({ onClose }: Props) {
   const [entries, setEntries] = useState<AllowlistEntryRow[] | null>(null)
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
-  // Mirror the findings view: blur is driven by the canonical
-  // `securityPageValuesBlurred` pref. Each row offers a per-row hover/
-  // click reveal so the user can read one value without flipping the
-  // global pref.
+  const [filter, setFilter] = useState('')
+  const [kindFilter, setKindFilter] = useState<string | null>(null)
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'global' | 'session'>('all')
   const [valuesBlurred, setValuesBlurred] = useState(false)
 
   useEffect(() => {
@@ -60,13 +62,37 @@ export default function AllowlistManageModal({ onClose }: Props) {
   }, [])
   useHotkeys({ Escape: onClose }, { modal: true })
 
-  const buckets = useMemo(() => {
-    if (!entries) return { global: [] as AllowlistEntryRow[], session: [] as AllowlistEntryRow[] }
-    return {
-      global: entries.filter((e) => e.scope === 'global'),
-      session: entries.filter((e) => e.scope === 'session'),
+  const total = entries?.length ?? 0
+
+  // Distinct kinds present in the list, for the type dropdown — scoped
+  // to what's actually ignored, not all 20+ detector kinds.
+  const presentKinds = useMemo(() => {
+    if (!entries) return [] as Array<{ kind: string; label: string }>
+    const seen = new Map<string, string>()
+    for (const e of entries) {
+      if (!seen.has(e.kind)) seen.set(e.kind, SENSITIVE_KIND_LABEL[e.kind as SensitiveKind] ?? e.kind)
     }
+    return [...seen.entries()]
+      .map(([kind, label]) => ({ kind, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
   }, [entries])
+
+  const visible = useMemo(() => {
+    if (!entries) return []
+    const q = filter.trim().toLowerCase()
+    const match = (e: AllowlistEntryRow): boolean => {
+      if (scopeFilter !== 'all' && e.scope !== scopeFilter) return false
+      if (kindFilter !== null && e.kind !== kindFilter) return false
+      if (!q) return true
+      const kindLabel = (SENSITIVE_KIND_LABEL[e.kind as SensitiveKind] ?? e.kind).toLowerCase()
+      return (
+        kindLabel.includes(q) ||
+        (e.value ?? '').toLowerCase().includes(q) ||
+        (e.sessionTitle ?? '').toLowerCase().includes(q)
+      )
+    }
+    return entries.filter(match).slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+  }, [entries, filter, kindFilter, scopeFilter])
 
   async function stopIgnoring(entry: AllowlistEntryRow) {
     const key = rowKey(entry)
@@ -86,8 +112,6 @@ export default function AllowlistManageModal({ onClose }: Props) {
     }
   }
 
-  const total = entries?.length ?? 0
-
   return (
     <div
       data-testid="ignored-manage"
@@ -97,32 +121,69 @@ export default function AllowlistManageModal({ onClose }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[720px] max-w-[calc(100vw-64px)] max-h-[70vh] flex flex-col overflow-hidden border border-warm-border dark:border-dark-border"
+        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[720px] max-w-[calc(100vw-64px)] min-h-[240px] max-h-[70vh] flex flex-col overflow-hidden border border-warm-border dark:border-dark-border"
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
-        <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-warm-border dark:border-dark-border">
-          <div>
-            <h2 className="text-[15px] leading-[20px] font-semibold tracking-[-0.005em] text-warm-text dark:text-dark-text">
-              {t('settings.security.allowlist_modal_title', { defaultValue: 'Ignored items' })}
-            </h2>
-            <p className="text-xs text-warm-muted dark:text-dark-muted mt-0.5">
-              {t('settings.security.allowlist_modal_sub', {
-                defaultValue: 'Things you told Spool to stop flagging. Stop ignoring one and the next scan flags it again.',
-              })}
-            </p>
-          </div>
+        <header className="flex items-center justify-between gap-4 px-5 pt-4 pb-2">
+          <h2 className="min-w-0 text-[15px] leading-[20px] font-semibold tracking-[-0.005em] text-warm-text dark:text-dark-text">
+            {t('settings.security.allowlist_modal_title', { defaultValue: 'Ignored items' })}
+          </h2>
           <button
             type="button"
             aria-label={t('common.close', { defaultValue: 'Close' })}
             data-testid="ignored-close"
             onClick={onClose}
-            className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text p-1 rounded"
+            className="flex-none w-7 h-7 inline-flex items-center justify-center text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface rounded-md -mr-1"
           >
-            <X size={16} strokeWidth={1.5} aria-hidden />
+            <X size={16} strokeWidth={1.75} aria-hidden />
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        {total > 0 && (
+          <div className="flex items-center gap-1 px-5 pb-3">
+            <FilterMenu
+              first
+              testId="ignored-scope-menu"
+              label={
+                scopeFilter === 'all'
+                  ? t('settings.security.allowlist_all_scopes', { defaultValue: 'All scopes' })
+                  : scopeFilter === 'global'
+                    ? t('settings.security.allowlist_scope_everywhere', { defaultValue: 'Everywhere' })
+                    : t('settings.security.allowlist_bucket_session', { defaultValue: 'Per session' })
+              }
+              items={[
+                { label: t('settings.security.allowlist_all_scopes', { defaultValue: 'All scopes' }), active: scopeFilter === 'all', onSelect: () => setScopeFilter('all') },
+                { label: t('settings.security.allowlist_scope_everywhere', { defaultValue: 'Everywhere' }), active: scopeFilter === 'global', onSelect: () => setScopeFilter('global') },
+                { label: t('settings.security.allowlist_bucket_session', { defaultValue: 'Per session' }), active: scopeFilter === 'session', onSelect: () => setScopeFilter('session') },
+              ]}
+            />
+            <FilterMenu
+              testId="ignored-kind-menu"
+              label={
+                kindFilter
+                  ? (SENSITIVE_KIND_LABEL[kindFilter as SensitiveKind] ?? kindFilter)
+                  : t('settings.security.allowlist_all_types', { defaultValue: 'All types' })
+              }
+              items={[
+                { label: t('settings.security.allowlist_all_types', { defaultValue: 'All types' }), active: kindFilter === null, onSelect: () => setKindFilter(null) },
+                ...presentKinds.map((k) => ({ label: k.label, active: kindFilter === k.kind, onSelect: () => setKindFilter(k.kind) })),
+              ]}
+            />
+            <div className="flex items-center gap-1.5 h-6 flex-1 min-w-0 max-w-[220px] ml-1 px-2 rounded bg-warm-surface dark:bg-dark-surface">
+              <Search size={12} strokeWidth={1.75} className="text-warm-faint dark:text-dark-faint shrink-0" aria-hidden />
+              <input
+                type="text"
+                data-testid="ignored-filter"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={t('settings.security.allowlist_filter_placeholder', { defaultValue: 'Filter…' })}
+                className="flex-1 min-w-0 bg-transparent text-[12px] text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-faint outline-none"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-2 pb-2 [scrollbar-gutter:stable]">
           {entries === null ? (
             <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
               {t('common.loading', { defaultValue: 'Loading…' })}
@@ -131,29 +192,23 @@ export default function AllowlistManageModal({ onClose }: Props) {
             <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
               {t('settings.security.allowlist_empty', { defaultValue: 'Nothing ignored yet. Findings you choose to ignore will appear here.' })}
             </p>
+          ) : visible.length === 0 ? (
+            <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
+              {t('settings.security.allowlist_no_matches', { defaultValue: 'No ignored items match your filter.' })}
+            </p>
           ) : (
-            <>
-              {buckets.global.length > 0 && (
-                <Bucket
-                  label={t('settings.security.allowlist_bucket_global', { defaultValue: 'Everywhere' })}
-                  entries={buckets.global}
-                  confirmKey={confirmKey}
-                  busyKey={busyKey}
+            <ul className="list-none m-0 p-0">
+              {visible.map((entry) => (
+                <IgnoredRow
+                  key={rowKey(entry)}
+                  entry={entry}
+                  isConfirming={confirmKey === rowKey(entry)}
+                  isBusy={busyKey === rowKey(entry)}
                   valuesBlurred={valuesBlurred}
                   onStopIgnoring={stopIgnoring}
                 />
-              )}
-              {buckets.session.length > 0 && (
-                <Bucket
-                  label={t('settings.security.allowlist_bucket_session', { defaultValue: 'This session' })}
-                  entries={buckets.session}
-                  confirmKey={confirmKey}
-                  busyKey={busyKey}
-                  valuesBlurred={valuesBlurred}
-                  onStopIgnoring={stopIgnoring}
-                />
-              )}
-            </>
+              ))}
+            </ul>
           )}
         </div>
       </div>
@@ -161,72 +216,111 @@ export default function AllowlistManageModal({ onClose }: Props) {
   )
 }
 
-interface BucketProps {
-  label: string
-  entries: AllowlistEntryRow[]
-  confirmKey: string | null
-  busyKey: string | null
+interface RowProps {
+  entry: AllowlistEntryRow
+  isConfirming: boolean
+  isBusy: boolean
   valuesBlurred: boolean
   onStopIgnoring: (e: AllowlistEntryRow) => void
 }
-function Bucket({ label, entries, confirmKey, busyKey, valuesBlurred, onStopIgnoring }: BucketProps) {
+function IgnoredRow({ entry, isConfirming, isBusy, valuesBlurred, onStopIgnoring }: RowProps) {
   const { t } = useTranslation()
+  const kindLabel = SENSITIVE_KIND_LABEL[entry.kind as SensitiveKind] ?? entry.kind
+  const hasValue = entry.value !== null && entry.value !== undefined
+  const kindOrUnavailable = hasValue
+    ? kindLabel
+    : t('settings.security.allowlist_value_unavailable', { defaultValue: 'original no longer available' })
+  // Kind + scope live together under the value; the right column is a
+  // clean, consistent time stamp (no ragged scope text floating right).
+  const subtitle = `${kindOrUnavailable} · ${scopeLabel(entry, t)}`
+  const time = entry.createdAt ? formatScanAgo(entry.createdAt) : ''
   return (
-    <section className="mb-4 last:mb-0">
-      <div className="text-[11px] font-medium text-warm-muted dark:text-dark-muted mb-1.5">{label}</div>
-      <ul className="list-none m-0 p-0 divide-y divide-warm-border dark:divide-dark-border border border-warm-border dark:border-dark-border rounded-md overflow-hidden bg-warm-surface dark:bg-dark-surface">
-        {entries.map((entry) => {
-          const key = rowKey(entry)
-          const isConfirming = confirmKey === key
-          const isBusy = busyKey === key
-          const kindLabel = SENSITIVE_KIND_LABEL[entry.kind as SensitiveKind] ?? entry.kind
-          return (
-            <li
-              key={key}
-              data-testid="ignored-row"
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-sm text-warm-text dark:text-dark-text shrink-0">{kindLabel}</span>
-                  <IgnoredValue value={entry.value} valuesBlurred={valuesBlurred} />
-                </div>
-                <div className="text-xs text-warm-muted dark:text-dark-muted truncate mt-0.5">
-                  {locationLabel(entry, t)}
-                  {entry.createdAt && (
-                    <span className="text-warm-faint dark:text-dark-faint"> · {formatScanAgo(entry.createdAt)}</span>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                data-testid="stop-ignoring-button"
-                disabled={isBusy}
-                onClick={() => onStopIgnoring(entry)}
-                className={[
-                  'inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs border transition-colors shrink-0',
-                  isConfirming
-                    ? 'border-accent dark:border-accent-dark text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
-                    : 'border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg dark:hover:bg-dark-bg',
-                  isBusy ? 'opacity-60' : '',
-                ].join(' ')}
-              >
-                <EyeOff size={12} strokeWidth={1.5} aria-hidden />
-                {isConfirming
-                  ? t('settings.security.allowlist_confirm', { defaultValue: 'Confirm' })
-                  : t('settings.security.allowlist_remove', { defaultValue: 'Stop ignoring' })}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
+    <li
+      data-testid="ignored-row"
+      className="group flex items-center gap-3 px-3 py-2 rounded-md hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+    >
+      <div className="min-w-0 flex-1">
+        {hasValue
+          ? <IgnoredValue value={entry.value as string} valuesBlurred={valuesBlurred} />
+          : <span className="block text-[13px] text-warm-muted dark:text-dark-muted truncate">{kindLabel}</span>}
+        <div className="text-[11px] text-warm-faint dark:text-dark-faint truncate mt-0.5">{subtitle}</div>
+      </div>
+      <div className="relative flex-none flex items-center justify-end min-w-[100px]">
+        <span
+          className={`whitespace-nowrap text-[11px] tabular-nums text-warm-faint dark:text-dark-faint transition-opacity duration-100 ${
+            isConfirming ? 'opacity-0' : 'group-hover:opacity-0'
+          }`}
+        >
+          {time}
+        </span>
+        <button
+          type="button"
+          data-testid="stop-ignoring-button"
+          disabled={isBusy}
+          onClick={() => onStopIgnoring(entry)}
+          className={[
+            'absolute right-0 inset-y-0 my-auto h-6 inline-flex items-center px-2 rounded-md text-xs whitespace-nowrap transition-opacity duration-100 focus-visible:opacity-100',
+            isConfirming
+              ? 'opacity-100 text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
+              : 'opacity-0 group-hover:opacity-100 text-warm-muted dark:text-dark-muted bg-warm-surface2 dark:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
+            isBusy ? 'opacity-60' : '',
+          ].join(' ')}
+        >
+          {isConfirming
+            ? t('settings.security.allowlist_confirm', { defaultValue: 'Confirm' })
+            : t('settings.security.allowlist_remove', { defaultValue: 'Stop ignoring' })}
+        </button>
+      </div>
+    </li>
   )
 }
 
-function locationLabel(entry: AllowlistEntryRow, t: TFunction): string {
+// Compact filter dropdown used for both the scope and the kind filters
+// in the toolbar — a subtle pill whose label reflects the current
+// selection, opening the shared Menu.
+function FilterMenu({ testId, label, items, first }: {
+  testId: string
+  label: string
+  items: ComponentProps<typeof Menu>['items']
+  first?: boolean
+}) {
+  // Native-select trick: stack every option label in one grid cell so
+  // the trigger is exactly as wide as its WIDEST option — tight (no
+  // dead space) AND stable (never reflows the row when the selection
+  // changes). Only the current label is visible.
+  const labels = items.flatMap((i) => ('label' in i ? [i.label] : []))
+  return (
+    <Menu
+      align="left"
+      testId={testId}
+      trigger={({ open, toggle }) => (
+        <button
+          type="button"
+          data-testid={testId.replace('-menu', '-filter')}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={toggle}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className={`flex-none inline-flex items-center gap-1 h-6 px-1.5 rounded text-[12px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors ${first ? '-ml-1.5' : ''}`}
+        >
+          <span className="grid max-w-[160px] text-left">
+            {labels.map((l) => (
+              <span key={l} className={`col-start-1 row-start-1 truncate ${l === label ? '' : 'invisible'}`}>{l}</span>
+            ))}
+          </span>
+          <ChevronDown size={12} strokeWidth={1.7} aria-hidden className="shrink-0 text-warm-faint dark:text-dark-faint" />
+        </button>
+      )}
+      items={items}
+    />
+  )
+}
+
+// Per-row scope label — replaces the old scope group headers so a flat
+// recency list still tells global from session-scoped at a glance.
+function scopeLabel(entry: AllowlistEntryRow, t: TFunction): string {
   if (entry.scope === 'global') {
-    return t('settings.security.allowlist_in_every_session', { defaultValue: 'in every session' })
+    return t('settings.security.allowlist_scope_everywhere', { defaultValue: 'Everywhere' })
   }
   const title = entry.sessionTitle?.trim()
   return title
@@ -236,25 +330,10 @@ function locationLabel(entry: AllowlistEntryRow, t: TFunction): string {
 
 // Live value cell — mirrors FindingsStrip's value treatment: blurred
 // when `valuesBlurred` (the canonical securityPageValuesBlurred pref),
-// with per-row hover/click reveal. When the value can't be
-// reconstructed (source purged / message gone) the kind label stands
-// alone with a muted hint.
-function IgnoredValue({ value, valuesBlurred }: { value: string | null; valuesBlurred: boolean }) {
-  const { t } = useTranslation()
+// with per-row hover/click reveal.
+function IgnoredValue({ value, valuesBlurred }: { value: string; valuesBlurred: boolean }) {
   const [localReveal, setLocalReveal] = useState(false)
-  if (value === null || value === undefined) {
-    return (
-      <span
-        data-testid="ignored-value"
-        data-value="0"
-        className="text-[11px] italic text-warm-faint dark:text-dark-faint truncate"
-      >
-        {t('settings.security.allowlist_value_unavailable', { defaultValue: 'original no longer available' })}
-      </span>
-    )
-  }
   const revealed = !valuesBlurred || localReveal
-  const display = truncateValue(value)
   return (
     <span
       data-testid="ignored-value"
@@ -263,13 +342,13 @@ function IgnoredValue({ value, valuesBlurred }: { value: string | null; valuesBl
       title={revealed ? value : undefined}
       onMouseEnter={() => valuesBlurred && setLocalReveal(true)}
       onClick={() => valuesBlurred && setLocalReveal(true)}
-      className={`font-mono text-[11px] truncate transition-[filter] duration-100 ${
+      className={`block font-mono text-xs truncate text-warm-text dark:text-dark-text transition-[filter] duration-100 ${
         revealed
-          ? 'text-warm-muted dark:text-dark-muted select-text cursor-text'
-          : 'text-warm-muted dark:text-dark-muted blur-[3.5px] cursor-pointer select-none'
+          ? 'select-text cursor-text'
+          : 'blur-[3.5px] cursor-pointer select-none'
       }`}
     >
-      {display}
+      {truncateValue(value)}
     </span>
   )
 }

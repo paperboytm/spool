@@ -198,20 +198,23 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 ### Library
 Lucide React (`lucide-react`) — consistent stroke weight, MIT licensed. Custom SVGs only when Lucide doesn't fit (mode toggle marks, source-specific glyphs).
 
-### Size scale (only these — no in-betweens)
+### Size scale (by role)
+These are the sizes actually in use, verified against the renderer. Treat them as a working set chosen by role — NOT a hard whitelist. The earlier "only 12/14/16/20, stroke 1.5" rule never held in practice and is retired (see Decisions log 2026-05-26).
+
 | Size | Role | Examples |
 |------|------|----------|
-| 12px | Micro chrome | Status-bar gear, inline meta accessory |
-| 14px | Default UI | Sidebar folder, search trigger, kebab dots, copy/resume action, source badge icons, chevron (open/close) |
-| 16px | Page-level | ⌘K search-overlay icon, settings tab icons, mode toggle marks |
-| 20px | Hero / empty-state | Illustration-tier accents only — rare |
+| 11px | Dense leading badges in tight rows | finding severity AlertTriangle/Info, inline meta accessories |
+| 12–13px | Row & toolbar controls | section chevrons (12), per-row reveal eye · rescan · page meta-row controls (13) |
+| 14px | Default UI | sidebar folder, search trigger, kebab, menu-item icons, source badges |
+| 16px | Page-level | ⌘K overlay icon, settings tab icons, mode toggle marks |
+| 20–22px | Hero / empty-state | illustration-tier accents only — rare |
 
-**No 9 / 10 / 11 / 13 / 15 / 18px icons.** Existing 9px chevrons and 13px kebab dots are drift — align to 12 or 14.
+**Rule of thumb: match the icons already adjacent to yours.** A control sitting next to a 13px icon should be 13px, not 14px "because a table said so" — consistency within a row beats global uniformity.
 
 ### Stroke
-- 1.5px at all sizes for outline icons
-- Filled state allowed only for active toggles (Pin filled = accent)
-- No 1px or 2px strokes — stroke is part of the system identity
+- **1.6–1.8 is the working range** (1.6 most common; 1.7/1.75 for toolbar / row controls). 1.5 is fine for larger page-level icons. Match adjacent icons.
+- Filled state allowed only for active toggles (Pin filled = accent).
+- Avoid ≥2px except tiny check / close glyphs that need the weight.
 
 ### Icon-text gap
 - `gap-2` (8px) — default for icon + label pairs (sidebar row, button with icon, AI answer header)
@@ -280,3 +283,4 @@ In list contexts (Library Home, Project View, search results), trust the surroun
 | 2026-05-08 | Page title type added (20px) | Library Home and Settings need a real h1 — previous scale topped at sidebar wordmark 16px, leaving the home pane labelless. |
 | 2026-05-08 | First-person rule softened from "all metadata" to "where it adds signal" | Literal "You discussed this · Mar 15" prefix on every row was repetitive once a user had hundreds of sessions. Library context already conveys ownership; reserve first-person for empty states, detail headers, and confirmations. |
 | 2026-05-08 | Source badge list trimmed to active agents only | Twitter / GitHub / YouTube / ChatGPT were carryover from the connector era. Spool ships only Claude Code / Codex CLI / Gemini today; new sources arrive via the daemon and get a row when shipped, not preemptively. |
+| 2026-05-26 | Retire the "icons only 12/14/16/20, stroke 1.5" rule — describe reality instead | The 2026-05-08 lock never held: the renderer actually uses 11/12/13/14 (13 & 14 dominant) at strokes 1.6–1.8 (1.6 most common, 1.5 a minority). The aspirational whitelist was actively misleading new work into picking sizes that clashed with adjacent icons. Replaced with a role-based working set + a "match adjacent icons" rule. Sizes/strokes are now chosen for local consistency, not global uniformity. |

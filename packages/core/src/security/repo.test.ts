@@ -24,6 +24,7 @@ import {
   removeAllowlistSession,
   removeAllowlistGlobal,
   listAllowlistEntries,
+  countAllowlistEntries,
   dismissFinding,
   dismissFindings,
   undismissFinding,
@@ -462,6 +463,20 @@ describe('repo: allowlist', () => {
     const snap = getAllowlists(db, 1)
     expect(snap.session.size).toBe(0)
     expect(snap.global.size).toBe(0)
+  })
+
+  it('countAllowlistEntries is 0 when empty, sums both scopes, reflects adds/removes', () => {
+    expect(countAllowlistEntries(db)).toBe(0)
+    addAllowlistSession(db, 1, 'email', 'hX')
+    addAllowlistSession(db, 2, 'email', 'hY')
+    addAllowlistGlobal(db, 'api-key', 'gK')
+    expect(countAllowlistEntries(db)).toBe(3)
+    // INSERT OR IGNORE — duplicates don't inflate the count.
+    addAllowlistSession(db, 1, 'email', 'hX')
+    expect(countAllowlistEntries(db)).toBe(3)
+    removeAllowlistGlobal(db, 'api-key', 'gK')
+    removeAllowlistSession(db, 1, 'email', 'hX')
+    expect(countAllowlistEntries(db)).toBe(1)
   })
 })
 

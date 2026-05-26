@@ -258,6 +258,8 @@
       "allowlist_remove": "무시 해제",
       "allowlist_confirm": "확인",
       "allowlist_value_unavailable": "원본을 더 이상 사용할 수 없음",
+      "allowlist_filter_placeholder": "값, 종류 또는 세션으로 필터링…",
+      "allowlist_no_matches": "필터와 일치하는 무시 항목이 없습니다.",
       "actions_title": "작업",
       "rescan_button": "모든 세션 재스캔",
       "rescan_sub": "현재 프로필을 모든 세션에 다시 적용합니다. 보통 탐지기를 전환한 후에만 필요합니다.",
@@ -298,6 +300,8 @@
   "security": {
     "summary": "{{findings}}개",
     "rescanAll": "모두 다시 스캔",
+    "ignored_manage": "무시한 항목",
+    "ignored_count": "무시함 · {{n}}",
     "severity_high": "높음",
     "severity_low": "낮음",
     "info_toggle": "참고 신호 · {{items}} (경로 / IP / 내부 호스트 — 오탐 비율 높음)",

@@ -265,6 +265,8 @@
       "allowlist_remove": "Arrêter d'ignorer",
       "allowlist_confirm": "Confirmer",
       "allowlist_value_unavailable": "original plus disponible",
+      "allowlist_filter_placeholder": "Filtrer par valeur, type ou session…",
+      "allowlist_no_matches": "Aucun élément ignoré ne correspond au filtre.",
       "actions_title": "Actions",
       "rescan_button": "Re-scanner toutes les sessions",
       "rescan_sub": "Réapplique le profil actif à chaque session. Généralement nécessaire seulement après avoir activé/désactivé un détecteur.",
@@ -305,6 +307,8 @@
   "security": {
     "summary": "{{findings}} actifs",
     "rescanAll": "Tout rescanner",
+    "ignored_manage": "Éléments ignorés",
+    "ignored_count": "Ignorés · {{n}}",
     "severity_high": "Élevé",
     "severity_low": "Faible",
     "info_toggle": "Signaux informationnels · {{items}} (chemins, IPs, hôtes internes — taux élevé de faux positifs)",

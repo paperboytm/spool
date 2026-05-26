@@ -265,6 +265,8 @@
       "allowlist_remove": "Nicht mehr ignorieren",
       "allowlist_confirm": "Bestätigen",
       "allowlist_value_unavailable": "Original nicht mehr verfügbar",
+      "allowlist_filter_placeholder": "Nach Wert, Art oder Sitzung filtern…",
+      "allowlist_no_matches": "Keine ignorierten Einträge entsprechen dem Filter.",
       "actions_title": "Aktionen",
       "rescan_button": "Alle Sitzungen neu scannen",
       "rescan_sub": "Wendet das aktive Profil erneut auf jede Sitzung an. Normalerweise nur nach dem Umschalten eines Detektors nötig.",
@@ -305,6 +307,8 @@
   "security": {
     "summary": "{{findings}} aktiv",
     "rescanAll": "Alle neu prüfen",
+    "ignored_manage": "Ignorierte Einträge",
+    "ignored_count": "Ignoriert · {{n}}",
     "severity_high": "Hoch",
     "severity_low": "Niedrig",
     "info_toggle": "Hinweissignale · {{items}} (Pfade, IPs, interne Hosts — hohe Falsch-positiv-Rate)",

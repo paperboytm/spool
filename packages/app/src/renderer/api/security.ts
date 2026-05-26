@@ -77,6 +77,8 @@ export const securityApi = {
 
   listAllowlistEntries: (): Promise<AllowlistEntryRow[]> =>
     window.spool.security.listAllowlistEntries(),
+  countAllowlistEntries: (): Promise<number> =>
+    window.spool.security.countAllowlistEntries(),
   removeAllowlistEntry: (args: {
     scope: 'session' | 'global'
     kind: SensitiveKind

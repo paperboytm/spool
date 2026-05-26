@@ -42,6 +42,7 @@ export {
   removeAllowlistSession,
   removeAllowlistGlobal,
   listAllowlistEntries,
+  countAllowlistEntries,
   dismissFinding,
   dismissFindings,
   undismissFinding,

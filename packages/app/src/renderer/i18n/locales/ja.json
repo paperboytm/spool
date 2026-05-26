@@ -258,6 +258,8 @@
       "allowlist_remove": "無視を解除",
       "allowlist_confirm": "確認",
       "allowlist_value_unavailable": "元の値は利用できません",
+      "allowlist_filter_placeholder": "値・種類・セッションで絞り込み…",
+      "allowlist_no_matches": "フィルターに一致する無視項目はありません。",
       "actions_title": "アクション",
       "rescan_button": "全セッションを再スキャン",
       "rescan_sub": "現在のプロファイルを全セッションに再適用します。通常は検出器を切り替えた後にのみ必要です。",
@@ -298,6 +300,8 @@
   "security": {
     "summary": "{{findings}} 件",
     "rescanAll": "すべて再スキャン",
+    "ignored_manage": "無視した項目",
+    "ignored_count": "無視 · {{n}}",
     "severity_high": "高",
     "severity_low": "低",
     "info_toggle": "参考信号 · {{items}}（パス / IP / 内部ホスト — 誤検出が多め）",

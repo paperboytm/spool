@@ -763,6 +763,19 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
   ]
 }
 
+/** Total allowlist rows across both scopes. A cheap header badge —
+ *  two `SELECT COUNT(*)` summed, no per-row value reconstruction.
+ *  Use this instead of `listAllowlistEntries().length` for counts. */
+export function countAllowlistEntries(db: Database.Database): number {
+  const session = db.prepare(
+    'SELECT COUNT(*) AS c FROM allowlist_session',
+  ).get() as { c: number }
+  const global = db.prepare(
+    'SELECT COUNT(*) AS c FROM allowlist_global',
+  ).get() as { c: number }
+  return session.c + global.c
+}
+
 // ─── Mutations called from IPC dismiss handlers ───────────────────
 
 /** Flip a finding to 'dismissed' and, depending on scope, write the

@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, CircleSlash, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import type {
@@ -37,6 +37,7 @@ import { securityApi } from '../api/security.js'
 import { securityFeatureEnabled } from '../featureFlags.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
+import AllowlistManageModal from './security/AllowlistManageModal.js'
 import DetectorsChip from './security/DetectorsChip.js'
 import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
 import { truncateValue } from './security/truncate-value.js'
@@ -141,6 +142,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   const [showInfo, setShowInfo] = useState(false)
   const [bulkPurgeKind, setBulkPurgeKind] = useState<string | null>(null)
   const [bulkPurgeSamples, setBulkPurgeSamples] = useState<Array<{ value: string; sessionTitle: string }>>([])
+  // "Ignored items" — a shallow entry into the same modal Settings →
+  // Security exposes. Count is fetched on mount + folded into the
+  // findings-changed refresh path (ignoring a finding writes an
+  // allowlist row → count moves), so the badge stays live without a
+  // dedicated subscription. Hidden when 0 to keep the meta row calm.
+  const [ignoredOpen, setIgnoredOpen] = useState(false)
+  const [ignoredCount, setIgnoredCount] = useState(0)
   // `securityPageValuesBlurred` is the single source of truth for
   // page-level value visibility. The Eye/EyeOff button writes
   // directly to the pref via setPrefs (no ephemeral override), so the
@@ -192,7 +200,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
 
   const refresh = useCallback(async () => {
     try {
-      const [r, sPage, sTotal, st, lastScan] = await Promise.all([
+      const [r, sPage, sTotal, st, lastScan, ignored] = await Promise.all([
         securityApi.riskByCategory(),
         securityApi.listSessionsWithFindingsPage({
           ...filter,
@@ -201,8 +209,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
         securityApi.countSessionsWithFindings(filter),
         securityApi.getScanStatus(),
         securityApi.lastScanCompletedAt(),
+        securityApi.countAllowlistEntries(),
       ])
       setRisk(r)
+      setIgnoredCount(ignored)
       setSessions(sPage.rows as Sess[])
       setSessionsHasMore(sPage.hasMore)
       setSessionsTotal(sTotal)
@@ -504,8 +514,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
     <div data-testid="security-page" className="flex flex-col flex-1 min-h-0">
       {/* Meta row — matches SharesPage's pattern (px-6 pt-1.5 pb-3) so
        *  the distance from the sidebar reads identical across pages. */}
-      <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
-        <span className="font-mono text-[11px] text-warm-faint dark:text-dark-muted tabular-nums">
+      <div className="flex-none px-6 pt-1.5 pb-3">
+        {/* pr-4 mirrors the SessionCards' px-4 content inset (+ the
+         *  scroll area's stable 8px gutter below) so the right-aligned
+         *  Ignored entry lines up with the cards' right-edge controls
+         *  instead of overhanging them. */}
+        <div className="max-w-[720px] pr-3 flex items-center gap-3">
+        <span className="font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
           {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
           {infoCount > 0 && (
             <span className="opacity-70">
@@ -567,6 +582,9 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             </>
           )}
         </span>
+        {/* Rescan stays paired with the "scanned X ago" stamp (reads as
+         *  "last scanned · refresh"); only the Ignored entry floats to
+         *  the far right, aligned to the list's right edge. */}
         <button
           type="button"
           data-testid="security-rescan-all"
@@ -587,9 +605,25 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             aria-hidden
           />
         </button>
+        {ignoredCount > 0 && (
+          <button
+            type="button"
+            data-testid="security-ignored-open"
+            onClick={() => setIgnoredOpen(true)}
+            title={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
+            aria-label={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
+            className="ml-auto flex-none inline-flex items-center gap-1.5 h-5 px-1.5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+          >
+            <CircleSlash size={13} strokeWidth={1.75} aria-hidden />
+            <span className="font-mono text-[11px]">
+              {t('security.ignored_label', { defaultValue: 'Ignored' })}
+            </span>
+          </button>
+        )}
+        </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]">
         <div className="max-w-[720px]">
           {/* ScanBanner + ScanResultBanner sit OUTSIDE the empty /
            *  findings / loading branch below so a manual rescan that
@@ -793,6 +827,17 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
         onConfirm={() => { void confirmBulkPurgeKind() }}
         onCancel={() => { setBulkPurgeKind(null); setBulkPurgeSamples([]) }}
       />
+
+      {ignoredOpen && (
+        <AllowlistManageModal
+          onClose={() => {
+            setIgnoredOpen(false)
+            // Un-ignoring inside the modal removes allowlist rows; pull
+            // a fresh count so the header badge reflects it immediately.
+            void securityApi.countAllowlistEntries().then(setIgnoredCount).catch(() => {})
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1455,11 +1500,16 @@ function FindingItem({
     // soft undo, not a modal). Sonner's 4s default is fine for one-
     // hand workflows; users mass-dismissing a kind can mash-undo as
     // toasts stack.
+    const kindLabel = SENSITIVE_KIND_LABEL[finding.kind as SensitiveKind] ?? finding.kind
     toast(
       scope === 'global'
-        ? t('security.dismissed_global_toast', { kind: finding.kind, defaultValue: 'Dismissed {{kind}} everywhere' })
-        : t('security.dismissed_session_toast', { kind: finding.kind, defaultValue: 'Dismissed {{kind}}' }),
+        ? t('security.dismissed_global_toast', { kind: kindLabel, defaultValue: 'Ignored {{kind}} everywhere' })
+        : t('security.dismissed_session_toast', { kind: kindLabel, defaultValue: 'Ignored {{kind}}' }),
       {
+        // Show the value so the confirmation is recognisable, not just
+        // "Ignored Env-var secret". Truncated; reconstructed plaintext,
+        // same as the row that was just acted on.
+        ...(value ? { description: truncateValue(value) } : {}),
         action: {
           label: t('common.undo', { defaultValue: 'Undo' }),
           onClick: () => {
