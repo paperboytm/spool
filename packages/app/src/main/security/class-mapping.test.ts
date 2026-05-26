@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import type { SensitiveMatch } from '@spool-lab/redact'
-import { mapPfMatch, mapPfMatches, type PfRawMatch } from './class-mapping.js'
+import {
+  mapPfMatch,
+  mapPfMatches,
+  setUnknownLabelSink,
+  type PfRawMatch,
+} from './class-mapping.js'
 
 const regex = (kind: SensitiveMatch['kind'], start: number, end: number): SensitiveMatch => ({
   kind, value: '', start, end, confidence: 0.95, provider: 'regex',
@@ -99,8 +104,67 @@ describe('class mapping — suppression rules', () => {
   })
 
   it('unknown labels are dropped without throwing', () => {
-    const pf: PfRawMatch = { class: 'wat-is-this', value: 'x', start: 0, end: 1, score: 0.8 }
+    // score ≥ 0.85 so it clears the confidence floor and actually
+    // reaches the unknown-label branch in mapClass().
+    const pf: PfRawMatch = { class: 'wat-is-this', value: 'x', start: 0, end: 1, score: 0.99 }
     expect(mapPfMatch(pf, { regexMatches: [], fullText: 'x' })).toBeNull()
+  })
+})
+
+describe('class mapping — unknown-label observability', () => {
+  afterEach(() => {
+    // Restore the default no-op sink between cases.
+    setUnknownLabelSink(() => {})
+  })
+
+  it('invokes the sink with the unknown label (still drops the match)', () => {
+    const sink = vi.fn()
+    setUnknownLabelSink(sink)
+    const pf: PfRawMatch = { class: 'new_model_class', value: 'secret-ish', start: 0, end: 10, score: 0.99 }
+    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'secret-ish' })).toBeNull()
+    expect(sink).toHaveBeenCalledTimes(1)
+    expect(sink).toHaveBeenCalledWith('new_model_class')
+  })
+
+  it('passes only the label, never the matched value', () => {
+    const sink = vi.fn()
+    setUnknownLabelSink(sink)
+    const pf: PfRawMatch = { class: 'mystery', value: 'sensitive-user-content', start: 0, end: 22, score: 0.9 }
+    mapPfMatch(pf, { regexMatches: [], fullText: 'sensitive-user-content' })
+    expect(sink).toHaveBeenCalledWith('mystery')
+    expect(sink.mock.calls[0]).not.toContain('sensitive-user-content')
+  })
+
+  it('does NOT fire for known or confidence-floored classes', () => {
+    const sink = vi.fn()
+    setUnknownLabelSink(sink)
+    // known class
+    mapPfMatch({ class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.99 }, { regexMatches: [], fullText: 'a@b.c' })
+    // unknown but below the 0.85 floor — dropped before mapClass()
+    mapPfMatch({ class: 'mystery', value: 'x', start: 0, end: 1, score: 0.5 }, { regexMatches: [], fullText: 'x' })
+    expect(sink).not.toHaveBeenCalled()
+  })
+
+  it('setUnknownLabelSink returns the previous sink for restoration', () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const restoredToFirst = setUnknownLabelSink(first)
+    const prev = setUnknownLabelSink(second)
+    expect(prev).toBe(first)
+    void restoredToFirst
+  })
+
+  it('fires once per unknown match in a bulk map', () => {
+    const sink = vi.fn()
+    setUnknownLabelSink(sink)
+    const pf: PfRawMatch[] = [
+      { class: 'mystery_a', value: 'p', start: 0, end: 1, score: 0.99 },
+      { class: 'email', value: 'a@b.c', start: 2, end: 7, score: 0.99 },
+      { class: 'mystery_b', value: 'q', start: 8, end: 9, score: 0.99 },
+    ]
+    const out = mapPfMatches(pf, { regexMatches: [], fullText: 'p a@b.c q' })
+    expect(out.map((m) => m.kind)).toEqual(['email'])
+    expect(sink.mock.calls.map((c) => c[0])).toEqual(['mystery_a', 'mystery_b'])
   })
 })
 

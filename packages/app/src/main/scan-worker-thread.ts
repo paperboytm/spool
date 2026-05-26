@@ -37,7 +37,7 @@ import {
 } from '@spool-lab/core'
 import { regexProvider, type RedactProvider, type SensitiveMatch } from '@spool-lab/redact'
 import { loadSecurityPreferences } from './securityPreferences.js'
-import { mapPfMatches, type PfRawMatch } from './security/class-mapping.js'
+import { mapPfMatches, setUnknownLabelSink, type PfRawMatch } from './security/class-mapping.js'
 import { detectWithRegex } from '@spool-lab/redact'
 import { PF_PROFILE_VERSION } from './security/model-paths.js'
 
@@ -107,6 +107,20 @@ void (async () => {
       ? { serviceName: 'spool-app-scan-worker', env: 'dev' }
       : { serviceName: 'spool-app-scan-worker', env: 'prod', logsDir: join(SPOOL_DIR, 'logs') },
   )
+
+  // Make unknown PF labels observable in prod, not just the dev
+  // console. A label that isn't in class-mapping's switch means a
+  // server-side model bump emitted a class before the mapping table
+  // was updated — those findings get dropped, and without this they
+  // vanish with zero diagnostic. Emit a span (label as attribute, no
+  // value) through the worker's own OTel runtime; the prod file
+  // exporter persists it to ~/.spool/logs. Fire-and-forget so the scan
+  // hot path never awaits the export.
+  setUnknownLabelSink((label) => {
+    void runEff(
+      Effect.void.pipe(Effect.withSpan('pf.unknown_label', { attributes: { label } })),
+    ).catch(() => {})
+  })
 
   // Main process already migrated the file before spawning this
   // thread; skipping here avoids a race with sync-worker (whose

@@ -43,6 +43,25 @@ export interface PfRawMatch {
   score: number
 }
 
+/** Sink invoked once per unknown PF label so the drop is observable in
+ *  prod (not just the dev console). The label is passed deliberately
+ *  WITHOUT the matched value — the model swap we're diagnosing is a
+ *  class-name regression, and the value is user content we don't want
+ *  in logs. The call site (scan-worker / pf-provider) wires this to the
+ *  OTel pipeline; default is a no-op so the module stays side-effect
+ *  free for unit tests and any caller that doesn't opt in. */
+export type UnknownLabelSink = (label: string) => void
+
+let unknownLabelSink: UnknownLabelSink = () => {}
+
+/** Install the observability sink for unknown PF labels. Returns the
+ *  previous sink so tests can restore it. */
+export function setUnknownLabelSink(sink: UnknownLabelSink): UnknownLabelSink {
+  const prev = unknownLabelSink
+  unknownLabelSink = sink
+  return prev
+}
+
 export interface MappingContext {
   /** Matches already produced by the regex provider for the same
    *  text. Used by url/secret rules — pf only emits when regex also
@@ -138,8 +157,12 @@ function mapClass(pf: PfRawMatch, ctx: MappingContext): SensitiveKind | null {
       return null
 
     default:
-      // Unknown label — log once in dev, drop in prod. Only fires on
-      // model swaps that forgot to update this switch.
+      // Unknown label — drop, but make it observable. Only fires on
+      // model swaps that emit a class before this switch is updated;
+      // in prod those findings vanish silently otherwise, so route the
+      // label through the observability sink (see UnknownLabelSink) and
+      // keep the dev console.warn for local feedback.
+      unknownLabelSink(pf.class)
       if (process.env['NODE_ENV'] !== 'production') {
         console.warn('[pf class-mapping] unknown label:', pf.class)
       }
