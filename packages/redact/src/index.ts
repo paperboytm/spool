@@ -33,7 +33,6 @@ export type { RedactProvider } from './providers.js'
 export { luhnOk, shannon, hashValueForRedactExclude } from './validators.js'
 
 export { maskValueByKind, detectVendor } from './mask.js'
-export { previewValueByKind } from './preview.js'
 
 export { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from './severity.js'
 export type { Severity } from './severity.js'

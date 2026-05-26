@@ -14,7 +14,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 14
+export const LATEST_SCHEMA_VERSION = 13
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -596,36 +596,6 @@ export function runMigrations(db: Database.Database): void {
     })()
   }
 
-  if (version < 14) {
-    // v14: recognition metadata for ignored findings. The allowlist
-    // tables store only a non-crypto hash of the value (for rescan
-    // matching) — unreadable to a human reviewing past decisions.
-    // Two forward-only, nullable columns close that gap WITHOUT
-    // storing plaintext:
-    //   • preview — a lossy, non-reversible recognition hint
-    //     (`Stripe ••a39f`, `m••@gmail.com`) computed at dismiss time
-    //     from the live message text. See @spool-lab/redact
-    //     `previewValueByKind`. Retains at most a vendor name + last-4
-    //     / email domain; the secret body is dropped, so it can't be
-    //     expanded back to the value.
-    //   • reason — an optional, user-supplied enum ("not-secret",
-    //     "test-credential", "low-risk", "acknowledged") explaining
-    //     why the finding was ignored.
-    // Both nullable so the millions of pre-v14 allowlist rows (and any
-    // dismiss path that can't reconstruct the value) render fine on a
-    // kind-only fallback. Wrapped in a transaction for the same
-    // half-migration safety as v12.
-    db.transaction(() => {
-      db.exec(`
-        ALTER TABLE allowlist_session ADD COLUMN preview TEXT;
-        ALTER TABLE allowlist_session ADD COLUMN reason  TEXT;
-        ALTER TABLE allowlist_global  ADD COLUMN preview TEXT;
-        ALTER TABLE allowlist_global  ADD COLUMN reason  TEXT;
-      `)
-      db.pragma('user_version = 14')
-    })()
-  }
-
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
@@ -671,17 +641,6 @@ function ensureSchemaSanity(db: Database.Database): void {
   ensureCol('sessions', 'title', 'TEXT')
   ensureCol('sessions', 'title_source', `TEXT NOT NULL DEFAULT 'derived'`)
   ensureCol('sessions', 'message_count', 'INTEGER NOT NULL DEFAULT 0')
-  // v14 recognition metadata. Same repair contract as above: a shared dev DB
-  // whose user_version reached 14 via another branch's migration — or a
-  // half-finished upgrade — can sit at 14 with the allowlist columns missing,
-  // which makes the dismiss/ignore path throw on INSERT. tableExists guards a
-  // pre-v12 DB where the allowlist tables don't exist yet.
-  for (const t of ['allowlist_session', 'allowlist_global']) {
-    if (tableExists(db, t)) {
-      ensureCol(t, 'preview', 'TEXT')
-      ensureCol(t, 'reason', 'TEXT')
-    }
-  }
 }
 
 /**

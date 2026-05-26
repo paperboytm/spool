@@ -33,7 +33,6 @@ import {
   type PurgeResult,
   type BackupFileInfo,
   type DeleteBackupsResult,
-  type DismissReason,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 import type Database from 'better-sqlite3'
@@ -210,8 +209,8 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
 
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DISMISS_FINDING,
-    (_e, args: { findingId: number; scope: 'session' | 'global'; reason?: DismissReason | null }) => {
-      const sessionId = dismissFinding(db, args.findingId, args.scope, true, args.reason ?? null)
+    (_e, args: { findingId: number; scope: 'session' | 'global' }) => {
+      const sessionId = dismissFinding(db, args.findingId, args.scope, true)
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
           type: 'state-changed', sessionId, findingId: args.findingId, state: 'dismissed',
@@ -222,8 +221,8 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DISMISS_FINDINGS,
-    (_e, args: { findingIds: number[]; scope: 'session' | 'global'; reason?: DismissReason | null }) => {
-      const sessionIds = dismissFindings(db, args.findingIds, args.scope, args.reason ?? null)
+    (_e, args: { findingIds: number[]; scope: 'session' | 'global' }) => {
+      const sessionIds = dismissFindings(db, args.findingIds, args.scope)
       for (const sessionId of sessionIds) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
           type: 'state-changed', sessionId, state: 'dismissed',

@@ -18,8 +18,8 @@ function seedProjectAndSession(db: Database.Database, sessionUuid: string): numb
 }
 
 describe('migration v12 — security scan schema', () => {
-  it('LATEST_SCHEMA_VERSION reflects the latest migration', () => {
-    expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(12)
+  it('LATEST_SCHEMA_VERSION is 13', () => {
+    expect(LATEST_SCHEMA_VERSION).toBe(13)
   })
 
   it('adds 5 scan_* columns to sessions (profile / completed_at / finding_count / high_count / purged_count)', () => {
@@ -83,7 +83,7 @@ describe('migration v12 — security scan schema', () => {
     expect((db.prepare('SELECT COUNT(*) AS c FROM findings').get() as { c: number }).c).toBe(0)
   })
 
-  it('creates allowlist_session and allowlist_global tables', () => {
+  it('creates allowlist_session and allowlist_global tables with NO preview/reason columns', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     expect(
@@ -92,6 +92,14 @@ describe('migration v12 — security scan schema', () => {
     expect(
       db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get('allowlist_global'),
     ).toBeDefined()
+    // The stored-preview approach was abandoned in favour of live
+    // reconstruction — neither table carries a preview or reason column.
+    for (const table of ['allowlist_session', 'allowlist_global']) {
+      const names = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>)
+        .map(c => c.name)
+      expect(names, `${table} should NOT have a preview column`).not.toContain('preview')
+      expect(names, `${table} should NOT have a reason column`).not.toContain('reason')
+    }
   })
 
   it('user_version reaches the latest schema after a clean migration', () => {
@@ -138,62 +146,5 @@ describe('migration v12 — security scan schema', () => {
     const names = new Set(cols.map(c => c.name))
     expect(names.has('scan_profile'), 'scan_profile should have been rolled back').toBe(false)
     expect(names.has('scan_purged_count'), 'scan_purged_count should have been rolled back').toBe(false)
-  })
-
-  it('v14 adds preview + reason columns to both allowlist tables', () => {
-    const db = new Database(':memory:')
-    runMigrations(db)
-    for (const table of ['allowlist_session', 'allowlist_global']) {
-      const names = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>)
-        .map(c => c.name)
-      expect(names, `${table} should have a preview column`).toContain('preview')
-      expect(names, `${table} should have a reason column`).toContain('reason')
-    }
-  })
-
-  it('v14 upgrade from v13 is additive — existing allowlist rows survive with null preview', () => {
-    const db = new Database(':memory:')
-    runMigrations(db) // full schema
-    // Simulate a v13 DB: drop the new columns by recreating the row
-    // shape pre-v14 is overkill; instead insert a row, then assert the
-    // upgrade path leaves prior data intact with null recognition meta.
-    db.prepare(
-      `INSERT INTO allowlist_global (kind, value_hash) VALUES ('email', 'legacy-hash')`,
-    ).run()
-    const row = db.prepare(
-      `SELECT preview, reason FROM allowlist_global WHERE value_hash = 'legacy-hash'`,
-    ).get() as { preview: string | null; reason: string | null }
-    expect(row.preview).toBeNull()
-    expect(row.reason).toBeNull()
-  })
-
-  it('self-heals a DB stamped at v14 but missing the allowlist columns (shared-DB version collision)', () => {
-    const db = new Database(':memory:')
-    runMigrations(db) // full v14 schema, columns present
-    // Reproduce the field bug: a shared dev DB whose user_version reached 14
-    // via another branch's migration never ran THIS v14 block, so it sits at
-    // 14 with the allowlist columns absent. The version gate then skips v14
-    // forever — only ensureSchemaSanity can repair it.
-    for (const table of ['allowlist_session', 'allowlist_global']) {
-      db.exec(`ALTER TABLE ${table} DROP COLUMN preview`)
-      db.exec(`ALTER TABLE ${table} DROP COLUMN reason`)
-    }
-    expect(userVersion(db)).toBe(LATEST_SCHEMA_VERSION) // still 14 → v14 block won't re-run
-
-    runMigrations(db)
-
-    for (const table of ['allowlist_session', 'allowlist_global']) {
-      const names = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>)
-        .map(c => c.name)
-      expect(names, `${table} should regain preview`).toContain('preview')
-      expect(names, `${table} should regain reason`).toContain('reason')
-    }
-    // And the dismiss/ignore INSERT path that threw "no column named preview"
-    // now works.
-    expect(() =>
-      db.prepare(
-        `INSERT INTO allowlist_global (kind, value_hash, preview, reason) VALUES ('api-key', 'h', 'Stripe ••a39f', 'test-credential')`,
-      ).run(),
-    ).not.toThrow()
   })
 })

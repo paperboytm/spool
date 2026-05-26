@@ -7,7 +7,6 @@ import type {
   FindingRow, SessionWithFindingCounts, RiskByCategoryRow,
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
   AllowlistEntryRow,
-  DismissReason,
   Page,
   BackupFileInfo, DeleteBackupsResult,
 } from '@spool-lab/core'
@@ -275,10 +274,10 @@ const api = {
       ipcRenderer.invoke('security:get-finding-values', ids),
     getScanStatus: (): Promise<ScanStatus> =>
       ipcRenderer.invoke('security:get-scan-status'),
-    dismissFinding: (findingId: number, scope: 'session' | 'global', reason?: DismissReason | null): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('security:dismiss-finding', { findingId, scope, reason }),
-    dismissFindings: (findingIds: number[], scope: 'session' | 'global', reason?: DismissReason | null): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('security:dismiss-findings', { findingIds, scope, reason }),
+    dismissFinding: (findingId: number, scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:dismiss-finding', { findingId, scope }),
+    dismissFindings: (findingIds: number[], scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:dismiss-findings', { findingIds, scope }),
     undismissFinding: (findingId: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:undismiss-finding', { findingId }),
     purgeFinding: (findingId: number): Promise<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }> =>

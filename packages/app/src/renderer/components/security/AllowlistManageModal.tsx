@@ -3,10 +3,12 @@
 // Lists every finding the user told Spool to stop flagging — per-
 // session and global scopes. The allowlist stores only a non-crypto
 // hash of the value for rescan matching (never plaintext), so a hash
-// slice is meaningless to a human. This surface reframes each row for
-// RECOGNITION: kind label + a lossy, non-reversible preview
-// (`Stripe ••a39f`, computed at ignore time) + where it applies +
-// how long ago it was ignored.
+// slice is meaningless to a human. Each row shows the LIVE value,
+// reconstructed at read time from the source message — exactly the
+// plaintext the findings view displays — rendered with the same blur
+// + hover/click reveal so screen-share safety is preserved. The blur
+// is driven by the canonical `securityPageValuesBlurred` pref. Plus
+// where the decision applies + how long ago it was ignored.
 //
 // "Stop ignoring" un-ignores a value (removes the allowlist row) so
 // the next scan surfaces it again. It is NOT destructive — no data is
@@ -22,10 +24,11 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { X, EyeOff } from 'lucide-react'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
-import type { AllowlistEntryRow, DismissReason } from '@spool-lab/core'
+import type { AllowlistEntryRow } from '@spool-lab/core'
 import { SENSITIVE_KIND_LABEL, type SensitiveKind } from '@spool-lab/redact'
 import { securityApi } from '../../api/security.js'
 import { formatScanAgo } from './page-helpers.js'
+import { truncateValue } from './truncate-value.js'
 
 interface Props {
   onClose: () => void
@@ -36,9 +39,24 @@ export default function AllowlistManageModal({ onClose }: Props) {
   const [entries, setEntries] = useState<AllowlistEntryRow[] | null>(null)
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  // Mirror the findings view: blur is driven by the canonical
+  // `securityPageValuesBlurred` pref. Each row offers a per-row hover/
+  // click reveal so the user can read one value without flipping the
+  // global pref.
+  const [valuesBlurred, setValuesBlurred] = useState(false)
 
   useEffect(() => {
     void securityApi.listAllowlistEntries().then(setEntries).catch(() => setEntries([]))
+  }, [])
+  useEffect(() => {
+    let cancelled = false
+    void securityApi.getPrefs().then((p) => {
+      if (!cancelled) setValuesBlurred(p.securityPageValuesBlurred === true)
+    }).catch(() => { /* default-reveal */ })
+    const off = securityApi.onPrefsChanged((p) => {
+      setValuesBlurred(p.securityPageValuesBlurred === true)
+    })
+    return () => { cancelled = true; off() }
   }, [])
   useHotkeys({ Escape: onClose }, { modal: true })
 
@@ -121,6 +139,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
                   entries={buckets.global}
                   confirmKey={confirmKey}
                   busyKey={busyKey}
+                  valuesBlurred={valuesBlurred}
                   onStopIgnoring={stopIgnoring}
                 />
               )}
@@ -130,6 +149,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
                   entries={buckets.session}
                   confirmKey={confirmKey}
                   busyKey={busyKey}
+                  valuesBlurred={valuesBlurred}
                   onStopIgnoring={stopIgnoring}
                 />
               )}
@@ -146,9 +166,10 @@ interface BucketProps {
   entries: AllowlistEntryRow[]
   confirmKey: string | null
   busyKey: string | null
+  valuesBlurred: boolean
   onStopIgnoring: (e: AllowlistEntryRow) => void
 }
-function Bucket({ label, entries, confirmKey, busyKey, onStopIgnoring }: BucketProps) {
+function Bucket({ label, entries, confirmKey, busyKey, valuesBlurred, onStopIgnoring }: BucketProps) {
   const { t } = useTranslation()
   return (
     <section className="mb-4 last:mb-0">
@@ -168,22 +189,12 @@ function Bucket({ label, entries, confirmKey, busyKey, onStopIgnoring }: BucketP
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2 min-w-0">
                   <span className="text-sm text-warm-text dark:text-dark-text shrink-0">{kindLabel}</span>
-                  {entry.preview && (
-                    <span
-                      data-testid="ignored-preview"
-                      className="font-mono text-[11px] text-warm-muted dark:text-dark-muted truncate"
-                    >
-                      {entry.preview}
-                    </span>
-                  )}
+                  <IgnoredValue value={entry.value} valuesBlurred={valuesBlurred} />
                 </div>
                 <div className="text-xs text-warm-muted dark:text-dark-muted truncate mt-0.5">
                   {locationLabel(entry, t)}
                   {entry.createdAt && (
                     <span className="text-warm-faint dark:text-dark-faint"> · {formatScanAgo(entry.createdAt)}</span>
-                  )}
-                  {entry.reason && (
-                    <span className="text-warm-faint dark:text-dark-faint"> · {reasonLabel(entry.reason, t)}</span>
                   )}
                 </div>
               </div>
@@ -223,17 +234,44 @@ function locationLabel(entry: AllowlistEntryRow, t: TFunction): string {
     : t('settings.security.allowlist_in_one_session', { defaultValue: 'in one session' })
 }
 
-function reasonLabel(reason: DismissReason, t: TFunction): string {
-  switch (reason) {
-    case 'not-secret':
-      return t('settings.security.reason_not_secret', { defaultValue: 'Not a real secret' })
-    case 'test-credential':
-      return t('settings.security.reason_test_credential', { defaultValue: 'Test credential' })
-    case 'low-risk':
-      return t('settings.security.reason_low_risk', { defaultValue: 'Low-risk / mine' })
-    case 'acknowledged':
-      return t('settings.security.reason_acknowledged', { defaultValue: 'Acknowledged' })
+// Live value cell — mirrors FindingsStrip's value treatment: blurred
+// when `valuesBlurred` (the canonical securityPageValuesBlurred pref),
+// with per-row hover/click reveal. When the value can't be
+// reconstructed (source purged / message gone) the kind label stands
+// alone with a muted hint.
+function IgnoredValue({ value, valuesBlurred }: { value: string | null; valuesBlurred: boolean }) {
+  const { t } = useTranslation()
+  const [localReveal, setLocalReveal] = useState(false)
+  if (value === null || value === undefined) {
+    return (
+      <span
+        data-testid="ignored-value"
+        data-value="0"
+        className="text-[11px] italic text-warm-faint dark:text-dark-faint truncate"
+      >
+        {t('settings.security.allowlist_value_unavailable', { defaultValue: 'original no longer available' })}
+      </span>
+    )
   }
+  const revealed = !valuesBlurred || localReveal
+  const display = truncateValue(value)
+  return (
+    <span
+      data-testid="ignored-value"
+      data-value="1"
+      data-blurred={revealed ? '0' : '1'}
+      title={revealed ? value : undefined}
+      onMouseEnter={() => valuesBlurred && setLocalReveal(true)}
+      onClick={() => valuesBlurred && setLocalReveal(true)}
+      className={`font-mono text-[11px] truncate transition-[filter] duration-100 ${
+        revealed
+          ? 'text-warm-muted dark:text-dark-muted select-text cursor-text'
+          : 'text-warm-muted dark:text-dark-muted blur-[3.5px] cursor-pointer select-none'
+      }`}
+    >
+      {display}
+    </span>
+  )
 }
 
 function rowKey(entry: AllowlistEntryRow): string {
