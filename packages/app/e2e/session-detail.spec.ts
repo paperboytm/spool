@@ -155,3 +155,57 @@ test('handles 1500-message session: virtualization + deep find', async () => {
   })
   await expect(window.locator('[data-testid="session-find-active-match"]')).toHaveCount(1)
 })
+
+test('custom session scrollbar thumb follows pointer while dragging long sessions', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator(`[data-testid="session-row"][data-session-uuid="${LARGE_SESSION_UUID}"]`)
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 10000 })
+
+  const scroller = window.locator('[data-testid="message-list-scroll"]')
+  const thumb = window.locator('[data-testid="message-scrollbar-thumb"]')
+  await expect
+    .poll(
+      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
+      { timeout: 3000 },
+    )
+    .toBeGreaterThan(0)
+  await expect(thumb).toBeVisible()
+
+  const before = await scroller.evaluate((el) => ({
+    scrollTop: el.scrollTop,
+    maxScrollTop: el.scrollHeight - el.clientHeight,
+  }))
+  expect(before.maxScrollTop).toBeGreaterThan(0)
+
+  const thumbBox = await thumb.boundingBox()
+  if (!thumbBox) throw new Error('missing scrollbar thumb box')
+  const trackBox = await window.locator('[data-testid="message-scrollbar-track"]').boundingBox()
+  if (!trackBox) throw new Error('missing scrollbar track box')
+
+  const startX = thumbBox.x + thumbBox.width / 2
+  const startY = thumbBox.y + thumbBox.height / 2
+  const targetY = Math.min(trackBox.y + trackBox.height - thumbBox.height / 2 - 8, startY + 120)
+
+  await window.mouse.move(startX, startY)
+  await window.mouse.down()
+  await window.mouse.move(startX, targetY, { steps: 12 })
+
+  await expect
+    .poll(async () => {
+      const draggingThumbBox = await thumb.boundingBox()
+      if (!draggingThumbBox) return Number.POSITIVE_INFINITY
+      const draggingThumbCenter = draggingThumbBox.y + draggingThumbBox.height / 2
+      return Math.abs(draggingThumbCenter - targetY)
+    })
+    .toBeLessThan(16)
+
+  await window.mouse.up()
+
+  const after = await scroller.evaluate((el) => el.scrollTop)
+  expect(after).toBeGreaterThan(before.scrollTop)
+})
