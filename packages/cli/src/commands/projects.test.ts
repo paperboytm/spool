@@ -51,6 +51,23 @@ describe('resolveProjectQuery', () => {
     }
   })
 
+  it('reports ambiguity when two projects share the same name', () => {
+    // Same display name, different identities (e.g. a local path vs a git
+    // remote) — an exact name hit can't pick one, so disambiguate by key.
+    const sameName = [
+      group('openclaw', '/Users/me/openclaw'),
+      group('openclaw', 'github.com/openclaw/openclaw'),
+    ]
+    const res = resolveProjectQuery(sameName, 'openclaw')
+    expect(res.kind).toBe('ambiguous')
+    if (res.kind === 'ambiguous') {
+      expect(res.groups).toEqual(sameName)
+    }
+    // The full identity key still resolves uniquely.
+    expect(resolveProjectQuery(sameName, 'github.com/openclaw/openclaw'))
+      .toEqual({ kind: 'match', group: sameName[1] })
+  })
+
   it('reports none when nothing matches', () => {
     expect(resolveProjectQuery(groups, 'nonexistent')).toEqual({ kind: 'none' })
   })
