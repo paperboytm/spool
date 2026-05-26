@@ -25,6 +25,19 @@ let cached: SecurityPreferences | null = null
 let inflight: Promise<SecurityPreferences | null> | null = null
 const subscribers = new Set<() => void>()
 
+// Monotonic version, bumped on every authoritative cache write
+// (prime resolve + EVT_PREFS_CHANGED). An optimistic patch records
+// the version it produced; if that version is no longer current when
+// the IPC rejects, a newer authoritative value has landed in between
+// and we must NOT clobber it by rolling back to a now-stale snapshot.
+let cacheVersion = 0
+
+function setCache(next: SecurityPreferences | null): void {
+  cached = next
+  cacheVersion += 1
+  emit()
+}
+
 function emit(): void {
   for (const fn of subscribers) {
     try { fn() } catch (err) { console.error('[securityPrefsCache] subscriber threw:', err) }
@@ -55,12 +68,29 @@ export function useCachedSecurityPrefs(): SecurityPreferences | null {
  *  main-process EVT_PREFS_CHANGED reply still lands in the cache,
  *  but by then the user already sees the new state. */
 export async function patchSecurityPrefs(patch: Partial<SecurityPreferences>): Promise<void> {
-  if (cached) {
-    cached = { ...cached, ...patch }
-    emit()
+  // Cold cache: nothing to optimistically update or roll back. Just
+  // persist; the EVT_PREFS_CHANGED broadcast primes the cache.
+  if (!cached) {
+    try { await securityApi.setPrefs(patch) }
+    catch (err) { console.error('[securityPrefsCache] setPrefs failed:', err) }
+    return
   }
-  try { await securityApi.setPrefs(patch) }
-  catch (err) { console.error('[securityPrefsCache] setPrefs failed:', err) }
+
+  const snapshot = cached
+  setCache({ ...cached, ...patch })
+  const optimisticVersion = cacheVersion
+  try {
+    await securityApi.setPrefs(patch)
+  } catch (err) {
+    console.error('[securityPrefsCache] setPrefs failed, rolling back:', err)
+    // Only revert if no authoritative write landed while the IPC was
+    // in flight. If `cacheVersion` moved past our optimistic write, a
+    // prime resolve or EVT_PREFS_CHANGED already replaced the cache
+    // with a newer truth — rolling back to `snapshot` would clobber it.
+    if (cacheVersion === optimisticVersion) {
+      setCache(snapshot)
+    }
+  }
 }
 
 /** Idempotent prefetch. Call once at app boot (from an App-level
@@ -72,9 +102,8 @@ export async function primeSecurityPrefsCache(): Promise<SecurityPreferences | n
   if (inflight) return inflight
   inflight = securityApi.getPrefs()
     .then((p) => {
-      cached = p
       inflight = null
-      emit()
+      setCache(p)
       return p
     })
     .catch(() => {
@@ -106,7 +135,31 @@ function ensureUpstreamSubscription(): void {
   if (typeof window === 'undefined' || !window.spool?.security?.onPrefsChanged) return
   subscriptionAttached = true
   securityApi.onPrefsChanged((next) => {
-    cached = next
-    emit()
+    setCache(next)
   })
+}
+
+/** Test-only. Reset all module-level state between cases and
+ *  optionally seed an initial authoritative cache value. */
+export function __resetSecurityPrefsCacheForTest(seed: SecurityPreferences | null = null): void {
+  cached = seed
+  inflight = null
+  cacheVersion = 0
+  subscribers.clear()
+  subscriptionAttached = false
+}
+
+/** Test-only. Simulate an authoritative EVT_PREFS_CHANGED landing. */
+export function __pushAuthoritativePrefsForTest(next: SecurityPreferences | null): void {
+  setCache(next)
+}
+
+/** Test-only. Read the current cache snapshot. */
+export function __readCacheForTest(): SecurityPreferences | null {
+  return cached
+}
+
+/** Test-only. Subscribe to cache-change notifications. */
+export function __subscribeForTest(fn: () => void): () => void {
+  return subscribe(fn)
 }
