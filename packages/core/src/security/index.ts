@@ -51,7 +51,9 @@ export type {
   SessionFindingFilter,
   FindingInput,
   AllowlistEntryRow,
+  AllowlistMeta,
   AllowlistSnapshot,
+  DismissReason,
   Page,
 } from './repo.js'
 

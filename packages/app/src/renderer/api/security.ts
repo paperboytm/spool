@@ -14,6 +14,7 @@ import type {
   FindingsChange,
   ScanStatus,
   AllowlistEntryRow,
+  DismissReason,
   Page,
   BackupFileInfo,
   DeleteBackupsResult,
@@ -23,7 +24,7 @@ export type { BackupFileInfo }
 import type { SensitiveKind } from '@spool-lab/redact'
 import type { SecurityPreferences, PfDownloadState, PfRuntimeInfo, SecurityReadiness } from '../../preload/index.js'
 
-export type { SecurityPreferences, AllowlistEntryRow, PfDownloadState, PfRuntimeInfo, SecurityReadiness }
+export type { SecurityPreferences, AllowlistEntryRow, DismissReason, PfDownloadState, PfRuntimeInfo, SecurityReadiness }
 
 /** Single source of truth for the renderer-side adapter. Components
  *  hold this object, not `window.spool.security` — keeps replaceability
@@ -50,10 +51,10 @@ export const securityApi = {
   getScanStatus: (): Promise<ScanStatus> =>
     window.spool.security.getScanStatus(),
 
-  dismissFinding: (findingId: number, scope: 'session' | 'global') =>
-    window.spool.security.dismissFinding(findingId, scope),
-  dismissFindings: (findingIds: number[], scope: 'session' | 'global') =>
-    window.spool.security.dismissFindings(findingIds, scope),
+  dismissFinding: (findingId: number, scope: 'session' | 'global', reason?: DismissReason | null) =>
+    window.spool.security.dismissFinding(findingId, scope, reason),
+  dismissFindings: (findingIds: number[], scope: 'session' | 'global', reason?: DismissReason | null) =>
+    window.spool.security.dismissFindings(findingIds, scope, reason),
   undismissFinding: (findingId: number) =>
     window.spool.security.undismissFinding(findingId),
   purgeFinding: (findingId: number) =>

@@ -23,6 +23,7 @@ import {
   addAllowlistGlobal,
   removeAllowlistSession,
   removeAllowlistGlobal,
+  listAllowlistEntries,
   dismissFinding,
   dismissFindings,
   undismissFinding,
@@ -535,5 +536,82 @@ describe('repo: dismiss/undismiss flow', () => {
     expect(snap.session.size).toBe(0)
     const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
     expect(counts.scan_finding_count).toBe(2)
+  })
+})
+
+describe('repo: allowlist recognition metadata (preview + reason)', () => {
+  let db: Database.Database
+  beforeEach(() => {
+    db = setupDb()
+    insertFindings(db, [
+      // AKIAIOSFODNN7EXAMPLE at [14,34] → AWS vendor, last4 MPLE.
+      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
+      // a@b.com at [51,58].
+      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 51, endOffset: 58, state: 'active' },
+    ])
+    updateSessionCounts(db, 1)
+  })
+
+  it('migration v14 adds preview + reason columns to both allowlist tables', () => {
+    for (const table of ['allowlist_session', 'allowlist_global']) {
+      const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(c => c.name)
+      expect(cols).toContain('preview')
+      expect(cols).toContain('reason')
+    }
+  })
+
+  it('session dismiss reconstructs a non-reversible preview from message text', () => {
+    const f = listFindings(db, { kind: 'api-key' })[0]!
+    dismissFinding(db, f.id, 'session', true, 'test-credential')
+    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'api-key')!
+    expect(entry.preview).toBe('AWS ••MPLE')
+    expect(entry.reason).toBe('test-credential')
+    // Never the full secret.
+    expect(entry.preview).not.toContain('AKIAIOSFODNN7')
+  })
+
+  it('global dismiss stores preview + reason on the global row', () => {
+    const f = listFindings(db, { kind: 'email' })[0]!
+    dismissFinding(db, f.id, 'global', true, 'low-risk')
+    const entry = listAllowlistEntries(db).find(e => e.scope === 'global' && e.kind === 'email')!
+    expect(entry.preview).toBe('a••@b.com')
+    expect(entry.reason).toBe('low-risk')
+  })
+
+  it('preview is null when the value cannot be reconstructed (purged finding)', () => {
+    const f = listFindings(db, { kind: 'api-key' })[0]!
+    db.prepare(`UPDATE findings SET state = 'purged' WHERE id = ?`).run(f.id)
+    dismissFinding(db, f.id, 'session')
+    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'api-key')!
+    expect(entry.preview).toBeNull()
+    expect(entry.reason).toBeNull()
+  })
+
+  it('dismiss without a reason leaves reason null but still records the preview', () => {
+    const f = listFindings(db, { kind: 'email' })[0]!
+    dismissFinding(db, f.id, 'session')
+    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'email')!
+    expect(entry.preview).toBe('a••@b.com')
+    expect(entry.reason).toBeNull()
+  })
+
+  it('addAllowlist upsert preserves an existing preview when a later write omits it', () => {
+    // First dismiss records the preview.
+    const f = listFindings(db, { kind: 'api-key' })[0]!
+    dismissFinding(db, f.id, 'session')
+    // A bare re-add (no meta) must not wipe the stored preview.
+    addAllowlistSession(db, 1, 'api-key', 'h1')
+    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'api-key')!
+    expect(entry.preview).toBe('AWS ••MPLE')
+    // Still idempotent: one row.
+    expect(getAllowlists(db, 1).session.size).toBe(1)
+  })
+
+  it('listAllowlistEntries returns null preview/reason for pre-v14-style rows', () => {
+    // Simulate a legacy row inserted without the new columns.
+    db.prepare(`INSERT INTO allowlist_global (kind, value_hash) VALUES ('phone', 'legacy')`).run()
+    const entry = listAllowlistEntries(db).find(e => e.valueHash === 'legacy')!
+    expect(entry.preview).toBeNull()
+    expect(entry.reason).toBeNull()
   })
 })

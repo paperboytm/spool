@@ -135,7 +135,7 @@ export function maskValueByKind(value: string, kind: SensitiveKind | string): st
 /** Recognise the vendor behind a token by its prefix. Returns null
  *  when the prefix isn't one we've codified — the caller falls
  *  back to a generic `[redacted API key]` mask. */
-function detectVendor(token: string): string | null {
+export function detectVendor(token: string): string | null {
   if (/^sk_(live|test)_/.test(token)) return 'Stripe'
   if (/^(rk|pk)_(live|test)_/.test(token)) return 'Stripe'
   if (/^sk-ant-/.test(token)) return 'Anthropic'

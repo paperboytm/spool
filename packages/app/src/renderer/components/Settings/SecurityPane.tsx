@@ -262,12 +262,12 @@ function SecurityPaneInner() {
         )}
       </Section>
 
-      {/* Allowlist */}
-      <Section title={t('settings.security.allowlist_title', { defaultValue: 'Allowlist' })}>
+      {/* Ignored items */}
+      <Section title={t('settings.security.allowlist_title', { defaultValue: 'Ignored items' })}>
         <DefaultsRow
-          label={t('settings.security.allowlist_row_title', { defaultValue: 'Global allowlist' })}
+          label={t('settings.security.allowlist_row_title', { defaultValue: 'Findings you ignored' })}
           description={t('settings.security.allowlist_stats', {
-            defaultValue: '{{global}} hashes allowlisted everywhere · {{session}} dismissed in a single session.',
+            defaultValue: '{{global}} ignored everywhere · {{session}} ignored in a single session.',
             global: globalCount,
             session: sessionCount,
           })}
@@ -278,8 +278,8 @@ function SecurityPaneInner() {
               onClick={() => setAllowlistOpen(true)}
               className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text transition-colors"
             >
-              {t('settings.security.allowlist_manage', { defaultValue: 'Manage' })}
-              <ArrowRight size={11} strokeWidth={1.8} aria-hidden />
+              {t('settings.security.allowlist_manage', { defaultValue: 'Review' })}
+              <ArrowRight size={12} strokeWidth={1.5} aria-hidden />
             </button>
           }
         />

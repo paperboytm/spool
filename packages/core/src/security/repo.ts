@@ -12,7 +12,12 @@
 
 import type Database from 'better-sqlite3'
 import type { SensitiveKind } from '@spool-lab/redact'
-import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from '@spool-lab/redact'
+import {
+  HIGH_SEVERITY_KINDS,
+  INFO_SEVERITY_KINDS,
+  severityOf,
+  previewValueByKind,
+} from '@spool-lab/redact'
 import type {
   FindingRow,
   FindingState,
@@ -620,26 +625,53 @@ export function isAllowlisted(
   return allow.session.has(key) || allow.global.has(key)
 }
 
+/** Optional recognition + audit metadata captured when a finding is
+ *  ignored. `preview` is the non-reversible hint from
+ *  `previewValueByKind` (never plaintext); `reason` is a user-supplied
+ *  enum. Both are best-effort — a missing value just means the row
+ *  falls back to kind-only display. */
+export interface AllowlistMeta {
+  preview?: string | null
+  reason?: DismissReason | null
+}
+
+/** Why a finding was ignored. Low-friction enum surfaced in the
+ *  dismiss flow; stored so the "Ignored items" review can show it. */
+export type DismissReason =
+  | 'not-secret'
+  | 'test-credential'
+  | 'low-risk'
+  | 'acknowledged'
+
 export function addAllowlistSession(
   db: Database.Database,
   sessionId: number,
   kind: SensitiveKind,
   valueHash: string,
+  meta: AllowlistMeta = {},
 ): void {
   db.prepare(
-    `INSERT OR IGNORE INTO allowlist_session (session_id, kind, value_hash)
-     VALUES (?, ?, ?)`,
-  ).run(sessionId, kind, valueHash)
+    `INSERT INTO allowlist_session (session_id, kind, value_hash, preview, reason)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(session_id, kind, value_hash) DO UPDATE SET
+       preview = COALESCE(excluded.preview, allowlist_session.preview),
+       reason  = COALESCE(excluded.reason,  allowlist_session.reason)`,
+  ).run(sessionId, kind, valueHash, meta.preview ?? null, meta.reason ?? null)
 }
 
 export function addAllowlistGlobal(
   db: Database.Database,
   kind: SensitiveKind,
   valueHash: string,
+  meta: AllowlistMeta = {},
 ): void {
   db.prepare(
-    `INSERT OR IGNORE INTO allowlist_global (kind, value_hash) VALUES (?, ?)`,
-  ).run(kind, valueHash)
+    `INSERT INTO allowlist_global (kind, value_hash, preview, reason)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(kind, value_hash) DO UPDATE SET
+       preview = COALESCE(excluded.preview, allowlist_global.preview),
+       reason  = COALESCE(excluded.reason,  allowlist_global.reason)`,
+  ).run(kind, valueHash, meta.preview ?? null, meta.reason ?? null)
 }
 
 export function removeAllowlistSession(
@@ -672,6 +704,12 @@ export interface AllowlistEntryRow {
   /** Session row context — null for global entries. */
   sessionUuid: string | null
   sessionTitle: string | null
+  /** Lossy, non-reversible recognition hint (`Stripe ••a39f`).
+   *  Null for pre-v14 rows or values that couldn't be reconstructed
+   *  at dismiss time — UI falls back to the kind label alone. */
+  preview: string | null
+  /** Why the finding was ignored, if the user picked a reason. */
+  reason: DismissReason | null
 }
 
 /** All allowlist rows from both tables, joined with the originating
@@ -682,6 +720,8 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
     `SELECT a.kind          AS kind,
             a.value_hash    AS value_hash,
             a.created_at    AS created_at,
+            a.preview       AS preview,
+            a.reason        AS reason,
             s.session_uuid  AS session_uuid,
             s.title         AS session_title
        FROM allowlist_session a
@@ -691,17 +731,21 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
     kind: string
     value_hash: string
     created_at: string
+    preview: string | null
+    reason: string | null
     session_uuid: string
     session_title: string | null
   }>
   const globalRows = db.prepare(
-    `SELECT kind, value_hash, created_at
+    `SELECT kind, value_hash, created_at, preview, reason
        FROM allowlist_global
       ORDER BY created_at DESC`,
   ).all() as Array<{
     kind: string
     value_hash: string
     created_at: string
+    preview: string | null
+    reason: string | null
   }>
   return [
     ...globalRows.map((r): AllowlistEntryRow => ({
@@ -711,6 +755,8 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
       createdAt: r.created_at,
       sessionUuid: null,
       sessionTitle: null,
+      preview: r.preview,
+      reason: (r.reason as DismissReason | null) ?? null,
     })),
     ...sessionRows.map((r): AllowlistEntryRow => ({
       scope: 'session',
@@ -719,6 +765,8 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
       createdAt: r.created_at,
       sessionUuid: r.session_uuid,
       sessionTitle: r.session_title,
+      preview: r.preview,
+      reason: (r.reason as DismissReason | null) ?? null,
     })),
   ]
 }
@@ -733,10 +781,28 @@ export function dismissFinding(
   findingId: number,
   scope: 'session' | 'global',
   recomputeCounts = true,
+  reason: DismissReason | null = null,
 ): number | null {
+  // Pull the live message text + offsets alongside the finding so we
+  // can compute a recognition preview from the raw value WITHOUT ever
+  // persisting plaintext — `previewValueByKind` drops the secret body.
   const f = db.prepare(
-    'SELECT session_id, kind, value_hash FROM findings WHERE id = ?',
-  ).get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
+    `SELECT f.session_id, f.kind, f.value_hash, f.start_offset, f.end_offset, f.state,
+            m.content_text
+       FROM findings f
+       LEFT JOIN messages m ON m.id = f.message_id
+      WHERE f.id = ?`,
+  ).get(findingId) as
+    | {
+        session_id: number
+        kind: string
+        value_hash: string
+        start_offset: number
+        end_offset: number
+        state: FindingState
+        content_text: string | null
+      }
+    | undefined
   if (!f) return null
   db.prepare(
     `UPDATE findings
@@ -744,13 +810,30 @@ export function dismissFinding(
             state_changed_at = datetime('now')
       WHERE id = ?`,
   ).run(findingId)
+  const meta: AllowlistMeta = { preview: previewForFinding(f), reason }
   if (scope === 'session') {
-    addAllowlistSession(db, f.session_id, f.kind as SensitiveKind, f.value_hash)
+    addAllowlistSession(db, f.session_id, f.kind as SensitiveKind, f.value_hash, meta)
   } else {
-    addAllowlistGlobal(db, f.kind as SensitiveKind, f.value_hash)
+    addAllowlistGlobal(db, f.kind as SensitiveKind, f.value_hash, meta)
   }
   if (recomputeCounts) updateSessionCounts(db, f.session_id)
   return f.session_id
+}
+
+/** Reconstruct the raw value from the message text at the finding's
+ *  offsets and reduce it to a non-reversible preview. Returns null
+ *  when the value can't be read (purged row, message gone) — the
+ *  allowlist row then renders kind-only. */
+function previewForFinding(f: {
+  kind: string
+  start_offset: number
+  end_offset: number
+  state: FindingState
+  content_text: string | null
+}): string | null {
+  if (f.content_text === null || f.state === 'purged') return null
+  const value = f.content_text.slice(f.start_offset, f.end_offset)
+  return previewValueByKind(value, f.kind)
 }
 
 /** Batch variant of {@link dismissFinding}. Dismisses many findings in a
@@ -764,6 +847,7 @@ export function dismissFindings(
   db: Database.Database,
   findingIds: readonly number[],
   scope: 'session' | 'global',
+  reason: DismissReason | null = null,
 ): number[] {
   if (findingIds.length === 0) return []
   const touched: number[] = []
@@ -772,7 +856,7 @@ export function dismissFindings(
     for (const id of ids) {
       // Defer count recompute — many ids usually share one session, so
       // recomputing per-id would redo the same aggregate N times.
-      const sessionId = dismissFinding(db, id, scope, false)
+      const sessionId = dismissFinding(db, id, scope, false, reason)
       if (sessionId != null && !seen.has(sessionId)) {
         seen.add(sessionId)
         touched.push(sessionId)
