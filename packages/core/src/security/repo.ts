@@ -716,6 +716,7 @@ export function dismissFinding(
   db: Database.Database,
   findingId: number,
   scope: 'session' | 'global',
+  recomputeCounts = true,
 ): number | null {
   const f = db.prepare(
     'SELECT session_id, kind, value_hash FROM findings WHERE id = ?',
@@ -732,8 +733,39 @@ export function dismissFinding(
   } else {
     addAllowlistGlobal(db, f.kind as SensitiveKind, f.value_hash)
   }
-  updateSessionCounts(db, f.session_id)
+  if (recomputeCounts) updateSessionCounts(db, f.session_id)
   return f.session_id
+}
+
+/** Batch variant of {@link dismissFinding}. Dismisses many findings in a
+ *  single transaction — one allowlist write + one `updateSessionCounts`
+ *  per affected session instead of N parallel IPC round-trips, each of
+ *  which recomputes counts. Mirrors the bulk-purge pattern
+ *  (`purgeFindings`). Returns the distinct session ids touched, in
+ *  first-seen order, so the IPC layer can emit one change event per
+ *  session. Unknown ids are skipped. */
+export function dismissFindings(
+  db: Database.Database,
+  findingIds: readonly number[],
+  scope: 'session' | 'global',
+): number[] {
+  if (findingIds.length === 0) return []
+  const touched: number[] = []
+  const seen = new Set<number>()
+  const txn = db.transaction((ids: readonly number[]) => {
+    for (const id of ids) {
+      // Defer count recompute — many ids usually share one session, so
+      // recomputing per-id would redo the same aggregate N times.
+      const sessionId = dismissFinding(db, id, scope, false)
+      if (sessionId != null && !seen.has(sessionId)) {
+        seen.add(sessionId)
+        touched.push(sessionId)
+      }
+    }
+    for (const sessionId of touched) updateSessionCounts(db, sessionId)
+  })
+  txn(findingIds)
+  return touched
 }
 
 /** Re-activate a dismissed finding and remove the allowlist entry

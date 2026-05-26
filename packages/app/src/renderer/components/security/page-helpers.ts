@@ -102,6 +102,22 @@ export function isInfoKind(kind: string): boolean {
   return INFO_SEVERITY_KINDS.has(kind as SensitiveKind)
 }
 
+/** Representative `kind` label for a bulk purge over a set of findings.
+ *  The bulk PurgeConfirmDialog renders `kind` as a literal label in its
+ *  title ("Rewrite N {kind} findings?"). Picking the first finding's kind
+ *  misrepresents the set when it's mixed-kind — e.g. a set that's mostly
+ *  email but includes one api-key would read "Rewrite N email findings?",
+ *  hiding the credential tier. Collapse to a single kind only when every
+ *  finding shares it; otherwise return 'mixed'. Empty set → 'mixed' too
+ *  (the dialog never opens on an empty set, but keep it total). This does
+ *  NOT drive the rotate reminder — that's the separate `hasCredential`
+ *  prop computed from the high-severity count. */
+export function representativeKind(kinds: readonly string[]): string {
+  if (kinds.length === 0) return 'mixed'
+  const first = kinds[0]!
+  return kinds.every(k => k === first) ? first : 'mixed'
+}
+
 /** Human-readable label for the per-kind purge mask + dismiss copy.
  *  E.g. `api-key` → `API key`. Returns the input unchanged for
  *  unknown kinds (forward-compat with kinds added later in the

@@ -17,6 +17,7 @@ import {
   getFindingValue,
   getFindingValues,
   dismissFinding,
+  dismissFindings,
   undismissFinding,
   purgeFinding,
   purgeFindings,
@@ -58,6 +59,7 @@ export const SECURITY_IPC_CHANNELS = {
 
   // mutations
   DISMISS_FINDING:             'security:dismiss-finding',
+  DISMISS_FINDINGS:            'security:dismiss-findings',
   UNDISMISS_FINDING:           'security:undismiss-finding',
   PURGE_FINDING:               'security:purge-finding',
   PURGE_FINDINGS:              'security:purge-findings',
@@ -207,6 +209,18 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
           type: 'state-changed', sessionId, findingId: args.findingId, state: 'dismissed',
+        })
+      }
+      return { ok: true }
+    },
+  )
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.DISMISS_FINDINGS,
+    (_e, args: { findingIds: number[]; scope: 'session' | 'global' }) => {
+      const sessionIds = dismissFindings(db, args.findingIds, args.scope)
+      for (const sessionId of sessionIds) {
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
+          type: 'state-changed', sessionId, state: 'dismissed',
         })
       }
       return { ok: true }

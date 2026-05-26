@@ -23,6 +23,7 @@ import {
   removeAllowlistSession,
   removeAllowlistGlobal,
   dismissFinding,
+  dismissFindings,
   undismissFinding,
 } from './repo.js'
 
@@ -462,6 +463,35 @@ describe('repo: dismiss/undismiss flow', () => {
     const snap = getAllowlists(db, 1)
     expect(snap.session.size).toBe(0)
     expect(snap.global.size).toBe(1)
+  })
+
+  it('dismissFindings batch-dismisses all ids in one call + updates counts once', () => {
+    const ids = listFindings(db, { sessionId: 1, state: 'active' }).map((r) => r.id)
+    expect(ids.length).toBe(2)
+    const touched = dismissFindings(db, ids, 'session')
+    expect(touched).toEqual([1])
+    const states = db.prepare('SELECT state FROM findings WHERE id IN (?, ?)').all(...ids) as Array<{ state: string }>
+    expect(states.every((s) => s.state === 'dismissed')).toBe(true)
+    const snap = getAllowlists(db, 1)
+    expect(snap.session.size).toBe(2)
+    const counts = db.prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number; scan_high_count: number }
+    expect(counts.scan_finding_count).toBe(0)
+    expect(counts.scan_high_count).toBe(0)
+  })
+
+  it('dismissFindings skips unknown ids and returns distinct sessions in first-seen order', () => {
+    const ids = listFindings(db, { sessionId: 1, state: 'active' }).map((r) => r.id)
+    const touched = dismissFindings(db, [99999, ...ids], 'global')
+    expect(touched).toEqual([1])
+    const snap = getAllowlists(db, 1)
+    expect(snap.global.size).toBe(2)
+    expect(snap.session.size).toBe(0)
+  })
+
+  it('dismissFindings on empty input is a no-op', () => {
+    expect(dismissFindings(db, [], 'session')).toEqual([])
+    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
+    expect(counts.scan_finding_count).toBe(2)
   })
 
   it('undismiss flips state back + removes allowlist entries', () => {

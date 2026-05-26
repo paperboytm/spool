@@ -274,6 +274,8 @@ const api = {
       ipcRenderer.invoke('security:get-scan-status'),
     dismissFinding: (findingId: number, scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:dismiss-finding', { findingId, scope }),
+    dismissFindings: (findingIds: number[], scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('security:dismiss-findings', { findingIds, scope }),
     undismissFinding: (findingId: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:undismiss-finding', { findingId }),
     purgeFinding: (findingId: number): Promise<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }> =>

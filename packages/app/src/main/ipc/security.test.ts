@@ -250,6 +250,27 @@ describe('registerSecurityIpc', () => {
       expect(after.state).toBe('dismissed')
     })
 
+    it('DISMISS_FINDINGS dismisses many in one call + emits one event per session', async () => {
+      insertFindings(fixture.db, [
+        { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 30, endOffset: 40, state: 'active' },
+        { sessionId: 1, messageId: 10, kind: 'phone', valueHash: 'h3', confidence: 0.8, provider: 'regex', startOffset: 45, endOffset: 55, state: 'active' },
+      ])
+      const ids = listFindings(fixture.db, { sessionId: 1, state: 'active' }).map((r) => r.id)
+      expect(ids.length).toBe(3)
+      sentEvents.length = 0
+      const result = await invoke<{ ok: boolean }>(
+        SECURITY_IPC_CHANNELS.DISMISS_FINDINGS,
+        { findingIds: ids, scope: 'session' },
+      )
+      expect(result).toEqual({ ok: true })
+      const after = listFindings(fixture.db, { sessionId: 1, state: 'any' })
+      expect(after.every((r) => r.state === 'dismissed')).toBe(true)
+      // One consolidated change event for the single affected session.
+      const changes = sentEvents.filter((e) => e.channel === SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED)
+      expect(changes).toHaveLength(1)
+      expect((changes[0]!.payload as { sessionId: number }).sessionId).toBe(1)
+    })
+
     it('UNDISMISS_FINDING flips state back to active', async () => {
       await invoke(SECURITY_IPC_CHANNELS.DISMISS_FINDING, { findingId, scope: 'session' })
       const result = await invoke<{ ok: boolean }>(

@@ -1206,7 +1206,7 @@ function SessionCard({
   async function handleDismissAll() {
     const ids = await sessionReportableIds()
     if (ids.length === 0) return
-    try { await Promise.all(ids.map(id => securityApi.dismissFinding(id, 'session'))) }
+    try { await securityApi.dismissFindings(ids, 'session') }
     catch { /* surfaces via reload */ }
     await load(); onRefresh()
   }

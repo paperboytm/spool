@@ -42,6 +42,7 @@ export {
   removeAllowlistGlobal,
   listAllowlistEntries,
   dismissFinding,
+  dismissFindings,
   undismissFinding,
 } from './repo.js'
 export type {

@@ -7,6 +7,7 @@ import {
   friendlyKind,
   isHighKind,
   isInfoKind,
+  representativeKind,
   scanInFlightCount,
   shouldShowScanBanner,
 } from './page-helpers.js'
@@ -149,6 +150,33 @@ describe('friendlyKind', () => {
   it('passes unknown kinds through unchanged (forward-compat)', () => {
     expect(friendlyKind('some-future-kind')).toBe('some-future-kind')
     expect(friendlyKind('')).toBe('')
+  })
+})
+
+describe('representativeKind', () => {
+  it('returns the shared kind when every finding is the same kind', () => {
+    expect(representativeKind(['api-key'])).toBe('api-key')
+    expect(representativeKind(['email', 'email', 'email'])).toBe('email')
+  })
+
+  it("returns 'mixed' when the set spans more than one kind — even if only one differs", () => {
+    // Regression: the bulk dialog used the FIRST finding's kind, so a
+    // low-severity-first set with a hidden credential would mislabel as
+    // the low kind. Any kind divergence must collapse to 'mixed'.
+    expect(representativeKind(['email', 'api-key'])).toBe('mixed')
+    expect(representativeKind(['api-key', 'email'])).toBe('mixed')
+    expect(representativeKind(['email', 'email', 'api-key'])).toBe('mixed')
+  })
+
+  it("returns 'mixed' for an empty set (total guard; dialog never opens empty)", () => {
+    expect(representativeKind([])).toBe('mixed')
+  })
+
+  it('does not assert severity — label and credential reminder are independent', () => {
+    // A high-severity finding buried in a same-kind set still reports
+    // that kind; the rotate reminder rides the separate hasCredential
+    // prop, not this label.
+    expect(representativeKind(['api-key', 'api-key'])).toBe('api-key')
   })
 })
 

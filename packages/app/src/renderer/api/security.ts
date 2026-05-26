@@ -50,6 +50,8 @@ export const securityApi = {
 
   dismissFinding: (findingId: number, scope: 'session' | 'global') =>
     window.spool.security.dismissFinding(findingId, scope),
+  dismissFindings: (findingIds: number[], scope: 'session' | 'global') =>
+    window.spool.security.dismissFindings(findingIds, scope),
   undismissFinding: (findingId: number) =>
     window.spool.security.undismissFinding(findingId),
   purgeFinding: (findingId: number) =>
