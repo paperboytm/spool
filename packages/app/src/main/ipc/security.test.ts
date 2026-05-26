@@ -334,6 +334,32 @@ describe('registerSecurityIpc', () => {
       expect(results).toHaveLength(1)
     })
 
+    it('PURGE_EVERYWHERE scrubs the value across sessions + returns touched sessions', async () => {
+      // Same value (one hash) in two sessions.
+      fixture.db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+         VALUES (2, 1, 1, 's-2', '/p/s-2', 'Session 2', '2026-01-02', '2026-01-02', 1)`,
+      ).run()
+      fixture.db.prepare(
+        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+         VALUES (20, 2, 1, 'user', 'dup AKIAIOSFODNN7EXAMPLE', '2026-01-02', 0)`,
+      ).run()
+      insertFindings(fixture.db, [
+        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 5, endOffset: 25, state: 'active' },
+        { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 4, endOffset: 24, state: 'active' },
+      ])
+      const out = await invoke<{ count: number; sessionIds: number[] }>(
+        SECURITY_IPC_CHANNELS.PURGE_EVERYWHERE,
+        { kind: 'api-key', valueHash: 'shared' },
+      )
+      expect(out.count).toBe(2)
+      expect([...out.sessionIds].sort()).toEqual([1, 2])
+      for (const id of [10, 20]) {
+        const msg = fixture.db.prepare('SELECT content_text FROM messages WHERE id = ?').get(id) as { content_text: string }
+        expect(msg.content_text.includes('AKIAIOSFODNN7EXAMPLE')).toBe(false)
+      }
+    })
+
     it('RESCAN_ALL delegates to worker.rescanAll and wraps as { count }', async () => {
       const result = await invoke<{ count: number }>(SECURITY_IPC_CHANNELS.RESCAN_ALL)
       expect(result.count).toBe(1)

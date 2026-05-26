@@ -140,6 +140,46 @@ export function purgeFindings(
   )
 }
 
+/** Purge EVERY active occurrence of one leaked value — the
+ *  `(kind, value_hash)` pair — across all sessions in the archive, in a
+ *  single logical operation. The natural follow-through to "I've rotated
+ *  this key at the source → now scrub every copy from Spool's surfaces".
+ *
+ *  Delegates to {@link purgeFindings}, which re-orders the collected ids
+ *  via {@link orderForBulkPurge} so per-message offsets stay valid. The
+ *  original `~/.claude` session files are NOT touched — this masks only
+ *  Spool's stored copies (DB + FTS), closing the search / AI / browse
+ *  exposure.
+ *
+ *  Returns the purge results plus the distinct session ids touched, in
+ *  first-seen order, so the IPC layer can emit one change event per
+ *  session. */
+export function purgeEverywhere(
+  kind: SensitiveKind,
+  valueHash: string,
+  deps: PurgeDeps,
+): Effect.Effect<{ results: PurgeResult[]; sessionIds: number[] }, PurgeError> {
+  return Effect.gen(function* () {
+    const ids = yield* Effect.try({
+      try: () =>
+        (deps.db.prepare(
+          `SELECT id FROM findings
+            WHERE kind = ? AND value_hash = ? AND state = 'active'`,
+        ).all(kind, valueHash) as Array<{ id: number }>).map(r => r.id),
+      catch: (cause) => new PurgeError({ findingId: -1, reason: 'db-failed', cause }),
+    })
+    const results = yield* purgeFindings(ids, deps)
+    const seen = new Set<number>()
+    const sessionIds: number[] = []
+    for (const r of results) {
+      if (!seen.has(r.sessionId)) { seen.add(r.sessionId); sessionIds.push(r.sessionId) }
+    }
+    return { results, sessionIds }
+  }).pipe(
+    Effect.withSpan('security.purge.everywhere', { attributes: { kind } }),
+  )
+}
+
 /** Produce a purge order that's safe against offset drift. Findings
  *  with `message_id IS NULL` (orphan rows that the schema permits but
  *  should never happen in practice) fall to the end so they don't

@@ -374,6 +374,7 @@
     "rotate_at_vendor": "{{vendor}} でローテーション",
     "blast_radius_sessions_other": "他の {{count}} 件のセッションにも存在",
     "blast_radius_projects_other": "{{count}} 個のプロジェクト",
+    "purge_everywhere_cta_other": "すべて削除 · {{count}} 件",
     "purge_unknown_value": "一致した値",
     "purge_bulk_pattern_other": "現在の集合内の {{count}} 個の値",
     "purge_bulk_samples_label": "書き換えられる値のサンプル",

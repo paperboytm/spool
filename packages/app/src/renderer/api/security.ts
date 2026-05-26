@@ -65,6 +65,8 @@ export const securityApi = {
     window.spool.security.purgeFinding(findingId),
   purgeFindings: (findingIds: number[]) =>
     window.spool.security.purgeFindings(findingIds),
+  purgeEverywhere: (kind: SensitiveKind, valueHash: string) =>
+    window.spool.security.purgeEverywhere(kind, valueHash),
   rescanAll: () => window.spool.security.rescanAll(),
   rescanSession: (sessionId: number) => window.spool.security.rescanSession(sessionId),
 

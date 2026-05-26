@@ -399,6 +399,8 @@
     "blast_radius_sessions_other": "Auch in {{count}} weiteren Sitzungen",
     "blast_radius_projects_one": "{{count}} Projekt",
     "blast_radius_projects_other": "{{count}} Projekte",
+    "purge_everywhere_cta_one": "Überall entfernen · {{count}} Kopie",
+    "purge_everywhere_cta_other": "Überall entfernen · {{count}} Kopien",
     "purge_unknown_value": "der erkannte Wert",
     "purge_bulk_pattern_one": "{{count}} Wert im aktiven Set",
     "purge_bulk_pattern_other": "{{count}} Werte im aktiven Set",

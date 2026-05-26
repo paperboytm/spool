@@ -374,6 +374,7 @@
     "rotate_at_vendor": "{{vendor}}에서 교체",
     "blast_radius_sessions_other": "다른 세션 {{count}}개에도 있음",
     "blast_radius_projects_other": "프로젝트 {{count}}개",
+    "purge_everywhere_cta_other": "모든 곳에서 제거 · {{count}}개",
     "purge_unknown_value": "일치한 값",
     "purge_bulk_pattern_other": "활성 세트의 {{count}}개 값",
     "purge_bulk_samples_label": "다시 작성될 값 샘플",

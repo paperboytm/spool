@@ -286,6 +286,8 @@ const api = {
       ipcRenderer.invoke('security:purge-finding', findingId),
     purgeFindings: (findingIds: number[]): Promise<Array<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }>> =>
       ipcRenderer.invoke('security:purge-findings', findingIds),
+    purgeEverywhere: (kind: SensitiveKind, valueHash: string): Promise<{ count: number; sessionIds: number[] }> =>
+      ipcRenderer.invoke('security:purge-everywhere', { kind, valueHash }),
     rescanAll: (): Promise<{ count: number }> =>
       ipcRenderer.invoke('security:rescan-all'),
     rescanSession: (sessionId: number): Promise<{ ok: boolean }> =>

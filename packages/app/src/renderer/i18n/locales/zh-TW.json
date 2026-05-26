@@ -374,6 +374,7 @@
     "rotate_at_vendor": "在 {{vendor}} 輪換",
     "blast_radius_sessions_other": "另外 {{count}} 個工作階段中也有",
     "blast_radius_projects_other": "{{count}} 個專案",
+    "purge_everywhere_cta_other": "全部清除 · {{count}} 處",
     "purge_unknown_value": "匹配到的值",
     "purge_bulk_pattern_other": "在目前集合中 {{count}} 個值",
     "purge_bulk_samples_label": "將被改寫的值範例",

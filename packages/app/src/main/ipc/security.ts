@@ -23,6 +23,7 @@ import {
   undismissFinding,
   purgeFinding,
   purgeFindings,
+  purgeEverywhere,
   listAllowlistEntries,
   countAllowlistEntries,
   removeAllowlistSession,
@@ -68,6 +69,7 @@ export const SECURITY_IPC_CHANNELS = {
   UNDISMISS_FINDING:           'security:undismiss-finding',
   PURGE_FINDING:               'security:purge-finding',
   PURGE_FINDINGS:              'security:purge-findings',
+  PURGE_EVERYWHERE:            'security:purge-everywhere',
   RESCAN_ALL:                  'security:rescan-all',
   RESCAN_SESSION:              'security:rescan-session',
 
@@ -268,6 +270,19 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     const results = await runPromise(purgeFindings(findingIds, { db, publish: publish as never })) as PurgeResult[]
     return results
   })
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.PURGE_EVERYWHERE,
+    async (_e, args: { kind: SensitiveKind; valueHash: string }) => {
+      const publish = (change: unknown) =>
+        Effect.sync(() => {
+          getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
+        })
+      const out = await runPromise(
+        purgeEverywhere(args.kind, args.valueHash, { db, publish: publish as never }),
+      ) as { results: PurgeResult[]; sessionIds: number[] }
+      return { count: out.results.length, sessionIds: out.sessionIds }
+    },
+  )
   ipcMain.handle(SECURITY_IPC_CHANNELS.RESCAN_ALL, () =>
     runPromise(worker.rescanAll()).then((count) => ({ count })),
   )

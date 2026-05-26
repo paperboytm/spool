@@ -10,10 +10,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Eraser } from 'lucide-react'
 import { securityApi, type OccurrenceBySession } from '../../api/security.js'
 import { getSessionSourceColor } from '../../../shared/sessionSources.js'
-import type { SensitiveKind } from '@spool-lab/redact'
+import { HIGH_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+import PurgeConfirmDialog from './PurgeConfirmDialog.js'
 
 interface Props {
   kind: SensitiveKind
@@ -31,6 +32,7 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, onLoade
   const { t } = useTranslation()
   const [rows, setRows] = useState<OccurrenceBySession[] | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [purgePending, setPurgePending] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +67,20 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, onLoade
     ? rows
     : rows.filter(r => r.sessionId !== currentSessionId)
   const otherCount = others.length
+  // "Purge everywhere" scrubs every copy across ALL sessions (including
+  // the one being viewed), so its count spans the whole archive — not
+  // just the other sessions surfaced in the headline.
+  const totalCopies = rows.reduce((sum, r) => sum + r.count, 0)
+  const isCredential = HIGH_SEVERITY_KINDS.has(kind)
+
+  async function purgeEverywhere() {
+    try { await securityApi.purgeEverywhere(kind, valueHash) }
+    catch { /* surfaces via onChange → refetch shrinks the radius */ }
+    await load()
+  }
+
+  // Nothing meaningful to show: the value lives only in the current
+  // session (or nowhere). The in-session ×N badge already covers that.
   if (otherCount <= 0) return null
   // Projects among those OTHER sessions — only surfaced when it spans
   // more than one, so we never print the awkward "across 1 project".
@@ -128,8 +144,39 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, onLoade
               )}
             </li>
           ))}
+          {/* Close the loop: after rotating at the source, scrub every
+           *  copy from Spool's surfaces in one transaction. The bulk
+           *  PurgeConfirmDialog makes clear the originals in ~/.claude
+           *  are untouched. Credentials only — the same tier that gets
+           *  the radius. */}
+          {isCredential && (
+            <li>
+              <button
+                type="button"
+                data-testid="purge-everywhere"
+                onClick={() => setPurgePending(true)}
+                className="inline-flex items-center gap-1.5 h-5 -ml-0.5 rounded font-sans text-[11px] text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors"
+              >
+                <Eraser size={12} strokeWidth={1.7} aria-hidden />
+                {t('security.purge_everywhere_cta', {
+                  count: totalCopies,
+                  defaultValue_one: 'Purge everywhere · {{count}} copy',
+                  defaultValue_other: 'Purge everywhere · {{count}} copies',
+                })}
+              </button>
+            </li>
+          )}
         </ul>
       )}
+      <PurgeConfirmDialog
+        open={purgePending}
+        count={totalCopies}
+        kind={kind}
+        bulk
+        hasCredential={isCredential}
+        onConfirm={() => { setPurgePending(false); void purgeEverywhere() }}
+        onCancel={() => setPurgePending(false)}
+      />
     </div>
   )
 }

@@ -87,3 +87,36 @@ test('credential finding shows cross-session blast radius; PII does not', async 
   await expect(radius.locator('[data-testid="blast-radius-row"]')).toHaveCount(1)
   await expect(radius.locator('[data-testid="blast-radius-row"] [data-testid="source-dot"]')).toHaveCount(1)
 })
+
+test('purge everywhere scrubs every copy and collapses the radius', async () => {
+  const { window } = ctx
+  await window.locator('[data-testid="sidebar-security"]').click()
+  await expect(window.locator('[data-testid="security-page"]')).toBeVisible()
+
+  const apiRow = window.locator('[data-testid="finding-row-wrap"]').filter({
+    has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
+  }).first()
+  const radius = apiRow.locator('[data-testid="blast-radius"]')
+  await expect(radius).toBeVisible({ timeout: 10_000 })
+  // Expand idempotently — the BlastRadius component is not remounted
+  // between tests in this file, so its `expanded` state can already be
+  // true from the previous test. Toggle only if currently collapsed,
+  // then wait for the list rather than assuming the click expanded it.
+  const toggle = radius.locator('[data-testid="blast-radius-toggle"]')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+  await expect(radius.locator('[data-testid="blast-radius-list"]')).toBeVisible()
+
+  // The "Purge everywhere" CTA opens the bulk confirm dialog.
+  await radius.locator('[data-testid="purge-everywhere"]').click()
+  const dialog = window.locator('[data-testid="purge-confirm"]')
+  await expect(dialog).toBeVisible()
+  await dialog.locator('[data-testid="purge-confirm-button"]').click()
+
+  // After purge: no api-key finding anywhere shows a blast radius (the
+  // value is masked across both sessions → 0 active occurrences). This
+  // is the UI proof that purge-everywhere reached every copy. FTS
+  // re-sync is asserted deterministically in the core purge unit test
+  // (purge.test.ts → 'keeps messages_fts in sync'), so it's not
+  // re-checked through the flakier search path here.
+  await expect(window.locator('[data-testid="blast-radius"]')).toHaveCount(0, { timeout: 10_000 })
+})
