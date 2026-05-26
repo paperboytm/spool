@@ -150,6 +150,35 @@ describe('SpoolWatcher', () => {
     expect(sources.has('opencode')).toBe(true)
   })
 
+  test('maps an opencode.db-wal change event to a sync of opencode.db', async () => {
+    const { opencodeRoot } = makeTempRoots()
+    // pollStability stats the main DB, so it must exist on disk. WAL-mode commits
+    // land in the -wal sidecar and may leave the main file's mtime unchanged —
+    // the watcher must still map the sidecar event back to opencode.db and sync.
+    const dbPath = join(opencodeRoot, 'opencode.db')
+    writeFileSync(dbPath, '')
+
+    const { syncer, calls } = makeStubSyncer()
+    const emitters: Array<EventEmitter & { path: string }> = []
+    const fakeWatch = (path: string) => {
+      const ee = new EventEmitter() as EventEmitter & { path: string; close: () => void }
+      ee.path = path
+      ee.close = () => { /* noop */ }
+      emitters.push(ee)
+      return ee as unknown as import('node:fs').FSWatcher
+    }
+    const w = new SpoolWatcher(syncer, { ...FAST, watchFn: fakeWatch })
+    runningWatchers.push(w)
+    w.start()
+
+    const ocWatcher = emitters.find(e => e.path === opencodeRoot)
+    expect(ocWatcher).toBeDefined()
+    ocWatcher!.emit('change', 'change', 'opencode.db-wal')
+
+    await waitFor(() => calls.length > 0, 2000)
+    expect(calls[0]).toEqual({ path: dbPath, source: 'opencode' })
+  })
+
   test('coalesces many new-session events into a single count', async () => {
     const { claudeRoot } = makeTempRoots()
     const { syncer, calls } = makeStubSyncer({ result: 'added' })

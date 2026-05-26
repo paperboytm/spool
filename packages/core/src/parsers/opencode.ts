@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { basename, dirname } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -8,6 +8,14 @@ export const OPENCODE_DB_NAME = 'opencode.db'
 const OPENCODE_SESSION_SEPARATOR = '#session='
 const OPENCODE_SUBAGENT_PARENT_PREFIX = 'opencode-subagent:'
 const OPENCODE_SUBAGENT_HEADER_PREFIX = 'OpenCode subagent:'
+// WAL/SHM/journal sidecars share the DB's basename + a suffix; watcher events on
+// them must map back to the main file so commits append to -wal (whose writes the
+// main file's mtime does not reflect until checkpoint) still trigger a re-index.
+const OPENCODE_DB_SIDECAR_SUFFIXES = ['-wal', '-shm', '-journal']
+// Guards the recursive session-tree walks against pathological/corrupt parent
+// chains. Real OpenCode trees are shallow (root → subagent → subagent); a cycle
+// is unreachable from a NULL-parent root, but this bounds the walk regardless.
+const OPENCODE_MAX_SESSION_DEPTH = 64
 const sessionMtimeCache = new Map<string, Map<string, number>>()
 
 interface OpenCodeSessionRow {
@@ -73,21 +81,37 @@ export function isOpenCodeDatabaseFile(filePath: string): boolean {
   return basename(filePath) === OPENCODE_DB_NAME
 }
 
+/**
+ * Map an OpenCode DB sidecar path (`opencode.db-wal` / `-shm` / `-journal`) back
+ * to the main `opencode.db`. Non-sidecar paths are returned unchanged. The watcher
+ * uses this so WAL-mode writes — which land in `-wal` and leave the main file's
+ * mtime stale until checkpoint — still schedule a re-index of the database.
+ */
+export function normalizeOpenCodeWatchPath(filePath: string): string {
+  const base = basename(filePath)
+  for (const suffix of OPENCODE_DB_SIDECAR_SUFFIXES) {
+    if (base === OPENCODE_DB_NAME + suffix) {
+      return join(dirname(filePath), OPENCODE_DB_NAME)
+    }
+  }
+  return filePath
+}
+
 export function listOpenCodeSessionFilePaths(dbPath: string): string[] {
   const db = openOpenCodeDb(dbPath)
   try {
     const rows = db.prepare(`
-      WITH RECURSIVE active_sessions(id, root_id, time_updated) AS (
-        SELECT id, id AS root_id, time_updated
+      WITH RECURSIVE active_sessions(id, root_id, time_updated, depth) AS (
+        SELECT id, id AS root_id, time_updated, 0 AS depth
         FROM session
         WHERE parent_id IS NULL AND time_archived IS NULL
 
         UNION ALL
 
-        SELECT child.id, active_sessions.root_id, child.time_updated
+        SELECT child.id, active_sessions.root_id, child.time_updated, active_sessions.depth + 1
         FROM session child
         JOIN active_sessions ON child.parent_id = active_sessions.id
-        WHERE child.time_archived IS NULL
+        WHERE child.time_archived IS NULL AND active_sessions.depth < ${OPENCODE_MAX_SESSION_DEPTH}
       )
       SELECT root_id AS id, MAX(time_updated) AS time_updated
       FROM active_sessions
@@ -113,17 +137,17 @@ export function getOpenCodeSessionIndexedMtime(filePath: string): string {
   const db = openOpenCodeDb(parsed.dbPath)
   try {
     const row = db.prepare(`
-      WITH RECURSIVE descendants(id, time_updated) AS (
-        SELECT id, time_updated
+      WITH RECURSIVE descendants(id, time_updated, depth) AS (
+        SELECT id, time_updated, 0 AS depth
         FROM session
         WHERE id = ? AND parent_id IS NULL AND time_archived IS NULL
 
         UNION ALL
 
-        SELECT child.id, child.time_updated
+        SELECT child.id, child.time_updated, descendants.depth + 1
         FROM session child
         JOIN descendants ON child.parent_id = descendants.id
-        WHERE child.time_archived IS NULL
+        WHERE child.time_archived IS NULL AND descendants.depth < ${OPENCODE_MAX_SESSION_DEPTH}
       )
       SELECT MAX(time_updated) AS time_updated
       FROM descendants
@@ -148,6 +172,10 @@ export function loadOpenCodeSession(filePath: string): ParseSessionResult {
     `).get(parsedPath.sessionId) as OpenCodeSessionRow | undefined
 
     if (!session) return { kind: 'filtered' }
+    // Subagent rows (parent_id set) are folded into their parent, never indexed
+    // standalone — surfacing them here would duplicate work already shown under
+    // the parent. listOpenCodeSessionFilePaths only ever yields root ids, so this
+    // guards the direct-load path (e.g. a stale indexed child path).
     if (session.parent_id) return { kind: 'filtered' }
 
     let cwd = session.directory || ''
@@ -212,7 +240,11 @@ export function parseOpenCodeSession(filePath: string): ParsedSession | null {
 }
 
 function openOpenCodeDb(dbPath: string): Database.Database {
-  return new Database(dbPath, { readonly: true, fileMustExist: true })
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+  // OpenCode may hold a write lock while checkpointing the WAL; wait briefly
+  // instead of throwing SQLITE_BUSY and churning the sync error log.
+  db.pragma('busy_timeout = 5000')
+  return db
 }
 
 function groupPartsByMessage(partRows: OpenCodePartRow[]): Map<string, OpenCodePartRow[]> {
@@ -240,7 +272,7 @@ function listOpenCodeChildSessions(db: Database.Database, sessionId: string): Op
              child.time_updated, child.model, child.agent, child_sessions.depth + 1
       FROM session child
       JOIN child_sessions ON child.parent_id = child_sessions.id
-      WHERE child.time_archived IS NULL
+      WHERE child.time_archived IS NULL AND child_sessions.depth < ${OPENCODE_MAX_SESSION_DEPTH}
     )
     SELECT id, parent_id, directory, title, time_created, time_updated, model, agent
     FROM child_sessions

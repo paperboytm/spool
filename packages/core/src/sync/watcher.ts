@@ -3,6 +3,7 @@ import { resolve as resolvePath } from 'node:path'
 import type { Syncer } from './syncer.js'
 import type { SessionSource } from '../types.js'
 import { detectSessionSource, getSessionRoots } from './source-paths.js'
+import { normalizeOpenCodeWatchPath } from '../parsers/opencode.js'
 
 export type WatcherEvent = 'new-sessions' | 'error'
 
@@ -112,7 +113,10 @@ export class SpoolWatcher {
 
     w.on('change', (_eventType, filename) => {
       if (this.stopped || !filename) return
-      const abs = resolvePath(root, filename.toString())
+      // OpenCode commits land in opencode.db-wal; map sidecar writes to the main
+      // DB so they aren't filtered out and trigger a re-index. Stability polling
+      // then debounces on the (static) main file, settling once writes pause.
+      const abs = normalizeOpenCodeWatchPath(resolvePath(root, filename.toString()))
       this.schedulePoll(abs)
     })
 

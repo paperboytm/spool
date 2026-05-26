@@ -8,6 +8,7 @@ import {
   listOpenCodeSessionFilePaths,
   loadOpenCodeSession,
   makeOpenCodeSessionFilePath,
+  normalizeOpenCodeWatchPath,
 } from './opencode.js'
 
 const tempDirs: string[] = []
@@ -137,6 +138,106 @@ describe('OpenCode parser', () => {
       }),
     ])
   })
+
+  it('folds grandchild subagent sessions into the root parent', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      seedOpenCodeSession(db)
+      seedOpenCodeSubagent(db)
+      // grandchild: a subagent spawned by the explore subagent
+      insertBareSession(db, { id: 'ses_grandchild', parentId: 'ses_child_explore', agent: 'review', title: 'Review findings' })
+      insertTextMessage(db, { sessionId: 'ses_grandchild', messageId: 'msg_gc', role: 'assistant', text: 'Looks correct.', at: Date.UTC(2026, 4, 19, 1, 0, 12) })
+    } finally {
+      db.close()
+    }
+
+    // Only the root is a standalone session.
+    expect(listOpenCodeSessionFilePaths(dbPath)).toEqual([
+      makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'),
+    ])
+
+    const result = loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'))
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+
+    // Grandchild content is folded in as a sidechain under the root.
+    const grandchild = result.session.messages.find(m => m.uuid === 'ses_grandchild:msg_gc')
+    expect(grandchild).toMatchObject({
+      role: 'assistant',
+      parentUuid: 'opencode-subagent:ses_grandchild',
+      contentText: 'Looks correct.',
+      isSidechain: true,
+    })
+    expect(result.session.messages.some(m => m.uuid === 'ses_grandchild:header')).toBe(true)
+    // Grandchild is never a standalone session.
+    expect(loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_grandchild'))).toEqual({ kind: 'filtered' })
+  })
+
+  it('does not surface a subagent whose parent row is missing (orphan stays folded-or-hidden)', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      // Child whose parent_id points at a row that does not exist. We treat any
+      // row with a parent_id as a subagent — never a standalone root — to stay
+      // consistent with how the other sources handle subagent records.
+      insertBareSession(db, { id: 'ses_orphan', parentId: 'ses_missing_parent', agent: 'build', title: 'Orphaned work' })
+      insertTextMessage(db, { sessionId: 'ses_orphan', messageId: 'msg_orphan', role: 'user', text: 'do the thing', at: Date.UTC(2026, 4, 19, 2, 0, 0) })
+    } finally {
+      db.close()
+    }
+
+    expect(listOpenCodeSessionFilePaths(dbPath)).toEqual([])
+    expect(loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_orphan'))).toEqual({ kind: 'filtered' })
+  })
+
+  it('keeps children of an archived parent hidden', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      const start = Date.UTC(2026, 4, 19, 3, 0, 0)
+      db.prepare(`
+        INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated, time_archived)
+        VALUES ('ses_arch_parent', 'proj_1', 'archived-root', '/work/api', 'Archived root', '1.0.0', ?, ?, ?)
+      `).run(start, start, start + 1)
+      insertBareSession(db, { id: 'ses_arch_child', parentId: 'ses_arch_parent', agent: 'explore', title: 'Child of archived' })
+      insertTextMessage(db, { sessionId: 'ses_arch_child', messageId: 'msg_ac', role: 'user', text: 'hidden work', at: start + 1000 })
+    } finally {
+      db.close()
+    }
+
+    // Archived parent exists, so its child stays hidden (respect the archive).
+    expect(listOpenCodeSessionFilePaths(dbPath)).toEqual([])
+    expect(loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_arch_child'))).toEqual({ kind: 'filtered' })
+  })
+
+  it('does not hang and produces no roots on a self-referential / cyclic parent_id', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      // Corrupt data: mutual cycle with no real NULL-parent root.
+      insertBareSession(db, { id: 'ses_cycle_a', parentId: 'ses_cycle_b', agent: 'build', title: 'A' })
+      insertBareSession(db, { id: 'ses_cycle_b', parentId: 'ses_cycle_a', agent: 'build', title: 'B' })
+      insertTextMessage(db, { sessionId: 'ses_cycle_a', messageId: 'msg_a', role: 'user', text: 'a', at: Date.UTC(2026, 4, 19, 4, 0, 0) })
+      insertTextMessage(db, { sessionId: 'ses_cycle_b', messageId: 'msg_b', role: 'user', text: 'b', at: Date.UTC(2026, 4, 19, 4, 0, 1) })
+    } finally {
+      db.close()
+    }
+
+    // Must terminate. Cyclic nodes reference existing rows, so neither is a root.
+    expect(listOpenCodeSessionFilePaths(dbPath)).toEqual([])
+    expect(loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_cycle_a'))).toEqual({ kind: 'filtered' })
+  })
+
+  it('returns null from parseOpenCodeSession for a missing database file', async () => {
+    const { parseOpenCodeSession } = await import('./opencode.js')
+    const missing = makeOpenCodeSessionFilePath('/no/such/opencode.db', 'ses_x')
+    expect(parseOpenCodeSession(missing)).toBeNull()
+  })
+
+  it('maps WAL/SHM sidecar paths back to the main database file', () => {
+    expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db-wal')).toBe('/data/opencode/opencode.db')
+    expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db-shm')).toBe('/data/opencode/opencode.db')
+    expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db-journal')).toBe('/data/opencode/opencode.db')
+    expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db')).toBe('/data/opencode/opencode.db')
+    expect(normalizeOpenCodeWatchPath('/data/other/file.jsonl')).toBe('/data/other/file.jsonl')
+  })
 })
 
 function createOpenCodeDb(): { db: Database.Database; dbPath: string } {
@@ -249,6 +350,39 @@ function seedOpenCodeSession(db: Database.Database): void {
     start + 2500,
     JSON.stringify({ type: 'tool', tool: 'grep', state: { status: 'completed' } }),
   )
+}
+
+function insertBareSession(
+  db: Database.Database,
+  opts: { id: string; parentId?: string | null; agent?: string; title?: string },
+): void {
+  const start = Date.UTC(2026, 4, 19, 1, 0, 6)
+  db.prepare(`
+    INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, model, agent)
+    VALUES (?, 'proj_1', ?, ?, '/work/api', ?, '1.0.0', ?, ?, 'opencode/gpt-5.4', ?)
+  `).run(
+    opts.id,
+    opts.parentId ?? null,
+    opts.id,
+    opts.title ?? opts.id,
+    start,
+    start + 4000,
+    opts.agent ?? 'build',
+  )
+}
+
+function insertTextMessage(
+  db: Database.Database,
+  opts: { sessionId: string; messageId: string; role: string; text: string; at: number },
+): void {
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(opts.messageId, opts.sessionId, opts.at, opts.at, JSON.stringify({ role: opts.role }))
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(`${opts.messageId}_text`, opts.messageId, opts.sessionId, opts.at, opts.at, JSON.stringify({ type: 'text', text: opts.text }))
 }
 
 function seedOpenCodeSubagent(db: Database.Database): void {

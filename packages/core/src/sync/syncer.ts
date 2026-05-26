@@ -304,9 +304,10 @@ export class Syncer {
       else if (result === 'error') hadError = true
     }
 
+    const activePaths = new Set(sessionPaths)
     const stalePaths = listIndexedOpenCodeSessionPaths(this.db)
       .filter(path => parseOpenCodeSessionFilePath(path)?.dbPath === dbPath)
-      .filter(path => !sessionPaths.includes(path))
+      .filter(path => !activePaths.has(path))
     for (const stalePath of stalePaths) {
       if (deleteSessionByFilePath(this.db, stalePath)) changed = true
     }
