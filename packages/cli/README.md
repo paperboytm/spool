@@ -30,8 +30,13 @@ spool show <uuid> --json       # Output as JSON
 spool status                   # Show index stats (session count, DB size)
 
 spool projects                 # List projects, grouped across sources
-spool projects --json          # Output as JSON
+spool projects spool           # List sessions in a project (by name or identity)
+spool projects spool -n 50     # Limit how many sessions are shown
+spool projects spool --json    # Output as JSON
 ```
+
+A project query matches its name or identity key — an exact name wins over
+partial matches, and ambiguous queries list the candidates so you can refine.
 
 ### Pin
 

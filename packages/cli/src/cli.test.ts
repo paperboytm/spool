@@ -423,6 +423,25 @@ describe('projects', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('lists the sessions in a project when given a query', () => {
+    const out = run(['projects', 'my-project'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Debugging authentication flow')
+    expect(out).toContain('Refactoring database queries')
+  })
+
+  it('outputs project sessions as JSON', () => {
+    const out = run(['projects', 'my-project', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const parsed = JSON.parse(out)
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.length).toBe(2)
+    expect(parsed[0].sessionUuid).toBeTruthy()
+  })
+
+  it('errors when no project matches the query', () => {
+    const out = runFail(['projects', 'zzz-no-such-project'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('No project matching')
+  })
 })
 
 describe('sync', () => {
