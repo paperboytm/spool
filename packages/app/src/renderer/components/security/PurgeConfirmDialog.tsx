@@ -4,10 +4,10 @@
 // about to happen, not a red banner. The modal shows the exact mask
 // rewrite in monospace.
 
-import { AlertTriangle, Eraser, KeyRound } from 'lucide-react'
+import { AlertTriangle, Eraser, ExternalLink, KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useRef } from 'react'
-import { HIGH_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+import { HIGH_SEVERITY_KINDS, detectVendor, rotationUrlForToken, type SensitiveKind } from '@spool-lab/redact'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { truncateValue } from './truncate-value.js'
 import { friendlyMaskName } from './format.js'
@@ -74,6 +74,14 @@ export default function PurgeConfirmDialog({
   // Single-kind purges derive this from `kind`; mixed/bulk callers pass
   // `hasCredential` explicitly because `kind` is then just a label.
   const isCredential = hasCredential ?? HIGH_SEVERITY_KINDS.has(kind as SensitiveKind)
+
+  // Rotate-at-source deep link. Only meaningful for single-finding
+  // purges where we have the raw value to resolve the vendor — bulk
+  // purges span many (possibly mixed-vendor) values, so no single link
+  // applies. Falls back to null (reminder text only) for unknown
+  // vendors or vendors without a verified rotation URL.
+  const vendor = isCredential && before && !bulk ? detectVendor(before) : null
+  const rotateUrl = vendor ? rotationUrlForToken(before!) : null
 
   return (
     <div
@@ -160,13 +168,30 @@ export default function PurgeConfirmDialog({
           )}
 
           {isCredential && (
-            <div className="mt-4 flex gap-2.5 rounded-lg border border-accent/20 dark:border-accent-dark/20 bg-accent/[0.06] dark:bg-accent-dark/[0.07] px-3 py-2.5">
-              <KeyRound size={14} strokeWidth={1.7} className="flex-none mt-[1px] text-accent dark:text-accent-dark" aria-hidden />
-              <p className="m-0 text-[12px] leading-[17px] text-warm-text dark:text-dark-text">
-                {t('security.purge_rotate_reminder', {
-                  defaultValue: 'This only masks Spool’s copy. If it’s a live secret, rotate or revoke it at the source — it may already be exposed elsewhere.',
-                })}
-              </p>
+            <div className="mt-4 rounded-lg border border-accent/20 dark:border-accent-dark/20 bg-accent/[0.06] dark:bg-accent-dark/[0.07] px-3 py-2.5">
+              <div className="flex items-start gap-2.5">
+                <KeyRound size={14} strokeWidth={1.7} className="flex-none mt-[1px] text-accent dark:text-accent-dark" aria-hidden />
+                <p className="m-0 text-[12px] leading-[17px] text-warm-text dark:text-dark-text">
+                  {t('security.purge_rotate_reminder', {
+                    defaultValue: 'This only masks Spool’s copy. If it’s a live secret, rotate or revoke it at the source — it may already be exposed elsewhere.',
+                  })}
+                </p>
+              </div>
+              {rotateUrl && (
+                <div className="mt-2 flex justify-end">
+                  <a
+                    data-testid="rotate-link"
+                    data-vendor={vendor!}
+                    href={rotateUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[12px] font-medium whitespace-nowrap text-accent dark:text-accent-dark underline-offset-2 hover:underline transition-colors"
+                  >
+                    {t('security.rotate_at_vendor', { vendor, defaultValue: 'Rotate at {{vendor}}' })}
+                    <ExternalLink size={12} strokeWidth={1.7} aria-hidden className="opacity-80" />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 

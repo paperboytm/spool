@@ -394,6 +394,7 @@
     "purge_title_bulk_b": "découvertes ?",
     "purge_confirm": "Purger",
     "purge_rotate_reminder": "Cela masque uniquement la copie dans Spool. S'il s'agit d'un secret actif, faites-le pivoter ou révoquez-le à la source — il est peut-être déjà exposé ailleurs.",
+    "rotate_at_vendor": "Faire pivoter chez {{vendor}}",
     "purge_unknown_value": "la valeur détectée",
     "purge_bulk_pattern_one": "{{count}} valeur dans l'ensemble actif",
     "purge_bulk_pattern_other": "{{count}} valeurs dans l'ensemble actif",

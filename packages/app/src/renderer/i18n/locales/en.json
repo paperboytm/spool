@@ -394,6 +394,7 @@
     "purge_title_bulk_b": "findings?",
     "purge_confirm": "Purge",
     "purge_rotate_reminder": "This only masks Spool's copy. If it's a live secret, rotate or revoke it at the source — it may already be exposed elsewhere.",
+    "rotate_at_vendor": "Rotate at {{vendor}}",
     "purge_unknown_value": "the matched value",
     "purge_bulk_pattern_one": "{{count}} value across the active set",
     "purge_bulk_pattern_other": "{{count}} values across the active set",

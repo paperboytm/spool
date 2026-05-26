@@ -371,6 +371,7 @@
     "purge_title_bulk_b": "件の検出？",
     "purge_confirm": "削除",
     "purge_rotate_reminder": "これは Spool 内のコピーをマスクするだけです。有効なシークレットの場合は、発行元でローテーションまたは無効化してください。すでに他の場所で漏洩している可能性があります。",
+    "rotate_at_vendor": "{{vendor}} でローテーション",
     "purge_unknown_value": "一致した値",
     "purge_bulk_pattern_other": "現在の集合内の {{count}} 個の値",
     "purge_bulk_samples_label": "書き換えられる値のサンプル",

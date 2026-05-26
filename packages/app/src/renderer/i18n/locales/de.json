@@ -394,6 +394,7 @@
     "purge_title_bulk_b": "Funde?",
     "purge_confirm": "Entfernen",
     "purge_rotate_reminder": "Dies maskiert nur die Kopie in Spool. Wenn es sich um ein aktives Geheimnis handelt, rotiere oder widerrufe es an der Quelle – es ist möglicherweise bereits anderswo offengelegt.",
+    "rotate_at_vendor": "Bei {{vendor}} rotieren",
     "purge_unknown_value": "der erkannte Wert",
     "purge_bulk_pattern_one": "{{count}} Wert im aktiven Set",
     "purge_bulk_pattern_other": "{{count}} Werte im aktiven Set",

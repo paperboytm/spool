@@ -371,6 +371,7 @@
     "purge_title_bulk_b": "項發現？",
     "purge_confirm": "清除",
     "purge_rotate_reminder": "這只會遮蔽 Spool 中的副本。如果它仍是有效密鑰，請在源頭輪換或撤銷——它可能已在別處外洩。",
+    "rotate_at_vendor": "在 {{vendor}} 輪換",
     "purge_unknown_value": "匹配到的值",
     "purge_bulk_pattern_other": "在目前集合中 {{count}} 個值",
     "purge_bulk_samples_label": "將被改寫的值範例",
