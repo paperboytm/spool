@@ -241,7 +241,7 @@
       "blur_strip_sub": "검출 값은 세션 상세의 Findings strip에서 기본적으로 흐리게 표시됩니다. 호버하거나 클릭하면 표시. 끄면 항상 표시.",
       "muted_kinds_title": "음소거된 카테고리",
       "muted_kinds_label": "카테고리로 음소거",
-      "muted_kinds_sub_empty": "아예 보고 싶지 않은 카테고리. 검출은 감사용으로 Dismissed로 기록되지만 배지와 목록에는 나타나지 않습니다.",
+      "muted_kinds_sub_empty": "아예 보고 싶지 않은 카테고리. 검출은 감사용으로 무시됨으로 기록되지만 배지와 목록에는 나타나지 않습니다.",
       "muted_kinds_sub_count_other": "{{count}}개 카테고리 음소거. 다시 켜면 백그라운드 재스캔이 시작됩니다.",
       "allowlist_title": "무시한 항목",
       "allowlist_row_title": "무시한 검출",

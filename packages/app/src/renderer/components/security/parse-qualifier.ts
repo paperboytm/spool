@@ -2,8 +2,12 @@
 //
 // Grammar (pragmatic — tolerant of mixed order, whitespace, and
 // stray tokens):
-//   `kind:<SensitiveKind>      severity:high|low      is:active|dismissed|purged
+//   `kind:<SensitiveKind>      severity:high|low      is:active|ignored|purged
 //    session:<uuid-prefix>     <free text>`
+//
+// `is:ignored` is the preferred spelling for per-value suppression;
+// `is:dismissed` stays a backward-compat alias mapping to the same
+// internal `dismissed` state.
 //
 // Unknown qualifiers are ignored (not errored) so the user can paste
 // half-formed queries without UX punishing them; the test suite
@@ -20,6 +24,10 @@ export interface ParsedQualifier {
 }
 
 const KNOWN_STATES: ReadonlySet<FindingState | 'any'> = new Set(['active', 'dismissed', 'purged', 'any'])
+// `ignored` is the preferred user-facing spelling; it maps onto the
+// internal `dismissed` state. `dismissed` stays accepted for backward
+// compatibility.
+const STATE_ALIASES: Readonly<Record<string, FindingState | 'any'>> = { ignored: 'dismissed' }
 const KNOWN_SEVERITIES: ReadonlySet<'high' | 'low'> = new Set(['high', 'low'])
 
 export function parseQualifier(input: string): ParsedQualifier {
@@ -51,13 +59,17 @@ export function parseQualifier(input: string): ParsedQualifier {
         if (out.filter.kind === undefined) out.filter.kind = value as SensitiveKind
         break
       }
-      case 'is':
-        if (KNOWN_STATES.has(value as FindingState | 'any')) {
+      case 'is': {
+        const aliased = STATE_ALIASES[value]
+        if (aliased) {
+          out.filter.state = aliased
+        } else if (KNOWN_STATES.has(value as FindingState | 'any')) {
           out.filter.state = value as FindingState | 'any'
         } else {
           remainder.push(token)
         }
         break
+      }
       case 'severity':
         if (KNOWN_SEVERITIES.has(value as 'high' | 'low')) {
           out.filter.severity = value as 'high' | 'low'

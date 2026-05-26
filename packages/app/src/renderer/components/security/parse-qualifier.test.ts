@@ -24,6 +24,15 @@ describe('parseQualifier', () => {
     expect(parseQualifier('is:any').filter.state).toBe('any')
   })
 
+  it('is:ignored is the preferred spelling, mapping to the internal dismissed state', () => {
+    expect(parseQualifier('is:ignored').filter.state).toBe('dismissed')
+  })
+
+  it('is:dismissed stays accepted as a backward-compat alias for is:ignored', () => {
+    expect(parseQualifier('is:dismissed').filter.state)
+      .toBe(parseQualifier('is:ignored').filter.state)
+  })
+
   it('is: with unknown value is treated as free text, not silently dropped', () => {
     const p = parseQualifier('is:wat')
     expect(p.filter.state).toBeUndefined()

@@ -241,7 +241,7 @@
       "blur_strip_sub": "命中值在会话详情 Findings 条中默认模糊；悬停或点击可显示。关闭则始终可见。",
       "muted_kinds_title": "类别屏蔽",
       "muted_kinds_label": "按类别屏蔽",
-      "muted_kinds_sub_empty": "整类不想再看到。被屏蔽的类别仍会作为 Dismissed 写入审计记录，只是不会出现在 badge 和列表里。",
+      "muted_kinds_sub_empty": "整类不想再看到。被屏蔽的类别仍会作为「已忽略」写入审计记录，只是不会出现在 badge 和列表里。",
       "muted_kinds_sub_count_other": "已屏蔽 {{count}} 个类别。重新开启时会在后台触发重扫。",
       "allowlist_title": "已忽略的项",
       "allowlist_row_title": "你忽略的检测",

@@ -72,7 +72,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
 
   return (
     <div
-      data-testid="allowlist-manage"
+      data-testid="ignored-manage"
       role="dialog"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-start justify-center bg-warm-text/50 dark:bg-black/65 backdrop-blur-md pt-[15vh]"
@@ -96,7 +96,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
           <button
             type="button"
             aria-label={t('common.close', { defaultValue: 'Close' })}
-            data-testid="allowlist-close"
+            data-testid="ignored-close"
             onClick={onClose}
             className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text p-1 rounded"
           >
@@ -162,7 +162,7 @@ function Bucket({ label, entries, confirmKey, busyKey, onStopIgnoring }: BucketP
           return (
             <li
               key={key}
-              data-testid="allowlist-row"
+              data-testid="ignored-row"
               className="flex items-center justify-between gap-3 px-3 py-2"
             >
               <div className="min-w-0 flex-1">
@@ -170,7 +170,7 @@ function Bucket({ label, entries, confirmKey, busyKey, onStopIgnoring }: BucketP
                   <span className="text-sm text-warm-text dark:text-dark-text shrink-0">{kindLabel}</span>
                   {entry.preview && (
                     <span
-                      data-testid="allowlist-preview"
+                      data-testid="ignored-preview"
                       className="font-mono text-[11px] text-warm-muted dark:text-dark-muted truncate"
                     >
                       {entry.preview}
@@ -189,7 +189,7 @@ function Bucket({ label, entries, confirmKey, busyKey, onStopIgnoring }: BucketP
               </div>
               <button
                 type="button"
-                data-testid="allowlist-remove"
+                data-testid="stop-ignoring-button"
                 disabled={isBusy}
                 onClick={() => onStopIgnoring(entry)}
                 className={[

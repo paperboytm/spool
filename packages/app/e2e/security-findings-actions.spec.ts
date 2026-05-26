@@ -76,9 +76,9 @@ test('strip dedupes repeated values with ×N and exposes per-row + bulk actions'
   // Per-row actions exist (opacity-0 until hover, but present + clickable
   // — Playwright visibility ignores opacity). Dismiss opens a scope menu
   // with exactly the session + global choices.
-  await expect(apiRow.locator('[data-testid="strip-dismiss"]')).toBeVisible()
+  await expect(apiRow.locator('[data-testid="strip-ignore"]')).toBeVisible()
   await expect(apiRow.locator('[data-testid="strip-purge"]')).toBeVisible()
-  await apiRow.locator('[data-testid="strip-dismiss"]').click()
+  await apiRow.locator('[data-testid="strip-ignore"]').click()
   await expect(window.locator('[role="menu"] [role="menuitem"]')).toHaveCount(2)
   await window.keyboard.press('Escape')
 

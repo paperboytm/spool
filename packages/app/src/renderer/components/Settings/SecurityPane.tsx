@@ -274,7 +274,7 @@ function SecurityPaneInner() {
           control={
             <button
               type="button"
-              data-testid="settings-allowlist-manage"
+              data-testid="settings-ignored-manage"
               onClick={() => setAllowlistOpen(true)}
               className="inline-flex items-center gap-1.5 h-7 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface hover:border-warm-border2 dark:hover:border-dark-border2 px-2.5 text-[12px] text-warm-text dark:text-dark-text transition-colors"
             >

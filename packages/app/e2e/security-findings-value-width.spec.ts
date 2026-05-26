@@ -54,8 +54,8 @@ test('finding value spans the full row width and actions stay reachable on hover
 
   // Hover surfaces the floating actions; they must be visible + enabled.
   await row.hover()
-  const dismiss = row.locator('[data-testid="dismiss-button"]')
-  await expect(dismiss).toBeVisible()
+  const ignore = row.locator('[data-testid="ignore-button"]')
+  await expect(ignore).toBeVisible()
   await expect(row.locator('[data-testid="purge-button"]')).toBeVisible()
-  await expect(dismiss).toBeEnabled()
+  await expect(ignore).toBeEnabled()
 })

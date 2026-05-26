@@ -60,16 +60,16 @@ test('Settings → Security pane: Allowlist Manage modal opens with empty state'
 
   await openSecurityTab(window)
 
-  await window.locator('[data-testid="settings-allowlist-manage"]').click()
-  const modal = window.locator('[data-testid="allowlist-manage"]')
+  await window.locator('[data-testid="settings-ignored-manage"]').click()
+  const modal = window.locator('[data-testid="ignored-manage"]')
   await expect(modal).toBeVisible()
 
   // No rows initially — assert empty-state text without checking exact
   // localized copy.
-  await expect(modal.locator('[data-testid="allowlist-row"]')).toHaveCount(0)
+  await expect(modal.locator('[data-testid="ignored-row"]')).toHaveCount(0)
 
   // Close via the X button + reopen settings stays untouched.
-  await window.locator('[data-testid="allowlist-close"]').click()
+  await window.locator('[data-testid="ignored-close"]').click()
   await expect(modal).toBeHidden()
 })
 

@@ -247,7 +247,7 @@
       "blur_strip_sub": "Les valeurs détectées sont floutées par défaut dans le strip Findings du détail de session ; survoler ou cliquer pour révéler. Désactivé = toujours visible.",
       "muted_kinds_title": "Catégories masquées",
       "muted_kinds_label": "Masquer par catégorie",
-      "muted_kinds_sub_empty": "Catégories que tu ne veux jamais voir. Les détections sont quand même enregistrées comme Dismissed pour l'audit — simplement absentes du badge et des listes.",
+      "muted_kinds_sub_empty": "Catégories que tu ne veux jamais voir. Les détections sont quand même enregistrées comme Ignoré pour l'audit — simplement absentes du badge et des listes.",
       "muted_kinds_sub_count_one": "{{count}} catégorie masquée. La réactiver déclenche un re-scan en arrière-plan.",
       "muted_kinds_sub_count_other": "{{count}} catégories masquées. Les réactiver déclenche un re-scan en arrière-plan.",
       "allowlist_title": "Éléments ignorés",

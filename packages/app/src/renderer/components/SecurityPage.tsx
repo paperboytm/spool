@@ -1547,11 +1547,11 @@ function FindingItem({
              *  caret live in one button so they stay baseline-aligned. */}
             <Menu
               align="right"
-              testId="dismiss-scope-menu"
+              testId="ignore-scope-menu"
               trigger={({ open, toggle }) => (
                 <button
                   type="button"
-                  data-testid="dismiss-button"
+                  data-testid="ignore-button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={toggle}
                   aria-haspopup="menu"
