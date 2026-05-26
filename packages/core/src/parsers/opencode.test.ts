@@ -78,7 +78,7 @@ describe('OpenCode parser', () => {
       makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'),
     ])
     expect(getOpenCodeSessionIndexedMtime(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123')))
-      .toBe('1779152404000::opencode-v2-sqlite-parent-subagents')
+      .toBe('1779152404000::opencode-v3-session-model-json')
   })
 
   it('folds OpenCode child sessions into the parent as sidechain messages', () => {
@@ -94,7 +94,7 @@ describe('OpenCode parser', () => {
       makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'),
     ])
     expect(getOpenCodeSessionIndexedMtime(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123')))
-      .toBe('1779152410000::opencode-v2-sqlite-parent-subagents')
+      .toBe('1779152410000::opencode-v3-session-model-json')
 
     const childPath = makeOpenCodeSessionFilePath(dbPath, 'ses_child_explore')
     expect(loadOpenCodeSession(childPath)).toEqual({ kind: 'filtered' })
@@ -231,6 +231,35 @@ describe('OpenCode parser', () => {
     expect(parseOpenCodeSession(missing)).toBeNull()
   })
 
+  it('derives the model from the session JSON, falling back for partial / non-JSON values', () => {
+    const cases: Array<{ id: string; rawModel: string; expected: string }> = [
+      { id: 'ses_model_full', rawModel: '{"id":"big-pickle","providerID":"opencode"}', expected: 'opencode/big-pickle' },
+      { id: 'ses_model_no_provider', rawModel: '{"id":"big-pickle"}', expected: 'big-pickle' },
+      { id: 'ses_model_malformed', rawModel: '{not json', expected: '{not json' },
+      { id: 'ses_model_plain', rawModel: 'opencode/gpt-5.4', expected: 'opencode/gpt-5.4' },
+    ]
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      const start = Date.UTC(2026, 4, 19, 1, 0, 6)
+      for (const c of cases) {
+        db.prepare(`
+          INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated, model, agent)
+          VALUES (?, 'proj_1', ?, '/work/api', ?, '1.0.0', ?, ?, ?, 'build')
+        `).run(c.id, c.id, c.id, start, start + 1000, c.rawModel)
+        insertTextMessage(db, { sessionId: c.id, messageId: `${c.id}_m`, role: 'user', text: 'hi', at: start + 500 })
+      }
+    } finally {
+      db.close()
+    }
+
+    for (const c of cases) {
+      const result = loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, c.id))
+      expect(result.kind, c.id).toBe('parsed')
+      if (result.kind !== 'parsed') continue
+      expect(result.session.model, c.id).toBe(c.expected)
+    }
+  })
+
   it('maps WAL/SHM sidecar paths back to the main database file', () => {
     expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db-wal')).toBe('/data/opencode/opencode.db')
     expect(normalizeOpenCodeWatchPath('/data/opencode/opencode.db-shm')).toBe('/data/opencode/opencode.db')
@@ -298,7 +327,7 @@ function seedOpenCodeSession(db: Database.Database): void {
   `).run(start, start)
   db.prepare(`
     INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated, model, agent)
-    VALUES ('ses_abc123', 'proj_1', 'fix-auth-callback', '/work/api', 'Fix the auth callback', '1.0.0', ?, ?, 'opencode/gpt-5.4', 'build')
+    VALUES ('ses_abc123', 'proj_1', 'fix-auth-callback', '/work/api', 'Fix the auth callback', '1.0.0', ?, ?, '{"id":"gpt-5.4","providerID":"opencode","variant":"default"}', 'build')
   `).run(start, start + 4000)
 
   db.prepare(`

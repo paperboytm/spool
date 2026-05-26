@@ -3,7 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
-export const OPENCODE_INDEX_VERSION = 'opencode-v2-sqlite-parent-subagents'
+export const OPENCODE_INDEX_VERSION = 'opencode-v3-session-model-json'
 export const OPENCODE_DB_NAME = 'opencode.db'
 const OPENCODE_SESSION_SEPARATOR = '#session='
 const OPENCODE_SUBAGENT_PARENT_PREFIX = 'opencode-subagent:'
@@ -389,9 +389,21 @@ function modelFromMessage(message: OpenCodeMessageData): string {
   return modelId ?? ''
 }
 
+// OpenCode stores `session.model` as a serialized JSON object
+// (`{"id","providerID","variant"?}`), not a plain string — so trim alone would
+// leak raw JSON into the model field. Parse it into the same `provider/model`
+// shape modelFromMessage produces; fall back to the trimmed string for any
+// non-JSON or unparseable value.
 function normalizeModel(model: string | null): string {
   if (!model) return ''
-  return model.trim()
+  const trimmed = model.trim()
+  if (!trimmed.startsWith('{')) return trimmed
+  const parsed = parseJson<{ id?: string; modelID?: string; providerID?: string }>(trimmed)
+  if (!parsed) return trimmed
+  const providerId = parsed.providerID
+  const modelId = parsed.modelID ?? parsed.id
+  if (providerId && modelId) return `${providerId}/${modelId}`
+  return modelId ?? ''
 }
 
 function parseJson<T>(raw: string): T | null {
