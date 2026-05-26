@@ -192,7 +192,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
 
   const refresh = useCallback(async () => {
     try {
-      const [r, sPage, sTotal, st] = await Promise.all([
+      const [r, sPage, sTotal, st, lastScan] = await Promise.all([
         securityApi.riskByCategory(),
         securityApi.listSessionsWithFindingsPage({
           ...filter,
@@ -200,21 +200,18 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
         }),
         securityApi.countSessionsWithFindings(filter),
         securityApi.getScanStatus(),
+        securityApi.lastScanCompletedAt(),
       ])
       setRisk(r)
       setSessions(sPage.rows as Sess[])
       setSessionsHasMore(sPage.hasMore)
       setSessionsTotal(sTotal)
       setScanStatus(st)
-      // Pick the most recent scan_completed_at across the session set
-      // we just fetched. Cheap because s is already in-memory.
-      const completedAts = (sPage.rows as Sess[])
-        .map(x => x.scanCompletedAt)
-        .filter((x): x is string => Boolean(x))
-      if (completedAts.length > 0) {
-        completedAts.sort()
-        setLastScanCompletedAt(completedAts[completedAts.length - 1] ?? null)
-      }
+      // True most-recent scan completion across ALL sessions — not the
+      // filtered/paginated findings page. A session scanned + cleaned
+      // (now 0 active findings) drops off that list, so deriving from
+      // it could read older than the real last scan.
+      setLastScanCompletedAt(lastScan)
       setLoading(false)
       setError(null)
       // Return fresh risk so callers (e.g. the manual-rescan ACK

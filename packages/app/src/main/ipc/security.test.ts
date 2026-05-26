@@ -18,6 +18,7 @@ import {
   runMigrations,
   insertFindings,
   updateSessionCounts,
+  setSessionScanProfile,
   listFindings,
   type ScanWorker,
   type ScanStatus,
@@ -212,6 +213,14 @@ describe('registerSecurityIpc', () => {
         SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY,
       )
       expect(rows[0]).toMatchObject({ kind: 'api-key', severity: 'high', count: 1, sessions: 1 })
+    })
+
+    it('LAST_SCAN_COMPLETED_AT returns null before any scan, then the MAX', async () => {
+      const before = await invoke<string | null>(SECURITY_IPC_CHANNELS.LAST_SCAN_COMPLETED_AT)
+      expect(before).toBeNull()
+      setSessionScanProfile(fixture.db, 1, 'regex@4', '2026-02-01T00:00:00Z')
+      const after = await invoke<string | null>(SECURITY_IPC_CHANNELS.LAST_SCAN_COMPLETED_AT)
+      expect(after).toBe('2026-02-01T00:00:00Z')
     })
 
     it('GET_FINDING_VALUE reads the live message text', async () => {

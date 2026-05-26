@@ -15,6 +15,7 @@ import {
   listSessionsWithFindingsPage,
   countSessionsWithFindings,
   riskByCategory,
+  lastScanCompletedAt,
   getFindingValue,
   getAllowlists,
   isAllowlisted,
@@ -398,6 +399,36 @@ describe('repo: scan_profile lifecycle', () => {
     setSessionScanProfile(db, 1, 'regex@2', '2026-01-10')
     setSessionScanProfile(db, 2, 'regex@3', '2026-01-11')
     expect(listSessionsNeedingScan(db, 'regex@3')).toEqual([1])
+  })
+})
+
+describe('repo: lastScanCompletedAt', () => {
+  let db: Database.Database
+  beforeEach(() => { db = setupDb() })
+
+  it('returns null when nothing has been scanned', () => {
+    expect(lastScanCompletedAt(db)).toBeNull()
+  })
+
+  it('returns the MAX scan_completed_at across all sessions', () => {
+    setSessionScanProfile(db, 1, 'regex@3', '2026-01-10T00:00:00Z')
+    setSessionScanProfile(db, 2, 'regex@3', '2026-01-12T00:00:00Z')
+    expect(lastScanCompletedAt(db)).toBe('2026-01-12T00:00:00Z')
+  })
+
+  it('counts a scanned-then-cleaned session (no active findings) — the regression case', () => {
+    // Session 1: older scan, still has an active finding (would be the
+    // only contributor to a findings-list-derived timestamp).
+    setSessionScanProfile(db, 1, 'regex@3', '2026-01-10T00:00:00Z')
+    insertFindings(db, [
+      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
+    ])
+    // Session 2: newer scan, came back clean (zero findings) so it
+    // drops off listSessionsWithFindings entirely.
+    setSessionScanProfile(db, 2, 'regex@3', '2026-01-15T00:00:00Z')
+    // The page-derived value would be session 1's old time; the true
+    // last scan is session 2's.
+    expect(lastScanCompletedAt(db)).toBe('2026-01-15T00:00:00Z')
   })
 })
 

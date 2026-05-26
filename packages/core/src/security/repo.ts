@@ -517,6 +517,22 @@ export function riskByCategory(db: Database.Database): RiskByCategoryRow[] {
   }))
 }
 
+/** The most recent `scan_completed_at` across ALL sessions, regardless
+ *  of whether they currently have active findings. Drives the Security
+ *  page's "scanned X ago" label. Deriving it from the filtered,
+ *  paginated findings list undercounts: a session scanned + cleaned
+ *  (no active findings) drops off that list and stops contributing, so
+ *  the label could read older than the true last scan. Returns null
+ *  when nothing has been scanned yet. */
+export function lastScanCompletedAt(db: Database.Database): string | null {
+  const row = db.prepare(
+    `SELECT MAX(scan_completed_at) AS last
+       FROM sessions
+      WHERE scan_completed_at IS NOT NULL`,
+  ).get() as { last: string | null }
+  return row.last
+}
+
 /** Read the live raw value for one finding. Used by the UI's review
  *  panel and the Purge confirm dialog. Returns null when the finding
  *  no longer points at a valid message (race against session

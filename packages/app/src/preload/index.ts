@@ -266,6 +266,8 @@ const api = {
       ipcRenderer.invoke('security:count-sessions-with-findings', filter),
     riskByCategory: (): Promise<RiskByCategoryRow[]> =>
       ipcRenderer.invoke('security:risk-by-category'),
+    lastScanCompletedAt: (): Promise<string | null> =>
+      ipcRenderer.invoke('security:last-scan-completed-at'),
     getFindingValue: (findingId: number): Promise<string | null> =>
       ipcRenderer.invoke('security:get-finding-value', findingId),
     getFindingValues: (ids: number[]): Promise<Record<number, string | null>> =>

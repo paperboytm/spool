@@ -32,6 +32,7 @@ export {
   listSessionsWithFindingsPage,
   countSessionsWithFindings,
   riskByCategory,
+  lastScanCompletedAt,
   getFindingValue,
   getFindingValues,
   getAllowlists,
