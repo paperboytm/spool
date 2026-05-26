@@ -5,17 +5,21 @@ import type { BrowserWindow, IpcMainEvent } from 'electron'
 import { makeModelHost, type ModelHostDeps } from './model-host.js'
 import { PF_IPC, type PfReadyMessage } from '../../renderer/inference/types.js'
 
-type FakeWindow = BrowserWindow & { destroyed: boolean }
+type FakeWindow = BrowserWindow & { destroyed: boolean; crash: () => void }
 
 /** Minimal stand-ins for the bits of `BrowserWindow` and `ipcMain` the
  *  ModelHost touches — vitest can't import the real ones because they
- *  require Electron's main process. */
+ *  require Electron's main process. webContents is an EventEmitter so
+ *  the host can attach its `render-process-gone` listener. */
 function fakeBrowserWindow(id: number): FakeWindow {
+  const wc = new EventEmitter() as unknown as BrowserWindow['webContents']
+  ;(wc as unknown as { id: number }).id = id
   const w: Partial<FakeWindow> = {
     destroyed: false,
-    webContents: { id } as BrowserWindow['webContents'],
+    webContents: wc,
     destroy() { (w as FakeWindow).destroyed = true },
     isDestroyed() { return (w as FakeWindow).destroyed },
+    crash() { (wc as unknown as EventEmitter).emit('render-process-gone', {}, { reason: 'crashed', exitCode: 139 }) },
   }
   return w as FakeWindow
 }
@@ -67,6 +71,27 @@ describe('makeModelHost', () => {
     const { deps, win } = depsEmittingReady(12, { runtime: 'wasm', detectionMs: 7 })
     await Effect.runPromise(Effect.scoped(makeModelHost(deps).pipe(Effect.asVoid)))
     expect(win.destroyed).toBe(true)
+  })
+
+  it('transitions to failed and fires onCrash on a post-handshake render-process-gone', async () => {
+    const { deps, win } = depsEmittingReady(14, { runtime: 'wasm', detectionMs: 3 })
+    let crashes = 0
+    const out = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const host = yield* makeModelHost({ ...deps, onCrash: () => { crashes++ } })
+      const readyBefore = yield* host.ready
+      // Renderer dies after a successful handshake. Pre-fix the host
+      // kept reporting `ready`, so scans silently went regex-only while
+      // the profile string still claimed pf@... coverage.
+      win.crash()
+      yield* Effect.sleep('1 millis')
+      const stateAfter = yield* host.getState
+      const readyAfter = yield* host.ready
+      return { readyBefore, stateAfter, readyAfter }
+    })))
+    expect(out.readyBefore).toBe(true)
+    expect(out.readyAfter).toBe(false)
+    expect(out.stateAfter.status).toBe('failed')
+    expect(crashes).toBe(1)
   })
 
   it('does not double-destroy if the window is already gone', async () => {
@@ -293,14 +318,11 @@ interface FakeWindowWithSender extends FakeWindow {
 /** Like fakeBrowserWindow but with a stub `webContents.send` so tests
  *  can react when ModelHost posts an analyze request. */
 function fakeBrowserWindowWithSender(id: number): FakeWindowWithSender {
-  const sendStub = (channel: string, payload: unknown) => {
-    w.webContents.sendImpl?.(channel, payload)
-  }
-  const w: Partial<FakeWindowWithSender> = {
-    destroyed: false,
-    webContents: { id, send: sendStub } as unknown as FakeWindowWithSender['webContents'],
-    destroy() { (w as FakeWindowWithSender).destroyed = true },
-    isDestroyed() { return (w as FakeWindowWithSender).destroyed },
-  }
-  return w as FakeWindowWithSender
+  // Reuse the EventEmitter-backed webContents so the host's
+  // `render-process-gone` listener attaches, then layer on send.
+  const w = fakeBrowserWindow(id) as unknown as FakeWindowWithSender
+  const wc = w.webContents as FakeWindowWithSender['webContents']
+  ;(wc as unknown as { send: (channel: string, payload: unknown) => void }).send =
+    (channel: string, payload: unknown) => { wc.sendImpl?.(channel, payload) }
+  return w
 }

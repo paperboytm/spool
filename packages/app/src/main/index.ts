@@ -115,7 +115,19 @@ let scanWorker: ScanWorkerProxy | null = null
 let disposeSecurityIpc: (() => void) | null = null
 let setSecurityReadiness: ((next: SecurityReadiness) => void) | null = null
 let disposeSecurityReadinessIpc: (() => void) | null = null
-const pfRuntime = makePfRuntime({ run: runWithObservability })
+const pfRuntime = makePfRuntime({
+  run: runWithObservability,
+  // A post-handshake renderer crash leaves the ModelHost reporting
+  // `ready` unless something flips it; the host now transitions to
+  // `failed` on its own, but the scan worker only learns pf is offline
+  // through this hook. Without it the worker keeps stamping `pf@...`
+  // into scan_profile while every analyze round-trips to a dead window
+  // and returns [] — a regex-only scan masquerading as ML coverage.
+  onCrash: () => {
+    console.error('[security] pf inference renderer crashed — taking scan worker offline')
+    scanWorker?.notifyPfOffline()
+  },
+})
 // Lazily resolved on first access — pfModelsRoot() reads app.getPath
 // which throws before app.ready, but this module evaluates at boot.
 let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null

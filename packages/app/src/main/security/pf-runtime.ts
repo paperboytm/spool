@@ -43,6 +43,10 @@ export interface PfRuntimeDeps {
    *  passes `runWithObservability` so PF spans land in the same
    *  OTel pipeline as scan-worker / sync-worker / IPC spans. */
   run?: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
+  /** Invoked when the live inference window's render process is gone
+   *  after a successful handshake. Main wires this to take the scan
+   *  worker offline so its profile string stops claiming ML coverage. */
+  onCrash?: () => void
 }
 
 export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
@@ -63,7 +67,11 @@ export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
     starting = run(
       Effect.gen(function* () {
         const fresh = yield* Scope.make()
-        const builtHost = yield* Effect.provideService(makeModelHost({ spawnWindow, ipc }), Scope.Scope, fresh)
+        const builtHost = yield* Effect.provideService(
+          makeModelHost({ spawnWindow, ipc, ...(deps.onCrash ? { onCrash: deps.onCrash } : {}) }),
+          Scope.Scope,
+          fresh,
+        )
         host = builtHost
         scope = fresh
         // Annotate after we have a state — useful when scrolling OTel

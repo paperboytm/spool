@@ -4,17 +4,20 @@ import type { BrowserWindow } from 'electron'
 import { makePfRuntime } from './pf-runtime.js'
 import { PF_IPC } from '../../renderer/inference/types.js'
 
-type FakeWindow = BrowserWindow & { destroyed: boolean }
+type FakeWindow = BrowserWindow & { destroyed: boolean; crash: () => void }
 
 function fakeWindow(id: number): FakeWindow {
+  // webContents is an EventEmitter so the host can attach its
+  // `render-process-gone` listener; `crash()` drives it in tests.
+  const wc = new EventEmitter() as unknown as BrowserWindow['webContents']
+  ;(wc as unknown as { id: number }).id = id
+  ;(wc as unknown as { send: () => void }).send = () => { /* no-op */ }
   const w: Partial<FakeWindow> = {
     destroyed: false,
-    webContents: {
-      id,
-      send: () => { /* no-op */ },
-    } as unknown as BrowserWindow['webContents'],
+    webContents: wc,
     destroy() { (w as FakeWindow).destroyed = true },
     isDestroyed() { return (w as FakeWindow).destroyed },
+    crash() { (wc as unknown as EventEmitter).emit('render-process-gone', {}, { reason: 'crashed', exitCode: 139 }) },
   }
   return w as FakeWindow
 }
@@ -48,6 +51,35 @@ describe('makePfRuntime', () => {
     await rt.stop()
     expect(rt.isActive()).toBe(false)
     expect(win.destroyed).toBe(true)
+  })
+
+  it('post-handshake renderer crash flips state to failed and fires onCrash', async () => {
+    const win = fakeWindow(55)
+    const { ipc, bus } = fakeIpc()
+    let crashes = 0
+    const rt = makePfRuntime({
+      ipc,
+      onCrash: () => { crashes++ },
+      spawnWindow: async () => {
+        setTimeout(() => bus.emit(PF_IPC.READY, { sender: { id: 55 } }, {
+          runtime: 'wasm', detectionMs: 1,
+        }), 0)
+        return win
+      },
+    })
+    await rt.start()
+    // Handshake succeeded — host reports ready.
+    expect((await rt.getState())?.status).toBe('ready')
+
+    // Render process dies after handshake. Pre-fix: state stays
+    // `ready`, onCrash never fires, scan worker keeps stamping pf@...
+    win.crash()
+    // Let the async Ref.set settle.
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect((await rt.getState())?.status).toBe('failed')
+    expect(crashes).toBe(1)
+    await rt.stop()
   })
 
   it('start is idempotent — calling it twice mounts a single host', async () => {

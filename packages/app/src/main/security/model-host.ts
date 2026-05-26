@@ -62,6 +62,12 @@ export interface ModelHostDeps {
   analyzeTimeoutMs?: number
   /** Override for tests — defaults to Electron's `ipcMain`. */
   ipc?: Pick<typeof ipcMain, 'on' | 'removeListener'>
+  /** Invoked when the inference renderer's process is gone after the
+   *  host was acquired (crash / OOM / killed). Lets the caller flip
+   *  downstream state — e.g. tell the scan worker pf is offline so its
+   *  profile string stops claiming ML coverage. The host has already
+   *  transitioned its own state to `failed` by the time this fires. */
+  onCrash?: () => void
 }
 
 /** Build a ModelHost as a Scoped resource. Scope-acquired spawns the
@@ -95,6 +101,16 @@ export function makeModelHost(
         error: err instanceof ModelHostError ? String(err.cause) : String(err),
       })
 
+    // Reject every pending analyze so callers stop waiting on a
+    // response that's never coming once the renderer is gone.
+    const rejectAllPending = (cause: string) => {
+      for (const p of pending.values()) {
+        clearTimeout(p.timer)
+        p.reject(new ModelHostError({ stage: 'analyze', cause }))
+      }
+      pending.clear()
+    }
+
     const win = yield* Effect.acquireRelease(
       Effect.gen(function* () {
         const w = yield* Effect.tryPromise({
@@ -122,8 +138,6 @@ export function makeModelHost(
       }),
       (w) =>
         Effect.sync(() => {
-          // Reject every pending analyze so callers stop waiting for a
-          // response that's never coming once the window is gone.
           for (const p of pending.values()) {
             clearTimeout(p.timer)
             p.reject(new ModelHostError({ stage: 'shutdown', cause: 'window closed' }))
@@ -132,6 +146,26 @@ export function makeModelHost(
           if (w && !w.isDestroyed()) w.destroy()
         }),
     )
+
+    // Watch for a post-acquire renderer crash. The handshake may have
+    // already succeeded (state === 'ready'), so without this the host
+    // keeps reporting `ready` after the inference window is gone:
+    // `analyze` then fails the `win.isDestroyed()` guard and returns
+    // [], scans silently downgrade to regex-only, and the scan
+    // worker's profile string keeps falsely claiming `pf@...` coverage.
+    // Flip state to `failed` and let the caller take the host offline.
+    if (win) {
+      const wc = win.webContents
+      const onRenderGone = () => {
+        rejectAllPending('render process gone')
+        void Effect.runPromise(failWith(new ModelHostError({ stage: 'analyze', cause: 'render process gone' })))
+        deps.onCrash?.()
+      }
+      yield* Effect.acquireRelease(
+        Effect.sync(() => { wc.on('render-process-gone', onRenderGone) }),
+        () => Effect.sync(() => { wc.removeListener('render-process-gone', onRenderGone) }),
+      )
+    }
 
     // Route analyze results back to the resolver waiting on that reqId.
     // We have to install this listener even when handshake hasn't
