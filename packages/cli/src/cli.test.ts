@@ -392,6 +392,39 @@ describe('pin / unpin / pinned', () => {
   })
 })
 
+describe('projects', () => {
+  let seeded: ReturnType<typeof createSeededDir>
+  beforeAll(() => { seeded = createSeededDir() })
+  afterAll(() => { seeded.cleanup() })
+
+  it('lists project groups with session counts', () => {
+    const out = run(['projects'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('my-project')
+    expect(out).toContain('claude')
+    expect(out).toMatch(/\b2\b/)
+  })
+
+  it('outputs JSON', () => {
+    const out = run(['projects', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const parsed = JSON.parse(out)
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0].displayName).toBe('my-project')
+    expect(parsed[0].sessionCount).toBe(2)
+    expect(parsed[0].sources).toContain('claude')
+  })
+
+  it('prints empty message when no projects', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-empty-'))
+    try {
+      const out = run(['projects'], { SPOOL_DATA_DIR: dir })
+      expect(out).toContain('No projects found')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('sync', () => {
   it('runs against empty session dirs', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spool-cli-sync-'))

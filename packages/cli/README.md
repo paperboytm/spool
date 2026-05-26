@@ -28,6 +28,9 @@ spool show <uuid>              # Print full session content
 spool show <uuid> --json       # Output as JSON
 
 spool status                   # Show index stats (session count, DB size)
+
+spool projects                 # List projects, grouped across sources
+spool projects --json          # Output as JSON
 ```
 
 ### Pin
