@@ -166,4 +166,34 @@ describe('migration v12 — security scan schema', () => {
     expect(row.preview).toBeNull()
     expect(row.reason).toBeNull()
   })
+
+  it('self-heals a DB stamped at v14 but missing the allowlist columns (shared-DB version collision)', () => {
+    const db = new Database(':memory:')
+    runMigrations(db) // full v14 schema, columns present
+    // Reproduce the field bug: a shared dev DB whose user_version reached 14
+    // via another branch's migration never ran THIS v14 block, so it sits at
+    // 14 with the allowlist columns absent. The version gate then skips v14
+    // forever — only ensureSchemaSanity can repair it.
+    for (const table of ['allowlist_session', 'allowlist_global']) {
+      db.exec(`ALTER TABLE ${table} DROP COLUMN preview`)
+      db.exec(`ALTER TABLE ${table} DROP COLUMN reason`)
+    }
+    expect(userVersion(db)).toBe(LATEST_SCHEMA_VERSION) // still 14 → v14 block won't re-run
+
+    runMigrations(db)
+
+    for (const table of ['allowlist_session', 'allowlist_global']) {
+      const names = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>)
+        .map(c => c.name)
+      expect(names, `${table} should regain preview`).toContain('preview')
+      expect(names, `${table} should regain reason`).toContain('reason')
+    }
+    // And the dismiss/ignore INSERT path that threw "no column named preview"
+    // now works.
+    expect(() =>
+      db.prepare(
+        `INSERT INTO allowlist_global (kind, value_hash, preview, reason) VALUES ('api-key', 'h', 'Stripe ••a39f', 'test-credential')`,
+      ).run(),
+    ).not.toThrow()
+  })
 })

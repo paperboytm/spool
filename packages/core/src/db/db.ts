@@ -665,12 +665,23 @@ function ensureSchemaSanity(db: Database.Database): void {
   // Backfill columns the head schema requires but historical DBs (or test
   // fixtures that seed an intentionally-minimal table) may be missing.
   // Each ALTER is a fast no-op when the column already exists.
-  const ensureCol = (col: string, ddl: string): void => {
-    if (!columnExists(db, 'sessions', col)) db.exec(`ALTER TABLE sessions ADD COLUMN ${col} ${ddl}`)
+  const ensureCol = (table: string, col: string, ddl: string): void => {
+    if (!columnExists(db, table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`)
   }
-  ensureCol('title', 'TEXT')
-  ensureCol('title_source', `TEXT NOT NULL DEFAULT 'derived'`)
-  ensureCol('message_count', 'INTEGER NOT NULL DEFAULT 0')
+  ensureCol('sessions', 'title', 'TEXT')
+  ensureCol('sessions', 'title_source', `TEXT NOT NULL DEFAULT 'derived'`)
+  ensureCol('sessions', 'message_count', 'INTEGER NOT NULL DEFAULT 0')
+  // v14 recognition metadata. Same repair contract as above: a shared dev DB
+  // whose user_version reached 14 via another branch's migration — or a
+  // half-finished upgrade — can sit at 14 with the allowlist columns missing,
+  // which makes the dismiss/ignore path throw on INSERT. tableExists guards a
+  // pre-v12 DB where the allowlist tables don't exist yet.
+  for (const t of ['allowlist_session', 'allowlist_global']) {
+    if (tableExists(db, t)) {
+      ensureCol(t, 'preview', 'TEXT')
+      ensureCol(t, 'reason', 'TEXT')
+    }
+  }
 }
 
 /**
