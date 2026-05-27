@@ -520,14 +520,8 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
          *  scroll area's stable 8px gutter below) so the right-aligned
          *  Ignored entry lines up with the cards' right-edge controls
          *  instead of overhanging them. */}
-        <div className="max-w-[720px] pr-3 flex items-center gap-3">
-        {/* Left group owns the flex-1 width so the stats truncate without
-         *  wrapping, while the ↻ button stays glued to the right of the
-         *  "scanned X ago" stamp (reads as "last scanned · refresh").
-         *  Only the Ignored entry, as the outer flex-none sibling, floats
-         *  to the list's right edge. */}
-        <div className="min-w-0 flex-1 flex items-center gap-2">
-        <span className="min-w-0 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
+        <div className="pr-3 flex items-center gap-3">
+        <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
           {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
           {infoCount > 0 && (
             <span className="opacity-70">
@@ -589,9 +583,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             </>
           )}
         </span>
-        {/* Rescan stays paired with the "scanned X ago" stamp (reads as
-         *  "last scanned · refresh"); only the Ignored entry floats to
-         *  the far right, aligned to the list's right edge. */}
+        {/* Both actions sit together at the row's right edge, icon-only
+         *  with tooltips for a uniform look — the stats span's flex-1
+         *  pushes the group over. */}
+        <div className="flex-none flex items-center gap-1">
         <button
           type="button"
           data-testid="security-rescan-all"
@@ -612,7 +607,6 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             aria-hidden
           />
         </button>
-        </div>
         {ignoredCount > 0 && (
           <button
             type="button"
@@ -620,19 +614,17 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             onClick={() => setIgnoredOpen(true)}
             title={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
             aria-label={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
-            className="flex-none inline-flex items-center gap-1.5 h-5 px-1.5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+            className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
           >
             <CircleSlash size={13} strokeWidth={1.75} aria-hidden />
-            <span className="font-mono text-[11px]">
-              {t('security.ignored_label', { defaultValue: 'Ignored' })}
-            </span>
           </button>
         )}
+        </div>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]">
-        <div className="max-w-[720px]">
+        <div>
           {/* ScanBanner + ScanResultBanner sit OUTSIDE the empty /
            *  findings / loading branch below so a manual rescan that
            *  finishes with zero findings still surfaces the "Scan

@@ -87,15 +87,7 @@ test('Meta row keeps the timestamp and holds the rescan button still during a sc
   // Precondition: the boot backfill has set a "scanned X ago" stamp.
   await expect(scanState).toBeVisible()
 
-  // Regression (meta-rescan-adjacency): the ↻ button sits immediately to
-  // the right of the "scanned X ago" stamp ("last scanned · refresh"),
-  // not flung to the row's far edge. A stats span that grew to `flex-1`
-  // once ate the full row width and shoved ↻ against the right margin.
-  const stampBox = (await scanState.boundingBox())!
-  const btnBoxResting = (await rescanBtn.boundingBox())!
-  expect(btnBoxResting.x - (stampBox.x + stampBox.width)).toBeLessThan(24)
-
-  const restingX = btnBoxResting.x
+  const restingX = (await rescanBtn.boundingBox())!.x
 
   await rescanBtn.click()
 

@@ -69,7 +69,8 @@ test('Security page surfaces an Ignored entry that opens the manage modal', asyn
   // rescan needed.
   const entry = window.locator('[data-testid="security-ignored-open"]')
   await expect(entry).toBeVisible({ timeout: 15_000 })
-  await expect(entry).toContainText(/Ignored/)
+  // Icon-only button — the label lives in the tooltip / aria-label.
+  await expect(entry).toHaveAttribute('aria-label', /Ignored/)
 
   // Clicking opens the shared manage modal.
   await entry.click()
