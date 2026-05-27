@@ -45,6 +45,7 @@ import { loadSecurityPreferences, saveSecurityPreferences } from './securityPref
 import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
 import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
 import { makePfCoordinator } from './security/pf-coordinator.js'
+import { shouldAutoActivatePf } from './security/pf-activation.js'
 import { pfModelDir } from './security/model-paths.js'
 import type {
   FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
@@ -131,6 +132,14 @@ const pfRuntime = makePfRuntime({
 // Lazily resolved on first access — pfModelsRoot() reads app.getPath
 // which throws before app.ready, but this module evaluates at boot.
 let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null
+// Whether the Security worker + IPC are currently up. Flipped by the
+// idempotent ensureSecurityBooted / teardownSecurity pair so the Labs
+// toggle can start/stop the feature live (no restart).
+let securityBooted = false
+// The PF model URL-scheme handler is a process-lifetime singleton:
+// registering it twice throws, so we only ever register once and leave
+// it (it's passive when no inference window hits it).
+let pfProtocolRegistered = false
 
 type CachedSearchValue = FragmentResult[]
 
@@ -169,7 +178,7 @@ class SearchCache {
 
 const searchCache = new SearchCache()
 
-/** Main-process mirror of the renderer's `securityFeatureEnabled()`.
+/** Main-process mirror of the renderer's `securityBuildCapable()`.
  *
  *  The renderer reads `import.meta.env.DEV` and
  *  `import.meta.env.VITE_FEATURE_SECURITY` (Vite inlines both at
@@ -186,10 +195,19 @@ const searchCache = new SearchCache()
  *  still run unconditionally — schema must be forward-compatible
  *  so that flipping the flag on later doesn't require a second
  *  upgrade pass. */
-function securityFeatureEnabled(): boolean {
+function securityBuildCapable(): boolean {
   const env = (import.meta as any).env as { DEV?: boolean; VITE_FEATURE_SECURITY?: string } | undefined
   if (env?.DEV) return true
   return env?.VITE_FEATURE_SECURITY === '1'
+}
+
+/** Runtime gate = build-capable AND the user opted in via the Labs
+ *  toggle (persisted on agents.json `securityEnabled`). Undefined opt-in
+ *  falls back to DEV, mirroring the renderer's resolveSecurityEnabled so
+ *  dev keeps the feature on without an explicit choice. */
+function securityRuntimeEnabled(config: import('./acp.js').AgentsConfig): boolean {
+  if (!securityBuildCapable()) return false
+  return config.securityEnabled ?? Boolean((import.meta as any).env?.DEV)
 }
 
 async function bootScanWorker(): Promise<void> {
@@ -232,6 +250,126 @@ async function shutdownScanWorker(): Promise<void> {
     scanWorker = null
   }
   try { await pfRuntime.stop() } catch { /* best effort */ }
+}
+
+/** Idempotent boot of the Security feature: scan worker + its IPC, plus
+ *  the process-lifetime PF protocol + coordinator (registered once).
+ *  Called at startup when the runtime gate is on, and live when the user
+ *  flips the Labs toggle on. */
+async function ensureSecurityBooted(): Promise<void> {
+  if (securityBooted) {
+    console.log('[security.lifecycle] ensureSecurityBooted: already booted, skipping')
+    return
+  }
+  securityBooted = true
+  console.log('[security.lifecycle] booting — registering IPC + scan worker')
+
+  const readiness = registerSecurityReadinessIpc(() => mainWindow)
+  setSecurityReadiness = readiness.setReadiness
+  disposeSecurityReadinessIpc = readiness.dispose
+
+  if (!pfProtocolRegistered) {
+    // Has to happen post-ready (uses protocol.handle + app.getPath).
+    registerPfModelProtocol()
+    pfProtocolRegistered = true
+  }
+  if (!pfCoordinator) {
+    // Electron's `net.fetch` honours system proxy + custom CA bundle;
+    // globalThis.fetch (undici) bypasses both (see bug_electron_proxy).
+    // E2E exception: SPOOL_E2E_TEST swaps in an immediate-503 fake so the
+    // download state machine is deterministic without a real network hop.
+    const pfFetchImpl: typeof globalThis.fetch = process.env['SPOOL_E2E_TEST'] === '1'
+      ? (async () => new Response(null, { status: 503, statusText: 'e2e-fake' })) as typeof globalThis.fetch
+      : ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch
+    pfCoordinator = makePfCoordinator({
+      modelDir: pfModelDir(),
+      fetch: pfFetchImpl,
+      run: runWithObservability,
+    })
+    // When a callout-initiated download completes, finish activation on
+    // the user's behalf — flip pfEnabled so syncPfRuntime spawns the
+    // inference window + kicks backfill.
+    pfCoordinator.subscribe((s) => {
+      if (s.phase !== 'installed') return
+      const prefs = loadSecurityPreferences()
+      // The coordinator (a process singleton) keeps downloading even
+      // after the user disables Security mid-download. shouldAutoActivatePf
+      // gates on securityBooted so we never resurrect a hidden inference
+      // window behind an OFF toggle (teardown clears pfActivationPending,
+      // so re-enabling starts clean).
+      if (!shouldAutoActivatePf({
+        phase: s.phase,
+        securityBooted,
+        pfActivationPending: prefs.pfActivationPending,
+        pfEnabled: prefs.pfEnabled,
+      })) return
+      void (async () => {
+        const next = saveSecurityPreferences({ pfEnabled: true })
+        mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+        await syncPfRuntime(true).catch((err) => {
+          console.error('[security] callout-driven activation failed:', err)
+        })
+      })()
+    })
+  }
+
+  await bootScanWorker()
+  if (!scanWorker) {
+    console.warn('[security.lifecycle] boot aborted — scanner unavailable')
+    setSecurityReadiness?.({ ready: false, reason: 'scanner-unavailable' })
+    return
+  }
+  disposeSecurityIpc = registerSecurityIpc({
+    db,
+    worker: scanWorker,
+    runPromise: runWithObservability,
+    getMainWindow: () => mainWindow,
+    pfCoordinator,
+    pfRuntime,
+    onPfEnabledChanged: (enabled) => {
+      void syncPfRuntime(enabled).catch((err) => {
+        console.error('[security] pf runtime transition failed:', err)
+      })
+    },
+  })
+  setSecurityReadiness?.({ ready: true })
+  console.log('[security.lifecycle] booted — worker + IPC ready, backfilling')
+  runWithObservability(scanWorker.backfill()).catch((err) => {
+    console.error('[security] boot backfill failed:', err)
+  })
+  // If the user enabled PF before this boot, bring the inference window
+  // up now that the rest of Spool is ready.
+  if (loadSecurityPreferences().pfEnabled) {
+    void syncPfRuntime(true).catch((err) => {
+      console.error('[security] pf runtime boot failed:', err)
+    })
+  }
+}
+
+/** Idempotent inverse: stop the scan worker + tear down its IPC + the PF
+ *  inference window (via shutdownScanWorker). Leaves the passive PF
+ *  protocol + coordinator registered for a clean re-enable. Called when
+ *  the user flips the Labs toggle off — immediate, no residual scanning,
+ *  no restart. */
+async function teardownSecurity(): Promise<void> {
+  if (!securityBooted) {
+    console.log('[security.lifecycle] teardownSecurity: not booted, skipping')
+    return
+  }
+  securityBooted = false
+  console.log('[security.lifecycle] tearing down — terminating worker + disposing IPC')
+  // Clear any pending PF activation (e.g. a model download kicked off
+  // from the callout that's still in flight): without this the
+  // coordinator's completion handler is now gated off (see subscribe),
+  // and the callout would otherwise hang on "Activating…" if the user
+  // re-enables. Re-enabling starts PF fresh from the persisted pfEnabled.
+  const prefs = loadSecurityPreferences()
+  if (prefs.pfActivationPending) {
+    const next = saveSecurityPreferences({ pfActivationPending: false })
+    mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+  }
+  await shutdownScanWorker()
+  console.log('[security.lifecycle] torn down — scanner stopped, zero residual')
 }
 
 /** Bring the Privacy Filter inference window up or down to match the
@@ -510,93 +648,18 @@ app.whenReady().then(async () => {
   // mount + initial sync don't wait on it. The Syncer's
   // onSessionChanged callback and the post-sync backfill are both
   // guarded by `if (scanWorker)`, so any session changes that fire
-  // before the worker is ready are no-ops — `scanWorker.backfill()`
-  // below catches up once boot completes.
+  // before the worker is ready are no-ops — backfill catches up once
+  // boot completes.
   //
-  // Gated by VITE_FEATURE_SECURITY so production builds (where the
-  // env var stays unset) never start the scanner.
-  if (securityFeatureEnabled()) {
-    // Register the readiness IPC eagerly so the renderer can wait for
-    // (or banner against) the worker boot. Without this, any Settings
-    // → Security or SecurityPage mount during the boot window hit
-    // unregistered handlers and surfaced as raw "No handler registered
-    // for security:..." errors.
-    const readiness = registerSecurityReadinessIpc(() => mainWindow)
-    setSecurityReadiness = readiness.setReadiness
-    disposeSecurityReadinessIpc = readiness.dispose
-
-    // Has to happen post-ready (uses protocol.handle + app.getPath).
-    registerPfModelProtocol()
-    // Electron's `net.fetch` honours system proxy + custom CA bundle;
-    // globalThis.fetch (undici) bypasses both. Per bug_electron_proxy
-    // memory: stealer logs / corp proxies / mainland China all need
-    // this for outbound HF traffic.
-    //
-    // E2E exception: when SPOOL_E2E_TEST is set, replace the fetch
-    // with an immediate-503 fake. The PF download e2e wants to
-    // verify the click → IPC → state-machine wiring, not network
-    // behaviour — the state machine's logic itself is fully covered
-    // by pf-coordinator.test.ts with injected fakes. Going to a real
-    // HF URL made the e2e flaky because the failure path waits on a
-    // network roundtrip whose latency we don't control. The fake
-    // resolves synchronously, so the state machine transitions
-    // not-installed → downloading → failed in milliseconds and the
-    // wiring assertion becomes deterministic.
-    const pfFetchImpl: typeof globalThis.fetch = process.env['SPOOL_E2E_TEST'] === '1'
-      ? (async () => new Response(null, { status: 503, statusText: 'e2e-fake' })) as typeof globalThis.fetch
-      : ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch
-    pfCoordinator = makePfCoordinator({
-      modelDir: pfModelDir(),
-      fetch: pfFetchImpl,
-      run: runWithObservability,
-    })
-    // When a download initiated from the callout completes, finish
-    // the activation handshake on the user's behalf — flip pfEnabled
-    // so syncPfRuntime spawns the inference window + kicks backfill.
-    // The callout self-renders an "Activating..." state until
-    // syncPfRuntime clears pfActivationPending below.
-    pfCoordinator.subscribe((s) => {
-      if (s.phase !== 'installed') return
-      const prefs = loadSecurityPreferences()
-      if (!prefs.pfActivationPending || prefs.pfEnabled) return
-      void (async () => {
-        const next = saveSecurityPreferences({ pfEnabled: true })
-        mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
-        await syncPfRuntime(true).catch((err) => {
-          console.error('[security] callout-driven activation failed:', err)
-        })
-      })()
-    })
-    void bootScanWorker().then(() => {
-      if (!scanWorker) {
-        setSecurityReadiness?.({ ready: false, reason: 'scanner-unavailable' })
-        return
-      }
-      disposeSecurityIpc = registerSecurityIpc({
-        db,
-        worker: scanWorker,
-        runPromise: runWithObservability,
-        getMainWindow: () => mainWindow,
-        pfCoordinator,
-        pfRuntime,
-        onPfEnabledChanged: (enabled) => {
-          void syncPfRuntime(enabled).catch((err) => {
-            console.error('[security] pf runtime transition failed:', err)
-          })
-        },
-      })
-      setSecurityReadiness?.({ ready: true })
-      runWithObservability(scanWorker.backfill()).catch((err) => {
-        console.error('[security] boot backfill failed:', err)
-      })
-      // If the user enabled PF before this app launch, bring the
-      // inference window up now that the rest of Spool is booted.
-      if (loadSecurityPreferences().pfEnabled) {
-        void syncPfRuntime(true).catch((err) => {
-          console.error('[security] pf runtime boot failed:', err)
-        })
-      }
-    })
+  // Two gates (see securityRuntimeEnabled): VITE_FEATURE_SECURITY keeps
+  // the code out of non-opted builds; the runtime `securityEnabled`
+  // (Labs toggle) is the user's opt-in. The boot/teardown is idempotent
+  // so the Labs toggle can start/stop it live — see the set-config IPC.
+  if (securityRuntimeEnabled(acpManager.getAgentsConfig())) {
+    console.log('[security.lifecycle] opt-in on at boot → starting')
+    void ensureSecurityBooted()
+  } else {
+    console.log('[security.lifecycle] opt-in off at boot → scanner not started')
   }
 
   // Auto-updater (only runs in packaged builds)
@@ -863,7 +926,20 @@ ipcMain.handle('spool:ai-get-config', () => {
 })
 
 ipcMain.handle('spool:ai-set-config', (_e, { config }: { config: import('./acp.js').AgentsConfig }) => {
+  // Detect a Security opt-in transition and start/stop the worker live
+  // so the Labs toggle takes effect without a restart. Off truly stops
+  // scanning (teardownSecurity terminates the worker thread + IPC); on
+  // boots it + backfills existing sessions.
+  const wasEnabled = securityRuntimeEnabled(acpManager.getAgentsConfig())
   acpManager.saveAgentsConfig(config)
+  const nowEnabled = securityRuntimeEnabled(config)
+  if (nowEnabled && !wasEnabled) {
+    console.log('[security.lifecycle] opt-in toggled ON → booting live')
+    void ensureSecurityBooted()
+  } else if (!nowEnabled && wasEnabled) {
+    console.log('[security.lifecycle] opt-in toggled OFF → tearing down live')
+    void teardownSecurity()
+  }
   return { ok: true }
 })
 

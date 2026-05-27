@@ -734,6 +734,11 @@
       "description": "Export any session as a polished image, PDF, or Markdown file — with privacy controls.",
       "feedback": "Tell us how it feels",
       "disabled_toast": "Share is off."
+    },
+    "security": {
+      "title": "Security Scan",
+      "description": "Surface API keys, tokens, and personal data inside your indexed sessions, jump straight to rotate a leaked key, and purge values from Spool's search/AI index. Pattern-based, local-only — your original session files are never touched.",
+      "feedback": "Tell us how it feels"
     }
   }
 }

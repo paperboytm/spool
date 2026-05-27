@@ -117,3 +117,31 @@ test('disabling share while in editor returns to the editor entry view (not Libr
 
   await window.evaluate(() => localStorage.removeItem('spool.labs.share'))
 })
+
+test('Labs Security toggle gates the Security surfaces live (no restart)', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  // launchApp seeds agents.json `securityEnabled: true`, so the feature
+  // is opted in and the sidebar entry is present at rest.
+  await expect(window.locator('[data-testid="sidebar-security"]')).toBeVisible()
+
+  await openLabs(window)
+  const toggle = window.locator('[data-testid="labs-toggle-security"]')
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+  // Turn OFF → every Security surface disappears immediately (the gate
+  // is reactive; the main process also tears the worker down — asserted
+  // indirectly by the UI, the worker lifecycle is unit-covered).
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="sidebar-security"]')).toBeHidden()
+
+  // Turn back ON → the entry returns without a relaunch.
+  await openLabs(window)
+  await window.locator('[data-testid="labs-toggle-security"]').click()
+  await expect(window.locator('[data-testid="labs-toggle-security"]')).toHaveAttribute('aria-checked', 'true')
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="sidebar-security"]')).toBeVisible()
+})

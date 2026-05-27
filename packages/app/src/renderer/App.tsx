@@ -34,7 +34,8 @@ import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
-import { useFeature, securityFeatureEnabled } from './featureFlags.js'
+import { useFeature, useSecurityEnabled } from './featureFlags.js'
+import { setSecurityEnabledConfig } from './api/securityEnabledCache.js'
 import { primeSecurityPrefsCache } from './api/securityPrefsCache.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
@@ -59,6 +60,7 @@ interface RuntimeInfo {
 export default function App() {
   const { t } = useTranslation()
   const shareEnabled = useFeature('share')
+  const securityEnabled = useSecurityEnabled()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [previewSuggestions, setPreviewSuggestions] = useState<SearchResult[]>([])
@@ -290,9 +292,9 @@ export default function App() {
   // off → on). When the feature flag is off the prime resolves to null
   // and nothing renders — harmless.
   useEffect(() => {
-    if (!securityFeatureEnabled()) return
+    if (!securityEnabled) return
     void primeSecurityPrefsCache()
-  }, [])
+  }, [securityEnabled])
 
   // Restore the pre-editor sidebar state when the user leaves the
   // share editor — by Back button, by clicking into a sidebar
@@ -323,7 +325,7 @@ export default function App() {
   // a stale `view='security'` from persisted state (or a future
   // deep link) can't surface the Security page when the feature
   // flag is off in production.
-  const isSecurityView = securityFeatureEnabled() && view === 'security'
+  const isSecurityView = securityEnabled && view === 'security'
   const isShareEditorView = shareEnabled && view === 'share-editor'
 
   // Bounce out of share-only views when the user disables the flag from
@@ -377,6 +379,12 @@ export default function App() {
     return () => window.clearTimeout(t)
   }, [themeEditor])
 
+  // The Security opt-in mirror is seeded once from disk at boot; after
+  // that the Labs toggle is its sole writer (optimistic). Re-seeding on
+  // every refreshAgents (which also fires on Settings close) would race
+  // a just-flipped toggle and clobber it with a stale disk read.
+  const securityConfigSeeded = useRef(false)
+
   // Load agents + config, apply configured default
   const refreshAgents = useCallback(() => {
     if (!window.spool?.getAiAgents) return
@@ -393,6 +401,11 @@ export default function App() {
       setPinnedSortOrder(config.pinnedSortOrder ?? DEFAULT_PINNED_SORT_ORDER)
       setProjectSortOrder(config.projectSortOrder ?? DEFAULT_PROJECT_SORT_ORDER)
       setLanguage(config.language ?? 'system')
+      // Seed the Security opt-in mirror once (see securityConfigSeeded).
+      if (!securityConfigSeeded.current) {
+        securityConfigSeeded.current = true
+        setSecurityEnabledConfig(config.securityEnabled)
+      }
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id

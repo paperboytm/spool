@@ -34,7 +34,7 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi } from '../api/security.js'
-import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityEnabled } from '../featureFlags.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import AllowlistManageModal from './security/AllowlistManageModal.js'
@@ -70,7 +70,7 @@ export default function SecurityPage(props: Props) {
   // hooks never run when the feature is off — keeping the conditional
   // return ABOVE the hooks would violate Rules of Hooks the moment
   // the flag becomes anything other than a build-time constant.
-  if (!securityFeatureEnabled()) return null
+  if (!useSecurityEnabled()) return null
   return <SecurityPageGate {...props} />
 }
 

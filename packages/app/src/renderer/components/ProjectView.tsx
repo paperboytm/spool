@@ -8,7 +8,7 @@ import { insertSessionSorted } from '../../shared/sessionSort.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { PROJECT_SORT_OPTIONS } from '../../shared/projectView.js'
-import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityEnabled } from '../featureFlags.js'
 import { securityApi } from '../api/security.js'
 
 type Props = {
@@ -31,6 +31,7 @@ export default function ProjectView({
   onShare,
 }: Props) {
   const { t, i18n } = useTranslation()
+  const securityEnabled = useSecurityEnabled()
   const projectSortLabel = (value: ProjectSessionSortOrder): string => {
     switch (value) {
       case 'recent': return t('project.sort_recent')
@@ -55,7 +56,7 @@ export default function ProjectView({
   // the Library row badge, and without a refetch the badge never
   // appears after the initial backfill.
   //
-  // Gated by securityFeatureEnabled() so the IPC subscription, the
+  // Gated by useSecurityEnabled() so the IPC subscription, the
   // mount-time bump, and the initial backfill check are all skipped
   // when the feature is off — prod builds (where VITE_FEATURE_SECURITY
   // isn't set) see this effect as a no-op.
@@ -66,7 +67,7 @@ export default function ProjectView({
   // burst settles — fast enough that the badge feels live, slow
   // enough that 500-session backfill collapses to a single refetch.
   useEffect(() => {
-    if (!securityFeatureEnabled()) return
+    if (!securityEnabled) return
 
     let timer: ReturnType<typeof setTimeout> | null = null
     const scheduleBump = () => {

@@ -8,7 +8,7 @@ import PinButton from './PinButton.js'
 import Menu from './Menu.js'
 import { formatRelativeDate, type BucketKey } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
-import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityEnabled } from '../featureFlags.js'
 import { compactModel } from './security/format.js'
 
 type Props = {
@@ -176,7 +176,7 @@ function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElemen
 
 function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
   const { t } = useTranslation()
-  if (!securityFeatureEnabled()) return null
+  if (!useSecurityEnabled()) return null
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0
   const purged = session.scanPurgedCount ?? 0

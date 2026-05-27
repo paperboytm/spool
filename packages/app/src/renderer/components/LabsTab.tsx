@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, MessageSquare } from 'lucide-react'
-import { setLabsFlag, type LabsFlag } from '../lib/labsFlags.js'
-import { useFeature } from '../featureFlags.js'
+import { setLabsFlag } from '../lib/labsFlags.js'
+import { useFeature, useSecurityEnabled, securityBuildCapable } from '../featureFlags.js'
+import { setSecurityEnabledConfig } from '../api/securityEnabledCache.js'
 import Toggle from './Toggle.js'
 
 // Permanent Discord invite (same one used in README / CONTRIBUTING /
@@ -11,6 +12,23 @@ const FEEDBACK_URL = 'https://discord.gg/aqeDxQUs5E'
 export default function LabsTab() {
   const { t } = useTranslation()
   const shareOn = useFeature('share')
+  const securityOn = useSecurityEnabled()
+
+  // The Security toggle is backed by the general `agents.json` config
+  // (not localStorage like the LabsFlags) so the main-process scan
+  // worker reads the same opt-in. Optimistically mirror into the shared
+  // cache so every Security surface flips instantly, then persist —
+  // main boots/tears down the worker on the set-config IPC, no restart.
+  async function toggleSecurity(next: boolean): Promise<void> {
+    console.log('[security.lifecycle] Labs toggle →', next ? 'on' : 'off')
+    setSecurityEnabledConfig(next)
+    try {
+      const config = await window.spool.getAgentsConfig()
+      await window.spool.setAgentsConfig({ ...config, securityEnabled: next })
+    } catch (err) {
+      console.error('[security.lifecycle] failed to persist securityEnabled:', err)
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -24,7 +42,23 @@ export default function LabsTab() {
         feedbackLabel={t('labs.share.feedback')}
         feedbackHref={FEEDBACK_URL}
         checked={shareOn}
+        onToggle={(next) => setLabsFlag('share', next)}
       />
+      {/* Only offer the Security opt-in in builds that actually ship the
+       *  code (dev + VITE_FEATURE_SECURITY builds). Elsewhere the whole
+       *  Security surface is tree-shaken out, so a toggle would be a
+       *  dead control. */}
+      {securityBuildCapable() && (
+        <LabsFlagRow
+          flag="security"
+          title={t('labs.security.title')}
+          description={t('labs.security.description')}
+          feedbackLabel={t('labs.security.feedback')}
+          feedbackHref={FEEDBACK_URL}
+          checked={securityOn}
+          onToggle={(next) => { void toggleSecurity(next) }}
+        />
+      )}
     </div>
   )
 }
@@ -36,13 +70,15 @@ function LabsFlagRow({
   feedbackLabel,
   feedbackHref,
   checked,
+  onToggle,
 }: {
-  flag: LabsFlag
+  flag: string
   title: string
   description: string
   feedbackLabel: string
   feedbackHref: string
   checked: boolean
+  onToggle: (next: boolean) => void
 }) {
   return (
     <div data-testid={`labs-row-${flag}`} className="py-3">
@@ -52,7 +88,7 @@ function LabsFlagRow({
         </h4>
         <Toggle
           checked={checked}
-          onChange={(next) => setLabsFlag(flag, next)}
+          onChange={onToggle}
           ariaLabel={title}
           testId={`labs-toggle-${flag}`}
         />

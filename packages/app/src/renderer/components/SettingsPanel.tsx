@@ -9,7 +9,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
 import SecurityPane from './Settings/SecurityPane.js'
-import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityEnabled } from '../featureFlags.js'
 import LabsTab from './LabsTab.js'
 import Toggle from './Toggle.js'
 
@@ -137,6 +137,7 @@ export default function SettingsPanel({
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const { t } = useTranslation()
+  const securityEnabled = useSecurityEnabled()
 
   useHotkeys({ Escape: onClose }, { modal: true })
 
@@ -153,7 +154,7 @@ export default function SettingsPanel({
             <h2 className="text-xl font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-0.5">
-            {TAB_DEFS.filter(def => def.id !== 'security' || securityFeatureEnabled()).map(def => (
+            {TAB_DEFS.filter(def => def.id !== 'security' || securityEnabled).map(def => (
               <button
                 key={def.id}
                 type="button"
@@ -210,7 +211,7 @@ export default function SettingsPanel({
             {tab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
             {tab === 'agent' && <AgentTab />}
             {tab === 'labs' && <LabsTab />}
-            {tab === 'security' && securityFeatureEnabled() && <SecurityPane />}
+            {tab === 'security' && securityEnabled && <SecurityPane />}
           </div>
         </div>
       </div>

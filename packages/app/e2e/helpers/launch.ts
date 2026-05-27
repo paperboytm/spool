@@ -1,6 +1,6 @@
 import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { mkdtempSync, mkdirSync, cpSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -64,6 +64,16 @@ export async function launchApp(opts: {
       : join(MOCKS_DIR, 'acp-mock-agent.mjs')
     env['SPOOL_ACP_AGENT_BIN'] = mockScript
   }
+
+  // Opt into the Security feature (the Labs flag persisted on
+  // agents.json). The built e2e app has VITE_FEATURE_SECURITY=1 so the
+  // code is present, but `import.meta.env.DEV` is false — without an
+  // explicit opt-in the runtime gate (securityRuntimeEnabled) resolves
+  // OFF and every Security surface would vanish. Seeding the real config
+  // file exercises the actual opt-in path a beta user takes.
+  const spoolHome = join(tmpDir, 'spool-home')
+  mkdirSync(spoolHome, { recursive: true })
+  writeFileSync(join(spoolHome, 'agents.json'), JSON.stringify({ securityEnabled: true }), 'utf8')
 
   const args = [join(APP_DIR, 'out', 'main', 'index.js')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')

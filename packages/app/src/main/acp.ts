@@ -51,6 +51,12 @@ export interface AgentsConfig {
   defaultSearchSort?: 'relevance' | 'newest' | 'oldest'
   /** Preferred terminal app for session resume (e.g. "iTerm2", "Warp"). Auto-detected if unset. */
   terminal?: string
+  /** Opt-in to the experimental Security Scan feature (Labs). Undefined
+   *  = no choice yet (resolver falls back to DEV). Read by main at boot
+   *  to gate the scan worker, and by the renderer to gate every Security
+   *  surface. Only meaningful in a build compiled with
+   *  VITE_FEATURE_SECURITY=1 (otherwise the code is tree-shaken out). */
+  securityEnabled?: boolean
   /** Show colored source dots in sidebar project rows (default: true) */
   sidebarShowSourceDots?: boolean
   /** Show session count in sidebar project rows (default: true) */

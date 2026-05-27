@@ -734,6 +734,11 @@
       "description": "Exportiere jede Sitzung als ansprechendes Bild, PDF oder Markdown — mit Datenschutzoptionen.",
       "feedback": "Sag uns, wie es sich anfühlt",
       "disabled_toast": "Teilen ist aus."
+    },
+    "security": {
+      "title": "Sicherheits-Scan",
+      "description": "Zeigt API-Schlüssel, Tokens und persönliche Daten in deinen indexierten Sitzungen, springt direkt zum Rotieren eines geleakten Schlüssels und entfernt Werte aus Spools Such-/KI-Index. Musterbasiert, nur lokal — deine originalen Sitzungsdateien bleiben unangetastet.",
+      "feedback": "Sag uns, wie es sich anfühlt"
     }
   }
 }

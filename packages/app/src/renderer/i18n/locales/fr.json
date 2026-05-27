@@ -734,6 +734,11 @@
       "description": "Exportez n'importe quelle session en image, PDF ou Markdown soigné — avec contrôles de confidentialité.",
       "feedback": "Dites-nous ce que vous en pensez",
       "disabled_toast": "Partage désactivé."
+    },
+    "security": {
+      "title": "Analyse de sécurité",
+      "description": "Repère les clés API, jetons et données personnelles dans vos sessions indexées, ouvre directement la page de rotation d'une clé fuitée et purge les valeurs de l'index de recherche/IA de Spool. Basé sur des motifs, 100 % local — vos fichiers de session d'origine ne sont jamais modifiés.",
+      "feedback": "Dites-nous ce que vous en pensez"
     }
   }
 }

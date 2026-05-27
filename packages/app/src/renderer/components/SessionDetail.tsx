@@ -6,7 +6,7 @@ import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
-import { securityFeatureEnabled } from '../featureFlags.js'
+import { useSecurityEnabled } from '../featureFlags.js'
 import { securityApi } from '../api/security.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
@@ -46,6 +46,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [findResultNonce, setFindResultNonce] = useState(0)
   const [findQuery, setFindQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
+  const securityEnabled = useSecurityEnabled()
   const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
   const isDark = useIsDark()
@@ -126,7 +127,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   // navigates away and back. Debounced because a Purge all of
   // N findings publishes N events.
   useEffect(() => {
-    if (!securityFeatureEnabled()) return
+    if (!securityEnabled) return
     const sessionId = session?.id
     if (sessionId === undefined) return
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -144,7 +145,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       if (timer) clearTimeout(timer)
       off()
     }
-  }, [sessionUuid, session?.id])
+  }, [sessionUuid, session?.id, securityEnabled])
 
   useEffect(() => {
     let cancelled = false
@@ -421,7 +422,7 @@ function RiskPill({
   onToggle: () => void
 }) {
   const { t } = useTranslation()
-  if (!securityFeatureEnabled()) return null
+  if (!useSecurityEnabled()) return null
 
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0

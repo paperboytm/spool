@@ -696,6 +696,11 @@
       "description": "把会话导出成一张精致的图片、PDF 或 Markdown 文件，自带隐私控制。",
       "feedback": "告诉我们感受",
       "disabled_toast": "分享已关闭。"
+    },
+    "security": {
+      "title": "安全扫描",
+      "description": "找出已索引会话里的 API 密钥、令牌和个人信息，一键跳转去轮换泄露的密钥，并把敏感值从 Spool 的搜索/AI 索引中清除。基于模式匹配、纯本地——你的原始会话文件永不被改动。",
+      "feedback": "告诉我们感受"
     }
   }
 }
