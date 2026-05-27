@@ -125,7 +125,7 @@ function buildRows(messages: Message[], label: DividerLabel): Row[] {
         messages: visibleSidechainMessages(group),
       }
     } else {
-      const showAvatar =
+      const showAvatar: boolean =
         !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
       row = { kind: 'msg', msg, showAvatar }
     }
