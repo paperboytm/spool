@@ -69,21 +69,20 @@ test('credential finding shows cross-session blast radius; PII does not', async 
   await expect(apiKeyTile).toBeVisible({ timeout: 10_000 })
   await apiKeyTile.click()
 
-  // The api-key finding row carries a blast-radius affordance. The same
-  // key leaks in 2 sessions; the radius is framed around the OTHER
-  // session (the finding's own session is excluded), so it reports 1
-  // other session in 1 project.
+  // The api-key value row carries a quiet ⧉N badge. The same key leaks
+  // in 2 sessions; the count is framed around the OTHER session (the
+  // finding's own is excluded), so the badge reports 1.
   const apiRow = window.locator('[data-testid="finding-row-wrap"]').filter({
     has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
   }).first()
-  const radius = apiRow.locator('[data-testid="blast-radius"]')
-  await expect(radius).toBeVisible({ timeout: 10_000 })
-  await expect(radius).toHaveAttribute('data-sessions', '1')
-  await expect(radius).toHaveAttribute('data-projects', '1')
+  const badge = apiRow.locator('[data-testid="blast-badge"]')
+  await expect(badge).toBeVisible({ timeout: 10_000 })
+  await expect(badge).toHaveAttribute('data-sessions', '1')
 
-  // Expand → the list shows the one OTHER session (not this finding's
-  // own), tagged with its source dot so it reads as a session.
-  await radius.locator('[data-testid="blast-radius-toggle"]').click()
+  // Clicking the badge expands the per-session list — the one OTHER
+  // session, tagged with its source dot so it reads as a session.
+  await badge.click()
+  const radius = apiRow.locator('[data-testid="blast-radius"]')
   await expect(radius.locator('[data-testid="blast-radius-row"]')).toHaveCount(1)
   await expect(radius.locator('[data-testid="blast-radius-row"] [data-testid="source-dot"]')).toHaveCount(1)
 })
@@ -96,14 +95,13 @@ test('purge everywhere scrubs every copy and collapses the radius', async () => 
   const apiRow = window.locator('[data-testid="finding-row-wrap"]').filter({
     has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
   }).first()
+  const badge = apiRow.locator('[data-testid="blast-badge"]')
+  await expect(badge).toBeVisible({ timeout: 10_000 })
+  // Expand idempotently — the badge's `expanded` state may already be
+  // true from the previous test (same page, no remount). Toggle only if
+  // collapsed, then wait for the list.
+  if ((await badge.getAttribute('aria-expanded')) !== 'true') await badge.click()
   const radius = apiRow.locator('[data-testid="blast-radius"]')
-  await expect(radius).toBeVisible({ timeout: 10_000 })
-  // Expand idempotently — the BlastRadius component is not remounted
-  // between tests in this file, so its `expanded` state can already be
-  // true from the previous test. Toggle only if currently collapsed,
-  // then wait for the list rather than assuming the click expanded it.
-  const toggle = radius.locator('[data-testid="blast-radius-toggle"]')
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
   await expect(radius.locator('[data-testid="blast-radius-list"]')).toBeVisible()
 
   // The "Purge everywhere" CTA opens the bulk confirm dialog.
@@ -112,11 +110,10 @@ test('purge everywhere scrubs every copy and collapses the radius', async () => 
   await expect(dialog).toBeVisible()
   await dialog.locator('[data-testid="purge-confirm-button"]').click()
 
-  // After purge: no api-key finding anywhere shows a blast radius (the
-  // value is masked across both sessions → 0 active occurrences). This
-  // is the UI proof that purge-everywhere reached every copy. FTS
-  // re-sync is asserted deterministically in the core purge unit test
-  // (purge.test.ts → 'keeps messages_fts in sync'), so it's not
-  // re-checked through the flakier search path here.
-  await expect(window.locator('[data-testid="blast-radius"]')).toHaveCount(0, { timeout: 10_000 })
+  // After purge: every copy is masked across both sessions → otherCount
+  // drops to 0 → the ⧉N badge disappears from every api-key row. This is
+  // the UI proof that purge-everywhere reached every copy. FTS re-sync is
+  // asserted deterministically in the core purge unit test
+  // (purge.test.ts → 'keeps messages_fts in sync').
+  await expect(window.locator('[data-testid="blast-badge"]')).toHaveCount(0, { timeout: 10_000 })
 })

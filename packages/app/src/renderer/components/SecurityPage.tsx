@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, CircleSlash, Copy, Eye, EyeOff, Info, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, CircleSlash, Copy, Eye, EyeOff, Info, Layers, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import type {
@@ -1360,7 +1360,7 @@ function SessionCard({
               ...(high + low > 0 ? [
                 {
                   label: t('security.dismiss_all', { defaultValue: 'Dismiss all' }),
-                  icon: <Check size={14} strokeWidth={1.6} aria-hidden />,
+                  icon: <CircleSlash size={14} strokeWidth={1.6} aria-hidden />,
                   onSelect: () => { void handleDismissAll() },
                 },
                 {
@@ -1489,6 +1489,11 @@ function FindingItem({
   // Per-row reveal override — only meaningful when valuesHidden is true.
   const [localReveal, setLocalReveal] = useState(false)
   const [purgePending, setPurgePending] = useState(false)
+  // Cross-session "blast radius": BlastRadius reports the other-session
+  // count (drives the value-row ⧉N badge) and renders the expanded list
+  // only when the badge toggles it open.
+  const [blastExpanded, setBlastExpanded] = useState(false)
+  const [blastCount, setBlastCount] = useState(0)
 
   const revealed = !valuesHidden || localReveal
 
@@ -1565,15 +1570,39 @@ function FindingItem({
     >
       <span className={`justify-self-center w-1 h-1 rounded-full ${bulletClass}`} />
       <span className="text-warm-muted dark:text-dark-muted truncate">{finding.kind}</span>
-      <span
-        data-testid="finding-value"
-        className={`truncate transition-[filter] duration-100 ${!isActive ? 'pr-20' : ''} ${valueClass}`}
-        title={revealed && value ? value : undefined}
-        onMouseEnter={() => valuesHidden && !isPurged && setLocalReveal(true)}
-        onClick={() => valuesHidden && !isPurged && setLocalReveal(true)}
-      >
-        {displayValue}
-      </span>
+      <div data-testid="finding-value-cell" className="flex items-center gap-2 min-w-0">
+        <span
+          data-testid="finding-value"
+          className={`min-w-0 truncate transition-[filter] duration-100 ${!isActive ? 'pr-20' : ''} ${valueClass}`}
+          title={revealed && value ? value : undefined}
+          onMouseEnter={() => valuesHidden && !isPurged && setLocalReveal(true)}
+          onClick={() => valuesHidden && !isPurged && setLocalReveal(true)}
+        >
+          {displayValue}
+        </span>
+        {/* Cross-session count — a quiet ⧉N badge right after the value
+         *  (label lives in the tooltip). Clicking expands the per-session
+         *  list below. Sits next to the value, clear of the hover-action
+         *  cluster that floats at the row's right edge. */}
+        {isActive && high && blastCount > 0 && (
+          <button
+            type="button"
+            data-testid="blast-badge"
+            data-sessions={blastCount}
+            onClick={() => setBlastExpanded(v => !v)}
+            aria-expanded={blastExpanded}
+            title={t('security.blast_radius_sessions', {
+              count: blastCount,
+              defaultValue_one: 'Also in 1 other session',
+              defaultValue_other: 'Also in {{count}} other sessions',
+            })}
+            className="flex-none inline-flex items-center gap-0.5 h-4 px-1 rounded font-mono text-[10px] leading-none tabular-nums text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors"
+          >
+            <Layers size={11} strokeWidth={1.6} aria-hidden />
+            <span className="leading-none">{blastCount}</span>
+          </button>
+        )}
+      </div>
       {/* Actions (active) / state label (otherwise) float over the
        *  value's right edge instead of holding a grid column. An
        *  always-present `auto` column reserved the full button-cluster
@@ -1607,11 +1636,11 @@ function FindingItem({
                   onClick={toggle}
                   aria-haspopup="menu"
                   aria-expanded={open}
-                  className="inline-flex items-center gap-0.5 h-[18px] font-sans text-[11px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                  className="inline-flex items-center justify-center h-[18px] w-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
                   title={t('security.dismiss', { defaultValue: 'Dismiss' })}
+                  aria-label={t('security.dismiss', { defaultValue: 'Dismiss' })}
                 >
-                  {t('security.dismiss', { defaultValue: 'Dismiss' })}
-                  <ChevronDown size={12} strokeWidth={1.7} aria-hidden className="-mr-0.5" />
+                  <CircleSlash size={12} strokeWidth={1.7} aria-hidden />
                 </button>
               )}
               items={[
@@ -1625,9 +1654,6 @@ function FindingItem({
                 },
               ]}
             />
-            {/* Hairline keeps the destructive Purge visually apart from
-             *  the dismiss group. */}
-            <span className="h-3 w-px bg-warm-border dark:bg-dark-border" aria-hidden />
             {/* Purge = scrub the value from the local archive, so an
              *  eraser (not a trash can) + its confirm dialog. */}
             <button
@@ -1661,9 +1687,15 @@ function FindingItem({
      *  high-severity (credential) tier where multi-session exposure is
      *  the actionable signal. */}
     {isActive && high && (
-      <div className="grid items-center gap-3 pl-6 pr-2 -mt-1" style={{ gridTemplateColumns: '14px 110px 1fr' }}>
+      <div className="grid items-center gap-3 pl-6 pr-2" style={{ gridTemplateColumns: '14px 110px 1fr' }}>
         <div className="col-start-3 min-w-0">
-          <BlastRadius kind={finding.kind as SensitiveKind} valueHash={finding.valueHash} currentSessionId={finding.sessionId} />
+          <BlastRadius
+            kind={finding.kind as SensitiveKind}
+            valueHash={finding.valueHash}
+            currentSessionId={finding.sessionId}
+            expanded={blastExpanded}
+            onCount={setBlastCount}
+          />
         </div>
       </div>
     )}

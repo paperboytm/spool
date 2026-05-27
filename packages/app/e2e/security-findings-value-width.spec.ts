@@ -44,13 +44,19 @@ test('finding value spans the full row width and actions stay reachable on hover
   await row.waitFor()
   const value = row.locator('[data-testid="finding-value"]')
 
-  // At rest (no hover) the value cell must reach the row's right edge —
-  // pre-fix the reserved action column held it ~200px short.
+  // At rest (no hover) the value CELL — the 1fr grid column holding the
+  // value text plus the optional inline ⧉N cross-session badge — must
+  // reach the row's right edge. Pre-fix a reserved `auto` action column
+  // held it ~200px short; actions now float absolutely over the right,
+  // so the column spans the row. (The value text itself is left-aligned
+  // within the cell, with trailing room on wide windows.)
+  const cell = row.locator('[data-testid="finding-value-cell"]')
   const rowBox = (await row.boundingBox())!
-  const valBox = (await value.boundingBox())!
-  const rowRight = rowBox.x + rowBox.width
-  const valRight = valBox.x + valBox.width
-  expect(rowRight - valRight).toBeLessThan(40)
+  const cellBox = (await cell.boundingBox())!
+  expect((rowBox.x + rowBox.width) - (cellBox.x + cellBox.width)).toBeLessThan(40)
+
+  // The value text is shown (not clipped to nothing by a reserved column).
+  await expect(value).toBeVisible()
 
   // Hover surfaces the floating actions; they must be visible + enabled.
   await row.hover()
