@@ -521,7 +521,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
          *  Ignored entry lines up with the cards' right-edge controls
          *  instead of overhanging them. */}
         <div className="max-w-[720px] pr-3 flex items-center gap-3">
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
+        {/* Left group owns the flex-1 width so the stats truncate without
+         *  wrapping, while the ↻ button stays glued to the right of the
+         *  "scanned X ago" stamp (reads as "last scanned · refresh").
+         *  Only the Ignored entry, as the outer flex-none sibling, floats
+         *  to the list's right edge. */}
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+        <span className="min-w-0 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
           {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
           {infoCount > 0 && (
             <span className="opacity-70">
@@ -606,6 +612,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             aria-hidden
           />
         </button>
+        </div>
         {ignoredCount > 0 && (
           <button
             type="button"
