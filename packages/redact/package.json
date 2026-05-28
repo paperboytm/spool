@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/redact",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Local, pure-TS sensitive-data detection for Spool sessions. Pattern + checksum + entropy pipeline today; pluggable provider boundary for future on-device ML (e.g. OpenAI Privacy Filter via transformers.js).",
   "type": "module",
   "main": "./dist/index.js",
