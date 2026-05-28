@@ -167,6 +167,19 @@ export function isObviouslyNonSecretValue(value: string): boolean {
       || looksLikePlaceholder(value)
 }
 
+/** Any non-ASCII character. Used by detectors whose regex would
+ *  otherwise accept natural-language placeholder text (CJK, Cyrillic,
+ *  Hangul, Arabic, emoji, …) — real secrets in those detectors are
+ *  always ASCII so non-ASCII content is a placeholder description.
+ *  Do NOT compose this into the shared isObviouslyNonSecretValue:
+ *  connection-string / url-creds / netrc legitimately allow unicode
+ *  passwords and would regress to false negatives. */
+const NON_ASCII_RX = /[^\x00-\x7F]/
+
+export function hasNonAsciiContent(value: string): boolean {
+  return NON_ASCII_RX.test(value)
+}
+
 /** Non-routable / documentation IP ranges that aren't real network
  *  endpoints — loopback, RFC 5737 doc ranges, RFC 3849 IPv6 doc
  *  range, unspecified address, link-local. */

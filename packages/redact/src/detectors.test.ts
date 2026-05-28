@@ -263,6 +263,32 @@ describe('false-positive filters (precision tuning)', () => {
     }
   })
 
+  describe('non-ASCII placeholder text in env-var values', () => {
+    // Real env-var secrets are ASCII; any natural-language non-ASCII
+    // content (CJK / Cyrillic / Hangul / emoji) is placeholder
+    // description text. See real reports like
+    // `AGENT_INTERNAL_SECRET='你自己生成的一串随机密钥'`.
+    for (const text of [
+      "AGENT_INTERNAL_SECRET='你自己生成的一串随机密钥'",
+      "FLY_API_TOKEN='刚才那个开发组织'",
+      "DB_PASSWORD='пароль-заглушка'",
+      "API_KEY='プレースホルダー'",
+      "WEBHOOK_SECRET='🔑🔒💰🔑🔒💰'",
+    ]) {
+      it(`drops ${JSON.stringify(text)}`, () => {
+        expect(kindsOf(text)).not.toContain('env-var')
+      })
+    }
+    it('keeps an ASCII secret of the same length range', () => {
+      // Sanity check: the non-ASCII filter must not regress ordinary
+      // ASCII tokens — `STRIPE_SECRET_KEY=` test above covers the
+      // primary positive, but include a shorter sibling here so a
+      // single failure points straight at the new clause.
+      const body = tok('sk_', 'live_', 'aH1xK9pQrSt7VwYzA3bC5dF8gJ')
+      expect(kindsOf(`OPENAI_API_KEY=${body}`)).toContain('env-var')
+    })
+  })
+
   describe('JS const declarations matching env-var shape', () => {
     for (const text of [
       "const LAST_COUNT_KEY = 'spool.shares.skeletonCount'",

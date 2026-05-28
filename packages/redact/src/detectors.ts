@@ -18,6 +18,7 @@ import type { SensitiveKind, SensitiveMatch } from './types.js'
 import {
   containsEllipsis,
   containsRedactionMarker,
+  hasNonAsciiContent,
   hasPublicEnvPrefix,
   hasQuotedEntropy,
   isObviouslyNonSecretValue,
@@ -221,6 +222,13 @@ function envVarLooksReal(value: string): boolean {
   // like `'spool.shares.skeletonCount'` / `'theme_editor'` without
   // rejecting a Stripe-style live key (has digits + ≥ 32 chars).
   if (/^[a-zA-Z][a-zA-Z._\-]*$/.test(stripped) && stripped.length < 28) return false
+  // Natural-language placeholder text (CJK / Cyrillic / Hangul /
+  // Arabic / emoji) in the value. Real env-var secrets are always
+  // ASCII; non-ASCII content here is a description like
+  // `AGENT_INTERNAL_SECRET='你自己生成的一串随机密钥'`. Scoped to
+  // env-var only — see hasNonAsciiContent for why it's not in the
+  // shared isObviouslyNonSecretValue.
+  if (hasNonAsciiContent(stripped)) return false
   return true
 }
 

@@ -20,11 +20,13 @@
 // it's NOT a user-visible "version of the security feature".
 //
 // Scope: consumed only by code gated behind VITE_FEATURE_SECURITY.
-// While the feature is pre-GA we keep this at 1 and force rescans
-// during development via `Settings → Security → Rescan all` or a
-// direct DB wipe. Once the feature ships, bump on every rule change
-// so users with old stamps automatically pick up the new rules.
-export const REDACT_DETECTOR_VERSION = 1
+// Bump on every rule change once the feature ships so users with old
+// stamps automatically pick up the new rules.
+//   1 — initial release
+//   2 — 2026-05-28: env-var detector now rejects values containing
+//       non-ASCII letters (CJK / Cyrillic / Hangul / Arabic / emoji
+//       are placeholder description text, never real env-var secrets).
+export const REDACT_DETECTOR_VERSION = 2
 
 export interface ProfileOpts {
   /** Regex detector revision. Bump in lockstep with rule changes. */
