@@ -8,8 +8,8 @@ set -euo pipefail
 # APPLE_TEAM_ID). The workflow also publishes @spool-lab/core and
 # @spool-lab/cli to npm using NODE_AUTH_TOKEN (granular token,
 # scope=@spool-lab, read+write, "Bypass 2FA" enabled). @spool-lab/redact
-# is published only when its version on disk differs from the registry —
-# bump its package.json manually whenever redact source changes.
+# is published only when its version on disk differs from the registry,
+# and is bumped here in lockstep with the rest so versions stay aligned.
 # See .github/workflows/release.yml.
 #
 # Usage:
@@ -60,7 +60,7 @@ NEW_VERSION="$major.$minor.$patch"
 TAG="v$NEW_VERSION"
 green "Bumping to $NEW_VERSION"
 
-for f in package.json packages/app/package.json packages/core/package.json packages/cli/package.json packages/landing/package.json; do
+for f in package.json packages/app/package.json packages/core/package.json packages/cli/package.json packages/landing/package.json packages/redact/package.json; do
   if [[ -f "$f" ]]; then
     jq --arg v "$NEW_VERSION" '.version = $v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   fi
