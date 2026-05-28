@@ -218,10 +218,9 @@ jobs:
           pnpm -F @spool-lab/cli build
 
       # Publish in dependency order. Each step is idempotent: if the registry
-      # already has this version (re-run after a partial-fail, or redact's
-      # version was unchanged this release), we skip rather than error. We must
-      # still update redact whenever its source changes — the version bump is
-      # manual since redact tracks its own semver, independent of the app.
+      # already has this version (re-run after a partial-fail), we skip rather
+      # than error. redact is bumped in lockstep with core/cli by release.sh,
+      # so a fresh release always produces a new version per package.
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
