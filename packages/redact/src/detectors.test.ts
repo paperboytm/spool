@@ -39,6 +39,16 @@ describe('identity', () => {
   it('skips Luhn-invalid card-shaped digit runs', () => {
     expect(kindsOf('order 4111 1111 1111 1112')).not.toContain('credit-card')
   })
+  it('does not flag the fractional part of a decimal as a credit card (issue #340)', () => {
+    // `5227687358856201` happens to be 16 digits, start with 5
+    // (Mastercard prefix), and pass Luhn — but it's the fractional
+    // part of a `confidence` float, not a card number.
+    expect(kindsOf("[{'label': 'silence', 'confidence': 0.5227687358856201}]")).not.toContain('credit-card')
+    expect(kindsOf('score=0.5227687358856201 next')).not.toContain('credit-card')
+    // Sanity: a real-looking card right after a period (non-decimal
+    // context) is still caught.
+    expect(kindsOf('Card. 4111 1111 1111 1111')).toContain('credit-card')
+  })
   it('finds a US SSN, rejects reserved area 000/666/9xx', () => {
     expect(kindsOf('SSN 123-45-6789')).toContain('ssn')
     expect(kindsOf('666-45-6789 000-45-6789 900-45-6789')).not.toContain('ssn')
@@ -226,6 +236,20 @@ describe('location / infra', () => {
     expect(kindsOf('cat .env.local')).not.toContain('internal-host')
     expect(kindsOf('open next.config.local then env.dev.local')).not.toContain('internal-host')
     expect(kindsOf('see settings.local for prefs')).not.toContain('internal-host')
+  })
+  it('does not flag PascalCase property chains ending in `.internal` (issue #340)', () => {
+    // `SqlParser.internal` is a class/property access in code, not a
+    // hostname. The case-sensitive regex (no `/i` flag) rejects it.
+    expect(kindsOf('throw new SqlParser.internal.UnexpectedTokenError()')).not.toContain('internal-host')
+    expect(kindsOf('AppRouter.internal handles the redirect')).not.toContain('internal-host')
+  })
+  it('does not flag bundler output filenames like `*.prod.js` (issue #340)', () => {
+    // `app-page-turbo.runtime.prod.js` is a webpack/turbo build
+    // artifact. The loose `prod\.[a-z0-9]+` tail in the regex
+    // matches it; the file-extension validator drops it.
+    expect(kindsOf('chunk app-page-turbo.runtime.prod.js loaded')).not.toContain('internal-host')
+    expect(kindsOf('failed loading vendor.prod.css')).not.toContain('internal-host')
+    expect(kindsOf('see chunk.stg.json for the map')).not.toContain('internal-host')
   })
 })
 

@@ -145,7 +145,10 @@ const GENERIC_SECRET_RX = /\b(?:api[_-]?key|secret|token|password|passwd|auth|ac
 
 // ── Identity ─────────────────────────────────────────────────────
 
-const CC_RX = /\b(?:4\d{3}|5[1-5]\d{2}|6(?:011|5\d{2})|3[47]\d{2}|3(?:0[0-5]|[68]\d)\d|(?:2131|1800|35\d{3}))[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{3,4}\b/g
+// Lookbehind `(?<!\d\.)` rejects the fractional part of a decimal
+// number — e.g. `confidence: 0.5227687358856201` happens to be 16
+// digits starting with 5 and Luhn-valid, but it's a float, not a card.
+const CC_RX = /(?<!\d\.)\b(?:4\d{3}|5[1-5]\d{2}|6(?:011|5\d{2})|3[47]\d{2}|3(?:0[0-5]|[68]\d)\d|(?:2131|1800|35\d{3}))[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{3,4}\b/g
 const SSN_RX = /\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g
 const EMAIL_RX = /\b[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}\b/g
 const PHONE_RX = /(?:\+\d[\d .\-()]{7,16}\d|\(\d{2,4}\)[\d .\-]{6,14}\d)/g
@@ -186,7 +189,11 @@ const ABSOLUTE_PATH_RX = /(?:\/Users\/|\/home\/|\/var\/|\/etc\/|\/opt\/|[A-Z]:\\
 // false-positive rate from a real-world scan with `.local` enabled.
 // The remaining TLDs (`.internal`, `.corp`, `.lan`, `.intra`,
 // `.home`, `.prod.*`, `.stg.*`) are unambiguous internal-DNS markers.
-const INTERNAL_HOST_RX = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:internal|corp|lan|intra|home|prod\.[a-z0-9]+|stg\.[a-z0-9]+)\b/gi
+//
+// Case-sensitive (no `/i`): real DNS labels are conventionally
+// lowercase. Dropping the `i` flag means PascalCase property chains
+// like `SqlParser.internal` no longer match.
+const INTERNAL_HOST_RX = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.(?:internal|corp|lan|intra|home|prod\.[a-z0-9]+|stg\.[a-z0-9]+)\b/g
 
 // ── Per-rule validators (false-positive filters) ─────────────────
 //
@@ -259,12 +266,29 @@ function ipLooksReal(value: string): boolean {
   return !isReservedIp(value)
 }
 
+// Common web/build asset extensions that the `prod\.[a-z0-9]+` and
+// `stg\.[a-z0-9]+` alternatives of INTERNAL_HOST_RX collide with —
+// e.g. `runtime.prod.js`, `vendor.prod.css`. Bundler output, not a
+// hostname.
+const HOST_TAIL_FILE_EXTS = new Set([
+  'js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs',
+  'css', 'scss', 'sass', 'less',
+  'json', 'jsonc', 'yaml', 'yml',
+  'html', 'htm', 'xml',
+  'map', 'wasm', 'md', 'txt', 'log',
+  'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico',
+])
+
 /** internal-host: reject JS property chains the regex inadvertently
- *  matches (`process.env.HOME`, `import.meta.home`). */
+ *  matches (`process.env.HOME`, `import.meta.home`) and bundler
+ *  output filenames matched by the loose `prod.*` / `stg.*` tail
+ *  (`runtime.prod.js`, `chunk.stg.css`). */
 function internalHostLooksReal(value: string): boolean {
   if (/^process\.env\./i.test(value)) return false
   if (/^import\.meta\./i.test(value)) return false
   if (/^window\.location\./i.test(value)) return false
+  const lastDot = value.lastIndexOf('.')
+  if (lastDot >= 0 && HOST_TAIL_FILE_EXTS.has(value.slice(lastDot + 1).toLowerCase())) return false
   return true
 }
 
