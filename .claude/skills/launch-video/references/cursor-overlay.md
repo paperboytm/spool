@@ -11,10 +11,10 @@ Two facts about the capture pipeline:
 
 So a scene like "click the + button, watch the picker open" reads as "the picker just appeared on its own" — no agency, no cause. The viewer doesn't see the click happen.
 
-Prior releases (v0.4.11 era) solved this by deleting the cursor entirely and using amber annotations to call out the *result* of the action ("the new pinned section appeared"). That works for changes that are visible at scale, but it falls apart when:
+An earlier approach deleted the cursor entirely and used amber annotations to call out the *result* of the action. That works for changes that are visible at scale, but it falls apart when:
 
-- The same UI region keeps appearing with different contents (Templates list cycling)
-- The click is on a tiny target (a + button, a tab)
+- The same UI region keeps appearing with different contents (a list cycling through options)
+- The click is on a tiny target (a + button, a tab, a row affordance that fades in on hover)
 - There are multiple consecutive clicks the viewer needs to follow
 
 The cursor-overlay technique fixes this. The trick is that the cursor must track real input — a cursor that floats by itself looks more uncanny than no cursor at all.
@@ -53,11 +53,11 @@ await cursorPark(ctx.window, 120, 360) // off to the side before clip 1 starts r
 
 await recordNativeWindow(ctx.app, OUT_DIR + '/01-foo.mov', 5.2, async () => {
   await ctx.window.waitForTimeout(550)
-  await cursorClick(ctx.window, '[data-testid="sidebar-shares"]', {
+  await cursorClick(ctx.window, '[data-testid="<your-target>"]', {
     preClickPause: 260,
     postClickPause: 280,
   })
-  await cursorPark(ctx.window, 700, 480, 22) // park on grid card, NOT on next clip's target
+  await cursorPark(ctx.window, 700, 480, 22) // park on real content, NOT on next clip's target
   await ctx.window.waitForTimeout(2600)
 })
 ```

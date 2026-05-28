@@ -29,12 +29,13 @@ The proven HyperFrames composition layout. Copy from `videos/launch-template/ind
 
 Camera = `transform-origin + scale` on the `.window`. The annotation rectangles inherit the same transform because they live inside `.window`.
 
-| Scene | Pattern |
+| Intent | Pattern |
 |---|---|
 | First-screen / overview | No zoom (`scale: 1`) |
-| Sidebar collapse / expand | Light zoom (`scale: 1.12–1.18`) with origin near sidebar centre (`8%, 50%`) |
-| Pinned-section emergence | Tight zoom (`scale: 1.25–1.35`) with origin on top-left sidebar (`12%, 17%`) |
-| Updater banner | Tight zoom (`scale: 1.28–1.5`) with origin on bottom-left sidebar (`10%, 85–95%`) |
+| Highlight a sidebar region | Light zoom (`scale: 1.12–1.18`) with origin near the region's centre |
+| Punch into a small element (badge, banner) | Tight zoom (`scale: 1.25–1.5`) with origin over the element |
+
+Many releases ship with `scale: 1` throughout and rely on the spotlight mask (`spotlight.md`) for focus. Reach for a camera punch only when you want the underlying UI itself to physically grow into frame — not as a substitute for spotlight focus.
 
 Avoid:
 
@@ -66,7 +67,7 @@ Symmetry matters — `left: 0.5%, width: 22%` will look unbalanced (touches side
 
 ## Annotation timing
 
-Fade the annotation in **after** the feature is fully visible in the clip, not when the clip starts. For example, if the `PINNED · N sessions` strip finishes populating at clip-time `2.5s`, the annotation should fade in at timeline `clip-start + 2.5s + 0.1s`. Earlier = empty rectangle on screen.
+Fade the annotation in **after** the target region is fully populated in the clip, not when the clip starts. For example, if a strip finishes populating at clip-time `2.5s`, the annotation should fade in at timeline `clip-start + 2.5s + 0.1s`. Earlier = empty rectangle on screen.
 
 Fade out **with the scene**, not after. When the panel exits and the camera transitions, the annotation goes with them.
 
@@ -129,30 +130,17 @@ Quality floor by tempo factor:
 
 Always append a 0.6–0.8s `afade=t=out` tail so the music decays into the lockup instead of stopping flat.
 
-## Artifact fan (optional capstone scene)
+## Optional capstone scene
 
-For releases whose centrepiece produces a tangible export (PDFs, share files, etc), an optional scene *between* the final feature beat and the brand outro: four document cards materialise centre-stage as a stylised fan, each pairing a paper × template combo with a format tag.
+Some releases earn an extra scene *between* the final feature beat and the brand outro — a stylised after-shot that shows the *outcome* of what the feature does (e.g. tangible exports fanned out as document cards, a list collapsing to "all clean", a generated artefact landing in a destination). Build it in pure HTML/CSS layered above `.window` so no extra captures are needed.
 
-Why it works:
-
-- The Export scene shows the *mechanism* (open a dropdown, see 4 formats). The artifact scene shows the *outcome* (here are 4 documents leaving the editor). Together they close the "tune → publish" arc.
-- Cards are pure CSS — no new captures, no fake browsers, no fake Twitter / Slack screenshots. The documents themselves are the demo.
-
-Composition:
-
-- 4 cards, 220×300px each, arranged in a subtle fan: rotations roughly -10° / -3° / +3° / +10°, slight Y arc (corner cards drop ~30px below middle cards)
-- Each card has: paper background colour (mirrors `share-kit`'s `PaperDef`), header with `Spool.` mark + template name, body in template-faithful style, bottom-left format tag (mono uppercase), bottom-right meta line (page count, image dimensions, file type)
-- Body styles are stylised per template: chat bubbles for Chat, threaded posts with avatars for Forum, vertical rail with markers for Timeline, monospace `# heading > quote` source view for Markdown (the MD card deliberately shows source code, not rendered output — that's what an .md file actually is, and the visual contrast against the other three keeps the formats distinct)
-- Stagger in 0.10–0.15s apart over ~0.55s each, hold 0.7–1.5s, fade out
-- Total scene: 3–4s including transitions
-
-Skip this scene if the release isn't export-focused — it adds runtime and would feel forced for, say, a sidebar polish release. Earned only when the export itself is the headline.
+Only earn this scene when the outcome is the headline. For releases whose payoff already lives inside the final feature clip (a count collapsing, a list emptying, a toggle settling), cut straight from that beat to the lockup — adding a capstone there forces redundancy and bloats runtime. The decision is per-release, not a default.
 
 ## Panel + annotation animations
 
 Already encoded in the template as `panelIn()`, `panelOut()`, `zoomTo()`, `clipFade()` GSAP helpers. Don't rewrite them per release; just call them with new timing values.
 
-The `clipCut(outSel, inSel, at)` helper that swaps videos should use the v0.5.0 timings — incoming clip opacity 1 at `at - 0.20`, outgoing opacity 0 at `at + 0.10` — so the renderer has time to decode the incoming clip's first frame before the outgoing one disappears. A tighter overlap can produce a one-frame dark gap that reads as a flash. See `pitfalls.md` #11.
+The `clipCut(outSel, inSel, at)` helper that swaps videos should bring the incoming clip's opacity to 1 at `at - 0.20` and drop the outgoing clip's opacity to 0 at `at + 0.10` — the 0.30s overlap gives the renderer time to decode the incoming clip's first frame before the outgoing one disappears. A tighter overlap can produce a one-frame dark gap that reads as a flash. See `pitfalls.md` on clip-boundary gaps.
 
 Word-by-word stagger on `panel-headline` is the one place where motion is *allowed* to be slightly playful — keeps the text from feeling like a static slide.
 

@@ -74,15 +74,15 @@ The video has ~6–8 strong beats from the BGM. Don't try to land every scene cu
 
 ## 10. Real screen recordings, not mock UIs
 
-Early v0.4.11 attempts (livecut v1–v6) used a hand-built HTML mockup of the Spool UI inside the composition. It iterated for hours and still looked uncanny — wrong row heights, wrong icons, wrong rhythm.
+Early attempts at hand-built HTML mockups of the Spool UI inside the composition iterate for hours and still look uncanny — wrong row heights, wrong icons, wrong rhythm.
 
 **Lesson:** always record the real Electron app. The capture pipeline exists for a reason. Don't try to recreate the UI in HTML, ever.
 
-(Exception: an *artifact* scene — a stylised post-demo card showing what the export "looks like" — is fine because the cards are explicitly not the app UI; they're documents. See `composition.md` § Artifact fan.)
+(Exception: a stylised post-demo capstone card — a document or artefact summary that's *explicitly not the app UI* — is fine because the viewer reads it as a separate object, not a fake UI. See `composition.md` § Optional capstone scene.)
 
 ## 11. Clip-boundary gap (the silent full-screen flash)
 
-The most insidious bug from v0.5.0. Two adjacent video clips, both showing visually identical editor states at the boundary, *should* swap invisibly. But on rendered output we'd see a single frame of near-black at the exact cut, reading as a full-screen flash.
+Two adjacent video clips, both showing visually identical UI states at the boundary, *should* swap invisibly. But on rendered output you can see a single frame of near-black at the exact cut, reading as a full-screen flash.
 
 **Root cause:** clip A's `data-duration` ended before clip B's `data-start` began. Even by 0.13s. During that gap, neither video element was "playing" — clip A had ended (browsers show a frozen last frame, but the HyperFrames renderer may release the buffer), clip B wasn't seekable yet. The result was a frame the renderer composed against an empty video element.
 
@@ -93,6 +93,8 @@ prev_clip.data_start + prev_clip.data_duration ≥ next_clip.data_start + 0.10
 ```
 
 In English: the previous clip must still be playing when the next clip starts to take over. Aim for ≥ 0.20s overlap. Tighten the next clip's `data-start` earlier rather than extending the previous clip's `data-duration` past the end of the actual `.mov` file (a video element past its natural end may render unpredictably).
+
+Also bring the incoming clip's opacity up 0.20s **before** the boundary (`clipCut` already does this), so the renderer has time to decode the first frame before the outgoing clip disappears.
 
 **Bonus fix in the `clipCut` helper:** bring the incoming clip's opacity up *before* the boundary, not at it:
 
@@ -107,17 +109,15 @@ This gives the renderer time to decode the incoming clip's first frame before th
 
 ## 12. Pre-clip state resets cause a flash at the cut
 
-Between recording clip 3 and clip 4 in v0.5.0 we tried to "reset" the editor to a clean baseline (clicking different template / paper / typeface / colorway). When the composition cut from clip 3's end-state to clip 4's start-state, the editor visibly jumped from `Timeline / Bone / Walnut` to `Chat / Snow / Amber`. The viewer's brain registered it as a glitch even though both states were technically valid.
+If you "reset" the demo's UI state between recordings (clicking different options to clean up for the next clip's start), the composition cuts from clip N's end-state to clip N+1's start-state and the UI visibly jumps. The viewer's brain registers it as a glitch even though both states were technically valid.
 
 **Why:** the reset clicks happened *outside* the recordings, so the viewer never saw the cause. A state change with no cause reads as a bug.
 
 **Do instead, in order of preference:**
 
 1. **Chain state.** Clip A ends with whatever state, clip B starts there. No reset between recordings. Design the demo flow so the natural state at each beat is what you want.
-2. **Reset *inside* a recording.** If you must change state mid-demo (e.g. to get back to Chat for the export beat), do it via visible cursor clicks during a recorded clip — the viewer sees the user making the choice.
+2. **Reset *inside* a recording.** If you must change state mid-demo to land a later beat on the right configuration, do it via visible cursor clicks during a recorded clip — the viewer sees the user making the choice.
 3. **Never** reset between clips and hope the panel transition will mask it. It won't.
-
-For the v0.5.0 export beat, the fix was to cycle Chat → Timeline → Chat *inside* clip 3, so by the time clips 4–7 ran, the editor was already on Chat and stayed there.
 
 ## 13. Cognitive budget per scene
 
@@ -126,9 +126,7 @@ A 5-second scene shows the viewer two channels in parallel: a panel headline + s
 - **One action + a full panel read** — cursor moves, one click, result settles. Viewer reads kicker + 2-line headline + 2-line sub.
 - **Up to 2 actions + a partial panel read** — cursor moves, click, settle ~1s, click again, settle. Viewer reads kicker + headline; the sub gets skimmed.
 
-**You cannot fit 3 actions in 5s with a panel.** The viewer's eyes can't track three template clicks on the right while reading a paragraph on the left. The third action might as well not exist.
-
-v0.5.0's original scene 3 cycled Chat → Letter → Forum → Timeline (3 clicks). The viewer absorbed the first and last; Letter and Forum slipped by uncounted. We trimmed it to Chat → Timeline → Chat (2 clicks across a longer beat) and the scene immediately read better.
+**You cannot fit 3 actions in 5s with a panel.** The viewer's eyes can't track three sequential clicks on the right while reading a paragraph on the left. The third action might as well not exist — middle-of-the-sequence clicks slip by uncounted while the eye snaps between text and UI.
 
 **Rule:** ≤ 2 clicks per scene if the panel has a sub. If you absolutely need to demo more variations, give it its own scene with a shorter panel.
 
@@ -139,9 +137,23 @@ Synchronising `panelIn()` and `spotlightSnap()` at the same instant means the vi
 **Do:** fire `panelIn(...)` first, then `spotlightSnap(...)` 0.3–0.4s later, then the click another 0.3–0.5s after that. The viewer reads the headline → finds where to look → sees the action.
 
 ```js
-panelIn("#panel4", 14.85);                          // 0.00s: text anchors
-spotlightSnap(F.editorPreview, 15.25, F.paperRow);  // 0.40s: highlight arrives
-// clip 04's paper-bone click happens at ~16.16     // ~1.30s: action lands
+panelIn("#panelN", T);                              // 0.00s: text anchors
+spotlightSnap(F.primaryRegion, T + 0.40, F.controlPanel); // 0.40s: highlight arrives
+// click in the captured clip lands around T + 1.30s        // ~1.30s: action lands
 ```
 
 This is the single most impactful timing rule for readability. Without it the video reads as "everything happening at once and I can't follow." With it the video has a natural rhythm.
+
+## 15. Spotlight coords must be verified on the rendered frame, not eyeballed off a grid
+
+Measuring focus rectangles by reading gridlines on a raw `.mov` frame is unreliable: the frame's content position can differ from the composition's display state (e.g. the captured clip is in an unfiltered state while the composition plays it after a filter has been applied, shifting rows down). Eyeballed coords come out 5–15% too high or low and read as "the spotlight isn't framing anything specific."
+
+**Do this closed loop before re-rendering:**
+
+1. Set your `F.region` coords.
+2. Compute the hole's canvas rect: `x_canvas = 700 + 10·x`, `y_canvas = 197 + 6.85·y`, `w_canvas = 10·w`, `h_canvas = 6.85·h` (window at canvas 700,197 sized 1000×685; viewBox 0–100).
+3. Overlay that rect on the existing rendered frame with `ffmpeg -ss <t> -i final.mp4 -frames:v 1 -vf "drawbox=x=…:y=…:w=…:h=…:color=lime:t=3" check.png`.
+4. Open `check.png`. If the bright box doesn't tightly frame its target, adjust coords and re-draw — content position is independent of the spotlight, so you don't need to re-render to iterate.
+5. Re-render only after every region's box visibly frames its target.
+
+The dim opacity also matters: against a dark UI, `fill-opacity=0.70` reads as nearly no dim, washing out the focus. `0.80` gives noticeable but not aggressive contrast.

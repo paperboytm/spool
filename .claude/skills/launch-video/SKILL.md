@@ -5,7 +5,7 @@ user-invocable: true
 argument-hint: "[version (e.g. v0.5.0)]"
 ---
 
-Build a release video for a Spool version. The output is a 1080p MP4 plus a poster JPG, intended for X / Twitter. Runtime scales with feature count: 20–40s, 3–8 feature beats + brand outro, optionally an "artifact" payoff scene before the outro for releases whose centrepiece is a tangible export (PDFs, share-files, etc).
+Build a release video for a Spool version. The output is a 1080p MP4 plus a poster JPG, intended for X / Twitter. Runtime scales with feature count: 20–40s, 3–8 feature beats + brand outro, optionally a stylised capstone scene before the outro for releases whose payoff is a tangible outcome the captured clips can't show on their own.
 
 ## Mental model
 
@@ -24,7 +24,7 @@ This is **not** a PPT: text panel and demo coexist continuously, with hard match
 
 Read these references before you start composing. They are not optional — each captures hard-won decisions from prior releases.
 
-- `references/composition.md` — the proven layout, dimensions, drop-shadow recipe, panel + annotation timing patterns, beat-sync approach, the panel-leads-spotlight rhythm rule, the optional artifact-fan payoff scene
+- `references/composition.md` — the proven layout, dimensions, drop-shadow recipe, panel + annotation timing patterns, beat-sync approach, the panel-leads-spotlight rhythm rule, the optional capstone scene
 - `references/capture.md` — how to record native macOS windows of the Electron app, helper functions to use, per-release seed authoring, the feature-flag-at-build-time gotcha
 - `references/cursor-overlay.md` — synthetic cursor that tracks Playwright mouse + visualises clicks. Solves "Playwright doesn't move the OS cursor and screencapture only films pixels"; required whenever a scene's whole point is a click
 - `references/spotlight.md` — SVG-mask focus technique; single-hole for one target, dual-hole for cause-effect (preview always bright + active control bright); the payoff pattern (collapse secondary to redirect the eye)
@@ -68,11 +68,12 @@ Read these references before you start composing. They are not optional — each
 ## Hard rules
 
 - **Synthetic cursor is allowed but must track real input.** A floating GSAP cursor that arrives at random places looks uncanny — that rule from prior releases stands. What's *not* uncanny is the cursor-overlay technique in `references/cursor-overlay.md`: a DOM cursor injected into the page that follows Playwright's actual `mouse.move()` and pulses on `mousedown`. If a scene's whole point is a click, draw the cursor. Don't draw a cursor for scenes where nothing's being clicked.
-- **Chain state across clips. Don't reset between recordings.** If clip 3 ends with the editor in `Timeline / Bone / Walnut`, clip 4 starts there. Pre-clip state resets (clicking different templates / papers between recordings) cause a visible "flash" at the clipCut boundary even though both clips show editor pixels. If the export beat needs a specific final look, get to it *inside* the recording (the user sees the click) or land it earlier in the chain so it's the natural state by the export beat.
+- **Chain state across clips. Don't reset between recordings.** If clip N ends with the UI in some configuration, clip N+1 starts there. Pre-clip state resets (clicking around to clean up between recordings) cause a visible "flash" at the clipCut boundary even though both clips show valid app pixels. If a later beat needs a specific look, get to it *inside* an earlier recording (the user sees the click) or design the demo flow so the natural state at each beat is already what you want.
 - **First frame must be the full hero state.** Brand mark + panel 1 + UI window all visible at `t=0`, not faded in. Twitter's auto-thumbnail grabs this frame.
 - **Annotations and spotlights live inside `.window`**, not on the outer canvas. They must move with the camera transform.
+- **Spotlight coords must be verified by overlay on the rendered frame.** Eyeballing them off a grid on a raw `.mov` is consistently 5–15% off. See `pitfalls.md` on the drawbox verification loop.
 - **No decorative chrome.** No vignette, callsign, progress bar, or trailer-style overlay flashes. The UI is the protagonist.
-- **No "pull back to neutral" before the outro.** End the last feature beat on its focus, then hard-cut/fade to the Spool lockup (or to the artifact-fan scene if the release earns it).
+- **No "pull back to neutral" before the outro.** End the last feature beat on its focus, then hard-cut/fade to the Spool lockup (or to the capstone scene if the release earns one).
 
 ## Files this skill touches
 

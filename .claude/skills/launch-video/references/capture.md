@@ -45,7 +45,7 @@ const PROJECTS: ProjectSeed[] = [
 **Rules for seed data:**
 
 - English-only titles
-- **Must not reference real user sessions** — invent plausible titles thematically relevant to the release (e.g. for a share-feature release, titles about "share flow review", "share rate limiting", etc).
+- **Must not reference real user sessions** — invent plausible titles thematically relevant to the release (e.g. for a security release, sessions describing the kind of work where the leaked secret might plausibly have been pasted into the chat).
 - 10–15 projects total feels right in the sidebar.
 - One project's `total` should be high (≥ 70) to demo the count badge.
 - Mix `source` between `claude` and `codex` so the badges look varied.
@@ -78,7 +78,7 @@ test('record release clips', async () => {
 
   await recordNativeWindow(ctx.app, path.join(OUT_DIR, '01-home.mov'), 4.0, async () => {
     await ctx.window.waitForTimeout(500)         // settle so the cursor is in the first filmed frame
-    await cursorClick(ctx.window, '[data-testid="sidebar-shares"]', {
+    await cursorClick(ctx.window, '[data-testid="<feature-gated-element>"]', {
       preClickPause: 260, postClickPause: 280,
     })
     // ... drive the rest of the scene
@@ -99,11 +99,13 @@ pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts \
 
 `--global-timeout` is required for relaxed-pacing releases — Playwright's config default is 300s and a 7-beat spec with relaxed `postClickPause` values can easily exceed that. `--retries=0` because a flaky capture (Electron failing to focus, screencapture permission glitch) on first run can spawn a second Electron whose window overlaps the first — the capture then records the wrong app state. Better to fail loudly and re-run by hand than auto-retry and ship wrong frames.
 
-If the feature being demoed is behind a build-time flag (e.g. `VITE_FEATURE_SHARE`), build the app with the flag *before* running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time:
+If the feature being demoed is behind a build-time flag (e.g. `VITE_FEATURE_<NAME>`), build the app with the flag *before* running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time:
 
 ```bash
-VITE_FEATURE_SHARE=1 pnpm --filter @spool/app run build:electron
+VITE_FEATURE_<NAME>=1 pnpm --filter @spool/app run build:electron
 ```
+
+If the feature is also gated by a runtime opt-in stored in `agents.json` (e.g. a Labs toggle), seed it via `launchDemoApp(..., { agentsConfig: { <flag>: true } })` so the main process reads it at boot.
 
 ## Capture-time constants
 
@@ -121,4 +123,4 @@ VITE_FEATURE_SHARE=1 pnpm --filter @spool/app run build:electron
 - **First-frame black pixels in the output `.mov`.** `screencapture -V` has ~21ms latency before the first frame lands. Padded out at composition time via `tpad` (see `poster.md`).
 - **Timing slips between perform() and screencapture.** `recordNativeWindow` starts the recording, then runs `perform()`. There's a ~500ms lead-in where you can `waitForTimeout` to settle before the first action.
 - **Captures show test-suite fixtures instead of demo seed.** Symptom: clip 1 records the wrong Electron window's content (e.g. test-project fixtures with XYLOPHONE_CANARY data). Cause: a previous test left an Electron process running and Playwright auto-retried after a flake, spawning a second Electron whose Quartz window-id won the `nativeWindowInfo()` match. Fix: `pkill -9 -f Electron` before the spec, and run with `--retries=0` so flakes don't silently double up.
-- **Build-time feature flag not applied.** Symptom: test fails to find a feature-gated selector (e.g. `[data-testid="sidebar-shares"]`) even though the smoke test passes for unrelated selectors. Cause: built the app without `VITE_FEATURE_<NAME>=1`. Vite inlines `import.meta.env.VITE_FEATURE_<NAME>` at build time, not runtime, so setting the env var when running playwright is too late. Rebuild with the flag.
+- **Build-time feature flag not applied.** Symptom: test fails to find a feature-gated selector (e.g. `[data-testid="<feature-gated-element>"]`) even though the smoke test passes for unrelated selectors. Cause: built the app without `VITE_FEATURE_<NAME>=1`. Vite inlines `import.meta.env.VITE_FEATURE_<NAME>` at build time, not runtime, so setting the env var when running playwright is too late. Rebuild with the flag.

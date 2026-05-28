@@ -63,13 +63,13 @@ function spotlightSnap(primary, at, secondary) {
 }
 ```
 
-Define your focus rectangles once near the top of the script, in `% of .window`:
+Define your focus rectangles once near the top of the script, in `% of .window`. Name them after what they frame in the captured UI (a sidebar row, a card, a control), measured per release:
 
 ```js
 const F = {
-  sidebarShares: { x: 0.6,  y: 10.0, w: 20,   h: 3.4 },
-  templates:     { x: 71.5, y: 11,   w: 26.5, h: 41 },
-  editorPreview: { x: 1,    y: 1,    w: 68,   h: 98 },
+  sidebarTarget:  { x: 0.6,  y: 10.0, w: 20,   h: 3.4 },
+  primaryRegion:  { x: 1,    y: 1,    w: 68,   h: 98 },
+  controlPanel:   { x: 71.5, y: 11,   w: 26.5, h: 41 },
   // ...
 };
 ```
@@ -77,10 +77,10 @@ const F = {
 Then in scene code:
 
 ```js
-spotlightOn(F.sidebarShares, 0.45);          // single, dim everything else
-spotlightSnap(F.draftsGrid, 1.55);            // retarget, still on
-spotlightSnap(F.editorPreview, 10.15, F.templates); // dual: preview + control
-spotlightSnap(F.editorPreview, 30.15);        // collapse secondary, single again
+spotlightOn(F.sidebarTarget, 0.45);                       // single, dim everything else
+spotlightSnap(F.primaryRegion, 1.55);                     // retarget, still on
+spotlightSnap(F.primaryRegion, 10.15, F.controlPanel);    // dual: preview + control
+spotlightSnap(F.primaryRegion, 30.15);                    // collapse secondary, single again
 spotlightOff(34.50);
 ```
 
@@ -95,30 +95,30 @@ A snap, paired with a click happening 100–200ms later, reads as "the eye is al
 **Single** — for scenes where one region matters at a time:
 
 - Sidebar click target
-- Drafts grid contents
+- A list or grid of items
 - A dropdown opening
 
 **Dual** — for cause-and-effect scenes where two regions need to be readable at the same time:
 
-- "User clicks Letter template, preview reflows" → primary = preview, secondary = template list
-- "User toggles Privacy bulk, masked pills update" → primary = preview, secondary = privacy summary
-- "User clicks Bone paper, preview restyles" → primary = preview, secondary = paper row
+- User clicks a control on the right; a preview on the left reflows → primary = preview, secondary = control
+- User toggles a setting; an indicator updates → primary = indicator, secondary = setting
+- User picks an option from a list; the staged document restyles → primary = document, secondary = option list
 
-The convention: **primary = preview / result**, **secondary = control / cause**. The secondary retargets per click; the primary stays fixed on the preview throughout the scene.
+The convention: **primary = result / outcome**, **secondary = control / cause**. The secondary retargets per click; the primary stays fixed on the outcome throughout the scene.
 
 ## The payoff pattern
 
-When the cause-and-effect has played its loop, collapse the secondary to `NULL_HOLE`. With the right side suddenly dim, the viewer's eye has only the preview to look at — and that's exactly when the preview's change is the payoff.
+When the cause-and-effect has played its loop, collapse the secondary to `NULL_HOLE`. With one side suddenly dim, the viewer's eye has only the outcome to look at — and that's exactly when the outcome's change is the payoff.
 
 ```js
-// Scene 6 (Privacy): preview + privacy panel both bright, user toggles masks.
-spotlightSnap(F.editorPreview, 25.65, F.privacyPanel);
-// After the re-mask click, kill the secondary.
-// Now the preview's redacted pills are the only thing lit.
-spotlightSnap(F.editorPreview, 29.65);
+// Dual: outcome + control both bright while the user toggles.
+spotlightSnap(F.primaryRegion, 25.65, F.controlPanel);
+// After the final click, kill the secondary.
+// Only the outcome stays lit — its state change reads as the answer.
+spotlightSnap(F.primaryRegion, 29.65);
 ```
 
-This is a deliberate 0.5–1.0s moment of "look here, this is the answer." Particularly useful for features whose payoff is subtle (mask states, gap markers, accent shifts) and could get lost in a busy dual-spotlight frame.
+This is a deliberate 0.5–1.0s moment of "look here, this is the answer." Particularly useful for features whose payoff is subtle (a count collapsing, a state flip, a value vanishing) and would get lost in a busy dual-spotlight frame.
 
 ## Measuring hole coordinates
 
@@ -132,17 +132,17 @@ Same workflow as amber rectangles, but with one advantage: spotlight is forgivin
 
 ## clipCut interaction
 
-`spotlightSnap` doesn't change which clip is visible — it just moves the holes. When a scene changes underlying clips (clip 3 → clip 4 etc.), the spotlight coords usually don't need to change since the layout is the same (right-panel controls in the same place, preview in the same place). Retarget only when the *active control* changes — Templates list → Paper row → Typeface row, etc.
+`spotlightSnap` doesn't change which clip is visible — it just moves the holes. When a scene changes underlying clips, the spotlight coords usually don't need to change if the layout is the same (controls in the same place, outcome in the same place). Retarget only when the *active control* changes from one row/element to another.
 
 Order of operations at scene boundaries:
 
 ```js
 // Panel anchors first (0.4s lead — see composition.md on panel-leads-spotlight)
-panelIn("#panel4", 14.85);
+panelIn("#panelN", 14.85);
 // Clip swaps next
-clipCut("#clip-templates", "#clip-style", 14.65);
+clipCut("#clip-prev", "#clip-next", 14.65);
 // Spotlight retargets last
-spotlightSnap(F.editorPreview, 15.25, F.paperRow);
+spotlightSnap(F.primaryRegion, 15.25, F.controlPanel);
 ```
 
 ## Common pitfalls
