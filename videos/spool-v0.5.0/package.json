@@ -1,0 +1,10 @@
+{
+  "name": "spool-v0.5.0-security",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.6.4 preview",
+    "check": "npx --yes hyperframes@0.6.4 lint && npx --yes hyperframes@0.6.4 validate && npx --yes hyperframes@0.6.4 inspect",
+    "render": "npx --yes hyperframes@0.6.4 render"
+  }
+}

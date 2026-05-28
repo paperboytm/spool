@@ -1,0 +1,586 @@
+<!doctype html>
+<!--
+  Spool v0.5.0 launch — SECURITY. 6 feature beats + hero + outro, ~34.2s.
+
+    Hero / SCAN   "Know what your history carries." — rescan banner sweeps
+    01 / 06 — EXPOSURE   Search → the pasted key surfaces in your history
+    02 / 06 — SURFACE    Security page → open api-key → hover-reveal a value
+    03 / 06 — REACH      ⧉N badge → blast radius across sessions
+    04 / 06 — CLOSE IT   Purge dialog → "Rotate at AWS ↗"
+    05 / 06 — YOUR COPY  Purge everywhere · N copies → risk count collapses
+    06 / 06 — ON YOUR TERMS  Settings → Security pane (modal + local-storage footer)
+
+    Outro — Spool. v0.5.0
+
+  Story: the secret travels with you (resume re-sends it, search surfaces
+  it) — so see it, trace it, close it at the source, scrub your copy.
+  No artifact-fan: security's payoff is the vanishing risk count (beat 05).
+
+  Focus: SVG mask, two transparent holes, HARD SNAPS (tl.set). The search
+  overlay, purge dialog, and settings panel carry their own backdrops, so
+  the composition spotlight is OFF during those beats to avoid double-dim.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap");
+
+      :root {
+        --bg: #141410;
+        --text: #f2f2ec;
+        --muted: rgba(242, 242, 236, 0.46);
+        --soft: rgba(242, 242, 236, 0.78);
+        --accent: #f07020;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Geist", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      body { position: relative; }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+
+      .panel {
+        position: absolute;
+        left: 132px;
+        top: 400px;
+        width: 540px;
+        z-index: 10;
+        opacity: 0;
+      }
+      .panel-kicker {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: "Geist Mono", monospace;
+        font-size: 13px;
+        letter-spacing: 0.30em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin-bottom: 28px;
+      }
+      .panel-kicker .bar {
+        display: inline-block;
+        width: 40px;
+        height: 2px;
+        background: var(--accent);
+      }
+      .panel-kicker .index { color: var(--text); }
+      .panel-headline {
+        font-size: 70px;
+        line-height: 0.97;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+        color: var(--text);
+      }
+      .panel-headline .word {
+        display: inline-block;
+        opacity: 0;
+        will-change: transform, opacity, filter;
+      }
+      .panel-headline .accent { color: var(--accent); }
+      .panel-sub {
+        margin-top: 32px;
+        font-size: 18px;
+        line-height: 1.45;
+        font-weight: 400;
+        color: var(--soft);
+        opacity: 0;
+      }
+
+      /* Hero panel visible at t=0 for the social thumbnail. */
+      #panel1 { opacity: 1; }
+      #panel1 .panel-headline .word { opacity: 1; }
+      #panel1 .panel-sub { opacity: 1; }
+
+      .brand-mark {
+        position: absolute;
+        left: 132px;
+        top: 200px;
+        z-index: 9;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        opacity: 1;
+      }
+      .brand-mark .wordmark {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.045em;
+        color: var(--text);
+      }
+      .brand-mark .wordmark .accent { color: var(--accent); }
+      .brand-mark .version {
+        font-family: "Geist Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.30em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .window {
+        position: absolute;
+        top: 197px;
+        left: 700px;
+        width: 1000px;
+        height: 685px;
+        z-index: 5;
+        transform-origin: 50% 50%;
+        border-radius: 8px;
+        overflow: hidden;
+        filter:
+          drop-shadow(0 60px 120px rgba(0, 0, 0, 0.75))
+          drop-shadow(0 24px 48px rgba(0, 0, 0, 0.55))
+          drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+        opacity: 1;
+      }
+      .window-media {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+      }
+      .window-media.lead { opacity: 1; }
+
+      .spotlight-mask {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 18;
+        pointer-events: none;
+        opacity: 0;
+      }
+      .spotlight-mask rect { transition: none; }
+
+      .outro-scene {
+        position: absolute;
+        inset: 0;
+        z-index: 40;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .outro-wrap {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .outro-lockup {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        opacity: 0;
+      }
+      .outro-logo { width: 92px; height: 92px; color: var(--text); }
+      .outro-logo svg { display: block; width: 100%; height: 100%; stroke: currentColor; }
+      .outro-wordmark {
+        font-size: 68px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+      }
+      .outro-wordmark .period { color: var(--accent); }
+      .outro-version {
+        font-family: "Geist Mono", monospace;
+        font-size: 13px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: rgba(242, 242, 236, 0.6);
+      }
+      #outro-fade {
+        position: absolute;
+        inset: 0;
+        background: rgba(20, 20, 16, 0.97);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 35;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="34.20"
+      data-width="1920"
+      data-height="1080"
+    >
+      <audio
+        id="bgm"
+        data-start="0"
+        data-duration="34.20"
+        data-track-index="10"
+        src="assets/bgm.mp3"
+        data-volume="0.82"
+      ></audio>
+
+      <div id="window" class="window">
+        <video
+          id="clip-scan"
+          class="window-media lead"
+          data-start="0.00"
+          data-duration="5.47"
+          data-track-index="1"
+          src="assets/live/01-scan.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-search"
+          class="window-media"
+          data-start="3.75"
+          data-duration="6.65"
+          data-track-index="2"
+          src="assets/live/02-search.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-surface"
+          class="window-media"
+          data-start="7.75"
+          data-duration="5.65"
+          data-track-index="3"
+          src="assets/live/03-surface.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-reach"
+          class="window-media"
+          data-start="12.25"
+          data-duration="5.47"
+          data-track-index="4"
+          src="assets/live/04-reach.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-close"
+          class="window-media"
+          data-start="16.75"
+          data-duration="6.43"
+          data-track-index="5"
+          src="assets/live/05-close.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-scrub"
+          class="window-media"
+          data-start="21.95"
+          data-duration="6.65"
+          data-track-index="6"
+          src="assets/live/06-scrub.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+        <video
+          id="clip-terms"
+          class="window-media"
+          data-start="27.45"
+          data-duration="6.78"
+          data-track-index="7"
+          src="assets/live/07-terms.mov"
+          data-volume="0"
+          muted
+          playsinline
+        ></video>
+
+        <svg
+          id="spotlight"
+          class="spotlight-mask"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <mask id="spotlight-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+              <rect width="100" height="100" fill="white"/>
+              <rect id="hole-primary"   x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black"/>
+              <rect id="hole-secondary" x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black"/>
+            </mask>
+          </defs>
+          <rect
+            width="100"
+            height="100"
+            fill="#121210"
+            fill-opacity="0.80"
+            mask="url(#spotlight-holes)"
+          />
+        </svg>
+      </div>
+
+      <div id="brand-mark" class="brand-mark">
+        <div class="wordmark">Spool<span class="accent">.</span></div>
+        <div class="version">v0.5.0 · Security</div>
+      </div>
+
+      <div id="panel1" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span>Spool v0.5 · Security</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">Know</span>&nbsp;<span class="word">what</span>&nbsp;<span class="word">your</span><br>
+          <span class="word">history</span>&nbsp;<span class="word">carries<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Spool scans every AI session you've had —<br>locally, on your machine.</div>
+      </div>
+
+      <div id="panel2" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">01</span> / 06 — Exposure</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">It</span>&nbsp;<span class="word">doesn't</span>&nbsp;<span class="word">just</span><br>
+          <span class="word">sit</span>&nbsp;<span class="word">there<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Resume the chat and it's re-sent. Search and it surfaces.<br>Your history is indexed — secrets and all.</div>
+      </div>
+
+      <div id="panel3" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">02</span> / 06 — Surface</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">See</span>&nbsp;<span class="word">it<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Every key, token and PII Spool found, in one list.<br>Pattern-based — a start, not a guarantee.</div>
+      </div>
+
+      <div id="panel4" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">03</span> / 06 — Reach</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">One</span>&nbsp;<span class="word">key</span>&nbsp;<span class="word">rarely</span><br>
+          <span class="word">lives</span>&nbsp;<span class="word">in</span>&nbsp;<span class="word">one</span>&nbsp;<span class="word">place<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Trace the same secret across every session<br>it leaked into.</div>
+      </div>
+
+      <div id="panel5" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">04</span> / 06 — Close it</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">Kill</span>&nbsp;<span class="word">it</span>&nbsp;<span class="word">where</span><br>
+          <span class="word">it</span>&nbsp;<span class="word">was</span>&nbsp;<span class="word">issued<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Spool links you straight to the provider's<br>rotate page.</div>
+      </div>
+
+      <div id="panel6" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">05</span> / 06 — Your copy</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">Scrub</span>&nbsp;<span class="word">it</span>&nbsp;<span class="word">from</span><br>
+          <span class="word">Spool's</span>&nbsp;<span class="word">index<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Every copy in Spool is masked. Search won't surface it.<br>Files on disk are untouched.</div>
+      </div>
+
+      <div id="panel7" class="panel">
+        <div class="panel-kicker">
+          <span class="bar"></span>
+          <span><span class="index">06</span> / 06 — On your terms</span>
+        </div>
+        <div class="panel-headline">
+          <span class="word">Local.</span>&nbsp;<span class="word">Optional.</span><br>
+          <span class="word">Yours<span class="accent">.</span></span>
+        </div>
+        <div class="panel-sub">Runs on your machine. Detectors and blur —<br>all in your hands.</div>
+      </div>
+
+      <div id="outro-fade" data-layout-ignore></div>
+      <section id="outro" class="outro-scene">
+        <div class="outro-wrap">
+          <div id="outro-lockup" class="outro-lockup">
+            <div class="outro-logo" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+                <ellipse cx="16" cy="9" rx="12" ry="4.5" stroke-width="1.8"></ellipse>
+                <line x1="4" y1="9" x2="4" y2="22" stroke-width="1.8"></line>
+                <line x1="28" y1="9" x2="28" y2="22" stroke-width="1.8"></line>
+                <path d="M4 22 C4 24.5 9 27 16 27 C23 27 28 24.5 28 22" stroke-width="1.8"></path>
+                <ellipse cx="16" cy="11" rx="7" ry="2.5" stroke-width="1.2"></ellipse>
+                <line x1="9" y1="11" x2="9" y2="20" stroke-width="1.2"></line>
+                <line x1="23" y1="11" x2="23" y2="20" stroke-width="1.2"></line>
+                <path d="M9 20 C9 21.5 12 23 16 23 C20 23 23 21.5 23 20" stroke-width="1.2"></path>
+                <ellipse cx="16" cy="11" rx="3" ry="1.2" fill="currentColor" stroke="none"></ellipse>
+              </svg>
+            </div>
+            <div class="outro-wordmark">Spool<span class="period">.</span></div>
+            <div class="outro-version">v0.5.0</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      function panelIn(sel, at) {
+        tl.set(sel, { opacity: 1 }, at - 0.001);
+        tl.fromTo(`${sel} .panel-kicker`,
+          { x: -10, opacity: 0 },
+          { x: 0, opacity: 1, duration: 0.28, ease: "power3.out" }, at);
+        tl.fromTo(`${sel} .word`,
+          { y: 18, opacity: 0, filter: "blur(6px)" },
+          { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.34, ease: "power3.out", stagger: 0.05 }, at + 0.04);
+        tl.fromTo(`${sel} .panel-sub`,
+          { y: 10, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.32, ease: "power2.out" }, at + 0.26);
+      }
+      function panelOut(sel, at) {
+        tl.to(`${sel} .panel-kicker`, { x: -8, opacity: 0, duration: 0.22, ease: "power2.in" }, at);
+        tl.to(`${sel} .word`, { y: -12, opacity: 0, filter: "blur(4px)", duration: 0.26, ease: "power2.in" }, at + 0.02);
+        tl.to(`${sel} .panel-sub`, { opacity: 0, duration: 0.22, ease: "power2.in" }, at);
+        tl.set(sel, { opacity: 0 }, at + 0.32);
+      }
+      // Incoming clip up 0.20s BEFORE the boundary, outgoing hidden 0.10s
+      // AFTER — the 0.30s overlap hides the swap (pitfalls.md #11).
+      function clipCut(outSel, inSel, at) {
+        tl.set(inSel,  { opacity: 1 }, at - 0.20);
+        tl.set(outSel, { opacity: 0 }, at + 0.10);
+      }
+
+      const NULL_HOLE = { x: 50, y: 50, w: 0, h: 0 };
+      function setHole(sel, rect, at) {
+        const r = rect || NULL_HOLE;
+        tl.set(sel, { attr: { x: r.x, y: r.y, width: r.w, height: r.h } }, at);
+      }
+      function spotlightOn(primary, at, secondary) {
+        setHole("#hole-primary",   primary,   at);
+        setHole("#hole-secondary", secondary, at);
+        tl.set("#spotlight", { opacity: 1 }, at);
+      }
+      function spotlightOff(at) {
+        tl.set("#spotlight", { opacity: 0 }, at);
+      }
+      function spotlightSnap(primary, at, secondary) {
+        setHole("#hole-primary",   primary,   at);
+        setHole("#hole-secondary", secondary, at);
+      }
+
+      // Focus rectangles in viewBox units (% of .window). Measured fresh
+      // from the v0.5.0 security clips (2160×1480 retina → /21.6, /14.8).
+      // Coords verified by drawing each hole's canvas rect (700+10x,
+      // 197+6.85y, 10w, 6.85h) onto the rendered frames and confirming it
+      // tightly frames its target — not eyeballed off gridlines.
+      const F = {
+        scanBanner: { x: 24, y: 4,    w: 64, h: 11 },  // scan-status line + "Scanning" banner
+        surfaceRow: { x: 29, y: 37,   w: 35, h: 11 },  // revealed credential card
+        blastBlock: { x: 38, y: 44,   w: 50, h: 16 },  // blast-radius list + Purge everywhere
+        chipsPayoff:{ x: 22, y: 5,    w: 37, h: 18 },  // risk count + chips collapsing
+      };
+
+      // ── SCENE 1 — SCAN / hero (clip-scan 0.00 – 4.00) ─────────────────
+      //   Hero panel holds the thumbnail; a rescan sweeps the "Scanning ·
+      //   N of M rescans" banner. Spotlight the banner zone.
+      spotlightOn(F.scanBanner, 1.60);
+      spotlightOff(3.85);
+      panelOut("#panel1", 3.80);
+
+      // ── SCENE 2 — EXPOSURE / search (clip-search 4.00 – 8.00) ─────────
+      //   The overlay carries its own dark backdrop → no composition
+      //   spotlight. Typing AKIA surfaces every session it leaked into,
+      //   the key highlighted in the snippet.
+      clipCut("#clip-scan", "#clip-search", 4.00);
+      panelIn("#panel2", 4.05);
+      panelOut("#panel2", 7.80);
+
+      // ── SCENE 3 — SURFACE (clip-surface 8.00 – 12.50) ─────────────────
+      clipCut("#clip-search", "#clip-surface", 8.00);
+      panelIn("#panel3", 8.05);
+      spotlightOn(F.surfaceRow, 10.30);
+      spotlightOff(12.35);
+      panelOut("#panel3", 12.30);
+
+      // ── SCENE 4 — REACH (clip-reach 12.50 – 17.00) ────────────────────
+      clipCut("#clip-surface", "#clip-reach", 12.50);
+      panelIn("#panel4", 12.55);
+      spotlightOn(F.blastBlock, 14.20);
+      spotlightOff(16.85);
+      panelOut("#panel4", 16.80);
+
+      // ── SCENE 5 — CLOSE IT (clip-close 17.00 – 22.20) ─────────────────
+      //   Purge dialog (own dark backdrop) → "Rotate at AWS ↗" under the
+      //   cursor. Composition spotlight stays OFF.
+      clipCut("#clip-reach", "#clip-close", 17.00);
+      panelIn("#panel5", 17.05);
+      panelOut("#panel5", 22.00);
+
+      // ── SCENE 6 — YOUR COPY (clip-scrub 22.20 – 27.70) ────────────────
+      //   Bulk purge → confirm; as the risk count + chips collapse the
+      //   spotlight snaps onto the chips (the payoff pattern).
+      clipCut("#clip-close", "#clip-scrub", 22.20);
+      panelIn("#panel6", 22.25);
+      spotlightOn(F.chipsPayoff, 26.10);
+      spotlightOff(27.55);
+      panelOut("#panel6", 27.50);
+
+      // ── SCENE 7 — ON YOUR TERMS (clip-terms 27.70 – 32.70) ────────────
+      //   Settings → Security pane. Modal's own dark backdrop is the
+      //   focus — no composition spotlight. Cursor walks the user
+      //   controls (blur → rescan); panel "Local. Optional. Yours."
+      //   narrates that these are in your hands.
+      clipCut("#clip-scrub", "#clip-terms", 27.70);
+      panelIn("#panel7", 27.75);
+      panelOut("#panel7", 32.55);
+
+      // ── OUTRO (32.70 – 34.20) ─────────────────────────────────────────
+      tl.to("#window",     { opacity: 0, duration: 0.30, ease: "power2.in" }, 32.65);
+      tl.to("#brand-mark", { opacity: 0, duration: 0.30, ease: "power2.in" }, 32.65);
+      tl.to("#outro-fade", { opacity: 1, duration: 0.30, ease: "power2.inOut" }, 32.70);
+      tl.to("#outro",      { opacity: 1, duration: 0.30, ease: "power2.inOut" }, 32.70);
+      tl.fromTo("#outro-lockup",
+        { y: 10, opacity: 0, scale: 0.98 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.out" }, 32.90);
+      tl.to("#outro-lockup", { opacity: 1, y: 0, scale: 1, duration: 0.001 }, 34.19);
+      tl.to("#outro",        { opacity: 1, duration: 0.001 }, 34.19);
+      tl.to("#outro-fade",   { opacity: 1, duration: 0.001 }, 34.19);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

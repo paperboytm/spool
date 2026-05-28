@@ -5,7 +5,7 @@
  */
 import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -20,6 +20,15 @@ export interface AppContext {
   cleanup: () => Promise<void>
 }
 
+export interface LaunchDemoOptions {
+  /** Shallow JSON written to `agents.json` in SPOOL_HOME *before* Electron
+   *  boots. Use this to seed feature flags the main process reads from
+   *  the config file at startup — e.g. `{ securityEnabled: true }` for a
+   *  Security capture. Stays feature-agnostic so future flags drop in
+   *  without changing this signature. */
+  agentsConfig?: Record<string, unknown>
+}
+
 /**
  * Build demo fixtures under a fresh tmpdir and launch Electron pointing at
  * them. Forces dark mode and disables GPU for deterministic frames.
@@ -27,9 +36,16 @@ export interface AppContext {
 export async function launchDemoApp(
   projects: ProjectSeed[],
   fixtureOptions: BuildDemoFixturesOptions = {},
+  launchOptions: LaunchDemoOptions = {},
 ): Promise<AppContext> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-demo-capture-'))
   buildDemoFixtures(tmpDir, projects, fixtureOptions)
+
+  if (launchOptions.agentsConfig) {
+    const spoolHome = join(tmpDir, 'spool-home')
+    mkdirSync(spoolHome, { recursive: true })
+    writeFileSync(join(spoolHome, 'agents.json'), JSON.stringify(launchOptions.agentsConfig), 'utf8')
+  }
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
