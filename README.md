@@ -8,7 +8,7 @@ Your local AI session library.
 
 Spool collects every Claude Code, Codex CLI, Gemini CLI, and OpenCode session you've ever had into a sidebar of projects you can browse, pin, and revisit. Press ⌘K to search across the whole archive.
 
-> **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
+> **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/paperboytm/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
 ## Install
 
@@ -16,7 +16,7 @@ Spool collects every Claude Code, Codex CLI, Gemini CLI, and OpenCode session yo
 curl -fsSL https://spool.pro/install.sh | bash
 ```
 
-macOS / Apple Silicon only. Or build from source:
+Or grab the prebuilt DMG (macOS arm64) / AppImage (Linux x86_64) directly from the [Releases page](https://github.com/paperboytm/spool/releases/latest). Or build from source:
 
 ```bash
 pnpm install
@@ -33,6 +33,7 @@ Spool turns the pile of AI sessions sitting on your disk into a browsable librar
 - **Pin** — keep important sessions on top of their project and on the global Library Home
 - **⌘K search** — fast full-text search scoped to All or the current project; AI mode synthesizes answers across fragments
 - **Agent search** — a `/spool` skill inside Claude Code (and any ACP agent) feeds matching fragments back into your conversation
+- **Security Scan** (default on, v0.5.0+) — always-on local scanner surfaces leaked API keys, tokens, and PII across every session; one-click rotate-at-source for major vendors, cross-session blast radius, and "purge everywhere" to wipe a value from your archive
 
 Everything stays on your machine. Nothing leaves.
 
@@ -42,9 +43,10 @@ Everything stays on your machine. Nothing leaves.
 
 ```
 packages/
-  app/      Electron macOS app (React + Vite + Tailwind)
+  app/      Electron app (React + Vite + Tailwind) — macOS + Linux
   core/     Indexing engine (SQLite + FTS5)
   cli/      CLI interface (`spool search ...`)
+  redact/   Secret-detection regex library (published as @spool-lab/redact)
   landing/  spool.pro website
 ```
 
