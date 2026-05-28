@@ -17,7 +17,7 @@
 //   2. regenerate the per-file sha256s against the new commit
 //   3. update class-mapping.ts if the label set changed
 
-import { PF_HF_REPO } from './model-paths.js'
+import { PF_HF_REPO } from './pf-version.js'
 
 export interface ManifestFile {
   /** Relative path inside the model directory + the path the file is

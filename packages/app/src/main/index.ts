@@ -52,7 +52,7 @@ import type {
   ShareDraftRow, UpsertShareDraftInput,
 } from '@spool-lab/core'
 import { setupTray } from './tray.js'
-import { AcpManager } from './acp.js'
+import { AcpManager, seedSecurityEnabledDefault } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
@@ -582,6 +582,13 @@ app.whenReady().then(async () => {
 
   db = getDB()
   acpManager = new AcpManager()
+
+  // Default-on for security-capable builds: write `securityEnabled: true`
+  // into agents.json the first time we see a config without an explicit
+  // choice. Keeps the resolver semantics clean — `undefined` still means
+  // "no opinion" — while making the GA default explicit on disk. Users
+  // who opt out via Labs persist as `false` and are not re-seeded.
+  if (securityBuildCapable()) seedSecurityEnabledDefault()
 
   syncer = new Syncer(db, undefined, (sessionId) => {
     // Sync mutated this session's messages; existing findings now have

@@ -219,6 +219,29 @@ function saveAgentsConfig(config: AgentsConfig): void {
   writeFileSync(AGENTS_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8')
 }
 
+/** Pure: if the config has no explicit `securityEnabled`, seed it to `true`.
+ *  Returns the (possibly-mutated) config and whether the caller should
+ *  persist. An explicit `false` is preserved — users who opted out stay
+ *  opted out across upgrades. */
+export function applySecurityEnabledSeed(
+  input: AgentsConfig | null,
+): { changed: boolean; config: AgentsConfig } {
+  const config: AgentsConfig = input ? { ...input } : {}
+  if (config.securityEnabled === undefined) {
+    config.securityEnabled = true
+    return { changed: true, config }
+  }
+  return { changed: false, config }
+}
+
+/** Side-effectful boot hook: seed `securityEnabled: true` into agents.json
+ *  on first launch of a security-capable build, so the feature is on by
+ *  default without conflating "no opinion" with "ON" inside the resolver. */
+export function seedSecurityEnabledDefault(): void {
+  const { changed, config } = applySecurityEnabledSeed(loadAgentsConfig())
+  if (changed) saveAgentsConfig(config)
+}
+
 /** Merge builtin + custom agent configs */
 function getEffectiveConfigs(): Record<string, AgentConfig> {
   const userConfig = loadAgentsConfig()

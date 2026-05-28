@@ -39,7 +39,11 @@ import { regexProvider, type RedactProvider, type SensitiveMatch } from '@spool-
 import { loadSecurityPreferences } from './securityPreferences.js'
 import { mapPfMatches, setUnknownLabelSink, type PfRawMatch } from './security/class-mapping.js'
 import { detectWithRegex } from '@spool-lab/redact'
-import { PF_PROFILE_VERSION } from './security/model-paths.js'
+// Import directly from pf-version (no `electron` import). Going through
+// model-paths.ts pulls `import { app } from 'electron'` into a shared
+// Rollup chunk and crashes the worker at load with
+// "Cannot find module 'electron'".
+import { PF_PROFILE_VERSION } from './security/pf-version.js'
 
 if (!parentPort) {
   throw new Error('scan-worker-thread.ts is only meant to run as a worker_thread child')
