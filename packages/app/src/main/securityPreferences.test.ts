@@ -48,6 +48,7 @@ describe('loadSecurityPreferences', () => {
       pfEnabled: false,
       pfCalloutDismissed: false,
       pfActivationPending: false,
+      sessionRowRiskIconVisible: true,
     })
   })
 
@@ -143,6 +144,30 @@ describe('loadSecurityPreferences', () => {
   it('falls back when kindAllowlist is not an array', () => {
     writeFileSync(configPath, JSON.stringify({ kindAllowlist: 'email' }))
     expect(mod.loadSecurityPreferences().kindAllowlist).toEqual([])
+  })
+
+  describe('sessionRowRiskIconVisible (default-on)', () => {
+    it('reads as true when the field is absent (default on)', () => {
+      writeFileSync(configPath, JSON.stringify({ kindAllowlist: ['email'] }))
+      expect(mod.loadSecurityPreferences().sessionRowRiskIconVisible).toBe(true)
+    })
+
+    it('reads as false only when the stored value is literally false', () => {
+      writeFileSync(configPath, JSON.stringify({ sessionRowRiskIconVisible: false }))
+      expect(mod.loadSecurityPreferences().sessionRowRiskIconVisible).toBe(false)
+    })
+
+    it('coerces garbage values to the on default rather than off', () => {
+      writeFileSync(configPath, JSON.stringify({ sessionRowRiskIconVisible: 'false' }))
+      expect(mod.loadSecurityPreferences().sessionRowRiskIconVisible).toBe(true)
+    })
+
+    it('round-trips through save', () => {
+      mod.saveSecurityPreferences({ sessionRowRiskIconVisible: false })
+      expect(mod.loadSecurityPreferences().sessionRowRiskIconVisible).toBe(false)
+      mod.saveSecurityPreferences({ sessionRowRiskIconVisible: true })
+      expect(mod.loadSecurityPreferences().sessionRowRiskIconVisible).toBe(true)
+    })
   })
 
   it('treats an unknown rescanAfterSync value as "auto" (safer default)', () => {
@@ -241,6 +266,7 @@ describe('saveSecurityPreferences', () => {
       // banner doesn't re-appear after the user opts in.
       pfCalloutDismissed: true,
       pfActivationPending: false,
+      sessionRowRiskIconVisible: true,
     })
   })
 

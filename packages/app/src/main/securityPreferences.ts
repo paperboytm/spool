@@ -60,6 +60,12 @@ export interface SecurityPreferences {
    *  the moment the download lands, and lets the callout render an
    *  "Activating..." state instead of vanishing into a silent gap. */
   pfActivationPending: boolean
+  /** Whether the per-session risk badge (AlertTriangle / resolved ✓)
+   *  renders in the Library + Project view session rows. Default on
+   *  so existing users see no change. Off lets users who find the
+   *  inline icon distracting (or who don't run the scanner) get a
+   *  cleaner row; the dedicated Security page is unaffected. */
+  sessionRowRiskIconVisible: boolean
 }
 
 const DEFAULTS: SecurityPreferences = {
@@ -71,6 +77,7 @@ const DEFAULTS: SecurityPreferences = {
   pfEnabled: false,
   pfCalloutDismissed: false,
   pfActivationPending: false,
+  sessionRowRiskIconVisible: true,
 }
 
 interface SecurityConfigFile {
@@ -85,6 +92,7 @@ interface SecurityConfigFile {
   pfEnabled?: unknown
   pfCalloutDismissed?: unknown
   pfActivationPending?: unknown
+  sessionRowRiskIconVisible?: unknown
   [key: string]: unknown
 }
 
@@ -136,6 +144,10 @@ export function loadSecurityPreferences(): SecurityPreferences {
     pfEnabled: c.pfEnabled === true,
     pfCalloutDismissed: c.pfCalloutDismissed === true,
     pfActivationPending: c.pfActivationPending === true,
+    // Default ON, so a missing or garbage value reads as true; only a
+    // literal stored `false` turns the badge off. Mirror image of the
+    // strict `=== true` pattern used for default-off fields above.
+    sessionRowRiskIconVisible: c.sessionRowRiskIconVisible !== false,
   }
 }
 
@@ -159,6 +171,12 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
   }
   if (next.pfCalloutDismissed !== undefined) merged.pfCalloutDismissed = next.pfCalloutDismissed === true
   if (next.pfActivationPending !== undefined) merged.pfActivationPending = next.pfActivationPending === true
+  if (next.sessionRowRiskIconVisible !== undefined) {
+    // Symmetric with the load-side read: only a literal `false` writes
+    // false; anything else (including a buggy `'false'` string) writes
+    // true so we never silently dim the badge.
+    merged.sessionRowRiskIconVisible = next.sessionRowRiskIconVisible !== false
+  }
   writeFile(merged)
   return loadSecurityPreferences()
 }

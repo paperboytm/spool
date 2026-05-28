@@ -245,6 +245,8 @@
       "blur_page_sub": "Finding values render blurred on the Security page; hover or click a row to reveal. Off = always visible.",
       "blur_strip_label": "Blur values in the session strip",
       "blur_strip_sub": "Finding values render blurred in the session-detail Findings strip; hover or click to reveal. Off = always visible.",
+      "row_risk_icon_label": "Risk icon on session rows",
+      "row_risk_icon_sub": "Show the inline ⚠ / ✓ on rows in Sessions and Project view. Off = the dedicated Security page still surfaces the same findings.",
       "muted_kinds_title": "Muted kinds",
       "muted_kinds_label": "Mute by kind",
       "muted_kinds_sub_empty": "Entire categories you never want to see. Findings still land as Ignored for audit — just suppressed from the badge and lists.",

@@ -239,6 +239,8 @@
       "blur_page_sub": "검출 값은 보안 페이지에서 기본적으로 흐리게 표시됩니다. 호버하거나 행을 클릭하면 표시. 끄면 항상 표시.",
       "blur_strip_label": "세션 strip에서 값 흐리게 표시",
       "blur_strip_sub": "검출 값은 세션 상세의 Findings strip에서 기본적으로 흐리게 표시됩니다. 호버하거나 클릭하면 표시. 끄면 항상 표시.",
+      "row_risk_icon_label": "세션 행의 위험 아이콘",
+      "row_risk_icon_sub": "Sessions와 프로젝트 보기 행에 ⚠ / ✓를 인라인으로 표시합니다. 끄더라도 전용 보안 페이지에서는 동일한 검출이 계속 표시됩니다.",
       "muted_kinds_title": "음소거된 카테고리",
       "muted_kinds_label": "카테고리로 음소거",
       "muted_kinds_sub_empty": "아예 보고 싶지 않은 카테고리. 검출은 감사용으로 무시됨으로 기록되지만 배지와 목록에는 나타나지 않습니다.",

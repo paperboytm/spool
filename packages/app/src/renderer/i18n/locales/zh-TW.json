@@ -239,6 +239,8 @@
       "blur_page_sub": "命中值在安全頁面預設模糊；懸停或點擊行可顯示。關閉則永遠可見。",
       "blur_strip_label": "在會話 Findings 列中模糊命中值",
       "blur_strip_sub": "命中值在會話詳情 Findings 列中預設模糊；懸停或點擊可顯示。關閉則永遠可見。",
+      "row_risk_icon_label": "會話列的風險圖示",
+      "row_risk_icon_sub": "在 Sessions 與專案檢視的列內顯示 ⚠ / ✓。關閉後專用的安全頁面仍會呈現相同的命中。",
       "muted_kinds_title": "類別屏蔽",
       "muted_kinds_label": "按類別屏蔽",
       "muted_kinds_sub_empty": "整類不想再看到。被屏蔽的類別仍會作為「已忽略」寫入審計記錄，只是不會出現在 badge 和清單中。",

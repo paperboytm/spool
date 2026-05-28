@@ -28,6 +28,7 @@ const base: SecurityPreferences = {
   pfEnabled: false,
   pfCalloutDismissed: false,
   pfActivationPending: false,
+  sessionRowRiskIconVisible: true,
 }
 
 describe('patchSecurityPrefs optimistic update', () => {

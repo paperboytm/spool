@@ -245,6 +245,8 @@
       "blur_page_sub": "Les valeurs détectées sont floutées par défaut sur la page Sécurité ; survoler ou cliquer une ligne pour révéler. Désactivé = toujours visible.",
       "blur_strip_label": "Flouter les valeurs dans le strip de session",
       "blur_strip_sub": "Les valeurs détectées sont floutées par défaut dans le strip Findings du détail de session ; survoler ou cliquer pour révéler. Désactivé = toujours visible.",
+      "row_risk_icon_label": "Icône de risque sur les lignes de session",
+      "row_risk_icon_sub": "Affiche ⚠ / ✓ en ligne sur les rangées de Sessions et de la vue Projet. Désactivé = la page Sécurité dédiée continue d'afficher les mêmes détections.",
       "muted_kinds_title": "Catégories masquées",
       "muted_kinds_label": "Masquer par catégorie",
       "muted_kinds_sub_empty": "Catégories que tu ne veux jamais voir. Les détections sont quand même enregistrées comme Ignoré pour l'audit — simplement absentes du badge et des listes.",

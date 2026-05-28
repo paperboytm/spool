@@ -233,6 +233,20 @@ function SecurityPaneInner() {
             )}
           />
           <DefaultsRow
+            label={t('settings.security.row_risk_icon_label', { defaultValue: 'Risk icon on session rows' })}
+            description={t('settings.security.row_risk_icon_sub', {
+              defaultValue: 'Show the inline ⚠ / ✓ on rows in Sessions and Project view. Off = the dedicated Security page still surfaces the same findings.',
+            })}
+            control={prefs && (
+              <Toggle
+                checked={prefs.sessionRowRiskIconVisible}
+                onChange={(v) => { void update({ sessionRowRiskIconVisible: v }) }}
+                ariaLabel={t('settings.security.row_risk_icon_label', { defaultValue: 'Risk icon on session rows' })}
+                testId="settings-row-risk-icon"
+              />
+            )}
+          />
+          <DefaultsRow
             label={t('settings.security.rescan_after_sync_label', { defaultValue: 'Rescan after sync' })}
             description={t('settings.security.rescan_after_sync_sub', {
               defaultValue: 'When new sessions land, automatically re-run detectors on the affected sessions in the background.',

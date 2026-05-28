@@ -21,6 +21,7 @@ export interface SecurityPreferences {
   pfEnabled: boolean
   pfCalloutDismissed: boolean
   pfActivationPending: boolean
+  sessionRowRiskIconVisible: boolean
 }
 
 export type PfPhase =

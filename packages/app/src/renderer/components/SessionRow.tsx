@@ -9,6 +9,7 @@ import Menu from './Menu.js'
 import { formatRelativeDate, type BucketKey } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { useSecurityEnabled } from '../featureFlags.js'
+import { useCachedSecurityPrefs } from '../api/securityPrefsCache.js'
 import { compactModel } from './security/format.js'
 
 type Props = {
@@ -176,7 +177,16 @@ function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElemen
 
 function SecurityBadge({ session }: { session: Session }): React.ReactElement | null {
   const { t } = useTranslation()
-  if (!useSecurityEnabled()) return null
+  const enabled = useSecurityEnabled()
+  // Per-user opt-out for the row-level badge. The pref defaults to
+  // `true`; when the cache is still cold (`null`) we also render the
+  // badge to avoid a visible appear-after-load flash on first paint.
+  // Only an authoritative `false` suppresses it. SecurityPage and the
+  // session-detail Findings strip render their own AlertTriangle and
+  // are intentionally not gated by this pref.
+  const prefs = useCachedSecurityPrefs()
+  if (!enabled) return null
+  if (prefs && !prefs.sessionRowRiskIconVisible) return null
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0
   const purged = session.scanPurgedCount ?? 0

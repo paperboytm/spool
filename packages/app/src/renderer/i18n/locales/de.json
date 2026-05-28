@@ -245,6 +245,8 @@
       "blur_page_sub": "Erkannte Werte werden auf der Sicherheitsseite standardmäßig unscharf angezeigt. Überfahren oder Zeile anklicken zum Anzeigen. Aus = immer sichtbar.",
       "blur_strip_label": "Werte im Sitzungs-Strip unscharf machen",
       "blur_strip_sub": "Erkannte Werte werden im Findings-Strip der Sitzungsdetailansicht standardmäßig unscharf angezeigt. Überfahren oder anklicken zum Anzeigen. Aus = immer sichtbar.",
+      "row_risk_icon_label": "Risiko-Symbol in Sitzungszeilen",
+      "row_risk_icon_sub": "Zeigt ⚠ / ✓ inline in Zeilen unter Sessions und Projektansicht. Aus = die dedizierte Sicherheitsseite listet dieselben Funde weiterhin.",
       "muted_kinds_title": "Stummgeschaltete Kategorien",
       "muted_kinds_label": "Nach Kategorie stummschalten",
       "muted_kinds_sub_empty": "Kategorien, die du nie sehen willst. Treffer werden weiterhin als „Ignoriert\" für die Prüfspur aufgezeichnet — nur in Badge und Listen ausgeblendet.",
