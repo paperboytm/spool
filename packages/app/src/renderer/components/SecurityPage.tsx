@@ -1210,6 +1210,35 @@ function SessionCard({
 
   useEffect(() => { void load() }, [load])
 
+  // Refetch findings when this session is rescanned (manual click,
+  // post-sync auto-rescan, REDACT_DETECTOR_VERSION bump, …). Without
+  // this, the card shows stale findings until the user navigates
+  // away and back. The parent SecurityPage refetches its session
+  // list on the same event but doesn't propagate into mounted cards.
+  //
+  // Stability: keep the subscription pinned to session.id alone so
+  // filter / pagination changes don't re-subscribe. `load` is held
+  // in a ref so the handler always invokes the latest one without
+  // appearing in the effect's deps.
+  //
+  // Debounce 300ms (same as ProjectView / SecurityPage / SessionDetail)
+  // so a backfill burst publishing N session-rescanned events
+  // collapses to one refetch instead of N.
+  const loadRef = useRef(load)
+  loadRef.current = load
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = securityApi.onChange((c) => {
+      if (c.sessionId !== session.id) return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { timer = null; void loadRef.current() }, 300)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
+  }, [session.id])
+
   // Reset pagination to first page when the active kind filter
   // changes — keeps Load-more counts aligned with the new result set.
   const activeKindsKey = activeKinds.join('|')
