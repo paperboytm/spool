@@ -26,7 +26,12 @@
 //   2 — 2026-05-28: env-var detector now rejects values containing
 //       non-ASCII letters (CJK / Cyrillic / Hangul / Arabic / emoji
 //       are placeholder description text, never real env-var secrets).
-export const REDACT_DETECTOR_VERSION = 2
+//   3 — 2026-05-28: internal-host regex no longer case-insensitive
+//       (drops PascalCase `SqlParser.internal` style FPs); validator
+//       rejects trailing file-extensions (`runtime.prod.js`);
+//       credit-card regex rejects decimal fractional parts
+//       (`0.5227687358856201`). See issue #340.
+export const REDACT_DETECTOR_VERSION = 3
 
 export interface ProfileOpts {
   /** Regex detector revision. Bump in lockstep with rule changes. */
