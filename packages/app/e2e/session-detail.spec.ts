@@ -209,3 +209,85 @@ test('custom session scrollbar thumb follows pointer while dragging long session
   const after = await scroller.evaluate((el) => el.scrollTop)
   expect(after).toBeGreaterThan(before.scrollTop)
 })
+
+test('clicking the scrollbar track jumps the message list to that position', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator(`[data-testid="session-row"][data-session-uuid="${LARGE_SESSION_UUID}"]`)
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 10000 })
+
+  const scroller = window.locator('[data-testid="message-list-scroll"]')
+  const track = window.locator('[data-testid="message-scrollbar-track"]')
+  await expect
+    .poll(
+      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
+      { timeout: 3000 },
+    )
+    .toBeGreaterThan(0)
+  await expect(track).toBeVisible()
+
+  const before = await scroller.evaluate((el) => el.scrollTop)
+
+  const trackBox = await track.boundingBox()
+  if (!trackBox) throw new Error('missing scrollbar track box')
+
+  await window.mouse.click(
+    trackBox.x + trackBox.width / 2,
+    trackBox.y + trackBox.height * 0.75,
+  )
+
+  await expect
+    .poll(async () => scroller.evaluate((el) => el.scrollTop), { timeout: 3000 })
+    .toBeGreaterThan(before + 200)
+})
+
+test('dragging the scrollbar thumb to the bottom reaches the actual list end', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator(`[data-testid="session-row"][data-session-uuid="${LARGE_SESSION_UUID}"]`)
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 10000 })
+
+  const scroller = window.locator('[data-testid="message-list-scroll"]')
+  const thumb = window.locator('[data-testid="message-scrollbar-thumb"]')
+  await expect
+    .poll(
+      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
+      { timeout: 3000 },
+    )
+    .toBeGreaterThan(0)
+  await expect(thumb).toBeVisible()
+
+  const thumbBox = await thumb.boundingBox()
+  if (!thumbBox) throw new Error('missing scrollbar thumb box')
+  const trackBox = await window.locator('[data-testid="message-scrollbar-track"]').boundingBox()
+  if (!trackBox) throw new Error('missing scrollbar track box')
+
+  const startX = thumbBox.x + thumbBox.width / 2
+  const startY = thumbBox.y + thumbBox.height / 2
+  const bottomY = trackBox.y + trackBox.height - 2
+
+  await window.mouse.move(startX, startY)
+  await window.mouse.down()
+  await window.mouse.move(startX, bottomY, { steps: 30 })
+  await window.mouse.up()
+
+  // The bug being regressed: pixel-ratio scrollTop math couldn't reach the
+  // true bottom because Virtuoso's scrollHeight estimate (1500 × 64) is
+  // smaller than the real measured total once markdown rows expand. With
+  // scrollToIndex(rowCount - 1), the scroller must land at the true max.
+  await expect
+    .poll(
+      async () =>
+        scroller.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop),
+      { timeout: 5000 },
+    )
+    .toBeLessThan(16)
+})

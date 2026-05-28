@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { Virtuoso, type Components, type ScrollSeekConfiguration, type ScrollSeekPlaceholderProps, type VirtuosoHandle } from 'react-virtuoso'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import type { Message } from '@spool-lab/core'
 import MessageBubble, { type FindRange } from './MessageBubble.js'
 
@@ -32,15 +32,6 @@ type Row =
   | { kind: 'msg'; msg: Message; showAvatar: boolean }
   | { kind: 'sidechain'; key: string; label: string; timestamp: string; messages: Message[] }
   | { kind: 'divider'; key: string; isoDay: string; label: string }
-
-const scrollSeekConfiguration: ScrollSeekConfiguration = {
-  enter: (velocity) => Math.abs(velocity) > 600,
-  exit: (velocity) => Math.abs(velocity) < 120,
-}
-
-const virtuosoComponents: Components<Row> = {
-  ScrollSeekPlaceholder: MessageScrollSeekPlaceholder,
-}
 
 /** Stable per-local-day key used for divider grouping + dedup. */
 function localDayKey(iso: string): string {
@@ -134,7 +125,7 @@ function buildRows(messages: Message[], label: DividerLabel): Row[] {
         messages: visibleSidechainMessages(group),
       }
     } else {
-      const showAvatar =
+      const showAvatar: boolean =
         !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
       row = { kind: 'msg', msg, showAvatar }
     }
@@ -174,25 +165,6 @@ function formatRowTime(iso: string, locale: string | undefined): string {
   } catch {
     return ''
   }
-}
-
-function MessageScrollSeekPlaceholder({ height, type }: ScrollSeekPlaceholderProps) {
-  if (type === 'group') return null
-  return (
-    <div
-      className="px-6 py-2"
-      style={{ height }}
-      aria-hidden
-    >
-      <div className="flex items-start gap-2">
-        <div className="flex-none w-5 h-5 rounded-full mt-0.5 bg-warm-surface2 dark:bg-dark-surface2" />
-        <div className="flex-1 min-w-0 space-y-2 pt-1">
-          <div className="h-3 w-3/4 rounded bg-warm-surface2 dark:bg-dark-surface2" />
-          <div className="h-3 w-1/2 rounded bg-warm-surface2 dark:bg-dark-surface2" />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
@@ -251,6 +223,19 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
       virtuosoRef.current?.scrollIntoView({ index: idx, align: 'center', behavior: 'auto' })
     },
   }), [idToRowIndex])
+
+  // Custom scrollbar maps thumb position → row index → Virtuoso scrollToIndex.
+  // We can't use scrollTop directly because Virtuoso estimates scrollHeight
+  // from defaultItemHeight; real rows (markdown bubbles) are usually taller,
+  // so a pixel-ratio map can't reach the actual top/bottom until rows measure.
+  const rowCount = rows.length
+  const scrollToRatio = useCallback((ratio: number) => {
+    const handle = virtuosoRef.current
+    if (!handle || rowCount === 0) return
+    const clamped = Math.max(0, Math.min(1, ratio))
+    const index = Math.round(clamped * (rowCount - 1))
+    handle.scrollToIndex({ index, align: 'start', behavior: 'auto' })
+  }, [rowCount])
 
   if (messages.length === 0) {
     return (
@@ -385,29 +370,49 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
         defaultItemHeight={64}
         {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
         increaseViewportBy={400}
-        scrollSeekConfiguration={scrollSeekConfiguration}
         totalListHeightChanged={requestScrollbarSync}
-        components={virtuosoComponents}
         data-testid="message-list-scroll"
         className="h-full scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]"
         itemContent={renderRowContent}
       />
-      <MessageScrollbar scroller={virtuosoScroller} syncNonce={scrollbarSyncNonce} />
+      <MessageScrollbar
+        scroller={virtuosoScroller}
+        syncNonce={scrollbarSyncNonce}
+        scrollToRatio={scrollToRatio}
+      />
     </div>
   )
 })
 
 export default MessageList
 
-function MessageScrollbar({ scroller, syncNonce }: { scroller: HTMLElement | null; syncNonce: number }) {
+function MessageScrollbar({
+  scroller,
+  syncNonce,
+  scrollToRatio,
+}: {
+  scroller: HTMLElement | null
+  syncNonce: number
+  scrollToRatio: (ratio: number) => void
+}) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const draggingRef = useRef(false)
+  const activeDragRef = useRef<{ move: (event: PointerEvent) => void; up: () => void } | null>(null)
   const [metrics, setMetrics] = useState({
     clientHeight: 0,
     scrollHeight: 0,
     scrollTop: 0,
   })
   const [dragThumbTop, setDragThumbTop] = useState<number | null>(null)
+
+  useEffect(() => () => {
+    const active = activeDragRef.current
+    if (!active) return
+    window.removeEventListener('pointermove', active.move)
+    window.removeEventListener('pointerup', active.up)
+    window.removeEventListener('pointercancel', active.up)
+    activeDragRef.current = null
+  }, [])
 
   const syncMetrics = useCallback(() => {
     if (!scroller || draggingRef.current) return
@@ -435,8 +440,8 @@ function MessageScrollbar({ scroller, syncNonce }: { scroller: HTMLElement | nul
 
     const observer = new ResizeObserver(() => syncMetrics())
     observer.observe(scroller)
-    const content = scroller.querySelector('[data-virtuoso-scroller] > *') ?? scroller.firstElementChild
-    if (content instanceof Element) observer.observe(content)
+    const content = scroller.firstElementChild
+    if (content) observer.observe(content)
 
     return () => {
       scroller.removeEventListener('scroll', syncMetrics)
@@ -463,7 +468,7 @@ function MessageScrollbar({ scroller, syncNonce }: { scroller: HTMLElement | nul
   const scrollToThumbTop = (top: number) => {
     const nextTop = Math.max(0, Math.min(maxThumbTop, top))
     setDragThumbTop(nextTop)
-    scroller.scrollTop = maxThumbTop === 0 ? 0 : (nextTop / maxThumbTop) * maxScrollTop
+    scrollToRatio(maxThumbTop === 0 ? 0 : nextTop / maxThumbTop)
   }
 
   return (
@@ -502,8 +507,10 @@ function MessageScrollbar({ scroller, syncNonce }: { scroller: HTMLElement | nul
             window.removeEventListener('pointermove', handlePointerMove)
             window.removeEventListener('pointerup', handlePointerUp)
             window.removeEventListener('pointercancel', handlePointerUp)
+            activeDragRef.current = null
           }
 
+          activeDragRef.current = { move: handlePointerMove, up: handlePointerUp }
           window.addEventListener('pointermove', handlePointerMove)
           window.addEventListener('pointerup', handlePointerUp)
           window.addEventListener('pointercancel', handlePointerUp)
