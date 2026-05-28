@@ -35,6 +35,7 @@ import {
   listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
   listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
   invalidateSessionScanProfile,
+  buildReplayGraph,
   makeObservabilityRuntime,
   SPOOL_DIR,
 } from '@spool-lab/core'
@@ -775,6 +776,12 @@ ipcMain.handle('spool:list-project-directory-counts', (_e, { identityKey, source
 
 ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string }) => {
   return getSessionWithMessages(db, sessionUuid)
+})
+
+ipcMain.handle('spool:get-session-replay-graph', (_e, { sessionUuid }: { sessionUuid: string }) => {
+  const result = getSessionWithMessages(db, sessionUuid)
+  if (!result) return null
+  return buildReplayGraph(result.messages)
 })
 
 ipcMain.handle('spool:get-status', () => {

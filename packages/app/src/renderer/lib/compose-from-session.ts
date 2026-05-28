@@ -49,6 +49,7 @@ export function composeFromSession(
     .map((m) => ({
       role: m.role as 'user' | 'assistant',
       body: m.contentText,
+      ...(m.toolNames.length > 0 ? { replay: { toolNames: m.toolNames } } : {}),
       timestamp: m.timestamp,
     }))
 

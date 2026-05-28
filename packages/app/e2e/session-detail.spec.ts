@@ -124,6 +124,27 @@ test('find-in-page matches rendered text, not markdown source', async () => {
   await expect(window.locator('[data-testid="session-find-status"]')).toContainText('No matches')
 })
 
+test('shows replay timeline from session detail', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator('[data-testid="session-row"][data-session-uuid="test-session-uuid-001"]')
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 5000 })
+
+  await window.locator('[data-testid="session-panel-replay"]').click()
+  await expect(window.locator('[data-testid="session-replay-view"]')).toBeVisible()
+  const firstReplayNode = window.locator('[data-testid="session-replay-node"]').first()
+  await expect(firstReplayNode).toBeVisible()
+  await firstReplayNode.getByRole('button').click()
+  await expect(firstReplayNode.locator('[data-testid="session-replay-node-detail"]')).toBeVisible()
+
+  await window.locator('[data-testid="session-panel-messages"]').click()
+  await expect(window.locator('[data-testid="message-list-scroll"]')).toBeVisible()
+})
+
 test('handles 1500-message session: virtualization + deep find', async () => {
   const { window } = ctx
   await waitForSync(window)

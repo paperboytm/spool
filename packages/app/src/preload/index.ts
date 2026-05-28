@@ -9,6 +9,7 @@ import type {
   AllowlistEntryRow,
   Page,
   BackupFileInfo, DeleteBackupsResult,
+  ReplayGraph,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 
@@ -117,6 +118,9 @@ const api = {
 
   getSession: (sessionUuid: string): Promise<{ session: Session; messages: Message[] } | null> =>
     ipcRenderer.invoke('spool:get-session', { sessionUuid }),
+
+  getSessionReplayGraph: (sessionUuid: string): Promise<ReplayGraph | null> =>
+    ipcRenderer.invoke('spool:get-session-replay-graph', { sessionUuid }),
 
   getStatus: (): Promise<StatusInfo> =>
     ipcRenderer.invoke('spool:get-status'),

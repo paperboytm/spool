@@ -35,6 +35,13 @@ export interface Turn {
   /** Display name for user turns, e.g. "[Maya]" or "[you]". Omitted for assistant. */
   author?: string | undefined
   body: string
+  /** Optional replay metadata from local agent sessions. Kept out of
+   *  parsed web-share conversations, but preserved in .spool drafts so
+   *  Timeline can show tool-call beats without changing templates that
+   *  only care about role/body text. */
+  replay?: {
+    toolNames?: string[] | undefined
+  } | undefined
   /** Literal substrings to redact when `opts.redact` is on. */
   redact?: string[] | undefined
   /** ISO timestamp of when this turn was sent/received. Optional —

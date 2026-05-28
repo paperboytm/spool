@@ -241,6 +241,15 @@ export function Timeline({ convo, opts }: Props) {
                       align with the role label's left edge (78 =
                       54+4+9+11). */}
                   <div style={{ paddingLeft: 78, marginTop: 8 }}>
+                    {turn.replay?.toolNames && turn.replay.toolNames.length > 0 && (
+                      <ToolCallRail
+                        toolNames={turn.replay.toolNames}
+                        accent={accent}
+                        accentBg={accentBg}
+                        muted={t.muted}
+                        border={t.border}
+                      />
+                    )}
                     <Body
                       text={turn.body}
                       redact={opts.redact ? redactList : undefined}
@@ -275,6 +284,65 @@ export function Timeline({ convo, opts }: Props) {
           <span style={{ color: accent }}>— {convo.createdAt} —</span>
         </div>
       )}
+    </div>
+  )
+}
+
+function ToolCallRail({
+  toolNames,
+  accent,
+  accentBg,
+  muted,
+  border,
+}: {
+  toolNames: string[]
+  accent: string
+  accentBg: string
+  muted: string
+  border: string
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 6,
+        margin: '0 0 8px',
+      }}
+    >
+      {toolNames.map((name, i) => (
+        <span
+          key={`${name}-${i}`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            minHeight: 20,
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: `1px solid ${border}`,
+            background: accentBg,
+            color: accent,
+            fontFamily: 'Geist Mono, monospace',
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: muted,
+              opacity: 0.75,
+            }}
+          />
+          {name}
+        </span>
+      ))}
     </div>
   )
 }
