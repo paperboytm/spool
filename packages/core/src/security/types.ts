@@ -116,7 +116,12 @@ export interface DismissScope {
  *  as no-ops (forward-compat). */
 export type FindingsChange =
   | { type: 'inserted'; sessionId: number }
-  | { type: 'state-changed'; sessionId: number; findingId: number; state: FindingState }
+  // `findingId` is omitted for bulk events that coalesce many
+  // findings into one per-session notification (bulk dismiss, bulk
+  // purge). All consumers filter by `sessionId` and re-fetch, so the
+  // omission is harmless and avoids fanning out N IPC messages for
+  // an action that touches K << N sessions.
+  | { type: 'state-changed'; sessionId: number; findingId?: number; state: FindingState }
   | { type: 'session-rescanned'; sessionId: number }
 
 /** Snapshot of the scan worker's transient state. The DB stores

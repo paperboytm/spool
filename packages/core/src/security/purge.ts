@@ -97,44 +97,75 @@ export function purgeFinding(
   )
 }
 
-/** Bulk purge across many findings. Caller passes an arbitrary
- *  ordering; we re-sort to the only correct order:
+/** Bulk purge across many findings.
  *
- *    1. Group by `message_id`
- *    2. Within each group, apply in **descending** `start_offset` so
- *       earlier offsets stay valid as the string shifts.
+ *  Ordering: caller passes an arbitrary order; we re-sort to the only
+ *  correct order — group by `message_id`, then within each group
+ *  apply in **descending** `start_offset` so earlier offsets stay
+ *  valid as the string shifts. Without this two findings inside the
+ *  same message at offsets [10..20] and [40..60] would corrupt:
+ *  purging [10..20] first shifts everything after by `mask.length -
+ *  10`, and the second slice now points at the wrong bytes.
  *
- *  Without this re-sort, two findings inside the same message at
- *  offsets [10..20] and [40..60] would corrupt: purging [10..20]
- *  first shifts everything after offset 20 by `mask.length - 10`,
- *  and the second slice [40..60] now points at the wrong bytes
- *  (often leaking part of the second secret into the mask, or
- *  losing it entirely). */
+ *  Performance: the whole bulk runs in ONE sqlite transaction with
+ *  one `content_text` SELECT/UPDATE per affected message and ONE
+ *  `updateSessionCounts` per affected session. The earlier
+ *  per-finding loop paid a fsync per finding (~3–5 ms on macOS) and
+ *  rebuilt session counts N times; on archives with ~17 k absolute-
+ *  path findings concentrated in a handful of sessions that
+ *  serialised into ~60 s of main-process work and froze the app
+ *  (issue #344). */
 export function purgeFindings(
   findingIds: readonly number[],
   deps: PurgeDeps,
 ): Effect.Effect<PurgeResult[], PurgeError> {
   return Effect.gen(function* () {
-    // Resolve offsets/message ids up front so we can deterministically
-    // order. The Effect.try preserves db-failure → PurgeError mapping.
-    const ordered = yield* Effect.try({
-      try: () => orderForBulkPurge(deps.db, findingIds),
+    if (findingIds.length === 0) {
+      return [] as PurgeResult[]
+    }
+
+    // Resolve every row up front so the transaction body never has
+    // to fan back out into per-finding SELECTs. The Map keys also
+    // dedupe accidental duplicate ids cheaply.
+    const rows = yield* Effect.try({
+      try: () => loadFindingsForBulkPurge(deps.db, findingIds),
       catch: (cause) => new PurgeError({ findingId: -1, reason: 'db-failed', cause }),
     })
 
-    const out: PurgeResult[] = []
-    for (const id of ordered) {
-      const result = yield* purgeFinding(id, deps).pipe(
-        Effect.catchTag('PurgeError', (err) =>
-          err.reason === 'already-purged'
-            ? Effect.succeed(null)
-            : Effect.fail(err),
-        ),
-      )
-      if (result) out.push(result)
+    // Mirror single-purge pre-checks so callers passing a stale or
+    // orphan id get the same `PurgeError` they'd see one at a time.
+    // Done BEFORE opening the transaction so a bad id never leaves a
+    // half-purged batch behind — the old loop committed each finding
+    // separately and could abort partway through.
+    for (const id of new Set(findingIds)) {
+      const row = rows.get(id)
+      if (!row) {
+        return yield* Effect.fail(new PurgeError({ findingId: id, reason: 'not-found' }))
+      }
+      if (row.state === 'active' && row.message_id === null) {
+        return yield* Effect.fail(new PurgeError({ findingId: id, reason: 'message-missing' }))
+      }
     }
-    yield* Effect.annotateCurrentSpan('purged', out.length)
-    return out
+
+    const { results, sessionIds } = yield* Effect.try({
+      try: () => applyBulkPurgeTxn(deps.db, rows),
+      catch: (cause) => new PurgeError({ findingId: -1, reason: 'db-failed', cause }),
+    })
+
+    // One coalesced event per touched session — the renderer's
+    // 300 ms debounce in SecurityPage / BlastRadius / SessionDetail
+    // would have collapsed N per-finding events into a single refetch
+    // anyway, so emitting one up front skips N-1 IPC hops.
+    for (const sessionId of sessionIds) {
+      yield* deps.publish({
+        type: 'state-changed',
+        sessionId,
+        state: 'purged',
+      })
+    }
+
+    yield* Effect.annotateCurrentSpan('purged', results.length)
+    return results
   }).pipe(
     Effect.withSpan('security.purge.bulk', { attributes: { requested: findingIds.length } }),
   )
@@ -223,6 +254,122 @@ export function orderForBulkPurge(
     for (const r of byMessage.get(key)!) out.push(r.id)
   }
   return out
+}
+
+function loadFindingsForBulkPurge(
+  db: Database.Database,
+  findingIds: readonly number[],
+): Map<number, FindingForPurge> {
+  const out = new Map<number, FindingForPurge>()
+  if (findingIds.length === 0) return out
+  // Chunk the IN-list — sqlite caps host parameters at 999 by
+  // default and a single rescan can hand us tens of thousands of ids.
+  const CHUNK = 500
+  for (let i = 0; i < findingIds.length; i += CHUNK) {
+    const slice = findingIds.slice(i, i + CHUNK)
+    const placeholders = slice.map(() => '?').join(',')
+    const rows = db.prepare(
+      `SELECT id, session_id, message_id, kind, start_offset, end_offset, state
+         FROM findings WHERE id IN (${placeholders})`,
+    ).all(...slice) as FindingForPurge[]
+    for (const r of rows) out.set(r.id, r)
+  }
+  return out
+}
+
+function applyBulkPurgeTxn(
+  db: Database.Database,
+  rows: Map<number, FindingForPurge>,
+): { results: PurgeResult[]; sessionIds: number[] } {
+  // Only `active` rows do work; `purged` rows are silently skipped to
+  // preserve the prior idempotent-on-replay semantics ("re-clicking
+  // Purge after a partial failure must not error"). Orphan rows have
+  // already been screened by the caller's pre-checks.
+  const active: FindingForPurge[] = []
+  for (const row of rows.values()) {
+    if (row.state === 'active' && row.message_id !== null) active.push(row)
+  }
+
+  // Group by message so each message body is rewritten exactly once.
+  const byMessage = new Map<number, FindingForPurge[]>()
+  for (const row of active) {
+    const key = row.message_id as number
+    let bucket = byMessage.get(key)
+    if (!bucket) { bucket = []; byMessage.set(key, bucket) }
+    bucket.push(row)
+  }
+  // Descending offset within each message — earlier offsets stay
+  // valid as the suffix shifts.
+  for (const bucket of byMessage.values()) {
+    bucket.sort((a, b) => b.start_offset - a.start_offset)
+  }
+
+  const purgedAt = new Date().toISOString()
+  const results: PurgeResult[] = []
+  const sessionIdsSeen = new Set<number>()
+  const sessionIds: number[] = []
+  const sessionsToRecount = new Set<number>()
+
+  const selectMessage = db.prepare(
+    'SELECT content_text FROM messages WHERE id = ?',
+  )
+  const updateMessage = db.prepare(
+    'UPDATE messages SET content_text = ? WHERE id = ?',
+  )
+  const updateFinding = db.prepare(
+    `UPDATE findings
+        SET state = 'purged', state_changed_at = ?
+      WHERE id = ?`,
+  )
+
+  // One transaction wraps the whole batch: a single fsync at COMMIT
+  // instead of one per finding. This is the load-bearing change for
+  // issue #344 — 17 k findings went from ~60 s to a few hundred ms.
+  db.transaction(() => {
+    for (const [messageId, bucket] of byMessage) {
+      const msg = selectMessage.get(messageId) as { content_text: string } | undefined
+      if (!msg) {
+        // The session-rescan / cascade-delete window is narrow but
+        // possible; treat a missing message like the single-purge
+        // path's "disappeared between read and purge" — throw inside
+        // the transaction so sqlite rolls everything back.
+        throw new Error(`Message ${messageId} disappeared between read and purge`)
+      }
+
+      let text = msg.content_text
+      for (const finding of bucket) {
+        const original = text.slice(finding.start_offset, finding.end_offset)
+        const mask = maskValueByKind(original, finding.kind as SensitiveKind)
+        text =
+          text.slice(0, finding.start_offset) +
+          mask +
+          text.slice(finding.end_offset)
+        updateFinding.run(purgedAt, finding.id)
+        results.push({
+          findingId: finding.id,
+          sessionId: finding.session_id,
+          maskUsed: mask,
+          purgedAt,
+        })
+        if (!sessionIdsSeen.has(finding.session_id)) {
+          sessionIdsSeen.add(finding.session_id)
+          sessionIds.push(finding.session_id)
+        }
+        sessionsToRecount.add(finding.session_id)
+      }
+      updateMessage.run(text, messageId)
+    }
+
+    // Recompute denormalised counts once per affected session — the
+    // earlier per-finding loop called this N times for sessions that
+    // had a large fan-in, which on its own ran two SELECTs +
+    // an UPDATE per call.
+    for (const sessionId of sessionsToRecount) {
+      updateSessionCounts(db, sessionId)
+    }
+  })()
+
+  return { results, sessionIds }
 }
 
 function applyPurgeTxn(

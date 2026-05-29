@@ -205,6 +205,70 @@ describe('purgeFindings bulk', () => {
     expect(after.content_text.endsWith(' tail')).toBe(true)
   })
 
+  // Regression for issue #344 — a bulk purge of ~17 k absolute-path
+  // findings froze the renderer for ~60 s because each finding paid
+  // its own BEGIN/COMMIT (and its own `updateSessionCounts`, and its
+  // own publish event). The fix collapses the batch into a single
+  // transaction and coalesces publish events to one per session. We
+  // assert the coalescing here — the timing improvement is a
+  // by-product of the same change and harder to assert reliably on
+  // an in-memory DB without fsync.
+  it('emits one publish event per touched session, not per finding (issue #344)', async () => {
+    const SESSIONS = 5
+    const FINDINGS_PER_SESSION = 50
+    // Extra sessions beyond session 1 already created by setupDb.
+    for (let i = 2; i <= SESSIONS; i++) {
+      db.prepare(
+        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at)
+         VALUES (?, 1, 1, ?, ?, ?, '2026-01-01', '2026-01-01')`,
+      ).run(i, `s-${i}`, `/p/s-${i}`, `Session ${i}`)
+    }
+    const raw = '/Users/someone/secrets'
+    let nextMessageId = 100
+    for (let s = 1; s <= SESSIONS; s++) {
+      for (let f = 0; f < FINDINGS_PER_SESSION; f++) {
+        const messageId = nextMessageId++
+        const content = `path-${f}: ${raw}`
+        db.prepare(
+          `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+           VALUES (?, ?, 1, 'user', ?, '2026-01-01', ?)`,
+        ).run(messageId, s, content, f)
+        const start = content.indexOf(raw)
+        insertFindings(db, [{
+          sessionId: s, messageId, kind: 'absolute-path',
+          valueHash: `h-${s}-${f}`, confidence: 0.9, provider: 'regex',
+          startOffset: start, endOffset: start + raw.length, state: 'active',
+        }])
+      }
+    }
+
+    const events: Array<{ type: string; sessionId: number; findingId?: number }> = []
+    const ids = (db.prepare('SELECT id FROM findings').all() as Array<{ id: number }>).map(r => r.id)
+    expect(ids.length).toBe(SESSIONS * FINDINGS_PER_SESSION)
+
+    const results = await Effect.runPromise(
+      purgeFindings(ids, {
+        db,
+        publish: (c) => Effect.sync(() => {
+          events.push(c as { type: string; sessionId: number; findingId?: number })
+        }),
+      }),
+    )
+
+    expect(results).toHaveLength(SESSIONS * FINDINGS_PER_SESSION)
+    // Exactly one event per affected session — the load-bearing
+    // coalescing assertion for issue #344.
+    expect(events).toHaveLength(SESSIONS)
+    expect(events.every(e => e.type === 'state-changed')).toBe(true)
+    expect(new Set(events.map(e => e.sessionId))).toEqual(new Set([1, 2, 3, 4, 5]))
+
+    // Every message body now contains the mask, no raw path survives.
+    const surviving = db.prepare(
+      "SELECT COUNT(*) AS n FROM messages WHERE content_text LIKE ?",
+    ).get(`%${raw}%`) as { n: number }
+    expect(surviving.n).toBe(0)
+  })
+
   describe('orderForBulkPurge', () => {
     it('returns ids grouped by message, descending start_offset within a message', () => {
       insertMessage(db, 30, 'msg A')
