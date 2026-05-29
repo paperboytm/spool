@@ -122,7 +122,17 @@
     "msgs_one": "{{count}} msg",
     "msgs_other": "{{count}} msgs",
     "divider_today": "Aujourd'hui",
-    "divider_yesterday": "Hier"
+    "divider_yesterday": "Hier",
+    "refreshFromSource": "Actualiser depuis la source",
+    "refreshPretitle": "Reconstruire depuis la source",
+    "refreshConfirmTitle": "Actualiser cette session depuis la source ?",
+    "refreshConfirmLead": "Spool va reconstruire les messages de cette session directement depuis le fichier de transcription original.",
+    "refreshConfirmWarnTitle": "Le contenu purgé revient en clair.",
+    "refreshConfirmWarnBody": "Toute valeur que tu as purgée dans cette session revient dans l'index de recherche de Spool et dans le contexte IA dès que tu confirmes, jusqu'à ce que le prochain scan la redétecte et que tu la purges à nouveau.",
+    "refreshConfirmDismissNote": "Les détections ignorées restent ignorées.",
+    "refreshConfirmAction": "Actualiser",
+    "refreshSuccess": "Session actualisée depuis la source",
+    "refreshError": "Impossible d'actualiser : {{error}}"
   },
   "library": {
     "greeting": "Bon retour",

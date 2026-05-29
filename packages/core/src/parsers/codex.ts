@@ -36,7 +36,16 @@ export function loadCodexSession(filePath: string): ParseSessionResult {
   let isInternalAssessmentSession = false
 
   // Extract UUID from filename: rollout-2026-03-23T17-13-24-{uuid}.jsonl
-  const fileMatch = basename(filePath).match(/rollout-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/)
+  //
+  // The previous `.+-` form was flagged by CodeQL as polynomial-ReDoS
+  // (js/polynomial-redos): an attacker-controlled filename like
+  // `rollout-rollout-rollout-...` could blow up regex backtracking on
+  // the ambiguity between `.+` and `-`. The fixed shape spells out
+  // codex's literal timestamp grammar (\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})
+  // which has no overlap with the trailing UUID-`-`-separator, so the
+  // engine matches in O(n) with no backtracking. Codex hasn't changed
+  // its rollout filename format since the parser was written.
+  const fileMatch = basename(filePath).match(/^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/)
   if (fileMatch?.[1]) sessionUuid = fileMatch[1]
 
   for (const line of readNonEmptyLines(filePath)) {

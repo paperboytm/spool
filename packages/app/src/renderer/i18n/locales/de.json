@@ -122,7 +122,17 @@
     "msgs_one": "{{count}} Nachr.",
     "msgs_other": "{{count}} Nachr.",
     "divider_today": "Heute",
-    "divider_yesterday": "Gestern"
+    "divider_yesterday": "Gestern",
+    "refreshFromSource": "Aus Quelle aktualisieren",
+    "refreshPretitle": "Aus Quelle neu aufbauen",
+    "refreshConfirmTitle": "Diese Sitzung aus der Quelle aktualisieren?",
+    "refreshConfirmLead": "Spool baut die Nachrichten dieser Sitzung direkt aus der ursprünglichen Transkriptdatei neu auf.",
+    "refreshConfirmWarnTitle": "Gelöschte Inhalte kommen als Klartext zurück.",
+    "refreshConfirmWarnBody": "Jeder Wert, den du in dieser Sitzung gelöscht hast, kehrt mit der Bestätigung sofort in Spools Suchindex und in den KI-Kontext zurück — bis der nächste Scan ihn erneut findet und du ihn erneut löschst.",
+    "refreshConfirmDismissNote": "Ignorierte Funde bleiben ignoriert.",
+    "refreshConfirmAction": "Aktualisieren",
+    "refreshSuccess": "Sitzung aus Quelle aktualisiert",
+    "refreshError": "Aktualisierung fehlgeschlagen: {{error}}"
   },
   "library": {
     "greeting": "Willkommen zurück",

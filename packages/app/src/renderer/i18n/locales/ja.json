@@ -118,7 +118,17 @@
     "scrollToBottom": "末尾までスクロール",
     "msgs_other": "{{count}} 件",
     "divider_today": "今日",
-    "divider_yesterday": "昨日"
+    "divider_yesterday": "昨日",
+    "refreshFromSource": "ソースから再同期",
+    "refreshPretitle": "ソースから再構築",
+    "refreshConfirmTitle": "このセッションをソースから再同期しますか？",
+    "refreshConfirmLead": "Spool は元のトランスクリプトファイルからこのセッションのメッセージを再構築します。",
+    "refreshConfirmWarnTitle": "完全削除した内容が原文に戻ります。",
+    "refreshConfirmWarnBody": "このセッションで完全削除した値は、確認した瞬間に Spool の検索インデックスと AI コンテキストに戻ります。次のスキャンで再検出され、再度完全削除するまでです。",
+    "refreshConfirmDismissNote": "無視した検出は無視のままです。",
+    "refreshConfirmAction": "再同期",
+    "refreshSuccess": "セッションをソースから再同期しました",
+    "refreshError": "再同期に失敗しました：{{error}}"
   },
   "library": {
     "greeting": "おかえりなさい",

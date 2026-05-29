@@ -118,7 +118,17 @@
     "scrollToBottom": "맨 아래로 스크롤",
     "msgs_other": "{{count}}개",
     "divider_today": "오늘",
-    "divider_yesterday": "어제"
+    "divider_yesterday": "어제",
+    "refreshFromSource": "원본에서 다시 동기화",
+    "refreshPretitle": "원본에서 다시 빌드",
+    "refreshConfirmTitle": "이 세션을 원본에서 다시 동기화할까요?",
+    "refreshConfirmLead": "Spool 이 원본 트랜스크립트 파일에서 이 세션의 메시지를 다시 빌드합니다.",
+    "refreshConfirmWarnTitle": "완전 삭제한 내용이 원문으로 돌아옵니다.",
+    "refreshConfirmWarnBody": "이 세션에서 완전 삭제한 값은 확인하는 순간 Spool 의 검색 인덱스와 AI 컨텍스트로 돌아옵니다. 다음 스캔에서 다시 감지되고 다시 완전 삭제할 때까지 그렇습니다.",
+    "refreshConfirmDismissNote": "무시한 발견은 무시 상태로 유지됩니다.",
+    "refreshConfirmAction": "다시 동기화",
+    "refreshSuccess": "세션을 원본에서 다시 동기화했습니다",
+    "refreshError": "다시 동기화 실패: {{error}}"
   },
   "library": {
     "greeting": "환영합니다",
