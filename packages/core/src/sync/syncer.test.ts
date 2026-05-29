@@ -416,6 +416,89 @@ describe('Syncer', () => {
   //   4. A shrunk parse result is a strong rewrite signal — source
   //      file truncation must replay through the safe path.
 
+  it('append-only sync keeps Security Scan masks in session_search_fts after a content-changing re-sync (no raw leak)', async () => {
+    // Regression for the gap the post-PR code review surfaced:
+    // upsertSessionSearch used to read from parsed.messages (the raw
+    // jsonl), so on every re-sync the session-level FTS index
+    // re-acquired the raw secret even though messages_fts was
+    // correctly masked. The fix routes session_search through
+    // messages.content_text — what's already in the DB after purge —
+    // so the "search across sessions" surface no longer leaks purged
+    // values for active sessions whose source files keep growing.
+    const baseDir = makeTempDir('spool-syncer-session-search-mask-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'session-search-mask.jsonl')
+    const userRecord = (uuid: string, ts: string, content: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'session-search-mask-session',
+      cwd: '/tmp/test-project',
+      uuid,
+      timestamp: ts,
+      message: { role: 'user', content },
+    })
+    // Two messages so the parser derives the title from the FIRST
+    // user message (a benign greeting) and the secret lives in a
+    // later message — this isolates the user_text/assistant_text leak
+    // the PR introduces from the title-derivation leak (pre-existing
+    // and out of scope here; the parser slices the first 120 chars of
+    // the first user message into sessions.title and that path has
+    // its own redaction story).
+    const SECRET = 'AKIAIOSFODNN7EXAMPLE'
+    writeFileSync(filePath, [
+      userRecord('m0', '2026-05-01T00:00:00Z', 'hello, please review my repo'),
+      userRecord('m1', '2026-05-01T00:01:00Z', `here is the credential: ${SECRET} thanks`),
+    ].join('\n'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'session-search-mask-session'"
+    ).get() as { id: number }).id
+    const messageId = (db.prepare(
+      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'"
+    ).get(sessionId) as { id: number }).id
+
+    // Simulate Security Scan purge of the m1 finding: mask
+    // content_text in place. The source jsonl still has the raw
+    // value — that's the threat model.
+    db.prepare(
+      `UPDATE messages SET content_text = 'here is the credential: [redacted: AWS key] thanks' WHERE id = ?`,
+    ).run(messageId)
+
+    // A real append at the source (claude session keeps growing).
+    writeFileSync(filePath, [
+      userRecord('m0', '2026-05-01T00:00:00Z', 'hello, please review my repo'),
+      userRecord('m1', '2026-05-01T00:01:00Z', `here is the credential: ${SECRET} thanks`),
+      userRecord('m2', '2026-05-01T00:02:00Z', 'a follow-up'),
+    ].join('\n'))
+    touchFile(filePath)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('updated')
+
+    // session_search.user_text must reflect what the DB holds (mask),
+    // not what parsed.messages saw (raw).
+    const search = db.prepare(
+      'SELECT user_text FROM session_search WHERE session_id = ?'
+    ).get(sessionId) as { user_text: string }
+    expect(search.user_text.includes(SECRET)).toBe(false)
+    expect(search.user_text.includes('[redacted: AWS key]')).toBe(true)
+
+    // And a column-restricted FTS search against user_text must not
+    // surface the raw value (assistant_text and title leaks would be
+    // separate paths — title derivation is the parser's job, not
+    // this PR's surface).
+    const ftsHits = db.prepare(
+      'SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?'
+    ).get(`user_text:"${SECRET}"`) as { n: number }
+    expect(ftsHits.n).toBe(0)
+  })
+
   it('append-only sync preserves Security Scan purge state across a no-op re-sync (issue #344 follow-up)', async () => {
     const baseDir = makeTempDir('spool-syncer-purge-survives-')
     const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')

@@ -273,26 +273,38 @@ export function insertMessages(
 
 /** Lightweight snapshot used by the syncer's `classifySync` heuristic
  *  to decide between append and rewrite paths — just the row count
- *  and the leading uuid in seq order. We deliberately do NOT pull
- *  `content_text` here: comparing parsed-vs-stored content would
- *  trigger rewrite whenever Security Scan has already replaced the
- *  raw value with its mask, undoing the purge on every re-sync. Only
- *  msg_uuid-bearing rows participate in the dedupe index, so NULL-uuid
- *  rows are excluded. */
+ *  and the leading uuid in seq order, joined off `session_uuid` so the
+ *  caller doesn't pay a second `SELECT id FROM sessions` round-trip
+ *  (upsertSession does that lookup anyway right after).
+ *
+ *  We deliberately do NOT pull `content_text` here: comparing parsed-
+ *  vs-stored content would trigger rewrite whenever Security Scan has
+ *  already replaced the raw value with its mask, undoing the purge on
+ *  every re-sync. Only msg_uuid-bearing rows participate in the dedupe
+ *  index, so NULL-uuid rows are excluded.
+ *
+ *  Returns `total === 0, firstUuid === null` both for "session row
+ *  doesn't exist yet" and "session exists with no msg_uuid-bearing
+ *  rows" — classifySync treats both as `rewrite` so the two-state
+ *  collapse is intentional, not a lost signal. */
 export function getMessageSnapshot(
   db: Database.Database,
-  sessionId: number,
+  sessionUuid: string,
 ): { firstUuid: string | null; total: number } {
-  const total = (db.prepare(
-    `SELECT COUNT(*) AS c FROM messages
-      WHERE session_id = ? AND msg_uuid IS NOT NULL`,
-  ).get(sessionId) as { c: number }).c
-  const first = db.prepare(
-    `SELECT msg_uuid FROM messages
-      WHERE session_id = ? AND msg_uuid IS NOT NULL
-      ORDER BY seq, id LIMIT 1`,
-  ).get(sessionId) as { msg_uuid: string } | undefined
-  return { firstUuid: first?.msg_uuid ?? null, total }
+  // Single window-function query: pulls total and leading uuid in one
+  // index scan over (session_id, msg_uuid). `LIMIT 1` returns the
+  // smallest-seq row; `COUNT(*) OVER ()` annotates it with the total
+  // across the windowed partition (no GROUP BY needed since the
+  // WHERE already scopes to one session).
+  const row = db.prepare(
+    `SELECT m.msg_uuid AS msg_uuid, COUNT(*) OVER () AS total
+       FROM messages m
+       JOIN sessions s ON s.id = m.session_id
+      WHERE s.session_uuid = ? AND m.msg_uuid IS NOT NULL
+      ORDER BY m.seq, m.id LIMIT 1`,
+  ).get(sessionUuid) as { msg_uuid: string; total: number } | undefined
+  if (!row) return { firstUuid: null, total: 0 }
+  return { firstUuid: row.msg_uuid, total: row.total }
 }
 
 /** Refresh `sessions.message_count` for a single session from the
