@@ -14,7 +14,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 13
+export const LATEST_SCHEMA_VERSION = 14
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -596,6 +596,94 @@ export function runMigrations(db: Database.Database): void {
     })()
   }
 
+  if (version < 14) {
+    // v14: dedupe (session_id, msg_uuid) and add a partial UNIQUE index.
+    //
+    // Why: append-only sync needs INSERT OR IGNORE on (session_id,
+    // msg_uuid) as the dedupe key. Today there is no UNIQUE constraint
+    // and the claude source emits some records twice (tool-use shadow
+    // entries — identical content, same uuid, different seq), which the
+    // pre-fix DELETE+INSERT sync silently re-doubled on every re-sync.
+    // Audit on a real archive showed 118 such pairs (all content-
+    // identical, 94 empty tool-only + 24 with text, 0 mixed). Cascade-
+    // delete on findings makes the dedupe loss-free: the redundant
+    // finding rows pointed at the redundant message rows, both go.
+    //
+    // After dropping the redundant rows we recompute the denormalised
+    // counts on the affected sessions so the Library badge and the
+    // Security risk numbers don't show a half-cent of drift until the
+    // next sync touches them.
+    db.transaction(() => {
+      const affected = db.prepare(
+        `SELECT DISTINCT session_id FROM messages
+          WHERE msg_uuid IS NOT NULL
+          GROUP BY session_id, msg_uuid HAVING COUNT(*) > 1`,
+      ).all() as Array<{ session_id: number }>
+
+      db.prepare(
+        `DELETE FROM messages
+          WHERE msg_uuid IS NOT NULL
+            AND id NOT IN (
+              SELECT MIN(id) FROM messages
+               WHERE msg_uuid IS NOT NULL
+               GROUP BY session_id, msg_uuid
+            )`,
+      ).run()
+
+      const recountMsg = db.prepare(
+        `UPDATE sessions SET message_count = (
+            SELECT COUNT(*) FROM messages
+             WHERE session_id = sessions.id AND is_sidechain = 0
+          ) WHERE id = ?`,
+      )
+      // Inline scan-count recompute mirrors security/repo.ts'
+      // updateSessionCounts; the kind lists below must match
+      // @spool-lab/redact's INFO_SEVERITY_KINDS / HIGH_SEVERITY_KINDS
+      // at the time this migration was authored. They are inlined (not
+      // imported) so the schema-migration layer can stay free of a
+      // detection-vocabulary dependency — a redact-side rename must
+      // never break opening a legacy DB.
+      const recountScan = db.prepare(
+        `UPDATE sessions SET
+            scan_finding_count = (
+              SELECT COUNT(*) FROM findings
+               WHERE session_id = sessions.id AND state = 'active'
+                 AND kind NOT IN ('absolute-path','ip','internal-host')
+            ),
+            scan_high_count = (
+              SELECT COUNT(*) FROM findings
+               WHERE session_id = sessions.id AND state = 'active'
+                 AND kind IN (
+                   'private-key','ssh-key','cloud-cred-ini',
+                   'kubeconfig-token','netrc','connection-string',
+                   'url-creds','api-key','jwt','bearer',
+                   'basic-auth','env-var','generic-secret'
+                 )
+            ),
+            scan_purged_count = (
+              SELECT COUNT(*) FROM findings
+               WHERE session_id = sessions.id AND state = 'purged'
+            )
+          WHERE id = ?`,
+      )
+      for (const row of affected) {
+        recountMsg.run(row.session_id)
+        recountScan.run(row.session_id)
+      }
+
+      // Partial index: allow NULL msg_uuid for forward-compat even
+      // though no current parser ever emits NULL — we don't want the
+      // schema to lock that behaviour in.
+      db.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_session_uuid
+           ON messages(session_id, msg_uuid)
+         WHERE msg_uuid IS NOT NULL`,
+      )
+
+      db.pragma('user_version = 14')
+    })()
+  }
+
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
@@ -641,6 +729,10 @@ function ensureSchemaSanity(db: Database.Database): void {
   ensureCol('sessions', 'title', 'TEXT')
   ensureCol('sessions', 'title_source', `TEXT NOT NULL DEFAULT 'derived'`)
   ensureCol('sessions', 'message_count', 'INTEGER NOT NULL DEFAULT 0')
+  // v14 (and forward) reads messages.msg_uuid; legacy DBs predating
+  // its introduction (some test fixtures, very old installs) won't have
+  // the column. ALTER ADD is a no-op when present.
+  ensureCol('messages', 'msg_uuid', 'TEXT')
 }
 
 /**
