@@ -47,6 +47,19 @@ export type SyncEventCallback = (event: SyncProgressEvent) => void
  *  Receives the sessions.id, NOT the session_uuid. */
 export type SessionChangedCallback = (sessionId: number) => void
 
+/** Per-call overrides for {@link Syncer.syncFile}. The watcher and
+ *  `syncAll` never pass these — they go through the standard
+ *  mtime-skip + classifySync path. The "Refresh from source" user
+ *  action sets `forceMode: 'rewrite'` to bypass both gates so a
+ *  session that looks identical at the uuid/length surface gets
+ *  rebuilt from the source jsonl anyway. */
+export interface SyncFileOptions {
+  /** Bypass classifySync and mtime-skip. Used by the explicit
+   *  "Refresh from source" IPC action; not set by the watcher or
+   *  syncAll. */
+  forceMode?: 'rewrite'
+}
+
 export class Syncer {
   private db: Database.Database
   private onProgress: SyncEventCallback | undefined
@@ -230,17 +243,31 @@ export class Syncer {
     })()
   }
 
-  syncFile(filePath: string, source: SessionSource, knownMtimes?: Map<string, string>, precomputedMtime?: string): 'added' | 'updated' | 'skipped' | 'error' {
+  syncFile(
+    filePath: string,
+    source: SessionSource,
+    knownMtimes?: Map<string, string>,
+    precomputedMtime?: string,
+    options?: SyncFileOptions,
+  ): 'added' | 'updated' | 'skipped' | 'error' {
+    const force = options?.forceMode
     try {
       if (source === 'opencode' && isOpenCodeDatabaseFile(filePath)) {
-        return this.syncOpenCodeDatabase(filePath, knownMtimes)
+        return this.syncOpenCodeDatabase(filePath, knownMtimes, options)
       }
 
       const mtime = precomputedMtime ?? getIndexedMtime(filePath, source)
       const existingMtime = knownMtimes
         ? (knownMtimes.get(filePath) ?? null)
         : getSessionMtime(this.db, filePath)
-      if (existingMtime === mtime) return 'skipped'
+      // mtime-skip is the watcher's hot-path optimization. The
+      // explicit "Refresh from source" action bypasses it on
+      // purpose — the user is asking for a re-sync precisely
+      // because they suspect the DB drifted from the source even
+      // though the mtime didn't move (e.g. manual jsonl edit, or
+      // the in-place updates some providers do without bumping
+      // mtime on the spool side).
+      if (!force && existingMtime === mtime) return 'skipped'
 
       const parseResult = source === 'claude'
         ? loadClaudeSession(filePath)
@@ -251,7 +278,15 @@ export class Syncer {
             : loadOpenCodeSession(filePath)
 
       if (parseResult.kind !== 'parsed') {
-        if (parseResult.kind === 'filtered' && existingMtime !== null) {
+        // The "filtered" path normally removes a session whose source
+        // is no longer indexable (e.g. claude subagent jsonl that
+        // moved under a /subagents/ subdir). Skip that destructive
+        // step in force mode: the user pressed "Refresh from source"
+        // expecting their session to come back, not to be deleted —
+        // and a refresh that lands on a filtered source is almost
+        // certainly something the user wants to know about rather
+        // than have happen silently.
+        if (parseResult.kind === 'filtered' && existingMtime !== null && !force) {
           this.db.prepare(`
             INSERT INTO sync_log (source_id, file_path, status, message)
             VALUES (?, ?, 'ok', ?)
@@ -290,7 +325,10 @@ export class Syncer {
       // DELETE-cascaded by upsertSession (`rewrite`). The
       // `first-sync` case is just `rewrite` semantically — there is
       // nothing to preserve.
-      const mode = this.classifySync(parsed.sessionUuid, parsed.messages)
+      // Explicit force overrides classification — the user has
+      // accepted that any per-message user-side state (Security Scan
+      // purge, dismiss) on this session will be rebuilt from source.
+      const mode: UpsertSessionMode = force ?? this.classifySync(parsed.sessionUuid, parsed.messages)
 
       let committedSessionId: number | null = null
       let insertedCount = 0
@@ -385,7 +423,7 @@ export class Syncer {
     }
   }
 
-  private syncOpenCodeDatabase(dbPath: string, knownMtimes?: Map<string, string>): 'added' | 'updated' | 'skipped' | 'error' {
+  private syncOpenCodeDatabase(dbPath: string, knownMtimes?: Map<string, string>, options?: SyncFileOptions): 'added' | 'updated' | 'skipped' | 'error' {
     let changed = false
     let hadError = false
 
@@ -408,7 +446,7 @@ export class Syncer {
     }
 
     for (const sessionPath of sessionPaths) {
-      const result = this.syncFile(sessionPath, 'opencode', knownMtimes)
+      const result = this.syncFile(sessionPath, 'opencode', knownMtimes, undefined, options)
       if (result === 'added' || result === 'updated') changed = true
       else if (result === 'error') hadError = true
     }

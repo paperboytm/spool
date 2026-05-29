@@ -122,7 +122,17 @@
     "msgs_one": "{{count}} msg",
     "msgs_other": "{{count}} msgs",
     "divider_today": "Today",
-    "divider_yesterday": "Yesterday"
+    "divider_yesterday": "Yesterday",
+    "refreshFromSource": "Refresh from source",
+    "refreshPretitle": "Rebuild from source",
+    "refreshConfirmTitle": "Refresh this session from source?",
+    "refreshConfirmLead": "Spool will rebuild this session's messages directly from the original transcript file.",
+    "refreshConfirmWarnTitle": "Purged content comes back as raw.",
+    "refreshConfirmWarnBody": "Any value you've purged in this session returns to Spool's search index and to the AI context the moment you confirm, until the next scan re-detects it and you purge again.",
+    "refreshConfirmDismissNote": "Dismissed findings stay dismissed.",
+    "refreshConfirmAction": "Refresh",
+    "refreshSuccess": "Session refreshed from source",
+    "refreshError": "Couldn't refresh: {{error}}"
   },
   "library": {
     "greeting": "Welcome back",

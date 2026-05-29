@@ -867,6 +867,49 @@ ipcMain.handle('spool:sync-now', () => {
   return runSyncWorker()
 })
 
+/**
+ * Explicit "Refresh from source" — rebuilds a single session by
+ * bypassing the watcher's mtime-skip and the syncer's classifySync
+ * heuristic. This is the escape hatch for the rare cases append-only
+ * sync deliberately can't auto-detect:
+ *
+ *   - The user manually edited the jsonl on disk (rare but real).
+ *   - A provider updated an existing message in-place without
+ *     bumping mtime in a way the watcher noticed.
+ *   - The session's DB rows have drifted from the source for any
+ *     other reason and the user wants to start over from source.
+ *
+ * Cost the user is accepting by triggering this: every finding row
+ * tied to the session's messages is cascade-deleted by the DELETE
+ * FROM messages step. Active findings are re-detected on the next
+ * scan; allowlist entries survive (different table, not cascaded);
+ * but per-finding state the user set explicitly — `state = 'purged'`
+ * is the one that hurts — is gone. The renderer warns about this
+ * before calling.
+ */
+ipcMain.handle('spool:force-resync-session', (_e, { sessionUuid }: { sessionUuid: string }) => {
+  if (!syncer) return { ok: false as const, error: 'syncer-not-ready' }
+  const row = db
+    .prepare('SELECT file_path, source_id FROM sessions WHERE session_uuid = ?')
+    .get(sessionUuid) as { file_path: string; source_id: number } | undefined
+  if (!row) return { ok: false as const, error: 'session-not-found' }
+  const sourceRow = db
+    .prepare('SELECT name FROM sources WHERE id = ?')
+    .get(row.source_id) as { name: SessionSource } | undefined
+  if (!sourceRow) return { ok: false as const, error: 'source-not-found' }
+  try {
+    const result = syncer.syncFile(
+      row.file_path, sourceRow.name, undefined, undefined,
+      { forceMode: 'rewrite' },
+    )
+    if (result === 'error') return { ok: false as const, error: 'sync-error' }
+    return { ok: true as const, result }
+  } catch (err) {
+    console.error('[spool:force-resync-session]', err)
+    return { ok: false as const, error: String(err) }
+  }
+})
+
 ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
   try {
     const command = getSessionResumeCommand(source, sessionUuid)

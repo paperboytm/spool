@@ -147,6 +147,12 @@ const api = {
   syncNow: (): Promise<SyncResult> =>
     ipcRenderer.invoke('spool:sync-now'),
 
+  forceResyncSession: (sessionUuid: string): Promise<
+    { ok: true; result: 'added' | 'updated' | 'skipped' }
+    | { ok: false; error: string }
+  > =>
+    ipcRenderer.invoke('spool:force-resync-session', { sessionUuid }),
+
   resumeCLI: (sessionUuid: string, source: string, cwd?: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('spool:resume-cli', { sessionUuid, source, cwd }),
 

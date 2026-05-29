@@ -705,6 +705,154 @@ describe('Syncer', () => {
     expect(changedIds).toEqual([])
   })
 
+  it('forceMode rewrite bypasses both the mtime-skip and classifySync gates (Refresh from source)', async () => {
+    // The "Refresh from source" user action runs against a session
+    // whose source file hasn't moved (mtime unchanged) and whose
+    // uuid/length signals say "no append needed". Both gates would
+    // normally short-circuit. Force=rewrite must go through the
+    // DELETE+INSERT path anyway — that's the whole point of the
+    // escape hatch.
+    const baseDir = makeTempDir('spool-syncer-force-rewrite-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'force-rewrite.jsonl')
+    const record = (uuid: string, ts: string, content: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'force-rewrite-session',
+      cwd: '/tmp/test-project',
+      uuid,
+      timestamp: ts,
+      message: { role: 'user', content },
+    })
+    writeFileSync(filePath, record('m1', '2026-05-01T00:00:00Z', 'original'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'force-rewrite-session'"
+    ).get() as { id: number }).id
+    const m1Id = (db.prepare(
+      "SELECT id FROM messages WHERE session_id = ?"
+    ).get(sessionId) as { id: number }).id
+
+    // Park scan state + a finding to verify the rewrite cascade
+    // actually fires (in append mode with insertedCount=0 it would
+    // be silently preserved — that's what makes Refresh meaningful).
+    db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE id = ?").run(sessionId)
+    db.prepare(
+      `INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state, state_changed_at)
+       VALUES (?, ?, 'api-key', 'h', 0.9, 'regex', 0, 1, 'purged', datetime('now'))`,
+    ).run(sessionId, m1Id)
+
+    // Standard re-sync — mtime hasn't moved, classify would say
+    // append. Confirm that's what would happen WITHOUT the force.
+    const baselineChanged: number[] = []
+    expect(
+      new Syncer(db, undefined, (id) => { baselineChanged.push(id) })
+        .syncFile(filePath, 'claude'),
+    ).toBe('skipped')
+    expect(baselineChanged).toEqual([])
+    expect((db.prepare(
+      "SELECT scan_profile FROM sessions WHERE id = ?"
+    ).get(sessionId) as { scan_profile: string | null }).scan_profile).toBe('regex@3')
+
+    // Force=rewrite must skip the mtime gate AND run the rewrite
+    // path. mtime is identical, classify would say append.
+    const forced: number[] = []
+    const forceResult = new Syncer(db, undefined, (id) => { forced.push(id) })
+      .syncFile(filePath, 'claude', undefined, undefined, { forceMode: 'rewrite' })
+    expect(forceResult).toBe('updated')
+    expect(forced).toEqual([sessionId])
+
+    // Rewrite ran → previous message rows were DELETEd, so the
+    // finding pointing at the old message_id was cascade-cleared.
+    // (SQLite reuses INTEGER PRIMARY KEY rowids on DELETE+INSERT in
+    // a single transaction, so the new message id may match the
+    // old; the cascade is the meaningful proof, not the rowid.)
+    const cleared = db.prepare(
+      'SELECT COUNT(*) AS c FROM findings WHERE session_id = ?'
+    ).get(sessionId) as { c: number }
+    expect(cleared.c).toBe(0)
+
+    // scan_profile must be NULLed so the worker re-scans.
+    expect((db.prepare(
+      "SELECT scan_profile FROM sessions WHERE id = ?"
+    ).get(sessionId) as { scan_profile: string | null }).scan_profile).toBeNull()
+  })
+
+  it('forceMode does not silently delete a session when its source parse returns filtered', async () => {
+    // Regression for the self-review finding on PR 3 (force-resync
+    // UI): the non-force code path treats a `filtered` parse result
+    // as "this session should be removed from the index" and calls
+    // deleteSessionByFilePath. Under force, the user pressed
+    // "Refresh from source" because they want their session back,
+    // not because they want it deleted — so the destructive
+    // branch must be skipped. Gemini is the cheapest source to
+    // construct a filtered result for: a record with `kind:
+    // 'subagent'` triggers the parser's `{ kind: 'filtered' }`
+    // return at gemini.ts:36.
+    const baseDir = makeTempDir('spool-syncer-force-filtered-')
+    const geminiCliHome = join(baseDir, 'gemini-home')
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    const historyDir = join(geminiCliHome, '.gemini', 'history', 'workspace')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(chatsDir, { recursive: true })
+    mkdirSync(historyDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('HOME', geminiCliHome)
+
+    // First sync — a normal gemini session lands in the DB.
+    const filePath = join(chatsDir, 'session-1.json')
+    writeFileSync(filePath, JSON.stringify({
+      sessionId: 'force-filtered-session',
+      startTime: '2026-05-01T00:00:00Z',
+      lastUpdated: '2026-05-01T00:00:00Z',
+      messages: [
+        { id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' },
+      ],
+    }))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('added')
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'force-filtered-session'"
+    ).get() as { id: number }).id
+
+    // Now mutate the source so the parser returns kind: 'filtered'
+    // (gemini does this when record.kind === 'subagent'). Without
+    // force, the destructive cleanup runs.
+    writeFileSync(filePath, JSON.stringify({
+      sessionId: 'force-filtered-session',
+      kind: 'subagent',
+      startTime: '2026-05-01T00:00:00Z',
+      lastUpdated: '2026-05-01T00:01:00Z',
+      messages: [
+        { id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' },
+      ],
+    }))
+    touchFile(filePath)
+
+    // Force=rewrite must NOT delete the session — that would be the
+    // exact regression the self-review caught. The action should
+    // be a no-op for unreachable sources and return 'skipped'.
+    const force = new Syncer(db).syncFile(
+      filePath, 'gemini', undefined, undefined, { forceMode: 'rewrite' },
+    )
+    expect(force).toBe('skipped')
+    const stillThere = db.prepare(
+      'SELECT COUNT(*) AS c FROM sessions WHERE id = ?'
+    ).get(sessionId) as { c: number }
+    expect(stillThere.c).toBe(1)
+  })
+
   it('falls back to rewrite when the source file shrinks below the stored row count', async () => {
     const baseDir = makeTempDir('spool-syncer-rewrite-on-shrink-')
     const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')

@@ -118,7 +118,17 @@
     "scrollToBottom": "滚到底部",
     "msgs_other": "{{count}} 条",
     "divider_today": "今天",
-    "divider_yesterday": "昨天"
+    "divider_yesterday": "昨天",
+    "refreshFromSource": "从源文件重新同步",
+    "refreshPretitle": "从源文件重建",
+    "refreshConfirmTitle": "从源文件重新同步这个会话？",
+    "refreshConfirmLead": "Spool 会用原始的记录文件重建这个会话的消息。",
+    "refreshConfirmWarnTitle": "清除过的内容会回到原始形态。",
+    "refreshConfirmWarnBody": "你在这个会话里清除过的值，确认后会立刻回到 Spool 的搜索索引和 AI 上下文里，直到下次扫描重新发现它、并由你再次清除。",
+    "refreshConfirmDismissNote": "已忽略的发现会保持忽略状态。",
+    "refreshConfirmAction": "重新同步",
+    "refreshSuccess": "会话已从源文件重新同步",
+    "refreshError": "重新同步失败：{{error}}"
   },
   "library": {
     "greeting": "欢迎回来",

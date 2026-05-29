@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check } from 'lucide-react'
+import { toast } from 'sonner'
+import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check, RotateCcw } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { type FindRange } from './MessageBubble.js'
 import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
+import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
 import { useSecurityEnabled } from '../featureFlags.js'
 import { securityApi } from '../api/security.js'
 import PinButton from './PinButton.js'
@@ -40,6 +42,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   useEffect(() => { setStripOpen(false) }, [sessionUuid])
   const [resuming, setResuming] = useState(false)
   const [commandCopied, setCommandCopied] = useState(false)
+  const [refreshDialogOpen, setRefreshDialogOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [showFindBar, setShowFindBar] = useState(false)
   const [showTargetHighlight, setShowTargetHighlight] = useState(false)
   const [findFocusNonce, setFindFocusNonce] = useState(0)
@@ -265,6 +269,34 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     setTimeout(() => setResuming(false), 1000)
   }
 
+  async function handleRefreshFromSource() {
+    if (!session || refreshing) return
+    setRefreshing(true)
+    try {
+      const out = await window.spool.forceResyncSession(session.sessionUuid)
+      if (out.ok) {
+        // Reload the session + messages so the rebuilt transcript
+        // and the cleared scan_* counts surface immediately. Without
+        // this the refresh succeeds in the DB but the user keeps
+        // looking at the pre-refresh transcript, which is the exact
+        // confusion this action exists to dispel.
+        const reloaded = await window.spool.getSession(session.sessionUuid)
+        if (reloaded) {
+          setSession(reloaded.session)
+          setMessages(reloaded.messages)
+        }
+        toast.success(t('session.refreshSuccess'))
+        setRefreshDialogOpen(false)
+      } else {
+        toast.error(t('session.refreshError', { error: out.error }))
+      }
+    } catch (err) {
+      toast.error(t('session.refreshError', { error: String(err) }))
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   const resumeCommandAvailable = Boolean(session && getSessionResumeCommand(session.source, session.sessionUuid))
 
   return (
@@ -367,6 +399,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
+              {
+                label: t('session.refreshFromSource'),
+                icon: <RotateCcw size={14} strokeWidth={1.6} aria-hidden />,
+                onSelect: () => { setRefreshDialogOpen(true) },
+              },
             ]}
           />
         </div>
@@ -386,6 +423,13 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       />
 
       <FindingsStrip session={session} open={stripOpen} onClose={() => setStripOpen(false)} />
+
+      <RefreshFromSourceDialog
+        open={refreshDialogOpen}
+        busy={refreshing}
+        onConfirm={() => { void handleRefreshFromSource() }}
+        onCancel={() => { if (!refreshing) setRefreshDialogOpen(false) }}
+      />
 
       {/* Messages */}
       <MessageList
