@@ -183,10 +183,12 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   // The latest moment `scan_completed_at` was set on ANY session — used
   // as the "scanned X ago" line in the meta row.
   const [lastScanCompletedAt, setLastScanCompletedAt] = useState<string | null>(null)
-  // Per-burst id used to fully remount ScanBanner on each new idle→busy
-  // transition. Without this, the bar's `width` CSS transition carries
-  // over from the previous burst's final 100% to the new burst's 0%,
-  // visually "rewinding" before going forward again.
+  // Per-burst id keyed onto the progress strip inside ScanStatusBanner
+  // so its `width` CSS transition doesn't carry the previous burst's
+  // final 100% into the new burst's 0% (which would visually "rewind"
+  // before going forward again). The banner outer DOM persists across
+  // bursts so the colour / content morph stays smooth; only the
+  // strip remounts on each fresh burst.
   const [scanBurstKey, setScanBurstKey] = useState(0)
   const parsed = useMemo(() => parseQualifier(query), [query])
 
@@ -366,16 +368,39 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
           // silently never render. Firing immediately + bypassing
           // the gate guarantees the ACK lands.
           if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
-          setDisplayBusy(false)
           setRescanInFlight(false)
           // Await the refetch + read counts from its return value, not
           // from riskRef.current — the ref isn't updated until the
           // next React render commits, so reading it synchronously
           // here yields the PRE-refresh counts (banner showed 43+21
           // while the meta row showed 75; this closes that gap).
+          //
+          // `setDisplayBusy(false)` is deliberately deferred into the
+          // same React batch as `setScanResult`. The previous shape
+          // flipped displayBusy first (synchronously) and let the
+          // async refresh set the result a few ms later, which gave
+          // React two commits: one where the scan banner had already
+          // unmounted but the result banner had not yet mounted (and
+          // the EmptyState / risk-list branch may have also flipped),
+          // producing a visible flicker at the end of the burst.
+          // Coalescing the two transitions into one commit eliminates
+          // the empty in-between frame. The unified ScanStatusBanner
+          // makes the scanning → complete transition smoother still
+          // (same DOM node, CSS-driven colour morph) but this batch
+          // is what guarantees displayBusy and scanResult flip on the
+          // same render so the banner enters its complete state in
+          // the same frame the worker reports idle.
           void (async () => {
-            const fresh = await refreshRef.current()
-            const rows = fresh ?? riskRef.current
+            // Fall back to the last-known risk snapshot if refresh
+            // throws — we still want to surface the ACK banner with
+            // the best counts available, not strand the user in a
+            // permanent busy state because a network/IPC blip ate
+            // the refetch.
+            let rows = riskRef.current
+            try {
+              const fresh = await refreshRef.current()
+              if (fresh) rows = fresh
+            } catch { /* keep the snapshot fallback */ }
             const currentHigh = rows.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
             const currentLow = rows.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0)
             setScanResult({
@@ -383,6 +408,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
               high: currentHigh,
               low: currentLow,
             })
+            setDisplayBusy(false)
           })()
           return
         }
@@ -625,30 +651,49 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]">
         <div>
-          {/* ScanBanner + ScanResultBanner sit OUTSIDE the empty /
-           *  findings / loading branch below so a manual rescan that
+          {/* Single ScanStatusBanner slot — outside the empty /
+           *  findings / loading branch so a manual rescan that
            *  finishes with zero findings still surfaces the "Scan
            *  complete · nothing high-risk found" ACK above the
-           *  empty-state body. If they were nested inside the else
-           *  branch (risk.length > 0 || scanning), a clean archive
-           *  would silently swallow the user's click. */}
-          {shouldShowScanBanner(scanStatus, displayBusy) && scanStatus && (
-            <ScanBanner key={scanBurstKey} status={scanStatus} />
-          )}
-          {/* ScanResultBanner gate is JUST `scanResult` — no
-           *  `!isScanning` check. The old gate AND'd isScanning,
-           *  which an auto sync-driven enqueue completing right
-           *  after a manual scan would flip back to true within
-           *  milliseconds, silently hiding the ACK the user just
-           *  earned. Persisting until the × dismiss matches the
-           *  "this is your action's result" contract. A new manual
-           *  rescan clears it explicitly via `handleRescanAll`. */}
-          {scanResult && (
-            <ScanResultBanner
-              result={scanResult}
-              onDismiss={() => setScanResult(null)}
-            />
-          )}
+           *  empty-state body.
+           *
+           *  Same React element type at the same JSX position for
+           *  both modes (scanning + complete) is what makes the
+           *  end-of-scan transition smooth: React reconciles the
+           *  outer div instead of unmount/mount, and CSS transitions
+           *  morph the colours / inner content in place.
+           *
+           *  Priority: scanning wins over a stale result. The result
+           *  is preserved in state (scanResult), so when the worker
+           *  drains back to idle the banner returns to the complete
+           *  mode without losing the manual ACK — matches the "this
+           *  is your action's result" contract that the previous
+           *  two-component shape encoded via a `!isScanning` guard on
+           *  ScanResultBanner. The user clears the ACK via the × or
+           *  by clicking Rescan all again (which calls setScanResult
+           *  in handleRescanAll). */}
+          {(() => {
+            const showScanBanner = shouldShowScanBanner(scanStatus, displayBusy) && scanStatus
+            if (showScanBanner) {
+              return (
+                <ScanStatusBanner
+                  state={{ kind: 'scanning', status: scanStatus, burstKey: scanBurstKey }}
+                />
+              )
+            }
+            if (scanResult) {
+              return (
+                <ScanStatusBanner
+                  state={{
+                    kind: 'complete',
+                    result: scanResult,
+                    onDismiss: () => setScanResult(null),
+                  }}
+                />
+              )
+            }
+            return null
+          })()}
           {loading ? null : error ? (
             <p className="text-sm text-warm-muted dark:text-dark-muted py-4">
               {t('common.error')}: {error}
@@ -842,127 +887,185 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   )
 }
 
-function ScanBanner({ status }: { status: ScanStatus }) {
+/** Discriminated state union driving {@link ScanStatusBanner}. The
+ *  same component renders both modes: the in-flight burst progress
+ *  ("Scanning N of M") and the post-burst ACK ("Scan complete · 3
+ *  high · 12 low"). Keeping them in one component is what makes the
+ *  scan-end transition smooth: React reconciles the same outer div
+ *  across the state swap, so background colour, border colour and
+ *  inner content all animate in place via CSS instead of the
+ *  unmount-one-mount-another flash the previous two-component shape
+ *  produced. */
+type ScanStatusBannerState =
+  | { kind: 'scanning'; status: ScanStatus; burstKey: number }
+  | {
+      kind: 'complete'
+      result: { scanned: number; high: number; low: number }
+      onDismiss: () => void
+    }
+
+function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
   const { t } = useTranslation()
-  const inFlight = scanInFlightCount(status)
-  // `Math.max` is a belt-and-suspenders guard for an inconsistent
-  // snapshot (backfillTotal lagging behind backfillRemaining for one
-  // tick) — shouldn't matter with the in-tree worker but keeps the
-  // rendering correct.
-  const total = Math.max(status.backfillTotal, inFlight)
-  const done = Math.max(0, total - inFlight)
+  const isScanning = state.kind === 'scanning'
+
+  // Per-mode derived values — kept local to keep the JSX below
+  // legible. The `Math.max` on `total` is a belt-and-suspenders guard
+  // for an inconsistent snapshot (backfillTotal lagging behind
+  // backfillRemaining for one tick).
+  const scanning = state.kind === 'scanning' ? state : null
+  const complete = state.kind === 'complete' ? state : null
+  const inFlight = scanning ? scanInFlightCount(scanning.status) : 0
+  const total = scanning ? Math.max(scanning.status.backfillTotal, inFlight) : 0
+  const done = scanning ? Math.max(0, total - inFlight) : 0
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+  const noFindings = complete ? complete.result.high === 0 && complete.result.low === 0 : false
 
   return (
     <div
-      data-testid="security-scan-banner"
-      className="relative grid items-center gap-3 mb-5 px-4 py-2.5 rounded-lg bg-accent-bg dark:bg-accent-bg-dark border border-accent-bg-strong dark:border-accent-bg-strong-dark overflow-hidden"
+      // Two testids preserved so the existing e2e specs
+      // (security-manual-rescan-ack, security-mute-refresh, etc.)
+      // keep their selectors. Only one is set per state.
+      data-testid={isScanning ? 'security-scan-banner' : 'security-scan-result-banner'}
+      {...(complete && {
+        'data-scanned': complete.result.scanned,
+        'data-high': complete.result.high,
+        'data-low': complete.result.low,
+      })}
+      // Amber surface while scanning, neutral surface on complete.
+      // Now that the banner is a single component instance across
+      // the state change (same outer DOM node, same JSX position),
+      // `transition-colors duration-300` makes the swap a smooth CSS
+      // interpolation rather than the one-frame paint flip the old
+      // two-component shape produced. Aligned with the progress
+      // strip's 300ms fade-out below so both finish on the same
+      // frame.
+      className={`relative grid items-center gap-3 mb-5 px-4 py-2.5 rounded-lg overflow-hidden border animate-in fade-in transition-colors duration-300 ${
+        isScanning
+          ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent-bg-strong dark:border-accent-bg-strong-dark'
+          : 'bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border'
+      }`}
       style={{ gridTemplateColumns: 'auto 1fr auto' }}
     >
+      {/* Icon column — pinging dot while scanning, green check on
+       *  complete. The wrapper is `w-4 h-4` in both modes so the
+       *  column width is identical and the middle text doesn't
+       *  jitter when the inner glyph swaps. */}
       <span className="relative inline-flex items-center justify-center w-4 h-4">
-        <span className="absolute inset-1 rounded-full bg-accent dark:bg-accent-dark" />
-        <span className="absolute inset-0 rounded-full bg-accent dark:bg-accent-dark opacity-30 animate-ping" />
-      </span>
-      <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
-          {t('security.scanning', { defaultValue: 'Scanning' })}
-        </span>
-        {/* Burst-scoped progress count: "23 of 145 rescans" makes it
-         *  obvious this is the active re-scan batch (sessions whose
-         *  scan_profile drifted from current), not the library total.
-         *  Without the verb "rescans" the slash format invites
-         *  comparison with the sidebar's total-sessions number — which
-         *  is a different denominator and would feel inconsistent.
-         *  Only show once we have a stable total; suppress while
-         *  inFlight=0 (terminal moment before the banner hides). */}
-        {total > 0 && (
+        {isScanning ? (
+          <>
+            <span className="absolute inset-1 rounded-full bg-accent dark:bg-accent-dark" />
+            <span className="absolute inset-0 rounded-full bg-accent dark:bg-accent-dark opacity-30 animate-ping" />
+          </>
+        ) : (
           <span
-            data-testid="security-scan-banner-progress"
-            className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums whitespace-nowrap"
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full"
+            style={{ background: 'var(--color-status-success)' }}
           >
-            {t('security.scanning_progress', {
-              done,
-              total,
-              defaultValue: '{{done}} of {{total}} rescans',
-            })}
+            <Check size={11} strokeWidth={2.2} className="text-white" aria-hidden />
           </span>
         )}
-      </div>
-      <span aria-hidden />
-      {/* Deterministic progress strip. The pct read here is fine
-       *  ratio-wise: `backfillRemaining` is the worker's pending
-       *  counter and the captured max-in-flight is a stable
-       *  denominator for the current burst. The numeric values aren't
-       *  shown (X / N stayed misleading because backfillRemaining is
-       *  cumulative across burst stacking) but the *ratio* still
-       *  faithfully reflects progress within whichever burst the user
-       *  is observing. ScanBanner is keyed by burst id at the call
-       *  site so width transitions never carry over between bursts. */}
-      <div
-        className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width] duration-300"
-        style={{ width: `${pct}%` }}
-        aria-hidden
-      />
-    </div>
-  )
-}
-
-function ScanResultBanner({
-  result,
-  onDismiss,
-}: {
-  result: { scanned: number; high: number; low: number }
-  onDismiss: () => void
-}) {
-  const { t } = useTranslation()
-  const noFindings = result.high === 0 && result.low === 0
-  return (
-    <div
-      data-testid="security-scan-result-banner"
-      data-scanned={result.scanned}
-      data-high={result.high}
-      data-low={result.low}
-      className="relative grid items-center gap-3 mb-5 px-4 py-2.5 rounded-lg bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border overflow-hidden"
-      style={{ gridTemplateColumns: 'auto 1fr auto' }}
-    >
-      <span
-        className="inline-flex items-center justify-center w-4 h-4 rounded-full"
-        style={{ background: 'var(--color-status-success)' }}
-      >
-        <Check size={11} strokeWidth={2.2} className="text-white" aria-hidden />
       </span>
+
+      {/* Middle text — same grid cell, content swaps per state. */}
       <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        <span className="text-[13px] text-warm-text dark:text-dark-text font-medium">
-          {t('security.scan_done', { defaultValue: 'Scan complete' })}
-        </span>
-        <span className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted">
-          {noFindings ? (
-            t('security.scan_done_clean', { defaultValue: 'nothing high-risk found' })
-          ) : (
-            <>
-              <span className="text-accent dark:text-accent-dark">
-                {t('security.scan_done_high', { count: result.high, defaultValue: '{{count}} high' })}
+        {scanning ? (
+          <>
+            <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
+              {t('security.scanning', { defaultValue: 'Scanning' })}
+            </span>
+            {/* Burst-scoped progress count: "23 of 145 rescans" makes
+             *  it obvious this is the active re-scan batch (sessions
+             *  whose scan_profile drifted from current), not the
+             *  library total. Without the verb "rescans" the slash
+             *  format invites comparison with the sidebar's total
+             *  sessions number — which is a different denominator and
+             *  would feel inconsistent. Only show once we have a
+             *  stable total; suppress while inFlight=0 (terminal
+             *  moment before the banner hides). */}
+            {total > 0 && (
+              <span
+                data-testid="security-scan-banner-progress"
+                className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums whitespace-nowrap"
+              >
+                {t('security.scanning_progress', {
+                  done,
+                  total,
+                  defaultValue: '{{done}} of {{total}} rescans',
+                })}
               </span>
-              {result.low > 0 && (
+            )}
+          </>
+        ) : complete ? (
+          <>
+            <span className="text-[13px] text-warm-text dark:text-dark-text font-medium">
+              {t('security.scan_done', { defaultValue: 'Scan complete' })}
+            </span>
+            <span className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted">
+              {noFindings ? (
+                t('security.scan_done_clean', { defaultValue: 'nothing high-risk found' })
+              ) : (
                 <>
-                  {' · '}
-                  {t('security.scan_done_low', { count: result.low, defaultValue: '{{count}} low' })}
+                  <span className="text-accent dark:text-accent-dark">
+                    {t('security.scan_done_high', { count: complete.result.high, defaultValue: '{{count}} high' })}
+                  </span>
+                  {complete.result.low > 0 && (
+                    <>
+                      {' · '}
+                      {t('security.scan_done_low', { count: complete.result.low, defaultValue: '{{count}} low' })}
+                    </>
+                  )}
                 </>
               )}
-            </>
-          )}
-        </span>
+            </span>
+          </>
+        ) : null}
       </div>
-      <button
-        type="button"
-        data-testid="security-scan-result-dismiss"
-        onClick={onDismiss}
-        title={t('common.close', { defaultValue: 'Close' })}
-        aria-label={t('common.close', { defaultValue: 'Close' })}
-        className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
-      >
-        <X size={13} strokeWidth={1.6} aria-hidden />
-      </button>
+
+      {/* Right column — invisible spacer during scan, dismiss button
+       *  on complete. Both modes occupy the same `w-5 h-5` so the
+       *  grid `auto 1fr auto` middle column stays put across the
+       *  swap. */}
+      {scanning ? (
+        <span aria-hidden className="inline-block w-5 h-5" />
+      ) : complete ? (
+        <button
+          type="button"
+          data-testid="security-scan-result-dismiss"
+          onClick={complete.onDismiss}
+          title={t('common.close', { defaultValue: 'Close' })}
+          aria-label={t('common.close', { defaultValue: 'Close' })}
+          className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        >
+          <X size={13} strokeWidth={1.6} aria-hidden />
+        </button>
+      ) : null}
+
+      {/* Deterministic progress strip. Rendered in both states so the
+       *  scan → complete transition can animate it out smoothly
+       *  instead of unmounting mid-animation (which the eye reads as
+       *  a "snap" — animated element gone in one frame). In complete
+       *  state the strip slides to 100% AND fades to 0 opacity over
+       *  300ms, giving the natural "completed + dissipates" feel
+       *  expected of a progress bar.
+       *
+       *  Keyed by burstKey (scanning state) so the `transition-[width]`
+       *  between consecutive bursts doesn't carry the previous burst's
+       *  final width into the new one. In complete state the key is
+       *  stable so the fade-out interpolates cleanly.
+       *
+       *  The pct read is ratio-faithful even when the
+       *  numerator/denominator pair would be misleading shown as text
+       *  (backfillRemaining is cumulative across burst stacking), so
+       *  we render only the bar, not "X / N" text. */}
+      <div
+        key={scanning ? scanning.burstKey : 'complete'}
+        className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width,opacity] duration-300"
+        style={{
+          width: scanning ? `${pct}%` : '100%',
+          opacity: scanning ? 1 : 0,
+        }}
+        aria-hidden
+      />
     </div>
   )
 }
