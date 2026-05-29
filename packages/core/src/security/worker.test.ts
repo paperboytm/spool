@@ -326,6 +326,63 @@ describe('ScanWorker', () => {
     })
   })
 
+  // Regression: the per-session loop in rescanAll / backfill used to
+  // call `updateStatus` for every offer, fanning out into N IPC
+  // events to the renderer (and N React renders) for a burst of N
+  // sessions. The same "1000 events for 1000 items" shape as the
+  // original bulk-purge bug in #346 — except for status events
+  // instead of finding events. The fix is to mutate the Ref per
+  // session but publish only once at the end of the burst, so a
+  // 1000-session rescan fans out into ~1 enqueue-phase event for the
+  // renderer rather than 1000.
+  it('rescanAll fans out into O(K) status events, not O(N), during the enqueue burst', async () => {
+    const N = 10
+    const multiDb = setupDb(N)
+    await withWorker(multiDb, async (worker) => {
+      const collectFiber = Effect.runFork(
+        Stream.takeUntil(worker.statusChanges, (s) =>
+          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        ).pipe(Stream.runCollect),
+      )
+      await new Promise<void>((r) => setTimeout(r, 20))
+      await Effect.runPromise(worker.rescanAll())
+      await Effect.runPromise(waitForIdle(worker))
+      const collected = Chunk.toReadonlyArray(
+        await Effect.runPromise(Fiber.join(collectFiber)),
+      )
+
+      // Per-burst event budget:
+      //   - 1 up-front updateStatus (sets backfillRemaining +
+      //     manualBurstInFlight via {@link rescanAll})
+      //   - 1 post-loop publishStatus (folds N per-session publishes
+      //     into one — the load-bearing change being asserted here)
+      //   - SCAN_LIFECYCLE_PUBLISHES (= 2) per scanOne, namely
+      //       start: queued--, scanning=id
+      //       end:   scanning=null, backfillRemaining--
+      //     The constant is captured at the top of the test so a
+      //     future change to scanOne (e.g. an intermediate progress
+      //     event) is a one-line bump here, not a budget mystery for
+      //     the next reader.
+      //
+      // Old per-item-publish loop produced N + SCAN_LIFECYCLE_PUBLISHES*N
+      // + 2 events for the same burst — roughly 32 at N=10. The new
+      // bound is 2 + SCAN_LIFECYCLE_PUBLISHES*N ≈ 22, leaving the +3
+      // slack for Effect's scheduler interleaving.
+      const SCAN_LIFECYCLE_PUBLISHES = 2
+      const eventBudget = 2 + SCAN_LIFECYCLE_PUBLISHES * N + 3
+      expect(collected.length).toBeLessThanOrEqual(eventBudget)
+
+      // Burst correctness still holds — the per-item loop's effect on
+      // backfillTotal must be the high-water mark.
+      expect(Math.max(...collected.map(s => s.backfillTotal))).toBe(N)
+      // …and the burst drains all the way back to idle.
+      const last = collected[collected.length - 1]!
+      expect(last.backfillRemaining).toBe(0)
+      expect(last.queued).toBe(0)
+      expect(last.scanning).toBeNull()
+    })
+  })
+
   it('backfill() default does NOT raise manualBurstInFlight', async () => {
     const multiDb = setupDb(3)
     await withWorker(multiDb, async (worker) => {

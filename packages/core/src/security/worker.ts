@@ -101,9 +101,11 @@ export function makeScanWorker(
 
     const publish = (c: FindingsChange) => PubSub.publish(events, c).pipe(Effect.asVoid)
 
-    // Update statusRef AND publish the new snapshot so subscribers get
-    // a push event for every mutation. One helper at the seam avoids
-    // forgetting to publish from a future Ref.update site.
+    // Mutate statusRef in place WITHOUT publishing — used as the
+    // building block for `updateStatus` (which publishes after
+    // mutating) and for the bulk-enqueue path in rescanAll / backfill
+    // (which mutates per session but publishes only once at the end of
+    // the burst).
     //
     // `backfillTotal` is derived here so individual mutation sites
     // (enqueue / rescanAll / backfill / scanOne) don't have to
@@ -114,7 +116,7 @@ export function makeScanWorker(
     // navigation: a user who switches tabs mid-burst and comes back
     // gets the true original total via `getStatus`, not the
     // remaining-at-remount-time approximation.
-    const updateStatus = (f: (s: ScanStatus) => ScanStatus) =>
+    const mutateStatus = (f: (s: ScanStatus) => ScanStatus) =>
       Ref.update(statusRef, (prev) => {
         const after = f(prev)
         // High-water mark of *backfillRemaining alone*. Including the
@@ -141,11 +143,27 @@ export function makeScanWorker(
         // sees a stale truth across burst boundaries.
         const manualBurstInFlight = fullyIdle ? false : after.manualBurstInFlight
         return { ...after, backfillTotal, manualBurstInFlight }
-      }).pipe(
-        Effect.zipRight(Ref.get(statusRef)),
-        Effect.flatMap((s) => PubSub.publish(statusEvents, s)),
-        Effect.asVoid,
-      )
+      })
+
+    /** Publish the current statusRef snapshot to the statusChanges
+     *  PubSub. Subscribers (the main-process forwarder fiber that
+     *  pushes to the renderer) wake up once per call. */
+    const publishStatus = Ref.get(statusRef).pipe(
+      Effect.flatMap((s) => PubSub.publish(statusEvents, s)),
+      Effect.asVoid,
+    )
+
+    /** Mutate statusRef AND publish the new snapshot so subscribers
+     *  get a push event for every mutation. The single-session
+     *  `enqueue` (and every scanOne lifecycle step) uses this; bulk
+     *  enqueue paths use `mutateStatus` + a single `publishStatus`
+     *  at the end of the burst instead, so a 1000-session rescanAll
+     *  fans out into one IPC event for the renderer rather than
+     *  one-per-session (and one React render rather than one per
+     *  session — the original purge-bulk problem in a different
+     *  shape). */
+    const updateStatus = (f: (s: ScanStatus) => ScanStatus) =>
+      mutateStatus(f).pipe(Effect.zipRight(publishStatus))
 
     // Burst-reset variant for backfill() (and any future caller that
     // means "start a fresh burst, discard whatever the previous one
@@ -240,6 +258,18 @@ export function makeScanWorker(
         yield* updateStatus((s) => ({ ...s, queued: s.queued + 1 }))
       })
 
+    /** Queue + mutate without publishing. Used by rescanAll / backfill
+     *  to fold N sessions worth of status mutations into a single
+     *  publish at the end of the burst. Each `Queue.offer` runs as a
+     *  separate Effect step, so the drain fiber can pull and process
+     *  items concurrently — `mutateStatus` ensures the per-item
+     *  increment is atomic with the Ref state the drain reads. */
+    const enqueueSilent = (sessionId: number) =>
+      Effect.gen(function* () {
+        yield* Queue.offer(queue, sessionId)
+        yield* mutateStatus((s) => ({ ...s, queued: s.queued + 1 }))
+      })
+
     const rescanAll = () =>
       Effect.gen(function* () {
         // SELECT and UPDATE share one transaction so a concurrent sync
@@ -268,8 +298,13 @@ export function makeScanWorker(
           manualBurstInFlight: true,
         }))
         for (const r of all) {
-          yield* enqueue(r.id)
+          yield* enqueueSilent(r.id)
         }
+        // Single publish at the end of the burst — collapses N IPC
+        // hops to the renderer into one (the previous per-item path
+        // hit the same "1000 React renders for a 1000-session
+        // archive" shape the bulk purge had before #346).
+        if (all.length > 0) yield* publishStatus
         yield* Effect.annotateCurrentSpan('enqueued', all.length)
         return all.length
       }).pipe(Effect.withSpan('security.worker.rescan_all'))
@@ -297,8 +332,11 @@ export function makeScanWorker(
           manualBurstInFlight: opts?.userInitiated === true,
         }))
         for (const id of stale) {
-          yield* enqueue(id)
+          yield* enqueueSilent(id)
         }
+        // Single publish at the end of the burst (see rescanAll for
+        // the rationale — same fan-out shape).
+        if (stale.length > 0) yield* publishStatus
         yield* Effect.annotateCurrentSpan('enqueued', stale.length)
         yield* Effect.annotateCurrentSpan('userInitiated', opts?.userInitiated === true)
         return stale.length
