@@ -24,6 +24,7 @@ import {
   type ScanStatus,
   type FindingsChange,
 } from '@spool-lab/core'
+import type { MutationWorkerProxy } from '../mutation-worker-proxy.js'
 
 // ─── electron mock ────────────────────────────────────────────────
 // vi.hoisted so the stub objects exist before vi.mock evaluates.
@@ -126,6 +127,10 @@ async function setupFixture(): Promise<Fixture> {
   const dispose = registerSecurityIpc({
     db,
     worker,
+    // null mutationWorker forces the in-process fallback path that
+    // the existing assertions already cover. A separate suite below
+    // pins the worker-delegated path with a fake proxy.
+    mutationWorker: null,
     runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
     getMainWindow: () => fakeWindow,
   })
@@ -498,6 +503,141 @@ describe('registerSecurityIpc', () => {
 //     must broadcast a readiness event so the renderer can switch
 //     from skeleton → ready or → "Scanner unavailable" banner instead
 //     of swallowing IPC errors.
+// When a mutation worker proxy is wired in, the IPC layer must
+// delegate purge / dismiss / undismiss to it (so the synchronous SQL
+// runs on the worker thread, not on the main process event loop) AND
+// forward the proxy's per-mutation FindingsChange events to the
+// renderer via the same EVT_FINDINGS_CHANGED channel the scan worker
+// uses — so renderer subscribers can't tell whether a change came
+// from a scan or a mutation.
+describe('registerSecurityIpc with mutationWorker', () => {
+  it('routes purge / dismiss / undismiss IPCs through the proxy instead of running SQL in-process', async () => {
+    handlers.clear()
+    sentEvents.length = 0
+    const db = setupDb()
+    const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
+    const worker: ScanWorker = {
+      enqueue: () => Effect.void,
+      rescanAll: () => Effect.sync(() => 0),
+      backfill: () => Effect.sync(() => 0),
+      changes: Stream.empty,
+      statusChanges: Stream.empty,
+      getStatus: Effect.sync(() => status),
+    } as ScanWorker
+
+    // Track every call so we can assert the right proxy method was
+    // hit and the in-process path was not.
+    const calls: Array<{ method: string; args: unknown[] }> = []
+    const fakeProxy: MutationWorkerProxy = {
+      purgeFinding: async (id) => { calls.push({ method: 'purgeFinding', args: [id] }); return { findingId: id, sessionId: 1, maskUsed: '[redacted]', purgedAt: 'now' } },
+      purgeFindings: async (ids) => { calls.push({ method: 'purgeFindings', args: [ids] }); return [] },
+      purgeEverywhere: async (kind, hash) => { calls.push({ method: 'purgeEverywhere', args: [kind, hash] }); return { results: [], sessionIds: [] } },
+      dismissFinding: async (id, scope) => { calls.push({ method: 'dismissFinding', args: [id, scope] }); return null },
+      dismissFindings: async (ids, scope) => { calls.push({ method: 'dismissFindings', args: [ids, scope] }); return [] },
+      undismissFinding: async (id) => { calls.push({ method: 'undismissFinding', args: [id] }); return null },
+      changes: Stream.empty,
+      shutdown: async () => { /* no-op */ },
+    }
+
+    const fakeWindow = {
+      webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
+    } as unknown as import('electron').BrowserWindow
+
+    const dispose = registerSecurityIpc({
+      db,
+      worker,
+      mutationWorker: fakeProxy,
+      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+      getMainWindow: () => fakeWindow,
+    })
+
+    try {
+      await invoke('security:purge-finding', 42)
+      await invoke('security:purge-findings', [1, 2, 3])
+      await invoke('security:purge-everywhere', { kind: 'api-key', valueHash: 'h' })
+      await invoke('security:dismiss-finding', { findingId: 7, scope: 'session' })
+      await invoke('security:dismiss-findings', { findingIds: [8, 9], scope: 'global' })
+      await invoke('security:undismiss-finding', { findingId: 7 })
+
+      expect(calls).toEqual([
+        { method: 'purgeFinding', args: [42] },
+        { method: 'purgeFindings', args: [[1, 2, 3]] },
+        { method: 'purgeEverywhere', args: ['api-key', 'h'] },
+        { method: 'dismissFinding', args: [7, 'session'] },
+        { method: 'dismissFindings', args: [[8, 9], 'global'] },
+        { method: 'undismissFinding', args: [7] },
+      ])
+
+      // The proxy's per-mutation publishes ride a separate forwarder
+      // (a Stream.empty proxy here emits nothing); the in-process
+      // fallback's manual webContents.send is what would normally
+      // populate sentEvents during a dismiss. With a real proxy
+      // those events flow through `mutationWorker.changes` instead
+      // — covered separately in the next test.
+      expect(sentEvents.length).toBe(0)
+    } finally {
+      dispose()
+      db.close()
+    }
+  })
+
+  it('forwards mutation worker change events to EVT_FINDINGS_CHANGED', async () => {
+    handlers.clear()
+    sentEvents.length = 0
+    const db = setupDb()
+    const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
+    const worker: ScanWorker = {
+      enqueue: () => Effect.void,
+      rescanAll: () => Effect.sync(() => 0),
+      backfill: () => Effect.sync(() => 0),
+      changes: Stream.empty,
+      statusChanges: Stream.empty,
+      getStatus: Effect.sync(() => status),
+    } as ScanWorker
+
+    const mutationPubsub = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
+    const fakeProxy: MutationWorkerProxy = {
+      purgeFinding: async () => { throw new Error('not used') },
+      purgeFindings: async () => [],
+      purgeEverywhere: async () => ({ results: [], sessionIds: [] }),
+      dismissFinding: async () => null,
+      dismissFindings: async () => [],
+      undismissFinding: async () => null,
+      changes: Stream.fromPubSub(mutationPubsub),
+      shutdown: async () => { /* no-op */ },
+    }
+
+    const fakeWindow = {
+      webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
+    } as unknown as import('electron').BrowserWindow
+
+    const dispose = registerSecurityIpc({
+      db,
+      worker,
+      mutationWorker: fakeProxy,
+      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+      getMainWindow: () => fakeWindow,
+    })
+
+    try {
+      // The forwarder fiber is forked via Effect.runPromise which is
+      // async; give it a tick to subscribe to the PubSub before we
+      // publish. Mirrors the 50ms wait in the worker.changes forwarder
+      // test above.
+      await new Promise((r) => setTimeout(r, 50))
+      const change: FindingsChange = { type: 'state-changed', sessionId: 5, state: 'purged' }
+      await Effect.runPromise(PubSub.publish(mutationPubsub, change))
+      await new Promise((r) => setTimeout(r, 50))
+      expect(sentEvents).toEqual([
+        { channel: 'security:evt-findings-changed', payload: change },
+      ])
+    } finally {
+      dispose()
+      db.close()
+    }
+  })
+})
+
 describe('registerSecurityReadinessIpc', () => {
   let fakeWin: { sent: Array<{ channel: string; payload: unknown }> }
   let getWindow: () => import('electron').BrowserWindow | null

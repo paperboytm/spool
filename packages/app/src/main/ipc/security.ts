@@ -46,6 +46,7 @@ import {
 } from '../securityPreferences.js'
 import type { PfCoordinator } from '../security/pf-coordinator.js'
 import type { PfRuntime } from '../security/pf-runtime.js'
+import type { MutationWorkerProxy } from '../mutation-worker-proxy.js'
 
 /** Channel name table. Shared via type only with the renderer adapter
  *  (no runtime import — preload uses the strings literally). */
@@ -157,6 +158,11 @@ export function registerSecurityReadinessIpc(
 export interface SecurityIpcDeps {
   db: Database.Database
   worker: ScanWorker
+  /** Writes-only proxy that forwards purge / dismiss commands to the
+   *  mutation worker thread. Falls back to in-process via the same
+   *  core helpers when null (worker boot failed or feature-flagged
+   *  off in a tests path). */
+  mutationWorker: MutationWorkerProxy | null
   /** Mount with `ManagedRuntime.make` so the IPC layer can run Effects
    *  without each call paying ManagedRuntime construction cost. */
   runPromise: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
@@ -180,7 +186,7 @@ export interface SecurityIpcDeps {
  *  fiber that forwards worker change events to the main window. The
  *  returned disposer interrupts the forwarding fiber. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
-  const { db, worker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged } = deps
+  const { db, worker, mutationWorker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged } = deps
 
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS, (_e, filter: FindingFilter) =>
     listFindings(db, filter),
@@ -218,9 +224,22 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     runPromise(worker.getStatus),
   )
 
+  // All write paths route through `mutationWorker` when present so
+  // the main event loop stays free during multi-second bulk
+  // operations on a large archive. The fallback to in-process is
+  // kept for the rare worker-boot-failure case (and for the IPC
+  // unit-tests that don't spin up a real worker) — the existing core
+  // helpers run synchronously on `db` exactly as before.
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DISMISS_FINDING,
-    (_e, args: { findingId: number; scope: 'session' | 'global' }) => {
+    async (_e, args: { findingId: number; scope: 'session' | 'global' }) => {
+      if (mutationWorker) {
+        // Per-event publish lands via the proxy's `changes` stream
+        // (subscribed below in the forwarder fiber), so no need to
+        // webContents.send on success here.
+        await mutationWorker.dismissFinding(args.findingId, args.scope)
+        return { ok: true }
+      }
       const sessionId = dismissFinding(db, args.findingId, args.scope, true)
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
@@ -232,7 +251,11 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DISMISS_FINDINGS,
-    (_e, args: { findingIds: number[]; scope: 'session' | 'global' }) => {
+    async (_e, args: { findingIds: number[]; scope: 'session' | 'global' }) => {
+      if (mutationWorker) {
+        await mutationWorker.dismissFindings(args.findingIds, args.scope)
+        return { ok: true }
+      }
       const sessionIds = dismissFindings(db, args.findingIds, args.scope)
       for (const sessionId of sessionIds) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
@@ -244,7 +267,11 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   )
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.UNDISMISS_FINDING,
-    (_e, args: { findingId: number }) => {
+    async (_e, args: { findingId: number }) => {
+      if (mutationWorker) {
+        await mutationWorker.undismissFinding(args.findingId)
+        return { ok: true }
+      }
       const sessionId = undismissFinding(db, args.findingId)
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
@@ -255,6 +282,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     },
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDING, async (_e, findingId: number) => {
+    if (mutationWorker) return mutationWorker.purgeFinding(findingId)
     const publish = (change: Parameters<NonNullable<typeof getMainWindow extends () => infer R ? R : never>['webContents']['send']>[1]) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
@@ -263,6 +291,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     return result
   })
   ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDINGS, async (_e, findingIds: number[]) => {
+    if (mutationWorker) return mutationWorker.purgeFindings(findingIds)
     const publish = (change: unknown) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
@@ -273,6 +302,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.PURGE_EVERYWHERE,
     async (_e, args: { kind: SensitiveKind; valueHash: string }) => {
+      if (mutationWorker) {
+        const out = await mutationWorker.purgeEverywhere(args.kind, args.valueHash)
+        return { count: out.results.length, sessionIds: out.sessionIds }
+      }
       const publish = (change: unknown) =>
         Effect.sync(() => {
           getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
@@ -394,6 +427,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
   // until explicitly interrupted by the returned disposer below.
   let forwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
   let statusForwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
+  let mutationForwarderFiber: Fiber.RuntimeFiber<void, never> | null = null
   // Stream consumers wrapped in `Effect.catchAllDefect` — webContents
   // .send synchronously throws on a destroyed window (e.g. user closed
   // the main window while a scan was mid-burst). Without this the
@@ -430,6 +464,19 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
           safeSend(SECURITY_IPC_CHANNELS.EVT_SCAN_STATUS, status),
         ),
       )
+      // Mutation worker has its own per-mutation FindingsChange stream;
+      // forward it onto the SAME EVT_FINDINGS_CHANGED renderer channel
+      // so consumers can't tell whether the publish came from a scan
+      // (via scan-worker) or a purge / dismiss (via mutation-worker).
+      // No-op when the worker failed to boot — the per-handler fallback
+      // sends its own EVT_FINDINGS_CHANGED so events still flow.
+      if (mutationWorker) {
+        mutationForwarderFiber = yield* Effect.forkDaemon(
+          Stream.runForEach(mutationWorker.changes, (change) =>
+            safeSend(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change),
+          ),
+        )
+      }
     }),
   ).catch(() => { /* fork rejected; ignore (cleanup path) */ })
 
@@ -439,6 +486,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): () => void {
     }
     if (statusForwarderFiber) {
       Effect.runFork(Fiber.interrupt(statusForwarderFiber))
+    }
+    if (mutationForwarderFiber) {
+      Effect.runFork(Fiber.interrupt(mutationForwarderFiber))
     }
     unsubscribePf?.()
     for (const ch of Object.values(SECURITY_IPC_CHANNELS)) {
