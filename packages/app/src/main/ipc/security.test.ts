@@ -124,13 +124,13 @@ async function setupFixture(): Promise<Fixture> {
   handlers.clear()
   sentEvents.length = 0
 
-  const dispose = registerSecurityIpc({
+  // Mutation worker is never attached in the default fixture so the
+  // existing assertions exercise the in-process fallback path; the
+  // suite further down attaches a fake proxy and pins the worker-
+  // delegated path.
+  const { dispose } = registerSecurityIpc({
     db,
     worker,
-    // null mutationWorker forces the in-process fallback path that
-    // the existing assertions already cover. A separate suite below
-    // pins the worker-delegated path with a fake proxy.
-    mutationWorker: null,
     runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
     getMainWindow: () => fakeWindow,
   })
@@ -543,13 +543,15 @@ describe('registerSecurityIpc with mutationWorker', () => {
       webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
     } as unknown as import('electron').BrowserWindow
 
-    const dispose = registerSecurityIpc({
+    const { dispose, attachMutationWorker } = registerSecurityIpc({
       db,
       worker,
-      mutationWorker: fakeProxy,
       runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
       getMainWindow: () => fakeWindow,
     })
+    // Late-attach the fake proxy — mirrors how production wires the
+    // mutation worker in after the IPC layer is already live.
+    attachMutationWorker(fakeProxy)
 
     try {
       await invoke('security:purge-finding', 42)
@@ -611,13 +613,13 @@ describe('registerSecurityIpc with mutationWorker', () => {
       webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
     } as unknown as import('electron').BrowserWindow
 
-    const dispose = registerSecurityIpc({
+    const { dispose, attachMutationWorker } = registerSecurityIpc({
       db,
       worker,
-      mutationWorker: fakeProxy,
       runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
       getMainWindow: () => fakeWindow,
     })
+    attachMutationWorker(fakeProxy)
 
     try {
       // The forwarder fiber is forked via Effect.runPromise which is

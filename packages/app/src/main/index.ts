@@ -341,13 +341,18 @@ async function ensureSecurityBooted(): Promise<void> {
     setSecurityReadiness?.({ ready: false, reason: 'scanner-unavailable' })
     return
   }
-  // Mutation worker is best-effort — a boot failure logs and the IPC
-  // handlers fall back to in-process SQL on the main thread.
-  await bootMutationWorker()
-  disposeSecurityIpc = registerSecurityIpc({
+  // Register IPC immediately after the scan worker is ready so the
+  // renderer's `security:get-scan-status` polling on first window
+  // open finds a handler. Mutation-worker boot is deferred and
+  // plumbed in via `securityIpc.attachMutationWorker` once it
+  // reports ready — the handlers fall back to in-process SQL in the
+  // meantime. Without this split the e2e harness saw the
+  // first-window polling rejected with "No handler registered for
+  // security:get-scan-status" because both worker boots were
+  // awaited sequentially before the IPC was registered.
+  const securityIpc = registerSecurityIpc({
     db,
     worker: scanWorker,
-    mutationWorker,
     runPromise: runWithObservability,
     getMainWindow: () => mainWindow,
     pfCoordinator,
@@ -358,10 +363,22 @@ async function ensureSecurityBooted(): Promise<void> {
       })
     },
   })
+  disposeSecurityIpc = securityIpc.dispose
   setSecurityReadiness?.({ ready: true })
   console.log('[security.lifecycle] booted — worker + IPC ready, backfilling')
   runWithObservability(scanWorker.backfill()).catch((err) => {
     console.error('[security] boot backfill failed:', err)
+  })
+
+  // Mutation worker boots in the background. Until it's ready the
+  // IPC handlers run their in-process fallback path on the main
+  // thread — same SQL, same correctness, just no off-main offload.
+  // On success, attach so subsequent calls route through the worker
+  // AND start the per-mutation change forwarder.
+  void bootMutationWorker().then(() => {
+    if (mutationWorker) {
+      securityIpc.attachMutationWorker(mutationWorker)
+    }
   })
   // If the user enabled PF before this boot, bring the inference window
   // up now that the rest of Spool is ready.
