@@ -214,7 +214,14 @@ describe('Syncer', () => {
     expect(sessionCount.n).toBe(2)
   })
 
-  it('Security Scan cascade: a message-mutating sync clears scan_profile and fires onSessionChanged', async () => {
+  it('Security Scan cascade: appending a new message clears scan_profile and fires onSessionChanged', async () => {
+    // This used to assert that ANY mtime touch + content change
+    // clears scan_profile, on the assumption that the syncer always
+    // does DELETE+INSERT. Under append-only sync that contract
+    // changes: the cascade fires only when at least one new row is
+    // actually inserted (new uuid). Re-syncing the same-uuid file
+    // with edited content is now an explicit "use Refresh from
+    // source" case, covered above by the no-auto-rewrite test.
     const baseDir = makeTempDir('spool-syncer-scan-cascade-')
     const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
     const spoolDataDir = join(baseDir, 'spool-data')
@@ -223,34 +230,32 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'cascade.jsonl')
-    const writeJsonl = (suffix: string) =>
-      writeFileSync(filePath, [
-        JSON.stringify({
-          type: 'user',
-          sessionId: 'cascade-session-1',
-          cwd: '/tmp/test-project',
-          uuid: 'u1',
-          timestamp: '2026-05-01T00:00:00Z',
-          message: { role: 'user', content: `hello ${suffix}` },
-        }),
-      ].join('\n'))
-    writeJsonl('first')
+    const record = (uuid: string, content: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'cascade-session-1',
+      cwd: '/tmp/test-project',
+      uuid,
+      timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
+      message: { role: 'user', content },
+    })
+    writeFileSync(filePath, record('u1', 'hello first'))
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
 
-    // First sync — session inserted with default scan_profile = NULL.
-    let firstSyncer = new Syncer(db)
-    expect(firstSyncer.syncFile(filePath, 'claude')).toBe('added')
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
 
     // Pretend the scan worker has finished a scan, so scan_profile is set.
     db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE session_uuid = ?")
       .run('cascade-session-1')
 
-    // Mutate the source file's mtime so syncFile re-processes.
-    touchFile(filePath)
-    writeJsonl('second-with-new-content')
+    // Append a brand-new message — this is the path that should
+    // invalidate scan_profile and notify subscribers.
+    writeFileSync(filePath, [
+      record('u1', 'hello first'),
+      record('u2', 'hello — new turn'),
+    ].join('\n'))
     touchFile(filePath)
 
     const changed: number[] = []
@@ -389,6 +394,279 @@ describe('Syncer', () => {
     expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeTruthy()
     expect(syncer.syncFile(dbPath, 'opencode')).toBe('updated')
     expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeUndefined()
+  })
+
+  // ─── Append-only sync (schema v14 follow-up) ────────────────────────
+  //
+  // The four tests below pin down the contract for the new
+  // INSERT-OR-IGNORE sync path:
+  //
+  //   1. Re-syncing a file whose content has not changed must NOT
+  //      invalidate the user-side state (Security Scan purge in
+  //      particular). This is the load-bearing fix that originally
+  //      motivated the redesign — issue #344's follow-up question
+  //      "does purge survive re-sync?".
+  //   2. Appending genuinely-new messages must take the fast path
+  //      (no DELETE+INSERT) but still trigger the Security Scan
+  //      cascade so the new content gets scanned.
+  //   3. An in-place edit of an already-stored message must be
+  //      detected and fall back to the rewrite path; otherwise
+  //      INSERT OR IGNORE silently drops the new content and the
+  //      DB ends up stale.
+  //   4. A shrunk parse result is a strong rewrite signal — source
+  //      file truncation must replay through the safe path.
+
+  it('append-only sync preserves Security Scan purge state across a no-op re-sync (issue #344 follow-up)', async () => {
+    const baseDir = makeTempDir('spool-syncer-purge-survives-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'purge-survives.jsonl')
+    writeFileSync(filePath, JSON.stringify({
+      type: 'user',
+      sessionId: 'purge-survives-session',
+      cwd: '/tmp/test-project',
+      uuid: 'm1',
+      timestamp: '2026-05-01T00:00:00Z',
+      message: { role: 'user', content: 'leaked: AKIAIOSFODNN7EXAMPLE here' },
+    }))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+
+    // Simulate a Security Scan run: a finding lands in the DB and the
+    // user purges it. content_text gets the mask, the finding flips
+    // to state='purged', scan_profile is filled.
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'purge-survives-session'"
+    ).get() as { id: number }).id
+    const messageId = (db.prepare(
+      'SELECT id FROM messages WHERE session_id = ? ORDER BY id LIMIT 1'
+    ).get(sessionId) as { id: number }).id
+    db.prepare(
+      `INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state, state_changed_at)
+       VALUES (?, ?, 'api-key', 'h-aws', 0.95, 'regex', 8, 28, 'purged', datetime('now'))`,
+    ).run(sessionId, messageId)
+    db.prepare(
+      `UPDATE messages SET content_text = 'leaked: [redacted: AWS key] here' WHERE id = ?`,
+    ).run(messageId)
+    db.prepare(
+      `UPDATE sessions SET scan_profile = 'regex@3', scan_purged_count = 1 WHERE id = ?`,
+    ).run(sessionId)
+
+    // Touch the source file's mtime without changing its content —
+    // this is exactly the pattern the old DELETE+INSERT path used to
+    // weaponise into a purge-undo.
+    touchFile(filePath)
+    const changedIds: number[] = []
+    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    reSyncer.syncFile(filePath, 'claude')
+
+    // Purge state must still be there.
+    const finding = db.prepare(
+      'SELECT state FROM findings WHERE session_id = ?'
+    ).get(sessionId) as { state: string } | undefined
+    expect(finding?.state).toBe('purged')
+
+    // Masked content must still be there.
+    const msg = db.prepare(
+      'SELECT content_text FROM messages WHERE id = ?'
+    ).get(messageId) as { content_text: string } | undefined
+    expect(msg?.content_text).toBe('leaked: [redacted: AWS key] here')
+
+    // scan_profile must NOT have been cleared — nothing changed, so
+    // the scan worker should not be asked to redo the session.
+    const sess = db.prepare(
+      'SELECT scan_profile FROM sessions WHERE id = ?'
+    ).get(sessionId) as { scan_profile: string | null }
+    expect(sess.scan_profile).toBe('regex@3')
+
+    // onSessionChanged must not have fired for the no-op re-sync.
+    expect(changedIds).toEqual([])
+  })
+
+  it('append-only sync inserts newly-appended messages without DELETEing the existing tail and still cascades scan_profile', async () => {
+    const baseDir = makeTempDir('spool-syncer-append-grows-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'append-grows.jsonl')
+    const userRecord = (uuid: string, ts: string, content: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'append-grows-session',
+      cwd: '/tmp/test-project',
+      uuid,
+      timestamp: ts,
+      message: { role: 'user', content },
+    })
+    writeFileSync(filePath, [
+      userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
+      userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
+    ].join('\n'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'append-grows-session'"
+    ).get() as { id: number }).id
+
+    // Stand in for "scan worker has finished": set scan_profile so
+    // the cascade is observable. Also park a finding row that should
+    // survive (it's tied to m1 by message_id, which append-only sync
+    // must not DELETE).
+    const m1Id = (db.prepare(
+      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'"
+    ).get(sessionId) as { id: number }).id
+    db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE id = ?").run(sessionId)
+    db.prepare(
+      `INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state)
+       VALUES (?, ?, 'email', 'h1', 0.9, 'regex', 0, 5, 'active')`,
+    ).run(sessionId, m1Id)
+
+    // Append a third message at the source.
+    writeFileSync(filePath, [
+      userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
+      userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
+      userRecord('m3', '2026-05-01T00:02:00Z', 'third — brand new'),
+    ].join('\n'))
+    touchFile(filePath)
+
+    const changedIds: number[] = []
+    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    expect(reSyncer.syncFile(filePath, 'claude')).toBe('updated')
+
+    // m1 row id stable → finding still pointing at the right row.
+    const m1RowAfter = db.prepare(
+      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'"
+    ).get(sessionId) as { id: number }
+    expect(m1RowAfter.id).toBe(m1Id)
+
+    // The pre-existing finding survives the re-sync.
+    const finding = db.prepare(
+      'SELECT message_id, state FROM findings WHERE session_id = ?'
+    ).get(sessionId) as { message_id: number; state: string }
+    expect(finding).toEqual({ message_id: m1Id, state: 'active' })
+
+    // m3 actually landed.
+    const newCount = (db.prepare(
+      'SELECT COUNT(*) AS c FROM messages WHERE session_id = ?'
+    ).get(sessionId) as { c: number }).c
+    expect(newCount).toBe(3)
+
+    // Cascade DID fire — new content arrived.
+    const sess = db.prepare(
+      'SELECT scan_profile FROM sessions WHERE id = ?'
+    ).get(sessionId) as { scan_profile: string | null }
+    expect(sess.scan_profile).toBeNull()
+    expect(changedIds).toEqual([sessionId])
+  })
+
+  it('does NOT auto-rewrite content on a same-uuid in-place source edit (deliberate; PR3 force-resync covers this)', async () => {
+    // This pins the deliberate trade-off behind the append-only
+    // design. Source files for every supported provider are
+    // append-only event logs at the tool contract level; in-place
+    // edits of an existing uuid only happen when a user manually
+    // mutates the jsonl on disk. We could content-compare in
+    // classifySync to catch that, but doing so would also trigger
+    // rewrite whenever Security Scan has replaced the raw value with
+    // its mask — undoing the purge on the next re-sync, which is the
+    // exact regression that motivated this work. The explicit
+    // "Refresh from source" action (PR 3) is the right UX for the
+    // rare manual-edit case.
+    const baseDir = makeTempDir('spool-syncer-no-auto-rewrite-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'manual-edit.jsonl')
+    const record = (text: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'manual-edit-session',
+      cwd: '/tmp/test-project',
+      uuid: 'u1',
+      timestamp: '2026-05-01T00:00:00Z',
+      message: { role: 'user', content: text },
+    })
+    writeFileSync(filePath, record('original content'))
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+
+    // Source rewrites the same uuid with different content.
+    writeFileSync(filePath, record('rewritten content'))
+    touchFile(filePath)
+    const changedIds: number[] = []
+    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    reSyncer.syncFile(filePath, 'claude')
+
+    // DB intentionally keeps the original content — INSERT OR IGNORE
+    // saw the existing uuid and skipped the new row.
+    const msg = db.prepare(
+      "SELECT content_text FROM messages WHERE msg_uuid = 'u1'"
+    ).get() as { content_text: string }
+    expect(msg.content_text).toBe('original content')
+
+    // And no cascade fired — append path with 0 inserted is a no-op.
+    expect(changedIds).toEqual([])
+  })
+
+  it('falls back to rewrite when the source file shrinks below the stored row count', async () => {
+    const baseDir = makeTempDir('spool-syncer-rewrite-on-shrink-')
+    const claudeDir = join(baseDir, 'claude', 'projects', 'test-project')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(claudeDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+
+    const filePath = join(claudeDir, 'rewrite-on-shrink.jsonl')
+    const userRecord = (uuid: string, content: string) => JSON.stringify({
+      type: 'user',
+      sessionId: 'rewrite-on-shrink-session',
+      cwd: '/tmp/test-project',
+      uuid,
+      timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
+      message: { role: 'user', content },
+    })
+    writeFileSync(filePath, [
+      userRecord('m1', 'first'),
+      userRecord('m2', 'second'),
+      userRecord('m3', 'third'),
+    ].join('\n'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
+
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'rewrite-on-shrink-session'"
+    ).get() as { id: number }).id
+    expect((db.prepare(
+      'SELECT COUNT(*) AS c FROM messages WHERE session_id = ?'
+    ).get(sessionId) as { c: number }).c).toBe(3)
+
+    // Source loses its tail.
+    writeFileSync(filePath, userRecord('m1', 'first'))
+    touchFile(filePath)
+    expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('updated')
+
+    // Stale m2/m3 are gone (rewrite path ran DELETE+INSERT) and m1
+    // remains.
+    const after = db.prepare(
+      'SELECT msg_uuid FROM messages WHERE session_id = ? ORDER BY msg_uuid'
+    ).all(sessionId) as Array<{ msg_uuid: string }>
+    expect(after.map(r => r.msg_uuid)).toEqual(['m1'])
   })
 })
 

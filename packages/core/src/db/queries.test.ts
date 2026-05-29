@@ -203,7 +203,15 @@ describe('insertSpoolAuthoredSession', () => {
     expect(row.title).toBe('real query')
     expect(row.title_source).toBe('spool')
     expect(row.file_path).toBe('/Users/x/.claude/projects/-Users-x--spool-agent-search-sessions/ask-uuid-3.jsonl')
-    expect(row.message_count).toBe(5)
+    // upsertSession deliberately no longer touches message_count —
+    // the syncer recomputes it from the actual DB row count after
+    // insertMessages so the count tracks INSERT-OR-IGNORE-deduped
+    // truth (claude tool-use shadows would otherwise re-inflate it
+    // back to pre-v14 levels on every sync).
+    // insertSpoolAuthoredSession seeded message_count = 0; the
+    // upsertSession opts above pass 5, but the row should still
+    // read 0 since the count is now owned by recomputeMessageCount.
+    expect(row.message_count).toBe(0)
   })
 })
 

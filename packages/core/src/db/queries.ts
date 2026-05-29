@@ -107,6 +107,21 @@ export function getAllSessionMtimes(db: Database.Database): Map<string, string> 
   return new Map(rows.map(r => [r.file_path, r.raw_file_mtime]))
 }
 
+/** Sync mode for {@link upsertSession}.
+ *
+ *  - `rewrite`: today's behaviour. When the session already exists,
+ *    DELETE all its messages so the caller's {@link insertMessages}
+ *    can fully repopulate from the parsed source. Used for first
+ *    syncs, source-rewrite recoveries, and the explicit "Refresh from
+ *    source" action.
+ *  - `append`: skip the DELETE. The caller's {@link insertMessages}
+ *    will INSERT OR IGNORE against the partial UNIQUE index on
+ *    (session_id, msg_uuid), so existing rows survive and any
+ *    user-side state attached to them (Security Scan purge/dismiss,
+ *    star, etc.) persists across the re-sync — the root-cause fix for
+ *    "purge gets undone by re-sync". */
+export type UpsertSessionMode = 'rewrite' | 'append'
+
 export function upsertSession(
   db: Database.Database,
   opts: {
@@ -123,6 +138,7 @@ export function upsertSession(
     model: string
     rawFileMtime: string
   },
+  mode: UpsertSessionMode = 'rewrite',
 ): number {
   const existing = db
     .prepare('SELECT id, file_path FROM sessions WHERE session_uuid = ?')
@@ -143,19 +159,28 @@ export function upsertSession(
         + `${existing.file_path} → ${opts.filePath}`,
       )
     }
-    db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id)
+    if (mode === 'rewrite') {
+      db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id)
+    }
     // file_path is updated too: Spool-authored sessions start with a sentinel
     // ('spool:pending:<uuid>') and get rebound to the real source path here on
     // first sync. For normal sessions this is a no-op (same path).
+    //
+    // `message_count` is intentionally NOT updated here — the syncer
+    // recomputes it from the actual DB row count after insertMessages
+    // returns, which is the only count consistent with INSERT OR
+    // IGNORE-driven dedupe (claude tool-use shadow records would
+    // otherwise inflate the parser-derived value back to pre-v14
+    // levels on every sync).
     db.prepare(`
       UPDATE sessions SET
         title = CASE WHEN title_source = 'derived' THEN ? ELSE title END,
         file_path = ?,
-        started_at = ?, ended_at = ?, message_count = ?,
+        started_at = ?, ended_at = ?,
         has_tool_use = ?, cwd = ?, model = ?, raw_file_mtime = ?
       WHERE id = ?
     `).run(
-      opts.title, opts.filePath, opts.startedAt, opts.endedAt, opts.messageCount,
+      opts.title, opts.filePath, opts.startedAt, opts.endedAt,
       opts.hasToolUse ? 1 : 0, opts.cwd, opts.model, opts.rawFileMtime,
       existing.id,
     )
@@ -201,6 +226,16 @@ export function upsertSessionSearch(
   )
 }
 
+/** Insert message rows, skipping any that collide with the partial
+ *  UNIQUE index on (session_id, msg_uuid). Returns the count of rows
+ *  actually inserted — callers use this to decide whether anything
+ *  changed (NULL scan_profile, fire onSessionChanged) or to skip
+ *  downstream work when re-sync was a no-op.
+ *
+ *  The ON CONFLICT clause must restate the same `WHERE msg_uuid IS
+ *  NOT NULL` predicate as the index it targets; SQLite requires the
+ *  predicates to match before it considers a partial index for
+ *  conflict resolution. */
 export function insertMessages(
   db: Database.Database,
   sessionId: number,
@@ -215,21 +250,67 @@ export function insertMessages(
     toolNames: string[]
     seq: number
   }>,
-): void {
+): number {
   const stmt = db.prepare(`
     INSERT INTO messages
       (session_id, source_id, msg_uuid, parent_uuid, role,
        content_text, timestamp, is_sidechain, tool_names, seq)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(session_id, msg_uuid) WHERE msg_uuid IS NOT NULL DO NOTHING
   `)
 
+  let inserted = 0
   for (const m of messages) {
-    stmt.run(
+    const info = stmt.run(
       sessionId, sourceId, m.uuid, m.parentUuid, m.role,
       m.contentText, m.timestamp, m.isSidechain ? 1 : 0,
       JSON.stringify(m.toolNames), m.seq,
     )
+    if (info.changes > 0) inserted++
   }
+  return inserted
+}
+
+/** Lightweight snapshot used by the syncer's `classifySync` heuristic
+ *  to decide between append and rewrite paths — just the row count
+ *  and the leading uuid in seq order. We deliberately do NOT pull
+ *  `content_text` here: comparing parsed-vs-stored content would
+ *  trigger rewrite whenever Security Scan has already replaced the
+ *  raw value with its mask, undoing the purge on every re-sync. Only
+ *  msg_uuid-bearing rows participate in the dedupe index, so NULL-uuid
+ *  rows are excluded. */
+export function getMessageSnapshot(
+  db: Database.Database,
+  sessionId: number,
+): { firstUuid: string | null; total: number } {
+  const total = (db.prepare(
+    `SELECT COUNT(*) AS c FROM messages
+      WHERE session_id = ? AND msg_uuid IS NOT NULL`,
+  ).get(sessionId) as { c: number }).c
+  const first = db.prepare(
+    `SELECT msg_uuid FROM messages
+      WHERE session_id = ? AND msg_uuid IS NOT NULL
+      ORDER BY seq, id LIMIT 1`,
+  ).get(sessionId) as { msg_uuid: string } | undefined
+  return { firstUuid: first?.msg_uuid ?? null, total }
+}
+
+/** Refresh `sessions.message_count` for a single session from the
+ *  actual non-sidechain row count. Called after every sync's INSERT
+ *  block so the denormalised count tracks the deduped truth — the
+ *  parser's `parsed.messages.length` would re-introduce the v14-fixed
+ *  inflation for source formats (claude) that emit some records
+ *  twice. */
+export function recomputeMessageCount(
+  db: Database.Database,
+  sessionId: number,
+): void {
+  db.prepare(
+    `UPDATE sessions SET message_count = (
+        SELECT COUNT(*) FROM messages
+         WHERE session_id = sessions.id AND is_sidechain = 0
+      ) WHERE id = ?`,
+  ).run(sessionId)
 }
 
 export const SESSION_SELECT = `
