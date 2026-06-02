@@ -113,8 +113,15 @@ export function maskValueByKind(value: string, kind: SensitiveKind | string): st
       // four-octet pattern matters more than the digits.
       return value.includes(':') ? '[redacted IPv6]' : '[redacted IPv4]'
     case 'internal-host': {
-      const m = value.match(/\.([a-z0-9-]+(?:\.[a-z0-9-]+)*)$/i)
-      return m ? `[redacted].${m[1]}` : '[redacted internal host]'
+      // Keep the domain suffix (everything after the first dot) so readers
+      // see which network it was on. indexOf + a flat char-class test stays
+      // linear; the previous end-anchored nested-quantifier regex backtracked
+      // quadratically on hostile input like ".-.-.-.-".
+      const dot = value.indexOf('.')
+      const suffix = dot >= 0 ? value.slice(dot + 1) : ''
+      return suffix && /^[a-z0-9.-]+$/i.test(suffix)
+        ? `[redacted].${suffix}`
+        : '[redacted internal host]'
     }
     case 'absolute-path': {
       const m = value.match(/^(\/Users\/|\/home\/|\/var\/|\/etc\/|\/opt\/|[A-Z]:\\Users\\)/)

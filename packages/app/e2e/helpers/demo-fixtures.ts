@@ -228,7 +228,7 @@ export function buildDemoFixtures(
         String(date.getUTCMonth() + 1).padStart(2, '0'),
         String(date.getUTCDate()).padStart(2, '0'),
       )
-      const slug = `rollout-${session.iso.replace(/:/g, '-').replace('.000Z', 'Z').replace('T', 'T')}-${sessionId}.jsonl`
+      const slug = `rollout-${session.iso.replace(/:/g, '-').replace('.000Z', 'Z')}-${sessionId}.jsonl`
       const filePath = join(relDir, slug)
       writeText(filePath, makeCodexSession(sessionId, cwd, session.title, session.iso))
     })

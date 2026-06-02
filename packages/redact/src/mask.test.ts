@@ -62,6 +62,15 @@ describe('maskValueByKind', () => {
     expect(maskValueByKind('api.eng.corp', 'internal-host')).toBe('[redacted].eng.corp')
     expect(maskValueByKind('db.prod.internal', 'internal-host')).toBe('[redacted].prod.internal')
   })
+  it('internal-host with no dot falls back to the generic mask', () => {
+    expect(maskValueByKind('localhost', 'internal-host')).toBe('[redacted internal host]')
+  })
+  it('internal-host stays fast on hostile input (no quadratic backtracking)', () => {
+    const hostile = `host${'.-'.repeat(50_000)}!`
+    const start = performance.now()
+    expect(maskValueByKind(hostile, 'internal-host')).toBe('[redacted internal host]')
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
   it('synthetic kinds get a sensible default', () => {
     expect(maskValueByKind('Maya', 'synthetic:author')).toBe('[redacted name]')
     expect(maskValueByKind('custom-blob', 'synthetic:manual')).toBe('[redacted]')

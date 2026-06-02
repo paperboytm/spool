@@ -38,4 +38,15 @@ q`
     const input = '<spool-system-prelude>a</spool-system-prelude>\n<spool-system-prelude>b</spool-system-prelude>\nq'
     expect(stripSpoolSystemPrelude(input)).toBe('q')
   })
+
+  it('leaves an unterminated marker intact', () => {
+    expect(stripSpoolSystemPrelude('<spool-system-prelude>no close tag')).toBe('<spool-system-prelude>no close tag')
+  })
+
+  it('stays fast on many unterminated open markers (no quadratic backtracking)', () => {
+    const hostile = '<spool-system-prelude>'.repeat(100_000)
+    const start = performance.now()
+    expect(stripSpoolSystemPrelude(hostile)).toBe(hostile)
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
 })

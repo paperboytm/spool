@@ -16,8 +16,17 @@ export function wrapSpoolSystemPrelude(systemBody: string, userQuery: string): s
   return `${SPOOL_SYSTEM_PRELUDE_OPEN}\n${systemBody}\n${SPOOL_SYSTEM_PRELUDE_CLOSE}\n\n${userQuery}`
 }
 
-const STRIP_RE = /<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g
-
 export function stripSpoolSystemPrelude(text: string): string {
-  return text.replace(STRIP_RE, '').trim()
+  // indexOf scanning instead of a regex: the `<open>[\s\S]*?<close>` form
+  // backtracks quadratically when many unterminated open markers appear in
+  // hostile input. Each pass here is linear.
+  let result = text
+  let open = result.indexOf(SPOOL_SYSTEM_PRELUDE_OPEN)
+  while (open !== -1) {
+    const close = result.indexOf(SPOOL_SYSTEM_PRELUDE_CLOSE, open + SPOOL_SYSTEM_PRELUDE_OPEN.length)
+    if (close === -1) break // unterminated marker — leave the remainder intact
+    result = result.slice(0, open) + result.slice(close + SPOOL_SYSTEM_PRELUDE_CLOSE.length)
+    open = result.indexOf(SPOOL_SYSTEM_PRELUDE_OPEN)
+  }
+  return result.trim()
 }

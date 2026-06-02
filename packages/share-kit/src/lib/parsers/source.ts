@@ -46,12 +46,13 @@ export class ParseError extends Error {
 export function decodeEntities(s: string): string {
   return s
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&#x27;/g, "'")
+    // `&amp;` last so e.g. `&amp;lt;` decodes to the literal `&lt;`, not `<`.
+    .replace(/&amp;/g, '&')
 }
 
 /** Word + read-time stats. Detects CJK content and counts characters
@@ -59,8 +60,12 @@ export function decodeEntities(s: string): string {
  *  treats 整段中文 as one "word", which looks silly in the header. */
 export function stats(turns: { body: string }[]): { wordCount: number; readMin: number } {
   const joined = turns.map((t) => t.body).join(' ')
-  const cjk = (joined.match(/[　-鿿가-힯぀-ゟ゠-ヿ]/g) || []).length
-  const latinWords = (joined.replace(/[　-鿿가-힯぀-ゟ゠-ヿ]+/g, ' ').trim().split(/\s+/).filter(Boolean)).length
+  // U+3000–U+9FFF (CJK symbols/punctuation through unified ideographs) plus
+  // Hangul. The old class also listed the Hiragana/Katakana blocks, but those
+  // sit inside U+3000–U+9FFF — pure overlap, same matches, now dropped.
+  const cjkRe = /[　-鿿가-힯]/g
+  const cjk = (joined.match(cjkRe) || []).length
+  const latinWords = (joined.replace(cjkRe, ' ').trim().split(/\s+/).filter(Boolean)).length
   const wordCount = cjk + latinWords
   // Mixed content: weight CJK at 500 chars/min, Latin at 220 wpm
   const cjkMinutes = cjk / 500

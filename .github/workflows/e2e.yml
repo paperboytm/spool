@@ -15,6 +15,10 @@ on:
       - "**/*.md"
       - "docs/**"
 
+# Tests only read the repo; upload-artifact needs no extra scope.
+permissions:
+  contents: read
+
 jobs:
   unit:
     strategy:

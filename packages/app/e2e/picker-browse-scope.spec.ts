@@ -19,7 +19,7 @@ test.beforeAll(async () => {
       // Claude derives a project subdir from the cwd; mirror its convention
       // (replace `/` with `-`) so the synthesized sessions group into a
       // single browseable project.
-      const projectSlug = BIG_PROJECT_DIR.replace(/\//g, '-').replace(/^-/, '-')
+      const projectSlug = BIG_PROJECT_DIR.replace(/\//g, '-')
       const projectDir = join(claudeDir, projectSlug)
       mkdirSync(projectDir, { recursive: true })
       for (let i = 0; i < BIG_PROJECT_SESSION_COUNT; i++) {
