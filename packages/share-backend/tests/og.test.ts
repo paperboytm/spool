@@ -207,7 +207,13 @@ describe('GET /api/og/[id].png', () => {
     const res = await onRequestGet(ctxFor(req, env, { id: `${id}.png` }))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('image/png')
-    expect(res.headers.get('cache-control')).toMatch(/max-age=300/)
+    // Aligned with snapshots/[id].ts so a revoke takes the OG preview
+    // off social platforms on the same timeline as the reader page.
+    const cc = res.headers.get('cache-control') ?? ''
+    expect(cc).toMatch(/max-age=30\b/)
+    expect(cc).toMatch(/s-maxage=30\b/)
+    expect(cc).toMatch(/must-revalidate/)
+    expect(res.headers.get('etag')).toBe(`"${id}-1"`)
   })
 
   it('410 after revoke', async () => {

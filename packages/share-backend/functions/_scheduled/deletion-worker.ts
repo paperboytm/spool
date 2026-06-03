@@ -21,7 +21,22 @@ export type DeletionEnv = {
   OG: R2Bucket
 }
 
+// Bounded window for the R2 orphan sweep — long enough to catch a
+// waitUntil failure that the user wouldn't notice, short enough that the
+// per-cron workload stays predictable. Anything older is assumed already
+// in steady state.
+const ORPHAN_SWEEP_WINDOW_MS = 7 * 24 * 3600 * 1000
+
+// Cap on shares processed per orphan sweep. With a 6h cron this drains
+// up to 2k stale objects/day — far above any realistic v0.5 backlog.
+const ORPHAN_SWEEP_LIMIT = 500
+
 export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<void> {
+  await sweepDeletedUsers(env, now)
+  await sweepOrphanShareAssets(env, now)
+}
+
+async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
   const due = await env.DB.prepare(
     'SELECT user_id FROM deletion_queue WHERE scheduled_at <= ? AND cancelled = 0',
   )
@@ -30,6 +45,18 @@ export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<v
 
   for (const row of due.results) {
     try {
+      // Re-check inside the loop. The outer SELECT might have seen
+      // this user before they POST'd DELETE /api/me/delete; D1 has no
+      // row-level locking. This narrows the race window from "the
+      // whole sweep duration" to "this user's processing time" — still
+      // racy in principle, but ~100x smaller and acceptable for v0.5.
+      const stillDue = await env.DB.prepare(
+        'SELECT 1 FROM deletion_queue WHERE user_id=? AND cancelled=0 AND scheduled_at <= ?',
+      )
+        .bind(row.user_id, now)
+        .first()
+      if (!stillDue) continue
+
       const shares = await env.DB.prepare(
         'SELECT id FROM published_shares WHERE user_id=?',
       )
@@ -64,10 +91,15 @@ export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<v
         )
           .bind(now, row.user_id)
           .run(),
+        // google_sub is replaced with a per-user sentinel so the Google
+        // subject id (PII) no longer maps back to this row. Same sign-in
+        // from the same Google account creates a fresh record instead
+        // of being permanently banned by the deleted row. The sentinel
+        // preserves the UNIQUE constraint without needing a migration.
         env.DB.prepare(
-          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, deleted_at=? WHERE id=?",
+          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, google_sub=?, deleted_at=? WHERE id=?",
         )
-          .bind(now, row.user_id)
+          .bind(`[deleted]-${row.user_id}`, now, row.user_id)
           .run(),
         env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
           .bind(row.user_id)
@@ -78,6 +110,31 @@ export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<v
       console.error('deletion sweep failed for', row.user_id, e)
     }
   }
+}
+
+async function sweepOrphanShareAssets(env: DeletionEnv, now: number): Promise<void> {
+  // The revoke endpoint and the share-expiration path rely on
+  // `waitUntil` to delete R2 objects. If the worker invocation dies
+  // before that runs, the JSON + PNG linger forever — reader still
+  // serves 410 (META gate is fail-closed) but storage accrues. Sweep
+  // recent tombstones idempotently: R2.delete is a no-op when the
+  // object is already gone, so this is cheap to run unconditionally.
+  const cutoff = now - ORPHAN_SWEEP_WINDOW_MS
+  const stale = await env.DB.prepare(
+    `SELECT id FROM published_shares
+       WHERE (revoked_at IS NOT NULL AND revoked_at > ?)
+          OR (expires_at IS NOT NULL AND expires_at <= ? AND revoked_at IS NULL)
+       LIMIT ?`,
+  )
+    .bind(cutoff, now, ORPHAN_SWEEP_LIMIT)
+    .all<{ id: string }>()
+
+  await Promise.all(
+    stale.results.flatMap((s) => [
+      env.SNAPSHOTS.delete(`${s.id}.json`),
+      env.OG.delete(`${s.id}.png`),
+    ]),
+  )
 }
 
 export default {

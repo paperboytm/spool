@@ -5,6 +5,14 @@ import { isValidSlug } from '../../../src/publish/slug'
 
 type Env = { META: KVNamespace; OG: R2Bucket }
 
+// Mirrors snapshots/[id].ts — same 30s window + must-revalidate so the
+// OG preview a social platform shows stops at the same time the JSON
+// reader does after a revoke. Without alignment, the PNG could linger
+// at the edge for 5× longer than the underlying snapshot.
+const OG_CACHE_MAX_AGE_SEC = 30
+const OG_CACHE_HEADER =
+  `public, max-age=${OG_CACHE_MAX_AGE_SEC}, s-maxage=${OG_CACHE_MAX_AGE_SEC}, must-revalidate`
+
 type Meta = {
   owner: string
   visibility: 'unlisted' | 'profile-listed'
@@ -35,7 +43,8 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     return new Response(obj.body as unknown as BodyInit, {
       headers: {
         'content-type': 'image/png',
-        'cache-control': 'public, max-age=300',
+        'cache-control': OG_CACHE_HEADER,
+        etag: `"${id}-${meta.version}"`,
       },
     })
   } catch (e) {
