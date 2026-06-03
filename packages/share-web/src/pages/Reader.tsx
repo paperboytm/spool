@@ -1,6 +1,23 @@
-import { Component, type ReactNode, useEffect, useState } from 'react'
-import { SnapshotReader } from '@spool/share-kit'
+import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
+import {
+  PAPERS,
+  SnapshotReader,
+  TEMPLATE_RATIO,
+  decodeSnapshot,
+} from '@spool/share-kit'
 import type { Snapshot } from '@spool/share-kit'
+
+const DEFAULT_PAPER_HEX = '#FAF7F0'
+
+function paperHexFor(snapshot: Snapshot): string {
+  const { opts } = decodeSnapshot(snapshot)
+  return PAPERS.find((p) => p.id === opts.paper)?.tokens.paper ?? DEFAULT_PAPER_HEX
+}
+
+function naturalWidthFor(snapshot: Snapshot): number {
+  const { opts } = decodeSnapshot(snapshot)
+  return TEMPLATE_RATIO[opts.template].w
+}
 
 import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
 import { reportMailto } from '../lib/mailto'
@@ -73,11 +90,30 @@ export function Reader({ id }: { id: string }) {
   if (state.kind === 'not-found') return <Tombstone reason="not-found" />
   if (state.kind === 'error') return <Tombstone reason="not-found" />
 
+  // Decode the snapshot once so we can size the canvas exactly to the
+  // template's natural width and paint the whole viewport in the same
+  // paper tone the template renders with — no dark gutter on either
+  // side, no mismatched body backdrop.
+  const paperHex = useMemo(() => paperHexFor(state.snapshot), [state.snapshot])
+  const naturalWidth = useMemo(() => naturalWidthFor(state.snapshot), [state.snapshot])
+
+  // Keep the body's chrome bg in sync with the snapshot paper so the
+  // initial paint and any scroll-overshoot area match the template.
+  useEffect(() => {
+    const prev = document.body.style.background
+    document.body.style.background = paperHex
+    return () => {
+      document.body.style.background = prev
+    }
+  }, [paperHex])
+
   return (
-    <div className="reader-canvas">
-      <SnapshotErrorBoundary>
-        <SnapshotReader snapshot={state.snapshot} />
-      </SnapshotErrorBoundary>
+    <div className="reader-canvas" style={{ background: paperHex }}>
+      <div className="reader-paper" style={{ width: naturalWidth }}>
+        <SnapshotErrorBoundary>
+          <SnapshotReader snapshot={state.snapshot} />
+        </SnapshotErrorBoundary>
+      </div>
       <footer className="reader-footer">
         <span>
           <a href={reportMailto(id)} rel="nofollow">
@@ -96,3 +132,4 @@ export function Reader({ id }: { id: string }) {
     </div>
   )
 }
+

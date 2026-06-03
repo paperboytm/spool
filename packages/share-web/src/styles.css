@@ -59,26 +59,22 @@ a:hover {
 }
 
 /* ── Reader canvas ──────────────────────────────────────────────
- * Wraps the SnapshotReader + footer. Templates render at their own
- * natural width (~720px for forum) and bring their own paper /
- * typography — we just need to center the result horizontally and
- * sit it on the shell's dark backdrop so it doesn't stick to the
- * viewport's left edge on wide screens. The shadow makes the cream
- * card feel like it's floating rather than a half-painted wall. */
+ * Wraps the SnapshotReader + footer. Background is set inline by
+ * Reader.tsx to the snapshot's paper tone so the viewport sides never
+ * expose a contrasting backdrop. Content drives the height — no
+ * min-height: 100vh, no big empty space pushing the footer way down
+ * on short conversations. */
 .reader-canvas {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 40px 16px 0;
-  gap: 0;
 }
 
-.reader-canvas > :first-child {
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.1),
-    0 20px 50px rgba(0, 0, 0, 0.08);
-  border-radius: 4px;
+/* The inner wrapper takes an explicit width from Reader.tsx (the
+ * template's natural width). max-width keeps narrow viewports honest;
+ * the template owns the padding inside. */
+.reader-paper {
   max-width: 100%;
 }
 
@@ -103,7 +99,7 @@ a:hover {
   justify-content: center;
   align-items: center;
   gap: 4px;
-  padding: 32px 16px 56px;
+  padding: 20px 16px 32px;
   font-size: 12px;
   color: var(--shell-muted);
 }
