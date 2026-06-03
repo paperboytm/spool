@@ -9,6 +9,7 @@ import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../../src/errors'
 import { isValidSlug } from '../../../src/publish/slug'
+import { checkRate } from '../../../src/rate-limit'
 
 type Env = {
   DB: D1Database
@@ -19,11 +20,25 @@ type Env = {
   RATE: KVNamespace
 }
 
+// Owner-scoped (you can only revoke your own), so the bucket is mostly
+// cost discipline — caps a leaked-token attacker's ability to spin up
+// META/D1/R2 writes in a tight loop. Same hourly shape as publish.
+const REVOKE_RATE_WINDOW_SEC = 3600
+const REVOKE_RATE_MAX = 60
+
 export const onRequestPost: PagesFunction<Env, 'id'> = async (ctx) => {
   try {
     const id = ctx.params.id as string
     if (!isValidSlug(id)) throw new ApiError('NOT_FOUND')
     const user = await requireUser(ctx.request, ctx.env)
+
+    const rate = await checkRate(ctx.env.RATE, {
+      bucket: 'revoke',
+      key: user.id,
+      windowSec: REVOKE_RATE_WINDOW_SEC,
+      max: REVOKE_RATE_MAX,
+    })
+    if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
     const owned = await ctx.env.DB.prepare(
       'SELECT 1 FROM published_shares WHERE id=? AND user_id=?',

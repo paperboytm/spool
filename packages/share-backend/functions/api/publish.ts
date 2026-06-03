@@ -18,7 +18,12 @@ type Env = {
   META: KVNamespace
   RATE: KVNamespace
   SNAPSHOTS: R2Bucket
+  // Origin returned in the published share URL. Dev points this at the
+  // local share-web vite server; prod defaults to spool.pro.
+  PUBLIC_BASE_URL?: string
 }
+
+const DEFAULT_PUBLIC_BASE_URL = 'https://spool.pro'
 
 // Hard cap on the raw request body — 10× the typical session export, low
 // enough that a single user can't fill R2 with a few shares.
@@ -247,6 +252,17 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       }
     }
 
+    // Write audit right after the authoritative D1 mutation so the
+    // evidence row exists even if the downstream META/R2 writes fail
+    // partway. audit() itself writes to D1, so its outcome shares the
+    // same blast radius as the row it's recording.
+    await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
+      user_id: user.id,
+      action: isRepublish ? 'republish' : 'publish',
+      target_id: slug,
+      details: { version, visibility: req.visibility },
+    })
+
     const meta = {
       owner: user.id,
       visibility: req.visibility,
@@ -273,17 +289,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       httpMetadata: { contentType: 'application/json' },
     })
 
-    await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
-      user_id: user.id,
-      action: isRepublish ? 'republish' : 'publish',
-      target_id: slug,
-      details: { version, visibility: req.visibility },
-    })
-
+    const baseUrl = ctx.env.PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL
     return jsonOk({
       id: slug,
       version,
-      url: `https://spool.pro/s/${slug}`,
+      url: `${baseUrl}/s/${slug}`,
     })
   } catch (e) {
     return jsonError(e)

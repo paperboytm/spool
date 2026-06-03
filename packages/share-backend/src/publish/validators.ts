@@ -7,21 +7,43 @@ export const Snapshot = z.object({
     origin_hint: z.string().optional(),
     captured_at: z.iso.datetime(),
   }),
-  conversation: z.object({
-    title: z.string().min(1).max(200),
-    turns: z
-      .array(
-        z.object({
-          id: z.string(),
-          role: z.enum(['user', 'assistant', 'system', 'tool']),
-          content: z.string().max(200_000),
-          redacted: z.boolean().optional(),
-        }),
-      )
-      .max(500),
-    turn_order: z.array(z.string()).max(500),
-    hidden_turns: z.array(z.string()),
-  }),
+  conversation: z
+    .object({
+      title: z.string().min(1).max(200),
+      turns: z
+        .array(
+          z.object({
+            id: z.string(),
+            role: z.enum(['user', 'assistant', 'system', 'tool']),
+            content: z.string().max(200_000),
+            redacted: z.boolean().optional(),
+          }),
+        )
+        .max(500),
+      turn_order: z.array(z.string()).max(500),
+      hidden_turns: z.array(z.string()),
+    })
+    // Reader assumes turn_order indexes every turn exactly once and that
+    // hidden_turns references known turn ids. Without these checks a
+    // malformed snapshot would render an empty / partial reader page
+    // with no clear error.
+    .refine((c) => c.turn_order.length === c.turns.length, {
+      message: 'turn_order length must match turns length',
+      path: ['turn_order'],
+    })
+    .refine(
+      (c) => {
+        const ids = new Set(c.turns.map((t) => t.id))
+        return (
+          c.turn_order.every((id) => ids.has(id)) &&
+          c.hidden_turns.every((id) => ids.has(id))
+        )
+      },
+      {
+        message: 'turn_order/hidden_turns reference an unknown turn id',
+        path: ['turn_order'],
+      },
+    ),
   // editor_opts.template/paper/typeface/colorway are intentionally
   // z.string() (not enums): share-kit ships built-in values but also
   // allows custom ones; the server is the wrong place to gate that.

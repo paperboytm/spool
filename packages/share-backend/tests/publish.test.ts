@@ -326,6 +326,77 @@ describe('POST /api/publish', () => {
     expect(((await res.json()) as { detail: string }).detail).toMatch(/1 year/)
   })
 
+  it('expires_at at the 5-minute / 1-year boundaries: just-below = 422, just-above = 200', async () => {
+    // Pin "now" indirectly: server reads Date.now() once at handler entry,
+    // so we generate offsets relative to the very recent past. The 4-min
+    // candidate is unambiguously inside the floor; the 6-min candidate is
+    // unambiguously outside it; same logic at the 1-year ceiling.
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const now = Date.now()
+    const justBelowFloor = new Date(now + 4 * 60 * 1000).toISOString()
+    const justAboveFloor = new Date(now + 6 * 60 * 1000).toISOString()
+    const justBelowCeiling = new Date(now + (365 * 24 * 3600 - 60) * 1000).toISOString()
+    const justAboveCeiling = new Date(now + (365 * 24 * 3600 + 600) * 1000).toISOString()
+
+    const cases: Array<{ at: string; status: number }> = [
+      { at: justBelowFloor, status: 422 },
+      { at: justAboveFloor, status: 200 },
+      { at: justBelowCeiling, status: 200 },
+      { at: justAboveCeiling, status: 422 },
+    ]
+    for (const c of cases) {
+      const req = authedReq('https://x/api/publish', {
+        snapshot: makeSnapshot(),
+        visibility: 'unlisted',
+        expires_at: c.at,
+      })
+      const res = await invoke(publishPost, req, env)
+      expect(res.status, `expires_at=${c.at}`).toBe(c.status)
+    }
+  })
+
+  it('422 when turn_order length does not match turns count', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const snap = makeSnapshot()
+    // 2 turns but turn_order names 3 entries — reader would render
+    // missing content otherwise.
+    snap.conversation.turn_order = ['t1', 't2', 't3']
+    const req = authedReq('https://x/api/publish', { snapshot: snap, visibility: 'unlisted' })
+    const res = await invoke(publishPost, req, env)
+    expect(res.status).toBe(422)
+    const body = (await res.json()) as { issues: Array<{ message: string }> }
+    expect(body.issues.some((i) => /turn_order/.test(i.message))).toBe(true)
+  })
+
+  it('422 when turn_order references a turn id that does not exist', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const snap = makeSnapshot()
+    snap.conversation.turn_order = ['t1', 'nope']
+    const req = authedReq('https://x/api/publish', { snapshot: snap, visibility: 'unlisted' })
+    const res = await invoke(publishPost, req, env)
+    expect(res.status).toBe(422)
+  })
+
+  it('returns the share URL using PUBLIC_BASE_URL when present', async () => {
+    const env = { ...envFor(), PUBLIC_BASE_URL: 'http://localhost:5173' }
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const req = authedReq('https://x/api/publish', {
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+    })
+    const res = await invoke(publishPost, req, env)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { url: string }
+    expect(body.url).toMatch(/^http:\/\/localhost:5173\/s\//)
+  })
+
   it('happy path: snapshot in R2, KV meta written, D1 row inserted, slug returned', async () => {
     const env = envFor()
     seedUser(env.state)
@@ -565,6 +636,38 @@ describe('republish + revoke', () => {
     expect(res.status).toBe(409)
   })
 
+  it('404 when republishing a slug that is already revoked', async () => {
+    // The SELECT inside publish.ts filters `revoked_at IS NULL`, so a
+    // revoked share looks like "not found" to the republish path even
+    // though the row physically exists. Without this guard a user could
+    // un-tombstone a revoked share by re-asserting it at v(N+1).
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const slug = nanoidSlug()
+    env.state.published_shares.push({
+      id: slug,
+      user_id: 'user-1',
+      title: 'mine',
+      visibility: 'unlisted',
+      expires_at: null,
+      version: 1,
+      published_at: Date.now() - 60_000,
+      republished_at: null,
+      revoked_at: Date.now() - 1000,
+    })
+    const res = await invoke(
+      publishPost,
+      authedReq('https://x/api/publish', {
+        snapshot: makeSnapshot(),
+        visibility: 'unlisted',
+        override_slug: slug,
+      }),
+      env,
+    )
+    expect(res.status).toBe(404)
+  })
+
   it('revoke marks meta + D1 and read returns 410', async () => {
     const env = envFor()
     seedUser(env.state)
@@ -589,6 +692,34 @@ describe('republish + revoke', () => {
     const getReq = new Request(`https://x/api/snapshots/${id}`)
     const getRes = await invoke(snapshotGet, getReq, env, { id })
     expect(getRes.status).toBe(410)
+  })
+
+  it('revoke 429 when the per-user hourly cap is exceeded', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const slug = nanoidSlug()
+    env.state.published_shares.push({
+      id: slug,
+      user_id: 'user-1',
+      title: 'mine',
+      visibility: 'unlisted',
+      expires_at: null,
+      version: 1,
+      published_at: Date.now(),
+      republished_at: null,
+      revoked_at: null,
+    })
+    // Mirror REVOKE_RATE_{WINDOW_SEC,MAX} from revoke/[id].ts.
+    const RATE_WINDOW_SEC = 3600
+    const RATE_MAX = 60
+    const slot = Math.floor(Date.now() / 1000 / RATE_WINDOW_SEC)
+    await env.RATE.put(`rate/revoke/user-1/${slot}`, String(RATE_MAX), {
+      expirationTtl: RATE_WINDOW_SEC * 2,
+    })
+    const req = authedReq(`https://x/api/revoke/${slug}`)
+    const res = await invoke(revokePost, req, env, { id: slug })
+    expect(res.status).toBe(429)
   })
 
   it('revoke 404 when slug is not owned', async () => {
