@@ -91,7 +91,13 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
       action: 'signin.web',
     })
 
-    const headers = new Headers({ Location: next })
+    // safeNext lets through any /-rooted path including UTF-8 characters
+    // (browsers / autocomplete history sometimes inject these). The Fetch
+    // spec wants Location ASCII-only; encode here so the header is RFC-
+    // compliant and workerd stops emitting non-ASCII warnings. encodeURI
+    // preserves the path/query delimiters (`/`, `?`, `&`, `=`), so it's
+    // an idempotent no-op on the common ASCII paths.
+    const headers = new Headers({ Location: encodeURI(next) })
     headers.append('Set-Cookie', buildSessionCookie(sess.token, MAX_TTL_SEC))
     headers.append('Set-Cookie', clearCookie(OAUTH_STATE_COOKIE))
     headers.append('Set-Cookie', clearCookie(OAUTH_VERIFIER_COOKIE))

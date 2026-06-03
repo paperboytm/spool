@@ -271,6 +271,46 @@ describe('GET /api/auth/google/callback', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('ASCII-encodes a non-ASCII next so the Location header is RFC-compliant', async () => {
+    // Browser autocomplete / IME quirks can inject UTF-8 into the next
+    // query param. safeNext only enforces open-redirect rules, so the
+    // cookie carries the raw bytes through to here. The Location header
+    // must be ASCII — encodeURI keeps `/?&=` intact and percent-encodes
+    // the rest.
+    const env = envFor()
+    const id_token = await mintTestJwt(kp, {
+      iss: ISS,
+      aud: WEB_AUD,
+      sub: 'web-sub-utf8',
+      email: 'utf8@example.com',
+      email_verified: true,
+      exp: future(),
+      iat: past(0),
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(tokenExchangeOk(id_token))
+    try {
+      const req = new Request(
+        'https://spool.pro/api/auth/google/callback?code=c&state=S',
+        {
+          headers: {
+            cookie:
+              '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
+          },
+        },
+      )
+      const res = await invoke(callbackGet, req, env)
+      expect(res.status).toBe(302)
+      const loc = res.headers.get('location') ?? ''
+      expect(loc).toBe('/me%E3%80%82%E8%BF%99%E6%AC%A1')
+      // Pure ASCII — no raw UTF-8 bytes left.
+      expect(loc).toMatch(/^[\x00-\x7f]*$/)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
 
 describe('POST /api/auth/sign-out', () => {
