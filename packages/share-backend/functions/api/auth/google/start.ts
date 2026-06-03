@@ -7,8 +7,15 @@ import {
 } from '../../../../src/auth/cookie'
 import { safeNext } from '../../../../src/auth/next'
 import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
+import { publicBaseUrl } from '../../../../src/public-url'
 
-type Env = { GOOGLE_CLIENT_ID_WEB: string }
+type Env = {
+  GOOGLE_CLIENT_ID_WEB: string
+  // Public origin Google must redirect back to — must exactly match the
+  // value registered in the Google client. Defaults to spool.pro; dev
+  // sets it to the share-web origin (e.g. http://localhost:3002).
+  PUBLIC_BASE_URL?: string
+}
 
 // 192 bits of CSRF entropy — orders of magnitude beyond the threat model.
 const STATE_BYTES = 24
@@ -23,7 +30,12 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const verifier = randomUrlSafe(PKCE_VERIFIER_BYTES)
   const challenge = await pkceChallenge(verifier)
 
-  const redirectUri = `${url.origin}/api/auth/google/callback`
+  // redirect_uri MUST come from PUBLIC_BASE_URL, not the request's own
+  // origin: when dev runs through share-web's vite proxy the request
+  // arrives at the backend (8788) but the URI registered with Google is
+  // the share-web origin (3002). Using ctx.request.url here causes a
+  // 400 redirect_uri_mismatch on every dev sign-in.
+  const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/google/callback`
   const auth = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   auth.searchParams.set('client_id', ctx.env.GOOGLE_CLIENT_ID_WEB)
   auth.searchParams.set('redirect_uri', redirectUri)

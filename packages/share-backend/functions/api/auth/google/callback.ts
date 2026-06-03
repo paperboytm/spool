@@ -12,6 +12,7 @@ import { safeNext } from '../../../../src/auth/next'
 import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { audit } from '../../../../src/audit'
 import { ApiError, jsonError } from '../../../../src/errors'
+import { publicBaseUrl } from '../../../../src/public-url'
 import { checkRate } from '../../../../src/rate-limit'
 import { clientIp } from '../../../../src/request'
 import { upsertUserByGoogleSub } from '../../../../src/store/d1'
@@ -22,6 +23,9 @@ type Env = {
   RATE: KVNamespace
   GOOGLE_CLIENT_ID_WEB: string
   GOOGLE_CLIENT_SECRET_WEB: string
+  // Must mirror the same value /api/auth/google/start used so the token
+  // exchange's redirect_uri is bit-identical to the /authorize one.
+  PUBLIC_BASE_URL?: string
 }
 
 // Same shape as the desktop sign-in throttle so a shared NAT can't lock
@@ -51,7 +55,10 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     if (cookieState !== state) throw new ApiError('FORBIDDEN', 'state mismatch')
     const next = safeNext(rawNext)
 
-    const redirectUri = `${url.origin}/api/auth/google/callback`
+    // Must match /api/auth/google/start's redirect_uri exactly. Same
+    // env-var-driven derivation; see public-url.ts for why we don't
+    // use ctx.request.url here.
+    const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/google/callback`
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
