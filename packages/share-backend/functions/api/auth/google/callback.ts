@@ -12,6 +12,8 @@ import { safeNext } from '../../../../src/auth/next'
 import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { audit } from '../../../../src/audit'
 import { ApiError, jsonError } from '../../../../src/errors'
+import { checkRate } from '../../../../src/rate-limit'
+import { clientIp } from '../../../../src/request'
 import { upsertUserByGoogleSub } from '../../../../src/store/d1'
 
 type Env = {
@@ -22,8 +24,21 @@ type Env = {
   GOOGLE_CLIENT_SECRET_WEB: string
 }
 
+// Same shape as the desktop sign-in throttle so a shared NAT can't lock
+// out web users by spamming desktop and vice versa — independent buckets.
+const CALLBACK_RATE_WINDOW_SEC = 60
+const CALLBACK_RATE_MAX = 10
+
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   try {
+    const rate = await checkRate(ctx.env.RATE, {
+      bucket: 'oauth-callback',
+      key: clientIp(ctx.request),
+      windowSec: CALLBACK_RATE_WINDOW_SEC,
+      max: CALLBACK_RATE_MAX,
+    })
+    if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
+
     const url = new URL(ctx.request.url)
     const code = url.searchParams.get('code')
     const state = url.searchParams.get('state')

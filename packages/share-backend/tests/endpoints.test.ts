@@ -215,6 +215,25 @@ describe('GET /api/auth/google/callback', () => {
     expect(res.status).toBe(403)
   })
 
+  it('429 when callback rate limit exceeded', async () => {
+    const env = envFor()
+    // Mirror CALLBACK_RATE_{WINDOW_SEC, MAX} from callback.ts; the bucket
+    // key is `oauth-callback/<ip>`. Pre-fill at MAX so the next request
+    // tips it over.
+    const RATE_WINDOW_SEC = 60
+    const RATE_MAX = 10
+    const slot = Math.floor(Date.now() / 1000 / RATE_WINDOW_SEC)
+    await env.RATE.put(`rate/oauth-callback/8.8.8.8/${slot}`, String(RATE_MAX), {
+      expirationTtl: RATE_WINDOW_SEC * 2,
+    })
+    const req = new Request(
+      'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
+      { headers: { 'CF-Connecting-IP': '8.8.8.8' } },
+    )
+    const res = await invoke(callbackGet, req, env)
+    expect(res.status).toBe(429)
+  })
+
   it('302 + Set-Cookie session on success', async () => {
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
