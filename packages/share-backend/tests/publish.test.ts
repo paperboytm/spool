@@ -15,7 +15,6 @@ const TOKEN = 'p'.repeat(40)
 function seedUser(state: FakeDbState, id = 'user-1'): void {
   state.users.push({
     id,
-    google_sub: `g-${id}`,
     email: `${id}@example.com`,
     name: id,
     avatar_url: null,

@@ -10,6 +10,7 @@ import { requireUser } from '../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../src/errors'
 import { isValidSlug, nanoidSlug } from '../../src/publish/slug'
 import { PublishRequest } from '../../src/publish/validators'
+import { publicBaseUrl } from '../../src/public-url'
 import { checkRate } from '../../src/rate-limit'
 
 type Env = {
@@ -22,8 +23,6 @@ type Env = {
   // local share-web vite server; prod defaults to spool.pro.
   PUBLIC_BASE_URL?: string
 }
-
-const DEFAULT_PUBLIC_BASE_URL = 'https://spool.pro'
 
 // Hard cap on the raw request body — 10× the typical session export, low
 // enough that a single user can't fill R2 with a few shares.
@@ -289,11 +288,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       httpMetadata: { contentType: 'application/json' },
     })
 
-    const baseUrl = ctx.env.PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL
     return jsonOk({
       id: slug,
       version,
-      url: `${baseUrl}/s/${slug}`,
+      url: `${publicBaseUrl(ctx.env)}/s/${slug}`,
     })
   } catch (e) {
     return jsonError(e)
