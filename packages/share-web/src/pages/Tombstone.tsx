@@ -48,7 +48,7 @@ export function Tombstone({ reason, at }: Props) {
           </p>
         )}
         <p className="tombstone-actions">
-          <a href="https://spool.lab" rel="noopener noreferrer">
+          <a href="https://spool.pro" rel="noopener noreferrer">
             Learn about Spool
           </a>
           <span aria-hidden="true"> · </span>
