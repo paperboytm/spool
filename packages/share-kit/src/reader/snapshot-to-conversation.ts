@@ -52,6 +52,22 @@ function safeColorway(raw: string): { id: EditorOpts['colorway']; hex: string } 
   return { id: DEFAULT_OPTS.colorway, hex: DEFAULT_OPTS.accentHex }
 }
 
+// Forum / Letter / Timeline / Chat templates render `conversation.createdAt`
+// verbatim, so we hand them an already-humanised string here rather than a
+// raw ISO timestamp. `toLocaleDateString` without a locale uses the viewer's
+// browser locale; the explicit short-form options keep the result tight
+// (e.g. "Jun 3, 2026") instead of the full numeric "6/3/2026" some locales
+// default to.
+function humanDate(rawIso: string): string {
+  const d = new Date(rawIso)
+  if (isNaN(d.getTime())) return rawIso
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export interface DecodedSnapshot {
   conversation: Conversation
   opts: EditorOpts
@@ -88,7 +104,7 @@ export function decodeSnapshot(snapshot: Snapshot): DecodedSnapshot {
     origin: { kind: 'file', filename: 'snapshot' },
     title: snapshot.conversation.title || 'Untitled',
     shareUrl: null,
-    createdAt: snapshot.source.captured_at || new Date().toISOString(),
+    createdAt: humanDate(snapshot.source.captured_at || new Date().toISOString()),
     wordCount: turns.reduce((acc, t) => acc + t.body.split(/\s+/).filter(Boolean).length, 0),
     readMin: 0,
     turns,
