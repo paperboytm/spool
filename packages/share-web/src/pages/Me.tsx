@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   cancelAccountDeletion,
+  checkHandle,
   claimHandle,
   fetchMe,
   fetchMyShares,
@@ -11,6 +12,14 @@ import {
   type MeResponse,
   type MeShareRow,
 } from '../lib/api'
+
+// Match the server-side handle regex (share-backend/src/handles.ts).
+// We pre-filter input so check requests + the submit button respond
+// to obvious mismatches without a round-trip.
+const HANDLE_NORMALISE = /[^a-z0-9_-]/g
+const HANDLE_MAX_LEN = 32
+const HANDLE_MIN_LEN = 3
+const CHECK_DEBOUNCE_MS = 320
 
 type LoadState =
   | { kind: 'loading' }
@@ -38,27 +47,71 @@ function shareUrl(id: string): string {
   return `${window.location.origin}/s/${encodeURIComponent(id)}`
 }
 
+type HandleAvailability =
+  | { kind: 'idle' }
+  | { kind: 'too-short' }
+  | { kind: 'checking' }
+  | { kind: 'available' }
+  | { kind: 'taken' }
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'error' }
+
 function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [availability, setAvailability] = useState<HandleAvailability>({ kind: 'idle' })
+  // Sequence guards stale debounced responses overwriting fresher ones.
+  const checkSeq = useRef(0)
+
+  // Debounced availability check. Skips the round-trip for inputs that
+  // can't possibly pass server-side validation.
+  useEffect(() => {
+    const handle = value
+    if (handle.length === 0) {
+      setAvailability({ kind: 'idle' })
+      return
+    }
+    if (handle.length < HANDLE_MIN_LEN) {
+      setAvailability({ kind: 'too-short' })
+      return
+    }
+    setAvailability({ kind: 'checking' })
+    const seq = ++checkSeq.current
+    const timer = window.setTimeout(async () => {
+      const r = await checkHandle(handle)
+      if (seq !== checkSeq.current) return
+      setAvailability(r)
+    }, CHECK_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [value])
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (busy) return
+    if (busy || availability.kind !== 'available') return
     setBusy(true)
     setErr(null)
-    const result = await claimHandle(value.trim().toLowerCase())
+    const result = await claimHandle(value)
     setBusy(false)
     if (result.kind === 'ok') {
       onClaimed(result.handle)
       return
     }
-    if (result.kind === 'taken') setErr('That handle is taken.')
-    else if (result.kind === 'invalid') setErr(result.reason)
-    else if (result.kind === 'rate-limited') setErr('Too many attempts — try again tomorrow.')
-    else setErr('Something went wrong.')
+    if (result.kind === 'taken') {
+      setErr('That handle was just taken — try a different one.')
+      setAvailability({ kind: 'taken' })
+    } else if (result.kind === 'invalid') {
+      setErr(result.reason)
+      setAvailability({ kind: 'invalid', reason: result.reason })
+    } else if (result.kind === 'rate-limited') {
+      setErr('Too many attempts — try again tomorrow.')
+    } else {
+      setErr('Something went wrong.')
+    }
   }
+
+  const status = renderAvailability(availability)
+  const submitDisabled = busy || availability.kind !== 'available'
 
   return (
     <form className="me-claim" onSubmit={onSubmit} noValidate>
@@ -69,16 +122,47 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
           autoComplete="off"
           spellCheck={false}
           placeholder="alice"
+          maxLength={HANDLE_MAX_LEN}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) =>
+            setValue(
+              e.target.value.toLowerCase().replace(HANDLE_NORMALISE, '').slice(0, HANDLE_MAX_LEN),
+            )
+          }
         />
       </label>
-      <button type="submit" disabled={busy || value.trim().length === 0}>
+      <button type="submit" disabled={submitDisabled}>
         {busy ? 'Claiming…' : 'Claim'}
       </button>
+      {status && (
+        <p className={`me-handle-status me-handle-status-${status.tone}`} role="status">
+          {status.text}
+        </p>
+      )}
       {err && <p className="me-error" role="alert">{err}</p>}
     </form>
   )
+}
+
+function renderAvailability(
+  a: HandleAvailability,
+): { tone: 'muted' | 'ok' | 'warn'; text: string } | null {
+  switch (a.kind) {
+    case 'idle':
+      return null
+    case 'too-short':
+      return { tone: 'muted', text: `At least ${HANDLE_MIN_LEN} characters.` }
+    case 'checking':
+      return { tone: 'muted', text: 'Checking…' }
+    case 'available':
+      return { tone: 'ok', text: 'Available.' }
+    case 'taken':
+      return { tone: 'warn', text: 'Taken.' }
+    case 'invalid':
+      return { tone: 'warn', text: a.reason }
+    case 'error':
+      return { tone: 'warn', text: 'Could not check right now.' }
+  }
 }
 
 function ShareRow({

@@ -177,6 +177,27 @@ export async function revokeShare(id: string): Promise<RevokeShareResult> {
   }
 }
 
+export type CheckHandleResult =
+  | { kind: 'available' }
+  | { kind: 'taken' }
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'error' }
+
+export async function checkHandle(handle: string): Promise<CheckHandleResult> {
+  try {
+    const r = await fetch(`/api/handles/check?h=${encodeURIComponent(handle)}`, {
+      headers: { accept: 'application/json' },
+    })
+    if (r.status !== 200) return { kind: 'error' }
+    const body = (await r.json()) as { available?: boolean; reason?: string }
+    if (body.available === true) return { kind: 'available' }
+    if (body.reason) return { kind: 'invalid', reason: body.reason }
+    return { kind: 'taken' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
 export async function claimHandle(handle: string): Promise<
   | { kind: 'ok'; handle: string }
   | { kind: 'invalid'; reason: string }

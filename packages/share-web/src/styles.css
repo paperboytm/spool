@@ -351,6 +351,24 @@ a:hover {
   margin: 8px 0 0;
 }
 
+.me-handle-status {
+  font-size: 13px;
+  margin: 8px 0 0;
+  flex-basis: 100%;
+}
+
+.me-handle-status-muted {
+  color: var(--shell-muted);
+}
+
+.me-handle-status-ok {
+  color: color-mix(in srgb, var(--shell-accent) 80%, var(--shell-text));
+}
+
+.me-handle-status-warn {
+  color: var(--shell-error);
+}
+
 .me-share {
   display: flex;
   align-items: center;
@@ -520,4 +538,52 @@ a:hover {
   color: var(--shell-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* ── Narrow viewport adjustments ────────────────────────────────
+ * Cards stop being roomy below ~480px wide. Stack header pieces
+ * vertically so a long name + handle don't crowd the sign-out button,
+ * collapse share-row actions under each share so they don't push the
+ * title off the right edge, and tighten the outer padding. */
+@media (max-width: 480px) {
+  .profile-page,
+  .me-page,
+  .signin-page {
+    padding: 24px 12px;
+  }
+
+  .profile-card,
+  .me-card,
+  .signin-card {
+    padding: 20px;
+  }
+
+  .profile-header,
+  .me-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .me-header .me-signout {
+    margin-left: auto;
+  }
+
+  .me-share {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .me-share-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .me-claim {
+    flex-wrap: wrap;
+  }
+
+  .me-claim button {
+    flex: 1;
+  }
 }
