@@ -33,6 +33,13 @@ interface Env {
   // Standard Pages binding that fetches static assets from the build
   // output. We use it to grab the unmodified index.html shell.
   ASSETS: { fetch: (request: Request) => Promise<Response> }
+  // Origin to call for /api/snapshots. In prod the dispatcher routes
+  // spool.pro/api/* to share-backend, so the default of "same origin
+  // as the incoming request" works. In `wrangler pages dev`, share-web
+  // and share-backend listen on different ports — set this to the
+  // share-backend origin (e.g. http://localhost:8788) via
+  // `--binding API_BASE_URL=...` so the inline fetch finds it.
+  API_BASE_URL?: string
 }
 
 interface SnapshotForOg {
@@ -58,10 +65,11 @@ export const onRequest: PagesFunction<Env, 'id'> = async (ctx) => {
     return passthroughShell(shell, 404)
   }
 
+  const apiBase = ctx.env.API_BASE_URL ?? reqUrl.origin
   let snapStatus = 0
   let title: string | undefined
   try {
-    const snapRes = await fetch(`${reqUrl.origin}/api/snapshots/${id}`)
+    const snapRes = await fetch(`${apiBase}/api/snapshots/${id}`)
     snapStatus = snapRes.status
     if (snapStatus === 200) {
       const snap = (await snapRes.json()) as SnapshotForOg
