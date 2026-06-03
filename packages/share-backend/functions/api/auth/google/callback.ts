@@ -9,7 +9,7 @@ import {
 } from '../../../../src/auth/cookie'
 import { verifyIdToken } from '../../../../src/auth/jwks'
 import { safeNext } from '../../../../src/auth/next'
-import { createSession } from '../../../../src/auth/session'
+import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { audit } from '../../../../src/audit'
 import { ApiError, jsonError } from '../../../../src/errors'
 import { upsertUserByGoogleSub } from '../../../../src/store/d1'
@@ -70,7 +70,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     })
 
     const headers = new Headers({ Location: next })
-    headers.append('Set-Cookie', buildSessionCookie(sess.token, 30 * 24 * 3600))
+    headers.append('Set-Cookie', buildSessionCookie(sess.token, MAX_TTL_SEC))
     headers.append('Set-Cookie', clearCookie(OAUTH_STATE_COOKIE))
     headers.append('Set-Cookie', clearCookie(OAUTH_VERIFIER_COOKIE))
     return new Response(null, { status: 302, headers })

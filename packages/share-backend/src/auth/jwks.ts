@@ -1,5 +1,8 @@
 const JWKS_URI = 'https://www.googleapis.com/oauth2/v3/certs'
 const ALLOWED_ISS = new Set(['https://accounts.google.com', 'accounts.google.com'])
+// Google rotates JWKS infrequently; one hour balances freshness against
+// per-request fetch cost.
+const JWKS_CACHE_TTL_MS = 60 * 60 * 1000
 
 export type Jwk = {
   kid: string
@@ -17,7 +20,7 @@ export function _resetJwksCacheForTests(): void {
 }
 
 async function defaultFetchJwks(): Promise<Jwk[]> {
-  if (cache && Date.now() - cache.fetchedAt < 3600_000) return cache.keys
+  if (cache && Date.now() - cache.fetchedAt < JWKS_CACHE_TTL_MS) return cache.keys
   const r = await fetch(JWKS_URI)
   if (!r.ok) throw new Error(`jwks fetch ${r.status}`)
   const body = (await r.json()) as { keys: Jwk[] }

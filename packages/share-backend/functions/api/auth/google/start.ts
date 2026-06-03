@@ -10,11 +10,17 @@ import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
 
 type Env = { GOOGLE_CLIENT_ID_WEB: string }
 
+// 192 bits of CSRF entropy — orders of magnitude beyond the threat model.
+const STATE_BYTES = 24
+// RFC 7636 §4.1: PKCE verifier must be 43–128 chars after base64url.
+// 64 random bytes → 86 chars, comfortably inside the window.
+const PKCE_VERIFIER_BYTES = 64
+
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   const url = new URL(ctx.request.url)
   const next = safeNext(url.searchParams.get('next'))
-  const state = randomUrlSafe(24)
-  const verifier = randomUrlSafe(64)
+  const state = randomUrlSafe(STATE_BYTES)
+  const verifier = randomUrlSafe(PKCE_VERIFIER_BYTES)
   const challenge = await pkceChallenge(verifier)
 
   const redirectUri = `${url.origin}/api/auth/google/callback`

@@ -2,6 +2,10 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 import { ApiError } from '../errors'
 
+// 16 hex chars = 64 bits of randomness — collision probability is
+// negligible at our user-table scale and the short id reads cleanly.
+const USER_ID_HEX_CHARS = 16
+
 export type UserRow = {
   id: string
   google_sub: string
@@ -34,7 +38,7 @@ export async function upsertUserByGoogleSub(
       .run()
     return { ...existing, email, name, avatar_url: avatar, last_signin_at: now }
   }
-  const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+  const id = crypto.randomUUID().replace(/-/g, '').slice(0, USER_ID_HEX_CHARS)
   await db
     .prepare(
       'INSERT INTO users (id, google_sub, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?,?)',

@@ -18,13 +18,23 @@ type Env = {
 
 type Body = { id_token: string; nonce: string }
 
+// Rate limit: 10 desktop sign-ins per IP per minute. Tight enough to
+// brake brute-force attempts, loose enough that a quick retry after a
+// transient Google failure still goes through. Exported so the test
+// suite can pre-fill the counter without copy-pasting the values.
+export const SIGNIN_RATE_WINDOW_SEC = 60
+export const SIGNIN_RATE_MAX = 10
+// Nonce replay window. Spans the time between desktop minting the
+// nonce + id_token and forwarding to us. 10 minutes is generous.
+const NONCE_TTL_SEC = 10 * 60
+
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const rate = await checkRate(ctx.env.RATE, {
       bucket: 'signin',
       key: clientIp(ctx.request),
-      windowSec: 60,
-      max: 10,
+      windowSec: SIGNIN_RATE_WINDOW_SEC,
+      max: SIGNIN_RATE_MAX,
     })
     if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
@@ -48,7 +58,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       nonce: body.nonce,
     })
 
-    await ctx.env.NONCE.put(usedKey, '1', { expirationTtl: 600 })
+    await ctx.env.NONCE.put(usedKey, '1', { expirationTtl: NONCE_TTL_SEC })
 
     if (!claims.email) throw new ApiError('BAD_REQUEST', 'no email')
     const user = await upsertUserByGoogleSub(

@@ -2,7 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { onRequestGet as callbackGet } from '../functions/api/auth/google/callback'
 import { onRequestGet as startGet } from '../functions/api/auth/google/start'
-import { onRequestPost as signInPost } from '../functions/api/auth/sign-in-with-id-token'
+import {
+  SIGNIN_RATE_MAX,
+  SIGNIN_RATE_WINDOW_SEC,
+  onRequestPost as signInPost,
+} from '../functions/api/auth/sign-in-with-id-token'
 import { onRequestPost as signOutPost } from '../functions/api/auth/sign-out'
 import {
   _resetJwksCacheForTests,
@@ -138,9 +142,13 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       iat: past(0),
       nonce: 'rl',
     })
-    // Pre-fill the rate counter for this IP at the current 60s slot.
-    const slot = Math.floor(Date.now() / 1000 / 60)
-    await env.RATE.put(`rate/signin/9.9.9.9/${slot}`, '10', { expirationTtl: 120 })
+    // Pre-fill the counter at the current window slot so the next request
+    // tips it over. checkRate writes with TTL = windowSec * 2; mirror that
+    // so the seeded row outlives the request under test.
+    const slot = Math.floor(Date.now() / 1000 / SIGNIN_RATE_WINDOW_SEC)
+    await env.RATE.put(`rate/signin/9.9.9.9/${slot}`, String(SIGNIN_RATE_MAX), {
+      expirationTtl: SIGNIN_RATE_WINDOW_SEC * 2,
+    })
     const req = new Request('https://x/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '9.9.9.9' },
