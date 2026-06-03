@@ -8,13 +8,16 @@ import {
 import type { Snapshot } from '@spool/share-kit'
 
 const DEFAULT_PAPER_HEX = '#FAF7F0'
+const DEFAULT_NATURAL_WIDTH = 720
 
-function paperHexFor(snapshot: Snapshot): string {
+function paperHexFor(snapshot: Snapshot | null): string {
+  if (!snapshot) return DEFAULT_PAPER_HEX
   const { opts } = decodeSnapshot(snapshot)
   return PAPERS.find((p) => p.id === opts.paper)?.tokens.paper ?? DEFAULT_PAPER_HEX
 }
 
-function naturalWidthFor(snapshot: Snapshot): number {
+function naturalWidthFor(snapshot: Snapshot | null): number {
+  if (!snapshot) return DEFAULT_NATURAL_WIDTH
   const { opts } = decodeSnapshot(snapshot)
   return TEMPLATE_RATIO[opts.template].w
 }
@@ -62,6 +65,13 @@ function fromFetch(result: SnapshotFetchResult): Exclude<State, { kind: 'loading
 export function Reader({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
 
+  // Pull the active snapshot (or null) into a single value so the hooks
+  // below can run unconditionally — Rules of Hooks require the same
+  // call order on every render, regardless of state.kind.
+  const activeSnapshot = state.kind === 'ok' ? state.snapshot : null
+  const paperHex = useMemo(() => paperHexFor(activeSnapshot), [activeSnapshot])
+  const naturalWidth = useMemo(() => naturalWidthFor(activeSnapshot), [activeSnapshot])
+
   useEffect(() => {
     let cancelled = false
     fetchSnapshot(id).then((result) => {
@@ -79,6 +89,18 @@ export function Reader({ id }: { id: string }) {
     }
   }, [id])
 
+  // Keep the body chrome bg in sync with the active paper so initial
+  // paint and any overscroll area match the template surface. Skips
+  // the assignment when there's no snapshot yet (loading / error).
+  useEffect(() => {
+    if (!activeSnapshot) return
+    const prev = document.body.style.background
+    document.body.style.background = paperHex
+    return () => {
+      document.body.style.background = prev
+    }
+  }, [activeSnapshot, paperHex])
+
   if (state.kind === 'loading') {
     return (
       <main className="reader-loading" aria-busy="true">
@@ -89,23 +111,6 @@ export function Reader({ id }: { id: string }) {
   if (state.kind === 'gone') return <Tombstone reason={state.reason} at={state.at} />
   if (state.kind === 'not-found') return <Tombstone reason="not-found" />
   if (state.kind === 'error') return <Tombstone reason="not-found" />
-
-  // Decode the snapshot once so we can size the canvas exactly to the
-  // template's natural width and paint the whole viewport in the same
-  // paper tone the template renders with — no dark gutter on either
-  // side, no mismatched body backdrop.
-  const paperHex = useMemo(() => paperHexFor(state.snapshot), [state.snapshot])
-  const naturalWidth = useMemo(() => naturalWidthFor(state.snapshot), [state.snapshot])
-
-  // Keep the body's chrome bg in sync with the snapshot paper so the
-  // initial paint and any scroll-overshoot area match the template.
-  useEffect(() => {
-    const prev = document.body.style.background
-    document.body.style.background = paperHex
-    return () => {
-      document.body.style.background = prev
-    }
-  }, [paperHex])
 
   return (
     <div className="reader-canvas" style={{ background: paperHex }}>
