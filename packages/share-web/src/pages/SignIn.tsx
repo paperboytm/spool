@@ -4,6 +4,9 @@
 // nextSafe(); we redefend on the click in case this page is reached
 // directly.
 
+import { useEffect, useState } from 'react'
+
+import { fetchMe } from '../lib/api'
 import { nextSafe } from '../lib/route'
 
 interface Props {
@@ -13,6 +16,37 @@ interface Props {
 export function SignIn({ next }: Props) {
   const safe = nextSafe(next)
   const href = `/api/auth/google/start?next=${encodeURIComponent(safe)}`
+
+  // If the user is already authenticated, bounce straight to next
+  // instead of showing the sign-in pitch — re-clicking "Sign in" would
+  // otherwise create a fresh KV session and orphan the live one for
+  // its full 30-day TTL (web doesn't have the desktop's prior-token
+  // revoke flow). A short 'checking' state avoids flashing the sign-
+  // in card before the redirect lands.
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMe().then((r) => {
+      if (cancelled) return
+      if (r.kind === 'ok') {
+        window.location.replace(safe)
+        return
+      }
+      setChecking(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [safe])
+
+  if (checking) {
+    return (
+      <main className="reader-loading" aria-busy="true">
+        <div className="reader-loading-card">Checking session…</div>
+      </main>
+    )
+  }
 
   return (
     <main className="signin-page">

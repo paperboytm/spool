@@ -83,13 +83,18 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
 
 function ShareRow({
   row,
+  disabled,
   onUnpublish,
 }: {
   row: MeShareRow
-  onUnpublish: (id: string) => Promise<void>
+  /** Block unpublish actions entirely (e.g. account in deletion grace
+   *  period — the backend would 403 anyway). */
+  disabled?: boolean
+  onUnpublish: (id: string) => Promise<{ ok: boolean; reason?: string }>
 }) {
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const revoked = row.revoked_at !== null
   const expiry = formatExpiry(row.expires_at)
 
@@ -104,10 +109,12 @@ function ShareRow({
   }
 
   async function unpublish() {
-    if (busy || revoked) return
+    if (busy || revoked || disabled) return
     setBusy(true)
-    await onUnpublish(row.id)
+    setErr(null)
+    const r = await onUnpublish(row.id)
     setBusy(false)
+    if (!r.ok) setErr(r.reason ?? 'Could not unpublish — try again.')
   }
 
   return (
@@ -121,6 +128,7 @@ function ShareRow({
           {expiry && ` · expires ${expiry}`}
           {revoked && ' · unpublished'}
         </span>
+        {err && <span className="me-share-error" role="alert">{err}</span>}
       </div>
       <div className="me-share-actions">
         <a href={`/s/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer">
@@ -130,7 +138,12 @@ function ShareRow({
           {copied ? 'Copied' : 'Copy link'}
         </button>
         {!revoked && (
-          <button type="button" onClick={unpublish} disabled={busy} className="me-share-danger">
+          <button
+            type="button"
+            onClick={unpublish}
+            disabled={busy || disabled}
+            className="me-share-danger"
+          >
             {busy ? 'Unpublishing…' : 'Unpublish'}
           </button>
         )}
@@ -139,13 +152,29 @@ function ShareRow({
   )
 }
 
-function DeleteAccount() {
+function DeleteAccount({
+  initialPendingUntil,
+  onCancelled,
+}: {
+  /** Epoch-ms — when non-null on mount, /me boots straight into the
+   *  scheduled / "cancel deletion" state instead of "Delete account…".
+   *  Carries the cross-device case where the user scheduled deletion
+   *  from desktop and now opens the web /me to recover. */
+  initialPendingUntil: number | null
+  /** Called after a successful cancel so the parent can clear its own
+   *  banner / re-enable handle claim + unpublish. */
+  onCancelled: () => void
+}) {
   const [state, setState] = useState<
     | { kind: 'idle' }
     | { kind: 'confirming' }
     | { kind: 'scheduled'; at: number }
     | { kind: 'cancelling' }
-  >({ kind: 'idle' })
+  >(
+    initialPendingUntil
+      ? { kind: 'scheduled', at: initialPendingUntil }
+      : { kind: 'idle' },
+  )
 
   async function schedule() {
     const r = await scheduleAccountDeletion()
@@ -155,8 +184,12 @@ function DeleteAccount() {
   async function cancel() {
     setState({ kind: 'cancelling' })
     const ok = await cancelAccountDeletion()
-    if (ok) setState({ kind: 'idle' })
-    else setState({ kind: 'scheduled', at: 0 })
+    if (ok) {
+      setState({ kind: 'idle' })
+      onCancelled()
+    } else {
+      setState({ kind: 'scheduled', at: 0 })
+    }
   }
 
   if (state.kind === 'scheduled' || state.kind === 'cancelling') {
@@ -211,17 +244,23 @@ export function Me() {
   const load = useCallback(async () => {
     // Parallel — shares is owned by /me's session cookie too, so the
     // request still flies in flight even before /me resolves.
-    const [meResult, shares] = await Promise.all([fetchMe(), fetchMyShares()])
-    if (meResult.kind === 'unauthenticated' || meResult.kind === 'forbidden') {
-      // forbidden = account pending deletion; either way send them to
-      // sign-in to recover via a fresh session.
+    const [meResult, sharesResult] = await Promise.all([fetchMe(), fetchMyShares()])
+    if (meResult.kind === 'unauthenticated') {
       window.location.replace('/sign-in?next=/me')
       return
     }
     if (meResult.kind !== 'ok') {
+      // /api/me returns 200 even during the 24h grace window (PR 3
+      // amend opened it for pending-deletion users so the cancel
+      // path stays reachable); any other non-ok is genuine error.
       setState({ kind: 'error' })
       return
     }
+    // Shares endpoint stays locked behind the default requireUser
+    // policy — pending-deletion gets 403, which we treat as "no
+    // shares to show" rather than punting to sign-in. The banner
+    // explains why; the cancel-deletion button is right there.
+    const shares = sharesResult.kind === 'ok' ? sharesResult.shares : []
     setState({ kind: 'ok', me: meResult.me, shares })
   }, [])
 
@@ -230,23 +269,49 @@ export function Me() {
     load()
   }, [load])
 
-  async function onUnpublish(id: string) {
-    const ok = await revokeShare(id)
-    if (!ok) return
-    setState((s) => {
-      if (s.kind !== 'ok') return s
-      return {
-        ...s,
-        shares: s.shares.map((x) =>
-          x.id === id ? { ...x, revoked_at: Date.now() } : x,
-        ),
-      }
-    })
+  async function onUnpublish(id: string): Promise<{ ok: boolean; reason?: string }> {
+    const r = await revokeShare(id)
+    if (r.kind === 'ok') {
+      setState((s) => {
+        if (s.kind !== 'ok') return s
+        return {
+          ...s,
+          shares: s.shares.map((x) =>
+            x.id === id ? { ...x, revoked_at: Date.now() } : x,
+          ),
+        }
+      })
+      return { ok: true }
+    }
+    if (r.kind === 'forbidden') {
+      return { ok: false, reason: 'Your account is pending deletion — cancel it first.' }
+    }
+    if (r.kind === 'rate-limited') {
+      return { ok: false, reason: 'Too many unpublish requests — wait a minute.' }
+    }
+    if (r.kind === 'not-found') {
+      return { ok: false, reason: 'Share not found (already revoked?).' }
+    }
+    return { ok: false, reason: 'Could not unpublish — try again.' }
   }
 
   async function onSignOut() {
     await signOut()
     window.location.assign('/')
+  }
+
+  function onDeletionCancelled(): void {
+    setState((s) =>
+      s.kind === 'ok'
+        ? { ...s, me: { ...s.me, deletion_pending_until: null } }
+        : s,
+    )
+    // Re-fetch shares — they were 403'd while pending; now that the
+    // user cancelled deletion they should reappear.
+    fetchMyShares().then((r) => {
+      if (r.kind !== 'ok') return
+      setState((s) => (s.kind === 'ok' ? { ...s, shares: r.shares } : s))
+    })
   }
 
   if (state.kind === 'loading') {
@@ -269,8 +334,20 @@ export function Me() {
   }
 
   const { me, shares } = state
+  const pendingUntil = me.deletion_pending_until
+  const pending = pendingUntil !== null
   return (
     <main className="me-page">
+      {pending && (
+        <div className="me-banner me-banner-pending" role="alert">
+          <strong>Account deletion is pending.</strong>{' '}
+          {pendingUntil
+            ? `Worker will hard-delete at ${new Date(pendingUntil).toLocaleString()}.`
+            : null}{' '}
+          Cancel deletion in the Danger zone below to restore access.
+        </div>
+      )}
+
       <header className="me-header">
         {me.avatar_url ? <img className="me-avatar" src={me.avatar_url} alt="" /> : null}
         <div className="me-identity">
@@ -287,7 +364,7 @@ export function Me() {
         </button>
       </header>
 
-      {!me.handle && (
+      {!me.handle && !pending && (
         <section className="me-section">
           <HandleClaim
             onClaimed={(handle) =>
@@ -299,12 +376,21 @@ export function Me() {
 
       <section className="me-section">
         <h2 className="me-section-title">Your shares</h2>
-        {shares.length === 0 ? (
+        {pending ? (
+          <p className="me-empty">
+            Hidden while deletion is pending. Cancel deletion to restore the list.
+          </p>
+        ) : shares.length === 0 ? (
           <p className="me-empty">You haven’t published anything yet.</p>
         ) : (
           <ul className="me-share-list">
             {shares.map((row) => (
-              <ShareRow key={row.id} row={row} onUnpublish={onUnpublish} />
+              <ShareRow
+                key={row.id}
+                row={row}
+                disabled={pending}
+                onUnpublish={onUnpublish}
+              />
             ))}
           </ul>
         )}
@@ -312,7 +398,7 @@ export function Me() {
 
       <section className="me-section me-danger-zone">
         <h2 className="me-section-title">Danger zone</h2>
-        <DeleteAccount />
+        <DeleteAccount initialPendingUntil={pendingUntil} onCancelled={onDeletionCancelled} />
       </section>
     </main>
   )

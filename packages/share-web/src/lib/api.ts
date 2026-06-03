@@ -91,6 +91,11 @@ export interface MeResponse {
   name: string | null
   avatar_url: string | null
   handle: string | null
+  /** Epoch-ms when the deletion worker will hard-delete this account;
+   *  null when the account is healthy. Non-null means the user is in
+   *  the 24h grace window — every endpoint except /api/me and the
+   *  DELETE cancel path will 403. */
+  deletion_pending_until: number | null
 }
 
 export interface MeShareRow {
@@ -125,25 +130,50 @@ export async function fetchMe(): Promise<MeFetchResult> {
   }
 }
 
-export async function fetchMyShares(): Promise<MeShareRow[]> {
-  const r = await fetch('/api/me/shares', {
-    headers: { accept: 'application/json' },
-    credentials: 'same-origin',
-  })
-  if (r.status !== 200) return []
-  const body = (await r.json()) as { items: MeShareRow[] }
-  return body.items ?? []
+export type MySharesFetchResult =
+  | { kind: 'ok'; shares: MeShareRow[] }
+  | { kind: 'unauthenticated' }
+  | { kind: 'forbidden' }
+  | { kind: 'error' }
+
+export async function fetchMyShares(): Promise<MySharesFetchResult> {
+  try {
+    const r = await fetch('/api/me/shares', {
+      headers: { accept: 'application/json' },
+      credentials: 'same-origin',
+    })
+    if (r.status === 200) {
+      const body = (await r.json()) as { items: MeShareRow[] }
+      return { kind: 'ok', shares: body.items ?? [] }
+    }
+    if (r.status === 401) return { kind: 'unauthenticated' }
+    if (r.status === 403) return { kind: 'forbidden' }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
 }
 
-export async function revokeShare(id: string): Promise<boolean> {
+export type RevokeShareResult =
+  | { kind: 'ok' }
+  | { kind: 'not-found' }
+  | { kind: 'forbidden' }
+  | { kind: 'rate-limited' }
+  | { kind: 'error' }
+
+export async function revokeShare(id: string): Promise<RevokeShareResult> {
   try {
     const r = await fetch(`/api/revoke/${encodeURIComponent(id)}`, {
       method: 'POST',
       credentials: 'same-origin',
     })
-    return r.ok
+    if (r.status === 200) return { kind: 'ok' }
+    if (r.status === 404) return { kind: 'not-found' }
+    if (r.status === 403) return { kind: 'forbidden' }
+    if (r.status === 429) return { kind: 'rate-limited' }
+    return { kind: 'error' }
   } catch {
-    return false
+    return { kind: 'error' }
   }
 }
 

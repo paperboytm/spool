@@ -385,6 +385,30 @@ a:hover {
   font-size: 12px;
 }
 
+.me-share-error {
+  color: var(--shell-error);
+  font-size: 12px;
+  display: block;
+  margin-top: 4px;
+}
+
+/* ── Me banner (deletion pending) ───────────────────────────── */
+.me-banner {
+  width: 100%;
+  max-width: 560px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.me-banner-pending {
+  background: color-mix(in srgb, var(--shell-error) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--shell-error) 30%, var(--shell-border));
+  color: var(--shell-text);
+}
+
 .me-share-actions {
   display: flex;
   align-items: center;
