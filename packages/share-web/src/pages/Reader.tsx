@@ -74,7 +74,7 @@ export function Reader({ id }: { id: string }) {
   if (state.kind === 'error') return <Tombstone reason="not-found" />
 
   return (
-    <>
+    <div className="reader-canvas">
       <SnapshotErrorBoundary>
         <SnapshotReader snapshot={state.snapshot} />
       </SnapshotErrorBoundary>
@@ -93,6 +93,6 @@ export function Reader({ id }: { id: string }) {
           <a href="/privacy">Privacy</a>
         </span>
       </footer>
-    </>
+    </div>
   )
 }

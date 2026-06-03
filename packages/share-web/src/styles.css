@@ -58,6 +58,30 @@ a:hover {
   color: var(--shell-accent);
 }
 
+/* ── Reader canvas ──────────────────────────────────────────────
+ * Wraps the SnapshotReader + footer. Templates render at their own
+ * natural width (~720px for forum) and bring their own paper /
+ * typography — we just need to center the result horizontally and
+ * sit it on the shell's dark backdrop so it doesn't stick to the
+ * viewport's left edge on wide screens. The shadow makes the cream
+ * card feel like it's floating rather than a half-painted wall. */
+.reader-canvas {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px 0;
+  gap: 0;
+}
+
+.reader-canvas > :first-child {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    0 20px 50px rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  max-width: 100%;
+}
+
 /* ── Reader loading ─────────────────────────────────────────── */
 .reader-loading {
   min-height: 100vh;
