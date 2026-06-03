@@ -1,10 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { onRequestGet as callbackGet } from '../functions/api/auth/google/callback'
+import { onRequestGet as startGet } from '../functions/api/auth/google/start'
+import { onRequestPost as signInPost } from '../functions/api/auth/sign-in-with-id-token'
+import { onRequestPost as signOutPost } from '../functions/api/auth/sign-out'
 import {
   _resetJwksCacheForTests,
   setJwksFetcherForTests,
 } from '../src/auth/jwks'
 
+import { getSetCookies, invoke } from './_helpers/ctx'
 import { makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 import {
   type Keypair,
@@ -47,24 +52,8 @@ function envFor(dbState?: FakeDbState) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ctxFor(req: Request, env: Record<string, unknown>): any {
-  return {
-    request: req,
-    env,
-    next: async () => new Response('not-found', { status: 404 }),
-    params: {},
-    waitUntil: () => undefined,
-    passThroughOnException: () => undefined,
-    data: {},
-  }
-}
-
 describe('POST /api/auth/sign-in-with-id-token', () => {
   it('200 + new user upserted + session token returned', async () => {
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
       iss: ISS,
@@ -83,10 +72,12 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
       body: JSON.stringify({ id_token, nonce: 'n1' }),
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signInPost, req, env)
     expect(res.status).toBe(200)
-    const body = await res.json()
+    const body = (await res.json()) as {
+      session_token: string
+      user: { email: string; name: string }
+    }
     expect(typeof body.session_token).toBe('string')
     expect(body.session_token.length).toBeGreaterThanOrEqual(32)
     expect(body.user.email).toBe('a@example.com')
@@ -101,24 +92,17 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
   })
 
   it('400 when id_token or nonce missing', async () => {
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
     const env = envFor()
     const req = new Request('https://x/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({}),
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signInPost, req, env)
     expect(res.status).toBe(400)
   })
 
   it('403 on nonce replay (same nonce twice)', async () => {
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
       iss: ISS,
@@ -136,18 +120,13 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id_token, nonce: 'replay' }),
       })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const r1 = await (onRequestPost as any)(ctxFor(makeReq(), env))
+    const r1 = await invoke(signInPost, makeReq(), env)
     expect(r1.status).toBe(200)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const r2 = await (onRequestPost as any)(ctxFor(makeReq(), env))
+    const r2 = await invoke(signInPost, makeReq(), env)
     expect(r2.status).toBe(403)
   })
 
   it('429 when rate limit exceeded', async () => {
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
       iss: ISS,
@@ -167,8 +146,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '9.9.9.9' },
       body: JSON.stringify({ id_token, nonce: 'rl' }),
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signInPost, req, env)
     expect(res.status).toBe(429)
   })
 
@@ -176,9 +154,6 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
     // verifyIdToken throws a non-ApiError when aud mismatches, so jsonError
     // wraps it as INTERNAL (500). That is fine — we just verify it does NOT
     // 200, and no user/session is created.
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
       iss: ISS,
@@ -195,8 +170,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id_token, nonce: 'wa' }),
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signInPost, req, env)
     expect(res.status).not.toBe(200)
     expect(env.state.users).toHaveLength(0)
   })
@@ -211,18 +185,15 @@ describe('GET /api/auth/google/callback', () => {
   }
 
   it('400 when state cookie is absent', async () => {
-    const { onRequestGet } = await import('../functions/api/auth/google/callback')
     const env = envFor()
     const req = new Request(
       'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestGet as any)(ctxFor(req, env))
+    const res = await invoke(callbackGet, req, env)
     expect(res.status).toBe(400)
   })
 
   it('403 when state cookie does not match query state', async () => {
-    const { onRequestGet } = await import('../functions/api/auth/google/callback')
     const env = envFor()
     const req = new Request(
       'https://spool.pro/api/auth/google/callback?code=abc&state=fromUrl',
@@ -232,13 +203,11 @@ describe('GET /api/auth/google/callback', () => {
         },
       },
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestGet as any)(ctxFor(req, env))
+    const res = await invoke(callbackGet, req, env)
     expect(res.status).toBe(403)
   })
 
   it('302 + Set-Cookie session on success', async () => {
-    const { onRequestGet } = await import('../functions/api/auth/google/callback')
     const env = envFor()
     const id_token = await mintTestJwt(kp, {
       iss: ISS,
@@ -263,14 +232,10 @@ describe('GET /api/auth/google/callback', () => {
           },
         },
       )
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (onRequestGet as any)(ctxFor(req, env))
+      const res = await invoke(callbackGet, req, env)
       expect(res.status).toBe(302)
       expect(res.headers.get('location')).toBe('/next')
-      const setCookies = res.headers
-        .getSetCookie?.()
-        ?? [res.headers.get('set-cookie') ?? '']
-      const all = setCookies.join('\n')
+      const all = getSetCookies(res).join('\n')
       expect(all).toMatch(/spool_session=/)
       expect(all).toMatch(/HttpOnly/)
       expect(env.state.users).toHaveLength(1)
@@ -283,7 +248,6 @@ describe('GET /api/auth/google/callback', () => {
 
 describe('POST /api/auth/sign-out', () => {
   it('clears KV session and returns a cleared cookie', async () => {
-    const { onRequestPost } = await import('../functions/api/auth/sign-out')
     const env = envFor()
     // Pre-seed a session.
     await env.SESSIONS.put('session/tok-123', JSON.stringify({
@@ -296,8 +260,7 @@ describe('POST /api/auth/sign-out', () => {
       method: 'POST',
       headers: { cookie: 'spool_session=tok-123' },
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signOutPost, req, env)
     expect(res.status).toBe(200)
     expect(await env.SESSIONS.get('session/tok-123')).toBeNull()
     const setCookie = res.headers.get('set-cookie') ?? ''
@@ -306,46 +269,36 @@ describe('POST /api/auth/sign-out', () => {
   })
 
   it('returns ok even with no session cookie', async () => {
-    const { onRequestPost } = await import('../functions/api/auth/sign-out')
     const env = envFor()
     const req = new Request('https://x/api/auth/sign-out', { method: 'POST' })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
+    const res = await invoke(signOutPost, req, env)
     expect(res.status).toBe(200)
   })
 })
 
 describe('start endpoint', () => {
   it('redirects to Google with PKCE challenge and sets both oauth cookies', async () => {
-    const { onRequestGet } = await import('../functions/api/auth/google/start')
     const env = envFor()
     const req = new Request('https://spool.pro/api/auth/google/start?next=/me')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestGet as any)(ctxFor(req, env))
+    const res = await invoke(startGet, req, env)
     expect(res.status).toBe(302)
     const loc = res.headers.get('location') ?? ''
     expect(loc).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/)
     expect(loc).toMatch(/code_challenge_method=S256/)
     expect(loc).toMatch(/scope=openid\+email\+profile/)
-    const setCookies =
-      res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? '']
-    const joined = setCookies.join('\n')
+    const joined = getSetCookies(res).join('\n')
     expect(joined).toMatch(/__spool_oauth_state=/)
     expect(joined).toMatch(/__spool_oauth_verifier=/)
   })
 
   it('coerces an unsafe next param back to /', async () => {
-    const { onRequestGet } = await import('../functions/api/auth/google/start')
     const env = envFor()
     const req = new Request(
       'https://spool.pro/api/auth/google/start?next=//evil.example.com',
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestGet as any)(ctxFor(req, env))
-    const setCookies: string[] =
-      res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? '']
+    const res = await invoke(startGet, req, env)
     const stateCookie =
-      setCookies.find((c: string) => c.includes('__spool_oauth_state=')) ?? ''
+      getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
     // The cookie value is `${state}|${next}`. Ensure the next half is `/`.
     expect(stateCookie).toMatch(/__spool_oauth_state=[^|]+\|\/;/)
   })
