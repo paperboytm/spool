@@ -180,6 +180,25 @@ describe('renderOgPng', () => {
     const longest = Math.max(...m.map((s) => s.length))
     expect(longest).toBeLessThanOrEqual(140)
   })
+
+  it('emits zero whitespace between tags so Satori does not count them as child text nodes', async () => {
+    // workers-og throws `Expected <div> to have explicit "display: flex"
+    // or "display: none" if it has more than one child node` when a
+    // multi-line template literal leaves whitespace between `</div>` and
+    // the next `<div>`. The vitest mock for ImageResponse can't catch
+    // this; assert string-level instead.
+    const { buildOgHtml } = await import('../src/publish/og')
+    const html = buildOgHtml({
+      conversation: { title: 'hello' },
+      publish: { published_at: new Date().toISOString() },
+      editor_opts: { template: 'forum', paper: 'cream', colorway: 'amber' },
+    })
+    expect(html).not.toMatch(/>\s+</)
+    // Sanity: still well-formed and contains the expected pieces.
+    expect(html).toMatch(/^<div /)
+    expect(html).toMatch(/<\/div>$/)
+    expect(html.match(/<div /g)?.length).toBe(4)
+  })
 })
 
 describe('GET /api/og/[id].png', () => {
