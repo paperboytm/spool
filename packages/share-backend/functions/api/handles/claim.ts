@@ -8,14 +8,25 @@ import { checkRate } from '../../../src/rate-limit'
 
 type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace }
 
+// 5 attempts per user per day is enough for a real human exploring
+// available names, far short of bulk squatting.
+const CLAIM_RATE_WINDOW_SEC = 86400
+const CLAIM_RATE_MAX = 5
+
+// SQLite/D1 surface UNIQUE-PK collisions with this string. Stable across
+// D1 versions; the exact prefix is `UNIQUE constraint failed: <table>.<col>`.
+function isUniqueViolation(e: unknown): boolean {
+  return e instanceof Error && /UNIQUE constraint failed/i.test(e.message)
+}
+
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
     const rate = await checkRate(ctx.env.RATE, {
       bucket: 'claim',
       key: user.id,
-      windowSec: 86400,
-      max: 5,
+      windowSec: CLAIM_RATE_WINDOW_SEC,
+      max: CLAIM_RATE_MAX,
     })
     if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
@@ -41,10 +52,18 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     }
 
     if (!existing) {
-      await ctx.env.DB
-        .prepare('INSERT INTO handles (handle, user_id, claimed_at) VALUES (?, ?, ?)')
-        .bind(v.handle, user.id, Date.now())
-        .run()
+      // TOCTOU: a concurrent claim could have raced past the SELECT
+      // above and INSERTed first. Map the PK violation to 409 instead
+      // of letting jsonError surface it as 500 INTERNAL.
+      try {
+        await ctx.env.DB
+          .prepare('INSERT INTO handles (handle, user_id, claimed_at) VALUES (?, ?, ?)')
+          .bind(v.handle, user.id, Date.now())
+          .run()
+      } catch (e) {
+        if (isUniqueViolation(e)) throw new ApiError('CONFLICT', 'handle taken')
+        throw e
+      }
     }
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {

@@ -6,10 +6,15 @@ import { jsonError, jsonOk } from '../../../src/errors'
 
 type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace }
 
+// User-visible grace window between scheduling deletion and the worker
+// actually executing it. Long enough for "I changed my mind" via the
+// DELETE cancel path; short enough that abandoned accounts don't linger.
+const GRACE_PERIOD_MS = 24 * 3600 * 1000
+
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
-    const until = Date.now() + 24 * 3600 * 1000
+    const until = Date.now() + GRACE_PERIOD_MS
     await ctx.env.DB
       .prepare('UPDATE users SET deletion_pending_until=? WHERE id=? AND deleted_at IS NULL')
       .bind(until, user.id)
