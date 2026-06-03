@@ -10,6 +10,15 @@ const TOMBSTONE_HEADERS = {
   'cache-control': 'no-store',
 }
 
+// 30s window keeps CDN cost manageable for viral shares while bounding the
+// post-revoke vulnerability — a panic revoke is fully effective inside
+// half a minute everywhere except in already-loaded browser tabs. The
+// must-revalidate disposition forces shared caches to re-check on next
+// hit instead of refreshing lazily.
+const SNAPSHOT_CACHE_MAX_AGE_SEC = 30
+const SNAPSHOT_CACHE_HEADER =
+  `public, max-age=${SNAPSHOT_CACHE_MAX_AGE_SEC}, s-maxage=${SNAPSHOT_CACHE_MAX_AGE_SEC}, must-revalidate`
+
 type Meta = {
   owner: string
   visibility: 'unlisted' | 'profile-listed'
@@ -46,7 +55,7 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     return new Response(obj.body as unknown as BodyInit, {
       headers: {
         'content-type': 'application/json',
-        'cache-control': 'public, max-age=60, s-maxage=60',
+        'cache-control': SNAPSHOT_CACHE_HEADER,
         etag: `"${id}-${meta.version}"`,
       },
     })

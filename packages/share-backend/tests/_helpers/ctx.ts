@@ -8,9 +8,10 @@ import type { EventContext, PagesFunction } from '@cloudflare/workers-types'
 // the test suite: the global `Request` we construct with `new Request(...)`
 // is structurally compatible with CF's `Request<unknown, CfProperties>`
 // at runtime, but TS treats them as distinct nominal types.
-// The optional `params` arg covers dynamic-segment routes (e.g. the
-// /api/auth/[provider]/start handler reads ctx.params.provider). Plain
-// handlers default to an empty object.
+// The optional `params` arg covers dynamic-segment routes
+// (`/api/snapshots/[id]`, `/api/revoke/[id]`, `/api/auth/[provider]/*`)
+// — Pages picks the segment name off the filename and surfaces it on
+// `ctx.params`. Plain handlers get the default empty object.
 export async function invoke<E>(
   handler: PagesFunction<E>,
   req: Request,

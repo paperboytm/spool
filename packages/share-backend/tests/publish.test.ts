@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
 
+import { onRequestPost as publishPost } from '../functions/api/publish'
+import { onRequestPost as revokePost } from '../functions/api/revoke/[id]'
+import { onRequestGet as snapshotGet } from '../functions/api/snapshots/[id]'
 import type { SessionRecord } from '../src/auth/session'
 import { isValidSlug, nanoidSlug } from '../src/publish/slug'
 
+import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
 const TOKEN = 'p'.repeat(40)
@@ -47,19 +51,6 @@ function envFor(state?: FakeDbState) {
     state: s,
     _snapshots: snapshots.store,
     _og: og.store,
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ctxFor(req: Request, env: Record<string, unknown>, params: Record<string, string> = {}): any {
-  return {
-    request: req,
-    env,
-    next: async () => new Response('not-found', { status: 404 }),
-    params,
-    waitUntil: (p: Promise<unknown>) => { void p },
-    passThroughOnException: () => undefined,
-    data: {},
   }
 }
 
@@ -171,31 +162,28 @@ describe('isValidSlug', () => {
 
 describe('POST /api/publish', () => {
   it('401 when unauthenticated', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     const req = new Request('https://x/api/publish', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ snapshot: makeSnapshot(), visibility: 'unlisted' }),
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(401)
   })
 
   it('422 when payload exceeds 2MB', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
     const big = 'x'.repeat(2 * 1024 * 1024 + 10)
     const req = authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted', _pad: big })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(422)
     expect(((await res.json()) as { detail: string }).detail).toMatch(/too large/)
   })
 
   it('422 + zod issues when snapshot shape is invalid', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -203,14 +191,13 @@ describe('POST /api/publish', () => {
     // Break the schema — title missing.
     delete (bad as { conversation: { title?: string } }).conversation.title
     const req = authedReq('https://x/api/publish', { snapshot: bad, visibility: 'unlisted' })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(422)
     const body = await res.json() as { issues?: unknown[] }
     expect(Array.isArray(body.issues)).toBe(true)
   })
 
   it('accepts content that contains literal credential-looking strings (no server rescan)', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -223,12 +210,11 @@ describe('POST /api/publish', () => {
     ]
     snap.conversation.turn_order = ['t1']
     const req = authedReq('https://x/api/publish', { snapshot: snap, visibility: 'unlisted' })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(200)
   })
 
   it('preserves turns[].redacted informational flag through R2', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -241,7 +227,7 @@ describe('POST /api/publish', () => {
     ]
     snap.conversation.turn_order = ['t1', 't2']
     const req = authedReq('https://x/api/publish', { snapshot: snap, visibility: 'unlisted' })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(200)
     const body = await res.json() as { id: string }
     const stored = env._snapshots.get(`${body.id}.json`)
@@ -254,7 +240,6 @@ describe('POST /api/publish', () => {
   })
 
   it('422 when visibility=profile-listed without a handle', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -262,13 +247,12 @@ describe('POST /api/publish', () => {
       snapshot: makeSnapshot(),
       visibility: 'profile-listed',
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(422)
     expect(((await res.json()) as { detail: string }).detail).toMatch(/handle/)
   })
 
   it('404 when republishing a slug not owned by the user', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -289,27 +273,60 @@ describe('POST /api/publish', () => {
       visibility: 'unlisted',
       override_slug: otherSlug,
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(404)
   })
 
   it('429 when hourly cap is exceeded', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
-    const slot = Math.floor(Date.now() / 1000 / 3600)
-    await env.RATE.put(`rate/publish-h/user-1/${slot}`, '30', { expirationTtl: 3600 * 2 })
+    // Mirror PUBLISH_RATE_HOURLY_{WINDOW_SEC,MAX} from publish.ts.
+    const RATE_WINDOW_SEC = 3600
+    const RATE_MAX = 30
+    const slot = Math.floor(Date.now() / 1000 / RATE_WINDOW_SEC)
+    await env.RATE.put(`rate/publish-h/user-1/${slot}`, String(RATE_MAX), {
+      expirationTtl: RATE_WINDOW_SEC * 2,
+    })
     const req = authedReq('https://x/api/publish', {
       snapshot: makeSnapshot(),
       visibility: 'unlisted',
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(429)
   })
 
+  it('422 when expires_at is already in the past', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const past = new Date(Date.now() - 60_000).toISOString()
+    const req = authedReq('https://x/api/publish', {
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+      expires_at: past,
+    })
+    const res = await invoke(publishPost, req, env)
+    expect(res.status).toBe(422)
+    expect(((await res.json()) as { detail: string }).detail).toMatch(/future/)
+  })
+
+  it('422 when expires_at is more than 1 year out', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const farFuture = new Date(Date.now() + 366 * 24 * 3600 * 1000).toISOString()
+    const req = authedReq('https://x/api/publish', {
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+      expires_at: farFuture,
+    })
+    const res = await invoke(publishPost, req, env)
+    expect(res.status).toBe(422)
+    expect(((await res.json()) as { detail: string }).detail).toMatch(/1 year/)
+  })
+
   it('happy path: snapshot in R2, KV meta written, D1 row inserted, slug returned', async () => {
-    const { onRequestPost } = await import('../functions/api/publish')
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -317,7 +334,7 @@ describe('POST /api/publish', () => {
       snapshot: makeSnapshot(),
       visibility: 'unlisted',
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(200)
     const body = await res.json() as { id: string; version: number; url: string }
     expect(isValidSlug(body.id)).toBe(true)
@@ -338,6 +355,24 @@ describe('POST /api/publish', () => {
     expect(row?.version).toBe(1)
     expect(env.state.audit.some((a) => a.action === 'publish' && a.target_id === body.id)).toBe(true)
   })
+
+  it('does not leak owner_user_id in the public snapshot JSON', async () => {
+    // owner_user_id used to be embedded in the R2 body — a free pivot
+    // point for anyone with a share URL. Author identity now belongs
+    // exclusively to /api/profiles/* (joinable by handle, not by raw id).
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const req = authedReq('https://x/api/publish', {
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+    })
+    const res = await invoke(publishPost, req, env)
+    const body = (await res.json()) as { id: string }
+    const stored = env._snapshots.get(`${body.id}.json`)!
+    const full = JSON.parse(new TextDecoder().decode(stored.bytes)) as Record<string, unknown>
+    expect(full).not.toHaveProperty('owner_user_id')
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────
@@ -346,12 +381,11 @@ describe('POST /api/publish', () => {
 
 describe('GET /api/snapshots/[id]', () => {
   async function publishOne(env: ReturnType<typeof envFor>) {
-    const { onRequestPost } = await import('../functions/api/publish')
     const req = authedReq('https://x/api/publish', {
       snapshot: makeSnapshot(),
       visibility: 'unlisted',
     })
-    const res = await onRequestPost(ctxFor(req, env))
+    const res = await invoke(publishPost, req, env)
     return (await res.json()) as { id: string; version: number }
   }
 
@@ -361,14 +395,28 @@ describe('GET /api/snapshots/[id]', () => {
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
     const { id } = await publishOne(env)
 
-    const { onRequestGet } = await import('../functions/api/snapshots/[id]')
     const req = new Request(`https://x/api/snapshots/${id}`)
-    const res = await onRequestGet(ctxFor(req, env, { id }))
+    const res = await invoke(snapshotGet, req, env, { id })
     expect(res.status).toBe(200)
     expect(res.headers.get('etag')).toBe(`"${id}-1"`)
     const body = await res.json() as { id: string; publish: { version: number } }
     expect(body.id).toBe(id)
     expect(body.publish.version).toBe(1)
+  })
+
+  it('sets a short, must-revalidate cache so revokes propagate within 30s', async () => {
+    // Reader CDN entry MUST expire fast enough that a panic revoke isn't
+    // stuck behind a long shared cache. 30s is the agreed budget.
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env)
+    const req = new Request(`https://x/api/snapshots/${id}`)
+    const res = await invoke(snapshotGet, req, env, { id })
+    const cc = res.headers.get('cache-control') ?? ''
+    expect(cc).toMatch(/max-age=30\b/)
+    expect(cc).toMatch(/s-maxage=30\b/)
+    expect(cc).toMatch(/must-revalidate/)
   })
 
   it('410 + tombstone JSON after revoke', async () => {
@@ -383,9 +431,8 @@ describe('GET /api/snapshots/[id]', () => {
     m.revoked_at = Date.now()
     await env.META.put(`meta/${id}`, JSON.stringify(m))
 
-    const { onRequestGet } = await import('../functions/api/snapshots/[id]')
     const req = new Request(`https://x/api/snapshots/${id}`)
-    const res = await onRequestGet(ctxFor(req, env, { id }))
+    const res = await invoke(snapshotGet, req, env, { id })
     expect(res.status).toBe(410)
     const body = await res.json() as { revoked: boolean; at: number }
     expect(body.revoked).toBe(true)
@@ -394,9 +441,8 @@ describe('GET /api/snapshots/[id]', () => {
 
   it('404 for badly shaped slug', async () => {
     const env = envFor()
-    const { onRequestGet } = await import('../functions/api/snapshots/[id]')
     const req = new Request('https://x/api/snapshots/not-a-slug')
-    const res = await onRequestGet(ctxFor(req, env, { id: 'not-a-slug' }))
+    const res = await invoke(snapshotGet, req, env, { id: 'not-a-slug' })
     expect(res.status).toBe(404)
   })
 
@@ -409,9 +455,8 @@ describe('GET /api/snapshots/[id]', () => {
     m.expires_at = Date.now() - 1000
     await env.META.put(`meta/${id}`, JSON.stringify(m))
 
-    const { onRequestGet } = await import('../functions/api/snapshots/[id]')
     const req = new Request(`https://x/api/snapshots/${id}`)
-    const res = await onRequestGet(ctxFor(req, env, { id }))
+    const res = await invoke(snapshotGet, req, env, { id })
     expect(res.status).toBe(410)
     const body = await res.json() as { expired: boolean }
     expect(body.expired).toBe(true)
@@ -428,24 +473,25 @@ describe('republish + revoke', () => {
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
 
-    const { onRequestPost: publish } = await import('../functions/api/publish')
-    const firstRes = await publish(ctxFor(
+    const firstRes = await invoke(
+      publishPost,
       authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
       env,
-    ))
+    )
     const first = await firstRes.json() as { id: string; version: number }
     expect(first.version).toBe(1)
 
     const updated = makeSnapshot()
     updated.conversation.title = 'Edited title'
-    const secondRes = await publish(ctxFor(
+    const secondRes = await invoke(
+      publishPost,
       authedReq('https://x/api/publish', {
         snapshot: updated,
         visibility: 'unlisted',
         override_slug: first.id,
       }),
       env,
-    ))
+    )
     const second = await secondRes.json() as { id: string; version: number }
     expect(second.id).toBe(first.id)
     expect(second.version).toBe(2)
@@ -471,20 +517,67 @@ describe('republish + revoke', () => {
     expect(env.state.audit.filter((a) => a.action === 'republish').length).toBe(1)
   })
 
+  it('409 when a concurrent republish bumps version before the UPDATE lands', async () => {
+    // Reproduces the SELECT-then-UPDATE race: the handler reads version=1,
+    // computes v=2, and tries to write WHERE version=1. Another worker
+    // landed a republish first (version is now 2) → UPDATE matches 0 rows
+    // → optimistic-concurrency check turns it into 409 instead of silently
+    // clobbering the winner.
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+
+    const firstRes = await invoke(
+      publishPost,
+      authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
+      env,
+    )
+    const first = await firstRes.json() as { id: string }
+
+    // Force the WHERE version=? clause to miss by mutating the stored
+    // row's version *after* the seeded SELECT path would observe v=1.
+    // Real-D1: a concurrent UPDATE landed in the same window. Test-D1:
+    // we just intercept the UPDATE to return changes=0.
+    const realPrepare = env.DB.prepare.bind(env.DB)
+    const intercept = (sql: string) => {
+      const stmt = realPrepare(sql)
+      if (/^UPDATE published_shares SET title=\?, visibility=\?/i.test(sql)) {
+        return {
+          bind: () => ({
+            run: async () => ({ success: true, meta: { changes: 0 } }),
+          }),
+        } as unknown as ReturnType<typeof realPrepare>
+      }
+      return stmt
+    }
+    ;(env.DB as unknown as { prepare: typeof realPrepare }).prepare =
+      intercept as unknown as typeof realPrepare
+
+    const res = await invoke(
+      publishPost,
+      authedReq('https://x/api/publish', {
+        snapshot: makeSnapshot(),
+        visibility: 'unlisted',
+        override_slug: first.id,
+      }),
+      env,
+    )
+    expect(res.status).toBe(409)
+  })
+
   it('revoke marks meta + D1 and read returns 410', async () => {
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
-    const { onRequestPost: publish } = await import('../functions/api/publish')
-    const pRes = await publish(ctxFor(
+    const pRes = await invoke(
+      publishPost,
       authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
       env,
-    ))
+    )
     const { id } = await pRes.json() as { id: string }
 
-    const { onRequestPost: revoke } = await import('../functions/api/revoke/[id]')
     const revokeReq = authedReq(`https://x/api/revoke/${id}`)
-    const revokeRes = await revoke(ctxFor(revokeReq, env, { id }))
+    const revokeRes = await invoke(revokePost, revokeReq, env, { id })
     expect(revokeRes.status).toBe(200)
 
     const row = env.state.published_shares.find((s) => s.id === id)
@@ -493,9 +586,8 @@ describe('republish + revoke', () => {
     expect(typeof meta.revoked_at).toBe('number')
     expect(env.state.audit.some((a) => a.action === 'revoke' && a.target_id === id)).toBe(true)
 
-    const { onRequestGet } = await import('../functions/api/snapshots/[id]')
     const getReq = new Request(`https://x/api/snapshots/${id}`)
-    const getRes = await onRequestGet(ctxFor(getReq, env, { id }))
+    const getRes = await invoke(snapshotGet, getReq, env, { id })
     expect(getRes.status).toBe(410)
   })
 
@@ -516,9 +608,8 @@ describe('republish + revoke', () => {
       republished_at: null,
       revoked_at: null,
     })
-    const { onRequestPost: revoke } = await import('../functions/api/revoke/[id]')
     const req = authedReq(`https://x/api/revoke/${otherSlug}`)
-    const res = await revoke(ctxFor(req, env, { id: otherSlug }))
+    const res = await invoke(revokePost, req, env, { id: otherSlug })
     expect(res.status).toBe(404)
   })
 })

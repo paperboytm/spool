@@ -20,7 +20,22 @@ type Env = {
   SNAPSHOTS: R2Bucket
 }
 
+// Hard cap on the raw request body — 10× the typical session export, low
+// enough that a single user can't fill R2 with a few shares.
 const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
+
+// Per-user publish throttles. The hourly bucket brakes runaway scripts,
+// the daily bucket caps overall storage growth per user.
+const PUBLISH_RATE_HOURLY_WINDOW_SEC = 3600
+const PUBLISH_RATE_HOURLY_MAX = 30
+const PUBLISH_RATE_DAILY_WINDOW_SEC = 86400
+const PUBLISH_RATE_DAILY_MAX = 100
+
+// expires_at must be ≥ 5 minutes out (clock skew tolerance, blocks
+// instantly-tombstoned publishes) and ≤ 1 year (matches the design
+// retention policy; long enough for any practical share lifetime).
+const MIN_EXPIRES_OFFSET_MS = 5 * 60 * 1000
+const MAX_EXPIRES_OFFSET_MS = 365 * 24 * 3600 * 1000
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
@@ -29,15 +44,15 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const hourly = await checkRate(ctx.env.RATE, {
       bucket: 'publish-h',
       key: user.id,
-      windowSec: 3600,
-      max: 30,
+      windowSec: PUBLISH_RATE_HOURLY_WINDOW_SEC,
+      max: PUBLISH_RATE_HOURLY_MAX,
     })
     if (!hourly.ok) throw new ApiError('TOO_MANY_REQUESTS')
     const daily = await checkRate(ctx.env.RATE, {
       bucket: 'publish-d',
       key: user.id,
-      windowSec: 86400,
-      max: 100,
+      windowSec: PUBLISH_RATE_DAILY_WINDOW_SEC,
+      max: PUBLISH_RATE_DAILY_MAX,
     })
     if (!daily.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
@@ -58,6 +73,17 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       })
     }
     const req = parsed.data
+
+    const now = Date.now()
+    const expiresAtMs = req.expires_at ? new Date(req.expires_at).getTime() : null
+    if (expiresAtMs !== null) {
+      if (expiresAtMs < now + MIN_EXPIRES_OFFSET_MS) {
+        throw new ApiError('UNPROCESSABLE', 'expires_at must be in the future')
+      }
+      if (expiresAtMs > now + MAX_EXPIRES_OFFSET_MS) {
+        throw new ApiError('UNPROCESSABLE', 'expires_at cannot be more than 1 year out')
+      }
+    }
 
     if (req.visibility === 'profile-listed') {
       const h = await ctx.env.DB.prepare(
@@ -103,6 +129,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const isRepublish = !!req.override_slug
     let slug: string
     let version: number
+    let priorVersion: number | null = null
     if (isRepublish) {
       if (!isValidSlug(req.override_slug!)) throw new ApiError('BAD_REQUEST', 'bad slug')
       // Read draft_id alongside version so we can reject a republish
@@ -122,63 +149,68 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         throw new ApiError('BAD_REQUEST', 'draft_id does not match slug')
       }
       slug = req.override_slug!
+      priorVersion = owned.version
       version = owned.version + 1
     } else {
       slug = nanoidSlug()
       version = 1
     }
 
-    const publishedAt = new Date().toISOString()
-    const fullSnap = {
-      ...req.snapshot,
-      id: slug,
-      owner_user_id: user.id,
-      publish: {
-        visibility: req.visibility,
-        expires_at: req.expires_at,
-        published_at: publishedAt,
-        version,
-      },
-    }
-    await ctx.env.SNAPSHOTS.put(`${slug}.json`, JSON.stringify(fullSnap), {
-      httpMetadata: { contentType: 'application/json' },
-    })
-
-    const meta = {
-      owner: user.id,
-      visibility: req.visibility,
-      expires_at: req.expires_at ? new Date(req.expires_at).getTime() : null,
-      revoked_at: null as number | null,
-      version,
-    }
-    await ctx.env.META.put(`meta/${slug}`, JSON.stringify(meta))
-
-    const now = Date.now()
+    // Write order is deliberate: D1 → META (KV) → R2. The D1 row is the
+    // single source of truth for "this slug exists and the user owns it";
+    // until it's in place the user has no way to see or revoke the share.
+    // KV is the tombstone gate and R2 the bulk body. Partial failures
+    // after this point are user-recoverable (republish refreshes both),
+    // whereas a public R2 object without a D1 row would be an orphan the
+    // owner doesn't even know about.
     if (isRepublish) {
-      await ctx.env.DB.prepare(
-        'UPDATE published_shares SET title=?, visibility=?, expires_at=?, version=?, republished_at=? WHERE id=?',
-      )
-        .bind(
-          req.snapshot.conversation.title,
-          req.visibility,
-          meta.expires_at,
-          version,
-          now,
-          slug,
+      // Optimistic-concurrency guard against a concurrent republish on the
+      // same row: scope the UPDATE to the version we just SELECTed. If a
+      // racing writer landed first, meta.changes will be 0 and we surface
+      // CONFLICT instead of silently overwriting their result.
+      // We also write draft_id on every republish to heal pre-existing
+      // rows that landed before the column was added, and write the new
+      // idempotency token so future retries hit the short-circuit above.
+      try {
+        const result = await ctx.env.DB.prepare(
+          'UPDATE published_shares SET title=?, visibility=?, expires_at=?, version=?, republished_at=?, draft_id=?, client_request_id=? WHERE id=? AND user_id=? AND version=?',
         )
-        .run()
+          .bind(
+            req.snapshot.conversation.title,
+            req.visibility,
+            expiresAtMs,
+            version,
+            now,
+            req.draft_id,
+            req.idempotency_key,
+            slug,
+            user.id,
+            priorVersion!,
+          )
+          .run()
+        if (result.meta.changes === 0) {
+          throw new ApiError('CONFLICT', 'concurrent republish — please retry')
+        }
+      } catch (updateErr) {
+        if (updateErr instanceof ApiError) throw updateErr
+        // The (user_id, client_request_id) unique index covers live rows.
+        // It can fire on republish only when the *same user* has another
+        // live share whose token also happens to equal this republish's
+        // token — i.e. two distinct drafts whose snapshot+visibility+
+        // expires hash to the same content. Vanishingly rare in practice
+        // (copy-pasted draft body across two share entries), but we
+        // translate it into 409 instead of 500 so the renderer can
+        // surface "edit your content or unpublish the other share".
+        const msg = updateErr instanceof Error ? updateErr.message : String(updateErr)
+        if (/UNIQUE constraint/i.test(msg)) {
+          throw new ApiError('CONFLICT', 'another live share carries the same idempotency token; edit content or revoke the other share')
+        }
+        throw updateErr
+      }
     } else {
-      await ctx.env.DB.prepare(
-        'INSERT INTO published_shares (id, user_id, title, visibility, expires_at, version, published_at) VALUES (?,?,?,?,?,?,?)',
-      )
-        .bind(
-          slug,
-          user.id,
-          req.snapshot.conversation.title,
-          req.visibility,
-          meta.expires_at,
-          version,
-          now,
+      try {
+        await ctx.env.DB.prepare(
+          'INSERT INTO published_shares (id, user_id, title, visibility, expires_at, version, published_at, draft_id, client_request_id) VALUES (?,?,?,?,?,?,?,?,?)',
         )
           .bind(
             slug,
@@ -214,6 +246,32 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         })
       }
     }
+
+    const meta = {
+      owner: user.id,
+      visibility: req.visibility,
+      expires_at: expiresAtMs,
+      revoked_at: null as number | null,
+      version,
+    }
+    await ctx.env.META.put(`meta/${slug}`, JSON.stringify(meta))
+
+    // Drop owner_user_id from the public JSON: reader doesn't need it, and
+    // exposing the internal id lets anyone with a share URL pivot to a
+    // user enumeration vector. Author identity belongs in /api/profiles/*.
+    const fullSnap = {
+      ...req.snapshot,
+      id: slug,
+      publish: {
+        visibility: req.visibility,
+        expires_at: req.expires_at,
+        published_at: new Date(now).toISOString(),
+        version,
+      },
+    }
+    await ctx.env.SNAPSHOTS.put(`${slug}.json`, JSON.stringify(fullSnap), {
+      httpMetadata: { contentType: 'application/json' },
+    })
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,
