@@ -22,7 +22,6 @@ function seedUser(
 ): FakeDbState['users'][number] {
   const user = {
     id: 'user-1',
-    google_sub: 'g-sub-1',
     email: 'a@example.com',
     name: 'Alice',
     avatar_url: 'https://x/a.png',
@@ -114,7 +113,7 @@ describe('requireUser', () => {
   it('bearer takes precedence over cookie', async () => {
     const env = envFor()
     seedUser(env.state, { id: 'user-bearer' })
-    seedUser(env.state, { id: 'user-cookie', google_sub: 'g-sub-2', email: 'c@c' })
+    seedUser(env.state, { id: 'user-cookie', email: 'c@c' })
     const bearerToken = 'b'.repeat(40)
     const cookieToken = 'c'.repeat(40)
     await seedSession(env.SESSIONS, bearerToken, 'user-bearer')
@@ -340,6 +339,7 @@ describe('GET /api/me', () => {
       name: 'Alice',
       avatar_url: 'https://x/a.png',
       handle: null,
+      deletion_pending_until: null,
     })
   })
 
@@ -364,6 +364,21 @@ describe('GET /api/me', () => {
     const req = new Request('https://x/api/me')
     const res = await invoke(meGet, req, env)
     expect(res.status).toBe(401)
+  })
+
+  it('200 (not 403) when deletion is pending, surfaces deletion_pending_until', async () => {
+    // Cross-device case: the user scheduled deletion on web, then opened
+    // the desktop app. /api/me must still answer so the app can render
+    // the Cancel-deletion CTA — every other endpoint stays locked.
+    const env = envFor()
+    const pendingUntil = Date.now() + 12 * 3600 * 1000
+    seedUser(env.state, { deletion_pending_until: pendingUntil })
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const req = authedReq('https://x/api/me')
+    const res = await invoke(meGet, req, env)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { deletion_pending_until: number | null }
+    expect(body.deletion_pending_until).toBe(pendingUntil)
   })
 })
 
