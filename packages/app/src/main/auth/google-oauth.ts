@@ -17,6 +17,8 @@ export interface SignInResult {
     name: string | null
     avatar_url: string | null
     handle?: string | null
+    /** Epoch-ms when worker will hard-delete; null when account is healthy. */
+    deletion_pending_until?: number | null
   }
 }
 

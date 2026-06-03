@@ -6,6 +6,10 @@ export type ShareAuthUser = {
   name: string | null
   avatar_url: string | null
   handle: string | null
+  /** Epoch-ms when worker will hard-delete this account; null when healthy.
+   *  Non-null means the user is in the 24h grace window and every endpoint
+   *  except /api/me + cancel-deletion will 403. */
+  deletion_pending_until: number | null
 } | null
 
 // Cross-component auth state broadcast. Without this, two surfaces
