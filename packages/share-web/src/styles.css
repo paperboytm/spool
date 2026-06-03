@@ -306,6 +306,9 @@ a:hover {
   display: flex;
   gap: 8px;
   align-items: flex-end;
+  /* status + error messages flex-basis to 100% to drop onto a new row
+   * below the input/button instead of squeezing them. */
+  flex-wrap: wrap;
 }
 
 .me-claim label {
