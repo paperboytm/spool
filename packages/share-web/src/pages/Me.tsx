@@ -342,7 +342,7 @@ export function Me() {
         <div className="me-banner me-banner-pending" role="alert">
           <strong>Account deletion is pending.</strong>{' '}
           {pendingUntil
-            ? `Worker will hard-delete at ${new Date(pendingUntil).toLocaleString()}.`
+            ? `Scheduled for ${new Date(pendingUntil).toLocaleString()}.`
             : null}{' '}
           Cancel deletion in the Danger zone below to restore access.
         </div>
