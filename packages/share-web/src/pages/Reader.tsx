@@ -1,10 +1,34 @@
-import { useEffect, useState } from 'react'
+import { Component, type ReactNode, useEffect, useState } from 'react'
 import { SnapshotReader } from '@spool/share-kit'
 import type { Snapshot } from '@spool/share-kit'
 
 import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
 import { reportMailto } from '../lib/mailto'
 import { Tombstone } from './Tombstone'
+
+// Defensive boundary around SnapshotReader. Server-validated JSON in
+// theory cannot reach us with shape mismatches, but a future template
+// regression or a content-driven render edge case shouldn't blank the
+// page silently — show the same tombstone the user would see for a
+// 404 / network error.
+class SnapshotErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  override state = { failed: false }
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
+  }
+  override componentDidCatch(error: Error): void {
+    // Logs to the browser console only; we don't have a remote logger
+    // in v0.5 share-web.
+    console.error('Reader render crash:', error)
+  }
+  override render(): ReactNode {
+    if (this.state.failed) return <Tombstone reason="not-found" />
+    return this.props.children
+  }
+}
 
 type State =
   | { kind: 'loading' }
@@ -51,7 +75,9 @@ export function Reader({ id }: { id: string }) {
 
   return (
     <>
-      <SnapshotReader snapshot={state.snapshot} />
+      <SnapshotErrorBoundary>
+        <SnapshotReader snapshot={state.snapshot} />
+      </SnapshotErrorBoundary>
       <footer className="reader-footer">
         <span>
           <a href={reportMailto(id)} rel="nofollow">
