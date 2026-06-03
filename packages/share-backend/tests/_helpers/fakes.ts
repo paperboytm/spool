@@ -396,22 +396,14 @@ export function makeDb(state: FakeDbState = emptyState()): {
           for (const s of state.published_shares) {
             if (s.user_id === user_id && s.revoked_at === null) s.revoked_at = revoked_at
           }
-<<<<<<< HEAD
           return { success: true, meta: { changes: 1 } }
-=======
-          return { success: true }
->>>>>>> b14193ff (feat(share-backend): OG image + scheduled deletion worker)
         }
         if (/^UPDATE handles SET released_at=\? WHERE user_id=\? AND released_at IS NULL/i.test(sql)) {
           const [released_at, user_id] = params as [number, string]
           for (const h of state.handles) {
             if (h.user_id === user_id && h.released_at === null) h.released_at = released_at
           }
-<<<<<<< HEAD
           return { success: true, meta: { changes: 1 } }
-=======
-          return { success: true }
->>>>>>> b14193ff (feat(share-backend): OG image + scheduled deletion worker)
         }
         if (/^UPDATE users SET email='\[deleted\]', name=NULL, avatar_url=NULL, deleted_at=\? WHERE id=\?/i.test(sql)) {
           const [deleted_at, id] = params as [number, string]
@@ -422,21 +414,13 @@ export function makeDb(state: FakeDbState = emptyState()): {
             u.avatar_url = null
             u.deleted_at = deleted_at
           }
-<<<<<<< HEAD
           return { success: true, meta: { changes: 1 } }
-=======
-          return { success: true }
->>>>>>> b14193ff (feat(share-backend): OG image + scheduled deletion worker)
         }
         if (/^DELETE FROM deletion_queue WHERE user_id=\?/i.test(sql)) {
           const [user_id] = params as [string]
           const idx = state.deletion_queue.findIndex((r) => r.user_id === user_id)
           if (idx >= 0) state.deletion_queue.splice(idx, 1)
-<<<<<<< HEAD
           return { success: true, meta: { changes: 1 } }
-=======
-          return { success: true }
->>>>>>> b14193ff (feat(share-backend): OG image + scheduled deletion worker)
         }
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
@@ -455,7 +439,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .map((s) => ({ id: s.id }))
           return { results: items as T[] }
         }
-<<<<<<< HEAD
         if (/^SELECT id FROM published_shares\s+WHERE \(revoked_at IS NOT NULL AND revoked_at > \?\)\s+OR \(expires_at IS NOT NULL AND expires_at <= \? AND revoked_at IS NULL\)\s+LIMIT \?/i.test(sql)) {
           const [revokedCutoff, expiresCutoff, limit] = params as [number, number, number]
           const items = state.published_shares
@@ -486,8 +469,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }))
           return { results: items as T[] }
         }
-=======
->>>>>>> b14193ff (feat(share-backend): OG image + scheduled deletion worker)
         if (/^SELECT id, title, visibility, expires_at, version, published_at, republished_at, revoked_at, draft_id, client_request_id FROM published_shares WHERE user_id=\? ORDER BY published_at DESC/i.test(sql)) {
           const [uid] = params as [string]
           const items = state.published_shares
