@@ -24,12 +24,20 @@ export default function SettingsAccount() {
 
   // Reset the handle draft whenever the signed-in identity changes so the
   // claim input doesn't carry a stale value across account switches.
+  // Deletion status is seeded from the server-side `deletion_pending_until`
+  // so the Cancel CTA shows up when the user scheduled deletion from a
+  // different device — otherwise this surface would look idle and the
+  // user couldn't recover within the grace window.
   useEffect(() => {
     setHandleDraft('')
     setHandleStatus('idle')
     setShowDeleteConfirm(false)
-    setDeletionStatus({ kind: 'idle' })
-  }, [user?.id])
+    setDeletionStatus(
+      user?.deletion_pending_until
+        ? { kind: 'pending', executeAt: user.deletion_pending_until }
+        : { kind: 'idle' },
+    )
+  }, [user?.id, user?.deletion_pending_until])
 
   if (loading) return null
 
