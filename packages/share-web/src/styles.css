@@ -1,249 +1,445 @@
-/* Minimal chrome for the spool.pro web reader.
- * Templates render their own paper/typography via inline styles, so
- * this file only covers the surrounding shell — body reset, the loading
- * card, tombstone, and reader footer.
- *
- * CSP note: no @font-face / @import rules pointing at external origins.
- * Geist / system stacks are referenced by name only; if the user lacks
- * Geist installed the stack falls back to system-ui which is fine for
- * tombstone copy. The template content surface owns its own fonts via
- * the share-kit components and Vite-bundled CSS variables. */
-
-:root {
-  --shell-bg: #f4efe6;
-  --shell-text: #2a2620;
-  --shell-muted: #6f6757;
-  --shell-card: #faf7ef;
-  --shell-border: #e3dcca;
-  --shell-accent: #c85a00;
-  --shell-error: #b73a1f;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --shell-bg: #141410;
-    --shell-text: #f4efe6;
-    --shell-muted: #9b937f;
-    --shell-card: #1c1b16;
-    --shell-border: #2e2a23;
-    --shell-accent: #f07020;
-    --shell-error: #e07a5a;
-    color-scheme: dark;
-  }
-}
+/* spool.pro share-web — unified design system.
+ * Tokens are scoped to .sw-root so the page can opt into a per-paper
+ * surface (Reader) without leaking into 3rd-party DOM. data-theme
+ * controls light/dark; default reads from the html[data-theme] root
+ * set by Chrome's ThemeToggle (which itself defers to the OS until
+ * the user overrides). */
 
 html,
 body,
 #root {
   height: 100%;
+  margin: 0;
+}
+
+html {
+  background: #FAFAF8;
+  color-scheme: light;
+}
+html[data-theme='dark'] {
+  background: #141410;
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  background: var(--shell-bg);
-  color: var(--shell-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
 }
 
-a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
+.sw-root {
+  --bg: #FAFAF8;
+  --bg-sink: #F4F4F0;
+  --card: #FFFFFF;
+  --card-2: #F4F4F0;
+  --border: #E8E8E2;
+  --border-strong: #D8D8D0;
+  --text: #1C1C18;
+  --muted: #6B6B60;
+  --faint: #ADADAA;
+  --accent: #C85A00;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #FFF3E8;
+  --accent-line: rgba(200, 90, 0, 0.30);
+  --ok: #3E7D52;
+  --err: #B23A1E;
+  --err-soft: #FBE9DF;
+  --src-claude: #C26A4E;
+  --src-chatgpt: #10A37F;
+  --src-gemini: #5887D0;
+  --paper: #FAF7F0;
+  --shadow-card: 0 1px 2px rgba(28, 28, 24, 0.04),
+    0 8px 24px rgba(28, 28, 24, 0.06);
+  --radius: 14px;
 
-a:hover {
-  color: var(--shell-accent);
-}
-
-/* ── Reader canvas ──────────────────────────────────────────────
- * Wraps the SnapshotReader + footer. Background is set inline by
- * Reader.tsx to the snapshot's paper tone so the viewport sides never
- * expose a contrasting backdrop. Content drives the height — no
- * min-height: 100vh, no big empty space pushing the footer way down
- * on short conversations. */
-.reader-canvas {
-  min-height: 100vh;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 40px 16px 0;
 }
 
-/* The inner wrapper takes an explicit width from Reader.tsx (the
- * template's natural width). max-width keeps narrow viewports honest;
- * the template owns the padding inside. */
-.reader-paper {
-  max-width: 100%;
+html[data-theme='dark'] .sw-root {
+  --bg: #141410;
+  --bg-sink: #0F0F0C;
+  --card: #1C1C18;
+  --card-2: #242420;
+  --border: #2E2E28;
+  --border-strong: #3A3A34;
+  --text: #F2F2EC;
+  --muted: #8A8A80;
+  --faint: #505048;
+  --accent: #F07020;
+  --accent-ink: #1A1206;
+  --accent-soft: #2A1800;
+  --accent-line: rgba(240, 112, 32, 0.34);
+  --ok: #6FB286;
+  --err: #E07A4E;
+  --err-soft: #2A1508;
+  --src-claude: #E89A7C;
+  --src-chatgpt: #20C38F;
+  --src-gemini: #8AB0E5;
+  --paper: #1A1A16;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30),
+    0 10px 30px rgba(0, 0, 0, 0.40);
 }
 
-/* ── Reader loading ─────────────────────────────────────────── */
-.reader-loading {
-  min-height: 100vh;
+.sw-root,
+.sw-root * {
+  box-sizing: border-box;
+}
+
+.sw-root a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sw-root a:hover {
+  color: var(--accent);
+}
+
+/* ── Page frame ─────────────────────────────────────────────── */
+.sw-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ── Header chrome ──────────────────────────────────────────── */
+/* Matches spool.pro landing — solid --bg, hairline bottom border, no
+ * blur, no semi-transparent overlay. Solid color reads as "site chrome"
+ * across light + dark; the frosted-glass look fought with the warm
+ * parchment palette and confused the reader's paper card. */
+.sw-header {
+  flex: 0 0 auto;
+  height: 60px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.sw-wordmark {
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text);
+  display: inline-flex;
+  align-items: baseline;
+}
+.sw-wordmark .dot {
+  color: var(--accent);
+}
+.sw-header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.sw-signin-link {
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.sw-signin-link:hover {
+  color: var(--accent);
+}
+.sw-theme-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  flex: 0 0 auto;
+}
+.sw-theme-toggle:hover {
+  background: var(--card-2);
+  border-color: var(--border);
+  color: var(--text);
 }
 
-.reader-loading-card {
-  font-size: 14px;
-  color: var(--shell-muted);
-  letter-spacing: 0.04em;
-}
-
-/* ── Reader footer ──────────────────────────────────────────── */
-.reader-footer {
-  /* Push to the viewport bottom when the conversation is short; flow
-   * right after the content when it's long. Pairs with the canvas's
-   * min-height: 100vh + flex column. */
+/* ── Footer chrome ──────────────────────────────────────────── */
+/* Solid --bg, hairline top border. Same chrome treatment as header. */
+.sw-footer {
+  flex: 0 0 auto;
   margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 4px;
-  padding: 32px 16px;
-  font-size: 12px;
-  color: var(--shell-muted);
-}
-
-/* ── Tombstone ──────────────────────────────────────────────── */
-.tombstone {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
-}
-
-.tombstone-card {
-  max-width: 480px;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  border-radius: 12px;
-  padding: 40px 32px;
-  text-align: left;
-}
-
-.tombstone-eyebrow {
+  gap: 0;
+  padding: 28px 16px 30px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--shell-muted);
-  margin-bottom: 16px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+.sw-footer a {
+  color: var(--muted);
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.sw-footer a:hover {
+  color: var(--accent);
+}
+.sw-footer .sep {
+  margin: 0 10px;
+  opacity: 0.55;
 }
 
-.tombstone-title {
-  font-size: 22px;
-  margin: 0 0 12px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.tombstone-body {
-  margin: 0 0 12px;
-  line-height: 1.55;
-  color: var(--shell-text);
-}
-
-.tombstone-meta {
-  margin: 0 0 24px;
-  font-size: 13px;
-  color: var(--shell-muted);
-}
-
-.tombstone-actions {
-  font-size: 13px;
-  color: var(--shell-muted);
-  margin: 0;
-}
-
-/* ── Profile ────────────────────────────────────────────────── */
-.profile-page,
-.me-page,
-.signin-page {
-  min-height: 100vh;
+/* ── Content scroll area ────────────────────────────────────── */
+.sw-main {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 16px;
+  padding: 56px 20px 8px;
+}
+.sw-main.center {
+  justify-content: center;
+  padding-top: 20px;
+}
+.sw-main.gap {
+  gap: 18px;
 }
 
-.profile-card,
-.me-card,
-.signin-card {
+/* ── Card ───────────────────────────────────────────────────── */
+.sw-card {
   width: 100%;
   max-width: 560px;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  border-radius: 12px;
-  padding: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 36px 36px 32px;
+}
+.sw-card.tight {
+  padding: 32px 32px;
+}
+.sw-card.w-600 {
+  max-width: 600px;
+}
+.sw-card.w-420 {
+  max-width: 420px;
+}
+.sw-card.w-480 {
+  max-width: 480px;
 }
 
-.profile-header,
-.me-header {
+/* ── Eyebrows / mastheads ───────────────────────────────────── */
+.sw-eyebrow {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sw-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   width: 100%;
-  max-width: 560px;
+}
+.sw-rule .line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+.sw-rule .tag {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.sw-rule .tag.muted {
+  color: var(--muted);
+}
+.sw-rule .tag.err {
+  color: var(--err);
+}
+.sw-rule .meta {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Titles ─────────────────────────────────────────────────── */
+.sw-title {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  margin: 0;
+  color: var(--text);
+}
+.sw-title.lg {
+  font-size: 27px;
+}
+.sw-accent-underline {
+  width: 38px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  margin: 14px 0 0;
+}
+.sw-lede {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+  text-wrap: pretty;
+}
+.sw-lede.muted {
+  color: var(--muted);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.sw-btn {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 9px;
+  padding: 9px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.sw-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.sw-btn-primary:hover {
+  filter: brightness(1.05);
+  color: var(--accent-ink);
+}
+.sw-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+.sw-btn-ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.sw-btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sw-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--muted);
+  border-color: var(--border);
+}
+.sw-btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  color: var(--err);
+}
+.sw-btn-danger:hover {
+  background: var(--err-soft);
+  color: var(--err);
+}
+.sw-btn-sm {
+  font-size: 12.5px;
+  padding: 5px 11px;
+  border-radius: 7px;
+}
+
+/* ── Avatar ─────────────────────────────────────────────────── */
+.sw-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--muted);
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+/* ── Identity header (profile / me) ─────────────────────────── */
+.sw-identity {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  width: 100%;
 }
-
-.profile-avatar,
-.me-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  object-fit: cover;
-}
-
-.profile-identity,
-.me-identity {
+.sw-identity .body {
   flex: 1;
   min-width: 0;
 }
-
-.profile-name,
-.me-name {
-  font-size: 22px;
-  margin: 0 0 2px;
+.sw-identity .name {
+  font-size: 21px;
   font-weight: 600;
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 3px;
+  line-height: 1.15;
 }
-
-.profile-handle,
-.me-handle,
-.me-email {
-  margin: 0;
-  color: var(--shell-muted);
+.sw-identity .handle {
   font-size: 14px;
-}
-
-.me-handle a {
-  color: var(--shell-accent);
-}
-
-.profile-shares,
-.me-section {
-  width: 100%;
-  max-width: 560px;
-  margin-bottom: 24px;
-}
-
-.profile-empty,
-.me-empty {
-  color: var(--shell-muted);
-  font-size: 14px;
+  color: var(--muted);
   margin: 0;
 }
+.sw-identity .handle.accent {
+  color: var(--accent);
+}
+.sw-identity .email {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin: 0 0 2px;
+}
 
-.profile-share-list,
-.me-share-list {
+/* ── Section label ──────────────────────────────────────────── */
+.sw-section-label {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  margin: 0;
+}
+.sw-section-label .count {
+  color: var(--accent);
+}
+
+/* ── Share rows (list + each row) ───────────────────────────── */
+.sw-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -251,342 +447,484 @@ a:hover {
   flex-direction: column;
   gap: 8px;
 }
-
-.profile-share-link {
+.sw-share {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  padding: 12px 16px;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  border-radius: 8px;
-  text-decoration: none;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s, background 0.15s;
 }
-
-.profile-share-link:hover {
-  border-color: var(--shell-accent);
+.sw-share:hover {
+  border-color: var(--border-strong);
 }
-
-.profile-share-title {
+.sw-share.link:hover {
+  border-color: var(--accent);
+}
+.sw-share.revoked {
+  opacity: 0.55;
+}
+.sw-share.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.sw-share-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sw-share-title {
   font-weight: 600;
-  color: var(--shell-text);
+  font-size: 14.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.profile-share-meta {
-  color: var(--shell-muted);
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-/* ── Me ─────────────────────────────────────────────────────── */
-.me-section-title {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--shell-muted);
-  margin: 0 0 12px;
-}
-
-.me-signout {
-  background: transparent;
-  border: 1px solid var(--shell-border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-}
-
-.me-claim {
+.sw-share-meta {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  /* status + error messages flex-basis to 100% to drop onto a new row
-   * below the input/button instead of squeezing them. */
+  align-items: center;
+  gap: 7px;
   flex-wrap: wrap;
 }
-
-.me-claim label {
-  flex: 1;
+.sw-share-meta .dot-sep {
+  opacity: 0.5;
 }
-
-.me-claim label span {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 6px;
+.sw-share-error {
+  color: var(--err);
+  font-size: 12px;
+  margin-top: 2px;
 }
-
-.me-claim input {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font: inherit;
-  color: inherit;
-}
-
-.me-claim button {
-  background: var(--shell-accent);
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  padding: 9px 16px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.me-claim button:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.me-error {
-  color: var(--shell-error);
-  font-size: 13px;
-  margin: 8px 0 0;
-}
-
-.me-handle-status {
-  font-size: 13px;
-  margin: 8px 0 0;
-  flex-basis: 100%;
-}
-
-.me-handle-status-muted {
-  color: var(--shell-muted);
-}
-
-.me-handle-status-ok {
-  color: color-mix(in srgb, var(--shell-accent) 80%, var(--shell-text));
-}
-
-.me-handle-status-warn {
-  color: var(--shell-error);
-}
-
-.me-share {
+.sw-share-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--shell-card);
-  border: 1px solid var(--shell-border);
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* compact icon buttons */
+.sw-icon-btn {
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
-}
-
-.me-share-revoked {
-  opacity: 0.6;
-}
-
-.me-share-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.me-share-title {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.me-share-meta {
-  color: var(--shell-muted);
-  font-size: 12px;
-}
-
-.me-share-error {
-  color: var(--shell-error);
-  font-size: 12px;
-  display: block;
-  margin-top: 4px;
-}
-
-/* ── Me banner (deletion pending) ───────────────────────────── */
-.me-banner {
-  width: 100%;
-  max-width: 560px;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 24px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.me-banner-pending {
-  background: color-mix(in srgb, var(--shell-error) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--shell-error) 30%, var(--shell-border));
-  color: var(--shell-text);
-}
-
-.me-share-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.me-share-actions a,
-.me-share-actions button {
-  font: inherit;
-  font-size: 13px;
+  border: 1px solid var(--border-strong);
   background: transparent;
-  border: 1px solid var(--shell-border);
-  border-radius: 6px;
-  padding: 4px 10px;
-  color: inherit;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  flex: 0 0 auto;
   text-decoration: none;
 }
-
-.me-share-actions a:hover,
-.me-share-actions button:hover {
-  border-color: var(--shell-accent);
-  color: var(--shell-accent);
+.sw-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
-
-.me-share-danger,
-.me-share-danger:hover {
-  color: var(--shell-error);
-  border-color: rgba(183, 58, 31, 0.5);
-}
-
-.me-danger-zone {
-  border-top: 1px solid var(--shell-border);
-  padding-top: 24px;
-}
-
-.me-delete {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.me-delete-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.me-delete button {
-  font: inherit;
+.sw-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
   background: transparent;
-  border: 1px solid var(--shell-border);
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  color: inherit;
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+.sw-icon-btn.ok,
+.sw-icon-btn.ok:hover {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: transparent;
+}
+.sw-icon-btn.busy {
+  cursor: progress;
+}
+.sw-icon-btn.danger:hover {
+  border-color: color-mix(in srgb, var(--err) 55%, transparent);
+  color: var(--err);
+  background: var(--err-soft);
 }
 
-.me-delete-pending {
-  background: rgba(200, 90, 0, 0.08);
-  border: 1px solid rgba(200, 90, 0, 0.3);
-  border-radius: 8px;
+/* visibility / status pills */
+.sw-pill {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+.sw-pill.listed {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.sw-pill.revoked {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 40%, transparent);
+}
+
+/* ── Handle claim ───────────────────────────────────────────── */
+.sw-claim {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.sw-claim label {
+  flex: 1;
+  min-width: 0;
+}
+.sw-claim label span {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.sw-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sw-input-wrap .at {
+  position: absolute;
+  left: 12px;
+  color: var(--faint);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  pointer-events: none;
+}
+.sw-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 9px 12px 9px 26px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sw-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.sw-claim-status {
+  flex-basis: 100%;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw-claim-status.muted {
+  color: var(--muted);
+}
+.sw-claim-status.ok {
+  color: var(--ok);
+}
+.sw-claim-status.warn {
+  color: var(--err);
+}
+.sw-claim-status .ico {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+}
+.sw-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* ── Banner ─────────────────────────────────────────────────── */
+.sw-banner {
+  width: 100%;
+  max-width: 600px;
+  border-radius: 11px;
+  padding: 13px 16px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.sw-banner.pending {
+  background: var(--err-soft);
+  border: 1px solid color-mix(in srgb, var(--err) 32%, transparent);
+  color: var(--text);
+}
+.sw-banner .ico {
+  flex: 0 0 auto;
+  color: var(--err);
+  margin-top: 1px;
+}
+.sw-banner strong {
+  font-weight: 600;
+}
+
+/* ── Signed-in-as footer (inside /me card) ──────────────────── */
+.sw-signed-in-as {
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sw-signed-in-as .ico {
+  color: var(--faint);
+  display: inline-flex;
+}
+
+/* ── Danger zone ────────────────────────────────────────────── */
+.sw-danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+  margin-top: 4px;
+}
+.sw-confirm-box {
+  background: var(--err-soft);
+  border: 1px solid color-mix(in srgb, var(--err) 28%, transparent);
+  border-radius: 11px;
   padding: 16px;
 }
-
-.me-delete-pending p {
-  margin: 0 0 12px;
-  color: var(--shell-text);
+.sw-confirm-box p {
+  margin: 0 0 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.sw-scheduled-box {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 11px;
+  padding: 16px;
+}
+.sw-scheduled-box p {
+  margin: 0 0 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
 }
 
 /* ── Sign-in ────────────────────────────────────────────────── */
-.signin-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--shell-muted);
-  margin-bottom: 16px;
+.sw-signin {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-
-.signin-title {
-  font-size: 24px;
-  margin: 0 0 8px;
+.sw-signin-emblem {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+.sw-signin .sw-eyebrow {
+  margin-bottom: 12px;
+}
+.sw-signin-title {
+  font-size: 27px;
   font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0;
 }
-
-.signin-body {
-  margin: 0 0 20px;
-  line-height: 1.5;
-  color: var(--shell-text);
+.sw-signin-sub {
+  margin: 14px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 32ch;
+  text-wrap: pretty;
 }
-
-.signin-button {
-  display: inline-block;
-  background: var(--shell-accent);
-  color: #fff;
+.sw-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  margin-top: 26px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  color: #2A2620;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
   text-decoration: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(40, 34, 26, 0.05),
+    0 6px 18px rgba(40, 34, 26, 0.06);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
+}
+.sw-google-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 4px rgba(40, 34, 26, 0.06),
+    0 10px 26px rgba(40, 34, 26, 0.10);
+  color: #2A2620;
+}
+.sw-google-btn:active {
+  transform: translateY(0.5px);
+}
+html[data-theme='dark'] .sw-google-btn {
+  background: var(--card-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+html[data-theme='dark'] .sw-google-btn:hover {
+  color: var(--text);
+}
+.sw-signin-foot {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-align: left;
+}
+.sw-signin-foot .ico {
+  flex: 0 0 auto;
+  color: var(--faint);
+  margin-top: 1px;
 }
 
-.signin-button:hover {
-  color: #fff;
-  filter: brightness(1.05);
+/* ── Loading / spin ─────────────────────────────────────────── */
+.sw-loading {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sw-loading .sw-spin {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+.sw-spin-anim {
+  animation: sw-spin 0.7s linear infinite;
+}
+@keyframes sw-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.signin-footnote {
-  margin: 24px 0 0;
-  color: var(--shell-muted);
-  font-size: 13px;
-  line-height: 1.5;
+/* ── Skeleton ───────────────────────────────────────────────── */
+.sw-skel {
+  background: var(--card-2);
+  border-radius: 6px;
+  display: block;
 }
 
-/* ── Narrow viewport adjustments ────────────────────────────────
- * Cards stop being roomy below ~480px wide. Stack header pieces
- * vertically so a long name + handle don't crowd the sign-out button,
- * collapse share-row actions under each share so they don't push the
- * title off the right edge, and tighten the outer padding. */
+/* ── Empty state ────────────────────────────────────────────── */
+.sw-empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+  padding: 6px 0;
+  margin: 0;
+}
+
+/* ── misc ───────────────────────────────────────────────────── */
+.sw-divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+}
+.sw-mono {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── Reader canvas ──────────────────────────────────────────── */
+/* The Reader page hosts a share-kit template that owns its own
+ * typography + padding. We just center it under the chrome and let
+ * its natural width drive layout. */
+.reader-canvas {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px 0;
+}
+.reader-paper {
+  max-width: 100%;
+}
+
+/* ── Narrow viewport adjustments ────────────────────────────── */
 @media (max-width: 480px) {
-  .profile-page,
-  .me-page,
-  .signin-page {
-    padding: 24px 12px;
+  .sw-header {
+    padding: 0 18px;
   }
-
-  .profile-card,
-  .me-card,
-  .signin-card {
-    padding: 20px;
+  .sw-main {
+    padding: 32px 14px 8px;
   }
-
-  .profile-header,
-  .me-header {
-    flex-wrap: wrap;
+  .sw-card {
+    padding: 24px 22px 22px;
+    border-radius: 12px;
+  }
+  .sw-card.tight {
+    padding: 22px 20px;
+  }
+  .sw-identity {
     gap: 12px;
   }
-
-  .me-header .me-signout {
-    margin-left: auto;
+  .sw-identity .name {
+    font-size: 19px;
   }
-
-  .me-share {
-    flex-direction: column;
-    align-items: stretch;
+  .sw-claim {
+    flex-wrap: wrap;
+  }
+  .sw-claim button {
+    flex: 1;
+  }
+  .sw-share {
+    flex-wrap: wrap;
     gap: 10px;
   }
-
-  .me-share-actions {
+  .sw-share-actions {
+    width: 100%;
     justify-content: flex-end;
-    flex-wrap: wrap;
   }
-
-  .me-claim {
-    flex-wrap: wrap;
-  }
-
-  .me-claim button {
-    flex: 1;
+  .reader-canvas {
+    padding: 24px 12px 0;
   }
 }

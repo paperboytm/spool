@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
+  Avatar,
+  Footer,
+  Header,
+  Icon,
+  Page,
+} from '../components/Chrome'
+import {
   cancelAccountDeletion,
   checkHandle,
   claimHandle,
@@ -12,6 +19,7 @@ import {
   type MeResponse,
   type MeShareRow,
 } from '../lib/api'
+import { humanDate, humanDateTime } from '../lib/dates'
 
 // Match the server-side handle regex (share-backend/src/handles.ts).
 // We pre-filter input so check requests + the submit button respond
@@ -25,23 +33,6 @@ type LoadState =
   | { kind: 'loading' }
   | { kind: 'ok'; me: MeResponse; shares: MeShareRow[] }
   | { kind: 'error' }
-
-function formatDate(ts: number): string {
-  try {
-    return new Date(ts).toLocaleDateString()
-  } catch {
-    return ''
-  }
-}
-
-function formatExpiry(ts: number | null): string | null {
-  if (ts === null) return null
-  try {
-    return new Date(ts).toLocaleString()
-  } catch {
-    return null
-  }
-}
 
 function shareUrl(id: string): string {
   return `${window.location.origin}/s/${encodeURIComponent(id)}`
@@ -61,11 +52,8 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [availability, setAvailability] = useState<HandleAvailability>({ kind: 'idle' })
-  // Sequence guards stale debounced responses overwriting fresher ones.
   const checkSeq = useRef(0)
 
-  // Debounced availability check. Skips the round-trip for inputs that
-  // can't possibly pass server-side validation.
   useEffect(() => {
     const handle = value
     if (handle.length === 0) {
@@ -114,54 +102,84 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
   const submitDisabled = busy || availability.kind !== 'available'
 
   return (
-    <form className="me-claim" onSubmit={onSubmit} noValidate>
+    <form className="sw-claim" onSubmit={onSubmit} noValidate>
       <label>
         <span>Claim a handle</span>
-        <input
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="alice"
-          maxLength={HANDLE_MAX_LEN}
-          value={value}
-          onChange={(e) =>
-            setValue(
-              e.target.value.toLowerCase().replace(HANDLE_NORMALISE, '').slice(0, HANDLE_MAX_LEN),
-            )
-          }
-        />
+        <div className="sw-input-wrap">
+          <span className="at">@</span>
+          <input
+            className="sw-input"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="alice"
+            maxLength={HANDLE_MAX_LEN}
+            value={value}
+            onChange={(e) =>
+              setValue(
+                e.target.value
+                  .toLowerCase()
+                  .replace(HANDLE_NORMALISE, '')
+                  .slice(0, HANDLE_MAX_LEN),
+              )
+            }
+          />
+        </div>
       </label>
-      <button type="submit" disabled={submitDisabled}>
+      <button
+        type="submit"
+        className="sw-btn sw-btn-primary"
+        disabled={submitDisabled}
+        style={{ padding: '9px 18px' }}
+      >
         {busy ? 'Claiming…' : 'Claim'}
       </button>
       {status && (
-        <p className={`me-handle-status me-handle-status-${status.tone}`} role="status">
+        <p className={`sw-claim-status ${status.tone}`} role="status">
+          {status.icon === 'spin' ? (
+            <span className="sw-spin sw-spin-anim ico" />
+          ) : status.icon ? (
+            <span className="ico">
+              <Icon name={status.icon} size={12} />
+            </span>
+          ) : null}
           {status.text}
         </p>
       )}
-      {err && <p className="me-error" role="alert">{err}</p>}
+      {err && (
+        <p className="sw-claim-status warn" role="alert">
+          <span className="ico">
+            <Icon name="alert" size={12} />
+          </span>
+          {err}
+        </p>
+      )}
     </form>
   )
 }
 
 function renderAvailability(
   a: HandleAvailability,
-): { tone: 'muted' | 'ok' | 'warn'; text: string } | null {
+): {
+  tone: 'muted' | 'ok' | 'warn'
+  text: string
+  icon: 'check-circle' | 'x-circle' | 'alert' | 'spin' | null
+} | null {
   switch (a.kind) {
     case 'idle':
       return null
     case 'too-short':
-      return { tone: 'muted', text: `At least ${HANDLE_MIN_LEN} characters.` }
+      return { tone: 'muted', text: `At least ${HANDLE_MIN_LEN} characters.`, icon: null }
     case 'checking':
-      return { tone: 'muted', text: 'Checking…' }
+      return { tone: 'muted', text: 'Checking…', icon: 'spin' }
     case 'available':
-      return { tone: 'ok', text: 'Available.' }
+      return { tone: 'ok', text: 'Available.', icon: 'check-circle' }
     case 'taken':
-      return { tone: 'warn', text: 'Taken.' }
+      return { tone: 'warn', text: 'Taken — try another.', icon: 'x-circle' }
     case 'invalid':
-      return { tone: 'warn', text: a.reason }
+      return { tone: 'warn', text: a.reason, icon: 'alert' }
     case 'error':
-      return { tone: 'warn', text: 'Could not check right now.' }
+      return { tone: 'warn', text: 'Could not check right now.', icon: 'alert' }
   }
 }
 
@@ -171,8 +189,6 @@ function ShareRow({
   onUnpublish,
 }: {
   row: MeShareRow
-  /** Block unpublish actions entirely (e.g. account in deletion grace
-   *  period — the backend would 403 anyway). */
   disabled?: boolean
   onUnpublish: (id: string) => Promise<{ ok: boolean; reason?: string }>
 }) {
@@ -180,7 +196,8 @@ function ShareRow({
   const [copied, setCopied] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const revoked = row.revoked_at !== null
-  const expiry = formatExpiry(row.expires_at)
+  const expiry = row.expires_at !== null ? humanDate(row.expires_at) : null
+  const listed = row.visibility === 'profile-listed'
 
   async function copy() {
     try {
@@ -202,34 +219,77 @@ function ShareRow({
   }
 
   return (
-    <li className={`me-share${revoked ? ' me-share-revoked' : ''}`}>
-      <div className="me-share-main">
-        <span className="me-share-title">{row.title}</span>
-        <span className="me-share-meta">
-          {row.visibility === 'profile-listed' ? 'Profile-listed' : 'Unlisted'}
-          {' · '}
-          published {formatDate(row.published_at)}
-          {expiry && ` · expires ${expiry}`}
-          {revoked && ' · unpublished'}
+    <li
+      className={`sw-share${revoked ? ' revoked' : ''}${disabled ? ' disabled' : ''}`}
+    >
+      <div className="sw-share-main">
+        <span className="sw-share-title">{row.title}</span>
+        <span className="sw-share-meta">
+          <span className={`sw-pill${listed ? ' listed' : ''}`}>
+            {listed ? 'Listed' : 'Unlisted'}
+          </span>
+          <span>published {humanDate(row.published_at)}</span>
+          {expiry && (
+            <>
+              <span className="dot-sep">·</span>
+              <span>expires {expiry}</span>
+            </>
+          )}
+          {revoked && (
+            <>
+              <span className="dot-sep">·</span>
+              <span className="sw-pill revoked">Unpublished</span>
+            </>
+          )}
         </span>
-        {err && <span className="me-share-error" role="alert">{err}</span>}
+        {err && (
+          <span className="sw-share-error" role="alert">
+            {err}
+          </span>
+        )}
       </div>
-      <div className="me-share-actions">
-        <a href={`/s/${encodeURIComponent(row.id)}`} target="_blank" rel="noreferrer">
-          View
+      <div className="sw-share-actions">
+        <a
+          className="sw-icon-btn"
+          href={`/s/${encodeURIComponent(row.id)}`}
+          target="_blank"
+          rel="noreferrer"
+          title="Open share"
+          aria-label="Open share"
+        >
+          <Icon name="external" size={14} />
         </a>
-        <button type="button" onClick={copy}>
-          {copied ? 'Copied' : 'Copy link'}
+        <button
+          type="button"
+          className={`sw-icon-btn${copied ? ' ok' : ''}`}
+          onClick={copy}
+          disabled={disabled}
+          title={copied ? 'Copied' : 'Copy link'}
+          aria-label={copied ? 'Copied' : 'Copy link'}
+        >
+          <Icon name={copied ? 'check' : 'link'} size={14} />
         </button>
         {!revoked && (
-          <button
-            type="button"
-            onClick={unpublish}
-            disabled={busy || disabled}
-            className="me-share-danger"
-          >
-            {busy ? 'Unpublishing…' : 'Unpublish'}
-          </button>
+          busy ? (
+            <span
+              className="sw-icon-btn busy"
+              aria-label="Unpublishing"
+              style={{ borderColor: 'var(--border-strong)' }}
+            >
+              <span className="sw-spin sw-spin-anim" style={{ width: 13, height: 13 }} />
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="sw-icon-btn danger"
+              onClick={unpublish}
+              disabled={disabled}
+              title="Unpublish"
+              aria-label="Unpublish"
+            >
+              <Icon name="eye-off" size={14} />
+            </button>
+          )
         )}
       </div>
     </li>
@@ -240,13 +300,7 @@ function DeleteAccount({
   initialPendingUntil,
   onCancelled,
 }: {
-  /** Epoch-ms — when non-null on mount, /me boots straight into the
-   *  scheduled / "cancel deletion" state instead of "Delete account…".
-   *  Carries the cross-device case where the user scheduled deletion
-   *  from desktop and now opens the web /me to recover. */
   initialPendingUntil: number | null
-  /** Called after a successful cancel so the parent can clear its own
-   *  banner / re-enable handle claim + unpublish. */
   onCancelled: () => void
 }) {
   const [state, setState] = useState<
@@ -266,28 +320,42 @@ function DeleteAccount({
   }
 
   async function cancel() {
+    const prev = state
     setState({ kind: 'cancelling' })
     const ok = await cancelAccountDeletion()
     if (ok) {
       setState({ kind: 'idle' })
       onCancelled()
+    } else if (prev.kind === 'scheduled') {
+      setState(prev)
     } else {
       setState({ kind: 'scheduled', at: 0 })
     }
   }
 
   if (state.kind === 'scheduled' || state.kind === 'cancelling') {
-    const when = state.kind === 'scheduled' && state.at > 0
-      ? new Date(state.at).toLocaleString()
-      : null
+    const at = state.kind === 'scheduled' ? state.at : 0
+    const when = at > 0 ? humanDateTime(at) : null
     return (
-      <div className="me-delete me-delete-pending">
+      <div className="sw-scheduled-box">
         <p>
-          Account deletion is scheduled
-          {when && ` for ${when}`}. You have 24 hours to cancel.
+          <strong>Account deletion is scheduled</strong>
+          {when ? ` for ${when}` : ''}. You have 24 hours to cancel.
         </p>
-        <button type="button" onClick={cancel} disabled={state.kind === 'cancelling'}>
-          {state.kind === 'cancelling' ? 'Cancelling…' : 'Cancel deletion'}
+        <button
+          type="button"
+          className="sw-btn sw-btn-ghost"
+          onClick={cancel}
+          disabled={state.kind === 'cancelling'}
+        >
+          {state.kind === 'cancelling' ? (
+            <>
+              <span className="sw-spin sw-spin-anim" style={{ width: 11, height: 11 }} />
+              Cancelling…
+            </>
+          ) : (
+            'Cancel deletion'
+          )}
         </button>
       </div>
     )
@@ -295,17 +363,20 @@ function DeleteAccount({
 
   if (state.kind === 'confirming') {
     return (
-      <div className="me-delete">
+      <div className="sw-confirm-box">
         <p>
-          Deleting your account unpublishes every share, releases your
-          handle, and removes your record after 24 hours. This can be
-          undone within that window.
+          Deleting your account unpublishes every share, releases your handle, and removes
+          your record after 24 hours. This can be undone within that window.
         </p>
-        <div className="me-delete-actions">
-          <button type="button" onClick={schedule} className="me-share-danger">
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="sw-btn sw-btn-danger" onClick={schedule}>
             Yes, delete my account
           </button>
-          <button type="button" onClick={() => setState({ kind: 'idle' })}>
+          <button
+            type="button"
+            className="sw-btn sw-btn-ghost"
+            onClick={() => setState({ kind: 'idle' })}
+          >
             Back
           </button>
         </div>
@@ -314,11 +385,13 @@ function DeleteAccount({
   }
 
   return (
-    <div className="me-delete">
-      <button type="button" onClick={() => setState({ kind: 'confirming' })}>
-        Delete account…
-      </button>
-    </div>
+    <button
+      type="button"
+      className="sw-btn sw-btn-ghost"
+      onClick={() => setState({ kind: 'confirming' })}
+    >
+      Delete account…
+    </button>
   )
 }
 
@@ -326,24 +399,15 @@ export function Me() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 
   const load = useCallback(async () => {
-    // Parallel — shares is owned by /me's session cookie too, so the
-    // request still flies in flight even before /me resolves.
     const [meResult, sharesResult] = await Promise.all([fetchMe(), fetchMyShares()])
     if (meResult.kind === 'unauthenticated') {
       window.location.replace('/sign-in?next=/me')
       return
     }
     if (meResult.kind !== 'ok') {
-      // /api/me returns 200 even during the 24h grace window (PR 3
-      // amend opened it for pending-deletion users so the cancel
-      // path stays reachable); any other non-ok is genuine error.
       setState({ kind: 'error' })
       return
     }
-    // Shares endpoint stays locked behind the default requireUser
-    // policy — pending-deletion gets 403, which we treat as "no
-    // shares to show" rather than punting to sign-in. The banner
-    // explains why; the cancel-deletion button is right there.
     const shares = sharesResult.kind === 'ok' ? sharesResult.shares : []
     setState({ kind: 'ok', me: meResult.me, shares })
   }, [])
@@ -381,17 +445,18 @@ export function Me() {
 
   async function onSignOut() {
     await signOut()
-    window.location.assign('/')
+    // share-web doesn't own `/` — in prod that's the landing site (a
+    // separate Pages project routed by the worker), in dev there's
+    // nothing → tombstone. /sign-in is the natural post-logout
+    // destination either way: it confirms the signed-out state and
+    // makes signing back in one click.
+    window.location.assign('/sign-in')
   }
 
   function onDeletionCancelled(): void {
     setState((s) =>
-      s.kind === 'ok'
-        ? { ...s, me: { ...s.me, deletion_pending_until: null } }
-        : s,
+      s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: null } } : s,
     )
-    // Re-fetch shares — they were 403'd while pending; now that the
-    // user cancelled deletion they should reappear.
     fetchMyShares().then((r) => {
       if (r.kind !== 'ok') return
       setState((s) => (s.kind === 'ok' ? { ...s, shares: r.shares } : s))
@@ -400,90 +465,149 @@ export function Me() {
 
   if (state.kind === 'loading') {
     return (
-      <main className="reader-loading" aria-busy="true">
-        <div className="reader-loading-card">Loading…</div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main center" aria-busy="true">
+          <div className="sw-loading">
+            <span className="sw-spin sw-spin-anim" />
+            Loading account
+          </div>
+        </main>
+        <Footer />
+      </Page>
     )
   }
 
   if (state.kind === 'error') {
     return (
-      <main className="me-page">
-        <div className="me-card">
-          <h1>Something went wrong</h1>
-          <p>We couldn’t load your account. Try refreshing.</p>
-        </div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main center">
+          <div className="sw-card tight w-480">
+            <div className="sw-rule" style={{ marginBottom: 20 }}>
+              <span className="tag err">Error</span>
+              <span className="line" />
+            </div>
+            <h1 className="sw-title">Something went wrong</h1>
+            <p className="sw-lede">We couldn’t load your account.</p>
+            <button
+              type="button"
+              className="sw-btn sw-btn-ghost"
+              style={{ marginTop: 20 }}
+              onClick={() => window.location.reload()}
+            >
+              Refresh
+            </button>
+          </div>
+        </main>
+        <Footer />
+      </Page>
     )
   }
 
   const { me, shares } = state
   const pendingUntil = me.deletion_pending_until
   const pending = pendingUntil !== null
+  const headerAuth = { name: me.name, src: me.avatar_url }
+
   return (
-    <main className="me-page">
-      {pending && (
-        <div className="me-banner me-banner-pending" role="alert">
-          <strong>Account deletion is pending.</strong>{' '}
-          {pendingUntil
-            ? `Scheduled for ${new Date(pendingUntil).toLocaleString()}.`
-            : null}{' '}
-          Cancel deletion in the Danger zone below to restore access.
-        </div>
-      )}
-
-      <header className="me-header">
-        {me.avatar_url ? <img className="me-avatar" src={me.avatar_url} alt="" /> : null}
-        <div className="me-identity">
-          {me.name && <h1 className="me-name">{me.name}</h1>}
-          <p className="me-email">{me.email}</p>
-          {me.handle ? (
-            <p className="me-handle">
-              <a href={`/@${me.handle}`}>@{me.handle}</a>
-            </p>
-          ) : null}
-        </div>
-        <button type="button" className="me-signout" onClick={onSignOut}>
-          Sign out
-        </button>
-      </header>
-
-      {!me.handle && !pending && (
-        <section className="me-section">
-          <HandleClaim
-            onClaimed={(handle) =>
-              setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, handle } } : s))
-            }
-          />
-        </section>
-      )}
-
-      <section className="me-section">
-        <h2 className="me-section-title">Your shares</h2>
-        {pending ? (
-          <p className="me-empty">
-            Hidden while deletion is pending. Cancel deletion to restore the list.
-          </p>
-        ) : shares.length === 0 ? (
-          <p className="me-empty">You haven’t published anything yet.</p>
-        ) : (
-          <ul className="me-share-list">
-            {shares.map((row) => (
-              <ShareRow
-                key={row.id}
-                row={row}
-                disabled={pending}
-                onUnpublish={onUnpublish}
-              />
-            ))}
-          </ul>
+    <Page>
+      <Header auth={headerAuth} />
+      <main className="sw-main gap">
+        {pending && (
+          <div className="sw-banner pending" role="alert">
+            <span className="ico">
+              <Icon name="alert" size={16} />
+            </span>
+            <span>
+              <strong>Account deletion is pending.</strong>{' '}
+              {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null} Cancel
+              it in the Danger zone below to restore access.
+            </span>
+          </div>
         )}
-      </section>
 
-      <section className="me-section me-danger-zone">
-        <h2 className="me-section-title">Danger zone</h2>
-        <DeleteAccount initialPendingUntil={pendingUntil} onCancelled={onDeletionCancelled} />
-      </section>
-    </main>
+        <div className="sw-card w-600">
+          <div className="sw-identity">
+            <Avatar src={me.avatar_url} name={me.name} size={54} />
+            <div className="body">
+              {me.name && <h1 className="name">{me.name}</h1>}
+              {me.handle ? (
+                <p className="handle accent">
+                  <a href={`/@${me.handle}`}>@{me.handle}</a>
+                </p>
+              ) : (
+                <p className="handle">No public handle yet</p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="sw-btn sw-btn-ghost sw-btn-sm"
+              onClick={onSignOut}
+            >
+              Sign out
+            </button>
+          </div>
+
+          {!me.handle && !pending && (
+            <>
+              <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
+              <HandleClaim
+                onClaimed={(handle) =>
+                  setState((s) =>
+                    s.kind === 'ok' ? { ...s, me: { ...s.me, handle } } : s,
+                  )
+                }
+              />
+            </>
+          )}
+
+          <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
+          <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
+            Your shares
+            {!pending && shares.length > 0 && <span className="count">{shares.length}</span>}
+          </h2>
+          {pending ? (
+            <p className="sw-empty">
+              Hidden while deletion is pending. Cancel deletion to restore the list.
+            </p>
+          ) : shares.length === 0 ? (
+            <p className="sw-empty">You haven’t published anything yet.</p>
+          ) : (
+            <ul className="sw-list">
+              {shares.map((row) => (
+                <ShareRow
+                  key={row.id}
+                  row={row}
+                  disabled={pending}
+                  onUnpublish={onUnpublish}
+                />
+              ))}
+            </ul>
+          )}
+
+          <div className="sw-danger-zone" style={{ marginTop: 24 }}>
+            <h2
+              className="sw-section-label"
+              style={{ marginBottom: 14, color: 'var(--muted)' }}
+            >
+              Danger zone
+            </h2>
+            <DeleteAccount
+              initialPendingUntil={pendingUntil}
+              onCancelled={onDeletionCancelled}
+            />
+          </div>
+
+          <p className="sw-signed-in-as">
+            <span className="ico">
+              <Icon name="lock" size={11} />
+            </span>
+            Signed in as {me.email}
+          </p>
+        </div>
+      </main>
+      <Footer />
+    </Page>
   )
 }

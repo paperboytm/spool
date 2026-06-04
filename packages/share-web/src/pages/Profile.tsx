@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 
+import {
+  Avatar,
+  Footer,
+  Header,
+  Icon,
+  Page,
+} from '../components/Chrome'
 import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
-import { Tombstone } from './Tombstone'
+import { humanDate } from '../lib/dates'
 
 type State =
   | { kind: 'loading' }
@@ -12,14 +19,6 @@ type State =
 function fromFetch(r: ProfileFetchResult): Exclude<State, { kind: 'loading' }> {
   if (r.kind === 'ok') return { kind: 'ok', profile: r.profile }
   return r
-}
-
-function formatDate(ts: number): string {
-  try {
-    return new Date(ts).toLocaleDateString()
-  } catch {
-    return ''
-  }
 }
 
 export function Profile({ handle }: { handle: string }) {
@@ -45,51 +44,96 @@ export function Profile({ handle }: { handle: string }) {
 
   if (state.kind === 'loading') {
     return (
-      <main className="reader-loading" aria-busy="true">
-        <div className="reader-loading-card">Loading…</div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main">
+          <div className="sw-card w-600">
+            <div className="sw-identity">
+              <span className="sw-skel" style={{ width: 54, height: 54, borderRadius: '50%' }} />
+              <div className="body">
+                <span className="sw-skel" style={{ width: 140, height: 18, marginBottom: 8 }} />
+                <span className="sw-skel" style={{ width: 80, height: 13 }} />
+              </div>
+            </div>
+            <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
+            <ul className="sw-list">
+              {[0, 1, 2].map((i) => (
+                <li key={i} className="sw-share" style={{ justifyContent: 'space-between' }}>
+                  <span className="sw-skel" style={{ width: `${60 - i * 8}%`, height: 14 }} />
+                  <span className="sw-skel" style={{ width: 70, height: 11 }} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </main>
+        <Footer />
+      </Page>
     )
   }
-  if (state.kind === 'not-found') {
+
+  if (state.kind === 'not-found' || state.kind === 'error') {
     return (
-      <main className="profile-page">
-        <div className="profile-card">
-          <h1>Profile not found</h1>
-          <p>Nothing here. Check the handle, or ask the author for a fresh link.</p>
-        </div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main">
+          <div className="sw-card tight w-600">
+            <div className="sw-rule" style={{ marginBottom: 22 }}>
+              <span className="tag muted">Profile not found</span>
+              <span className="line" />
+            </div>
+            <h1 className="sw-title">Nothing here</h1>
+            <p className="sw-lede">Check the handle, or ask the author for a fresh link.</p>
+          </div>
+        </main>
+        <Footer />
+      </Page>
     )
   }
-  if (state.kind === 'error') return <Tombstone reason="not-found" />
 
   const { profile } = state
   return (
-    <main className="profile-page">
-      <header className="profile-header">
-        {profile.avatar_url ? (
-          <img className="profile-avatar" src={profile.avatar_url} alt="" />
-        ) : null}
-        <div className="profile-identity">
-          {profile.name && <h1 className="profile-name">{profile.name}</h1>}
-          <p className="profile-handle">@{profile.handle}</p>
+    <Page>
+      <Header auth="out" />
+      <main className="sw-main">
+        <div className="sw-card w-600">
+          <div className="sw-identity">
+            <Avatar src={profile.avatar_url} name={profile.name} size={54} />
+            <div className="body">
+              {profile.name && <h1 className="name">{profile.name}</h1>}
+              <p className="handle">@{profile.handle}</p>
+            </div>
+          </div>
+          <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
+          <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
+            Published
+            {profile.shares.length > 0 && (
+              <span className="count">{profile.shares.length}</span>
+            )}
+          </h2>
+          {profile.shares.length === 0 ? (
+            <p className="sw-empty">Nothing published yet.</p>
+          ) : (
+            <ul className="sw-list">
+              {profile.shares.map((s) => (
+                <li key={s.id}>
+                  <a className="sw-share link" href={`/s/${encodeURIComponent(s.id)}`}>
+                    <span className="sw-share-main">
+                      <span className="sw-share-title">{s.title}</span>
+                    </span>
+                    <span className="sw-share-meta" style={{ flex: '0 0 auto' }}>
+                      {humanDate(s.published_at)}
+                    </span>
+                    <span style={{ color: 'var(--muted)', display: 'inline-flex' }}>
+                      <Icon name="arrow-right" size={14} />
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </header>
-      <section className="profile-shares">
-        {profile.shares.length === 0 ? (
-          <p className="profile-empty">Nothing published yet.</p>
-        ) : (
-          <ul className="profile-share-list">
-            {profile.shares.map((s) => (
-              <li key={s.id}>
-                <a className="profile-share-link" href={`/s/${encodeURIComponent(s.id)}`}>
-                  <span className="profile-share-title">{s.title}</span>
-                  <span className="profile-share-meta">{formatDate(s.published_at)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+      </main>
+      <Footer />
+    </Page>
   )
 }

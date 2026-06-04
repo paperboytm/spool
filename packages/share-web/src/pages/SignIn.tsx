@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
 import { fetchMe } from '../lib/api'
 import { nextSafe } from '../lib/route'
 
@@ -14,8 +15,15 @@ interface Props {
 }
 
 export function SignIn({ next }: Props) {
+  // share-web doesn't own `/` — in prod that's the landing site, in
+  // dev it's empty → tombstone. When the caller didn't pin a `next`,
+  // /me is the only post-auth destination that makes sense on this
+  // origin. This applies BOTH to the OAuth round-trip (the backend
+  // redirects to `next` after setting the cookie) AND to the already-
+  // signed-in bounce below.
   const safe = nextSafe(next)
-  const href = `/api/auth/google/start?next=${encodeURIComponent(safe)}`
+  const dest = safe === '/' ? '/me' : safe
+  const href = `/api/auth/google/start?next=${encodeURIComponent(dest)}`
 
   // If the user is already authenticated, bounce straight to next
   // instead of showing the sign-in pitch — re-clicking "Sign in" would
@@ -30,7 +38,7 @@ export function SignIn({ next }: Props) {
     fetchMe().then((r) => {
       if (cancelled) return
       if (r.kind === 'ok') {
-        window.location.replace(safe)
+        window.location.replace(dest)
         return
       }
       setChecking(false)
@@ -38,33 +46,50 @@ export function SignIn({ next }: Props) {
     return () => {
       cancelled = true
     }
-  }, [safe])
+  }, [dest])
 
   if (checking) {
     return (
-      <main className="reader-loading" aria-busy="true">
-        <div className="reader-loading-card">Checking session…</div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main center" aria-busy="true">
+          <div className="sw-loading">
+            <span className="sw-spin sw-spin-anim" />
+            Checking session
+          </div>
+        </main>
+        <Footer />
+      </Page>
     )
   }
 
   return (
-    <main className="signin-page">
-      <div className="signin-card">
-        <div className="signin-eyebrow">spool.pro</div>
-        <h1 className="signin-title">Sign in</h1>
-        <p className="signin-body">
-          Sign in to publish, manage, and unpublish your shares.
-        </p>
-        <a className="signin-button" href={href}>
-          Sign in with Google
-        </a>
-        <p className="signin-footnote">
-          We use Google only to verify your identity. We don’t request
-          any data from your Google account beyond your email, name,
-          and picture.
-        </p>
-      </div>
-    </main>
+    <Page>
+      <Header auth="out" />
+      <main className="sw-main center">
+        <div className="sw-card tight sw-signin w-420">
+          <div className="sw-signin-emblem">
+            <SpoolMark size={30} />
+          </div>
+          <div className="sw-eyebrow">spool.pro</div>
+          <h1 className="sw-signin-title">Sign in</h1>
+          <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>
+          <a className="sw-google-btn" href={href}>
+            <Icon name="google" size={18} />
+            Continue with Google
+          </a>
+          <div className="sw-signin-foot">
+            <span className="ico">
+              <Icon name="lock" size={14} />
+            </span>
+            <span>
+              We use Google only to verify your identity — nothing beyond your email, name, and
+              picture.
+            </span>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </Page>
   )
 }
