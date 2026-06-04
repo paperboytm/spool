@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ChevronDown, LogIn, Send } from 'lucide-react'
+import { ChevronDown, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
 import { PublishModal } from './PublishModal.js'
@@ -23,20 +23,18 @@ type Props = {
 }
 
 /**
- * Editor topbar publish CTA. Three states:
+ * Editor topbar publish CTA. Two visual states:
  *
- *  1. Signed out → "Sign in to publish" — click runs Google OAuth via
- *     `useShareAuth().signIn`.
- *  2. Signed in, never published → "Publish ▾" — click opens
- *     `PublishModal`.
- *  3. Already published (current snapshot has a slug) → `PublishedBadge`
+ *  1. Draft (signed in OR out) → "Publish ▾" — click opens
+ *     `PublishModal`. The modal renders a ConnectCard when signed-out
+ *     so we never gate the button itself on auth.
+ *  2. Already published (current snapshot has a slug) → `PublishedBadge`
  *     with the View / Copy / Republish / Unpublish menu.
  */
 export function PublishButton({ getEditorState, onRedactAll, initialPublished = null }: Props) {
-  const { user, loading, signIn } = useShareAuth()
+  const { user, loading } = useShareAuth()
   const { open, openModal, closeModal, published, handlePublished, clearPublished } =
     usePublishShare(initialPublished)
-  const [signingIn, setSigningIn] = useState(false)
   const [pending, setPending] = useState<{ conversation: Conversation; opts: EditorOpts } | null>(
     null,
   )
@@ -52,18 +50,6 @@ export function PublishButton({ getEditorState, onRedactAll, initialPublished = 
     setPending(state)
     openModal()
   }, [getEditorState, openModal])
-
-  const onSignIn = useCallback(async () => {
-    if (signingIn) return
-    setSigningIn(true)
-    try {
-      await signIn()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Sign-in failed.')
-    } finally {
-      setSigningIn(false)
-    }
-  }, [signIn, signingIn])
 
   const onBadgeAction = useCallback(
     async (action: PublishedBadgeAction) => {
@@ -132,22 +118,10 @@ export function PublishButton({ getEditorState, onRedactAll, initialPublished = 
     )
   }
 
-  if (!user) {
-    return (
-      <button
-        type="button"
-        onClick={() => { void onSignIn() }}
-        disabled={signingIn}
-        data-testid="share-editor-signin"
-        style={noDragStyle}
-        className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[12px] font-medium text-warm-text dark:text-dark-text border border-warm-border dark:border-dark-border hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <LogIn size={12} strokeWidth={1.8} aria-hidden />
-        <span>{signingIn ? 'Signing in…' : 'Sign in to publish'}</span>
-      </button>
-    )
-  }
-
+  // Draft branch — signed in or out. The button always reads "Publish".
+  // The modal handles the signed-out case by rendering the ConnectCard
+  // ahead of the form, so a fresh user lands in one consistent place
+  // instead of two diverging entry points.
   return (
     <>
       <button
@@ -155,9 +129,9 @@ export function PublishButton({ getEditorState, onRedactAll, initialPublished = 
         onClick={openPublishModal}
         data-testid="share-editor-publish"
         style={noDragStyle}
-        className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+        className="inline-flex items-center gap-1.5 h-[26px] px-[9px] rounded-md text-[12px] font-medium text-warm-text dark:text-dark-text border border-warm-border2 dark:border-dark-border2 bg-transparent hover:bg-accent-bg hover:dark:bg-accent-bg-dark hover:border-accent hover:dark:border-accent-dark hover:text-accent hover:dark:text-accent-dark transition-colors"
       >
-        <Send size={12} strokeWidth={1.8} aria-hidden />
+        <Send size={12} strokeWidth={1.8} aria-hidden className="text-accent dark:text-accent-dark" />
         <span>Publish</span>
         <ChevronDown size={11} strokeWidth={1.8} aria-hidden />
       </button>
@@ -165,7 +139,7 @@ export function PublishButton({ getEditorState, onRedactAll, initialPublished = 
         <PublishModal
           conversation={pending.conversation}
           opts={pending.opts}
-          hasHandle={!!user.handle}
+          hasHandle={!!user?.handle}
           {...(onRedactAll && { onRedactAll })}
           onClose={closeModal}
           onPublished={(r) => {

@@ -7,6 +7,8 @@ import {
   type ExpiryOption,
 } from './publish-logic.js'
 import { buildSnapshotFromEditor } from './snapshot-adapter.js'
+import { ConnectCard } from './ConnectCard.js'
+import { useShareAuth } from '../../hooks/useShareAuth.js'
 import type { PublishSuccess, Visibility } from '../../../shared/share-publish.js'
 
 type Props = {
@@ -59,6 +61,10 @@ export function PublishModal({
   onClose,
   onPublished,
 }: Props) {
+  // Re-poll /me on this surface — when the user signs in via the
+  // embedded ConnectCard below, we want the modal to flip from the
+  // login prompt to the publish form without an outer remount.
+  const { user, loading: authLoading, refresh: refreshAuth } = useShareAuth()
   const [visibility, setVisibility] = useState<Visibility>('unlisted')
   const [expires, setExpires] = useState<ExpiryOption>('never')
   const [customExpiry, setCustomExpiry] = useState('')
@@ -133,6 +139,54 @@ export function PublishModal({
   }
 
   const isRepublish = !!existingSlug
+
+  // Signed-out branch: clicking Publish from the editor always opens
+  // this modal; if no /me cookie exists, render the embedded ConnectCard
+  // ahead of the form so the user signs in here instead of bouncing to
+  // a separate sign-in surface. Once auth refreshes the modal flips to
+  // the publish form without unmounting.
+  if (!authLoading && !user) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="publish-modal-title"
+        data-testid="publish-modal"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+        className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[12vh] animate-in fade-in duration-150"
+      >
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="w-full max-w-[520px] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+        >
+          <div className="px-5 pt-5 pb-3">
+            <h2 id="publish-modal-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
+              Publish to spool.pro
+            </h2>
+            <p className="mt-1 text-[12px] leading-snug text-warm-faint dark:text-dark-muted">
+              Sign in to publish this conversation. Your draft stays on this machine until you do.
+            </p>
+          </div>
+          <div className="px-5 pb-4">
+            <ConnectCard
+              onSignedIn={() => {
+                void refreshAuth()
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 px-5 pt-3 pb-4 border-t border-warm-border/60 dark:border-dark-border/60">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
