@@ -7,6 +7,11 @@ import {
 } from '@spool/share-kit'
 import type { Snapshot } from '@spool/share-kit'
 
+import { Footer, Header, Page } from '../components/Chrome'
+import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
+import { reportMailto } from '../lib/mailto'
+import { Tombstone } from './Tombstone'
+
 const DEFAULT_PAPER_HEX = '#FAF7F0'
 const DEFAULT_NATURAL_WIDTH = 720
 
@@ -21,10 +26,6 @@ function naturalWidthFor(snapshot: Snapshot | null): number {
   const { opts } = decodeSnapshot(snapshot)
   return TEMPLATE_RATIO[opts.template].w
 }
-
-import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
-import { reportMailto } from '../lib/mailto'
-import { Tombstone } from './Tombstone'
 
 // Defensive boundary around SnapshotReader. Server-validated JSON in
 // theory cannot reach us with shape mismatches, but a future template
@@ -89,23 +90,18 @@ export function Reader({ id }: { id: string }) {
     }
   }, [id])
 
-  // Keep the body chrome bg in sync with the active paper so initial
-  // paint and any overscroll area match the template surface. Skips
-  // the assignment when there's no snapshot yet (loading / error).
-  useEffect(() => {
-    if (!activeSnapshot) return
-    const prev = document.body.style.background
-    document.body.style.background = paperHex
-    return () => {
-      document.body.style.background = prev
-    }
-  }, [activeSnapshot, paperHex])
-
   if (state.kind === 'loading') {
     return (
-      <main className="reader-loading" aria-busy="true">
-        <div className="reader-loading-card">Loading…</div>
-      </main>
+      <Page>
+        <Header auth="out" />
+        <main className="sw-main center" aria-busy="true">
+          <div className="sw-loading">
+            <span className="sw-spin sw-spin-anim" />
+            Loading share
+          </div>
+        </main>
+        <Footer report reportHref={reportMailto(id)} />
+      </Page>
     )
   }
   if (state.kind === 'gone') return <Tombstone reason={state.reason} at={state.at} />
@@ -113,28 +109,19 @@ export function Reader({ id }: { id: string }) {
   if (state.kind === 'error') return <Tombstone reason="not-found" />
 
   return (
-    <div className="reader-canvas" style={{ background: paperHex }}>
-      <div className="reader-paper" style={{ width: naturalWidth }}>
-        <SnapshotErrorBoundary>
-          <SnapshotReader snapshot={state.snapshot} />
-        </SnapshotErrorBoundary>
+    <Page>
+      <Header auth="out" />
+      <div className="reader-canvas">
+        <div
+          className="reader-paper"
+          style={{ width: naturalWidth, background: paperHex }}
+        >
+          <SnapshotErrorBoundary>
+            <SnapshotReader snapshot={state.snapshot} />
+          </SnapshotErrorBoundary>
+        </div>
       </div>
-      <footer className="reader-footer">
-        <span>
-          <a href={reportMailto(id)} rel="nofollow">
-            Report this share
-          </a>
-        </span>
-        <span aria-hidden="true"> · </span>
-        <span>
-          <a href="/terms">Terms</a>
-        </span>
-        <span aria-hidden="true"> · </span>
-        <span>
-          <a href="/privacy">Privacy</a>
-        </span>
-      </footer>
-    </div>
+      <Footer report reportHref={reportMailto(id)} />
+    </Page>
   )
 }
-

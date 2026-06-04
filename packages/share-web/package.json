@@ -13,6 +13,8 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource/geist-mono": "^5.2.7",
     "@spool/share-kit": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
