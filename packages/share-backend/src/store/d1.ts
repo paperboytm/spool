@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types'
 
+import type { IdentityClaim } from '../auth/providers/types'
 import { ApiError } from '../errors'
 
 // 16 hex chars = 64 bits of randomness — collision probability is
@@ -8,6 +9,10 @@ const USER_ID_HEX_CHARS = 16
 
 export type UserRow = {
   id: string
+  // google_sub remains on the users table for one release as a safety
+  // net (rollback / audit triage). New rows carry a `<provider>:<sub>`
+  // composite so the existing UNIQUE constraint still rejects duplicate
+  // users; nothing reads this column anymore for sign-in routing.
   google_sub: string
   email: string
   name: string | null
@@ -18,39 +23,57 @@ export type UserRow = {
   deleted_at: number | null
 }
 
-export async function upsertUserByGoogleSub(
+/** Look up a user by their (provider, provider_sub) identity, updating
+ *  their profile fields when one exists. Creates a fresh users row +
+ *  user_identities link when none does. */
+export async function upsertUserByIdentity(
   db: D1Database,
-  sub: string,
-  email: string,
-  name: string | null,
-  avatar: string | null,
+  claim: IdentityClaim,
 ): Promise<UserRow> {
   const existing = await db
-    .prepare('SELECT * FROM users WHERE google_sub = ?')
-    .bind(sub)
+    .prepare(
+      'SELECT u.* FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = ? AND i.provider_sub = ?',
+    )
+    .bind(claim.provider, claim.sub)
     .first<UserRow>()
   const now = Date.now()
   if (existing) {
     if (existing.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
     await db
       .prepare('UPDATE users SET email=?, name=?, avatar_url=?, last_signin_at=? WHERE id=?')
-      .bind(email, name, avatar, now, existing.id)
+      .bind(claim.email, claim.name, claim.avatar_url, now, existing.id)
       .run()
-    return { ...existing, email, name, avatar_url: avatar, last_signin_at: now }
+    return {
+      ...existing,
+      email: claim.email,
+      name: claim.name,
+      avatar_url: claim.avatar_url,
+      last_signin_at: now,
+    }
   }
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, USER_ID_HEX_CHARS)
+  // Composite ${provider}:${sub} satisfies users.google_sub UNIQUE NOT
+  // NULL without conflating identities — a future GitHub identity for
+  // the same email becomes a separate user row with its own composite.
+  const compositeSub = `${claim.provider}:${claim.sub}`
   await db
     .prepare(
       'INSERT INTO users (id, google_sub, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?,?)',
     )
-    .bind(id, sub, email, name, avatar, now, now)
+    .bind(id, compositeSub, claim.email, claim.name, claim.avatar_url, now, now)
+    .run()
+  await db
+    .prepare(
+      'INSERT INTO user_identities (provider, provider_sub, user_id, email, linked_at) VALUES (?,?,?,?,?)',
+    )
+    .bind(claim.provider, claim.sub, id, claim.email, now)
     .run()
   return {
     id,
-    google_sub: sub,
-    email,
-    name,
-    avatar_url: avatar,
+    google_sub: compositeSub,
+    email: claim.email,
+    name: claim.name,
+    avatar_url: claim.avatar_url,
     created_at: now,
     last_signin_at: now,
     deletion_pending_until: null,

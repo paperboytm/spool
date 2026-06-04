@@ -1,12 +1,23 @@
+// Desktop (Electron-loopback) sign-in endpoint. The client performs the
+// OAuth dance itself (PKCE + system browser → loopback redirect),
+// receives a provider id_token + nonce, and POSTs them here. We verify
+// + bind the nonce, mint a session, and return the session token + user.
+//
+// Provider is now an explicit body field; the resolver in
+// src/auth/providers/registry decides which verifier to run. Adding
+// GitHub means registering a provider that implements
+// verifyNativeIdToken — no change to this handler.
+
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
-import { verifyIdToken } from '../../../src/auth/jwks'
 import { createSession } from '../../../src/auth/session'
+import { getProvider } from '../../../src/auth/providers/registry'
+import type { ProviderId } from '../../../src/auth/providers/types'
 import { audit } from '../../../src/audit'
 import { ApiError, jsonError } from '../../../src/errors'
 import { checkRate } from '../../../src/rate-limit'
 import { clientIp } from '../../../src/request'
-import { upsertUserByGoogleSub } from '../../../src/store/d1'
+import { upsertUserByIdentity } from '../../../src/store/d1'
 
 type Env = {
   DB: D1Database
@@ -16,17 +27,21 @@ type Env = {
   GOOGLE_CLIENT_ID_DESKTOP: string
 }
 
-type Body = { id_token: string; nonce: string }
+type Body = { provider?: string; id_token: string; nonce: string }
 
 // Rate limit: 10 desktop sign-ins per IP per minute. Tight enough to
 // brake brute-force attempts, loose enough that a quick retry after a
-// transient Google failure still goes through. Exported so the test
+// transient provider failure still goes through. Exported so the test
 // suite can pre-fill the counter without copy-pasting the values.
 export const SIGNIN_RATE_WINDOW_SEC = 60
 export const SIGNIN_RATE_MAX = 10
 // Nonce replay window. Spans the time between desktop minting the
 // nonce + id_token and forwarding to us. 10 minutes is generous.
 const NONCE_TTL_SEC = 10 * 60
+// Backwards compat: clients minted against the Google-only contract
+// (no `provider` field) default here so the desktop release behind
+// the new backend keeps working through a rolling upgrade.
+const DEFAULT_PROVIDER: ProviderId = 'google'
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
@@ -48,30 +63,29 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       throw new ApiError('BAD_REQUEST', 'missing fields')
     }
 
-    // Pre-check so a replayed token still 403s; verify also binds nonce.
+    const providerId = body.provider ?? DEFAULT_PROVIDER
+    const provider = getProvider(providerId)
+    if (!provider) throw new ApiError('BAD_REQUEST', 'unknown provider')
+
+    // Pre-check so a replayed token still 403s; verifyNativeIdToken
+    // also binds nonce inside the JWS verification itself.
     const usedKey = `nonce/${body.nonce}`
     const seen = await ctx.env.NONCE.get(usedKey)
     if (seen) throw new ApiError('FORBIDDEN', 'nonce replay')
 
-    const claims = await verifyIdToken(body.id_token, {
-      audience: ctx.env.GOOGLE_CLIENT_ID_DESKTOP,
-      nonce: body.nonce,
-    })
+    const claim = await provider.verifyNativeIdToken(
+      { idToken: body.id_token, nonce: body.nonce },
+      ctx.env,
+    )
 
     await ctx.env.NONCE.put(usedKey, '1', { expirationTtl: NONCE_TTL_SEC })
 
-    if (!claims.email) throw new ApiError('BAD_REQUEST', 'no email')
-    const user = await upsertUserByGoogleSub(
-      ctx.env.DB,
-      claims.sub,
-      claims.email,
-      claims.name ?? null,
-      claims.picture ?? null,
-    )
+    const user = await upsertUserByIdentity(ctx.env.DB, claim)
     const sess = await createSession(ctx.env.SESSIONS, user.id)
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,
       action: 'signin.desktop',
+      details: { provider: provider.id },
     })
 
     return new Response(

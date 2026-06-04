@@ -56,12 +56,23 @@ type AuditRow = {
   ts: number
 }
 
+type UserIdentityRow = {
+  provider: string
+  provider_sub: string
+  user_id: string
+  email: string | null
+  linked_at: number
+}
+
 export type FakeDbState = {
   users: UserRow[]
   audit: AuditRow[]
+  user_identities: UserIdentityRow[]
 }
 
-export function makeDb(state: FakeDbState = { users: [], audit: [] }): {
+export function makeDb(
+  state: FakeDbState = { users: [], audit: [], user_identities: [] },
+): {
   db: D1Database
   state: FakeDbState
 } {
@@ -73,7 +84,19 @@ export function makeDb(state: FakeDbState = { users: [], audit: [] }): {
         return stmt
       },
       async first<T = unknown>(): Promise<T | null> {
+        if (/^SELECT u\.\* FROM users u JOIN user_identities i ON i\.user_id = u\.id WHERE i\.provider = \? AND i\.provider_sub = \?/i.test(sql)) {
+          const [provider, sub] = params as [string, string]
+          const link = state.user_identities.find(
+            (i) => i.provider === provider && i.provider_sub === sub,
+          )
+          if (!link) return null
+          const u = state.users.find((x) => x.id === link.user_id)
+          return (u as T) ?? null
+        }
         if (/^SELECT \* FROM users WHERE google_sub = \?/i.test(sql)) {
+          // Legacy single-provider path. Kept so older tests that still
+          // seed users via google_sub continue to work; new code goes
+          // through user_identities above.
           const [sub] = params
           return (state.users.find((u) => u.google_sub === sub) as T) ?? null
         }
@@ -123,6 +146,17 @@ export function makeDb(state: FakeDbState = { users: [], audit: [] }): {
             u.avatar_url = avatar
             u.last_signin_at = last
           }
+          return { success: true }
+        }
+        if (/^INSERT INTO user_identities \(provider, provider_sub, user_id, email, linked_at\) VALUES/i.test(sql)) {
+          const [provider, provider_sub, user_id, email, linked_at] = params as [
+            string,
+            string,
+            string,
+            string | null,
+            number,
+          ]
+          state.user_identities.push({ provider, provider_sub, user_id, email, linked_at })
           return { success: true }
         }
         if (/^INSERT INTO audit_log/i.test(sql)) {

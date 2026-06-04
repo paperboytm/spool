@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { onRequestGet as callbackGet } from '../functions/api/auth/google/callback'
-import { onRequestGet as startGet } from '../functions/api/auth/google/start'
+import { onRequestGet as callbackGet } from '../functions/api/auth/[provider]/callback'
+import { onRequestGet as startGet } from '../functions/api/auth/[provider]/start'
 import {
   SIGNIN_RATE_MAX,
   SIGNIN_RATE_WINDOW_SEC,
@@ -87,7 +87,9 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
     expect(body.user.email).toBe('a@example.com')
     expect(body.user.name).toBe('Alice')
     expect(env.state.users).toHaveLength(1)
-    expect(env.state.users[0]?.google_sub).toBe('sub-1')
+    expect(env.state.user_identities).toEqual([
+      expect.objectContaining({ provider: 'google', provider_sub: 'sub-1' }),
+    ])
     // Audit row written for signin.desktop
     expect(env.state.audit.some((r) => r.action === 'signin.desktop')).toBe(true)
     // Session row in KV
@@ -197,7 +199,7 @@ describe('GET /api/auth/google/callback', () => {
     const req = new Request(
       'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
     )
-    const res = await invoke(callbackGet, req, env)
+    const res = await invoke(callbackGet, req, env, { provider: 'google' })
     expect(res.status).toBe(400)
   })
 
@@ -211,7 +213,7 @@ describe('GET /api/auth/google/callback', () => {
         },
       },
     )
-    const res = await invoke(callbackGet, req, env)
+    const res = await invoke(callbackGet, req, env, { provider: 'google' })
     expect(res.status).toBe(403)
   })
 
@@ -230,7 +232,7 @@ describe('GET /api/auth/google/callback', () => {
       'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
       { headers: { 'CF-Connecting-IP': '8.8.8.8' } },
     )
-    const res = await invoke(callbackGet, req, env)
+    const res = await invoke(callbackGet, req, env, { provider: 'google' })
     expect(res.status).toBe(429)
   })
 
@@ -259,14 +261,16 @@ describe('GET /api/auth/google/callback', () => {
           },
         },
       )
-      const res = await invoke(callbackGet, req, env)
+      const res = await invoke(callbackGet, req, env, { provider: 'google' })
       expect(res.status).toBe(302)
       expect(res.headers.get('location')).toBe('/next')
       const all = getSetCookies(res).join('\n')
       expect(all).toMatch(/spool_session=/)
       expect(all).toMatch(/HttpOnly/)
       expect(env.state.users).toHaveLength(1)
-      expect(env.state.users[0]?.google_sub).toBe('web-sub')
+      expect(env.state.user_identities).toEqual([
+        expect.objectContaining({ provider: 'google', provider_sub: 'web-sub' }),
+      ])
     } finally {
       fetchSpy.mockRestore()
     }
@@ -301,7 +305,7 @@ describe('GET /api/auth/google/callback', () => {
           },
         },
       )
-      const res = await invoke(callbackGet, req, env)
+      const res = await invoke(callbackGet, req, env, { provider: 'google' })
       expect(res.status).toBe(302)
       const loc = res.headers.get('location') ?? ''
       expect(loc).toBe('/me%E3%80%82%E8%BF%99%E6%AC%A1')
@@ -347,7 +351,7 @@ describe('start endpoint', () => {
   it('redirects to Google with PKCE challenge and sets both oauth cookies', async () => {
     const env = envFor()
     const req = new Request('https://spool.pro/api/auth/google/start?next=/me')
-    const res = await invoke(startGet, req, env)
+    const res = await invoke(startGet, req, env, { provider: 'google' })
     expect(res.status).toBe(302)
     const loc = res.headers.get('location') ?? ''
     expect(loc).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/)
@@ -363,10 +367,26 @@ describe('start endpoint', () => {
     const req = new Request(
       'https://spool.pro/api/auth/google/start?next=//evil.example.com',
     )
-    const res = await invoke(startGet, req, env)
+    const res = await invoke(startGet, req, env, { provider: 'google' })
     const stateCookie =
       getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
     // The cookie value is `${state}|${next}`. Ensure the next half is `/`.
     expect(stateCookie).toMatch(/__spool_oauth_state=[^|]+\|\/;/)
+  })
+
+  it('404s on an unknown provider (no scanner enumeration)', async () => {
+    const env = envFor()
+    const req = new Request('https://spool.pro/api/auth/github/start')
+    const res = await invoke(startGet, req, env, { provider: 'github' })
+    expect(res.status).toBe(404)
+  })
+
+  it('callback 404s on an unknown provider', async () => {
+    const env = envFor()
+    const req = new Request(
+      'https://spool.pro/api/auth/github/callback?code=x&state=y',
+    )
+    const res = await invoke(callbackGet, req, env, { provider: 'github' })
+    expect(res.status).toBe(404)
   })
 })
