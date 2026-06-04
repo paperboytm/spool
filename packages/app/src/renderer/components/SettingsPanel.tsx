@@ -169,25 +169,28 @@ export default function SettingsPanel({
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="w-[960px] h-[680px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-48px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
-        {/* Sidebar */}
-        <div className="w-[176px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-8 pb-3">
-          <div className="px-5 mb-3">
-            <h2 className="text-xl font-semibold text-warm-text dark:text-dark-text">{t('settings.title')}</h2>
+        {/* Sidebar — width + paddings tuned to match the desktop handoff
+            (220px rail, 22px vertical padding, 14px horizontal). */}
+        <div className="w-[220px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-[22px] pb-3">
+          <div className="px-[14px] mb-[18px]">
+            <h2 className="text-[22px] font-bold text-warm-text dark:text-dark-text leading-none">{t('settings.title')}</h2>
           </div>
-          <div className="px-2 space-y-0.5">
+          <div className="px-2 space-y-[2px]">
             {TAB_DEFS.filter(def => def.id !== 'security' || securityEnabled).map(def => (
               <button
                 key={def.id}
                 type="button"
                 aria-pressed={tab === def.id}
                 onClick={() => setTab(def.id)}
-                className={`flex w-full items-center gap-2 rounded-[6px] px-3 py-2 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
+                className={`flex w-full items-center gap-[11px] rounded-lg h-9 px-3 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
                   tab === def.id
-                    ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-[#2A1800] font-medium'
-                    : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-bg/70 dark:hover:bg-dark-bg/60'
+                    ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
+                    : 'text-warm-text dark:text-dark-text hover:bg-warm-bg dark:hover:bg-dark-bg'
                 }`}
               >
-                {def.icon}
+                <span className={tab === def.id ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'}>
+                  {def.icon}
+                </span>
                 {tabLabel(t, def.labelKey, def.fallbackLabel)}
               </button>
             ))}

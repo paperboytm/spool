@@ -282,11 +282,13 @@ function PublishedRow({
     <li
       data-testid="published-row"
       data-revoked={revoked ? '' : undefined}
-      className="group flex items-center gap-3 rounded-[6px] px-3 py-2.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className={`group flex items-center gap-3 rounded-[7px] px-3 py-2.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors ${
+        revoked ? 'opacity-55' : ''
+      }`}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-warm-text dark:text-dark-text truncate">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[14px] font-medium text-warm-text dark:text-dark-text truncate">
             {item.title || 'Untitled'}
           </span>
           {revoked && (
