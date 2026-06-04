@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
+import { ConnectCard } from './share-editor/ConnectCard.js'
 import { DeleteAccountConfirmModal } from './DeleteAccountConfirmModal.js'
 import { useShareAuth } from '../hooks/useShareAuth.js'
 
@@ -9,7 +10,7 @@ type DeletionStatus =
   | { kind: 'pending'; executeAt: number }
 
 export default function SettingsAccount() {
-  const { user, loading, signIn, signOut, refresh } = useShareAuth()
+  const { user, loading, signOut, refresh } = useShareAuth()
   const [handleDraft, setHandleDraft] = useState('')
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
   const [claiming, setClaiming] = useState(false)
@@ -44,22 +45,11 @@ export default function SettingsAccount() {
   if (!user) {
     return (
       <div className="space-y-6">
-        <div className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface p-5">
-          <h4 className="text-sm font-semibold text-warm-text dark:text-dark-text mb-1">
-            Sign in to Spool Share
-          </h4>
-          <p className="text-[12px] text-warm-muted dark:text-dark-muted leading-relaxed mb-4">
-            Spool only ever uploads snapshots you explicitly publish. Drafts and your library never leave this machine.
-          </p>
-          <button
-            type="button"
-            data-testid="settings-account-signin"
-            onClick={() => { void signIn() }}
-            className="inline-flex items-center gap-2 h-9 px-4 rounded-[6px] text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
-          >
-            Sign in with Google
-          </button>
-        </div>
+        <ConnectCard
+          onSignedIn={() => {
+            void refresh()
+          }}
+        />
       </div>
     )
   }
