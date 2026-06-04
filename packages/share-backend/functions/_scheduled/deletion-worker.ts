@@ -91,15 +91,17 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         )
           .bind(now, row.user_id)
           .run(),
-        // google_sub is replaced with a per-user sentinel so the Google
-        // subject id (PII) no longer maps back to this row. Same sign-in
-        // from the same Google account creates a fresh record instead
-        // of being permanently banned by the deleted row. The sentinel
-        // preserves the UNIQUE constraint without needing a migration.
+        // Drop every (provider, sub) link this user had. A fresh sign-in
+        // from the same Google / GitHub / … account then finds no
+        // identity row → upsertUserByIdentity creates a brand-new user
+        // row, no permanent ban from the soft-deleted tombstone.
+        env.DB.prepare('DELETE FROM user_identities WHERE user_id=?')
+          .bind(row.user_id)
+          .run(),
         env.DB.prepare(
-          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, google_sub=?, deleted_at=? WHERE id=?",
+          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, deleted_at=? WHERE id=?",
         )
-          .bind(`[deleted]-${row.user_id}`, now, row.user_id)
+          .bind(now, row.user_id)
           .run(),
         env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
           .bind(row.user_id)

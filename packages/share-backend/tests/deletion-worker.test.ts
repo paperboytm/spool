@@ -22,7 +22,6 @@ function envFor(state?: FakeDbState) {
 function seedUser(state: FakeDbState, id: string): void {
   state.users.push({
     id,
-    google_sub: `g-${id}`,
     email: `${id}@example.com`,
     name: id,
     avatar_url: `https://example.com/${id}.png`,
@@ -30,6 +29,15 @@ function seedUser(state: FakeDbState, id: string): void {
     last_signin_at: Date.now(),
     deletion_pending_until: null,
     deleted_at: null,
+  })
+  // Mirror the user_identities link that upsertUserByIdentity would
+  // have written at sign-in time, so deletion sees something to drop.
+  state.user_identities.push({
+    provider: 'google',
+    provider_sub: `g-${id}`,
+    user_id: id,
+    email: `${id}@example.com`,
+    linked_at: Date.now(),
   })
 }
 
@@ -91,15 +99,17 @@ describe('runDeletionSweep', () => {
     expect(env.state.published_shares.find((s) => s.id === slug)?.revoked_at).toBeTruthy()
     // handle released
     expect(env.state.handles.find((h) => h.handle === 'alice')?.released_at).toBeTruthy()
-    // user soft-deleted: PII fields cleared, google_sub replaced with a
-    // per-user sentinel so re-signing-in with the same Google account
-    // creates a fresh record instead of hitting the old row.
+    // user soft-deleted: PII fields cleared. The "you can sign back in"
+    // guarantee is that user_identities lost every row for this user
+    // (the JOIN in upsertUserByIdentity misses, fresh row created).
     const user = env.state.users.find((u) => u.id === 'user-1')!
     expect(user.email).toBe('[deleted]')
     expect(user.name).toBeNull()
     expect(user.avatar_url).toBeNull()
-    expect(user.google_sub).toBe('[deleted]-user-1')
     expect(typeof user.deleted_at).toBe('number')
+    // identity links dropped — re-sign-in with the same Google account
+    // misses the JOIN in upsertUserByIdentity and creates a fresh user.
+    expect(env.state.user_identities.filter((i) => i.user_id === 'user-1')).toEqual([])
     // queue row gone
     expect(env.state.deletion_queue.find((r) => r.user_id === 'user-1')).toBeUndefined()
   })

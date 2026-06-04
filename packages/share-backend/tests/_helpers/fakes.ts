@@ -405,14 +405,13 @@ export function makeDb(state: FakeDbState = emptyState()): {
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE users SET email='\[deleted\]', name=NULL, avatar_url=NULL, google_sub=\?, deleted_at=\? WHERE id=\?/i.test(sql)) {
-          const [google_sub, deleted_at, id] = params as [string, number, string]
+        if (/^UPDATE users SET email='\[deleted\]', name=NULL, avatar_url=NULL, deleted_at=\? WHERE id=\?/i.test(sql)) {
+          const [deleted_at, id] = params as [number, string]
           const u = state.users.find((u) => u.id === id)
           if (u) {
             u.email = '[deleted]'
             u.name = null
             u.avatar_url = null
-            u.google_sub = google_sub
             u.deleted_at = deleted_at
           }
           return { success: true, meta: { changes: 1 } }
