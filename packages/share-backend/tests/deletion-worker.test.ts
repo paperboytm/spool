@@ -101,7 +101,8 @@ describe('runDeletionSweep', () => {
     expect(env.state.handles.find((h) => h.handle === 'alice')?.released_at).toBeTruthy()
     // user soft-deleted: PII fields cleared. The "you can sign back in"
     // guarantee is that user_identities lost every row for this user
-    // (the JOIN in upsertUserByIdentity misses, fresh row created).
+    // — the JOIN in upsertUserByIdentity misses and a fresh users row
+    // is created on next sign-in.
     const user = env.state.users.find((u) => u.id === 'user-1')!
     expect(user.email).toBe('[deleted]')
     expect(user.name).toBeNull()

@@ -1,10 +1,14 @@
 // Static sign-in screen. The actual OAuth dance happens server-side at
-// /api/auth/google/start, which sets the session cookie and bounces
+// /api/auth/<provider>/start, which sets the session cookie and bounces
 // back to `next`. `next` is already sanitized by the router via
 // nextSafe(); we redefend on the click in case this page is reached
 // directly.
+//
+// Provider list is data-driven — adding GitHub / email is one entry
+// here plus the matching backend provider registration. The visual
+// layout stays the same; only the button count grows.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
 import { fetchMe } from '../lib/api'
@@ -14,16 +18,33 @@ interface Props {
   next: string
 }
 
+type ProviderId = 'google'
+
+interface ProviderEntry {
+  id: ProviderId
+  label: string
+  icon: ReactNode
+}
+
+// Registered providers, rendered in order. v0.5 ships Google-only;
+// adding GitHub is one extra entry + a matching backend provider.
+const PROVIDERS: readonly ProviderEntry[] = [
+  { id: 'google', label: 'Continue with Google', icon: <Icon name="google" size={18} /> },
+]
+
+function authStartHref(provider: ProviderId, dest: string): string {
+  return `/api/auth/${provider}/start?next=${encodeURIComponent(dest)}`
+}
+
 export function SignIn({ next }: Props) {
   // share-web doesn't own `/` — in prod that's the landing site, in
   // dev it's empty → tombstone. When the caller didn't pin a `next`,
   // /me is the only post-auth destination that makes sense on this
-  // origin. This applies BOTH to the OAuth round-trip (the backend
+  // origin. Applies both to the OAuth round-trip (the backend
   // redirects to `next` after setting the cookie) AND to the already-
   // signed-in bounce below.
   const safe = nextSafe(next)
   const dest = safe === '/' ? '/me' : safe
-  const href = `/api/auth/google/start?next=${encodeURIComponent(dest)}`
 
   // If the user is already authenticated, bounce straight to next
   // instead of showing the sign-in pitch — re-clicking "Sign in" would
@@ -74,17 +95,19 @@ export function SignIn({ next }: Props) {
           <div className="sw-eyebrow">spool.pro</div>
           <h1 className="sw-signin-title">Sign in</h1>
           <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>
-          <a className="sw-google-btn" href={href}>
-            <Icon name="google" size={18} />
-            Continue with Google
-          </a>
+          {PROVIDERS.map((p) => (
+            <a key={p.id} className="sw-google-btn" href={authStartHref(p.id, dest)}>
+              {p.icon}
+              {p.label}
+            </a>
+          ))}
           <div className="sw-signin-foot">
             <span className="ico">
               <Icon name="lock" size={14} />
             </span>
             <span>
-              We use Google only to verify your identity — nothing beyond your email, name, and
-              picture.
+              We use your provider only to verify your identity — nothing beyond your email,
+              name, and picture.
             </span>
           </div>
         </div>
