@@ -12,7 +12,6 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 
 import { createSession } from '../../../src/auth/session'
 import { getProvider } from '../../../src/auth/providers/registry'
-import type { ProviderId } from '../../../src/auth/providers/types'
 import { audit } from '../../../src/audit'
 import { ApiError, jsonError } from '../../../src/errors'
 import { checkRate } from '../../../src/rate-limit'
@@ -27,7 +26,7 @@ type Env = {
   GOOGLE_CLIENT_ID_DESKTOP: string
 }
 
-type Body = { provider?: string; id_token: string; nonce: string }
+type Body = { provider: string; id_token: string; nonce: string }
 
 // Rate limit: 10 desktop sign-ins per IP per minute. Tight enough to
 // brake brute-force attempts, loose enough that a quick retry after a
@@ -38,10 +37,6 @@ export const SIGNIN_RATE_MAX = 10
 // Nonce replay window. Spans the time between desktop minting the
 // nonce + id_token and forwarding to us. 10 minutes is generous.
 const NONCE_TTL_SEC = 10 * 60
-// Backwards compat: clients minted against the Google-only contract
-// (no `provider` field) default here so the desktop release behind
-// the new backend keeps working through a rolling upgrade.
-const DEFAULT_PROVIDER: ProviderId = 'google'
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
@@ -59,12 +54,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     } catch {
       throw new ApiError('BAD_REQUEST', 'invalid json')
     }
-    if (!body?.id_token || !body?.nonce) {
+    if (!body?.provider || !body?.id_token || !body?.nonce) {
       throw new ApiError('BAD_REQUEST', 'missing fields')
     }
 
-    const providerId = body.provider ?? DEFAULT_PROVIDER
-    const provider = getProvider(providerId)
+    const provider = getProvider(body.provider)
     if (!provider) throw new ApiError('BAD_REQUEST', 'unknown provider')
 
     // Pre-check so a replayed token still 403s; verifyNativeIdToken

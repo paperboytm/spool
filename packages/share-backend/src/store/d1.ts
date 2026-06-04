@@ -9,11 +9,6 @@ const USER_ID_HEX_CHARS = 16
 
 export type UserRow = {
   id: string
-  // google_sub remains on the users table for one release as a safety
-  // net (rollback / audit triage). New rows carry a `<provider>:<sub>`
-  // composite so the existing UNIQUE constraint still rejects duplicate
-  // users; nothing reads this column anymore for sign-in routing.
-  google_sub: string
   email: string
   name: string | null
   avatar_url: string | null
@@ -52,15 +47,11 @@ export async function upsertUserByIdentity(
     }
   }
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, USER_ID_HEX_CHARS)
-  // Composite ${provider}:${sub} satisfies users.google_sub UNIQUE NOT
-  // NULL without conflating identities — a future GitHub identity for
-  // the same email becomes a separate user row with its own composite.
-  const compositeSub = `${claim.provider}:${claim.sub}`
   await db
     .prepare(
-      'INSERT INTO users (id, google_sub, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?,?)',
+      'INSERT INTO users (id, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?)',
     )
-    .bind(id, compositeSub, claim.email, claim.name, claim.avatar_url, now, now)
+    .bind(id, claim.email, claim.name, claim.avatar_url, now, now)
     .run()
   await db
     .prepare(
@@ -70,7 +61,6 @@ export async function upsertUserByIdentity(
     .run()
   return {
     id,
-    google_sub: compositeSub,
     email: claim.email,
     name: claim.name,
     avatar_url: claim.avatar_url,

@@ -74,7 +74,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
     const req = new Request('https://spool.pro/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-      body: JSON.stringify({ id_token, nonce: 'n1' }),
+      body: JSON.stringify({ provider: 'google', id_token, nonce: 'n1' }),
     })
     const res = await invoke(signInPost, req, env)
     expect(res.status).toBe(200)
@@ -124,7 +124,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
       new Request('https://x/api/auth/sign-in-with-id-token', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id_token, nonce: 'replay' }),
+        body: JSON.stringify({ provider: 'google', id_token, nonce: 'replay' }),
       })
     const r1 = await invoke(signInPost, makeReq(), env)
     expect(r1.status).toBe(200)
@@ -154,7 +154,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
     const req = new Request('https://x/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '9.9.9.9' },
-      body: JSON.stringify({ id_token, nonce: 'rl' }),
+      body: JSON.stringify({ provider: 'google', id_token, nonce: 'rl' }),
     })
     const res = await invoke(signInPost, req, env)
     expect(res.status).toBe(429)
@@ -178,7 +178,7 @@ describe('POST /api/auth/sign-in-with-id-token', () => {
     const req = new Request('https://x/api/auth/sign-in-with-id-token', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id_token, nonce: 'wa' }),
+      body: JSON.stringify({ provider: 'google', id_token, nonce: 'wa' }),
     })
     const res = await invoke(signInPost, req, env)
     expect(res.status).not.toBe(200)
