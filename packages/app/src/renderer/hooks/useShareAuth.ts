@@ -70,5 +70,20 @@ export function useShareAuth() {
     authBus?.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
   }, [])
 
-  return { user, loading, signIn, signOut }
+  /** Re-fetch /me without going through the OAuth flow. Used by surfaces
+   *  that embed a child sign-in component (e.g. the PublishModal's
+   *  ConnectCard branch) so the parent can flip from "signed-out" to
+   *  "signed-in" without remounting. */
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const full = await fetchAndStore()
+      authBus?.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
+      return full
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchAndStore])
+
+  return { user, loading, signIn, signOut, refresh }
 }

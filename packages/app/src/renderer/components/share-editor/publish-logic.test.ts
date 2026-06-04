@@ -150,14 +150,48 @@ describe('computeExpiresAt', () => {
     expect(computeExpiresAt({ kind: '30d' }, NOW)).toBe('2026-01-31T00:00:00.000Z')
   })
 
-  it('returns ISO of parsed datetime-local for "custom"', () => {
-    const iso = computeExpiresAt({ kind: 'custom', custom: '2026-06-15T12:30' }, NOW)
-    expect(iso).toMatch(/^2026-06-15T/)
-    expect(new Date(iso!).toISOString()).toBe(iso!)
+  it('returns now + 90 days for "90d"', () => {
+    expect(computeExpiresAt({ kind: '90d' }, NOW)).toBe('2026-04-01T00:00:00.000Z')
+  })
+})
+
+describe('computeUnredactedMatches — hidden turns', () => {
+  it('skips matches in turns excluded by opts.selected (TurnSelector)', () => {
+    // Two turns, both contain credentials. opts.selected only includes
+    // turn 0 → matches in turn 1 are not reported, since that turn's
+    // body won't be published.
+    const conv = convo([
+      { id: 't-0', role: 'assistant', body: `key=${API_KEY}` },
+      { id: 't-1', role: 'assistant', body: `key=${API_KEY}` },
+    ])
+    const r = computeUnredactedMatches(
+      conv,
+      opts({ redact: false, selected: [0] }),
+    )
+    expect(r.high.every((m) => m.turn_index !== 1)).toBe(true)
+    expect(r.high.some((m) => m.turn_index === 0)).toBe(true)
   })
 
-  it('returns undefined for "custom" with empty/invalid input', () => {
-    expect(computeExpiresAt({ kind: 'custom', custom: '' }, NOW)).toBeUndefined()
-    expect(computeExpiresAt({ kind: 'custom', custom: 'garbage' }, NOW)).toBeUndefined()
+  it('reports all turns when opts.selected is undefined (no TurnSelector active)', () => {
+    const conv = convo([
+      { id: 't-0', role: 'assistant', body: `key=${API_KEY}` },
+      { id: 't-1', role: 'assistant', body: `key=${API_KEY}` },
+    ])
+    const r = computeUnredactedMatches(conv, opts({ redact: false }))
+    const turnIdxs = new Set(r.high.map((m) => m.turn_index))
+    expect(turnIdxs.has(0)).toBe(true)
+    expect(turnIdxs.has(1)).toBe(true)
+  })
+
+  it('reports nothing when all turns are excluded', () => {
+    const conv = convo([
+      { id: 't-0', role: 'assistant', body: `key=${API_KEY}` },
+    ])
+    const r = computeUnredactedMatches(
+      conv,
+      opts({ redact: false, selected: [] }),
+    )
+    expect(r.high).toEqual([])
+    expect(r.medium).toEqual([])
   })
 })

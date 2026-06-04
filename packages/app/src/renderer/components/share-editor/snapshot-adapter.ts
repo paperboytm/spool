@@ -54,15 +54,31 @@ export function buildSnapshotFromEditor(args: {
           .map((t, idx) => ({ id: t.id!, idx }))
           .filter(({ idx }) => !selected.includes(idx))
           .map((t) => t.id)
+  // Hidden turns survive in the `turns` array (the backend validates
+  // `turn_order.length === turns.length`), but their bodies are
+  // BLANKED before upload so the snapshot stored in R2 carries no
+  // record of the content the author chose to exclude. Without this
+  // step, hidden bodies still ride along on the wire — the Reader
+  // hides them client-side, but a direct GET of the snapshot JSON
+  // would leak them. Matches the user's mental model: "unchecked = not
+  // published, full stop."
+  const hiddenIdSet = new Set(hiddenTurnIds)
 
-  const snapshotTurns = redactedConv.turns.map((t) => ({
-    id: t.id!,
-    role: (t.role === 'user' || t.role === 'assistant'
+  const snapshotTurns = redactedConv.turns.map((t) => {
+    const id = t.id!
+    const role = (t.role === 'user' || t.role === 'assistant'
       ? t.role
-      : 'assistant') as 'user' | 'assistant',
-    content: t.body,
-    ...(perTurnRedacted.has(t.id!) ? { redacted: true as const } : {}),
-  }))
+      : 'assistant') as 'user' | 'assistant'
+    if (hiddenIdSet.has(id)) {
+      return { id, role, content: '' }
+    }
+    return {
+      id,
+      role,
+      content: t.body,
+      ...(perTurnRedacted.has(id) ? { redacted: true as const } : {}),
+    }
+  })
 
   return {
     schema_version: 1,

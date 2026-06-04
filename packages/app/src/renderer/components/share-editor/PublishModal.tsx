@@ -4,10 +4,12 @@ import type { Conversation, EditorOpts } from '@spool/share-kit'
 import {
   computeExpiresAt,
   computeUnredactedMatches,
+  validateCustomExpiry,
   type ExpiryOption,
 } from './publish-logic.js'
 import { buildSnapshotFromEditor } from './snapshot-adapter.js'
 import { ConnectCard } from './ConnectCard.js'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { useShareAuth } from '../../hooks/useShareAuth.js'
 import type { PublishSuccess, Visibility } from '../../../shared/share-publish.js'
 
@@ -78,18 +80,23 @@ export function PublishModal({
     [conversation, opts],
   )
   const highBlocked = high.length > 0 && !highOverride
+  const customValidity =
+    expires === 'custom' ? validateCustomExpiry(customExpiry) : 'ok'
+  const expiryInvalid = customValidity !== 'ok'
 
-  // Esc closes — same convention as the rename/delete modals.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !publishing) {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose, publishing])
+  // Esc closes — routed through useHotkeys so the stack-based modal
+  // layer absorbs the key and blocks lower-layer bindings (e.g. ⌘Z
+  // in the underlying editor) from firing while the modal is open.
+  // `modal: true` pushes a new layer; deps on `publishing` so the
+  // closed-over callback reflects the current request state.
+  useHotkeys(
+    {
+      Escape: () => {
+        if (!publishing) onClose()
+      },
+    },
+    { modal: true },
+  )
 
   // If the user picks profile-listed then loses their handle eligibility
   // (e.g. the modal re-renders with hasHandle=false), snap back to
@@ -108,7 +115,7 @@ export function PublishModal({
   }, [high.length, highOverride])
 
   async function handlePublish() {
-    if (highBlocked || publishing) return
+    if (highBlocked || publishing || expiryInvalid) return
     setPublishing(true)
     setError(null)
     try {
@@ -374,12 +381,33 @@ export function PublishModal({
             ))}
           </div>
           {expires === 'custom' && (
-            <input
-              type="datetime-local"
-              value={customExpiry}
-              onChange={(e) => setCustomExpiry(e.target.value)}
-              className="mt-2 h-8 px-2 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-[12.5px] text-warm-text dark:text-dark-text focus:outline-none focus:ring-1 focus:ring-warm-border2 dark:focus:ring-dark-border2"
-            />
+            <>
+              <input
+                type="datetime-local"
+                value={customExpiry}
+                onChange={(e) => setCustomExpiry(e.target.value)}
+                aria-invalid={customValidity === 'past' || customValidity === 'invalid'}
+                className="mt-2 h-8 px-2 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-[12.5px] text-warm-text dark:text-dark-text focus:outline-none focus:ring-1 focus:ring-warm-border2 dark:focus:ring-dark-border2"
+              />
+              {customValidity === 'past' && (
+                <p
+                  role="alert"
+                  data-testid="publish-modal-custom-expiry-error"
+                  className="mt-1.5 text-[11.5px] text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]"
+                >
+                  Pick a future date — earlier than now would publish a share
+                  that's already expired.
+                </p>
+              )}
+              {customValidity === 'invalid' && (
+                <p
+                  role="alert"
+                  className="mt-1.5 text-[11.5px] text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]"
+                >
+                  That date doesn't look right — try again.
+                </p>
+              )}
+            </>
           )}
         </fieldset>
 
@@ -407,7 +435,7 @@ export function PublishModal({
               type="button"
               data-testid="publish-modal-confirm-anyway"
               onClick={() => setHighOverride(true)}
-              disabled={publishing}
+              disabled={publishing || expiryInvalid}
               className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Publish anyway
@@ -417,7 +445,7 @@ export function PublishModal({
               type="button"
               data-testid="publish-modal-submit"
               onClick={() => { void handlePublish() }}
-              disabled={publishing}
+              disabled={publishing || expiryInvalid}
               className={`inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed ${
                 high.length > 0
                   ? 'bg-[color:var(--color-status-error)] hover:opacity-90'

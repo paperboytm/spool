@@ -87,9 +87,17 @@ export function computeUnredactedMatches(
     }
     return true
   }
+  // Hidden turns aren't published — `buildSnapshotFromEditor` blanks
+  // their bodies before upload — so any sensitive matches inside them
+  // are moot. Skip them here too, otherwise the gate fires on data
+  // that will never reach R2 and the warning copy lies to the user.
+  const selected = opts.selected
+  const isHidden = (idx: number): boolean =>
+    selected !== undefined && !selected.includes(idx)
   const high: UnredactedMatch[] = []
   const medium: UnredactedMatch[] = []
   conversation.turns.forEach((turn, idx) => {
+    if (isHidden(idx)) return
     const matches = detectSensitiveSpans(turn.body)
     if (matches.length === 0) return
     for (const m of matches) {
@@ -117,6 +125,12 @@ const DAY_MS = 86_400_000
  * Resolve a fixed expiry preset to the absolute ISO timestamp the
  * backend expects, or undefined for "never". `now` is injectable for
  * deterministic tests.
+ *
+ * No custom date picker: GitHub gists, Notion, Linear, Figma, Google
+ * Docs, Slack offer no expiry at all (revoke only); Dropbox, Loom,
+ * Vercel use fixed presets. None offer arbitrary datetimes for
+ * share-link expiry. If product wants more granularity later, switch
+ * to a date-only picker — never a datetime-local.
  */
 export function computeExpiresAt(
   args: { kind: ExpiryOption },
@@ -129,12 +143,7 @@ export function computeExpiresAt(
       return new Date(now + 7 * DAY_MS).toISOString()
     case '30d':
       return new Date(now + 30 * DAY_MS).toISOString()
-    case 'custom': {
-      const raw = args.custom ?? ''
-      if (!raw) return undefined
-      const t = Date.parse(raw)
-      if (Number.isNaN(t)) return undefined
-      return new Date(t).toISOString()
-    }
+    case '90d':
+      return new Date(now + 90 * DAY_MS).toISOString()
   }
 }
