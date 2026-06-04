@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-describe('signInWithGoogle (orchestrator)', () => {
+describe('signInWith (loopback OAuth orchestrator)', () => {
   beforeEach(() => {
     opened.length = 0
     process.env['SPOOL_GOOGLE_CLIENT_ID_DESKTOP'] = 'test-client.apps.googleusercontent.com'
@@ -37,10 +37,12 @@ describe('signInWithGoogle (orchestrator)', () => {
     delete process.env['SPOOL_SHARE_BACKEND']
   })
 
-  it('throws if client id env var is missing', async () => {
+  it('throws if the provider client id env var is missing', async () => {
     delete process.env['SPOOL_GOOGLE_CLIENT_ID_DESKTOP']
-    const { signInWithGoogle } = await import('./google-oauth.js')
-    await expect(signInWithGoogle()).rejects.toThrow(/SPOOL_GOOGLE_CLIENT_ID_DESKTOP missing/)
+    const { signInWith } = await import('./oauth.js')
+    await expect(signInWith('google')).rejects.toThrow(
+      /SPOOL_GOOGLE_CLIENT_ID_DESKTOP missing/,
+    )
   })
 
   it('throws if Google client secret env var is missing', async () => {
@@ -54,8 +56,9 @@ describe('signInWithGoogle (orchestrator)', () => {
     )
   })
 
-  it('full happy path: opens browser, exchanges code with PKCE, posts to backend', async () => {
+  it('full happy path: opens browser, exchanges code with PKCE, posts to backend with provider', async () => {
     let capturedNonce: string | null = null
+    let capturedProvider: string | null = null
     let capturedVerifier: string | null = null
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -83,6 +86,7 @@ describe('signInWithGoogle (orchestrator)', () => {
         const body = JSON.parse(String(init?.body ?? '{}'))
         expect(body.id_token).toBe('ID.TOKEN.XYZ')
         capturedNonce = body.nonce
+        capturedProvider = body.provider
         return new Response(
           JSON.stringify({
             session_token: 'sess_123',
@@ -94,17 +98,26 @@ describe('signInWithGoogle (orchestrator)', () => {
       throw new Error(`unexpected fetch: ${url}`)
     })
 
-    const { signInWithGoogle } = await import('./google-oauth.js')
-    const result = await signInWithGoogle()
+    const { signInWith } = await import('./oauth.js')
+    const result = await signInWith('google')
 
     expect(opened).toHaveLength(1)
     expect(opened[0]).toContain('accounts.google.com/o/oauth2/v2/auth')
     expect(opened[0]).toContain('code_challenge_method=S256')
     expect(capturedVerifier).toBeTruthy()
     expect(capturedNonce).toBeTruthy()
+    expect(capturedProvider).toBe('google')
     expect(result).toEqual({
       session_token: 'sess_123',
       user: { id: 'u1', email: 'a@b.c', name: 'Anne', avatar_url: null, handle: null },
     })
+  })
+
+  it('rejects an unregistered provider', async () => {
+    const { signInWith } = await import('./oauth.js')
+    // @ts-expect-error — runtime guard, not type-level — proves callers
+    // who lose the type discipline still hit a clear error instead of a
+    // misleading "client id missing" downstream.
+    await expect(signInWith('github')).rejects.toThrow(/unknown provider/)
   })
 })

@@ -3,6 +3,7 @@ import type {
   FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup,
   ListSessionsByIdentityOptions, ProjectSessionSortOrder, SessionsCursor, SessionsPage, DirectoryCount,
   ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
+  PublishedShareCacheItem,
   SessionSource,
   FindingRow, SessionWithFindingCounts, RiskByCategoryRow, OccurrenceBySession,
   FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
@@ -52,6 +53,14 @@ import type { SearchSortOrder } from '../shared/searchSort.js'
 import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
+import type {
+  PublishRequestBody,
+  PublishResult,
+  MySharesResponse,
+  HandleCheckResponse,
+  HandleClaimResponse,
+  ScheduleDeleteResponse,
+} from '../shared/share-publish.js'
 
 export interface AgentInfo {
   id: string
@@ -376,12 +385,36 @@ export interface ShareAuthUser {
 const spoolShare = {
   authAvailable: (): Promise<boolean> =>
     ipcRenderer.invoke('share-auth:available'),
-  signIn: (): Promise<ShareAuthUser> =>
-    ipcRenderer.invoke('share-auth:signin'),
+  // Optional provider: defaults to Google when omitted. Caller hard-codes
+  // the choice (no auto-picking) so an outdated renderer can't accidentally
+  // sign the user in with a provider they didn't pick from the SignIn UI.
+  signIn: (arg?: { provider?: 'google' }): Promise<ShareAuthUser> =>
+    ipcRenderer.invoke('share-auth:signin', arg),
   me: (): Promise<ShareAuthUser | null> =>
     ipcRenderer.invoke('share-auth:me'),
   signOut: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('share-auth:signout'),
+
+  publish: (body: PublishRequestBody): Promise<PublishResult> =>
+    ipcRenderer.invoke('share-publish:publish', body),
+  revoke: (id: string): Promise<{ ok: true }> =>
+    ipcRenderer.invoke('share-publish:revoke', id),
+  myShares: (): Promise<MySharesResponse> =>
+    ipcRenderer.invoke('share-publish:my-shares'),
+  claimHandle: (handle: string): Promise<HandleClaimResponse> =>
+    ipcRenderer.invoke('share-publish:claim-handle', handle),
+  checkHandle: (handle: string): Promise<HandleCheckResponse> =>
+    ipcRenderer.invoke('share-publish:check-handle', handle),
+
+  cachedPublished: (): Promise<PublishedShareCacheItem[]> =>
+    ipcRenderer.invoke('share-publish:cached-published'),
+  cachePublished: (items: PublishedShareCacheItem[]): Promise<{ ok: true }> =>
+    ipcRenderer.invoke('share-publish:cache-published', items),
+
+  scheduleDelete: (): Promise<ScheduleDeleteResponse> =>
+    ipcRenderer.invoke('share-publish:schedule-delete'),
+  cancelDelete: (): Promise<{ ok: true }> =>
+    ipcRenderer.invoke('share-publish:cancel-delete'),
 }
 
 export type SpoolShareAPI = typeof spoolShare

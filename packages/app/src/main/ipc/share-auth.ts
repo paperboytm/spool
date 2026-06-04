@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { signInWithGoogle, type SignInResult } from '../auth/google-oauth.js'
+import { signInWith, type ProviderId, type SignInResult } from '../auth/oauth.js'
 import { saveToken, loadToken, clearToken, isAvailable } from '../auth/session-store.js'
 import { authedFetch } from '../share/api-client.js'
 
@@ -31,15 +31,21 @@ export async function performSignIn(deps: SignInDeps): Promise<SignInResult['use
   return result.user
 }
 
+// Renderer payload for share-auth:signin. The provider arg is optional
+// — clients that pre-date the multi-provider switch keep working
+// because the IPC defaults to Google.
+type SignInArg = { provider?: ProviderId } | undefined
+
 export function registerShareAuthIpc(): void {
   ipcMain.handle('share-auth:available', () => isAvailable())
 
-  ipcMain.handle('share-auth:signin', async () => {
+  ipcMain.handle('share-auth:signin', async (_e, arg: SignInArg) => {
     if (!isAvailable()) throw new Error('OS keychain unavailable')
+    const provider: ProviderId = arg?.provider ?? 'google'
     return performSignIn({
       loadToken,
       saveToken,
-      signIn: signInWithGoogle,
+      signIn: () => signInWith(provider),
       revokePrior: async () => {
         await authedFetch('/api/auth/sign-out', { method: 'POST' })
       },
