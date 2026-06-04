@@ -1,13 +1,11 @@
 -- 0001_init.sql
--- Initial schema for spool-share-db. Mirrors §7 of the design spec
--- (~/Documents/dev-docs/spool/2026-05-19-spool-share-publish-spec-update.md).
+-- Initial schema for spool-share-db.
 --
--- Tables: users, handles, published_shares, audit_log, deletion_queue.
+-- Tables: users, user_identities, handles, published_shares, audit_log, deletion_queue.
 
 CREATE TABLE users (
   id TEXT PRIMARY KEY,                        -- nanoid(16)
-  google_sub TEXT NOT NULL UNIQUE,            -- Google's `sub` claim
-  email TEXT NOT NULL,                        -- may be re-issued by Google over time
+  email TEXT NOT NULL,                        -- email reported by the sign-in provider; may change
   name TEXT,
   avatar_url TEXT,
   created_at INTEGER NOT NULL,
@@ -15,7 +13,19 @@ CREATE TABLE users (
   deletion_pending_until INTEGER,             -- null when not pending
   deleted_at INTEGER                          -- soft delete marker
 );
--- google_sub already has an implicit unique index from the UNIQUE constraint above.
+
+-- One row per linked sign-in method. v0.5 only registers 'google'; the
+-- schema is provider-agnostic so adding GitHub / email later is one
+-- backend Provider entry + a row here per user, not a schema change.
+CREATE TABLE user_identities (
+  provider TEXT NOT NULL,                     -- 'google'
+  provider_sub TEXT NOT NULL,                 -- provider's stable user id
+  user_id TEXT NOT NULL REFERENCES users(id),
+  email TEXT,                                 -- email reported at link time
+  linked_at INTEGER NOT NULL,
+  PRIMARY KEY (provider, provider_sub)
+);
+CREATE INDEX user_identities_user ON user_identities(user_id);
 
 CREATE TABLE handles (
   handle TEXT PRIMARY KEY,                    -- lowercase
@@ -76,6 +86,7 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX audit_user_ts ON audit_log(user_id, ts);
 CREATE INDEX audit_action_ts ON audit_log(action, ts);
+CREATE INDEX audit_ts ON audit_log(ts);
 
 CREATE TABLE deletion_queue (
   user_id TEXT PRIMARY KEY REFERENCES users(id),
