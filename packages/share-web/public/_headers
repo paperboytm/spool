@@ -5,13 +5,13 @@
   Permissions-Policy: interest-cohort=()
 
 /s/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
 
 /@*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
 
 /me
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
 
 /sign-in
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
