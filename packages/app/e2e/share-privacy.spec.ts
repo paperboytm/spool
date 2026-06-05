@@ -235,8 +235,10 @@ test('.spool sanitised download replaces literals with per-kind masks and strips
   await withSensitiveDraft('spool-download', async (window) => {
     await installSaveFilePickerMock(window)
 
-    await window.locator('[data-testid="share-editor-download-trigger"]').click()
-    await window.locator('[data-testid="share-editor-download-option-spool"]').click()
+    await window.locator('[data-testid="share-menu-trigger"]').click()
+    await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    await window.locator('[data-testid="share-menu-export-spool"]').click()
+    await window.locator('[data-testid="share-menu-download"]').click()
 
     const saved = await waitForSavedFile(window, '.spool')
     const doc = JSON.parse(new TextDecoder().decode(saved.bytes)) as {
@@ -273,8 +275,10 @@ test('Markdown export uses per-kind masks wrapped in inline code', async () => {
   await withSensitiveDraft('markdown-export', async (window) => {
     await installSaveFilePickerMock(window)
 
-    await window.locator('[data-testid="share-editor-download-trigger"]').click()
-    await window.locator('[data-testid="share-editor-download-option-md"]').click()
+    await window.locator('[data-testid="share-menu-trigger"]').click()
+    await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    await window.locator('[data-testid="share-menu-export-md"]').click()
+    await window.locator('[data-testid="share-menu-download"]').click()
 
     const saved = await waitForSavedFile(window, '.md')
     const md = new TextDecoder().decode(saved.bytes)
@@ -305,8 +309,10 @@ test('Per-item opt-out keeps that value verbatim in the sanitised .spool', async
       .toContainText('visible')
 
     await installSaveFilePickerMock(window)
-    await window.locator('[data-testid="share-editor-download-trigger"]').click()
-    await window.locator('[data-testid="share-editor-download-option-spool"]').click()
+    await window.locator('[data-testid="share-menu-trigger"]').click()
+    await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    await window.locator('[data-testid="share-menu-export-spool"]').click()
+    await window.locator('[data-testid="share-menu-download"]').click()
 
     const saved = await waitForSavedFile(window, '.spool')
     const doc = JSON.parse(new TextDecoder().decode(saved.bytes)) as {

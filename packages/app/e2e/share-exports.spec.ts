@@ -19,8 +19,14 @@ test.afterAll(async () => {
 })
 
 async function exportAs(window: Awaited<ReturnType<typeof launchApp>>['window'], k: 'png' | 'pdf' | 'md' | 'spool') {
-  await window.locator('[data-testid="share-editor-download-trigger"]').click()
-  await window.locator(`[data-testid="share-editor-download-option-${k}"]`).click()
+  // Old surface: <DownloadButton> exposed a flat trigger + per-format option.
+  // New surface: <ShareMenu> popover with an Export tab (the only tab when
+  // VITE_FEATURE_SHAREPUBLISH is unset, as in e2e). Pick a format radio,
+  // then click Download.
+  await window.locator('[data-testid="share-menu-trigger"]').click()
+  await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+  await window.locator(`[data-testid="share-menu-export-${k}"]`).click()
+  await window.locator('[data-testid="share-menu-download"]').click()
 }
 
 test('.spool export captures a valid SpoolDocument', async () => {
