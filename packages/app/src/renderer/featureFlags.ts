@@ -13,22 +13,14 @@ import { useSecurityEnabledConfig } from './api/securityEnabledCache.js'
 // this is the user's escape hatch from a DEV / env that would otherwise
 // pin it on.
 //
-// `DEV_DEFAULT_ON` is per-flag because not every feature should be
-// ergonomic in DEV:
+//   share — Phase 0 editor, already shipped on main; DEV on by default
+//   so contributors don't have to opt in just to see existing UI.
 //
-//   share         — Phase 0 editor, already shipped on main; DEV on by
-//                   default so contributors don't have to opt in just to
-//                   see existing UI.
-//   sharePublish  — Remote publish + accounts. Pre-launch and not in
-//                   the Labs UI on purpose. Even on DEV, the feature stays
-//                   invisible until VITE_FEATURE_SHAREPUBLISH=1 is set
-//                   (or localStorage `spool.labs.sharePublish=1` for the
-//                   power-user escape hatch). Keeps the published surface
-//                   from intruding on other contributors' dev sessions
-//                   between merge and GA.
+// `sharePublish` is intentionally NOT a LabsFlag — see useSharePublish
+// below. Pre-launch we gate that surface purely on a build-time env var
+// so it stays out of the Labs UI for other contributors.
 const DEV_DEFAULT_ON: Record<LabsFlag, boolean> = {
   share: true,
-  sharePublish: false,
 }
 
 export interface FeatureRuntimeDeps {
