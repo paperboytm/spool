@@ -44,6 +44,7 @@ jobs:
       - run: pnpm --filter @spool-lab/core test
       - run: pnpm --filter @spool-lab/cli build
       - run: pnpm --filter @spool-lab/cli test
+      - run: pnpm --filter @spool/share-kit build
       - run: pnpm --filter @spool/share-kit test
       - run: pnpm --filter @spool/app test
 
