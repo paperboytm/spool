@@ -59,14 +59,23 @@ export function SignIn({ next }: Props) {
     fetchMe().then((r) => {
       if (cancelled) return
       if (r.kind === 'ok') {
-        // Belt-and-braces vs CodeQL's js/client-side-unvalidated-url-redirection:
-        // `dest` is already nextSafe()-filtered (strips `//`, `/\`, `..`,
-        // and javascript:/data:/vbscript: schemes; forces a leading `/`),
-        // but static analysis can't see through the helper. Re-asserting
-        // the same-origin shape at the redirect site keeps the safety
-        // locally provable and survives any future loosening of nextSafe.
-        const sameOrigin = dest.startsWith('/') && !dest.startsWith('//')
-        window.location.replace(sameOrigin ? dest : '/me')
+        // Resolve `dest` through the URL constructor against the current
+        // origin and forward only when the parsed origin matches. CodeQL
+        // (js/client-side-unvalidated-url-redirection) recognises this
+        // pattern as a same-origin guard, whereas a string-prefix check
+        // is not visible to the static flow analysis even though it's
+        // sufficient on paper. nextSafe() upstream is the primary line
+        // of defence; this is the locally-provable belt-and-braces.
+        let target = '/me'
+        try {
+          const url = new URL(dest, window.location.origin)
+          if (url.origin === window.location.origin) {
+            target = url.pathname + url.search + url.hash
+          }
+        } catch {
+          // Malformed URL → keep the safe default.
+        }
+        window.location.replace(target)
         return
       }
       setChecking(false)
