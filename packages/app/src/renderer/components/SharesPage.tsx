@@ -184,6 +184,58 @@ function PublishedList() {
   const { items, loading, refresh, noteLocalMutation } = usePublishedShares()
   const [busyId, setBusyId] = useState<string | null>(null)
 
+  // Re-fetch the published list when this window regains focus — picks up
+  // remote revocations (user opened spool.pro/me on the web and revoked)
+  // that the desktop wouldn't otherwise see until a manual restart.
+  useEffect(() => {
+    if (!user) return
+    function onFocus() { void refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [user, refresh])
+
+  // After signing in via the empty-state CTA, the hook's initial mount
+  // ran with no token and returned an empty list. Trigger a manual
+  // refresh so the list actually populates. Errors surface as a toast
+  // — without this the button appears to do nothing on failure (the
+  // IPC rejection bubbles through `void` and the user gets no feedback).
+  const [signingIn, setSigningIn] = useState(false)
+  async function handleSignIn() {
+    if (signingIn) return
+    setSigningIn(true)
+    try {
+      await signIn()
+      await refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // Strip Electron's "Error invoking remote method '…': Error:" wrapper
+      // so the toast reads as a plain product error, not a stack trace.
+      const cleaned = msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
+      toast.error("Couldn't sign in", { description: cleaned })
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  // Auth-loading flicker fix: render a skeleton while useShareAuth is
+  // resolving the cookie. Without this, the brief `user === null`
+  // window before `/me` returns paints the "Sign in" CTA, then snaps
+  // to the published list. The skeleton matches the same shape as
+  // the post-auth loading state below so the transition is invisible.
+  if (authLoading) {
+    return (
+      <ul data-testid="published-skeleton" className="flex flex-col gap-1 px-3 pb-6" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <li
+            key={i}
+            className="h-[64px] rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse"
+            style={{ opacity: 1 - i * 0.2 }}
+          />
+        ))}
+      </ul>
+    )
+  }
+
   if (!user) {
     return (
       <FeaturedEmptyState
@@ -194,7 +246,7 @@ function PublishedList() {
           <button
             type="button"
             data-testid="published-signin"
-            onClick={() => { void signIn() }}
+            onClick={() => { void handleSignIn() }}
             disabled={signingIn}
             className="inline-flex items-center gap-2 h-8 px-3 rounded-md text-[12px] font-medium bg-white dark:bg-dark-surface2 text-[#1C1C18] dark:text-dark-text border border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
@@ -212,7 +264,19 @@ function PublishedList() {
   }
 
   if (loading && items.length === 0) {
-    return null
+    // Network fetch can take several hundred ms — return a minimal
+    // skeleton instead of a blank panel so the user has feedback.
+    return (
+      <ul data-testid="published-skeleton" className="flex flex-col gap-1 px-3 pb-6" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <li
+            key={i}
+            className="h-[64px] rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse"
+            style={{ opacity: 1 - i * 0.2 }}
+          />
+        ))}
+      </ul>
+    )
   }
 
   if (items.length === 0) {
@@ -289,7 +353,14 @@ function PublishedRow({
   onUnpublish: () => void
 }) {
   const revoked = item.revoked_at !== null
-  const expiresSoon = item.expires_at !== null && item.expires_at > Date.now()
+  // "Soon" means within 7 days — flagging a year-from-now expiry as
+  // "expiring soon" defeats the badge's purpose. The Expires row in
+  // the UI still appears via this guard, so renamed to reflect the
+  // narrow window.
+  const EXPIRE_SOON_MS = 7 * 24 * 60 * 60 * 1000
+  const expiresSoon = item.expires_at !== null
+    && item.expires_at > Date.now()
+    && item.expires_at - Date.now() < EXPIRE_SOON_MS
   const publishedLabel = new Date(item.published_at).toLocaleDateString()
   return (
     <li

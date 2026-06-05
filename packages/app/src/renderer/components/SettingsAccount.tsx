@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { ConnectCard } from './share-editor/ConnectCard.js'
 import { DeleteAccountConfirmModal } from './DeleteAccountConfirmModal.js'
 import { useShareAuth } from '../hooks/useShareAuth.js'
+
+// 320ms matches the web /me HandleClaim debounce — see share-web/Me.tsx.
+// Without it, every keystroke fires a backend IPC + network call, and
+// out-of-order responses can stamp a stale 'available' over a fresh
+// 'taken' when the user is typing fast.
+const HANDLE_CHECK_DEBOUNCE_MS = 320
 
 type DeletionStatus =
   | { kind: 'idle' }
@@ -22,6 +28,10 @@ export default function SettingsAccount() {
   // signal beyond the disabled-attribute flicker.
   const [scheduling, setScheduling] = useState(false)
   const [cancellingDelete, setCancellingDelete] = useState(false)
+  // Sequence counter drops out-of-order checkHandle responses; debounce
+  // timer collapses a burst of keystrokes into a single network call.
+  const checkSeqRef = useRef(0)
+  const debounceRef = useRef<number | null>(null)
 
   // Reset the handle draft whenever the signed-in identity changes so the
   // claim input doesn't carry a stale value across account switches.
@@ -54,24 +64,29 @@ export default function SettingsAccount() {
     )
   }
 
-  const checkHandle = async (h: string) => {
-    setHandleStatus('checking')
-    try {
-      const r = await window.spoolShare.checkHandle(h)
-      setHandleStatus(r.available ? 'available' : 'taken')
-    } catch {
-      setHandleStatus('invalid')
-    }
-  }
-
   const onHandleChange = (v: string) => {
     const normalized = v.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase().slice(0, 24)
     setHandleDraft(normalized)
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
     if (normalized.length < 3) {
       setHandleStatus(normalized.length === 0 ? 'idle' : 'invalid')
       return
     }
-    void checkHandle(normalized)
+    setHandleStatus('checking')
+    const seq = ++checkSeqRef.current
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const r = await window.spoolShare.checkHandle(normalized)
+        if (seq !== checkSeqRef.current) return
+        setHandleStatus(r.available ? 'available' : 'taken')
+      } catch {
+        if (seq !== checkSeqRef.current) return
+        setHandleStatus('invalid')
+      }
+    }, HANDLE_CHECK_DEBOUNCE_MS)
   }
 
   const onClaim = async () => {
