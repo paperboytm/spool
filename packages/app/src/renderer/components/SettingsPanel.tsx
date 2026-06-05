@@ -108,17 +108,6 @@ const TAB_DEFS: {
     ),
   },
   {
-    id: 'account',
-    labelKey: 'settings.tab_account',
-    fallbackLabel: 'Account',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-    ),
-  },
-  {
     id: 'labs',
     labelKey: 'settings.tab_labs',
     icon: (
@@ -137,6 +126,21 @@ const TAB_DEFS: {
         <path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4z"/>
         <path d="M12 8v4"/>
         <path d="M12 16h.01"/>
+      </svg>
+    ),
+  },
+  // Account is pinned to the bottom of the rail (after feature tabs) so
+  // toggling the `sharePublish` flag — which conditionally hides this
+  // row — doesn't shift Labs/Security up and down. Matches the GitHub
+  // and Slack settings convention: identity sits below configuration.
+  {
+    id: 'account',
+    labelKey: 'settings.tab_account',
+    fallbackLabel: 'Account',
+    icon: (
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
       </svg>
     ),
   },

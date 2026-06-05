@@ -91,7 +91,20 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
         {publishEnabled ? (
           <SharesTabStrip tab={tab} onTab={setTab} draftsCount={drafts.length} />
         ) : (
-          <div className="h-6" />
+          // sharePublish off: no tab strip, just a single "Drafts" label
+          // in the same visual slot — matches the pre-publish baseline so
+          // the header doesn't collapse to a lone + icon.
+          <div
+            className="inline-flex items-center gap-1.5 h-6 px-2 font-mono text-[11px] tabular-nums text-warm-text dark:text-dark-text"
+            aria-label="Drafts"
+          >
+            <span>Drafts</span>
+            {drafts.length > 0 && (
+              <span className="text-warm-faint dark:text-dark-muted">
+                {drafts.length}
+              </span>
+            )}
+          </div>
         )}
         {(tab === 'drafts' || !publishEnabled) && onStartNewDraft && (
           <button
