@@ -59,7 +59,14 @@ export function SignIn({ next }: Props) {
     fetchMe().then((r) => {
       if (cancelled) return
       if (r.kind === 'ok') {
-        window.location.replace(dest)
+        // Belt-and-braces vs CodeQL's js/client-side-unvalidated-url-redirection:
+        // `dest` is already nextSafe()-filtered (strips `//`, `/\`, `..`,
+        // and javascript:/data:/vbscript: schemes; forces a leading `/`),
+        // but static analysis can't see through the helper. Re-asserting
+        // the same-origin shape at the redirect site keeps the safety
+        // locally provable and survives any future loosening of nextSafe.
+        const sameOrigin = dest.startsWith('/') && !dest.startsWith('//')
+        window.location.replace(sameOrigin ? dest : '/me')
         return
       }
       setChecking(false)
