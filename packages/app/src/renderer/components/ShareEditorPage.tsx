@@ -28,6 +28,8 @@ import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
 import { useUndoableState } from '../hooks/useUndoableState.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
+import { sharePublicUrl } from '../lib/sharePublicUrl.js'
+import type { PublishedRow, PublishSuccess, Visibility } from '../../shared/share-publish.js'
 
 type Props = {
   /** Stable id of the share_drafts row to autosave into. */
@@ -100,6 +102,143 @@ export default function ShareEditorPage({
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [pdfPreview, setPdfPreview] = useState<{ url: string; filename: string } | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // Single source of truth for "is this draft currently published?"
+  //   - `undefined` ⇒ lookup in flight, popover suppresses the form/manage
+  //     flash until we know.
+  //   - `null`      ⇒ no live share.
+  //   - object      ⇒ live share.
+  //
+  // The state moves in three ways:
+  //   1. Initial cache lookup on mount (fast, local).
+  //   2. Background stale-while-revalidate refresh against /api/me/shares
+  //      (slow, network) — closes the "another device / web revoked it"
+  //      window so the editor doesn't keep showing a dead share's
+  //      manage view.
+  //   3. Local user action — publish, republish, unpublish — surfaced by
+  //      ShareMenu via onPublishedChange.
+  //
+  // `mutationGen` increments on every local mutation; the SWR effect
+  // captures the generation it saw at fetch start and discards its
+  // result if the user has acted in the meantime. Without this, a slow
+  // myShares response could overwrite a fresh publish or a just-fired
+  // unpublish (race-y but observable on dev's wrangler with cold KV).
+  // The cache row owns three things at once: the slug + version (drives
+  // PublishSuccess), the revoked_at flag (gates manage vs publish form),
+  // and the `client_request_id` content hash (drives the Unpublished
+  // edits badge). Carrying it through as the single state value keeps
+  // those three in lockstep — instead of three separate values that
+  // can drift on a partial update.
+  const [publishedRow, setPublishedRow] = useState<PublishedShareCacheItem | null | undefined>(undefined)
+  const mutationGen = useRef(0)
+
+  // Derived: PublishSuccess shape for the manage view; null when no live row.
+  const published = useMemo<PublishSuccess | null | undefined>(() => {
+    if (publishedRow === undefined) return undefined
+    if (!publishedRow || publishedRow.revoked_at !== null) return null
+    return {
+      id: publishedRow.id,
+      url: sharePublicUrl(publishedRow.id),
+      version: publishedRow.version,
+    }
+  }, [publishedRow])
+
+  const handlePublishedChange = useCallback((next: PublishSuccess | null, row?: PublishedRow) => {
+    mutationGen.current += 1
+    if (!next) {
+      setPublishedRow(null)
+      return
+    }
+    // Main hands us the freshly-written cache row inside the publish
+    // IPC response, so we can update local state without going through
+    // the cache. Bypasses the race where an in-flight myShares poll's
+    // `replaceAll` would clobber main's write between our publish and
+    // our re-read — the manage view would flash the new version then
+    // revert to the old one. If the caller didn't supply a row (an
+    // older path or a test mock), fall back to a cache re-read.
+    if (row) {
+      setPublishedRow(row)
+      return
+    }
+    const localGen = mutationGen.current
+    void (async () => {
+      try {
+        const cached = await window.spoolShare.getPublishedByDraft(draftId)
+        if (mutationGen.current !== localGen) return
+        if (cached && cached.revoked_at === null) setPublishedRow(cached)
+      } catch (err) {
+        console.warn('Refresh published row from cache after publish failed:', err)
+      }
+    })()
+  }, [draftId])
+
+  useEffect(() => {
+    let alive = true
+    setPublishedRow(undefined)
+    // Reset the generation when the draft identity changes so the new
+    // SWR cycle compares against itself, not against a prior draft's
+    // mutation count.
+    mutationGen.current = 0
+    const fetchGen = mutationGen.current
+
+    void (async () => {
+      // Step 1: cache lookup. Fast; commits the initial view.
+      let row: PublishedShareCacheItem | null = null
+      try {
+        row = await window.spoolShare.getPublishedByDraft(draftId)
+      } catch (err) {
+        console.warn('Lookup published share for draft (cache) failed:', err)
+      }
+      if (!alive) return
+      // Only land the cache result if the user hasn't already acted in
+      // the gap between mount and now (e.g. a very fast publish-on-mount).
+      if (mutationGen.current === fetchGen) setPublishedRow(row)
+
+      // Step 2: SWR. Refresh from /api/me/shares so a publish on
+      // another surface (web Me page, second device) corrects the
+      // editor. Same guard: drop the result if the user has acted.
+      try {
+        const remote = await window.spoolShare.myShares()
+        if (!alive) return
+        // Re-check the generation BEFORE writing to the cache. The
+        // user can publish/revoke during the myShares fetch, and main
+        // has already written the fresh row into the cache by then.
+        // If we blindly call cachePublished (which is `replaceAll`),
+        // we'd clobber that write with the now-stale remote snapshot
+        // — the editor's manage view would briefly flash the new
+        // version then revert to the old one. Skipping the cache write
+        // is safe: a future SWR cycle will reconcile once the remote
+        // catches up.
+        if (mutationGen.current !== fetchGen) return
+        const now = Date.now()
+        await window.spoolShare.cachePublished(
+          remote.items.map((r) => ({
+            id: r.id,
+            title: r.title,
+            visibility: r.visibility,
+            version: r.version,
+            published_at: r.published_at,
+            revoked_at: r.revoked_at,
+            expires_at: r.expires_at,
+            draft_id: r.draft_id,
+            client_request_id: r.client_request_id,
+            updated_at: now,
+          })),
+        )
+        const refreshed = await window.spoolShare.getPublishedByDraft(draftId)
+        if (!alive) return
+        if (mutationGen.current !== fetchGen) return
+        // Only restate when meaningful state changed; avoids re-renders
+        // when SWR confirms the same row we already had.
+        setPublishedRow((curr) => publishedRowEqual(curr, refreshed) ? curr : refreshed)
+      } catch {
+        // myShares fails when the user is signed out (401), offline, or
+        // the share backend is down. The cache result from step 1 is
+        // already on screen and stays good — silently drop the SWR.
+      }
+    })()
+    return () => { alive = false }
+  }, [draftId])
   // Draft title state lives in `editable.state.title` above; the rename
   // modal still uses `title` / `setTitle` directly. Empty strings persist
   // as-is during the edit but resolve to a sane fallback ("Untitled") at
@@ -149,6 +288,62 @@ export default function ShareEditorPage({
     () => ({ ...conversation, title: effectiveTitle }),
     [conversation, effectiveTitle],
   )
+
+  // Drift detection: if the live draft hashes to something different
+  // from the publish-time content hash on the cache row, the editor
+  // shows "Unpublished edits" so the user knows their next Republish
+  // would actually push a new version (rather than short-circuit to
+  // the existing one via the backend idempotency guard).
+  //
+  // We hash with the row's existing visibility + expires_at so the
+  // comparison isolates content drift — visibility / expiry changes
+  // are explicit user actions in the publish form and will trigger
+  // their own re-hash on submit.
+  //
+  // Legacy rows with no `client_request_id` (pre-v0.5.0 publishes
+  // that never landed the column) get no badge: we have nothing to
+  // compare against, so silently treating them as up-to-date is
+  // better than crying wolf on every open.
+  const [hasUnpublishedEdits, setHasUnpublishedEdits] = useState(false)
+  useEffect(() => {
+    if (
+      !publishedRow ||
+      publishedRow.revoked_at !== null ||
+      !publishedRow.client_request_id
+    ) {
+      setHasUnpublishedEdits(false)
+      return
+    }
+    let alive = true
+    const rowVisibility = publishedRow.visibility as Visibility
+    const rowExpiresIso = publishedRow.expires_at
+      ? new Date(publishedRow.expires_at).toISOString()
+      : null
+    const rowHash = publishedRow.client_request_id
+    void (async () => {
+      try {
+        const snapshot = buildSnapshotFromEditor({
+          conversation: liveConversation,
+          opts,
+        })
+        const key = await computePublishIdempotencyKey({
+          snapshot,
+          visibility: rowVisibility,
+          expires_at: rowExpiresIso,
+        })
+        if (!alive) return
+        setHasUnpublishedEdits(key !== rowHash)
+      } catch (err) {
+        if (!alive) return
+        // Hash compute failures shouldn't lie — default to no badge.
+        console.warn('Compute live draft hash for drift check failed:', err)
+        setHasUnpublishedEdits(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [publishedRow, liveConversation, opts])
 
   // Autosave opts changes back into share_drafts. Debounced so a
   // rapid sequence of clicks (e.g. paging through colorways) collapses
@@ -532,7 +727,17 @@ export default function ShareEditorPage({
                   {t('shareEditor.savePdf')}
                 </button>
               </div>
-              <iframe src={pdfPreview.url} title={t('shareEditor.pdfPreviewTitle')} className="flex-1 w-full border-0 bg-white" />
+              {/* `<iframe>` lets Chromium's built-in PDF MIME handler
+               *  paint the preview directly — toolbar, page thumbnails,
+               *  zoom controls. This relies on the renderer's CSP
+               *  permitting `frame-src 'self' blob:`; with stricter
+               *  values the iframe goes blank without a console hint.
+               *  See csp.ts for the directive and the rationale. */}
+              <iframe
+                src={pdfPreview.url}
+                title={t('shareEditor.pdfPreviewTitle')}
+                className="flex-1 w-full border-0 bg-white"
+              />
             </div>
           </div>
         )}
@@ -575,6 +780,23 @@ export default function ShareEditorPage({
  * click outside cancels. Empty title is allowed; the caller resolves
  * the empty fallback ("Untitled") at render time.
  */
+function publishedRowEqual(
+  a: PublishedShareCacheItem | null | undefined,
+  b: PublishedShareCacheItem | null | undefined,
+): boolean {
+  if (a == null && b == null) return a === b // distinguish undefined vs null intentionally
+  if (a == null || b == null) return false
+  // Drop `updated_at` from the comparison — the SWR refresh restamps
+  // it on every fetch even when nothing else changed, so including it
+  // would re-trigger a render every poll for no behavioural reason.
+  return (
+    a.id === b.id &&
+    a.version === b.version &&
+    a.revoked_at === b.revoked_at &&
+    a.client_request_id === b.client_request_id
+  )
+}
+
 function RenameDraftModal({
   initialTitle,
   onSave,

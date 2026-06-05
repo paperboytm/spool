@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   resolveFeatureRuntime,
   resolveSecurityEnabled,
+  resolveSharePublish,
   securityBuildCapable,
   type FeatureRuntimeDeps,
 } from './featureFlags.js'
