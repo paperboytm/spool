@@ -6,7 +6,7 @@ import { getMonthDayFormatter } from '../../shared/formatDate.js'
 import { useShareDrafts } from '../hooks/useShareDrafts'
 import { useShareAuth } from '../hooks/useShareAuth.js'
 import { usePublishedShares } from '../hooks/usePublishedShares.js'
-import { useFeature } from '../featureFlags.js'
+import { useSharePublish } from '../featureFlags.js'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { sharePublicOrigin, sharePublicUrl } from '../lib/sharePublicUrl.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
@@ -37,7 +37,7 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
   const [tab, setTab] = useState<SharesTab>('drafts')
   // Published tab is sub-gated behind `sharePublish` — when the publish
   // backend is off, Shares is drafts-only and the tab strip disappears.
-  const publishEnabled = useFeature('sharePublish')
+  const publishEnabled = useSharePublish()
 
   const handleOpenPicker = useCallback(() => setPickerOpen(true), [])
   const handleClosePicker = useCallback(() => setPickerOpen(false), [])

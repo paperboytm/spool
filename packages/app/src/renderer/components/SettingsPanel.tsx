@@ -9,7 +9,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
 import SecurityPane from './Settings/SecurityPane.js'
-import { useSecurityEnabled } from '../featureFlags.js'
+import { useSecurityEnabled, useSharePublish } from '../featureFlags.js'
 import LabsTab from './LabsTab.js'
 import SettingsAccount from './SettingsAccount.js'
 import Toggle from './Toggle.js'
@@ -163,6 +163,11 @@ export default function SettingsPanel({
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const { t } = useTranslation()
   const securityEnabled = useSecurityEnabled()
+  // Account tab is the spool.pro identity surface (sign-in, handle,
+  // delete-account schedule). Sub-gated behind the share-publish flag
+  // so the tab doesn't appear in pre-launch dev builds that don't
+  // opt into the publish stack.
+  const publishEnabled = useSharePublish()
 
   useHotkeys({ Escape: onClose }, { modal: true })
 
@@ -180,7 +185,10 @@ export default function SettingsPanel({
             <h2 className="text-[22px] font-bold text-warm-text dark:text-dark-text leading-none">{t('settings.title')}</h2>
           </div>
           <div className="px-2 space-y-[2px]">
-            {TAB_DEFS.filter(def => def.id !== 'security' || securityEnabled).map(def => (
+            {TAB_DEFS
+              .filter(def => def.id !== 'security' || securityEnabled)
+              .filter(def => def.id !== 'account' || publishEnabled)
+              .map(def => (
               <button
                 key={def.id}
                 type="button"

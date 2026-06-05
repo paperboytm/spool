@@ -5,7 +5,7 @@
 // The explicit "0" is the reason this isn't just a boolean pref —
 // without it, a user couldn't turn off a feature that DEV or env pins on.
 
-export type LabsFlag = 'share' | 'sharePublish'
+export type LabsFlag = 'share'
 
 const PREFIX = 'spool.labs.'
 
