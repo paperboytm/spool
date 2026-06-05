@@ -46,7 +46,7 @@ test('.spool export captures a valid SpoolDocument', async () => {
     conversation: { turns: unknown[]; title: string }
     opts: { template: string }
   }
-  expect(doc.version).toBe(1)
+  expect(doc.version).toBe(2)
   expect(doc.opts.template).toBe('chat')
   expect(Array.isArray(doc.conversation.turns)).toBe(true)
   expect(doc.conversation.turns.length).toBeGreaterThan(0)
