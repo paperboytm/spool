@@ -168,6 +168,14 @@ export default function SettingsPanel({
   // so the tab doesn't appear in pre-launch dev builds that don't
   // opt into the publish stack.
   const publishEnabled = useSharePublish()
+  const visibleTabs = TAB_DEFS.filter(def => {
+    if (def.id === 'security' && !securityEnabled) return false
+    if (def.id === 'account' && !publishEnabled) return false
+    return true
+  })
+  // If the Account tab was active when the flag flipped off, fall back
+  // to General so the panel doesn't render against a hidden tab.
+  const activeTab: SettingsTab = !publishEnabled && tab === 'account' ? 'general' : tab
 
   useHotkeys({ Escape: onClose }, { modal: true })
 
