@@ -15,7 +15,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'es2022',
-    sourcemap: true,
+    // No sourcemaps in production. The reader is the most public
+    // surface in the product — emitting .js.map exposes the entire
+    // unminified source (every template, redact preprocessor, state
+    // machine) via DevTools. Switch to 'hidden' if we ever wire up
+    // a backend that ingests sourcemaps for crash symbolication.
+    sourcemap: false,
   },
   server: {
     port: 3002,

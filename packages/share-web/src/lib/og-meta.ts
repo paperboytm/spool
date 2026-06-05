@@ -60,11 +60,24 @@ export function buildOgTagBlock(meta: OgMeta): string {
 }
 
 /** Replace the static template <title>spool.pro</title> with the
- *  caller's tag block, inserted immediately before </head>. The replace
- *  is intentionally narrow — we only touch the bits we own; everything
- *  else (vite-generated <script>, etc) flows through unchanged. */
+ *  caller's tag block, inserted immediately before </head>. Also strip
+ *  the static `<meta name="robots" content="noindex">` — the SPA shell
+ *  ships with noindex so the bare /index.html doesn't get crawled, but
+ *  a served-with-200 share page IS something we want indexed. (Failure
+ *  paths in [id].ts call passthroughShell instead, leaving the noindex
+ *  intact for 404 / 410 / 502 / 500.)
+ *
+ *  The replace is intentionally narrow — we only touch the bits we
+ *  own; everything else (vite-generated <script>, etc) flows through
+ *  unchanged. Returns the html untouched (and warns) when </head> is
+ *  missing so a corrupted ASSETS response doesn't fail silently. */
 export function injectMetaIntoHtml(html: string, tagBlock: string): string {
+  if (!/<\/head>/i.test(html)) {
+    console.warn('[og-meta] </head> not found in HTML shell — OG tags not injected')
+    return html
+  }
   return html
     .replace(/<title>[^<]*<\/title>\s*/i, '')
+    .replace(/<meta[^>]+name=["']robots["'][^>]*>\s*/i, '')
     .replace(/<\/head>/i, `    ${tagBlock}\n  </head>`)
 }

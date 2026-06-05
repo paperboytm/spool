@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { buildOgTagBlock, injectMetaIntoHtml } from './og-meta'
 
@@ -94,7 +94,63 @@ describe('injectMetaIntoHtml', () => {
 
   it('does nothing destructive when </head> is missing', () => {
     const html = '<html><body>oops</body></html>'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const out = injectMetaIntoHtml(html, '<meta x="y">')
     expect(out).toBe(html)
+    // Surfacing the failure makes a corrupted ASSETS response observable
+    // in Cloudflare logs instead of silently shipping OG-less pages.
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('strips the static <meta name="robots" content="noindex"> on inject', () => {
+    // The SPA shell ships with noindex so the bare /index.html stays out
+    // of search results. A served-with-200 share page is something we
+    // want indexed, so the inject step must remove the noindex.
+    const html = [
+      '<!doctype html>',
+      '<html lang="en">',
+      '  <head>',
+      '    <meta charset="UTF-8" />',
+      '    <meta name="robots" content="noindex" />',
+      '    <title>spool.pro</title>',
+      '  </head>',
+      '  <body></body>',
+      '</html>',
+    ].join('\n')
+    const out = injectMetaIntoHtml(html, '<meta property="og:title" content="hi">')
+    expect(out).not.toMatch(/name=["']robots["']/i)
+  })
+
+  it('leaves the noindex meta alone when </head> is missing (passthrough)', () => {
+    const html = '<meta name="robots" content="noindex">'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const out = injectMetaIntoHtml(html, '<meta x="y">')
+    expect(out).toBe(html)
+    warn.mockRestore()
+  })
+})
+
+describe('robots / cache invariants', () => {
+  // These invariants matter on the live /s/<id> Pages Function: a 200
+  // response should be indexable, but the failure passthrough paths
+  // (passthroughShell in [id].ts) MUST keep noindex so that 410/404
+  // shells don't pollute search results.
+  it('a successful inject + buildOgTagBlock combo has no robots meta and a canonical link', () => {
+    const html = [
+      '<!doctype html>',
+      '<html><head>',
+      '<meta name="robots" content="noindex">',
+      '<title>spool.pro</title>',
+      '</head><body></body></html>',
+    ].join('\n')
+    const block = buildOgTagBlock({
+      title: 'Hi',
+      ogImageUrl: 'https://spool.pro/api/og/abc.png',
+      canonicalUrl: 'https://spool.pro/s/abc',
+    })
+    const out = injectMetaIntoHtml(html, block)
+    expect(out).not.toMatch(/name=["']robots["']/i)
+    expect(out).toContain('rel="canonical"')
   })
 })
