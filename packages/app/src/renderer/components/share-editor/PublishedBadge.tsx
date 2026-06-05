@@ -30,10 +30,14 @@ export function PublishedBadge({ url, onAction }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('mousedown', onDocClick)
+    // Capture phase — ShareEditorPage's preview pane and control panel
+    // both call stopPropagation on mousedown, so a bubble-phase listener
+    // wouldn't fire when the user clicks outside the badge but inside
+    // those zones. Memory: feedback_capture_phase_outside_click.
+    document.addEventListener('mousedown', onDocClick, true)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('mousedown', onDocClick, true)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
