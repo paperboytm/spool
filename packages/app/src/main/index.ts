@@ -62,6 +62,7 @@ import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollaps
 import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import { registerShareAuthIpc } from './ipc/share-auth.js'
+import { installRendererCsp } from './security/csp.js'
 import { registerSharePublishIpc } from './ipc/share-publish.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
@@ -612,6 +613,12 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 }
 
 app.whenReady().then(async () => {
+  // Renderer CSP — has to land BEFORE any BrowserWindow loads its URL,
+  // otherwise the first response slips through with whatever Vite (or
+  // the bundled file:// loader) emits and Electron's "Insecure CSP"
+  // warning fires once before our header takes over.
+  installRendererCsp({ dev: isDevMode })
+
   // Hydrate the agent-binary path cache from disk before anything has a
   // chance to call `cachedResolveAsync`. Without this every cold launch
   // re-runs `<user-shell> -ilc 'command -v ...'` once per agent — three
