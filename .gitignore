@@ -31,6 +31,16 @@ dist-electron/
 # Local env
 .env
 .env.local
+.env.development.local
+.env.production.local
+# wrangler local secrets (committed only as .dev.vars.example)
+.dev.vars
+# wrangler local state (D1/KV/R2 emulated to disk)
+.wrangler/
+# Optional operator-only override containing real prod resource ids
+# (wrangler.toml committed has placeholders; the dashboard is the
+# source of truth for prod bindings).
+wrangler.toml.local
 
 # Spool DB (user data, not committed)
 .spool/
