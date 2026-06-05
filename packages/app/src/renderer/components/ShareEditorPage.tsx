@@ -20,8 +20,7 @@ import type { ShareDraftSourceKind } from '@spool-lab/core'
 import PageLayout from './PageLayout.js'
 import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
 import { ControlPanel } from './share-editor/ControlPanel.js'
-import { DownloadButton } from './share-editor/DownloadButton.js'
-import { PublishButton } from './share-editor/PublishButton.js'
+import { ShareMenu } from './share-editor/ShareMenu.js'
 import type { PublishedShareCacheItem } from '@spool-lab/core'
 import { computePublishIdempotencyKey } from '../lib/publishIdempotency.js'
 import { buildSnapshotFromEditor } from './share-editor/snapshot-adapter.js'
@@ -463,16 +462,14 @@ export default function ShareEditorPage({
         />
       </div>
       <div className="flex-1" />
-      <PublishButton
+      <ShareMenu
         draftId={draftId}
         getEditorState={() => ({ conversation: liveConversation, opts })}
         onRedactAll={() => setOpts({ ...opts, redact: true, redactExclude: undefined })}
         published={published}
         hasUnpublishedEdits={hasUnpublishedEdits}
         onPublishedChange={handlePublishedChange}
-      />
-      <DownloadButton
-        saving={saveState === 'saving'}
+        exporting={saveState === 'saving'}
         onExport={(fmt) => {
           if (fmt === 'png') void exportPng()
           else if (fmt === 'pdf') void exportPdf()

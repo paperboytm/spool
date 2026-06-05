@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useShareAuth } from '../../hooks/useShareAuth.js'
 
-/** Embedded sign-in card. Lives inside PublishModal (signed-out) and
- *  inside SettingsAccount (signed-out) so the user lands in one
- *  consistent surface no matter how they trigger sign-in.
+/** Embedded sign-in card. Lives inside the Share popover's Publish
+ *  tab (signed-out branch) and inside SettingsAccount (signed-out)
+ *  so the user lands in one consistent surface no matter how they
+ *  trigger sign-in.
  *
  *  The OAuth dance runs via useShareAuth.signIn — which wraps the
  *  IPC and broadcasts an auth-change event so every other mounted

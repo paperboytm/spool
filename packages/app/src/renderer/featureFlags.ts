@@ -34,6 +34,40 @@ export function resolveFeatureRuntime(
   return deps.dev || deps.envEnabled(flag.toUpperCase())
 }
 
+/**
+ * Pure resolver for the share-publish gate. Split out from the hook
+ * `useSharePublish` so unit tests can drive the decision without
+ * stubbing `import.meta.env`.
+ *
+ * Why this gate isn't a LabsFlag:
+ *  - Pre-launch we don't want this surface exposed via the Labs UI to
+ *    other contributors poking around dev builds.
+ *  - The flag is purely a build-time concern (Vite inlines the env
+ *    value, prod builds don't define it) so a localStorage tri-state
+ *    adds no value and only creates a "stale labs override pinned the
+ *    flag off and I had to remember to clear it" DX trap.
+ *  - DEV does NOT default this on. Contributors who don't actively
+ *    work on share-publish shouldn't see the half-finished surface
+ *    just for running `pnpm dev`. Opt in by adding
+ *    `VITE_FEATURE_SHAREPUBLISH=1` to packages/app/.env.development.local
+ *    (gitignored).
+ *
+ * At GA the body of `useSharePublish` becomes `return true` (or this
+ * helper is removed) — single source of truth, no labs row, no
+ * scattered envEnabled calls.
+ */
+export function resolveSharePublish(
+  env: Record<string, string | undefined>,
+): boolean {
+  return env['VITE_FEATURE_SHAREPUBLISH'] === '1'
+}
+
+export function useSharePublish(): boolean {
+  return resolveSharePublish(
+    import.meta.env as Record<string, string | undefined>,
+  )
+}
+
 export function useFeature(flag: LabsFlag): boolean {
   return useSyncExternalStore(
     (onChange) => subscribeLabsFlag(flag, onChange),

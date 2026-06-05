@@ -71,9 +71,10 @@ export function useShareAuth() {
   }, [])
 
   /** Re-fetch /me without going through the OAuth flow. Used by surfaces
-   *  that embed a child sign-in component (e.g. the PublishModal's
-   *  ConnectCard branch) so the parent can flip from "signed-out" to
-   *  "signed-in" without remounting. */
+   *  that embed a child sign-in component (e.g. the Share popover's
+   *  signed-out branch via ConnectCard) so the parent can flip from
+   *  "signed-out" to "signed-in" without remounting. Broadcasts the
+   *  refreshed result so other open surfaces pick up the change too. */
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
