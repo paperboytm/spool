@@ -41,6 +41,12 @@ dist-electron/
 # (wrangler.toml committed has placeholders; the dashboard is the
 # source of truth for prod bindings).
 wrangler.toml.local
+# Internal runbooks — kept out of git until the corresponding feature
+# ships. Authors live in ~/Documents/dev-docs/spool/; promote into
+# docs/ via a follow-up commit only after launch.
+docs/runbooks/
+# Playwright e2e screenshots / diagnostic artefacts.
+e2e-output/
 
 # Spool DB (user data, not committed)
 .spool/
