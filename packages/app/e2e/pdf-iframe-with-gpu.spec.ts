@@ -32,7 +32,12 @@ test('PDF iframe renders with GPU enabled', async () => {
   await openShareEditorFromSessionDetail(window, SESSION_UUID)
 
   await window.locator('[data-testid="share-menu-trigger"]').click()
-  await window.locator('[data-testid="share-menu-tab-export"]').click()
+  await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+  // The tab strip is only rendered when VITE_FEATURE_SHAREPUBLISH is on;
+  // e2e runs with publish disabled, so the popover opens directly on the
+  // Export tab and there's no tab button to click first.
+  const exportTab = window.locator('[data-testid="share-menu-tab-export"]')
+  if (await exportTab.count()) await exportTab.click()
   await window.locator('[data-testid="share-menu-export-pdf"]').click()
   await window.locator('[data-testid="share-menu-download"]').click()
 
