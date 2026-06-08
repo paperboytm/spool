@@ -92,9 +92,16 @@ export async function startSharePublishMockBackend(): Promise<SharePublishMockHa
     } catch (err) {
       // Defensive: any thrown error should surface as 500 rather than
       // leave the renderer's IPC hanging on a torn socket.
+      //
+      // Don't echo the raw error into the response body — CodeQL flags
+      // `String(err)` as potential stack-trace exposure. Mock-backend
+      // failures are debugger fodder; log to stderr where Playwright
+      // pipes it into the test output, and keep the wire response
+      // minimal.
+      console.error('[share-publish-mock-backend] internal error:', err)
       res.statusCode = 500
       res.setHeader('content-type', 'application/json')
-      res.end(JSON.stringify({ error: 'mock_internal', detail: String(err) }))
+      res.end(JSON.stringify({ error: 'mock_internal' }))
     }
   })
 
