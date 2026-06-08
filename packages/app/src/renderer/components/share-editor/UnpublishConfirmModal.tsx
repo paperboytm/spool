@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
+import { useFocusTrap } from '../../hooks/useFocusTrap.js'
 
 type Props = {
   open: boolean
@@ -51,6 +52,12 @@ export function UnpublishConfirmModal({
     }
   }, [open])
 
+  // Focus trap: Tab/Shift+Tab stays inside the modal; initial focus
+  // lands on Cancel (the safe default for a destructive confirm) so a
+  // user pressing Enter immediately on open doesn't commit the action.
+  const cancelRef = useRef<HTMLButtonElement | null>(null)
+  const trapRef = useFocusTrap<HTMLDivElement>(open, cancelRef)
+
   if (!open) return null
 
   return (
@@ -59,6 +66,7 @@ export function UnpublishConfirmModal({
       aria-modal="true"
       aria-labelledby="unpublish-confirm-title"
       data-testid="unpublish-confirm"
+      ref={trapRef}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onClose()
       }}
@@ -98,6 +106,7 @@ export function UnpublishConfirmModal({
         <div className="flex items-center justify-end gap-2 px-5 pb-5 pt-2">
           <button
             type="button"
+            ref={cancelRef}
             onClick={onClose}
             disabled={busy}
             data-testid="unpublish-confirm-cancel"

@@ -11,6 +11,7 @@ import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
 import { sharePublicOrigin, sharePublicUrl } from '../lib/sharePublicUrl.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
 import NewDraftPicker from './NewDraftPicker.js'
+import { UnpublishConfirmModal } from './share-editor/UnpublishConfirmModal.js'
 import type { PublishedShareCacheItem, ShareDraftListItem } from '@spool-lab/core'
 import {
   TemplateRender,
@@ -183,6 +184,15 @@ function PublishedList() {
   const { user, loading: authLoading, signIn } = useShareAuth()
   const { items, loading, refresh, noteLocalMutation } = usePublishedShares()
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Confirmation state for the Unpublish action. Mirrors the Share
+  // popover's UnpublishConfirmModal so a single click on the row's
+  // Unpublish icon can't tombstone the share without a deliberate
+  // second action. Stores a snapshot of the target row so the modal
+  // copy can render the title and the confirm handler still has the
+  // row even if the SWR refresh between click and confirm flips
+  // `items`.
+  const [pendingUnpublish, setPendingUnpublish] = useState<PublishedShareCacheItem | null>(null)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
 
   // Re-fetch the published list when this window regains focus — picks up
   // remote revocations (user opened spool.pro/me on the web and revoked)
@@ -302,9 +312,21 @@ function PublishedList() {
     window.open(sharePublicUrl(it.id), '_blank', 'noopener,noreferrer')
   }
 
-  const onUnpublish = async (it: PublishedShareCacheItem) => {
+  const requestUnpublish = (it: PublishedShareCacheItem) => {
+    // Don't open a second confirm while one is in flight. The button
+    // is also visually disabled across all rows when `busyId !== null`,
+    // so this guard is belt-and-braces; the visible disabled state
+    // matters more for user feedback than this early return.
     if (busyId) return
+    setConfirmError(null)
+    setPendingUnpublish(it)
+  }
+
+  const confirmUnpublish = async () => {
+    if (!pendingUnpublish || busyId) return
+    const it = pendingUnpublish
     setBusyId(it.id)
+    setConfirmError(null)
     // Tell the hook a local mutation is starting so any focus-triggered
     // refresh whose myShares response is in flight skips its cache
     // replaceAll — otherwise it would stomp the optimistic revoke
@@ -314,9 +336,14 @@ function PublishedList() {
     try {
       await window.spoolShare.revoke(it.id)
       toast.success('Share unpublished')
+      setPendingUnpublish(null)
       await refresh()
     } catch (err) {
       console.error('Unpublish failed:', err)
+      // Surface the error inline in the modal so the user can decide
+      // whether to retry or cancel; the toast remains a secondary cue
+      // for accessibility (screen readers announce it).
+      setConfirmError(err instanceof Error ? err.message : "Couldn't unpublish")
       toast.error("Couldn't unpublish")
     } finally {
       setBusyId(null)
@@ -324,30 +351,56 @@ function PublishedList() {
   }
 
   return (
-    <ul data-testid="published-list" className="flex flex-col gap-1 px-3 pb-6">
-      {items.map((it) => (
-        <PublishedRow
-          key={it.id}
-          item={it}
-          busy={busyId === it.id}
-          onCopy={() => void onCopy(it)}
-          onView={() => onView(it)}
-          onUnpublish={() => void onUnpublish(it)}
-        />
-      ))}
-    </ul>
+    <>
+      <ul data-testid="published-list" className="flex flex-col gap-1 px-3 pb-6">
+        {items.map((it) => (
+          <PublishedRow
+            key={it.id}
+            item={it}
+            busy={busyId === it.id}
+            // Lock every row's Unpublish button while any revoke is in
+            // flight, so clicking row B during row A's confirm/revoke
+            // can't silently no-op. The row that's actually busy gets
+            // the spinner via `busy`; other locked rows just appear
+            // disabled.
+            locked={busyId !== null && busyId !== it.id}
+            onCopy={() => void onCopy(it)}
+            onView={() => onView(it)}
+            onUnpublish={() => requestUnpublish(it)}
+          />
+        ))}
+      </ul>
+      <UnpublishConfirmModal
+        open={pendingUnpublish !== null}
+        title={pendingUnpublish?.title || 'Untitled'}
+        busy={busyId === pendingUnpublish?.id}
+        error={confirmError}
+        onClose={() => {
+          if (busyId === pendingUnpublish?.id) return
+          setPendingUnpublish(null)
+          setConfirmError(null)
+        }}
+        onConfirm={() => void confirmUnpublish()}
+      />
+    </>
   )
 }
 
 function PublishedRow({
   item,
   busy,
+  locked = false,
   onCopy,
   onView,
   onUnpublish,
 }: {
   item: PublishedShareCacheItem
   busy: boolean
+  /** True when *some other* row is currently being revoked — disable
+   *  this row's destructive control so a click doesn't silently
+   *  no-op behind the modal. The active row uses `busy` instead and
+   *  shows its own spinner. */
+  locked?: boolean
   onCopy: () => void
   onView: () => void
   onUnpublish: () => void
@@ -405,7 +458,7 @@ function PublishedRow({
         <RowAction label="View" onClick={onView}><ExternalLink size={13} strokeWidth={1.6} /></RowAction>
         <RowAction label="Copy link" onClick={onCopy}><LinkIcon size={13} strokeWidth={1.6} /></RowAction>
         {!revoked && (
-          <RowAction label={busy ? 'Unpublishing' : 'Unpublish'} onClick={onUnpublish} disabled={busy}>
+          <RowAction label={busy ? 'Unpublishing' : 'Unpublish'} onClick={onUnpublish} disabled={busy || locked}>
             {busy
               ? <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
               : <EyeOff size={13} strokeWidth={1.6} />}
