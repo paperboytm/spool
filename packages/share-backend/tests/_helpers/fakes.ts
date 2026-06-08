@@ -174,6 +174,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           )
           return (row ? ({ id: row.id, version: row.version } as T) : null)
         }
+        if (/^SELECT revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
+          const [id, uid] = params
+          const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
+          return (row ? ({ revoked_at: row.revoked_at } as T) : null)
+        }
         if (/^SELECT 1 FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
           const [id, uid] = params
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)

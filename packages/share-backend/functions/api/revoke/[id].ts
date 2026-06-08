@@ -40,12 +40,27 @@ export const onRequestPost: PagesFunction<Env, 'id'> = async (ctx) => {
     })
     if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
-    const owned = await ctx.env.DB.prepare(
-      'SELECT 1 FROM published_shares WHERE id=? AND user_id=?',
+    // Idempotent revoke: distinguish "not yours / never existed" from
+    // "yours but already revoked". The first is 404; the second is a
+    // 200 with no write — preserves the original revoked_at (audit
+    // trail + 7-day orphan-sweep window) without forcing every caller
+    // to special-case a 404 on stale local state. Cross-device
+    // unpublish (revoked on web, retried on desktop) is the canonical
+    // case where the desktop's local cache is stale and a retry must
+    // succeed cleanly.
+    const existing = await ctx.env.DB.prepare(
+      'SELECT revoked_at FROM published_shares WHERE id=? AND user_id=?',
     )
       .bind(id, user.id)
-      .first()
-    if (!owned) throw new ApiError('NOT_FOUND')
+      .first<{ revoked_at: number | null }>()
+    if (!existing) throw new ApiError('NOT_FOUND')
+    if (existing.revoked_at !== null) {
+      // Already tombstoned — return success without touching D1, KV,
+      // R2, or audit. No write means the original revoked_at stays
+      // pinned to the first revoke, which is what the orphan sweep
+      // and the audit log need to see.
+      return jsonOk({ ok: true })
+    }
 
     const now = Date.now()
     // Write order matches the publish handler's discipline: D1 row

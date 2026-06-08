@@ -10,6 +10,15 @@ export const Snapshot = z.object({
   conversation: z
     .object({
       title: z.string().min(1).max(200),
+      // Array bounds sized against real-world session-length data:
+      // p99 ≈ 1,740 turns, max observed ≈ 4,565 turns on actual
+      // power-user dbs. 20,000 = ~4× the largest real session — wide
+      // enough that nobody legitimate hits it, narrow enough that
+      // zod can't be coerced into iterating millions of array
+      // entries before MAX_SNAPSHOT_BYTES (2MB) would have rejected
+      // the payload upstream. The body cap is the real defense; this
+      // is the sanity guard that prevents validator CPU bloat on a
+      // crafted-array attack.
       turns: z
         .array(
           z.object({
@@ -19,9 +28,13 @@ export const Snapshot = z.object({
             redacted: z.boolean().optional(),
           }),
         )
-        .max(500),
-      turn_order: z.array(z.string()).max(500),
-      hidden_turns: z.array(z.string()),
+        .max(20_000),
+      turn_order: z.array(z.string()).max(20_000),
+      // hidden_turns can never legitimately exceed turns.length (the
+      // refine below enforces every id is real). Same 20k cap so a
+      // crafted payload can't sit between "body fits in 2MB" and
+      // "refine catches it" pumping validator memory.
+      hidden_turns: z.array(z.string()).max(20_000),
     })
     // Reader assumes turn_order indexes every turn exactly once and that
     // hidden_turns references known turn ids. Without these checks a

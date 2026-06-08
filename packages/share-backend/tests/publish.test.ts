@@ -731,6 +731,37 @@ describe('republish + revoke', () => {
     expect(res.status).toBe(429)
   })
 
+  it('revoke is idempotent on an already-revoked share — 200, original revoked_at preserved', async () => {
+    // Cross-device unpublish: user revokes on web at T0, opens the
+    // desktop app at T1 with a stale cache showing the share as live,
+    // clicks Unpublish → backend must return 200 (so the desktop UI
+    // doesn't toast an error for a no-op the user already performed)
+    // AND must NOT overwrite the original revoked_at (preserves the
+    // audit trail and the 7-day orphan-sweep window from the first
+    // revoke).
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const slug = nanoidSlug()
+    const originalRevokedAt = Date.now() - 1000 * 60 * 60 // 1h ago
+    env.state.published_shares.push({
+      id: slug,
+      user_id: 'user-1',
+      title: 'old',
+      visibility: 'unlisted',
+      expires_at: null,
+      version: 1,
+      published_at: originalRevokedAt - 1000,
+      republished_at: null,
+      revoked_at: originalRevokedAt,
+    })
+    const req = authedReq(`https://x/api/revoke/${slug}`)
+    const res = await invoke(revokePost, req, env, { id: slug })
+    expect(res.status).toBe(200)
+    const row = env.state.published_shares.find((r) => r.id === slug)!
+    expect(row.revoked_at).toBe(originalRevokedAt)
+  })
+
   it('revoke 404 when slug is not owned', async () => {
     const env = envFor()
     seedUser(env.state, 'user-1')
