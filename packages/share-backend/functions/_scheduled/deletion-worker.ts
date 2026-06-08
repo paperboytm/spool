@@ -148,14 +148,21 @@ async function sweepOrphanShareAssets(env: DeletionEnv, now: number): Promise<vo
 
 async function deleteAvatarPrefix(env: DeletionEnv, userId: string): Promise<void> {
   // Avatar keys live at `avatars/<user_id>/<id>.<ext>`. R2 list+delete
-  // iterates by prefix; we cap to one realistic page (1000 objects)
-  // because per-user upload history is bounded by the per-user
-  // rate-limit (10/h * 24h would be the absurd upper bound).
+  // iterates by prefix; per-user upload history is bounded by the
+  // upload rate-limit (10/h) so one page is the realistic case, but
+  // we still page until R2 says it's done so a stuck/orphaned tail
+  // doesn't survive the user's hard-delete.
   const prefix = `avatars/${userId}/`
-  const listing = await env.AVATARS.list({ prefix, limit: 1000 })
-  await Promise.all(
-    listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)),
-  )
+  let cursor: string | undefined
+  for (let page = 0; page < 32; page++) {
+    const listing = await env.AVATARS.list({ prefix, limit: 1000, cursor })
+    await Promise.all(
+      listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)),
+    )
+    if (!listing.truncated) return
+    cursor = listing.cursor
+    if (!cursor) return
+  }
 }
 
 export default {

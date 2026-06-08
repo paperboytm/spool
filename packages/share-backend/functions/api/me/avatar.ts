@@ -52,6 +52,12 @@ function newAvatarId(): string {
 }
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
+  // Observability: log the inbound shape so we can pinpoint *which*
+  // step of the pipeline rejected a request. Without this the only
+  // signal is a generic 422 in wrangler's access log.
+  const ct = ctx.request.headers.get('content-type') ?? '<missing>'
+  const cl = ctx.request.headers.get('content-length') ?? '<missing>'
+  console.log(`[avatar-upload] in: content-type="${ct}" content-length=${cl}`)
   try {
     const user = await requireUser(ctx.request, ctx.env)
 
@@ -68,15 +74,20 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     let form: FormData
     try {
       form = await ctx.request.formData()
-    } catch {
+    } catch (e) {
+      console.log(`[avatar-upload] formData() threw: ${e instanceof Error ? e.message : String(e)}`)
       throw new ApiError('UNPROCESSABLE', 'invalid multipart body')
     }
+    const fieldNames = Array.from(form.keys())
+    console.log(`[avatar-upload] form fields: [${fieldNames.join(', ')}]`)
     const file = form.get('avatar')
     if (!file || typeof file === 'string') {
+      console.log(`[avatar-upload] avatar field present=${!!file} typeof=${typeof file}`)
       throw new ApiError('UNPROCESSABLE', 'missing avatar file field')
     }
 
     const ab = await (file as File).arrayBuffer()
+    console.log(`[avatar-upload] file bytes=${ab.byteLength} name=${(file as File).name} type=${(file as File).type}`)
     if (ab.byteLength === 0) throw new ApiError('UNPROCESSABLE', 'empty upload')
     if (ab.byteLength > MAX_AVATAR_BYTES) {
       throw new ApiError('UNPROCESSABLE', 'avatar too large (max 1 MB)')
@@ -85,6 +96,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
     // 1. Sniff MIME from bytes (not Content-Type header).
     const mime = sniffMime(raw)
+    console.log(`[avatar-upload] sniffMime=${mime ?? 'null'} first4=${Array.from(raw.slice(0, 4)).map((b) => b.toString(16).padStart(2, '0')).join(' ')}`)
     if (!mime) {
       throw new ApiError('UNPROCESSABLE', 'unsupported image format (PNG/JPEG/WebP only)')
     }
@@ -94,6 +106,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     //    framebuffer is not. We don't decode here — just refuse
     //    anything that claims absurd dimensions.
     const dims = readDimensions(mime, raw)
+    console.log(`[avatar-upload] dims=${dims ? `${dims.width}x${dims.height}` : 'null'}`)
     if (!dims) throw new ApiError('UNPROCESSABLE', 'malformed image header')
     if (dims.width < MIN_AVATAR_DIM || dims.height < MIN_AVATAR_DIM) {
       throw new ApiError('UNPROCESSABLE', `avatar too small (min ${MIN_AVATAR_DIM}x${MIN_AVATAR_DIM})`)
@@ -146,6 +159,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       url: `/api/avatars/${user.id}`,
     })
   } catch (e) {
+    if (e instanceof ApiError) {
+      console.log(`[avatar-upload] reject: code=${e.code} detail=${e.detail ?? ''}`)
+    } else {
+      console.log(`[avatar-upload] uncaught: ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
+    }
     return jsonError(e)
   }
 }
@@ -165,8 +183,12 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
       return jsonOk({ ok: true })
     }
 
+    // Reset avatar_visible too so removing the custom avatar always
+    // reverts to "show the provider photo if any, else initials" —
+    // otherwise a previously-hidden provider stays hidden and the user
+    // ends up with initials when they expected their Google photo back.
     await ctx.env.DB
-      .prepare('UPDATE users SET custom_avatar_id=NULL WHERE id=?')
+      .prepare('UPDATE users SET custom_avatar_id=NULL, avatar_visible=1 WHERE id=?')
       .bind(user.id)
       .run()
 

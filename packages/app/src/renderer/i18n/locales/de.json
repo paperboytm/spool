@@ -316,27 +316,10 @@
       "allowlist_scope_everywhere": "Überall"
     },
     "account": {
-      "profile_title": "Profil",
-      "profile_displayName_label": "Anzeigename",
       "profile_displayName_placeholder": "Wie andere dich sehen",
-      "profile_displayName_help": "Überschreibt den Namen deines Anmeldeanbieters. Leer lassen, um den Anbieternamen zu verwenden.",
-      "profile_displayName_save": "Speichern",
-      "profile_displayName_saving": "Wird gespeichert…",
-      "profile_displayName_savedToast": "Anzeigename aktualisiert",
       "profile_displayName_error_tooLong": "Anzeigename ist zu lang (maximal 50 Zeichen).",
       "profile_displayName_error_controlChars": "Anzeigename enthält nicht erlaubte Zeichen.",
       "profile_displayName_error_generic": "Anzeigename konnte nicht aktualisiert werden",
-      "profile_avatar_title": "Avatar",
-      "profile_avatar_uploadButton": "Bild hochladen",
-      "profile_avatar_uploading": "Wird hochgeladen…",
-      "profile_avatar_removeButton": "Eigenen Avatar entfernen",
-      "profile_avatar_removing": "Wird entfernt…",
-      "profile_avatar_removedToast": "Eigener Avatar entfernt",
-      "profile_avatar_uploadedToast": "Avatar hochgeladen",
-      "profile_avatar_help": "PNG, JPEG oder WebP bis zu 1 MB. EXIF-Metadaten werden vor dem Speichern entfernt.",
-      "profile_avatar_showGoogle": "Profilbild meines Anmeldeanbieters anzeigen",
-      "profile_avatar_showGoogleHelp": "Deaktiviere dies, um stattdessen deine Initialen zu verwenden.",
-      "profile_avatar_initialsAlt": "Initialen-Avatar",
       "profile_avatar_error_tooLarge": "Bild ist zu groß (maximal 1 MB).",
       "profile_avatar_error_unsupported": "Nur PNG, JPEG und WebP werden akzeptiert.",
       "profile_avatar_error_generic": "Avatar konnte nicht hochgeladen werden",
@@ -375,7 +358,10 @@
       "deleteConfirm_item_record": "Ihr Kontodatensatz wird von spool.pro entfernt",
       "deleteConfirm_footnote": "Sie können dies jederzeit vor Ablauf der Abkühlphase abbrechen. Entwürfe auf diesem Gerät bleiben unverändert — sie liegen lokal.",
       "deleteConfirm_confirm": "Löschung planen",
-      "deleteConfirm_scheduling": "Plane…"
+      "deleteConfirm_scheduling": "Plane…",
+      "profile_avatar_change": "Foto ändern",
+      "profile_avatar_remove": "Foto entfernen",
+      "profile_emailLabel": "E-Mail"
     }
   },
   "security": {

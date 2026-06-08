@@ -28,7 +28,14 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     // so we expose both: `display_name` (resolved) for read-paths,
     // and `display_name_override` / `custom_avatar_id` / `avatar_visible`
     // for the Settings → Account form.
-    const customAvatarUrl = user.custom_avatar_id ? `/api/avatars/${user.id}` : null
+    // Append the avatar id as a cache-buster so a re-upload changes
+    // the URL and the renderer's <img> + downstream HTTP caches refetch
+    // instead of serving the previous bytes from memory. The backend
+    // route is keyed on the path's user_id only, so the query string
+    // is ignored server-side.
+    const customAvatarUrl = user.custom_avatar_id
+      ? `/api/avatars/${user.id}?v=${encodeURIComponent(user.custom_avatar_id)}`
+      : null
     const visibleProviderAvatar = user.avatar_visible !== 0 ? user.avatar_url : null
     const avatar_url = customAvatarUrl ?? visibleProviderAvatar
 

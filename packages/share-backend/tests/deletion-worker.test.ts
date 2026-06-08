@@ -304,6 +304,31 @@ describe('runDeletionSweep', () => {
     expect(env._og.has(`${activeSlug}.png`)).toBe(true)
   })
 
+  it('avatar sweep: pages through R2 list until truncated=false (1001 objects)', async () => {
+    // R2's list endpoint caps at 1000 results per call. Without the
+    // cursor loop in deleteAvatarPrefix the 1001st object would survive
+    // the user's hard-delete — a privacy bug for the "I uploaded a
+    // selfie and then deleted my account" case.
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: Date.now() - 1000,
+      cancelled: 0,
+    })
+    for (let i = 0; i < 1001; i++) {
+      await env.AVATARS.put(`avatars/user-1/${String(i).padStart(4, '0')}.png`, new Uint8Array([0]).buffer)
+    }
+    // A sibling key under a different prefix must NOT be touched.
+    await env.AVATARS.put('avatars/user-2/keep.png', new Uint8Array([0]).buffer)
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    const survivors = Array.from(env._avatars.keys())
+    expect(survivors).toEqual(['avatars/user-2/keep.png'])
+  })
+
   it('processes multiple due users in one sweep', async () => {
     const env = envFor()
     seedUser(env.state, 'user-1')

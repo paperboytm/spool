@@ -1,24 +1,22 @@
-// Display-name override + avatar upload card. Embedded inside
-// SettingsAccount. The server is the source of truth (we read the
-// resolved values off useShareAuth.user); local form state only
-// carries what the user is currently editing.
+// The identity surface for Settings → Account. Notion-style:
+// avatar + editable name in one row, save-on-blur, tiny contextual
+// text-link actions beneath. Replaces the old "Profile" card +
+// separate identity block.
 //
-// Avatar:
-//   - File picker (HTML <input type="file">) accepts PNG/JPEG/WebP
-//     up to 1 MB. We do client-side checks before sending so a bad
-//     file fails fast without a backend round-trip.
-//   - Upload streams the bytes to main via IPC as ArrayBuffer; main
-//     builds the multipart Blob + POSTs to /api/me/avatar.
-//   - "Show provider picture" toggle: hides the Google avatar without
-//     uploading a custom one. Useful for privacy without committing
-//     to an image.
+// Avatar interaction:
+//   - Click the circle → file picker (PNG/JPEG/WebP up to 1 MB).
+//   - Hover/focus → "Change" overlay with camera glyph.
+//   - When a custom avatar exists, a "Remove photo" link drops it.
+//   - When the provider photo is visible, "Use initials" hides it.
+//   - When the provider photo is hidden, "Use account photo" restores.
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Trash2, Upload } from 'lucide-react'
+import { Camera, X } from 'lucide-react'
 
 import { useShareAuth } from '../hooks/useShareAuth.js'
+import { resolveAvatarUrl } from '../lib/sharePublicUrl.js'
 
 const MAX_AVATAR_BYTES = 1 * 1024 * 1024
 const ACCEPT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
@@ -29,42 +27,33 @@ export default function ProfileEditor() {
 
   const [draftName, setDraftName] = useState('')
   const [savingName, setSavingName] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [removing, setRemoving] = useState(false)
-  const [savingVisible, setSavingVisible] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<'idle' | 'upload' | 'remove'>('idle')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
-  // Seed the input from the server's `display_name_override` so the
-  // form reflects what the user actually typed, not the resolved
-  // value (which may be the provider name). Re-seed on identity
-  // change so a sign-out/sign-in doesn't carry a stale draft across.
   useEffect(() => {
     setDraftName(user?.display_name_override ?? '')
+    setNameError(null)
   }, [user?.id, user?.display_name_override])
 
   if (!user) return null
 
-  const nameDirty = (user.display_name_override ?? '') !== draftName.trim()
+  const persisted = user.display_name_override ?? ''
 
-  async function handleSaveName() {
+  async function commitName() {
     if (savingName) return
+    const trimmed = draftName.trim()
+    if (trimmed === persisted) return
     setSavingName(true)
+    setNameError(null)
     try {
-      const trimmed = draftName.trim()
-      // Empty = clear override (back to provider name).
-      const value = trimmed === '' ? null : trimmed
-      await window.spoolShare.updateDisplayName(value)
+      await window.spoolShare.updateDisplayName(trimmed === '' ? null : trimmed)
       await refresh()
-      toast.success(t('settings.account.profile_displayName_savedToast'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('too_long')) {
-        toast.error(t('settings.account.profile_displayName_error_tooLong'))
-      } else if (msg.includes('control_chars')) {
-        toast.error(t('settings.account.profile_displayName_error_controlChars'))
-      } else {
-        toast.error(t('settings.account.profile_displayName_error_generic'))
-      }
+      if (msg.includes('too_long')) setNameError(t('settings.account.profile_displayName_error_tooLong'))
+      else if (msg.includes('control_chars')) setNameError(t('settings.account.profile_displayName_error_controlChars'))
+      else setNameError(t('settings.account.profile_displayName_error_generic'))
     } finally {
       setSavingName(false)
     }
@@ -72,7 +61,7 @@ export default function ProfileEditor() {
 
   async function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    e.target.value = '' // allow re-picking the same file
+    e.target.value = ''
     if (!file) return
     if (file.size > MAX_AVATAR_BYTES) {
       toast.error(t('settings.account.profile_avatar_error_tooLarge'))
@@ -82,192 +71,145 @@ export default function ProfileEditor() {
       toast.error(t('settings.account.profile_avatar_error_unsupported'))
       return
     }
-    setUploading(true)
+    setBusy('upload')
     try {
       const buf = await file.arrayBuffer()
       await window.spoolShare.uploadAvatar(buf, file.type)
       await refresh()
-      toast.success(t('settings.account.profile_avatar_uploadedToast'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('too large')) {
-        toast.error(t('settings.account.profile_avatar_error_tooLarge'))
-      } else if (msg.includes('unsupported') || msg.includes('malformed')) {
+      if (msg.includes('too large')) toast.error(t('settings.account.profile_avatar_error_tooLarge'))
+      else if (msg.includes('unsupported') || msg.includes('malformed')) {
         toast.error(t('settings.account.profile_avatar_error_unsupported'))
       } else {
         toast.error(t('settings.account.profile_avatar_error_generic'))
       }
     } finally {
-      setUploading(false)
+      setBusy('idle')
     }
   }
 
-  async function handleRemoveCustomAvatar() {
-    if (removing) return
-    setRemoving(true)
+  async function handleRemoveCustom() {
+    if (busy !== 'idle') return
+    setBusy('remove')
     try {
       await window.spoolShare.deleteAvatar()
       await refresh()
-      toast.success(t('settings.account.profile_avatar_removedToast'))
     } catch {
       toast.error(t('settings.account.profile_avatar_error_generic'))
     } finally {
-      setRemoving(false)
+      setBusy('idle')
     }
   }
 
-  async function handleToggleVisible(next: boolean) {
-    if (savingVisible) return
-    setSavingVisible(true)
-    try {
-      await window.spoolShare.setAvatarVisible(next)
-      await refresh()
-    } catch {
-      // Silent rollback: the toggle will revert on next refresh.
-    } finally {
-      setSavingVisible(false)
-    }
-  }
-
-  const initials = computeInitials(user.display_name)
-  const hasCustomAvatar = !!user.custom_avatar_id
-  const showProviderToggle = !hasCustomAvatar && !!user.name
+  const hasCustom = !!user.custom_avatar_id
+  const avatarSrc = user.avatar_url ? resolveAvatarUrl(user.avatar_url) : null
 
   return (
-    <section className="space-y-6">
-      <h3 className="text-[14px] font-medium text-warm-text dark:text-dark-text">
-        {t('settings.account.profile_title')}
-      </h3>
+    <section className="space-y-4">
+      <div className="flex items-center gap-4">
+        {/* `group` lives on the wrapper so the X badge (sibling of the
+         *  avatar button) can show on hover of either, not just on
+         *  hover of itself. */}
+        <div className="group relative flex-none">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy === 'upload'}
+            aria-label={t('settings.account.profile_avatar_change')}
+            className="relative w-14 h-14 rounded-full overflow-hidden block bg-warm-surface2 dark:bg-dark-surface2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-accent-dark disabled:opacity-70"
+          >
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="w-full h-full inline-flex items-center justify-center text-[18px] font-medium text-white bg-accent dark:bg-accent-dark">
+                {computeInitials(user.display_name)}
+              </span>
+            )}
+            <span className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity inline-flex items-center justify-center">
+              <Camera size={16} strokeWidth={1.75} className="text-white" aria-hidden />
+            </span>
+          </button>
+          {/* Top-right close badge — hidden until the avatar block is
+           *  hovered or focused, matching Notion's affordance. Only
+           *  rendered when a custom avatar is set. */}
+          {hasCustom && (
+            <button
+              type="button"
+              onClick={() => void handleRemoveCustom()}
+              disabled={busy !== 'idle'}
+              aria-label={t('settings.account.profile_avatar_remove')}
+              className="absolute -top-1 -right-1 w-[18px] h-[18px] rounded-full bg-warm-surface dark:bg-dark-surface2 border border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted inline-flex items-center justify-center hover:text-warm-text dark:hover:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-accent-dark disabled:opacity-50 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+            >
+              <X size={11} strokeWidth={2} aria-hidden />
+            </button>
+          )}
+        </div>
 
-      {/* Display name */}
-      <div className="space-y-2">
-        <label htmlFor="profile-display-name" className="text-[12px] font-medium text-warm-text dark:text-dark-text">
-          {t('settings.account.profile_displayName_label')}
-        </label>
-        <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
           <input
-            id="profile-display-name"
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
-            placeholder={t('settings.account.profile_displayName_placeholder')}
+            onBlur={() => void commitName()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            placeholder={user.display_name}
             maxLength={50}
-            className="flex-1 h-8 px-2.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-[13px] text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted focus:outline-none focus:border-accent dark:focus:border-accent-dark"
+            disabled={savingName}
+            aria-label={t('settings.account.profile_displayName_placeholder')}
+            className="block w-full -mx-2 px-2 h-7 rounded-md text-[15px] font-medium text-warm-text dark:text-dark-text bg-transparent hover:bg-warm-surface dark:hover:bg-dark-surface focus:bg-warm-surface dark:focus:bg-dark-surface focus:outline-none transition-colors placeholder:text-warm-muted dark:placeholder:text-dark-muted disabled:opacity-60 leading-[1.2]"
           />
-          <button
-            type="button"
-            onClick={() => void handleSaveName()}
-            disabled={savingName || !nameDirty}
-            className="h-8 px-3 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {savingName
-              ? t('settings.account.profile_displayName_saving')
-              : t('settings.account.profile_displayName_save')}
-          </button>
-        </div>
-        <p className="text-[11.5px] text-warm-muted dark:text-dark-muted">
-          {t('settings.account.profile_displayName_help')}
-        </p>
-      </div>
-
-      {/* Avatar */}
-      <div className="space-y-2">
-        <label className="text-[12px] font-medium text-warm-text dark:text-dark-text">
-          {t('settings.account.profile_avatar_title')}
-        </label>
-        <div className="flex items-start gap-3">
-          {/* Preview */}
-          {user.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover border border-warm-border dark:border-dark-border"
-            />
-          ) : (
-            <div
-              role="img"
-              aria-label={t('settings.account.profile_avatar_initialsAlt')}
-              className="w-16 h-16 rounded-full inline-flex items-center justify-center text-[18px] font-medium text-white bg-accent dark:bg-accent-dark"
-            >
-              {initials}
+          {user.handle && (
+            <div className="text-[12px] text-warm-muted dark:text-dark-muted truncate leading-tight">
+              @{user.handle}
             </div>
           )}
-
-          <div className="flex-1 space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-warm-text dark:text-dark-text border border-warm-border dark:border-dark-border hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-50"
-              >
-                <Upload size={12} strokeWidth={1.75} aria-hidden />
-                {uploading
-                  ? t('settings.account.profile_avatar_uploading')
-                  : t('settings.account.profile_avatar_uploadButton')}
-              </button>
-              {hasCustomAvatar && (
-                <button
-                  type="button"
-                  onClick={() => void handleRemoveCustomAvatar()}
-                  disabled={removing}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)] border border-[color:var(--color-status-error)]/30 hover:bg-[color:var(--color-status-error)]/8 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 size={12} strokeWidth={1.75} aria-hidden />
-                  {removing
-                    ? t('settings.account.profile_avatar_removing')
-                    : t('settings.account.profile_avatar_removeButton')}
-                </button>
-              )}
-            </div>
-            <p className="text-[11.5px] text-warm-muted dark:text-dark-muted">
-              {t('settings.account.profile_avatar_help')}
+          {nameError && (
+            <p
+              role="alert"
+              className="mt-1 text-[11.5px] text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]"
+            >
+              {nameError}
             </p>
-
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(e) => void handlePickFile(e)}
-            />
-
-            {showProviderToggle && (
-              <label className="flex items-start gap-2 cursor-pointer mt-1">
-                <input
-                  type="checkbox"
-                  checked={user.avatar_visible}
-                  onChange={(e) => void handleToggleVisible(e.target.checked)}
-                  disabled={savingVisible}
-                  className="mt-0.5 accent-accent dark:accent-accent-dark"
-                />
-                <span className="flex-1">
-                  <span className="block text-[12px] text-warm-text dark:text-dark-text">
-                    {t('settings.account.profile_avatar_showGoogle')}
-                  </span>
-                  <span className="block text-[11.5px] text-warm-muted dark:text-dark-muted">
-                    {t('settings.account.profile_avatar_showGoogleHelp')}
-                  </span>
-                </span>
-              </label>
-            )}
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Email — read-only labeled row. Sign-in identity, not editable
+       *  here (would require an OAuth-side change). */}
+      <div>
+        <div className="text-[11.5px] text-warm-faint dark:text-dark-muted">
+          {t('settings.account.profile_emailLabel')}
+        </div>
+        <div className="mt-0.5 text-[12.5px] font-mono text-warm-muted dark:text-dark-muted truncate">
+          {user.email}
+        </div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => void handlePickFile(e)}
+      />
     </section>
   )
 }
 
-/** Take the first grapheme of the resolved display name as the
- *  initial circle's content. Intl.Segmenter handles emoji + CJK
- *  correctly (a single rendered glyph, not a surrogate pair). */
 function computeInitials(name: string): string {
   if (!name) return '?'
   try {
     const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
     for (const s of seg.segment(name)) return s.segment.toUpperCase()
   } catch {
-    // Older runtime — fall back to code-unit slice.
     return name.charAt(0).toUpperCase()
   }
   return '?'

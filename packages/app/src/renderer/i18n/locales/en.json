@@ -316,27 +316,10 @@
       "allowlist_scope_everywhere": "Everywhere"
     },
     "account": {
-      "profile_title": "Profile",
-      "profile_displayName_label": "Display name",
       "profile_displayName_placeholder": "How others see you",
-      "profile_displayName_help": "Overrides the name from your sign-in provider. Leave empty to use it.",
-      "profile_displayName_save": "Save",
-      "profile_displayName_saving": "Saving…",
-      "profile_displayName_savedToast": "Display name updated",
       "profile_displayName_error_tooLong": "Display name is too long (max 50 characters).",
       "profile_displayName_error_controlChars": "Display name contains characters that aren't allowed.",
       "profile_displayName_error_generic": "Couldn't update display name",
-      "profile_avatar_title": "Avatar",
-      "profile_avatar_uploadButton": "Upload image",
-      "profile_avatar_uploading": "Uploading…",
-      "profile_avatar_removeButton": "Remove custom avatar",
-      "profile_avatar_removing": "Removing…",
-      "profile_avatar_removedToast": "Custom avatar removed",
-      "profile_avatar_uploadedToast": "Avatar uploaded",
-      "profile_avatar_help": "PNG, JPEG, or WebP up to 1 MB. We strip EXIF metadata before storing.",
-      "profile_avatar_showGoogle": "Show my sign-in provider's profile picture",
-      "profile_avatar_showGoogleHelp": "Turn this off to use your initials instead.",
-      "profile_avatar_initialsAlt": "Initials avatar",
       "profile_avatar_error_tooLarge": "Image is too large (max 1 MB).",
       "profile_avatar_error_unsupported": "Only PNG, JPEG, and WebP images are accepted.",
       "profile_avatar_error_generic": "Couldn't upload avatar",
@@ -375,7 +358,10 @@
       "deleteConfirm_item_record": "Your account record is removed from spool.pro",
       "deleteConfirm_footnote": "You can cancel from this screen any time before the cool-off expires. Drafts on this device are unaffected — they live locally.",
       "deleteConfirm_confirm": "Schedule deletion",
-      "deleteConfirm_scheduling": "Scheduling…"
+      "deleteConfirm_scheduling": "Scheduling…",
+      "profile_avatar_change": "Change photo",
+      "profile_avatar_remove": "Remove photo",
+      "profile_emailLabel": "Email"
     }
   },
   "security": {

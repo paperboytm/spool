@@ -78,7 +78,12 @@ export const onRequestGet: PagesFunction<Env, 'handle'> = async (ctx) => {
     // the resolved values only — Profile is a public read surface,
     // there's no reason to leak the raw provider-claim values to a
     // visitor.
-    const customAvatarUrl = owner.custom_avatar_id ? `/api/avatars/${owner.user_id}` : null
+    // Cache-buster query — see comment in /api/me. Re-uploads change
+    // custom_avatar_id, which flips the URL and forces downstream
+    // caches to refetch.
+    const customAvatarUrl = owner.custom_avatar_id
+      ? `/api/avatars/${owner.user_id}?v=${encodeURIComponent(owner.custom_avatar_id)}`
+      : null
     const visibleProviderAvatar = owner.avatar_visible !== 0 ? owner.avatar_url : null
     const avatar_url = customAvatarUrl ?? visibleProviderAvatar
 

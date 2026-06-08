@@ -67,11 +67,20 @@ export function registerShareProfileIpc(): void {
       const form = new FormData()
       const blob = new Blob([bytes], { type: mime })
       form.append('avatar', blob, 'avatar.bin')
+      console.log(
+        `[share-profile] upload-avatar: bytes=${bytes.byteLength} mime=${mime} blob.size=${blob.size}`,
+      )
       const r = await authedFetch('/api/me/avatar', {
         method: 'POST',
         body: form,
       })
-      if (!r.ok) throw new Error(await readErrorDetail(r))
+      if (!r.ok) {
+        const detail = await readErrorDetail(r)
+        console.error(
+          `[share-profile] upload-avatar failed: status=${r.status} detail=${detail}`,
+        )
+        throw new Error(detail)
+      }
       return (await r.json()) as AvatarUploadResponse
     },
   )

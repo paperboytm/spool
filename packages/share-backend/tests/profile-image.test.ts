@@ -134,6 +134,19 @@ describe('readDimensions', () => {
     const buf = buildPngHeader(0, 0)
     expect(readDimensions('image/png', buf)).toBeNull()
   })
+
+  it('reads unsigned 32-bit PNG width with the high bit set', () => {
+    // PNG width = 0xFF000010 (4278190096) — the high byte forces the
+    // signed-int interpretation negative without the `>>> 0` coercion.
+    // The dimension is way past MAX_AVATAR_DIM but readDimensions must
+    // surface the raw value so the caller can reject it; returning null
+    // here would mask a "too large" with a "malformed header" error.
+    const huge = buildPngHeader(0xff000010, 0xff000020)
+    expect(readDimensions('image/png', huge)).toEqual({
+      width: 0xff000010,
+      height: 0xff000020,
+    })
+  })
 })
 
 // ─── stripMetadata ─────────────────────────────────────────────────
@@ -165,6 +178,55 @@ describe('stripMetadata (PNG)', () => {
     const clean = buildPngHeader(32, 32)
     const out = stripMetadata('image/png', clean)
     expect(out.length).toBe(clean.length)
+  })
+})
+
+describe('stripMetadata (JPEG)', () => {
+  // Minimal hand-built JPEG: SOI, one APPn segment, SOF0 (so the
+  // dimension parser can find it), SOS + a few bytes of payload, EOI.
+  function buildJpegWithAppMarker(marker: number, payload: Uint8Array): Uint8Array {
+    const segLen = payload.length + 2
+    const sof: number[] = [
+      0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x10,
+      0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+    ]
+    const sos: number[] = [0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00]
+    const tail: number[] = [0xde, 0xad, 0xbe, 0xef, 0xff, 0xd9]
+    const out: number[] = [0xff, 0xd8]
+    out.push(0xff, marker, (segLen >> 8) & 0xff, segLen & 0xff)
+    for (const b of payload) out.push(b)
+    out.push(...sof, ...sos, ...tail)
+    return new Uint8Array(out)
+  }
+
+  it('strips APP1 (EXIF / XMP)', () => {
+    const exifPayload = new Uint8Array(Array.from('Exif\0\0deadbeef').map((c) => c.charCodeAt(0)))
+    const withExif = buildJpegWithAppMarker(0xe1, exifPayload)
+    const out = stripMetadata('image/jpeg', withExif)
+    expect(Buffer.from(out).includes(Buffer.from('Exif'))).toBe(false)
+  })
+
+  it('strips APP13 (Photoshop / IPTC)', () => {
+    // APP13 carries geo + caption — the old "EXIF + XMP + ICC + COM"
+    // strip list missed it. Regression test for the broader strip.
+    const photoshop = new Uint8Array(Array.from('Photoshop 3.0\0iptcdata').map((c) => c.charCodeAt(0)))
+    const withPhotoshop = buildJpegWithAppMarker(0xed, photoshop)
+    const out = stripMetadata('image/jpeg', withPhotoshop)
+    expect(Buffer.from(out).includes(Buffer.from('Photoshop'))).toBe(false)
+  })
+
+  it('preserves APP0 (JFIF — structural)', () => {
+    const jfif = new Uint8Array(Array.from('JFIF\0\x01\x02\x00\x00\x60\x00\x60\x00\x00').map((c) => c.charCodeAt(0)))
+    const withJfif = buildJpegWithAppMarker(0xe0, jfif)
+    const out = stripMetadata('image/jpeg', withJfif)
+    expect(Buffer.from(out).includes(Buffer.from('JFIF'))).toBe(true)
+  })
+
+  it('preserves APP14 (Adobe colour-space flag)', () => {
+    const adobe = new Uint8Array(Array.from('Adobe\0\x64\x80\x00\x00\x00\x00').map((c) => c.charCodeAt(0)))
+    const withAdobe = buildJpegWithAppMarker(0xee, adobe)
+    const out = stripMetadata('image/jpeg', withAdobe)
+    expect(Buffer.from(out).includes(Buffer.from('Adobe'))).toBe(true)
   })
 })
 

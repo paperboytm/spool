@@ -145,6 +145,21 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const u = state.users.find((u) => u.id === id && u.deleted_at === null)
           return (u as T) ?? null
         }
+        if (/^SELECT custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL/i.test(sql)) {
+          const [id] = params
+          const u = state.users.find((u) => u.id === id && u.deleted_at === null)
+          if (!u) return null
+          return ({
+            custom_avatar_id: u.custom_avatar_id ?? null,
+            avatar_visible: u.avatar_visible ?? 1,
+          } as T)
+        }
+        if (/^SELECT custom_avatar_id FROM users WHERE id=\?/i.test(sql)) {
+          const [id] = params
+          const u = state.users.find((u) => u.id === id)
+          if (!u) return null
+          return ({ custom_avatar_id: u.custom_avatar_id ?? null } as T)
+        }
         if (/^SELECT 1 FROM handles WHERE handle=\? AND released_at IS NULL/i.test(sql)) {
           const [h] = params
           const row = state.handles.find((x) => x.handle === h && x.released_at === null)
@@ -593,20 +608,33 @@ export function makeR2(): { bucket: R2Bucket; store: Map<string, { bytes: Uint8A
     async delete(key: string) {
       store.delete(key)
     },
-    async list(opts?: { prefix?: string; limit?: number }) {
-      // Used by deletion-worker's avatar cleanup. We don't model
-      // cursoring — production R2 lists are paged, but for unit-test
-      // scenarios the per-user upload history is single-digit.
+    async list(opts?: { prefix?: string; limit?: number; cursor?: string }) {
+      // Mirrors the R2 list shape: page through `prefix`-matching keys
+      // honoring `limit`, return `truncated: true` + a `cursor` when
+      // more pages remain. The deletion-worker's avatar sweep relies on
+      // this paging contract; if the fake silently returned
+      // `truncated: false` the test would never exercise the cursor
+      // loop and a regression there would slip through.
+      //
+      // R2 cursors are opaque tokens that work even when objects are
+      // deleted between pages. We model that by encoding the cursor as
+      // the last-returned key — the next page filters strictly greater
+      // than that key, which stays correct even after the prior page
+      // has been wiped from `store`.
       const prefix = opts?.prefix ?? ''
       const limit = opts?.limit ?? 1000
-      const objects: { key: string }[] = []
+      const after = opts?.cursor ?? ''
+      const matched: string[] = []
       for (const key of store.keys()) {
-        if (key.startsWith(prefix)) {
-          objects.push({ key })
-          if (objects.length >= limit) break
-        }
+        if (key.startsWith(prefix) && key > after) matched.push(key)
       }
-      return { objects, truncated: false }
+      matched.sort()
+      const slice = matched.slice(0, limit)
+      const objects = slice.map((key) => ({ key }))
+      if (slice.length < matched.length) {
+        return { objects, truncated: true as const, cursor: slice[slice.length - 1] }
+      }
+      return { objects, truncated: false as const }
     },
   }
   return { bucket: bucket as unknown as R2Bucket, store }

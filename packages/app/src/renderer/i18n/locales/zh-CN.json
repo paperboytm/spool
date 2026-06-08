@@ -309,27 +309,10 @@
       "allowlist_scope_everywhere": "全局"
     },
     "account": {
-      "profile_title": "个人资料",
-      "profile_displayName_label": "显示名称",
       "profile_displayName_placeholder": "别人看到的名字",
-      "profile_displayName_help": "覆盖登录提供商的名字。留空使用提供商名字。",
-      "profile_displayName_save": "保存",
-      "profile_displayName_saving": "保存中…",
-      "profile_displayName_savedToast": "显示名称已更新",
       "profile_displayName_error_tooLong": "显示名称太长(最多 50 个字符)。",
       "profile_displayName_error_controlChars": "显示名称含有不允许的字符。",
       "profile_displayName_error_generic": "无法更新显示名称",
-      "profile_avatar_title": "头像",
-      "profile_avatar_uploadButton": "上传图片",
-      "profile_avatar_uploading": "上传中…",
-      "profile_avatar_removeButton": "移除自定义头像",
-      "profile_avatar_removing": "移除中…",
-      "profile_avatar_removedToast": "已移除自定义头像",
-      "profile_avatar_uploadedToast": "头像已上传",
-      "profile_avatar_help": "PNG、JPEG 或 WebP,最大 1 MB。保存前会清除 EXIF 元数据。",
-      "profile_avatar_showGoogle": "显示登录提供商的头像",
-      "profile_avatar_showGoogleHelp": "关闭后将使用姓名首字母作为头像。",
-      "profile_avatar_initialsAlt": "首字母头像",
       "profile_avatar_error_tooLarge": "图片过大(最大 1 MB)。",
       "profile_avatar_error_unsupported": "只接受 PNG、JPEG 和 WebP。",
       "profile_avatar_error_generic": "无法上传头像",
@@ -368,7 +351,10 @@
       "deleteConfirm_item_record": "你的账户记录将从 spool.pro 删除",
       "deleteConfirm_footnote": "在冷却期结束前你可以随时在此界面取消。本机的草稿不受影响——它们保存在本地。",
       "deleteConfirm_confirm": "安排删除",
-      "deleteConfirm_scheduling": "安排中…"
+      "deleteConfirm_scheduling": "安排中…",
+      "profile_avatar_change": "更换照片",
+      "profile_avatar_remove": "移除照片",
+      "profile_emailLabel": "邮箱"
     }
   },
   "security": {

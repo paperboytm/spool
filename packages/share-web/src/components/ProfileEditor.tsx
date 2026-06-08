@@ -1,18 +1,15 @@
-// Display name + avatar editor for the /me page. Mirrors the desktop
-// SettingsAccount ProfileEditor — same backend endpoints, just a
-// different host. Reuses the existing Avatar component for the
-// preview so the visual matches the rest of /me.
+// Identity surface for /me. Notion-style: clickable avatar +
+// editable name in one row, save-on-blur, tiny text-link actions
+// beneath. Mirrors the desktop SettingsAccount → ProfileEditor.
 
 import { useEffect, useRef, useState } from 'react'
 
 import {
   deleteAvatar,
   type MeResponse,
-  setAvatarVisible,
   updateDisplayName,
   uploadAvatar,
 } from '../lib/api'
-import { Avatar } from './Chrome'
 
 const MAX_AVATAR_BYTES = 1 * 1024 * 1024
 const ACCEPT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
@@ -25,24 +22,24 @@ interface Props {
 export function ProfileEditor({ me, onChanged }: Props) {
   const [draftName, setDraftName] = useState(me.display_name_override ?? '')
   const [savingName, setSavingName] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [removing, setRemoving] = useState(false)
-  const [savingVisible, setSavingVisible] = useState(false)
+  const [busy, setBusy] = useState<'idle' | 'upload' | 'remove'>('idle')
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     setDraftName(me.display_name_override ?? '')
+    setError(null)
   }, [me.id, me.display_name_override])
 
-  const nameDirty = (me.display_name_override ?? '') !== draftName.trim()
+  const persisted = me.display_name_override ?? ''
 
-  async function handleSaveName() {
+  async function commitName() {
     if (savingName) return
+    const trimmed = draftName.trim()
+    if (trimmed === persisted) return
     setSavingName(true)
     setError(null)
     try {
-      const trimmed = draftName.trim()
       await updateDisplayName(trimmed === '' ? null : trimmed)
       onChanged()
     } catch (err) {
@@ -66,7 +63,7 @@ export function ProfileEditor({ me, onChanged }: Props) {
       setError('Only PNG, JPEG, and WebP images are accepted.')
       return
     }
-    setUploading(true)
+    setBusy('upload')
     try {
       await uploadAvatar(file)
       onChanged()
@@ -74,13 +71,13 @@ export function ProfileEditor({ me, onChanged }: Props) {
       const msg = err instanceof Error ? err.message : ''
       setError(messageForAvatarError(msg))
     } finally {
-      setUploading(false)
+      setBusy('idle')
     }
   }
 
-  async function handleRemove() {
-    if (removing) return
-    setRemoving(true)
+  async function handleRemoveCustom() {
+    if (busy !== 'idle') return
+    setBusy('remove')
     setError(null)
     try {
       await deleteAvatar()
@@ -88,123 +85,119 @@ export function ProfileEditor({ me, onChanged }: Props) {
     } catch {
       setError("Couldn't remove avatar.")
     } finally {
-      setRemoving(false)
+      setBusy('idle')
     }
   }
 
-  async function handleToggleVisible(next: boolean) {
-    if (savingVisible) return
-    setSavingVisible(true)
-    setError(null)
-    try {
-      await setAvatarVisible(next)
-      onChanged()
-    } catch {
-      // Silent: next refresh re-syncs.
-    } finally {
-      setSavingVisible(false)
-    }
-  }
-
-  const hasCustomAvatar = !!me.custom_avatar_id
-  const showProviderToggle = !hasCustomAvatar && !!me.name
+  const hasCustom = !!me.custom_avatar_id
+  const initial = computeInitial(me.display_name)
 
   return (
-    <div className="sw-profile-editor">
-      {/* Display name */}
-      <div className="sw-form-row">
-        <label htmlFor="me-display-name" className="sw-label">
-          Display name
-        </label>
-        <div className="sw-input-row">
+    <section className="sw-profile-editor">
+      <div className="sw-profile-row">
+        <div className="sw-avatar-wrap">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy === 'upload'}
+            aria-label="Change profile photo"
+            className="sw-avatar-btn"
+          >
+            {me.avatar_url ? (
+              <img src={me.avatar_url} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="sw-avatar-initial">{initial}</span>
+            )}
+            <span className="sw-avatar-overlay" aria-hidden>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </span>
+          </button>
+          {hasCustom && (
+            <button
+              type="button"
+              onClick={() => void handleRemoveCustom()}
+              disabled={busy !== 'idle'}
+              aria-label="Remove photo"
+              className="sw-avatar-remove"
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <div className="sw-profile-body">
           <input
-            id="me-display-name"
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
-            placeholder="How others see you"
+            onBlur={() => void commitName()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            placeholder={me.display_name}
             maxLength={50}
-            className="sw-input"
+            disabled={savingName}
+            aria-label="Display name"
+            className="sw-name-input"
           />
-          <button
-            type="button"
-            onClick={() => void handleSaveName()}
-            disabled={savingName || !nameDirty}
-            className="sw-btn sw-btn-primary sw-btn-sm"
-          >
-            {savingName ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-        <p className="sw-hint">
-          Overrides the name from your sign-in provider. Leave empty to use it.
-        </p>
-      </div>
-
-      {/* Avatar */}
-      <div className="sw-form-row">
-        <label className="sw-label">Avatar</label>
-        <div className="sw-avatar-row">
-          <Avatar src={me.avatar_url} name={me.display_name} size={64} />
-          <div className="sw-avatar-actions">
-            <div className="sw-btn-row">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="sw-btn sw-btn-ghost sw-btn-sm"
-              >
-                {uploading ? 'Uploading…' : 'Upload image'}
-              </button>
-              {hasCustomAvatar && (
-                <button
-                  type="button"
-                  onClick={() => void handleRemove()}
-                  disabled={removing}
-                  className="sw-btn sw-btn-danger sw-btn-sm"
-                >
-                  {removing ? 'Removing…' : 'Remove custom avatar'}
-                </button>
-              )}
-            </div>
-            <p className="sw-hint">
-              PNG, JPEG, or WebP up to 1 MB. We strip EXIF metadata before storing.
+          {me.handle && <div className="sw-profile-meta">@{me.handle}</div>}
+          {error && (
+            <p role="alert" className="sw-error">
+              {error}
             </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sw-hidden"
-              onChange={(e) => void handlePickFile(e)}
-            />
-            {showProviderToggle && (
-              <label className="sw-toggle">
-                <input
-                  type="checkbox"
-                  checked={me.avatar_visible}
-                  onChange={(e) => void handleToggleVisible(e.target.checked)}
-                  disabled={savingVisible}
-                />
-                <span>
-                  <span className="sw-toggle-title">
-                    Show my sign-in provider&apos;s profile picture
-                  </span>
-                  <span className="sw-toggle-sub">
-                    Turn this off to use your initials instead.
-                  </span>
-                </span>
-              </label>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {error && (
-        <p role="alert" className="sw-error">
-          {error}
-        </p>
-      )}
-    </div>
+      <div className="sw-profile-email">
+        <div className="sw-profile-email-label">Email</div>
+        <div className="sw-profile-email-value sw-mono">{me.email}</div>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="sw-hidden"
+        onChange={(e) => void handlePickFile(e)}
+      />
+    </section>
   )
+}
+
+function computeInitial(name: string): string {
+  if (!name) return '?'
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    for (const s of seg.segment(name)) return s.segment.toUpperCase()
+  } catch {
+    return name.charAt(0).toUpperCase()
+  }
+  return '?'
 }
 
 function messageForDisplayNameError(msg: string): string {

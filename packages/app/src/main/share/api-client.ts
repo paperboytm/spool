@@ -20,6 +20,11 @@ export async function authedFetch(
   const token = loadToken()
   const headers = new Headers(init.headers)
   if (token) headers.set('authorization', `Bearer ${token}`)
-  if (!headers.has('content-type') && init.body) headers.set('content-type', 'application/json')
+  // Default to JSON only when the body is plain — for FormData we have
+  // to let the runtime set `multipart/form-data; boundary=…` itself,
+  // otherwise the backend can't parse the parts.
+  if (!headers.has('content-type') && init.body && !(init.body instanceof FormData)) {
+    headers.set('content-type', 'application/json')
+  }
   return fetchFn(`${backendUrl()}${path}`, { ...init, headers })
 }

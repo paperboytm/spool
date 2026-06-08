@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev ./public --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG",
+    "dev": "wrangler pages dev ./public --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG --r2 AVATARS",
     "deploy:staging": "wrangler pages deploy public --project-name spool-share-staging",
     "deploy:prod": "wrangler pages deploy public --project-name spool-share",
     "test": "vitest run",

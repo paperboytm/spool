@@ -539,32 +539,43 @@ export function Me() {
         )}
 
         <div className="sw-card w-600">
-          <div className="sw-identity">
-            <Avatar src={me.avatar_url} name={me.name} size={54} />
-            <div className="body">
-              {me.name && <h1 className="name">{me.name}</h1>}
-              {me.handle ? (
-                <p className="handle accent">
-                  <a href={`/@${me.handle}`}>@{me.handle}</a>
-                </p>
-              ) : (
-                <p className="handle">No public handle yet</p>
-              )}
+          {pending ? (
+            // Pending deletion: identity is read-only. Skip the editable
+            // ProfileEditor entirely so the surface communicates that
+            // changes won't survive the grace window.
+            <div className="sw-identity">
+              <Avatar src={me.avatar_url} name={me.display_name} size={54} />
+              <div className="body">
+                <h1 className="name">{me.display_name}</h1>
+                {me.handle ? (
+                  <p className="handle accent">
+                    <a href={`/@${me.handle}`}>@{me.handle}</a>
+                  </p>
+                ) : (
+                  <p className="handle">No public handle yet</p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="sw-btn sw-btn-ghost sw-btn-sm"
+                onClick={onSignOut}
+              >
+                Sign out
+              </button>
             </div>
-            <button
-              type="button"
-              className="sw-btn sw-btn-ghost sw-btn-sm"
-              onClick={onSignOut}
-            >
-              Sign out
-            </button>
-          </div>
-
-          {!pending && (
-            <>
-              <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
-              <ProfileEditor me={me} onChanged={refreshMe} />
-            </>
+          ) : (
+            <div className="sw-me-header">
+              <div className="sw-me-header-main">
+                <ProfileEditor me={me} onChanged={refreshMe} />
+              </div>
+              <button
+                type="button"
+                className="sw-btn sw-btn-ghost sw-btn-sm"
+                onClick={onSignOut}
+              >
+                Sign out
+              </button>
+            </div>
           )}
 
           {!me.handle && !pending && (

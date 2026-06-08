@@ -30,11 +30,17 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     const userId = ctx.params.id as string
     if (!USER_ID_RE.test(userId)) throw new ApiError('NOT_FOUND')
 
+    // Check `avatar_visible` too — /api/me + /api/profiles already gate
+    // the URL on this flag, so anyone holding a stale `/api/avatars/<id>`
+    // link must also get 404 once the user opts to hide their photo.
+    // Without this the GET endpoint is the bypass that defeats the
+    // resolver-level gate.
     const row = await ctx.env.DB
-      .prepare('SELECT custom_avatar_id FROM users WHERE id=? AND deleted_at IS NULL')
+      .prepare('SELECT custom_avatar_id, avatar_visible FROM users WHERE id=? AND deleted_at IS NULL')
       .bind(userId)
-      .first<{ custom_avatar_id: string | null }>()
+      .first<{ custom_avatar_id: string | null; avatar_visible: number | null }>()
     if (!row?.custom_avatar_id) throw new ApiError('NOT_FOUND')
+    if ((row.avatar_visible ?? 1) === 0) throw new ApiError('NOT_FOUND')
 
     const key = `avatars/${userId}/${row.custom_avatar_id}`
     const obj = await ctx.env.AVATARS.get(key)

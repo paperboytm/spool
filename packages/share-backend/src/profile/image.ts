@@ -70,9 +70,13 @@ export function readDimensions(mime: SupportedMime, buf: Uint8Array): { width: n
 
 function readPngDimensions(buf: Uint8Array): { width: number; height: number } | null {
   // Width/height are big-endian uint32 at offsets 16 and 20 (IHDR chunk).
+  // `>>> 0` coerces the bit-or result back to unsigned — without it a width
+  // with the high bit set (>= 2^31) reads as negative in JS's signed 32-bit
+  // bitwise math and the `<= 0` guard rejects it as malformed even though
+  // the PNG header is technically well-formed.
   if (buf.length < 24) return null
-  const width = (buf[16]! << 24) | (buf[17]! << 16) | (buf[18]! << 8) | buf[19]!
-  const height = (buf[20]! << 24) | (buf[21]! << 16) | (buf[22]! << 8) | buf[23]!
+  const width = (((buf[16]! << 24) | (buf[17]! << 16) | (buf[18]! << 8) | buf[19]!) >>> 0)
+  const height = (((buf[20]! << 24) | (buf[21]! << 16) | (buf[22]! << 8) | buf[23]!) >>> 0)
   if (width <= 0 || height <= 0) return null
   return { width, height }
 }
@@ -200,8 +204,20 @@ function stripJpegMetadata(buf: Uint8Array): Uint8Array {
     const segLen = (buf[i + 2]! << 8) | buf[i + 3]!
     if (segLen < 2) break
     const total = 2 + segLen
-    // APP1 (FFE1) APP2 (FFE2) COM (FFFE) — strip; everything else stays
-    const strip = marker === 0xe1 || marker === 0xe2 || marker === 0xfe
+    // Strip every APPn we don't need + the COM (comment) marker:
+    //   APP1 (FFE1)  EXIF / XMP
+    //   APP2 (FFE2)  ICC profile / FlashPix
+    //   APP3..APP12  proprietary maker notes
+    //   APP13 (FFED) Photoshop / IPTC (carries geo + captions)
+    //   APP15 (FFEF) reserved / app-specific
+    //   COM   (FFFE) free-text comment
+    // Keep:
+    //   APP0  (FFE0) JFIF — structural, defines pixel density
+    //   APP14 (FFEE) Adobe — colour-space flag some decoders rely on
+    const strip =
+      (marker >= 0xe1 && marker <= 0xed) ||
+      marker === 0xef ||
+      marker === 0xfe
     if (!strip) {
       for (let j = 0; j < total; j++) out.push(buf[i + j]!)
     }

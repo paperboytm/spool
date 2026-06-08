@@ -32,7 +32,15 @@ import { session as electronSession } from 'electron'
  * external API), add the origin to the matching directive here.
  */
 
-const IMG_ALLOW = "'self' data: blob: https://lh3.googleusercontent.com"
+// Backend origins: the renderer renders user-uploaded avatars served
+// from `/api/avatars/<id>` on the share-backend. In dev that's the
+// local wrangler at :8788; in prod it's spool.pro. Without these
+// origins in img-src Chromium silently drops the request — the
+// network tab shows nothing and the <img> renders as broken.
+const IMG_ALLOW_DEV =
+  "'self' data: blob: https://lh3.googleusercontent.com http://localhost:8788"
+const IMG_ALLOW_PROD =
+  "'self' data: blob: https://lh3.googleusercontent.com https://spool.pro https://*.spool.pro"
 
 // The editor's PDF preview renders a generated `blob:` URL inside an
 // `<iframe>` and lets Chromium's built-in PDF MIME handler take over.
@@ -63,7 +71,7 @@ const DEV_CSP = [
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  `img-src ${IMG_ALLOW}`,
+  `img-src ${IMG_ALLOW_DEV}`,
   `connect-src 'self' ${CONNECT_BLOB} http://localhost:8788 http://localhost:5173 ws://localhost:5173 ws://127.0.0.1:5173`,
   `frame-src ${FRAME_ALLOW}`,
   `object-src ${OBJECT_ALLOW}`,
@@ -79,7 +87,7 @@ const PROD_CSP = [
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  `img-src ${IMG_ALLOW}`,
+  `img-src ${IMG_ALLOW_PROD}`,
   `connect-src 'self' ${CONNECT_BLOB} https://spool.pro https://*.spool.pro`,
   `frame-src ${FRAME_ALLOW}`,
   `object-src ${OBJECT_ALLOW}`,

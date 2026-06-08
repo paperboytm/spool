@@ -873,6 +873,172 @@ html[data-theme='dark'] .sw-google-btn:hover {
 .sw-mono {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+.sw-hidden {
+  display: none;
+}
+
+/* ── Profile editor (notion-style identity surface) ─────────── */
+.sw-me-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+.sw-me-header-main {
+  flex: 1;
+  min-width: 0;
+}
+.sw-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sw-avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.sw-avatar-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.sw-avatar-wrap:hover .sw-avatar-remove,
+.sw-avatar-wrap:focus-within .sw-avatar-remove {
+  opacity: 1;
+}
+.sw-avatar-remove:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+.sw-avatar-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sw-avatar-btn {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.sw-avatar-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.sw-avatar-btn > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sw-avatar-initial {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+}
+.sw-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.sw-avatar-btn:hover .sw-avatar-overlay,
+.sw-avatar-btn:focus-visible .sw-avatar-overlay {
+  opacity: 1;
+}
+.sw-profile-body {
+  flex: 1;
+  min-width: 0;
+}
+.sw-name-input {
+  display: block;
+  width: 100%;
+  margin: -4px -8px 0;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  outline: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.sw-name-input::placeholder {
+  color: var(--muted);
+  font-weight: 600;
+}
+.sw-name-input:hover {
+  background: var(--card-2);
+}
+.sw-name-input:focus {
+  background: var(--card-2);
+  border-color: var(--border-strong);
+}
+.sw-name-input:disabled {
+  opacity: 0.7;
+}
+.sw-profile-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-profile-email {
+  margin-top: 18px;
+}
+.sw-profile-email-label {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.75;
+}
+.sw-profile-email-value {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger, #b14a4a);
+}
 
 /* ── Reader canvas ──────────────────────────────────────────── */
 /* The Reader page hosts a share-kit template that owns its own
