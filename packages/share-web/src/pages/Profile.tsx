@@ -4,7 +4,6 @@ import {
   Avatar,
   Footer,
   Header,
-  Icon,
   Page,
 } from '../components/Chrome'
 import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
@@ -45,7 +44,7 @@ export function Profile({ handle }: { handle: string }) {
   if (state.kind === 'loading') {
     return (
       <Page>
-        <Header auth="out" />
+        <Header />
         <main className="sw-main">
           <div className="sw-card w-600">
             <div className="sw-identity">
@@ -74,7 +73,7 @@ export function Profile({ handle }: { handle: string }) {
   if (state.kind === 'not-found' || state.kind === 'error') {
     return (
       <Page>
-        <Header auth="out" />
+        <Header />
         <main className="sw-main">
           <div className="sw-card tight w-600">
             <div className="sw-rule" style={{ marginBottom: 22 }}>
@@ -93,7 +92,7 @@ export function Profile({ handle }: { handle: string }) {
   const { profile } = state
   return (
     <Page>
-      <Header auth="out" />
+      <Header />
       <main className="sw-main">
         <div className="sw-card w-600">
           <div className="sw-identity">
@@ -115,17 +114,15 @@ export function Profile({ handle }: { handle: string }) {
           ) : (
             <ul className="sw-list">
               {profile.shares.map((s) => (
-                <li key={s.id}>
-                  <a className="sw-share link" href={`/s/${encodeURIComponent(s.id)}`}>
-                    <span className="sw-share-main">
-                      <span className="sw-share-title">{s.title}</span>
+                <li key={s.id} className="sw-share">
+                  <a
+                    className="sw-share-link"
+                    href={`/s/${encodeURIComponent(s.id)}`}
+                  >
+                    <span className="sw-share-title" title={s.title}>
+                      {s.title}
                     </span>
-                    <span className="sw-share-meta" style={{ flex: '0 0 auto' }}>
-                      {humanDate(s.published_at)}
-                    </span>
-                    <span style={{ color: 'var(--muted)', display: 'inline-flex' }}>
-                      <Icon name="arrow-right" size={14} />
-                    </span>
+                    <span className="sw-share-date">{humanDate(s.published_at)}</span>
                   </a>
                 </li>
               ))}

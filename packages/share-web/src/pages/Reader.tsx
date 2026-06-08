@@ -93,7 +93,7 @@ export function Reader({ id }: { id: string }) {
   if (state.kind === 'loading') {
     return (
       <Page>
-        <Header auth="out" />
+        <Header />
         <main className="sw-main center" aria-busy="true">
           <div className="sw-loading">
             <span className="sw-spin sw-spin-anim" />
@@ -110,7 +110,7 @@ export function Reader({ id }: { id: string }) {
 
   return (
     <Page>
-      <Header auth="out" />
+      <Header />
       <div className="reader-canvas">
         <div
           className="reader-paper"

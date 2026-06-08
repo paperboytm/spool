@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import {
   Avatar,
@@ -31,7 +31,15 @@ const CHECK_DEBOUNCE_MS = 320
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ok'; me: MeResponse; shares: MeShareRow[] }
+  | {
+      kind: 'ok'
+      me: MeResponse
+      shares: MeShareRow[]
+      deleteOpen?: boolean
+      unpublishTarget?: MeShareRow | null
+      unpublishBusy?: boolean
+      unpublishErr?: string | null
+    }
   | { kind: 'error' }
 
 function shareUrl(id: string): string {
@@ -186,15 +194,13 @@ function renderAvailability(
 function ShareRow({
   row,
   disabled,
-  onUnpublish,
+  onUnpublishRequest,
 }: {
   row: MeShareRow
   disabled?: boolean
-  onUnpublish: (id: string) => Promise<{ ok: boolean; reason?: string }>
+  onUnpublishRequest: (row: MeShareRow) => void
 }) {
-  const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
   const revoked = row.revoked_at !== null
   const expiry = row.expires_at !== null ? humanDate(row.expires_at) : null
   const listed = row.visibility === 'profile-listed'
@@ -209,24 +215,35 @@ function ShareRow({
     }
   }
 
-  async function unpublish() {
-    if (busy || revoked || disabled) return
-    setBusy(true)
-    setErr(null)
-    const r = await onUnpublish(row.id)
-    setBusy(false)
-    if (!r.ok) setErr(r.reason ?? 'Could not unpublish — try again.')
-  }
-
   return (
     <li
       className={`sw-share${revoked ? ' revoked' : ''}${disabled ? ' disabled' : ''}`}
     >
-      <div className="sw-share-main">
-        <span className="sw-share-title">{row.title}</span>
+      <a
+        className="sw-share-link"
+        href={`/s/${encodeURIComponent(row.id)}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <span className="sw-share-title" title={row.title}>
+          {row.title}
+        </span>
         <span className="sw-share-meta">
-          <span className={`sw-pill${listed ? ' listed' : ''}`}>
-            {listed ? 'Listed' : 'Unlisted'}
+          {/* Visibility is an icon-only glyph with a tooltip — text label
+           *  fought the title for visual weight (industry pattern:
+           *  GitHub gist / YouTube / Google Docs). `link-2` is the
+           *  straight-edge chain so it doesn't visually collide with
+           *  the copy-link button's curvy `link` icon. */}
+          <span
+            className="sw-share-vis"
+            title={
+              listed
+                ? 'On profile — visible on your /@handle page'
+                : 'Link only — unlisted, accessible only with the URL'
+            }
+            aria-label={listed ? 'On profile' : 'Link only'}
+          >
+            <Icon name={listed ? 'globe' : 'link-2'} size={12} />
           </span>
           <span>published {humanDate(row.published_at)}</span>
           {expiry && (
@@ -242,161 +259,243 @@ function ShareRow({
             </>
           )}
         </span>
-        {err && (
-          <span className="sw-share-error" role="alert">
-            {err}
-          </span>
-        )}
-      </div>
-      <div className="sw-share-actions">
-        <a
-          className="sw-icon-btn"
-          href={`/s/${encodeURIComponent(row.id)}`}
-          target="_blank"
-          rel="noreferrer"
-          title="Open share"
-          aria-label="Open share"
-        >
-          <Icon name="external" size={14} />
-        </a>
-        <button
-          type="button"
-          className={`sw-icon-btn${copied ? ' ok' : ''}`}
-          onClick={copy}
-          disabled={disabled}
-          title={copied ? 'Copied' : 'Copy link'}
-          aria-label={copied ? 'Copied' : 'Copy link'}
-        >
-          <Icon name={copied ? 'check' : 'link'} size={14} />
-        </button>
-        {!revoked && (
-          busy ? (
-            <span
-              className="sw-icon-btn busy"
-              aria-label="Unpublishing"
-              style={{ borderColor: 'var(--border-strong)' }}
-            >
-              <span className="sw-spin sw-spin-anim" style={{ width: 13, height: 13 }} />
-            </span>
-          ) : (
+      </a>
+      {!disabled && (
+        <div className="sw-share-actions">
+          <button
+            type="button"
+            className={`sw-icon-btn${copied ? ' ok' : ''}`}
+            onClick={copy}
+            title={copied ? 'Copied' : 'Copy link'}
+            aria-label={copied ? 'Copied' : 'Copy link'}
+          >
+            <Icon name={copied ? 'check' : 'link'} size={14} />
+          </button>
+          {!revoked && (
             <button
               type="button"
               className="sw-icon-btn danger"
-              onClick={unpublish}
-              disabled={disabled}
+              onClick={() => onUnpublishRequest(row)}
               title="Unpublish"
               aria-label="Unpublish"
             >
               <Icon name="eye-off" size={14} />
             </button>
-          )
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </li>
   )
 }
 
-function DeleteAccount({
-  initialPendingUntil,
+// Generic modal shell used by both DeleteAccountModal and
+// UnpublishConfirmModal. Esc + backdrop click close (gated by `busy`
+// so we don't drop an in-flight request).
+function ModalShell({
+  open,
+  busy,
+  onClose,
+  labelledBy,
+  children,
+}: {
+  open: boolean
+  busy?: boolean
+  onClose: () => void
+  labelledBy: string
+  children: ReactNode
+}) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, busy, onClose])
+  if (!open) return null
+  return (
+    <div
+      className="sw-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose()
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={labelledBy}
+    >
+      <div className="sw-modal">{children}</div>
+    </div>
+  )
+}
+
+function DeleteAccountModal({
+  open,
+  onClose,
+  pendingUntil,
+  onScheduled,
   onCancelled,
 }: {
-  initialPendingUntil: number | null
+  open: boolean
+  onClose: () => void
+  pendingUntil: number | null
+  onScheduled: (at: number) => void
   onCancelled: () => void
 }) {
-  const [state, setState] = useState<
-    | { kind: 'idle' }
-    | { kind: 'confirming' }
-    | { kind: 'scheduled'; at: number }
-    | { kind: 'cancelling' }
-  >(
-    initialPendingUntil
-      ? { kind: 'scheduled', at: initialPendingUntil }
-      : { kind: 'idle' },
-  )
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const pending = pendingUntil !== null
 
-  async function schedule() {
-    const r = await scheduleAccountDeletion()
-    if (r.kind === 'ok') setState({ kind: 'scheduled', at: r.scheduled_at })
-  }
-
-  async function cancel() {
-    const prev = state
-    setState({ kind: 'cancelling' })
-    const ok = await cancelAccountDeletion()
-    if (ok) {
-      setState({ kind: 'idle' })
-      onCancelled()
-    } else if (prev.kind === 'scheduled') {
-      setState(prev)
-    } else {
-      setState({ kind: 'scheduled', at: 0 })
+  // Reset transient state each time the modal re-opens — otherwise a
+  // previous error lingers when the user re-triggers from the footer.
+  useEffect(() => {
+    if (open) {
+      setBusy(false)
+      setErr(null)
     }
+  }, [open])
+
+  async function onSchedule() {
+    if (busy) return
+    setBusy(true)
+    setErr(null)
+    const r = await scheduleAccountDeletion()
+    setBusy(false)
+    if (r.kind === 'ok') {
+      onScheduled(r.scheduled_at)
+      onClose()
+      return
+    }
+    setErr('Could not schedule deletion — try again.')
   }
 
-  if (state.kind === 'scheduled' || state.kind === 'cancelling') {
-    const at = state.kind === 'scheduled' ? state.at : 0
-    const when = at > 0 ? humanDateTime(at) : null
-    return (
-      <div className="sw-scheduled-box">
-        <p>
-          <strong>Account deletion is scheduled</strong>
-          {when ? ` for ${when}` : ''}. You have 24 hours to cancel.
-        </p>
-        <button
-          type="button"
-          className="sw-btn sw-btn-ghost"
-          onClick={cancel}
-          disabled={state.kind === 'cancelling'}
-        >
-          {state.kind === 'cancelling' ? (
-            <>
-              <span className="sw-spin sw-spin-anim" style={{ width: 11, height: 11 }} />
-              Cancelling…
-            </>
-          ) : (
-            'Cancel deletion'
-          )}
-        </button>
-      </div>
-    )
-  }
-
-  if (state.kind === 'confirming') {
-    return (
-      <div className="sw-confirm-box">
-        <p>
-          Deleting your account unpublishes every share, releases your handle, and removes
-          your record after 24 hours. This can be undone within that window.
-        </p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="sw-btn sw-btn-danger" onClick={schedule}>
-            Yes, delete my account
-          </button>
-          <button
-            type="button"
-            className="sw-btn sw-btn-ghost"
-            onClick={() => setState({ kind: 'idle' })}
-          >
-            Back
-          </button>
-        </div>
-      </div>
-    )
+  async function onCancel() {
+    if (busy) return
+    setBusy(true)
+    setErr(null)
+    const ok = await cancelAccountDeletion()
+    setBusy(false)
+    if (ok) {
+      onCancelled()
+      onClose()
+      return
+    }
+    setErr('Could not cancel deletion — try again.')
   }
 
   return (
-    <button
-      type="button"
-      className="sw-btn sw-btn-ghost"
-      onClick={() => setState({ kind: 'confirming' })}
+    <ModalShell open={open} busy={busy} onClose={onClose} labelledBy="delete-account-title">
+      <h2 id="delete-account-title" className="sw-modal-title">
+        {pending ? 'Cancel account deletion?' : 'Delete account?'}
+      </h2>
+      {pending && pendingUntil ? (
+        <p className="sw-modal-body">
+          Scheduled for <span className="sw-mono">{humanDateTime(pendingUntil)}</span>. Cancelling
+          keeps your shares, handle, and account intact.
+        </p>
+      ) : (
+        <p className="sw-modal-body">
+          Unpublishes every share, releases your handle, and removes your account record after 24
+          hours. You can undo this from the same place within that window.
+        </p>
+      )}
+      {err && (
+        <p className="sw-modal-error" role="alert">
+          {err}
+        </p>
+      )}
+      <div className="sw-modal-actions">
+        <button
+          type="button"
+          className="sw-btn sw-btn-ghost"
+          onClick={onClose}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        {pending ? (
+          <button
+            type="button"
+            className="sw-btn sw-btn-primary"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            {busy ? 'Cancelling…' : 'Cancel deletion'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="sw-btn sw-btn-danger"
+            onClick={onSchedule}
+            disabled={busy}
+          >
+            {busy ? 'Scheduling…' : 'Yes, delete account'}
+          </button>
+        )}
+      </div>
+    </ModalShell>
+  )
+}
+
+function UnpublishConfirmModal({
+  target,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  target: MeShareRow | null
+  busy: boolean
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <ModalShell
+      open={target !== null}
+      busy={busy}
+      onClose={onClose}
+      labelledBy="unpublish-title"
     >
-      Delete account…
-    </button>
+      <h2 id="unpublish-title" className="sw-modal-title">
+        Unpublish this share?
+      </h2>
+      {target && (
+        <p className="sw-modal-target sw-mono" title={target.title}>
+          {target.title}
+        </p>
+      )}
+      <p className="sw-modal-body">
+        This permanently deletes the snapshot from R2 and locks the URL to <span className="sw-mono">410 Gone</span>. The
+        slug can never be reused. To share this conversation again, republish from the desktop app
+        — you'll get a new URL.
+      </p>
+      <div className="sw-modal-actions">
+        <button
+          type="button"
+          className="sw-btn sw-btn-ghost"
+          onClick={onClose}
+          disabled={busy}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="sw-btn sw-btn-danger"
+          onClick={onConfirm}
+          disabled={busy}
+        >
+          {busy ? 'Unpublishing…' : 'Yes, unpublish permanently'}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 
 export function Me() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  // Re-entrancy lock on confirmUnpublish: the button is `disabled={busy}`
+  // but a double-tap on a slow device can fire onClick twice before React
+  // commits the `unpublishBusy: true` write. The ref blocks the second
+  // call synchronously, before any async work.
+  const unpublishingRef = useRef(false)
 
   const load = useCallback(async () => {
     const [meResult, sharesResult] = await Promise.all([fetchMe(), fetchMyShares()])
@@ -466,7 +565,7 @@ export function Me() {
   if (state.kind === 'loading') {
     return (
       <Page>
-        <Header auth="out" />
+        <Header />
         <main className="sw-main center" aria-busy="true">
           <div className="sw-loading">
             <span className="sw-spin sw-spin-anim" />
@@ -481,7 +580,7 @@ export function Me() {
   if (state.kind === 'error') {
     return (
       <Page>
-        <Header auth="out" />
+        <Header />
         <main className="sw-main center">
           <div className="sw-card tight w-480">
             <div className="sw-rule" style={{ marginBottom: 20 }}>
@@ -508,11 +607,53 @@ export function Me() {
   const { me, shares } = state
   const pendingUntil = me.deletion_pending_until
   const pending = pendingUntil !== null
-  const headerAuth = { name: me.name, src: me.avatar_url }
+
+  function openDelete() {
+    setState((s) => (s.kind === 'ok' ? { ...s, deleteOpen: true } : s))
+  }
+  function closeDelete() {
+    setState((s) => (s.kind === 'ok' ? { ...s, deleteOpen: false } : s))
+  }
+  function onDeletionScheduled(at: number) {
+    setState((s) =>
+      s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: at } } : s,
+    )
+  }
+  function requestUnpublish(row: MeShareRow) {
+    setState((s) => (s.kind === 'ok' ? { ...s, unpublishTarget: row, unpublishErr: null } : s))
+  }
+  function closeUnpublish() {
+    setState((s) =>
+      s.kind === 'ok' ? { ...s, unpublishTarget: null, unpublishErr: null } : s,
+    )
+  }
+  async function confirmUnpublish() {
+    if (state.kind !== 'ok' || !state.unpublishTarget) return
+    if (unpublishingRef.current) return
+    unpublishingRef.current = true
+    const target = state.unpublishTarget
+    setState((s) => (s.kind === 'ok' ? { ...s, unpublishBusy: true, unpublishErr: null } : s))
+    try {
+      const r = await onUnpublish(target.id)
+      setState((s) => {
+        if (s.kind !== 'ok') return s
+        if (r.ok) {
+          return { ...s, unpublishBusy: false, unpublishTarget: null, unpublishErr: null }
+        }
+        return {
+          ...s,
+          unpublishBusy: false,
+          unpublishErr: r.reason ?? 'Could not unpublish — try again.',
+        }
+      })
+    } finally {
+      unpublishingRef.current = false
+    }
+  }
 
   return (
     <Page>
-      <Header auth={headerAuth} />
+      <Header />
       <main className="sw-main gap">
         {pending && (
           <div className="sw-banner pending" role="alert">
@@ -521,8 +662,15 @@ export function Me() {
             </span>
             <span>
               <strong>Account deletion is pending.</strong>{' '}
-              {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null} Cancel
-              it in the Danger zone below to restore access.
+              {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null}{' '}
+              <button
+                type="button"
+                className="sw-banner-action"
+                onClick={openDelete}
+              >
+                Cancel deletion
+              </button>{' '}
+              to restore access.
             </span>
           </div>
         )}
@@ -580,34 +728,46 @@ export function Me() {
                   key={row.id}
                   row={row}
                   disabled={pending}
-                  onUnpublish={onUnpublish}
+                  onUnpublishRequest={requestUnpublish}
                 />
               ))}
             </ul>
           )}
 
-          <div className="sw-danger-zone" style={{ marginTop: 24 }}>
-            <h2
-              className="sw-section-label"
-              style={{ marginBottom: 14, color: 'var(--muted)' }}
-            >
-              Danger zone
-            </h2>
-            <DeleteAccount
-              initialPendingUntil={pendingUntil}
-              onCancelled={onDeletionCancelled}
-            />
-          </div>
-
           <p className="sw-signed-in-as">
             <span className="ico">
               <Icon name="lock" size={11} />
             </span>
-            Signed in as {me.email}
+            <span>Signed in as {me.email}</span>
+            <button
+              type="button"
+              className="sw-link-quiet"
+              onClick={openDelete}
+            >
+              {pending ? 'Cancel deletion' : 'Delete account'}
+            </button>
           </p>
+          {state.unpublishErr && (
+            <p className="sw-unpublish-err" role="alert">
+              {state.unpublishErr}
+            </p>
+          )}
         </div>
       </main>
       <Footer />
+      <DeleteAccountModal
+        open={state.deleteOpen === true}
+        onClose={closeDelete}
+        pendingUntil={pendingUntil}
+        onScheduled={onDeletionScheduled}
+        onCancelled={onDeletionCancelled}
+      />
+      <UnpublishConfirmModal
+        target={state.unpublishTarget ?? null}
+        busy={state.unpublishBusy === true}
+        onClose={closeUnpublish}
+        onConfirm={confirmUnpublish}
+      />
     </Page>
   )
 }

@@ -4,6 +4,9 @@
 
 import type { Snapshot } from '@spool/share-kit'
 
+import { invalidateAuthCache } from './auth-cache'
+import { clearCachedMe, writeCachedMe } from './me-cache'
+
 export type SnapshotFetchResult =
   | { kind: 'ok'; snapshot: Snapshot }
   | { kind: 'gone'; reason: 'revoked' | 'expired'; at: number }
@@ -121,8 +124,23 @@ export async function fetchMe(): Promise<MeFetchResult> {
       headers: { accept: 'application/json' },
       credentials: 'same-origin',
     })
-    if (r.status === 200) return { kind: 'ok', me: (await r.json()) as MeResponse }
-    if (r.status === 401) return { kind: 'unauthenticated' }
+    if (r.status === 200) {
+      const me = (await r.json()) as MeResponse
+      // Write the public-identity slice into the SWR cache so the next
+      // page mount can paint the avatar before the round trip lands.
+      writeCachedMe({ name: me.name, avatar_url: me.avatar_url })
+      return { kind: 'ok', me }
+    }
+    if (r.status === 401) {
+      // Cookie expired / signed out from another tab — drop both the
+      // localStorage avatar cache AND the in-memory auth promise so the
+      // next Header mount doesn't paint stale identity.
+      clearCachedMe()
+      invalidateAuthCache()
+      return { kind: 'unauthenticated' }
+    }
+    // 403 = deletion-pending account; leave the cache alone, the user
+    // is still effectively signed in for the recovery surface.
     if (r.status === 403) return { kind: 'forbidden' }
     return { kind: 'error' }
   } catch {
@@ -229,6 +247,11 @@ export async function claimHandle(handle: string): Promise<
 }
 
 export async function signOut(): Promise<boolean> {
+  // Always drop the local identity cache, even if the network call
+  // fails — the user's intent is "log me out of this device" and a
+  // stale cached avatar is the wrong signal.
+  clearCachedMe()
+  invalidateAuthCache()
   try {
     const r = await fetch('/api/auth/sign-out', {
       method: 'POST',

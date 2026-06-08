@@ -10,7 +10,29 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
-export type AuthState = 'out' | { name: string | null; src: string | null }
+import { fetchMe } from '../lib/api'
+import {
+  type AuthIdentity,
+  getCachedAuth,
+  setCachedAuth,
+} from '../lib/auth-cache'
+import { readCachedMe } from '../lib/me-cache'
+
+export type AuthState = AuthIdentity | 'auto'
+
+async function resolveAuthState(): Promise<AuthIdentity> {
+  const existing = getCachedAuth()
+  if (existing) return existing
+  const p = (async () => {
+    const r = await fetchMe()
+    if (r.kind === 'ok') {
+      return { name: r.me.name, src: r.me.avatar_url } as AuthIdentity
+    }
+    return 'out' as AuthIdentity
+  })()
+  setCachedAuth(p)
+  return p
+}
 
 const THEME_KEY = 'spool.share-web.theme'
 
@@ -111,6 +133,7 @@ export function Avatar({
 type IconName =
   | 'external'
   | 'link'
+  | 'link-2'
   | 'check'
   | 'check-circle'
   | 'alert'
@@ -118,6 +141,7 @@ type IconName =
   | 'arrow-right'
   | 'clock'
   | 'eye-off'
+  | 'globe'
   | 'lock'
   | 'sun'
   | 'moon'
@@ -156,6 +180,26 @@ export function Icon({
         <svg {...common}>
           <path d="M6.5 9.5a2.5 2.5 0 0 0 3.6.1l2-2a2.55 2.55 0 0 0-3.6-3.6l-1.1 1.1" />
           <path d="M9.5 6.5a2.5 2.5 0 0 0-3.6-.1l-2 2a2.55 2.55 0 0 0 3.6 3.6l1.1-1.1" />
+        </svg>
+      )
+    case 'link-2':
+      // Lucide-style link-2: straight chain — distinct from the curvy
+      // `link` glyph used by the copy-link button, so a meta-line
+      // visibility marker (link-only share) doesn't read as the same
+      // affordance as the copy action sitting next to it.
+      return (
+        <svg {...common}>
+          <path d="M5 8h6" />
+          <path d="M5.5 4.5h-2A2.5 2.5 0 0 0 1 7v2a2.5 2.5 0 0 0 2.5 2.5h2" />
+          <path d="M10.5 4.5h2A2.5 2.5 0 0 1 15 7v2a2.5 2.5 0 0 1-2.5 2.5h-2" />
+        </svg>
+      )
+    case 'globe':
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="8" r="6" />
+          <path d="M2 8h12" />
+          <path d="M8 2c1.7 2 2.6 4 2.6 6S9.7 14 8 14c-1.7 0-2.6-2-2.6-6S6.3 2 8 2z" />
         </svg>
       )
     case 'check':
@@ -271,21 +315,44 @@ export function ThemeToggle() {
   )
 }
 
-export function Header({ auth = 'out' as AuthState }: { auth?: AuthState }) {
+export function Header({ auth = 'auto' as AuthState }: { auth?: AuthState }) {
+  // 'auto' = SWR pattern: first frame paints from the localStorage
+  // cache, background fetchMe revalidates and rewrites. 'out' or an
+  // explicit object lets a page short-circuit (SignIn knows the user
+  // is unauthenticated by definition).
+  const [resolved, setResolved] = useState<AuthState>(() => {
+    if (auth !== 'auto') return auth
+    const cached = readCachedMe()
+    return cached
+      ? ({ name: cached.name, src: cached.avatar_url } as AuthState)
+      : 'out'
+  })
+
+  useEffect(() => {
+    if (auth !== 'auto') return
+    let alive = true
+    resolveAuthState().then((next) => {
+      if (alive) setResolved(next)
+    })
+    return () => {
+      alive = false
+    }
+  }, [auth])
+
   return (
     <header className="sw-header">
-      <a href="/" aria-label="Spool home">
+      <a href="https://spool.pro/" aria-label="Spool home">
         <Wordmark />
       </a>
       <div className="sw-header-right">
         <ThemeToggle />
-        {auth === 'out' ? (
+        {resolved === 'out' || resolved === 'auto' ? (
           <a className="sw-signin-link" href="/sign-in">
             Sign in
           </a>
         ) : (
           <a href="/me" title="Your account" style={{ display: 'inline-flex' }}>
-            <Avatar src={auth.src} name={auth.name} size={30} />
+            <Avatar src={resolved.src} name={resolved.name} size={30} />
           </a>
         )}
       </div>

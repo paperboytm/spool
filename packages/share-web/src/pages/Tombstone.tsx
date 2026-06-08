@@ -49,7 +49,7 @@ export function Tombstone({ reason, at }: Props) {
   const when = formatAt(at)
   return (
     <Page>
-      <Header auth="out" />
+      <Header />
       <main className="sw-main center">
         <div className="sw-card tight" style={{ maxWidth: 560 }}>
           <div className="sw-rule" style={{ marginBottom: 22 }}>

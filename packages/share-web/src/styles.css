@@ -426,7 +426,6 @@ html[data-theme='dark'] .sw-root {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--faint);
   display: flex;
   align-items: center;
@@ -447,21 +446,28 @@ html[data-theme='dark'] .sw-root {
   flex-direction: column;
   gap: 8px;
 }
+/* Two row variants share `.sw-share`:
+ *   - /me  (owner) — multi-line: title + meta (visibility icon + dates
+ *     + state pill), actions on the right
+ *   - /@handle (public) — single line: title left + mono date right
+ *
+ * Whole-row click affordance: `<a class="sw-share-link">` wraps the
+ * title + meta column on /me and the title + date on /@handle. The
+ * anchor itself is the click target, so hovering any child (incl.
+ * the visibility icon) shows that child's `title=` tooltip naturally
+ * — no `::after` overlay to fight. Actions live OUTSIDE the anchor
+ * as siblings, so their own onClick wins. */
 .sw-share {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 13px 16px;
-  background: var(--card-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  transition: border-color 0.15s, background 0.15s;
+  gap: 10px;
+  padding: 4px 12px;
+  margin: 0 -12px;
+  border-radius: 8px;
+  transition: background 0.12s;
 }
 .sw-share:hover {
-  border-color: var(--border-strong);
-}
-.sw-share.link:hover {
-  border-color: var(--accent);
+  background: var(--card-2);
 }
 .sw-share.revoked {
   opacity: 0.55;
@@ -470,23 +476,48 @@ html[data-theme='dark'] .sw-root {
   opacity: 0.5;
   pointer-events: none;
 }
-.sw-share-main {
+.sw-share-link {
   flex: 1;
   min-width: 0;
   display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  color: inherit;
+  text-decoration: none;
+}
+/* /me variant: title + meta stack vertically inside the anchor.
+ * Triggered by the meta line's presence — public /@handle rows
+ * have no meta line so they keep the row layout (title + date). */
+.sw-share-link:has(> .sw-share-meta) {
   flex-direction: column;
-  gap: 3px;
+  align-items: stretch;
+  gap: 4px;
 }
 .sw-share-title {
+  flex: 1;
+  min-width: 0;
+  display: block;
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 15.5px;
+  line-height: 1.35;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.sw-share:hover .sw-share-title {
+  color: var(--accent);
+}
+.sw-share-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 .sw-share-meta {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 11.5px;
   letter-spacing: 0.02em;
   color: var(--muted);
   display: flex;
@@ -497,16 +528,25 @@ html[data-theme='dark'] .sw-root {
 .sw-share-meta .dot-sep {
   opacity: 0.5;
 }
-.sw-share-error {
-  color: var(--err);
+.sw-share-vis {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  cursor: help;
+}
+.sw-share-date {
+  flex: 0 0 auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  margin-top: 2px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .sw-share-actions {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+  padding: 8px 0;
 }
 
 /* compact icon buttons */
@@ -696,6 +736,55 @@ html[data-theme='dark'] .sw-root {
 .sw-signed-in-as .ico {
   color: var(--faint);
   display: inline-flex;
+}
+/* Wrap the user identity span so its ellipsis behaviour works
+ * without stealing the flex slot from the Delete account link. */
+.sw-signed-in-as > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Push the destructive trigger to the right edge of the row so the
+ * left side reads as a stable identity line. */
+.sw-signed-in-as .sw-link-quiet {
+  margin-left: auto;
+}
+/* Quiet text link — used for the Delete account / Cancel deletion
+ * trigger next to "Signed in as …". Reads as ancillary metadata
+ * unless hovered. */
+.sw-link-quiet {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--faint);
+  cursor: pointer;
+  text-underline-offset: 2px;
+  transition: color 0.12s;
+}
+.sw-link-quiet:hover,
+.sw-link-quiet:focus-visible {
+  color: var(--err);
+  text-decoration: underline;
+}
+.sw-banner-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-banner-action:hover {
+  color: var(--accent);
+}
+.sw-unpublish-err {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--err);
 }
 
 /* ── Danger zone ────────────────────────────────────────────── */
@@ -887,6 +976,74 @@ html[data-theme='dark'] .sw-google-btn:hover {
 }
 .reader-paper {
   max-width: 100%;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(40, 34, 26, 0.05),
+    0 18px 50px rgba(40, 34, 26, 0.10);
+}
+html[data-theme='dark'] .reader-paper {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Modal shell (Delete / Unpublish confirm) ───────────────── */
+.sw-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 16, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+html[data-theme='dark'] .sw-modal-overlay {
+  background: rgba(0, 0, 0, 0.65);
+}
+.sw-modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  padding: 26px 26px 22px;
+}
+.sw-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+.sw-modal-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+.sw-modal-target {
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  margin: 0 0 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-modal-error {
+  font-size: 12.5px;
+  color: var(--err);
+  margin: 0 0 12px;
+}
+.sw-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* ── Narrow viewport adjustments ────────────────────────────── */
