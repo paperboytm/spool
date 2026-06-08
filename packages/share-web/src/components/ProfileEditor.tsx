@@ -11,7 +11,7 @@ import {
   uploadAvatar,
 } from '../lib/api'
 
-const MAX_AVATAR_BYTES = 1 * 1024 * 1024
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 const ACCEPT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 interface Props {
@@ -56,7 +56,7 @@ export function ProfileEditor({ me, onChanged }: Props) {
     if (!file) return
     setError(null)
     if (file.size > MAX_AVATAR_BYTES) {
-      setError('Image is too large (max 1 MB).')
+      setError('Image is too large (max 2 MB).')
       return
     }
     if (!ACCEPT_MIME.has(file.type)) {
@@ -207,7 +207,7 @@ function messageForDisplayNameError(msg: string): string {
 }
 
 function messageForAvatarError(msg: string): string {
-  if (msg.includes('too large')) return 'Image is too large (max 1 MB).'
+  if (msg.includes('too large')) return 'Image is too large (max 2 MB).'
   if (msg.includes('unsupported') || msg.includes('malformed')) {
     return 'Only PNG, JPEG, and WebP images are accepted.'
   }

@@ -8,13 +8,13 @@
 //
 // No transcoding, no resize: v1 accepts what the user gives us within
 // caps. Cloudflare Pages Function runtime doesn't ship `sharp` or
-// libwebp; bringing them in would mean a Rust NAPI binding the way
-// AFFiNE does it. Out of scope. The 1 MB body cap + 4096 px dimension
-// cap is the bound that keeps R2 storage sane.
+// libwebp, and bringing in a native image lib via NAPI bindings is out
+// of scope for v1. The 2 MB body cap + 4096 px dimension cap is the
+// bound that keeps R2 storage sane.
 
 export type SupportedMime = 'image/png' | 'image/jpeg' | 'image/webp'
 
-export const MAX_AVATAR_BYTES = 1 * 1024 * 1024 // 1 MB
+export const MAX_AVATAR_BYTES = 2 * 1024 * 1024 // 2 MB
 export const MAX_AVATAR_DIM = 4096
 export const MIN_AVATAR_DIM = 32
 

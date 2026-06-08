@@ -313,7 +313,7 @@
       "profile_displayName_error_tooLong": "顯示名稱太長(最多 50 個字元)。",
       "profile_displayName_error_controlChars": "顯示名稱含有不允許的字元。",
       "profile_displayName_error_generic": "無法更新顯示名稱",
-      "profile_avatar_error_tooLarge": "圖片過大(最大 1 MB)。",
+      "profile_avatar_error_tooLarge": "圖片過大(最大 2 MB)。",
       "profile_avatar_error_unsupported": "只接受 PNG、JPEG 和 WebP。",
       "profile_avatar_error_generic": "無法上傳頭像",
       "handle_title": "Handle",

@@ -5,10 +5,12 @@
 //                         provider-claim avatar (users.avatar_url)
 //                         is unaffected.
 //
-// Mirrors AFFiNE's resolver.uploadAvatar shape but on Pages Functions
-// + R2 — no NestJS, no NAPI image lib. Cap 1 MB, accepts PNG/JPEG/WebP.
-// Resize/transcode is out of scope for v1 — the dimension cap is the
-// only protection against pathological inputs.
+// Backend-proxied upload: the bytes go through the Pages Function so we
+// can sniff the MIME from the bytes (not the client-claimed
+// Content-Type), strip metadata, cap dimensions, and only then commit
+// to R2. Cap 2 MB, accepts PNG/JPEG/WebP. Resize/transcode is out of
+// scope for v1 — the dimension cap is the only protection against
+// pathological inputs.
 
 import type { D1Database, KVNamespace, PagesFunction, R2Bucket } from '@cloudflare/workers-types'
 
@@ -90,7 +92,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     console.log(`[avatar-upload] file bytes=${ab.byteLength} name=${(file as File).name} type=${(file as File).type}`)
     if (ab.byteLength === 0) throw new ApiError('UNPROCESSABLE', 'empty upload')
     if (ab.byteLength > MAX_AVATAR_BYTES) {
-      throw new ApiError('UNPROCESSABLE', 'avatar too large (max 1 MB)')
+      throw new ApiError('UNPROCESSABLE', 'avatar too large (max 2 MB)')
     }
     const raw = new Uint8Array(ab)
 

@@ -313,7 +313,7 @@
       "profile_displayName_error_tooLong": "表示名が長すぎます(最大50文字)。",
       "profile_displayName_error_controlChars": "表示名に使用できない文字が含まれています。",
       "profile_displayName_error_generic": "表示名を更新できませんでした",
-      "profile_avatar_error_tooLarge": "画像が大きすぎます(最大1 MB)。",
+      "profile_avatar_error_tooLarge": "画像が大きすぎます(最大2 MB)。",
       "profile_avatar_error_unsupported": "PNG、JPEG、WebPのみ対応しています。",
       "profile_avatar_error_generic": "アバターをアップロードできませんでした",
       "handle_title": "ハンドル",

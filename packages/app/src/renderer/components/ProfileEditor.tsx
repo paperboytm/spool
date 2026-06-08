@@ -4,7 +4,7 @@
 // separate identity block.
 //
 // Avatar interaction:
-//   - Click the circle → file picker (PNG/JPEG/WebP up to 1 MB).
+//   - Click the circle → file picker (PNG/JPEG/WebP up to 2 MB).
 //   - Hover/focus → "Change" overlay with camera glyph.
 //   - When a custom avatar exists, a "Remove photo" link drops it.
 //   - When the provider photo is visible, "Use initials" hides it.
@@ -18,7 +18,7 @@ import { Camera, X } from 'lucide-react'
 import { useShareAuth } from '../hooks/useShareAuth.js'
 import { resolveAvatarUrl } from '../lib/sharePublicUrl.js'
 
-const MAX_AVATAR_BYTES = 1 * 1024 * 1024
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 const ACCEPT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 export default function ProfileEditor() {

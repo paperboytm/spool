@@ -313,7 +313,7 @@
       "profile_displayName_error_tooLong": "표시 이름이 너무 깁니다(최대 50자).",
       "profile_displayName_error_controlChars": "표시 이름에 허용되지 않은 문자가 포함되어 있습니다.",
       "profile_displayName_error_generic": "표시 이름을 업데이트할 수 없음",
-      "profile_avatar_error_tooLarge": "이미지가 너무 큼(최대 1 MB).",
+      "profile_avatar_error_tooLarge": "이미지가 너무 큼(최대 2 MB).",
       "profile_avatar_error_unsupported": "PNG, JPEG, WebP만 지원됩니다.",
       "profile_avatar_error_generic": "아바타를 업로드할 수 없음",
       "handle_title": "핸들",

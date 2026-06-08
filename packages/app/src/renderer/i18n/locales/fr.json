@@ -320,7 +320,7 @@
       "profile_displayName_error_tooLong": "Nom d'affichage trop long (50 caractères maximum).",
       "profile_displayName_error_controlChars": "Nom d'affichage contient des caractères non autorisés.",
       "profile_displayName_error_generic": "Impossible de mettre à jour le nom d'affichage",
-      "profile_avatar_error_tooLarge": "L'image est trop grande (1 Mo maximum).",
+      "profile_avatar_error_tooLarge": "L'image est trop grande (2 Mo maximum).",
       "profile_avatar_error_unsupported": "Seuls PNG, JPEG et WebP sont acceptés.",
       "profile_avatar_error_generic": "Impossible de télécharger l'avatar",
       "handle_title": "Handle",

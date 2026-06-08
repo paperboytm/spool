@@ -320,7 +320,7 @@
       "profile_displayName_error_tooLong": "Display name is too long (max 50 characters).",
       "profile_displayName_error_controlChars": "Display name contains characters that aren't allowed.",
       "profile_displayName_error_generic": "Couldn't update display name",
-      "profile_avatar_error_tooLarge": "Image is too large (max 1 MB).",
+      "profile_avatar_error_tooLarge": "Image is too large (max 2 MB).",
       "profile_avatar_error_unsupported": "Only PNG, JPEG, and WebP images are accepted.",
       "profile_avatar_error_generic": "Couldn't upload avatar",
       "handle_title": "Handle",

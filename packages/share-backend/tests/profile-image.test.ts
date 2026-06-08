@@ -233,8 +233,8 @@ describe('stripMetadata (JPEG)', () => {
 // ─── bounds ───────────────────────────────────────────────────────
 
 describe('bounds export sanity', () => {
-  it('caps avatar at 1 MB', () => {
-    expect(MAX_AVATAR_BYTES).toBe(1 * 1024 * 1024)
+  it('caps avatar at 2 MB', () => {
+    expect(MAX_AVATAR_BYTES).toBe(2 * 1024 * 1024)
   })
   it('limits dimensions to a sane window', () => {
     expect(MIN_AVATAR_DIM).toBe(32)
