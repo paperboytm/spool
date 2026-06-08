@@ -12,6 +12,11 @@
 // In dev (vite) the function never runs — vite serves index.html as the
 // SPA fallback and the page hydrates client-side, which is fine because
 // social previews are a prod concern only.
+//
+// Performance note: we fetch /api/meta/<id> (<1 KB response) rather than
+// /api/snapshots/<id> (capped at 2 MB). A viral share hit by every
+// social-card scraper on the planet should not allocate the full
+// conversation body in this Pages Function just to read one title.
 
 import { buildOgTagBlock, injectMetaIntoHtml } from '../../src/lib/og-meta'
 
@@ -33,7 +38,7 @@ interface Env {
   // Standard Pages binding that fetches static assets from the build
   // output. We use it to grab the unmodified index.html shell.
   ASSETS: { fetch: (request: Request) => Promise<Response> }
-  // Origin to call for /api/snapshots. In prod the dispatcher routes
+  // Origin to call for /api/meta. In prod the dispatcher routes
   // spool.pro/api/* to share-backend, so the default of "same origin
   // as the incoming request" works. In `wrangler pages dev`, share-web
   // and share-backend listen on different ports — set this to the
@@ -42,8 +47,13 @@ interface Env {
   API_BASE_URL?: string
 }
 
-interface SnapshotForOg {
-  conversation?: { title?: string }
+interface MetaForOg {
+  // null on legacy shares published before the title field landed in
+  // KV; we just render without a custom OG title in that case.
+  title: string | null
+  visibility?: string
+  expires_at?: number | null
+  version?: number
 }
 
 // Same cache window as /api/snapshots/[id] so a revoke takes the
@@ -66,22 +76,22 @@ export const onRequest: PagesFunction<Env, 'id'> = async (ctx) => {
   }
 
   const apiBase = ctx.env.API_BASE_URL ?? reqUrl.origin
-  let snapStatus = 0
+  let metaStatus = 0
   let title: string | undefined
   try {
-    const snapRes = await fetch(`${apiBase}/api/snapshots/${id}`)
-    snapStatus = snapRes.status
-    if (snapStatus === 200) {
-      const snap = (await snapRes.json()) as SnapshotForOg
-      title = snap.conversation?.title
+    const metaRes = await fetch(`${apiBase}/api/meta/${id}`)
+    metaStatus = metaRes.status
+    if (metaStatus === 200) {
+      const meta = (await metaRes.json()) as MetaForOg
+      title = meta.title ?? undefined
     }
   } catch {
     return passthroughShell(shell, 502)
   }
 
-  if (snapStatus === 410) return passthroughShell(shell, 410)
-  if (snapStatus === 404) return passthroughShell(shell, 404)
-  if (snapStatus !== 200) return passthroughShell(shell, 500)
+  if (metaStatus === 410) return passthroughShell(shell, 410)
+  if (metaStatus === 404) return passthroughShell(shell, 404)
+  if (metaStatus !== 200) return passthroughShell(shell, 500)
 
   const tagBlock = buildOgTagBlock({
     title: title ?? '',

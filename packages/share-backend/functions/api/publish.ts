@@ -264,8 +264,16 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       details: { version, visibility: req.visibility },
     })
 
+    // `title` is stored in KV alongside the lifecycle metadata so
+    // /api/meta/:id can answer with a tiny payload (<1KB) instead of
+    // forcing share-web's OG Pages Function to fetch the full 2MB
+    // snapshot just to extract the title for the social-card preview.
+    // Republish bumps the version and may have edited the title, so
+    // the KV write always carries the latest value (this code path
+    // runs after the D1 UPDATE for republish too).
     const meta = {
       owner: user.id,
+      title: req.snapshot.conversation.title,
       visibility: req.visibility,
       expires_at: expiresAtMs,
       revoked_at: null as number | null,

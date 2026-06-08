@@ -3,6 +3,7 @@ import type { KVNamespace } from '@cloudflare/workers-types'
 
 import { onRequestPost as publishPost } from '../functions/api/publish'
 import { onRequestPost as revokePost } from '../functions/api/revoke/[id]'
+import { onRequestGet as metaGet } from '../functions/api/meta/[id]'
 import { onRequestGet as snapshotGet } from '../functions/api/snapshots/[id]'
 import type { SessionRecord } from '../src/auth/session'
 import { isValidSlug, nanoidSlug } from '../src/publish/slug'
@@ -540,6 +541,144 @@ describe('GET /api/snapshots/[id]', () => {
     expect(res.status).toBe(410)
     const body = await res.json() as { expired: boolean }
     expect(body.expired).toBe(true)
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────
+// GET /api/meta/[id] — lightweight title + lifecycle sidecar
+// ────────────────────────────────────────────────────────────────────
+
+describe('GET /api/meta/[id]', () => {
+  async function publishOne(env: ReturnType<typeof envFor>, title = 'A nice chat') {
+    const snap = makeSnapshot()
+    snap.conversation.title = title
+    const req = authedReq('https://x/api/publish', {
+      snapshot: snap,
+      visibility: 'unlisted',
+    })
+    const res = await invoke(publishPost, req, env)
+    return (await res.json()) as { id: string; version: number }
+  }
+
+  it('200 with title from the KV meta record (no R2 snapshot fetch)', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env, 'Hello world')
+
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      title: string | null
+      visibility: string
+      expires_at: number | null
+      version: number
+    }
+    expect(body.title).toBe('Hello world')
+    expect(body.visibility).toBe('unlisted')
+    expect(body.expires_at).toBeNull()
+    expect(body.version).toBe(1)
+    expect(res.headers.get('etag')).toBe(`"${id}-1"`)
+  })
+
+  it('does NOT leak the owner user id', async () => {
+    // Owner field belongs to the internal KV record; exposing it here
+    // would let anyone with a slug pivot to a user-enumeration vector
+    // via /api/profiles/*. Mirror the public-shape discipline applied
+    // to /api/snapshots/:id.
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env)
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    const body = await res.json() as Record<string, unknown>
+    expect(body.owner).toBeUndefined()
+    expect(body.user_id).toBeUndefined()
+  })
+
+  it('410 + tombstone JSON after revoke', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env)
+
+    const metaRaw = (await env.META.get(`meta/${id}`))!
+    const m = JSON.parse(metaRaw)
+    m.revoked_at = Date.now()
+    await env.META.put(`meta/${id}`, JSON.stringify(m))
+
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    expect(res.status).toBe(410)
+    const body = await res.json() as { revoked: boolean }
+    expect(body.revoked).toBe(true)
+  })
+
+  it('410 + expired JSON after expires_at', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env)
+    const m = JSON.parse((await env.META.get(`meta/${id}`))!)
+    m.expires_at = Date.now() - 1000
+    await env.META.put(`meta/${id}`, JSON.stringify(m))
+
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    expect(res.status).toBe(410)
+    const body = await res.json() as { expired: boolean }
+    expect(body.expired).toBe(true)
+  })
+
+  it('404 when KV record is missing', async () => {
+    const env = envFor()
+    const id = 'abcdefghijklmnopqrstu' // 21-char valid slug shape, no row
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    expect(res.status).toBe(404)
+  })
+
+  it('404 for badly shaped slug (no KV round-trip)', async () => {
+    const env = envFor()
+    const req = new Request('https://x/api/meta/not-a-slug')
+    const res = await invoke(metaGet, req, env, { id: 'not-a-slug' })
+    expect(res.status).toBe(404)
+  })
+
+  it('serves null title on legacy shares published before the field landed', async () => {
+    // Pre-existing shares (pre-feat/share-og-meta-sidecar) have a KV
+    // record without the `title` field. Endpoint returns 200 with
+    // title: null — caller renders without a custom OG title (the
+    // og:image is built independently and still works).
+    const env = envFor()
+    const id = 'legacysharelegacyshrx' // 21-char slug
+    await env.META.put(`meta/${id}`, JSON.stringify({
+      owner: 'user-1',
+      visibility: 'unlisted',
+      expires_at: null,
+      revoked_at: null,
+      version: 1,
+    }))
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    expect(res.status).toBe(200)
+    const body = await res.json() as { title: string | null }
+    expect(body.title).toBeNull()
+  })
+
+  it('sets the same 30s must-revalidate cache as /api/snapshots/:id', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const { id } = await publishOne(env)
+    const req = new Request(`https://x/api/meta/${id}`)
+    const res = await invoke(metaGet, req, env, { id })
+    const cc = res.headers.get('cache-control') ?? ''
+    expect(cc).toMatch(/max-age=30\b/)
+    expect(cc).toMatch(/s-maxage=30\b/)
+    expect(cc).toMatch(/must-revalidate/)
   })
 })
 
