@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   Check,
@@ -78,6 +79,7 @@ export function PublishTab({
   onRequestUnpublish,
   onSignedIn,
 }: Props) {
+  const { t } = useTranslation()
   const { user, loading: authLoading, refresh: refreshAuth } = useShareAuth()
   const [visibility, setVisibility] = useState<Visibility>('unlisted')
   const [expires, setExpires] = useState<ExpiryOption>('never')
@@ -148,17 +150,17 @@ export function PublishTab({
       })
       if (!res.ok) {
         if (res.status === 401) {
-          setError('Your session expired — sign in again to publish.')
+          setError(t('shareEditor.publishTab.error_sessionExpired'))
         } else if (res.status === 429) {
-          setError('Too many publishes. Try again in a few minutes.')
+          setError(t('shareEditor.publishTab.error_rateLimited'))
         } else {
-          setError(res.error.detail ?? res.error.error ?? 'Publish failed. Check your connection and try again.')
+          setError(res.error.detail ?? res.error.error ?? t('shareEditor.publishTab.error_generic'))
         }
         return
       }
       onPublished(res.data, res.row)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Publish failed. Check your connection and try again.')
+      setError(e instanceof Error ? e.message : t('shareEditor.publishTab.error_generic'))
     } finally {
       publishingRef.current = false
       setPublishing(false)
@@ -200,6 +202,7 @@ export function PublishTab({
     //    honest than letting the click look successful.
     const republishDisabled = publishing || !pending || !hasUnpublishedEdits
     return <PublishedManageView
+      t={t}
       published={published}
       hasUnpublishedEdits={hasUnpublishedEdits}
       copied={copied}
@@ -231,6 +234,7 @@ export function PublishTab({
     <div className="flex flex-col">
       {high.length > 0 && (
         <PiiHighWarning
+          t={t}
           count={high.length}
           rows={high.slice(0, HIGH_ROW_LIMIT)}
           extra={high.length - HIGH_ROW_LIMIT}
@@ -241,6 +245,7 @@ export function PublishTab({
 
       {medium.length > 0 && (
         <PiiMediumWarning
+          t={t}
           count={medium.length}
           rows={medium.slice(0, 12)}
           extra={medium.length - 12}
@@ -251,20 +256,24 @@ export function PublishTab({
 
       <fieldset disabled={publishing} className="px-4 pb-3">
         <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
-          Visibility
+          {t('shareEditor.publishTab.visibility_legend')}
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <VisibilityCard
             icon={<LinkIcon size={15} strokeWidth={1.75} aria-hidden />}
-            title="Link only"
-            description="Anyone with the link."
+            title={t('shareEditor.publishTab.visibility_link_title')}
+            testId="share-menu-visibility-link-only"
+            description={t('shareEditor.publishTab.visibility_link_description')}
             checked={visibility === 'unlisted'}
             onSelect={() => setVisibility('unlisted')}
           />
           <VisibilityCard
             icon={<FileText size={15} strokeWidth={1.75} aria-hidden />}
-            title="On profile"
-            description={hasHandle ? 'Listed on your @handle.' : 'Needs a handle.'}
+            title={t('shareEditor.publishTab.visibility_profile_title')}
+            testId="share-menu-visibility-on-profile"
+            description={hasHandle
+              ? t('shareEditor.publishTab.visibility_profile_description_listed')
+              : t('shareEditor.publishTab.visibility_profile_description_needsHandle')}
             checked={visibility === 'profile-listed'}
             disabled={!hasHandle}
             onSelect={() => setVisibility('profile-listed')}
@@ -286,7 +295,7 @@ export function PublishTab({
        *  a date-only picker (no time component). */}
       <fieldset disabled={publishing} className="px-4 pb-3">
         <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
-          Expires
+          {t('shareEditor.publishTab.expires_legend')}
         </legend>
         <select
           value={expires}
@@ -294,10 +303,10 @@ export function PublishTab({
           data-testid="share-menu-expires"
           className="mt-2 w-full h-8 px-2.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-[12px] text-warm-text dark:text-dark-text focus:outline-none focus:ring-1 focus:ring-accent dark:focus:ring-accent-dark"
         >
-          <option value="never">Never</option>
-          <option value="7d">7 days</option>
-          <option value="30d">30 days</option>
-          <option value="90d">90 days</option>
+          <option value="never">{t('shareEditor.publishTab.expires_never')}</option>
+          <option value="7d">{t('shareEditor.publishTab.expires_7d')}</option>
+          <option value="30d">{t('shareEditor.publishTab.expires_30d')}</option>
+          <option value="90d">{t('shareEditor.publishTab.expires_90d')}</option>
         </select>
       </fieldset>
 
@@ -313,7 +322,7 @@ export function PublishTab({
       )}
 
       <Footer
-        hint="A snapshot uploads to spool.pro. Revoke any time."
+        hint={t('shareEditor.publishTab.footerHint')}
         action={
           highBlocked ? (
             <button
@@ -323,7 +332,7 @@ export function PublishTab({
               disabled={publishing}
               className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Publish anyway
+              {t('shareEditor.publishTab.publishAnyway')}
             </button>
           ) : (
             <button
@@ -338,10 +347,10 @@ export function PublishTab({
               }`}
             >
               {publishing
-                ? <><Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />Publishing…</>
+                ? <><Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />{t('shareEditor.publishTab.publishing')}</>
                 : error
-                  ? 'Try again'
-                  : <><Send size={12} strokeWidth={1.8} aria-hidden />{high.length > 0 ? 'Publish anyway' : 'Publish'}</>
+                  ? t('shareEditor.publishTab.tryAgain')
+                  : <><Send size={12} strokeWidth={1.8} aria-hidden />{high.length > 0 ? t('shareEditor.publishTab.publishAnyway') : t('shareEditor.publishTab.publish')}</>
               }
             </button>
           )
@@ -356,6 +365,7 @@ export function PublishTab({
 function VisibilityCard({
   icon,
   title,
+  testId,
   description,
   checked,
   disabled,
@@ -363,6 +373,7 @@ function VisibilityCard({
 }: {
   icon: React.ReactNode
   title: string
+  testId: string
   description: string
   checked: boolean
   disabled?: boolean
@@ -373,7 +384,7 @@ function VisibilityCard({
       type="button"
       role="radio"
       aria-checked={checked}
-      data-testid={`share-menu-visibility-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      data-testid={testId}
       onClick={onSelect}
       disabled={disabled}
       className={`relative text-left rounded-md p-2.5 border transition-colors disabled:cursor-not-allowed ${
@@ -418,12 +429,14 @@ function VisibilityCard({
 }
 
 function PiiHighWarning({
+  t,
   count,
   rows,
   extra,
   onRedactAll,
   blocked,
 }: {
+  t: ReturnType<typeof useTranslation>['t']
   count: number
   rows: { label: string; preview: string; turn_index: number; start: number }[]
   extra: number
@@ -444,7 +457,7 @@ function PiiHighWarning({
         />
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-medium text-warm-text dark:text-dark-text">
-            {count} credential-like value{count === 1 ? '' : 's'} would publish unredacted
+            {t('shareEditor.publishTab.pii_high_warning', { count })}
           </p>
           <ul className="mt-1.5 space-y-1">
             {rows.map((m, i) => (
@@ -460,7 +473,7 @@ function PiiHighWarning({
             ))}
             {extra > 0 && (
               <li className="text-[10.5px] italic text-warm-faint dark:text-dark-muted">
-                +{extra} more
+                {t('shareEditor.publishTab.pii_more', { count: extra })}
               </li>
             )}
           </ul>
@@ -472,13 +485,13 @@ function PiiHighWarning({
                 data-testid="share-menu-redact-all"
                 className="text-[11px] font-medium underline text-warm-text dark:text-dark-text hover:opacity-80"
               >
-                Redact all
+                {t('shareEditor.publishTab.pii_redactAll')}
               </button>
             )}
           </div>
           {blocked && (
             <p className="mt-2 text-[11px] text-warm-muted dark:text-dark-muted">
-              Click <span className="font-medium">Publish anyway</span> below to confirm you intend to publish these values as-is.
+              {t('shareEditor.publishTab.pii_blocked_hint_prefix')} <span className="font-medium">{t('shareEditor.publishTab.pii_blocked_hint_emphasis')}</span> {t('shareEditor.publishTab.pii_blocked_hint_suffix')}
             </p>
           )}
         </div>
@@ -488,12 +501,14 @@ function PiiHighWarning({
 }
 
 function PiiMediumWarning({
+  t,
   count,
   rows,
   extra,
   open,
   onToggle,
 }: {
+  t: ReturnType<typeof useTranslation>['t']
   count: number
   rows: { label: string; preview: string; turn_index: number; start: number }[]
   extra: number
@@ -515,7 +530,7 @@ function PiiMediumWarning({
           ? <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
           : <ChevronRight size={12} strokeWidth={1.8} aria-hidden />}
         <span>
-          {count} identity / location signal{count === 1 ? '' : 's'} (email, phone, name, path)
+          {t('shareEditor.publishTab.pii_medium_signals', { count })}
         </span>
       </button>
       {open && (
@@ -533,7 +548,7 @@ function PiiMediumWarning({
           ))}
           {extra > 0 && (
             <li className="text-[10.5px] italic text-warm-faint dark:text-dark-muted">
-              +{extra} more
+              {t('shareEditor.publishTab.pii_more', { count: extra })}
             </li>
           )}
         </ul>
@@ -543,6 +558,7 @@ function PiiMediumWarning({
 }
 
 function PublishedManageView({
+  t,
   published,
   hasUnpublishedEdits,
   copied,
@@ -554,6 +570,7 @@ function PublishedManageView({
   republishDisabled,
   error,
 }: {
+  t: ReturnType<typeof useTranslation>['t']
   published: PublishSuccess
   hasUnpublishedEdits: boolean
   copied: boolean
@@ -576,7 +593,7 @@ function PublishedManageView({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-[11.5px] text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-            <span>Published · v{published.version}</span>
+            <span>{t('shareEditor.publishTab.published_status', { version: published.version })}</span>
           </div>
           {hasUnpublishedEdits && (
             // Drift indicator — the live draft hashes differently from
@@ -587,10 +604,10 @@ function PublishedManageView({
             <span
               data-testid="share-menu-unpublished-edits"
               className="inline-flex items-center gap-1 px-1.5 h-4 rounded-[3px] text-[10px] font-medium bg-accent-bg dark:bg-[#2A1800] text-accent dark:text-accent-dark"
-              title="The live draft differs from the published snapshot. Republish to push your edits."
+              title={t('shareEditor.publishTab.unpublishedEdits_title')}
             >
               <span className="inline-block w-1 h-1 rounded-full bg-current" />
-              Unpublished edits
+              {t('shareEditor.publishTab.unpublishedEdits')}
             </span>
           )}
         </div>
@@ -605,8 +622,8 @@ function PublishedManageView({
             className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-[11.5px] font-medium text-warm-text dark:text-dark-text border border-warm-border2 dark:border-dark-border2 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
           >
             {copied
-              ? <><Check size={12} strokeWidth={1.8} aria-hidden /> Copied</>
-              : <><Copy size={12} strokeWidth={1.8} aria-hidden /> Copy</>}
+              ? <><Check size={12} strokeWidth={1.8} aria-hidden /> {t('shareEditor.publishTab.copied')}</>
+              : <><Copy size={12} strokeWidth={1.8} aria-hidden /> {t('shareEditor.publishTab.copy')}</>}
           </button>
         </div>
 
@@ -618,13 +635,17 @@ function PublishedManageView({
         <div className="mt-2 grid grid-cols-2 gap-1.5">
           <ActionButton
             icon={<RefreshCw size={12} strokeWidth={1.8} className={republishing ? 'animate-spin' : ''} aria-hidden />}
-            label={republishing ? 'Republishing…' : hasUnpublishedEdits ? 'Republish' : 'Up to date'}
+            label={republishing
+              ? t('shareEditor.publishTab.republishing')
+              : hasUnpublishedEdits
+                ? t('shareEditor.publishTab.republish')
+                : t('shareEditor.publishTab.upToDate')}
             onClick={onRepublish}
             disabled={republishDisabled}
           />
           <ActionButton
             icon={<EyeOff size={12} strokeWidth={1.8} aria-hidden />}
-            label="Unpublish"
+            label={t('shareEditor.publishTab.unpublish')}
             danger
             onClick={onUnpublish}
             disabled={republishing}
@@ -643,7 +664,7 @@ function PublishedManageView({
       )}
 
       <Footer
-        hint="Snapshot lives at the link above. Revoke any time."
+        hint={t('shareEditor.publishTab.footerHint_published')}
         action={
           <button
             type="button"
@@ -652,7 +673,7 @@ function PublishedManageView({
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
           >
             <ExternalLink size={12} strokeWidth={1.8} aria-hidden />
-            Open share
+            {t('shareEditor.publishTab.openShare')}
           </button>
         }
       />

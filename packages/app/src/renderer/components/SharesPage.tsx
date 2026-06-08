@@ -97,9 +97,9 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
           // the header doesn't collapse to a lone + icon.
           <div
             className="inline-flex items-center gap-1.5 h-6 px-2 font-mono text-[11px] tabular-nums text-warm-text dark:text-dark-text"
-            aria-label="Drafts"
+            aria-label={t('shares.tab_drafts')}
           >
-            <span>Drafts</span>
+            <span>{t('shares.tab_drafts')}</span>
             {drafts.length > 0 && (
               <span className="text-warm-faint dark:text-dark-muted">
                 {drafts.length}
@@ -150,12 +150,13 @@ function SharesTabStrip({
   onTab: (next: SharesTab) => void
   draftsCount: number
 }) {
+  const { t } = useTranslation()
   const items: Array<{ id: SharesTab; label: string; count?: number }> = [
-    { id: 'drafts', label: 'Drafts', count: draftsCount },
-    { id: 'published', label: 'Published' },
+    { id: 'drafts', label: t('shares.tab_drafts'), count: draftsCount },
+    { id: 'published', label: t('shares.tab_published') },
   ]
   return (
-    <div role="tablist" aria-label="Shares" className="inline-flex items-center gap-1">
+    <div role="tablist" aria-label={t('shares.tabs_aria')} className="inline-flex items-center gap-1">
       {items.map((it) => {
         const active = it.id === tab
         return (
@@ -181,6 +182,7 @@ function SharesTabStrip({
 }
 
 function PublishedList() {
+  const { t } = useTranslation()
   const { user, loading: authLoading, signIn } = useShareAuth()
   const { items, loading, refresh, noteLocalMutation } = usePublishedShares()
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -221,7 +223,7 @@ function PublishedList() {
       // Strip Electron's "Error invoking remote method '…': Error:" wrapper
       // so the toast reads as a plain product error, not a stack trace.
       const cleaned = msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, '')
-      toast.error("Couldn't sign in", { description: cleaned })
+      toast.error(t('shares.publishedTab.signedOut_signInError'), { description: cleaned })
     } finally {
       setSigningIn(false)
     }
@@ -250,8 +252,8 @@ function PublishedList() {
     return (
       <FeaturedEmptyState
         icon={<Newspaper size={22} strokeWidth={1.5} />}
-        title="Sign in to see your published shares"
-        hint="Spool only uploads snapshots you explicitly publish. Drafts and your library stay on this machine."
+        title={t('shares.publishedTab.signedOut_title')}
+        hint={t('shares.publishedTab.signedOut_hint')}
         action={(
           <button
             type="button"
@@ -266,7 +268,7 @@ function PublishedList() {
               <path d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z" fill="#FBBC05" />
               <path d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" fill="#EA4335" />
             </svg>
-            Sign in with Google
+            {t('shares.publishedTab.signedOut_signIn')}
           </button>
         )}
       />
@@ -293,8 +295,8 @@ function PublishedList() {
     return (
       <FeaturedEmptyState
         icon={<Newspaper size={22} strokeWidth={1.5} />}
-        title="No published shares yet"
-        hint="When you publish a draft, it shows up here so you can manage it from any signed-in Spool."
+        title={t('shares.publishedTab.empty_title')}
+        hint={t('shares.publishedTab.empty_hint')}
       />
     )
   }
@@ -302,9 +304,9 @@ function PublishedList() {
   const onCopy = async (it: PublishedShareCacheItem) => {
     try {
       await navigator.clipboard.writeText(sharePublicUrl(it.id))
-      toast.success('Link copied')
+      toast.success(t('shares.publishedTab.linkCopied'))
     } catch {
-      toast.error("Couldn't copy link")
+      toast.error(t('shares.publishedTab.linkCopyError'))
     }
   }
 
@@ -335,7 +337,7 @@ function PublishedList() {
     noteLocalMutation()
     try {
       await window.spoolShare.revoke(it.id)
-      toast.success('Share unpublished')
+      toast.success(t('shares.publishedTab.unpublishedToast'))
       setPendingUnpublish(null)
       await refresh()
     } catch (err) {
@@ -343,8 +345,8 @@ function PublishedList() {
       // Surface the error inline in the modal so the user can decide
       // whether to retry or cancel; the toast remains a secondary cue
       // for accessibility (screen readers announce it).
-      setConfirmError(err instanceof Error ? err.message : "Couldn't unpublish")
-      toast.error("Couldn't unpublish")
+      setConfirmError(err instanceof Error ? err.message : t('shares.publishedTab.unpublishError'))
+      toast.error(t('shares.publishedTab.unpublishError'))
     } finally {
       setBusyId(null)
     }
@@ -372,7 +374,7 @@ function PublishedList() {
       </ul>
       <UnpublishConfirmModal
         open={pendingUnpublish !== null}
-        title={pendingUnpublish?.title || 'Untitled'}
+        title={pendingUnpublish?.title || t('common.untitled')}
         busy={busyId === pendingUnpublish?.id}
         error={confirmError}
         onClose={() => {
@@ -405,6 +407,7 @@ function PublishedRow({
   onView: () => void
   onUnpublish: () => void
 }) {
+  const { t } = useTranslation()
   const revoked = item.revoked_at !== null
   // "Soon" means within 7 days — flagging a year-from-now expiry as
   // "expiring soon" defeats the badge's purpose. The Expires row in
@@ -426,28 +429,28 @@ function PublishedRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[14px] font-medium text-warm-text dark:text-dark-text truncate">
-            {item.title || 'Untitled'}
+            {item.title || t('common.untitled')}
           </span>
           {revoked && (
             <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-faint dark:text-dark-muted">
-              Revoked
+              {t('shares.publishedTab.badge_revoked')}
             </span>
           )}
           {item.visibility === 'profile-listed' && !revoked && (
             <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-accent-bg dark:bg-[#2A1800] text-accent dark:text-accent-dark">
-              Listed
+              {t('shares.publishedTab.badge_listed')}
             </span>
           )}
           {expiresSoon && !revoked && (
             <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-muted dark:text-dark-muted">
-              Expires {new Date(item.expires_at as number).toLocaleDateString()}
+              {t('shares.publishedTab.badge_expires', { when: new Date(item.expires_at as number).toLocaleDateString() })}
             </span>
           )}
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
           <span className="font-mono">{sharePublicOrigin().replace(/^https?:\/\//, '')}/s/{item.id}</span>
           <span aria-hidden>·</span>
-          <span>Published {publishedLabel}</span>
+          <span>{t('shares.publishedTab.publishedOn', { when: publishedLabel })}</span>
         </div>
       </div>
       {/* Action icons always visible — matches the share-web Me page
@@ -455,10 +458,10 @@ function PublishedRow({
        *  but produced a "what can I do here?" gap that the web list
        *  doesn't have. */}
       <div className="flex-none flex items-center gap-0.5">
-        <RowAction label="View" onClick={onView}><ExternalLink size={13} strokeWidth={1.6} /></RowAction>
-        <RowAction label="Copy link" onClick={onCopy}><LinkIcon size={13} strokeWidth={1.6} /></RowAction>
+        <RowAction label={t('shares.publishedTab.action_view')} onClick={onView}><ExternalLink size={13} strokeWidth={1.6} /></RowAction>
+        <RowAction label={t('shares.publishedTab.action_copyLink')} onClick={onCopy}><LinkIcon size={13} strokeWidth={1.6} /></RowAction>
         {!revoked && (
-          <RowAction label={busy ? 'Unpublishing' : 'Unpublish'} onClick={onUnpublish} disabled={busy || locked}>
+          <RowAction label={busy ? t('shares.publishedTab.action_unpublishing') : t('shares.publishedTab.action_unpublish')} onClick={onUnpublish} disabled={busy || locked}>
             {busy
               ? <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
               : <EyeOff size={13} strokeWidth={1.6} />}

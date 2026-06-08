@@ -95,7 +95,6 @@ type Props = {
  */
 export function ExportTab({ exporting, onExport, onClose }: Props) {
   const { t } = useTranslation()
-  const tx = t as unknown as (k: string) => string
   const [selected, setSelected] = useState<ExportFormat>('png')
 
   function handleDownload() {
@@ -112,7 +111,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
     <div className="flex flex-col">
       <fieldset disabled={exporting} className="px-4 pb-3">
         <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
-          Format
+          {t('shareEditor.exportTab.format_legend')}
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {FORMATS.map((f) => {
@@ -154,7 +153,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
                   </span>
                 </div>
                 <div className="mt-2 text-[12.5px] font-semibold text-warm-text dark:text-dark-text">
-                  {tx(f.labelKey)}
+                  {t(f.labelKey)}
                 </div>
                 {/* Reserve two text lines on every card so a single-line
                  * description (e.g. "A4 paginated · print-ready") doesn't
@@ -162,7 +161,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
                  * neighbours. `line-clamp-2 min-h-[2.6em]` pins both
                  * the floor and the ceiling. */}
                 <div className="mt-0.5 text-[11px] leading-snug text-warm-muted dark:text-dark-muted line-clamp-2 min-h-[2.6em]">
-                  {tx(f.subKey)}
+                  {t(f.subKey)}
                 </div>
               </button>
             )
@@ -172,7 +171,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
 
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40">
         <p className="flex-1 min-w-0 text-[11px] text-warm-muted dark:text-dark-muted leading-snug">
-          Exports this conversation. Nothing leaves your machine.
+          {t('shareEditor.exportTab.footerHint')}
         </p>
         <button
           type="button"
@@ -186,7 +185,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
           ) : (
             <Download size={12} strokeWidth={1.8} aria-hidden />
           )}
-          {exporting ? 'Exporting…' : 'Download'}
+          {exporting ? t('shareEditor.exportTab.downloading') : t('shareEditor.exportTab.download')}
         </button>
       </div>
     </div>

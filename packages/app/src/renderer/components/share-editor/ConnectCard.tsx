@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useShareAuth } from '../../hooks/useShareAuth.js'
 
 /** Embedded sign-in card. Lives inside the Share popover's Publish
@@ -18,6 +19,7 @@ export function ConnectCard({
 }: {
   onSignedIn?: () => void
 }) {
+  const { t } = useTranslation()
   const { signIn: dispatchSignIn } = useShareAuth()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -30,7 +32,7 @@ export function ConnectCard({
       await dispatchSignIn()
       onSignedIn?.()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Sign-in failed.')
+      setErr(e instanceof Error ? e.message : t('shareEditor.connectCard.signInFailed'))
     } finally {
       setBusy(false)
     }
@@ -39,11 +41,10 @@ export function ConnectCard({
   return (
     <div className="rounded-lg border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface p-5">
       <h4 className="text-[14px] font-semibold text-warm-text dark:text-dark-text mb-1.5">
-        Sign in to spool.pro
+        {t('shareEditor.connectCard.title')}
       </h4>
       <p className="text-[12px] leading-snug text-warm-muted dark:text-dark-muted mb-4">
-        Spool only ever uploads snapshots you explicitly publish. Drafts and your library
-        never leave this machine.
+        {t('shareEditor.connectCard.body')}
       </p>
       <button
         type="button"
@@ -55,12 +56,12 @@ export function ConnectCard({
         {busy ? (
           <>
             <span className="inline-block w-3 h-3 rounded-full border-[1.6px] border-current border-t-transparent animate-spin" />
-            Waiting for browser…
+            {t('shareEditor.connectCard.waitingForBrowser')}
           </>
         ) : (
           <>
             <GoogleMark size={15} />
-            Sign in with Google
+            {t('shareEditor.connectCard.signInWithGoogle')}
           </>
         )}
       </button>

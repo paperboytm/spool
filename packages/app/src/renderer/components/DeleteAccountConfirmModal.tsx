@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useFocusTrap } from '../hooks/useFocusTrap.js'
@@ -29,6 +30,7 @@ export function DeleteAccountConfirmModal({
   onClose,
   onConfirm,
 }: Props) {
+  const { t } = useTranslation()
   useHotkeys(
     {
       Escape: () => {
@@ -76,19 +78,18 @@ export function DeleteAccountConfirmModal({
             id="delete-account-confirm-title"
             className="text-[15px] font-semibold text-warm-text dark:text-dark-text"
           >
-            Delete your Spool Share account?
+            {t('settings.account.deleteConfirm_title')}
           </h2>
           <p className="mt-3 text-[12.5px] leading-relaxed text-warm-text dark:text-dark-text">
-            This schedules deletion <strong>24 hours from now</strong>. When the cool-off ends:
+            {t('settings.account.deleteConfirm_lead')} <strong>{t('settings.account.deleteConfirm_leadEmphasis')}</strong>{t('settings.account.deleteConfirm_leadSuffix')}
           </p>
           <ul className="mt-2 ml-4 list-disc text-[12.5px] leading-relaxed text-warm-muted dark:text-dark-muted space-y-0.5">
-            <li>Every published share returns <strong>410 Gone</strong></li>
-            <li>Your handle is released and can be re-claimed by anyone</li>
-            <li>Your account record is removed from spool.pro</li>
+            <li>{t('settings.account.deleteConfirm_item_shares_prefix')} <strong>{t('settings.account.deleteConfirm_item_shares_emphasis')}</strong></li>
+            <li>{t('settings.account.deleteConfirm_item_handle')}</li>
+            <li>{t('settings.account.deleteConfirm_item_record')}</li>
           </ul>
           <p className="mt-3 text-[12px] leading-relaxed text-warm-muted dark:text-dark-muted">
-            You can cancel from this screen any time before the cool-off expires. Drafts on this
-            device are unaffected — they live locally.
+            {t('settings.account.deleteConfirm_footnote')}
           </p>
           {error && (
             <p
@@ -108,7 +109,7 @@ export function DeleteAccountConfirmModal({
             data-testid="delete-account-confirm-cancel"
             className="px-3 h-8 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -118,7 +119,7 @@ export function DeleteAccountConfirmModal({
             className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {busy && <Loader2 size={11} strokeWidth={1.8} className="animate-spin" aria-hidden />}
-            {busy ? 'Scheduling…' : 'Schedule deletion'}
+            {busy ? t('settings.account.deleteConfirm_scheduling') : t('settings.account.deleteConfirm_confirm')}
           </button>
         </div>
       </div>

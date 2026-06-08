@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { useFocusTrap } from '../../hooks/useFocusTrap.js'
@@ -32,6 +33,7 @@ export function UnpublishConfirmModal({
   onClose,
   onConfirm,
 }: Props) {
+  const { t } = useTranslation()
   useHotkeys(
     {
       Escape: () => {
@@ -81,7 +83,7 @@ export function UnpublishConfirmModal({
             id="unpublish-confirm-title"
             className="text-[15px] font-semibold text-warm-text dark:text-dark-text"
           >
-            Unpublish this share?
+            {t('shareEditor.unpublishConfirm.title')}
           </h2>
           <p
             className="mt-2 px-2 py-1.5 rounded-md bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border font-mono text-[11.5px] text-warm-muted dark:text-dark-muted truncate"
@@ -90,9 +92,7 @@ export function UnpublishConfirmModal({
             {title}
           </p>
           <p className="mt-3 text-[12.5px] leading-relaxed text-warm-text dark:text-dark-text">
-            This is permanent. The link will return <strong>410 Gone</strong>, the snapshot
-            is deleted from spool.pro storage, and the URL can't be reused. To share this
-            conversation again you'll need to publish a fresh copy — it will have a new URL.
+            {t('shareEditor.unpublishConfirm.body_prefix')} <strong>{t('shareEditor.unpublishConfirm.body_emphasis')}</strong>{t('shareEditor.unpublishConfirm.body_suffix')}
           </p>
           {error && (
             <p
@@ -112,7 +112,7 @@ export function UnpublishConfirmModal({
             data-testid="unpublish-confirm-cancel"
             className="px-3 h-8 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -122,7 +122,7 @@ export function UnpublishConfirmModal({
             className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {busy && <Loader2 size={11} strokeWidth={1.8} className="animate-spin" aria-hidden />}
-            {busy ? 'Unpublishing…' : 'Yes, unpublish permanently'}
+            {busy ? t('shareEditor.unpublishConfirm.confirming') : t('shareEditor.unpublishConfirm.confirm')}
           </button>
         </div>
       </div>

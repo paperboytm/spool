@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { ConnectCard } from './share-editor/ConnectCard.js'
@@ -16,6 +17,7 @@ type DeletionStatus =
   | { kind: 'pending'; executeAt: number }
 
 export default function SettingsAccount() {
+  const { t } = useTranslation()
   const { user, loading, signOut, refresh } = useShareAuth()
   const [handleDraft, setHandleDraft] = useState('')
   const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
@@ -94,10 +96,10 @@ export default function SettingsAccount() {
     setClaiming(true)
     try {
       await window.spoolShare.claimHandle(handleDraft)
-      toast.success(`Handle @${handleDraft} claimed`)
+      toast.success(t('settings.account.handle_claimedToast', { handle: handleDraft }))
       await refresh()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Couldn\'t claim handle'
+      const msg = err instanceof Error ? err.message : t('settings.account.handle_claimError')
       toast.error(msg)
     } finally {
       setClaiming(false)
@@ -114,7 +116,7 @@ export default function SettingsAccount() {
       setShowDeleteConfirm(false)
     } catch (err) {
       console.error('Schedule delete failed:', err)
-      toast.error("Couldn't schedule deletion")
+      toast.error(t('settings.account.deletionScheduled_scheduleError'))
     } finally {
       setScheduling(false)
     }
@@ -126,10 +128,10 @@ export default function SettingsAccount() {
     try {
       await window.spoolShare.cancelDelete()
       setDeletionStatus({ kind: 'idle' })
-      toast.success('Deletion cancelled')
+      toast.success(t('settings.account.deletionScheduled_cancelledToast'))
     } catch (err) {
       console.error('Cancel delete failed:', err)
-      toast.error("Couldn't cancel deletion")
+      toast.error(t('settings.account.deletionScheduled_cancelError'))
     } finally {
       setCancellingDelete(false)
     }
@@ -170,10 +172,10 @@ export default function SettingsAccount() {
       {!user.handle && (
         <div>
           <h4 className="text-[12px] font-medium text-warm-text dark:text-dark-text mb-2">
-            Handle
+            {t('settings.account.handle_title')}
           </h4>
           <p className="text-[12px] text-warm-muted dark:text-dark-muted mb-2">
-            Claim a handle to get a public profile at <span className="font-mono">spool.pro/@your-handle</span>.
+            {t('settings.account.handle_help')} <span className="font-mono">spool.pro/@your-handle</span>.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex-1 inline-flex items-center h-9 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface focus-within:border-accent dark:focus-within:border-accent-dark transition-colors">
@@ -182,11 +184,11 @@ export default function SettingsAccount() {
                 type="text"
                 value={handleDraft}
                 onChange={(e) => onHandleChange(e.target.value)}
-                placeholder="your-handle"
+                placeholder={t('settings.account.handle_placeholder')}
                 className="flex-1 bg-transparent outline-none text-[12px] font-mono text-warm-text dark:text-dark-text"
                 data-testid="settings-account-handle-input"
               />
-              <HandleStatusIndicator status={handleStatus} />
+              <HandleStatusIndicator status={handleStatus} t={t} />
             </div>
             <button
               type="button"
@@ -194,7 +196,7 @@ export default function SettingsAccount() {
               disabled={claiming || handleStatus !== 'available'}
               className="h-9 px-3 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             >
-              {claiming ? 'Saving…' : 'Save'}
+              {claiming ? t('settings.account.handle_saving') : t('settings.account.handle_save')}
             </button>
           </div>
           {/* Hints live below the input so the contextual copy doesn't
@@ -202,12 +204,12 @@ export default function SettingsAccount() {
            *  shown for non-neutral states. */}
           {handleStatus === 'taken' && (
             <p className="mt-1.5 text-[11px] text-warm-muted dark:text-dark-muted">
-              That handle is already claimed. Try a different one.
+              {t('settings.account.handle_hint_taken')}
             </p>
           )}
           {handleStatus === 'invalid' && (
             <p className="mt-1.5 text-[11px] text-warm-muted dark:text-dark-muted">
-              Use 3–24 lowercase letters, numbers, dash, or underscore.
+              {t('settings.account.handle_hint_invalid')}
             </p>
           )}
         </div>
@@ -229,10 +231,10 @@ export default function SettingsAccount() {
         <div className="flex items-center justify-between gap-6">
           <div className="flex-1 min-w-0">
             <div className="text-[12.5px] font-medium text-warm-text dark:text-dark-text">
-              Sign out
+              {t('settings.account.signOut_title')}
             </div>
             <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
-              You'll need to sign back in to publish from this device.
+              {t('settings.account.signOut_body')}
             </div>
           </div>
           <button
@@ -241,7 +243,7 @@ export default function SettingsAccount() {
             onClick={() => { void signOut() }}
             className="flex-none h-8 px-3 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-[12px] text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 transition-colors"
           >
-            Sign out
+            {t('settings.account.signOut_title')}
           </button>
         </div>
 
@@ -251,11 +253,23 @@ export default function SettingsAccount() {
         {deletionStatus.kind === 'pending' ? (
           <div>
             <div className="text-[12.5px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]">
-              Deletion scheduled
+              {t('settings.account.deletionScheduled_title')}
             </div>
             <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
-              Your account and all published shares will be removed at{' '}
-              <span className="font-mono">{new Date(deletionStatus.executeAt).toLocaleString()}</span>.
+              {(() => {
+                // Split the localized string around the {{when}} marker so the
+                // monospace timestamp can be inlined while keeping a single
+                // translatable sentence.
+                const parts = t('settings.account.deletionScheduled_body', { when: ' WHEN ' }).split(' WHEN ')
+                const when = new Date(deletionStatus.executeAt).toLocaleString()
+                return (
+                  <>
+                    {parts[0]}
+                    <span className="font-mono">{when}</span>
+                    {parts[1] ?? ''}
+                  </>
+                )
+              })()}
             </div>
             <button
               type="button"
@@ -263,17 +277,17 @@ export default function SettingsAccount() {
               disabled={cancellingDelete}
               className="mt-2 h-8 px-3 rounded-md text-[12px] font-medium border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
-              {cancellingDelete ? 'Cancelling…' : 'Cancel deletion'}
+              {cancellingDelete ? t('settings.account.deletionScheduled_cancelling') : t('settings.account.deletionScheduled_cancel')}
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-6">
             <div className="flex-1 min-w-0">
               <div className="text-[12.5px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]">
-                Delete account
+                {t('settings.account.deleteAccount_title')}
               </div>
               <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
-                Permanently remove your account and every published share. 24-hour cool-off.
+                {t('settings.account.deleteAccount_body')}
               </div>
             </div>
             <button
@@ -282,7 +296,7 @@ export default function SettingsAccount() {
               onClick={() => setShowDeleteConfirm(true)}
               className="flex-none h-8 px-3 rounded-md border border-[color:var(--color-status-error)]/30 dark:border-[color:var(--color-status-error-dark)]/30 text-[12px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)] hover:bg-[color:var(--color-status-error)]/8 dark:hover:bg-[color:var(--color-status-error-dark)]/8 transition-colors whitespace-nowrap"
             >
-              Delete account
+              {t('settings.account.deleteAccount_title')}
             </button>
           </div>
         )}
@@ -309,18 +323,20 @@ export default function SettingsAccount() {
  */
 function HandleStatusIndicator({
   status,
+  t,
 }: {
   status: 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  t: ReturnType<typeof useTranslation>['t']
 }) {
   if (status === 'idle') return null
   if (status === 'checking') {
     return (
       <span
         className="px-2 inline-flex items-center gap-1 text-[10px] font-medium text-warm-faint dark:text-dark-muted"
-        aria-label="Checking handle availability"
+        aria-label={t('settings.account.handle_status_checking_aria')}
       >
         <span className="inline-block w-2.5 h-2.5 rounded-full border-[1.5px] border-current border-t-transparent animate-spin" />
-        Checking
+        {t('settings.account.handle_status_checking')}
       </span>
     )
   }
@@ -328,20 +344,20 @@ function HandleStatusIndicator({
     return (
       <span className="px-2 inline-flex items-center gap-1 text-[10px] font-medium text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
         <Check size={10} strokeWidth={2.5} aria-hidden />
-        Available
+        {t('settings.account.handle_status_available')}
       </span>
     )
   }
   if (status === 'taken') {
     return (
       <span className="px-2 text-[10px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]">
-        Taken
+        {t('settings.account.handle_status_taken')}
       </span>
     )
   }
   return (
     <span className="px-2 text-[10px] font-medium text-warm-muted dark:text-dark-muted">
-      Invalid
+      {t('settings.account.handle_status_invalid')}
     </span>
   )
 }
