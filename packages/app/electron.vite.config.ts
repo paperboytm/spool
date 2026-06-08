@@ -131,6 +131,18 @@ function inlineMainEnvPlugin(env: Map<string, string>): Plugin {
 
 export default defineConfig(({ mode }) => ({
   main: {
+    // Build-time-replaced constants. The only build-time switch in the
+    // codebase is __SPOOL_E2E__ — flipped to `true` ONLY when test:e2e
+    // sets SPOOL_E2E_TEST=1 during the electron-vite build. Production
+    // builds resolve it to the literal `false`, which terser deletes
+    // every `if (__SPOOL_E2E__)` branch (and the dynamic `import()` calls
+    // those branches contain) from the output bundle. The test-mode
+    // modules under src/main/e2e-mode/ are therefore never loaded — they
+    // don't even resolve through Rollup — in any production binary. A
+    // ci unit test grep-asserts this invariant against out/main/index.js.
+    define: {
+      __SPOOL_E2E__: JSON.stringify(process.env['SPOOL_E2E_TEST'] === '1'),
+    },
     // Bundle pure-ESM deps instead of externalizing them. When a dep is
     // marked external, electron-vite emits a CJS `require()`, and pure-ESM
     // modules (no `module.exports = ` shim, no `__esModule` marker) come

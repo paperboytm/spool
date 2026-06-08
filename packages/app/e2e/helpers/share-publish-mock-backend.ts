@@ -22,8 +22,9 @@
 //     rate-limit windows in a unit-sized server adds noise without
 //     catching regressions in the renderer paths
 //   - Real auth verification — every signed-in request is accepted; the
-//     OAuth path is short-circuited in oauth.ts under SPOOL_E2E_TEST=1
-//     before any token would reach us
+//     OAuth path is replaced at the IPC composition root by the e2e-mode
+//     entry (src/main/e2e-mode/share-auth-e2e.ts), which never runs the
+//     loopback dance or Google token exchange
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { AddressInfo } from 'node:net'
@@ -132,8 +133,9 @@ async function routeRequest(
   const method = req.method ?? 'GET'
 
   // POST /api/auth/sign-in-with-id-token
-  // The renderer's signIn → main oauth.ts (SPOOL_E2E_TEST branch) →
-  // here. We accept any id_token payload and mint a session token.
+  // The renderer's signIn IPC → e2e-mode's e2eSignIn() → here. We
+  // accept any id_token payload (the e2e entry hard-codes the
+  // 'e2e-fake-id-token' marker) and mint a session token.
   if (method === 'POST' && url.pathname === '/api/auth/sign-in-with-id-token') {
     await readBody(req)
     return json(res, 200, {

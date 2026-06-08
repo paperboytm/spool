@@ -3,7 +3,14 @@
 // What this spec actually exercises:
 //   - The Share popover trigger + popover scaffold on the editor
 //   - The signed-out branch (ConnectCard) + the click-through that
-//     drives main's signIn IPC under the SPOOL_E2E_TEST short-circuit
+//     drives main's signIn IPC. In e2e the build-time __SPOOL_E2E__
+//     constant routes share-auth IPC registration through
+//     src/main/e2e-mode/share-auth-e2e.ts, which swaps session-store
+//     to in-memory and replaces the OAuth dance with a fake-id-token
+//     POST. Production source has zero awareness of test mode; the
+//     e2e-mode entry is dead-code-eliminated from production bundles
+//     and an invariant test (e2e-mode/e2e-mode-clean.test.ts) keeps
+//     it that way.
 //   - The signed-in publish form: visibility radios, expiry select,
 //     Publish button, the spinner during in-flight publish
 //   - The post-publish manage view: URL string with copy-link, the
@@ -12,9 +19,9 @@
 //   - Republish bumps version + Unpublished-edits state on drift
 //
 // What this spec does NOT exercise (and why):
-//   - Real Google OAuth — main's signInWith() short-circuits under
-//     SPOOL_E2E_TEST; the loopback server + token exchange are
-//     covered by main/auth/oauth.test.ts at the unit layer
+//   - Real Google OAuth — the e2e-mode entry's e2eSignIn() replaces
+//     the loopback server + Google token exchange. Those are covered
+//     by main/auth/oauth.test.ts at the unit layer
 //   - Server-side validation rejections — backend/tests/publish.test.ts
 //     covers 401/422/409/429 paths against the real validator
 //   - The Privacy / PII gate — publish-logic.test.ts covers the pure

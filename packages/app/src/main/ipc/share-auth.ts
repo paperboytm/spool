@@ -36,7 +36,15 @@ export async function performSignIn(deps: SignInDeps): Promise<SignInResult['use
 // because the IPC defaults to Google.
 type SignInArg = { provider?: ProviderId } | undefined
 
-export function registerShareAuthIpc(): void {
+/** Optional override for the OAuth dance. Default is the production
+ *  loopback-PKCE flow against the configured provider. Override exists
+ *  so the e2e composition root can pass a fake-id-token POST that
+ *  exercises the rest of the IPC + backend chain without a real browser. */
+export type SignInImpl = (provider: ProviderId) => Promise<SignInResult>
+
+export function registerShareAuthIpc(
+  signInImpl: SignInImpl = signInWith,
+): void {
   ipcMain.handle('share-auth:available', () => isAvailable())
 
   ipcMain.handle('share-auth:signin', async (_e, arg: SignInArg) => {
@@ -45,7 +53,7 @@ export function registerShareAuthIpc(): void {
     return performSignIn({
       loadToken,
       saveToken,
-      signIn: () => signInWith(provider),
+      signIn: () => signInImpl(provider),
       revokePrior: async () => {
         await authedFetch('/api/auth/sign-out', { method: 'POST' })
       },

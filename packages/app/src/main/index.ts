@@ -721,8 +721,19 @@ app.whenReady().then(async () => {
     console.log('[security.lifecycle] opt-in off at boot → scanner not started')
   }
 
-  // Share-auth IPC (PKCE loopback OAuth + safeStorage session)
-  registerShareAuthIpc()
+  // Share-auth IPC (PKCE loopback OAuth + safeStorage session).
+  // The build-time __SPOOL_E2E__ switch is the ONE place the production
+  // binary chooses between real OAuth + safeStorage and the e2e-mode
+  // in-memory store + fake-id-token. Prod builds get
+  // `if (false) { ... }` here, which terser deletes outright; the
+  // dynamic import to ./e2e-mode/share-auth-e2e is never resolved by
+  // rollup, so its source never ships in any production bundle.
+  if (__SPOOL_E2E__) {
+    const { registerShareAuthIpcForE2E } = await import('./e2e-mode/share-auth-e2e.js')
+    registerShareAuthIpcForE2E()
+  } else {
+    registerShareAuthIpc()
+  }
   // Share-publish IPC (publish / revoke / republish + handles)
   registerSharePublishIpc()
 
