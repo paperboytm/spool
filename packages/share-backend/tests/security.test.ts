@@ -210,7 +210,7 @@ describe('_middleware security headers', () => {
     expect(res.headers.get('cache-control')).toBe('private, max-age=5')
   })
 
-  it('does NOT touch Cache-Control on GET API responses', async () => {
+  it('does NOT override an explicit Cache-Control on a GET (handler keeps its public/max-age)', async () => {
     const { onRequest } = await import('../functions/_middleware')
     const inner = new Response('{"ok":true}', {
       headers: { 'cache-control': 'public, max-age=60' },
@@ -221,6 +221,24 @@ describe('_middleware security headers', () => {
       next: () => Promise<Response>
     }) => Promise<Response>)({ request: req, next: async () => inner })
     expect(res.headers.get('cache-control')).toBe('public, max-age=60')
+  })
+
+  it('adds Cache-Control: no-store to GET API responses with no explicit header', async () => {
+    // Defense-in-depth: any future /api/* GET that forgets to set
+    // Cache-Control (think /api/me, /api/admin/audit, /api/me/shares)
+    // must still 'no-store' by default — otherwise a shared cache
+    // could fan out one user's private response to other readers.
+    const { onRequest } = await import('../functions/_middleware')
+    const inner = new Response('{"ok":true}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    const req = new Request('https://x/api/me', { method: 'GET' })
+    const res = await (onRequest as unknown as (c: {
+      request: Request
+      next: () => Promise<Response>
+    }) => Promise<Response>)({ request: req, next: async () => inner })
+    expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
   it('does NOT set CSP for non-/api routes', async () => {

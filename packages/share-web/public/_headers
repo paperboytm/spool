@@ -3,6 +3,8 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: interest-cohort=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Frame-Options: DENY
 
 /s/*
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
