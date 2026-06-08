@@ -30,3 +30,20 @@ export function sharePublicOrigin(
 export function sharePublicUrl(slug: string, env?: Record<string, string | undefined>): string {
   return `${sharePublicOrigin(env)}/s/${encodeURIComponent(slug)}`
 }
+
+/**
+ * Resolve an avatar URL for an `<img src>` tag. The /api/me + /api/profiles
+ * endpoints return either:
+ *   - a relative path like "/api/avatars/<user_id>" (custom upload), OR
+ *   - an absolute URL to the provider CDN (e.g. lh3.googleusercontent.com)
+ * Relative paths need the public share-backend origin prefixed so the
+ * renderer (which runs at app://) can fetch them.
+ */
+export function resolveAvatarUrl(
+  raw: string,
+  env?: Record<string, string | undefined>,
+): string {
+  if (/^https?:\/\//i.test(raw)) return raw
+  if (!raw.startsWith('/')) return raw
+  return `${sharePublicOrigin(env)}${raw}`
+}

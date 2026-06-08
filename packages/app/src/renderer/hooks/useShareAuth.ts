@@ -3,8 +3,23 @@ import { useCallback, useEffect, useState } from 'react'
 export type ShareAuthUser = {
   id: string
   email: string
+  /** Provider-claim name (e.g. from the Google id_token). Unmodified
+   *  even when the user has set a display_name override. */
   name: string | null
+  /** Server-resolved name: override-or-provider-or-email-local-part.
+   *  This is what every read surface should render. */
+  display_name: string
+  /** Raw override the user typed. `null` means "use the provider name".
+   *  Populates the Settings form on edit. */
+  display_name_override: string | null
+  /** Resolved avatar URL — points at /api/avatars/<user> for custom
+   *  uploads, at the provider URL when visible, or null (renderer
+   *  draws initials) when neither. */
   avatar_url: string | null
+  /** Opaque id of the custom avatar in R2, if uploaded. Null when none. */
+  custom_avatar_id: string | null
+  /** When false, hide the provider avatar even though one exists. */
+  avatar_visible: boolean
   handle: string | null
   /** Epoch-ms when worker will hard-delete this account; null when healthy.
    *  Non-null means the user is in the 24h grace window and every endpoint

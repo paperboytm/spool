@@ -333,11 +333,19 @@ describe('GET /api/me', () => {
     const req = authedReq('https://x/api/me')
     const res = await invoke(meGet, req, env)
     expect(res.status).toBe(200)
+    // v0.6 added the resolved-profile fields (display_name +
+    // display_name_override + custom_avatar_id + avatar_visible). A
+    // fresh user with no override sees display_name fall through to
+    // the provider claim and avatar_visible defaulting to true.
     expect(await res.json()).toEqual({
       id: 'user-1',
       email: 'a@example.com',
       name: 'Alice',
+      display_name: 'Alice',
+      display_name_override: null,
       avatar_url: 'https://x/a.png',
+      custom_avatar_id: null,
+      avatar_visible: true,
       handle: null,
       deletion_pending_until: null,
     })

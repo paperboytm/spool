@@ -88,14 +88,79 @@ export async function fetchProfile(handle: string): Promise<ProfileFetchResult> 
 export interface MeResponse {
   id: string
   email: string
+  /** Provider claim — unmodified even when an override is set. */
   name: string | null
+  /** Server-resolved name: override-or-provider-or-email-local-part. */
+  display_name: string
+  /** Raw user-typed override; `null` when using the provider name. */
+  display_name_override: string | null
+  /** Resolved avatar (custom > provider-if-visible > null). */
   avatar_url: string | null
+  /** Opaque id of the uploaded avatar in R2, or null. */
+  custom_avatar_id: string | null
+  /** When false, hide the provider avatar even though one exists. */
+  avatar_visible: boolean
   handle: string | null
   /** Epoch-ms when the deletion worker will hard-delete this account;
    *  null when the account is healthy. Non-null means the user is in
    *  the 24h grace window — every endpoint except /api/me and the
    *  DELETE cancel path will 403. */
   deletion_pending_until: number | null
+}
+
+/** PATCH /api/me/profile — non-binary profile updates. */
+export async function updateDisplayName(value: string | null): Promise<void> {
+  const r = await fetch('/api/me/profile', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ display_name: value }),
+  })
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    throw new Error(detail.detail ?? `HTTP_${r.status}`)
+  }
+}
+
+export async function setAvatarVisible(visible: boolean): Promise<void> {
+  const r = await fetch('/api/me/profile', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ avatar_visible: visible }),
+  })
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    throw new Error(detail.detail ?? `HTTP_${r.status}`)
+  }
+}
+
+/** POST /api/me/avatar — multipart upload. Caller is responsible for
+ *  basic client-side checks (size, MIME) before invoking. */
+export async function uploadAvatar(file: File): Promise<{ avatar_id: string; url: string }> {
+  const form = new FormData()
+  form.append('avatar', file)
+  const r = await fetch('/api/me/avatar', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    throw new Error(detail.detail ?? `HTTP_${r.status}`)
+  }
+  return (await r.json()) as { avatar_id: string; url: string }
+}
+
+export async function deleteAvatar(): Promise<void> {
+  const r = await fetch('/api/me/avatar', {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    throw new Error(detail.detail ?? `HTTP_${r.status}`)
+  }
 }
 
 export interface MeShareRow {

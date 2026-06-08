@@ -2,6 +2,7 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 
 import { ApiError, jsonError, jsonOk } from '../../../src/errors'
 import { validateHandle } from '../../../src/handles'
+import { resolveDisplayName } from '../../../src/profile/display-name'
 import { checkRate } from '../../../src/rate-limit'
 import { clientIp } from '../../../src/request'
 
@@ -14,9 +15,14 @@ type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace }
 const PROFILE_RATE_WINDOW_SEC = 60
 const PROFILE_RATE_MAX = 120
 
-type Row = {
+type OwnerRow = {
+  user_id: string
+  email: string
   name: string | null
   avatar_url: string | null
+  display_name: string | null
+  custom_avatar_id: string | null
+  avatar_visible: number
 }
 
 type ShareRow = {
@@ -45,12 +51,15 @@ export const onRequestGet: PagesFunction<Env, 'handle'> = async (ctx) => {
 
     const owner = await ctx.env.DB
       .prepare(
-        'SELECT u.id AS user_id, u.name AS name, u.avatar_url AS avatar_url ' +
+        'SELECT u.id AS user_id, u.email AS email, u.name AS name, ' +
+          'u.avatar_url AS avatar_url, u.display_name AS display_name, ' +
+          'u.custom_avatar_id AS custom_avatar_id, ' +
+          'u.avatar_visible AS avatar_visible ' +
           'FROM handles h JOIN users u ON u.id = h.user_id ' +
           'WHERE h.handle = ? AND h.released_at IS NULL AND u.deleted_at IS NULL',
       )
       .bind(v.handle)
-      .first<Row & { user_id: string }>()
+      .first<OwnerRow>()
     if (!owner) throw new ApiError('NOT_FOUND')
 
     const now = Date.now()
@@ -64,11 +73,20 @@ export const onRequestGet: PagesFunction<Env, 'handle'> = async (ctx) => {
       .bind(owner.user_id, 'profile-listed', now, SHARE_LIMIT)
       .all<ShareRow>()
 
+    // Resolution: user overrides win over provider claims; provider
+    // avatar respects the avatar_visible toggle. The endpoint exposes
+    // the resolved values only — Profile is a public read surface,
+    // there's no reason to leak the raw provider-claim values to a
+    // visitor.
+    const customAvatarUrl = owner.custom_avatar_id ? `/api/avatars/${owner.user_id}` : null
+    const visibleProviderAvatar = owner.avatar_visible !== 0 ? owner.avatar_url : null
+    const avatar_url = customAvatarUrl ?? visibleProviderAvatar
+
     return jsonOk(
       {
         handle: v.handle,
-        name: owner.name,
-        avatar_url: owner.avatar_url,
+        name: resolveDisplayName(owner),
+        avatar_url,
         shares: shares.results,
       },
       {

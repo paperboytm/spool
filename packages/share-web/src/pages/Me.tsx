@@ -20,6 +20,7 @@ import {
   type MeShareRow,
 } from '../lib/api'
 import { humanDate, humanDateTime } from '../lib/dates'
+import { ProfileEditor } from '../components/ProfileEditor'
 
 // Match the server-side handle regex (share-backend/src/handles.ts).
 // We pre-filter input so check requests + the submit button respond
@@ -412,6 +413,16 @@ export function Me() {
     setState({ kind: 'ok', me: meResult.me, shares })
   }, [])
 
+  // Re-fetch only /api/me (not /me/shares) after a profile edit so the
+  // identity card + ProfileEditor surface reflect the new values
+  // without disturbing the shares listing.
+  const refreshMe = useCallback(async () => {
+    const meResult = await fetchMe()
+    if (meResult.kind === 'ok') {
+      setState((s) => (s.kind === 'ok' ? { ...s, me: meResult.me } : s))
+    }
+  }, [])
+
   useEffect(() => {
     document.title = 'Your account · spool.pro'
     load()
@@ -548,6 +559,13 @@ export function Me() {
               Sign out
             </button>
           </div>
+
+          {!pending && (
+            <>
+              <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
+              <ProfileEditor me={me} onChanged={refreshMe} />
+            </>
+          )}
 
           {!me.handle && !pending && (
             <>

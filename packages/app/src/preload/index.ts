@@ -417,6 +417,15 @@ const spoolShare = {
     ipcRenderer.invoke('share-publish:schedule-delete'),
   cancelDelete: (): Promise<{ ok: true }> =>
     ipcRenderer.invoke('share-publish:cancel-delete'),
+
+  updateDisplayName: (value: string | null): Promise<{ ok: true; changed: number }> =>
+    ipcRenderer.invoke('share-profile:update-display-name', value),
+  setAvatarVisible: (visible: boolean): Promise<{ ok: true; changed: number }> =>
+    ipcRenderer.invoke('share-profile:set-avatar-visible', visible),
+  uploadAvatar: (bytes: ArrayBuffer, mime: string): Promise<{ avatar_id: string; url: string }> =>
+    ipcRenderer.invoke('share-profile:upload-avatar', bytes, mime),
+  deleteAvatar: (): Promise<{ ok: true }> =>
+    ipcRenderer.invoke('share-profile:delete-avatar'),
 }
 
 export type SpoolShareAPI = typeof spoolShare

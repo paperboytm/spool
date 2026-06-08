@@ -62,6 +62,7 @@ import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollaps
 import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import { registerShareAuthIpc } from './ipc/share-auth.js'
+import { registerShareProfileIpc } from './ipc/share-profile.js'
 import { installRendererCsp } from './security/csp.js'
 import { registerSharePublishIpc } from './ipc/share-publish.js'
 import type Database from 'better-sqlite3'
@@ -736,6 +737,8 @@ app.whenReady().then(async () => {
   }
   // Share-publish IPC (publish / revoke / republish + handles)
   registerSharePublishIpc()
+  // Share-profile IPC (display name + avatar upload / delete / visibility)
+  registerShareProfileIpc()
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)

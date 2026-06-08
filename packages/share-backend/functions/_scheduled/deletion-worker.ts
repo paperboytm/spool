@@ -19,6 +19,7 @@ export type DeletionEnv = {
   META: KVNamespace
   SNAPSHOTS: R2Bucket
   OG: R2Bucket
+  AVATARS: R2Bucket
 }
 
 // Bounded window for the R2 orphan sweep — long enough to catch a
@@ -99,13 +100,19 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
           .bind(row.user_id)
           .run(),
         env.DB.prepare(
-          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, deleted_at=? WHERE id=?",
+          "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, " +
+            'display_name=NULL, custom_avatar_id=NULL, deleted_at=? WHERE id=?',
         )
           .bind(now, row.user_id)
           .run(),
         env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
           .bind(row.user_id)
           .run(),
+        // R2 avatars/ prefix sweep. R2 list+delete must be paged for
+        // very large prefixes; per-user the count is at most the upload
+        // history (capped at 10/h via rate-limit), so one or two pages
+        // is the realistic worst case.
+        deleteAvatarPrefix(env, row.user_id),
       ])
     } catch (e) {
       // One bad user shouldn't block the rest of the sweep.
@@ -136,6 +143,18 @@ async function sweepOrphanShareAssets(env: DeletionEnv, now: number): Promise<vo
       env.SNAPSHOTS.delete(`${s.id}.json`),
       env.OG.delete(`${s.id}.png`),
     ]),
+  )
+}
+
+async function deleteAvatarPrefix(env: DeletionEnv, userId: string): Promise<void> {
+  // Avatar keys live at `avatars/<user_id>/<id>.<ext>`. R2 list+delete
+  // iterates by prefix; we cap to one realistic page (1000 objects)
+  // because per-user upload history is bounded by the per-user
+  // rate-limit (10/h * 24h would be the absurd upper bound).
+  const prefix = `avatars/${userId}/`
+  const listing = await env.AVATARS.list({ prefix, limit: 1000 })
+  await Promise.all(
+    listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)),
   )
 }
 

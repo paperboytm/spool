@@ -4,6 +4,8 @@ import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { ConnectCard } from './share-editor/ConnectCard.js'
 import { DeleteAccountConfirmModal } from './DeleteAccountConfirmModal.js'
+import ProfileEditor from './ProfileEditor.js'
+import { resolveAvatarUrl } from '../lib/sharePublicUrl.js'
 import { useShareAuth } from '../hooks/useShareAuth.js'
 
 // 320ms matches the web /me HandleClaim debounce — see share-web/Me.tsx.
@@ -143,19 +145,19 @@ export default function SettingsAccount() {
       <div className="flex items-center gap-4">
         {user.avatar_url ? (
           <img
-            src={user.avatar_url}
+            src={resolveAvatarUrl(user.avatar_url)}
             alt=""
             referrerPolicy="no-referrer"
-            className="w-12 h-12 rounded-full bg-warm-surface2 dark:bg-dark-surface2"
+            className="w-12 h-12 rounded-full bg-warm-surface2 dark:bg-dark-surface2 object-cover"
           />
         ) : (
           <div className="w-12 h-12 rounded-full bg-warm-surface2 dark:bg-dark-surface2 flex items-center justify-center text-warm-faint dark:text-dark-muted text-xs">
-            {(user.name ?? user.email).slice(0, 1).toUpperCase()}
+            {(user.display_name ?? user.email).slice(0, 1).toUpperCase()}
           </div>
         )}
         <div className="min-w-0">
           <div className="text-sm font-medium text-warm-text dark:text-dark-text truncate">
-            {user.name ?? user.email}
+            {user.display_name}
           </div>
           <div className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate">
             {user.email}
@@ -167,6 +169,9 @@ export default function SettingsAccount() {
           )}
         </div>
       </div>
+
+      {/* Profile customization — display name + avatar override */}
+      <ProfileEditor />
 
       {/* Handle claim */}
       {!user.handle && (

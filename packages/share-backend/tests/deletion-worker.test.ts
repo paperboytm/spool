@@ -8,14 +8,17 @@ function envFor(state?: FakeDbState) {
   const { db, state: s } = makeDb(state ?? emptyState())
   const snapshots = makeR2()
   const og = makeR2()
+  const avatars = makeR2()
   return {
     DB: db,
     META: makeKv(),
     SNAPSHOTS: snapshots.bucket,
     OG: og.bucket,
+    AVATARS: avatars.bucket,
     state: s,
     _snapshots: snapshots.store,
     _og: og.store,
+    _avatars: avatars.store,
   }
 }
 

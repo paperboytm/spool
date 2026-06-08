@@ -16,6 +16,14 @@ export type UserRow = {
   last_signin_at: number
   deletion_pending_until: number | null
   deleted_at: number | null
+  // v0.6+ profile customization (migration 0002). Nullable on rows
+  // from before the migration ran; defaults to NULL/1 on new inserts.
+  display_name: string | null
+  custom_avatar_id: string | null
+  // SQLite stores booleans as 0/1 integers. `avatar_visible` is NOT
+  // NULL DEFAULT 1 — 0 means "render initials, even if the user has
+  // a Google avatar". Persisted as integer so D1 round-trips cleanly.
+  avatar_visible: number
 }
 
 /** Look up a user by their (provider, provider_sub) identity, updating
@@ -68,6 +76,11 @@ export async function upsertUserByIdentity(
     last_signin_at: now,
     deletion_pending_until: null,
     deleted_at: null,
+    display_name: null,
+    custom_avatar_id: null,
+    // Matches the migration 0002 column default. New users see their
+    // provider avatar by default; the visibility toggle is opt-out.
+    avatar_visible: 1,
   }
 }
 
