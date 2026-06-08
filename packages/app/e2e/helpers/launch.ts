@@ -12,6 +12,11 @@ export interface AppContext {
   app: ElectronApplication
   window: Page
   dbPath: string
+  /** Root tmpdir for this test run. Tracked explicitly so restartApp's
+   *  cleanup doesn't have to reconstruct it from env-var string
+   *  manipulation — fragile once extraEnv lets callers override
+   *  SPOOL_DATA_DIR. */
+  tmpDir: string
   env: Record<string, string>
   cleanup: () => Promise<void>
 }
@@ -21,6 +26,11 @@ export async function launchApp(opts: {
   /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
    * have been copied and before Electron starts. Receives the resolved dirs. */
   extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string; opencodeDir: string }) => void
+  /** Extra env to merge into the Electron child process env. Used by the
+   * share-publish e2e to point SPOOL_SHARE_BACKEND at the in-process
+   * mock backend, which binds to a random port per test run and so
+   * can't be expressed via static playwright.config.ts env. */
+  extraEnv?: Record<string, string>
 } = {}): Promise<AppContext> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-e2e-'))
 
@@ -65,6 +75,12 @@ export async function launchApp(opts: {
     env['SPOOL_ACP_AGENT_BIN'] = mockScript
   }
 
+  if (opts.extraEnv) {
+    for (const [k, v] of Object.entries(opts.extraEnv)) {
+      env[k] = v
+    }
+  }
+
   // Opt into the Security feature (the Labs flag persisted on
   // agents.json). The built e2e app has VITE_FEATURE_SECURITY=1 so the
   // code is present, but `import.meta.env.DEV` is false — without an
@@ -92,6 +108,7 @@ export async function launchApp(opts: {
     app,
     window,
     dbPath: join(tmpDir, 'data', 'spool.db'),
+    tmpDir,
     env,
     cleanup: async () => {
       await app.close()
@@ -117,17 +134,15 @@ export async function restartApp(ctx: AppContext): Promise<AppContext> {
     app,
     window,
     dbPath: ctx.dbPath,
+    tmpDir: ctx.tmpDir,
     env: ctx.env,
     cleanup: async () => {
       await app.close()
-      // tmpDir cleanup uses the original env's SPOOL_DATA_DIR's grandparent,
-      // which is what ctx.cleanup also targets. Run the original cleanup
-      // path so the dir gets removed exactly once.
-      const dataDir = ctx.env['SPOOL_DATA_DIR']
-      if (dataDir) {
-        const tmpDir = dataDir.replace(/\/data$/, '')
-        rmSync(tmpDir, { recursive: true, force: true })
-      }
+      // Use the original ctx's tmpDir explicitly. Reconstructing from
+      // SPOOL_DATA_DIR with a regex (the previous version) was fragile
+      // once extraEnv let callers override SPOOL_DATA_DIR — the strip
+      // wouldn't match and we'd silently leak the entire tmpdir.
+      rmSync(ctx.tmpDir, { recursive: true, force: true })
     },
   }
 }

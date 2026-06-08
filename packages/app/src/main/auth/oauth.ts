@@ -82,6 +82,30 @@ async function readShortBody(res: Response): Promise<string> {
 }
 
 export async function signInWith(providerId: ProviderId = 'google'): Promise<SignInResult> {
+  // E2E shortcut: skip the OAuth dance with the real provider entirely.
+  // CI runners can't open the system browser, can't reach Google's auth
+  // endpoints anyway, and don't have legit client IDs configured. Instead,
+  // POST a marker id_token straight to the (mock) backend, which is
+  // primed to recognise it and return a session. Exercises every layer
+  // EXCEPT the loopback server + Google token exchange — the parts that
+  // are fundamentally not reproducible in CI.
+  if (process.env['SPOOL_E2E_TEST'] === '1') {
+    const nonce = b64url(crypto.randomBytes(24))
+    const backendRes = await fetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: providerId,
+        id_token: process.env['SPOOL_E2E_FAKE_ID_TOKEN'] ?? 'e2e-fake-id-token',
+        nonce,
+      }),
+    })
+    if (!backendRes.ok) {
+      throw new Error(`backend sign-in ${backendRes.status}: ${await readShortBody(backendRes)}`)
+    }
+    return (await backendRes.json()) as SignInResult
+  }
+
   const config = PROVIDERS[providerId]
   if (!config) throw new Error(`unknown provider: ${providerId}`)
   const cid = config.clientIdFromEnv()

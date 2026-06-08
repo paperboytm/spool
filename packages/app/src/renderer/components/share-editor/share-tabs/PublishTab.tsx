@@ -231,7 +231,7 @@ export function PublishTab({
 
   // ── State 4: signed in + draft — publish form ────────────────────
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" data-testid="share-menu-form">
       {high.length > 0 && (
         <PiiHighWarning
           t={t}
@@ -588,7 +588,7 @@ function PublishedManageView({
   // URL display: strip https:// for compactness, the user knows what it is.
   const displayUrl = published.url.replace(/^https?:\/\//, '')
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" data-testid="share-menu-manage-view">
       <div className="px-4 pb-3">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-[11.5px] text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
@@ -642,6 +642,7 @@ function PublishedManageView({
                 : t('shareEditor.publishTab.upToDate')}
             onClick={onRepublish}
             disabled={republishDisabled}
+            testid="share-menu-republish"
           />
           <ActionButton
             icon={<EyeOff size={12} strokeWidth={1.8} aria-hidden />}
@@ -649,6 +650,7 @@ function PublishedManageView({
             danger
             onClick={onUnpublish}
             disabled={republishing}
+            testid="share-menu-unpublish"
           />
         </div>
       </div>
@@ -687,16 +689,19 @@ function ActionButton({
   danger,
   disabled,
   onClick,
+  testid,
 }: {
   icon: React.ReactNode
   label: string
   danger?: boolean
   disabled?: boolean
   onClick: () => void
+  testid?: string
 }) {
   return (
     <button
       type="button"
+      data-testid={testid}
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex items-center justify-center gap-1 h-7 rounded text-[11.5px] font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
