@@ -2,6 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import {
   type Jwk,
+  _resetJwksCacheForTests,
+  setJwksFetcherForTests,
+  verifyIdToken,
   verifyIdTokenWithKeys,
 } from '../src/auth/jwks'
 import {
@@ -184,6 +187,64 @@ describe('PKCE helpers', () => {
     const a = randomUrlSafe(16)
     const b = randomUrlSafe(16)
     expect(a).not.toBe(b)
+  })
+})
+
+describe('verifyIdToken — JWKS rotation recovery', () => {
+  it('force-refreshes on "no matching jwk" and accepts a token signed by the new key', async () => {
+    const oldKp = await generateKeypair('kid-old')
+    const newKp = await generateKeypair('kid-new')
+    let calls = 0
+    setJwksFetcherForTests(async (force = false) => {
+      calls++
+      // First fetch (cache populate) → only the OLD key.
+      // Force fetch (triggered by "no matching jwk") → only the NEW key.
+      return force ? [newKp.publicJwk] : [oldKp.publicJwk]
+    })
+    _resetJwksCacheForTests()
+
+    const tok = await mintTestJwt(newKp, {
+      iss: ISS,
+      aud: AUD,
+      sub: 'g-rotated',
+      email: 'r@example.com',
+      email_verified: true,
+      name: 'R',
+      exp: future(600),
+      iat: past(0),
+    })
+    const claims = await verifyIdToken(tok, { audience: AUD })
+    expect(claims.sub).toBe('g-rotated')
+    expect(calls).toBe(2) // first cached fetch, then force-refresh
+
+    setJwksFetcherForTests(null)
+    _resetJwksCacheForTests()
+  })
+
+  it('does NOT force-refresh on bad-signature errors', async () => {
+    let calls = 0
+    setJwksFetcherForTests(async () => {
+      calls++
+      return [kp.publicJwk]
+    })
+    _resetJwksCacheForTests()
+    // Token signed by a different keypair than the JWKS returns →
+    // verifyIdTokenWithKeys throws 'bad signature', not 'no matching jwk'
+    // (the kid matches kp's kid but the key bytes differ on the wire).
+    const other = await generateKeypair('kid-A') // same kid as kp
+    const tok = await mintTestJwt(other, {
+      iss: ISS,
+      aud: AUD,
+      sub: 'g-x',
+      email_verified: true,
+      exp: future(600),
+      iat: past(0),
+    })
+    await expect(verifyIdToken(tok, { audience: AUD })).rejects.toThrow(/bad signature/)
+    expect(calls).toBe(1) // no force-refresh on signature failure
+
+    setJwksFetcherForTests(null)
+    _resetJwksCacheForTests()
   })
 })
 

@@ -61,18 +61,45 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const provider = getProvider(body.provider)
     if (!provider) throw new ApiError('BAD_REQUEST', 'unknown provider')
 
-    // Pre-check so a replayed token still 403s; verifyNativeIdToken
-    // also binds nonce inside the JWS verification itself.
+    // Pre-check + reservation: two concurrent requests carrying the
+    // same nonce would otherwise both read "unseen", both verify the
+    // id_token, and both mint a session — defeating replay protection.
+    // The previous order (check → verify → write) left a window equal
+    // to one verify + KV round-trip.
+    //
+    // Order now:
+    //   1. read — fail fast on a confirmed replay
+    //   2. write the reservation BEFORE verify (succeeds at most once
+    //      under realistic KV contention)
+    //   3. verify the id_token (also binds nonce inside the JWS)
+    //   4. on verify failure, release the reservation so a legitimate
+    //      retry with a corrected payload isn't permanently locked out
+    //
+    // KV is eventually-consistent; this isn't perfect mutual exclusion,
+    // but it shrinks the race window to "between read and write" which
+    // is materially smaller than "between read and write + verify".
     const usedKey = `nonce/${body.nonce}`
     const seen = await ctx.env.NONCE.get(usedKey)
     if (seen) throw new ApiError('FORBIDDEN', 'nonce replay')
 
-    const claim = await provider.verifyNativeIdToken(
-      { idToken: body.id_token, nonce: body.nonce },
-      ctx.env,
-    )
-
     await ctx.env.NONCE.put(usedKey, '1', { expirationTtl: NONCE_TTL_SEC })
+
+    let claim
+    try {
+      claim = await provider.verifyNativeIdToken(
+        { idToken: body.id_token, nonce: body.nonce },
+        ctx.env,
+      )
+    } catch (verifyErr) {
+      // Release the reservation: this token was bad, but the user may
+      // legitimately retry with a freshly-minted nonce + id_token. Not
+      // releasing would burn the slot for the full 10-minute TTL.
+      // Don't await this — a release failure here is acceptable
+      // (it just times out instead of being explicit), and we don't
+      // want to mask the underlying verification error.
+      ctx.waitUntil(ctx.env.NONCE.delete(usedKey).catch(() => undefined))
+      throw verifyErr
+    }
 
     const user = await upsertUserByIdentity(ctx.env.DB, claim)
     const sess = await createSession(ctx.env.SESSIONS, user.id)

@@ -326,6 +326,28 @@ describe('safeNext', () => {
   it('rejects backslash injection', () => {
     expect(safeNext('/\\evil.com')).toBe('/')
   })
+  it('rejects percent-encoded protocol-relative bypass', () => {
+    // /%2Fevil.com decodes to //evil.com — must be rejected even
+    // though raw.startsWith('//') is false at first glance.
+    expect(safeNext('/%2Fevil.com')).toBe('/')
+    expect(safeNext('/%2f%2fevil.com')).toBe('/')
+    expect(safeNext('/%2F%2Fevil.com/foo')).toBe('/')
+  })
+  it('rejects percent-encoded backslash and traversal', () => {
+    expect(safeNext('/%5Cevil.com')).toBe('/')
+    expect(safeNext('/foo/%2E%2E/bar')).toBe('/')
+  })
+  it('rejects malformed percent-encoding', () => {
+    // decodeURIComponent throws on lone "%" — fail closed.
+    expect(safeNext('/%')).toBe('/')
+    expect(safeNext('/%ZZ')).toBe('/')
+  })
+  it('keeps a same-origin path even if it contains a safe percent-encoded segment', () => {
+    // /me%2Fpublished decodes to /me/published — still same-origin,
+    // still no traversal. We return the RAW value so the eventual
+    // Location header round-trips intact.
+    expect(safeNext('/me%2Fpublished')).toBe('/me%2Fpublished')
+  })
   it('rejects ".." segments (defense-in-depth)', () => {
     expect(safeNext('/foo/../bar')).toBe('/')
     expect(safeNext('/../etc/passwd')).toBe('/')

@@ -19,8 +19,10 @@ export function _resetJwksCacheForTests(): void {
   cache = null
 }
 
-async function defaultFetchJwks(): Promise<Jwk[]> {
-  if (cache && Date.now() - cache.fetchedAt < JWKS_CACHE_TTL_MS) return cache.keys
+async function defaultFetchJwks(force = false): Promise<Jwk[]> {
+  if (!force && cache && Date.now() - cache.fetchedAt < JWKS_CACHE_TTL_MS) {
+    return cache.keys
+  }
   const r = await fetch(JWKS_URI)
   if (!r.ok) throw new Error(`jwks fetch ${r.status}`)
   const body = (await r.json()) as { keys: Jwk[] }
@@ -28,14 +30,14 @@ async function defaultFetchJwks(): Promise<Jwk[]> {
   return body.keys
 }
 
-let jwksFetcher: () => Promise<Jwk[]> = defaultFetchJwks
+let jwksFetcher: (force?: boolean) => Promise<Jwk[]> = defaultFetchJwks
 
-export function setJwksFetcherForTests(fn: (() => Promise<Jwk[]>) | null): void {
+export function setJwksFetcherForTests(fn: ((force?: boolean) => Promise<Jwk[]>) | null): void {
   jwksFetcher = fn ?? defaultFetchJwks
 }
 
-export async function fetchJwks(): Promise<Jwk[]> {
-  return jwksFetcher()
+export async function fetchJwks(force = false): Promise<Jwk[]> {
+  return jwksFetcher(force)
 }
 
 function b64urlToBuf(s: string): ArrayBuffer {
@@ -132,5 +134,20 @@ export async function verifyIdToken(
   opts: VerifyOpts,
 ): Promise<IdTokenClaims> {
   const keys = await jwksFetcher()
-  return verifyIdTokenWithKeys(idToken, keys, opts)
+  try {
+    return await verifyIdTokenWithKeys(idToken, keys, opts)
+  } catch (err) {
+    // Google rotates JWKS rarely but without warning. Our 1-hour cache
+    // can hold a stale snapshot when a new `kid` first appears in the
+    // wild — every desktop sign-in carrying the rotated key would 401
+    // until the TTL elapses. Treat "no matching jwk" as a probable
+    // rotation, force-refresh once, and retry. Any other failure
+    // (bad signature, bad iss, expired) propagates immediately —
+    // refreshing keys can't help those.
+    if (err instanceof Error && err.message === 'no matching jwk') {
+      const freshKeys = await jwksFetcher(true)
+      return verifyIdTokenWithKeys(idToken, freshKeys, opts)
+    }
+    throw err
+  }
 }
