@@ -237,6 +237,8 @@ test('.spool sanitised download replaces literals with per-kind masks and strips
 
     await window.locator('[data-testid="share-menu-trigger"]').click()
     await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    const exportTab = window.locator('[data-testid="share-menu-tab-export"]')
+    if (await exportTab.count()) await exportTab.click()
     await window.locator('[data-testid="share-menu-export-spool"]').click()
     await window.locator('[data-testid="share-menu-download"]').click()
 
@@ -277,6 +279,8 @@ test('Markdown export uses per-kind masks wrapped in inline code', async () => {
 
     await window.locator('[data-testid="share-menu-trigger"]').click()
     await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    const exportTab = window.locator('[data-testid="share-menu-tab-export"]')
+    if (await exportTab.count()) await exportTab.click()
     await window.locator('[data-testid="share-menu-export-md"]').click()
     await window.locator('[data-testid="share-menu-download"]').click()
 
@@ -311,6 +315,8 @@ test('Per-item opt-out keeps that value verbatim in the sanitised .spool', async
     await installSaveFilePickerMock(window)
     await window.locator('[data-testid="share-menu-trigger"]').click()
     await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+    const exportTab = window.locator('[data-testid="share-menu-tab-export"]')
+    if (await exportTab.count()) await exportTab.click()
     await window.locator('[data-testid="share-menu-export-spool"]').click()
     await window.locator('[data-testid="share-menu-download"]').click()
 

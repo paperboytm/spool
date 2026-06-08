@@ -20,11 +20,17 @@ test.afterAll(async () => {
 
 async function exportAs(window: Awaited<ReturnType<typeof launchApp>>['window'], k: 'png' | 'pdf' | 'md' | 'spool') {
   // Old surface: <DownloadButton> exposed a flat trigger + per-format option.
-  // New surface: <ShareMenu> popover with an Export tab (the only tab when
-  // VITE_FEATURE_SHAREPUBLISH is unset, as in e2e). Pick a format radio,
-  // then click Download.
+  // New surface: <ShareMenu> popover. When VITE_FEATURE_SHAREPUBLISH is
+  // unset, the popover opens directly on the Export tab (no tab strip).
+  // When VITE_FEATURE_SHAREPUBLISH=1 (now the case in CI's test:e2e build,
+  // see packages/app/package.json), the tab strip renders and the
+  // popover opens on the Publish tab by default — so the test must
+  // click the Export tab before picking a format. count() check makes
+  // this work in both flag configurations.
   await window.locator('[data-testid="share-menu-trigger"]').click()
   await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+  const exportTab = window.locator('[data-testid="share-menu-tab-export"]')
+  if (await exportTab.count()) await exportTab.click()
   await window.locator(`[data-testid="share-menu-export-${k}"]`).click()
   await window.locator('[data-testid="share-menu-download"]').click()
 }
