@@ -18,6 +18,12 @@ vi.mock('workers-og', () => ({
       },
     }
   }),
+  // Tests don't exercise the Google Fonts network — stub to a tiny
+  // ArrayBuffer so renderOgPng's font-load path completes without
+  // actually fetching. The real subset-fetch is exercised in prod.
+  loadGoogleFont: vi
+    .fn()
+    .mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
 }))
 
 const TOKEN = 'p'.repeat(40)

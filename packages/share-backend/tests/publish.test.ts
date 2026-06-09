@@ -11,13 +11,17 @@ import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
 // Mock workers-og so publish.ts (which imports renderOgPng → workers-og)
-// can be exercised in node without loading Satori/wasm.
+// can be exercised in node without loading Satori/wasm or fetching
+// font subsets from Google Fonts.
 vi.mock('workers-og', () => ({
   ImageResponse: vi.fn().mockImplementation(() => ({
     async arrayBuffer() {
       return new Uint8Array([137, 80, 78, 71]).buffer
     },
   })),
+  loadGoogleFont: vi
+    .fn()
+    .mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
 }))
 
 const TOKEN = 'p'.repeat(40)
