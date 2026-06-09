@@ -425,10 +425,14 @@ describe('POST /api/publish', () => {
     expect(env._snapshots.has(`${body.id}.json`)).toBe(true)
     const metaRaw = await env.META.get(`meta/${body.id}`)
     expect(metaRaw).not.toBeNull()
-    const meta = JSON.parse(metaRaw!) as { owner: string; version: number; revoked_at: number | null }
+    const meta = JSON.parse(metaRaw!) as { owner: string; version: number; revoked_at: number | null; title: string | null }
     expect(meta.owner).toBe('user-1')
     expect(meta.version).toBe(1)
     expect(meta.revoked_at).toBeNull()
+    // Title is the whole point of the meta sidecar — assert it lands
+    // in KV at the publish layer so a typo on the publish.ts side
+    // surfaces here rather than only at the /api/meta read layer.
+    expect(meta.title).toBe('A nice chat')
 
     const row = env.state.published_shares.find((s) => s.id === body.id)
     expect(row).toBeTruthy()
