@@ -182,7 +182,6 @@ html[data-theme='dark'] .sw-root {
   gap: 0;
   padding: 28px 16px 30px;
   background: var(--bg);
-  border-top: 1px solid var(--border);
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   letter-spacing: 0.04em;

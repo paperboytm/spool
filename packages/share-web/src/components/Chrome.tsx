@@ -360,6 +360,17 @@ export function Header({ auth = 'auto' as AuthState }: { auth?: AuthState }) {
   )
 }
 
+/**
+ * Footer is now report-only. The previous "Learn about Spool · Terms ·
+ * Privacy" row was dropped because Terms / Privacy never had real copy
+ * — the placeholder routes 404'd, and a misleading link is worse than
+ * no link. The Learn-about-Spool link is redundant with the Wordmark
+ * in the header (both link to the landing site).
+ *
+ * Only Reader still mounts a footer, exclusively to surface the
+ * report-share path. Pages that call `<Footer />` without a report
+ * prop render nothing.
+ */
 export function Footer({
   report,
   reportHref,
@@ -367,21 +378,12 @@ export function Footer({
   report?: boolean
   reportHref?: string
 }) {
+  if (!report || !reportHref) return null
   return (
     <footer className="sw-footer">
-      {report && reportHref && (
-        <>
-          <a href={reportHref} rel="nofollow">
-            Report this share
-          </a>
-          <span className="sep">·</span>
-        </>
-      )}
-      <a href="https://spool.pro">Learn about Spool</a>
-      <span className="sep">·</span>
-      <a href="/terms">Terms</a>
-      <span className="sep">·</span>
-      <a href="/privacy">Privacy</a>
+      <a href={reportHref} rel="nofollow">
+        Report this share
+      </a>
     </footer>
   )
 }
