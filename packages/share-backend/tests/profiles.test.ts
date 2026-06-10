@@ -100,7 +100,7 @@ describe('GET /api/profiles/:handle', () => {
     expect(body.shares).toEqual([])
   })
 
-  it('returns only profile-listed, non-revoked, non-expired shares ordered by published_at DESC', async () => {
+  it('returns only profile-listed, non-revoked shares ordered by published_at DESC', async () => {
     const env = envFor()
     seedUser(env.state)
     env.state.handles.push({
@@ -159,9 +159,10 @@ describe('GET /api/profiles/:handle', () => {
         republished_at: null,
         revoked_at: now,
       },
-      // expired — must be excluded
+      // legacy row with a stale expires_at — the expiry feature was
+      // removed, so this stays listed like any other live share
       {
-        id: 'expired',
+        id: 'legacy-expiry',
         user_id: 'user-1',
         title: 'E',
         visibility: 'profile-listed',
@@ -188,7 +189,7 @@ describe('GET /api/profiles/:handle', () => {
     const res = await invoke(profileGet, req, env, { handle: 'alice' })
     expect(res.status).toBe(200)
     const body = (await res.json()) as { shares: Array<{ id: string }> }
-    expect(body.shares.map((s) => s.id)).toEqual(['newer', 'older'])
+    expect(body.shares.map((s) => s.id)).toEqual(['newer', 'legacy-expiry', 'older'])
   })
 
   it('429 when the per-IP profile cap is exceeded', async () => {

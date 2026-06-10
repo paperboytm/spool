@@ -122,20 +122,19 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
 }
 
 async function sweepOrphanShareAssets(env: DeletionEnv, now: number): Promise<void> {
-  // The revoke endpoint and the share-expiration path rely on
-  // `waitUntil` to delete R2 objects. If the worker invocation dies
-  // before that runs, the JSON + PNG linger forever — reader still
-  // serves 410 (META gate is fail-closed) but storage accrues. Sweep
-  // recent tombstones idempotently: R2.delete is a no-op when the
-  // object is already gone, so this is cheap to run unconditionally.
+  // The revoke endpoint relies on `waitUntil` to delete R2 objects. If
+  // the worker invocation dies before that runs, the JSON + PNG linger
+  // forever — reader still serves 410 (META gate is fail-closed) but
+  // storage accrues. Sweep recent tombstones idempotently: R2.delete
+  // is a no-op when the object is already gone, so this is cheap to
+  // run unconditionally.
   const cutoff = now - ORPHAN_SWEEP_WINDOW_MS
   const stale = await env.DB.prepare(
     `SELECT id FROM published_shares
-       WHERE (revoked_at IS NOT NULL AND revoked_at > ?)
-          OR (expires_at IS NOT NULL AND expires_at <= ? AND revoked_at IS NULL)
+       WHERE revoked_at IS NOT NULL AND revoked_at > ?
        LIMIT ?`,
   )
-    .bind(cutoff, now, ORPHAN_SWEEP_LIMIT)
+    .bind(cutoff, ORPHAN_SWEEP_LIMIT)
     .all<{ id: string }>()
 
   await Promise.all(

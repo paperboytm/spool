@@ -256,7 +256,8 @@ describe('GET /api/og/[id].png', () => {
     expect(res.status).toBe(410)
   })
 
-  it('410 when expired', async () => {
+  it('serves a legacy share whose KV meta still carries an old expires_at', async () => {
+    // Expiry removed — stale legacy values are dead data, not a gate.
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -268,7 +269,7 @@ describe('GET /api/og/[id].png', () => {
     const { onRequestGet } = await import('../functions/api/og/[id].png')
     const req = new Request(`https://x/api/og/${id}.png`)
     const res = await onRequestGet(ctxFor(req, env, { id: `${id}.png` }))
-    expect(res.status).toBe(410)
+    expect(res.status).toBe(200)
   })
 
   it('404 for bad slug', async () => {

@@ -37,12 +37,6 @@ const PUBLISH_RATE_HOURLY_MAX = 30
 const PUBLISH_RATE_DAILY_WINDOW_SEC = 86400
 const PUBLISH_RATE_DAILY_MAX = 100
 
-// expires_at must be ≥ 5 minutes out (clock skew tolerance, blocks
-// instantly-tombstoned publishes) and ≤ 1 year (matches the design
-// retention policy; long enough for any practical share lifetime).
-const MIN_EXPIRES_OFFSET_MS = 5 * 60 * 1000
-const MAX_EXPIRES_OFFSET_MS = 365 * 24 * 3600 * 1000
-
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
@@ -81,15 +75,6 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     const req = parsed.data
 
     const now = Date.now()
-    const expiresAtMs = req.expires_at ? new Date(req.expires_at).getTime() : null
-    if (expiresAtMs !== null) {
-      if (expiresAtMs < now + MIN_EXPIRES_OFFSET_MS) {
-        throw new ApiError('UNPROCESSABLE', 'expires_at must be in the future')
-      }
-      if (expiresAtMs > now + MAX_EXPIRES_OFFSET_MS) {
-        throw new ApiError('UNPROCESSABLE', 'expires_at cannot be more than 1 year out')
-      }
-    }
 
     if (req.visibility === 'profile-listed') {
       const h = await ctx.env.DB.prepare(
@@ -179,12 +164,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       // idempotency token so future retries hit the short-circuit above.
       try {
         const result = await ctx.env.DB.prepare(
-          'UPDATE published_shares SET title=?, visibility=?, expires_at=?, version=?, republished_at=?, draft_id=?, client_request_id=? WHERE id=? AND user_id=? AND version=?',
+          'UPDATE published_shares SET title=?, visibility=?, version=?, republished_at=?, draft_id=?, client_request_id=? WHERE id=? AND user_id=? AND version=?',
         )
           .bind(
             req.snapshot.conversation.title,
             req.visibility,
-            expiresAtMs,
             version,
             now,
             req.draft_id,
@@ -202,8 +186,8 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         // The (user_id, client_request_id) unique index covers live rows.
         // It can fire on republish only when the *same user* has another
         // live share whose token also happens to equal this republish's
-        // token — i.e. two distinct drafts whose snapshot+visibility+
-        // expires hash to the same content. Vanishingly rare in practice
+        // token — i.e. two distinct drafts whose snapshot+visibility
+        // hash to the same content. Vanishingly rare in practice
         // (copy-pasted draft body across two share entries), but we
         // translate it into 409 instead of 500 so the renderer can
         // surface "edit your content or unpublish the other share".
@@ -216,14 +200,13 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     } else {
       try {
         await ctx.env.DB.prepare(
-          'INSERT INTO published_shares (id, user_id, title, visibility, expires_at, version, published_at, draft_id, client_request_id) VALUES (?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO published_shares (id, user_id, title, visibility, version, published_at, draft_id, client_request_id) VALUES (?,?,?,?,?,?,?,?)',
         )
           .bind(
             slug,
             user.id,
             req.snapshot.conversation.title,
             req.visibility,
-            expiresAtMs,
             version,
             now,
             req.draft_id,
@@ -275,7 +258,6 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       owner: user.id,
       title: req.snapshot.conversation.title,
       visibility: req.visibility,
-      expires_at: expiresAtMs,
       revoked_at: null as number | null,
       version,
     }
@@ -289,7 +271,6 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       id: slug,
       publish: {
         visibility: req.visibility,
-        expires_at: req.expires_at,
         published_at: new Date(now).toISOString(),
         version,
       },

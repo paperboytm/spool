@@ -11,7 +11,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     const user = await requireUser(ctx.request, ctx.env)
     const rows = await ctx.env.DB
       .prepare(
-        'SELECT id, title, visibility, expires_at, version, published_at, republished_at, revoked_at, draft_id, client_request_id ' +
+        'SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id ' +
           'FROM published_shares WHERE user_id=? ORDER BY published_at DESC',
       )
       .bind(user.id)

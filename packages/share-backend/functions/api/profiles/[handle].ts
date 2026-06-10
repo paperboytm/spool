@@ -62,15 +62,13 @@ export const onRequestGet: PagesFunction<Env, 'handle'> = async (ctx) => {
       .first<OwnerRow>()
     if (!owner) throw new ApiError('NOT_FOUND')
 
-    const now = Date.now()
     const shares = await ctx.env.DB
       .prepare(
         'SELECT id, title, published_at, version FROM published_shares ' +
           'WHERE user_id = ? AND visibility = ? AND revoked_at IS NULL ' +
-          'AND (expires_at IS NULL OR expires_at > ?) ' +
           'ORDER BY published_at DESC LIMIT ?',
       )
-      .bind(owner.user_id, 'profile-listed', now, SHARE_LIMIT)
+      .bind(owner.user_id, 'profile-listed', SHARE_LIMIT)
       .all<ShareRow>()
 
     // Resolution: user overrides win over provider claims; provider

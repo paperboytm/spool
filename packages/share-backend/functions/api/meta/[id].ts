@@ -39,7 +39,6 @@ type KvMeta = {
   // was added; new publishes always carry it.
   title?: string
   visibility: 'unlisted' | 'profile-listed'
-  expires_at: number | null
   revoked_at: number | null
   version: number
 }
@@ -59,20 +58,12 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
         { status: 410, headers: TOMBSTONE_HEADERS },
       )
     }
-    if (meta.expires_at && Date.now() > meta.expires_at) {
-      return new Response(
-        JSON.stringify({ expired: true, at: meta.expires_at }),
-        { status: 410, headers: TOMBSTONE_HEADERS },
-      )
-    }
-
     // Owner intentionally omitted — same reasoning as /api/snapshots/:id:
     // exposing the internal user id to anyone with a slug would hand
     // them a pivot into a user-enumeration vector via /api/profiles/*.
     const body = {
       title: meta.title ?? null,
       visibility: meta.visibility,
-      expires_at: meta.expires_at,
       version: meta.version,
     }
     return new Response(JSON.stringify(body), {

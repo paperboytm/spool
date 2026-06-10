@@ -350,9 +350,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (r) r.cancelled = 1
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^INSERT INTO published_shares \(id, user_id, title, visibility, expires_at, version, published_at, draft_id, client_request_id\)/i.test(sql)) {
-          const [id, user_id, title, visibility, expires_at, version, published_at, draft_id, client_request_id] = params as [
-            string, string, string, string, number | null, number, number, string | null, string | null,
+        if (/^INSERT INTO published_shares \(id, user_id, title, visibility, version, published_at, draft_id, client_request_id\)/i.test(sql)) {
+          const [id, user_id, title, visibility, version, published_at, draft_id, client_request_id] = params as [
+            string, string, string, string, number, number, string | null, string | null,
           ]
           // Mirror the UNIQUE(user_id, client_request_id) partial index
           // so the publish handler's catch-and-resolve path is exercised
@@ -376,7 +376,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             user_id,
             title,
             visibility,
-            expires_at,
+            expires_at: null,
             version,
             published_at,
             republished_at: null,
@@ -386,9 +386,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
           })
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE published_shares SET title=\?, visibility=\?, expires_at=\?, version=\?, republished_at=\?, draft_id=\?, client_request_id=\? WHERE id=\? AND user_id=\? AND version=\?/i.test(sql)) {
-          const [title, visibility, expires_at, version, republished_at, draft_id, client_request_id, id, user_id, expectedVersion] = params as [
-            string, string, number | null, number, number, string | null, string | null, string, string, number,
+        if (/^UPDATE published_shares SET title=\?, visibility=\?, version=\?, republished_at=\?, draft_id=\?, client_request_id=\? WHERE id=\? AND user_id=\? AND version=\?/i.test(sql)) {
+          const [title, visibility, version, republished_at, draft_id, client_request_id, id, user_id, expectedVersion] = params as [
+            string, string, number, number, string | null, string | null, string, string, number,
           ]
           // Honour the optimistic-concurrency clause: only the row whose
           // current version still matches the SELECTed-then-bound value
@@ -401,7 +401,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
           // Mirror the partial UNIQUE(user_id, client_request_id) index
           // on the republish path too. If another LIVE row for the same
           // user already holds this token (rare: two drafts whose
-          // snapshot+visibility+expires hash to the same content), the
+          // snapshot+visibility hash to the same content), the
           // index fires. Without this branch, tests would silently
           // accept a state real D1 rejects, hiding bugs in the handler.
           if (
@@ -418,7 +418,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
           }
           s.title = title
           s.visibility = visibility
-          s.expires_at = expires_at
           s.version = version
           s.republished_at = republished_at
           s.draft_id = draft_id
@@ -485,28 +484,22 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .map((s) => ({ id: s.id }))
           return { results: items as T[] }
         }
-        if (/^SELECT id FROM published_shares\s+WHERE \(revoked_at IS NOT NULL AND revoked_at > \?\)\s+OR \(expires_at IS NOT NULL AND expires_at <= \? AND revoked_at IS NULL\)\s+LIMIT \?/i.test(sql)) {
-          const [revokedCutoff, expiresCutoff, limit] = params as [number, number, number]
+        if (/^SELECT id FROM published_shares\s+WHERE revoked_at IS NOT NULL AND revoked_at > \?\s+LIMIT \?/i.test(sql)) {
+          const [revokedCutoff, limit] = params as [number, number]
           const items = state.published_shares
-            .filter((s) => {
-              const recentRevoke = s.revoked_at !== null && s.revoked_at > revokedCutoff
-              const expired =
-                s.expires_at !== null && s.expires_at <= expiresCutoff && s.revoked_at === null
-              return recentRevoke || expired
-            })
+            .filter((s) => s.revoked_at !== null && s.revoked_at > revokedCutoff)
             .slice(0, limit)
             .map((s) => ({ id: s.id }))
           return { results: items as T[] }
         }
-        if (/^SELECT id, title, published_at, version FROM published_shares WHERE user_id = \? AND visibility = \? AND revoked_at IS NULL AND \(expires_at IS NULL OR expires_at > \?\) ORDER BY published_at DESC LIMIT \?/i.test(sql)) {
-          const [uid, vis, now, limit] = params as [string, string, number, number]
+        if (/^SELECT id, title, published_at, version FROM published_shares WHERE user_id = \? AND visibility = \? AND revoked_at IS NULL ORDER BY published_at DESC LIMIT \?/i.test(sql)) {
+          const [uid, vis, limit] = params as [string, string, number]
           const items = state.published_shares
             .filter(
               (s) =>
                 s.user_id === uid &&
                 s.visibility === vis &&
-                s.revoked_at === null &&
-                (s.expires_at === null || s.expires_at > now),
+                s.revoked_at === null,
             )
             .slice()
             .sort((a, b) => b.published_at - a.published_at)
@@ -536,7 +529,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }))
           return { results: items as T[] }
         }
-        if (/^SELECT id, title, visibility, expires_at, version, published_at, republished_at, revoked_at, draft_id, client_request_id FROM published_shares WHERE user_id=\? ORDER BY published_at DESC/i.test(sql)) {
+        if (/^SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id FROM published_shares WHERE user_id=\? ORDER BY published_at DESC/i.test(sql)) {
           const [uid] = params as [string]
           const items = state.published_shares
             .filter((s) => s.user_id === uid)
@@ -546,7 +539,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
               id: s.id,
               title: s.title,
               visibility: s.visibility,
-              expires_at: s.expires_at,
               version: s.version,
               published_at: s.published_at,
               republished_at: s.republished_at,

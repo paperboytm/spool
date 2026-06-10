@@ -16,7 +16,6 @@ const OG_CACHE_HEADER =
 type Meta = {
   owner: string
   visibility: 'unlisted' | 'profile-listed'
-  expires_at: number | null
   revoked_at: number | null
   version: number
 }
@@ -35,7 +34,6 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     const meta = JSON.parse(metaRaw) as Meta
 
     if (meta.revoked_at) throw new ApiError('GONE')
-    if (meta.expires_at && Date.now() > meta.expires_at) throw new ApiError('GONE')
 
     const obj = await ctx.env.OG.get(`${id}.png`)
     if (!obj) throw new ApiError('NOT_FOUND')

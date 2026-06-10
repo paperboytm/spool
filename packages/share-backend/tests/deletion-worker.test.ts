@@ -273,33 +273,33 @@ describe('runDeletionSweep', () => {
     expect(env.state.users.find((u) => u.id === 'user-2')?.deleted_at).toBeTruthy()
   })
 
-  it('orphan sweep: cleans R2 for revoked-but-not-cleaned and recently-expired shares', async () => {
-    // Bulk publish three shares that bypassed the revoke/expire R2
-    // cleanup (waitUntil failure / silent expiration). The orphan
-    // branch must reap their R2 assets without touching the still-
-    // active share.
+  it('orphan sweep: cleans R2 for revoked-but-not-cleaned shares, leaves live ones (incl. legacy expiry rows)', async () => {
+    // A revoked share that bypassed the revoke R2 cleanup (waitUntil
+    // failure) must be reaped. A live share with a stale legacy
+    // expires_at must NOT be — the expiry feature was removed and old
+    // values are dead data.
     const env = envFor()
     seedUser(env.state, 'user-1')
     const now = Date.now()
     const revokedSlug = nanoidSlug()
-    const expiredSlug = nanoidSlug()
+    const legacyExpirySlug = nanoidSlug()
     const activeSlug = nanoidSlug()
     await seedShareWithAssets(env, 'user-1', revokedSlug)
-    await seedShareWithAssets(env, 'user-1', expiredSlug)
+    await seedShareWithAssets(env, 'user-1', legacyExpirySlug)
     await seedShareWithAssets(env, 'user-1', activeSlug)
     const revokedRow = env.state.published_shares.find((s) => s.id === revokedSlug)!
     revokedRow.revoked_at = now - 1000 // recent revoke, R2 not cleaned
-    const expiredRow = env.state.published_shares.find((s) => s.id === expiredSlug)!
-    expiredRow.expires_at = now - 1000 // expired just now, R2 still there
+    const legacyRow = env.state.published_shares.find((s) => s.id === legacyExpirySlug)!
+    legacyRow.expires_at = now - 1000 // stale legacy value — not a tombstone
 
     const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
     await runDeletionSweep(env, now)
 
     expect(env._snapshots.has(`${revokedSlug}.json`)).toBe(false)
     expect(env._og.has(`${revokedSlug}.png`)).toBe(false)
-    expect(env._snapshots.has(`${expiredSlug}.json`)).toBe(false)
-    expect(env._og.has(`${expiredSlug}.png`)).toBe(false)
-    // Active share untouched.
+    // Live shares untouched — including the legacy-expiry one.
+    expect(env._snapshots.has(`${legacyExpirySlug}.json`)).toBe(true)
+    expect(env._og.has(`${legacyExpirySlug}.png`)).toBe(true)
     expect(env._snapshots.has(`${activeSlug}.json`)).toBe(true)
     expect(env._og.has(`${activeSlug}.png`)).toBe(true)
   })

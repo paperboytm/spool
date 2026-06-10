@@ -310,65 +310,22 @@ describe('POST /api/publish', () => {
     expect(res.status).toBe(429)
   })
 
-  it('422 when expires_at is already in the past', async () => {
+  it('ignores a legacy expires_at field instead of rejecting it', async () => {
+    // The expiry feature was removed; z.object strips unknown keys, so
+    // an older client still sending expires_at publishes a permanent
+    // share rather than tripping a 422.
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
-    const past = new Date(Date.now() - 60_000).toISOString()
     const req = authedReq('https://x/api/publish', {
       snapshot: makeSnapshot(),
       visibility: 'unlisted',
-      expires_at: past,
+      expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
     })
     const res = await invoke(publishPost, req, env)
-    expect(res.status).toBe(422)
-    expect(((await res.json()) as { detail: string }).detail).toMatch(/future/)
-  })
-
-  it('422 when expires_at is more than 1 year out', async () => {
-    const env = envFor()
-    seedUser(env.state)
-    await seedSession(env.SESSIONS, TOKEN, 'user-1')
-    const farFuture = new Date(Date.now() + 366 * 24 * 3600 * 1000).toISOString()
-    const req = authedReq('https://x/api/publish', {
-      snapshot: makeSnapshot(),
-      visibility: 'unlisted',
-      expires_at: farFuture,
-    })
-    const res = await invoke(publishPost, req, env)
-    expect(res.status).toBe(422)
-    expect(((await res.json()) as { detail: string }).detail).toMatch(/1 year/)
-  })
-
-  it('expires_at at the 5-minute / 1-year boundaries: just-below = 422, just-above = 200', async () => {
-    // Pin "now" indirectly: server reads Date.now() once at handler entry,
-    // so we generate offsets relative to the very recent past. The 4-min
-    // candidate is unambiguously inside the floor; the 6-min candidate is
-    // unambiguously outside it; same logic at the 1-year ceiling.
-    const env = envFor()
-    seedUser(env.state)
-    await seedSession(env.SESSIONS, TOKEN, 'user-1')
-    const now = Date.now()
-    const justBelowFloor = new Date(now + 4 * 60 * 1000).toISOString()
-    const justAboveFloor = new Date(now + 6 * 60 * 1000).toISOString()
-    const justBelowCeiling = new Date(now + (365 * 24 * 3600 - 60) * 1000).toISOString()
-    const justAboveCeiling = new Date(now + (365 * 24 * 3600 + 600) * 1000).toISOString()
-
-    const cases: Array<{ at: string; status: number }> = [
-      { at: justBelowFloor, status: 422 },
-      { at: justAboveFloor, status: 200 },
-      { at: justBelowCeiling, status: 200 },
-      { at: justAboveCeiling, status: 422 },
-    ]
-    for (const c of cases) {
-      const req = authedReq('https://x/api/publish', {
-        snapshot: makeSnapshot(),
-        visibility: 'unlisted',
-        expires_at: c.at,
-      })
-      const res = await invoke(publishPost, req, env)
-      expect(res.status, `expires_at=${c.at}`).toBe(c.status)
-    }
+    expect(res.status).toBe(200)
+    const row = env.state.published_shares[0]!
+    expect(row.expires_at).toBeNull()
   })
 
   it('422 when turn_order length does not match turns count', async () => {
@@ -535,7 +492,9 @@ describe('GET /api/snapshots/[id]', () => {
     expect(res.status).toBe(404)
   })
 
-  it('410 when expired', async () => {
+  it('serves a legacy share whose KV meta still carries an old expires_at', async () => {
+    // The expiry feature was removed; stale expires_at values in legacy
+    // KV records are dead data and must not gate reads anymore.
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -546,9 +505,7 @@ describe('GET /api/snapshots/[id]', () => {
 
     const req = new Request(`https://x/api/snapshots/${id}`)
     const res = await invoke(snapshotGet, req, env, { id })
-    expect(res.status).toBe(410)
-    const body = await res.json() as { expired: boolean }
-    expect(body.expired).toBe(true)
+    expect(res.status).toBe(200)
   })
 })
 
@@ -580,12 +537,10 @@ describe('GET /api/meta/[id]', () => {
     const body = await res.json() as {
       title: string | null
       visibility: string
-      expires_at: number | null
       version: number
     }
     expect(body.title).toBe('Hello world')
     expect(body.visibility).toBe('unlisted')
-    expect(body.expires_at).toBeNull()
     expect(body.version).toBe(1)
     expect(res.headers.get('etag')).toBe(`"${id}-1"`)
   })
@@ -624,7 +579,8 @@ describe('GET /api/meta/[id]', () => {
     expect(body.revoked).toBe(true)
   })
 
-  it('410 + expired JSON after expires_at', async () => {
+  it('serves meta for a legacy share whose KV record still carries an old expires_at', async () => {
+    // Expiry removed — stale legacy values are dead data, not a gate.
     const env = envFor()
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
@@ -635,9 +591,7 @@ describe('GET /api/meta/[id]', () => {
 
     const req = new Request(`https://x/api/meta/${id}`)
     const res = await invoke(metaGet, req, env, { id })
-    expect(res.status).toBe(410)
-    const body = await res.json() as { expired: boolean }
-    expect(body.expired).toBe(true)
+    expect(res.status).toBe(200)
   })
 
   it('404 when KV record is missing', async () => {

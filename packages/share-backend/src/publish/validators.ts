@@ -84,13 +84,15 @@ export const PublishRequest = z.object({
   draft_id: z.string().min(1).max(128),
   // Idempotency token for at-most-once publish on retry. The renderer
   // derives it deterministically from the request payload (snapshot +
-  // visibility + expires_at), so retries of the same intent re-use the
-  // same token and the backend short-circuits to the prior result; a
-  // re-edited intent generates a fresh token and creates a new share.
+  // visibility), so retries of the same intent re-use the same token
+  // and the backend short-circuits to the prior result; a re-edited
+  // intent generates a fresh token and creates a new share.
   // 64-char sha256 hex is the canonical value; we bound generously to
   // accommodate future hash bumps without a schema change.
+  // NOTE: `expires_at` was removed with the expiry feature. z.object
+  // strips unknown keys, so an older client still sending it simply
+  // gets a permanent share instead of a 422.
   idempotency_key: z.string().min(8).max(256),
-  expires_at: z.iso.datetime().optional(),
   // Mirror `isValidSlug` (slug.ts): 21 chars, URL-safe alphabet. The
   // handler re-runs `isValidSlug()` after this, but enforcing at the
   // schema boundary lets us reject malformed slugs before any DB

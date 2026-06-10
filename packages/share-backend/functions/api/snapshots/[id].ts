@@ -23,7 +23,6 @@ const SNAPSHOT_CACHE_HEADER =
 type Meta = {
   owner: string
   visibility: 'unlisted' | 'profile-listed'
-  expires_at: number | null
   revoked_at: number | null
   version: number
 }
@@ -43,13 +42,6 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
         { status: 410, headers: TOMBSTONE_HEADERS },
       )
     }
-    if (meta.expires_at && Date.now() > meta.expires_at) {
-      return new Response(
-        JSON.stringify({ expired: true, at: meta.expires_at }),
-        { status: 410, headers: TOMBSTONE_HEADERS },
-      )
-    }
-
     const obj = await ctx.env.SNAPSHOTS.get(`${id}.json`)
     if (!obj) throw new ApiError('NOT_FOUND')
 
