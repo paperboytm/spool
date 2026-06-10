@@ -556,6 +556,13 @@
     "privacy_show": "表示",
     "privacy_header": "機密データを検出",
     "privacy_help": "エクスポート前にマスクする項目を選択してください。",
+    "shareMenu": {
+      "trigger": "共有",
+      "tab_publish": "公開",
+      "tab_export": "エクスポート",
+      "popover_aria": "共有",
+      "tablist_aria": "共有方法"
+    },
     "publishTab": {
       "visibility_legend": "公開範囲",
       "visibility_link_title": "リンクのみ",

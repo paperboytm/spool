@@ -585,6 +585,13 @@
     "privacy_show": "Anzeigen",
     "privacy_header": "Sensible Daten gefunden",
     "privacy_help": "Wählen Sie vor dem Export, was geschwärzt wird.",
+    "shareMenu": {
+      "trigger": "Teilen",
+      "tab_publish": "Veröffentlichen",
+      "tab_export": "Exportieren",
+      "popover_aria": "Teilen",
+      "tablist_aria": "Freigabeart"
+    },
     "publishTab": {
       "visibility_legend": "Sichtbarkeit",
       "visibility_link_title": "Nur Link",

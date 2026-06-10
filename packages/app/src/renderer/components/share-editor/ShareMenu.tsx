@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
@@ -76,6 +77,7 @@ export function ShareMenu({
   exporting,
   onExport,
 }: Props) {
+  const { t } = useTranslation()
   const lookupLoading = published === undefined
   // When the publish surface is flag-gated off, the popover collapses
   // to just the Export tab — no tab strip, no "Publish" entry to imply
@@ -188,14 +190,14 @@ export function ShareMenu({
         aria-expanded={open}
         className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[13px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
       >
-        <span>Share</span>
+        <span>{t('shareEditor.shareMenu.trigger')}</span>
         <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
       </button>
 
       {open && (
         <div
           role="dialog"
-          aria-label="Share"
+          aria-label={t('shareEditor.shareMenu.popover_aria')}
           data-testid="share-menu-popover"
           className="absolute right-0 top-full mt-1.5 w-[380px] rounded-[10px] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border shadow-xl z-20 flex flex-col overflow-hidden"
         >
@@ -206,7 +208,7 @@ export function ShareMenu({
           {publishEnabled && (
             <div
               role="tablist"
-              aria-label="Share surface"
+              aria-label={t('shareEditor.shareMenu.tablist_aria')}
               className="m-3 p-1 flex gap-1 rounded-md bg-warm-surface dark:bg-dark-surface"
             >
               {(['publish', 'export'] as const).map((id) => {
@@ -231,7 +233,9 @@ export function ShareMenu({
                         : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text border-transparent'
                     }`}
                   >
-                    {id === 'publish' ? 'Publish' : 'Export'}
+                    {id === 'publish'
+                      ? t('shareEditor.shareMenu.tab_publish')
+                      : t('shareEditor.shareMenu.tab_export')}
                   </button>
                 )
               })}

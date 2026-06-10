@@ -556,6 +556,13 @@
     "privacy_show": "표시",
     "privacy_header": "민감한 데이터 감지됨",
     "privacy_help": "내보내기 전에 가릴 항목을 선택하세요.",
+    "shareMenu": {
+      "trigger": "공유",
+      "tab_publish": "게시",
+      "tab_export": "내보내기",
+      "popover_aria": "공유",
+      "tablist_aria": "공유 방식"
+    },
     "publishTab": {
       "visibility_legend": "공개 범위",
       "visibility_link_title": "링크만",

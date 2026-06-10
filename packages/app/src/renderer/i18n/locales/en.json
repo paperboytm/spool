@@ -585,6 +585,13 @@
     "privacy_show": "Show",
     "privacy_header": "Sensitive data found",
     "privacy_help": "Choose what to mask before exporting.",
+    "shareMenu": {
+      "trigger": "Share",
+      "tab_publish": "Publish",
+      "tab_export": "Export",
+      "popover_aria": "Share",
+      "tablist_aria": "Share surface"
+    },
     "publishTab": {
       "visibility_legend": "Visibility",
       "visibility_link_title": "Link only",
