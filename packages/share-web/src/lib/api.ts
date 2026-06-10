@@ -259,6 +259,49 @@ export async function revokeShare(id: string): Promise<RevokeShareResult> {
   }
 }
 
+export type SetVisibilityResult =
+  | { kind: 'ok' }
+  | { kind: 'unauthenticated' }
+  | { kind: 'not-found' }
+  | { kind: 'gone' }
+  | { kind: 'forbidden' }
+  | { kind: 'needs-handle' }
+  | { kind: 'rate-limited' }
+  | { kind: 'error' }
+
+/** PATCH /api/me/shares/:id — owner-scoped listing toggle. 422 only
+ *  fires for profile-listed without a live handle (the UI gates on the
+ *  handle too, but a release can race), surfaced as `needs-handle`. */
+export async function setShareVisibility(
+  id: string,
+  visibility: 'unlisted' | 'profile-listed',
+): Promise<SetVisibilityResult> {
+  try {
+    const r = await fetch(`/api/me/shares/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ visibility }),
+    })
+    if (r.status === 200) return { kind: 'ok' }
+    if (r.status === 401) {
+      // Session died between page load and the click — same cache
+      // discipline as fetchMe so the next render redirects cleanly.
+      clearCachedMe()
+      invalidateAuthCache()
+      return { kind: 'unauthenticated' }
+    }
+    if (r.status === 404) return { kind: 'not-found' }
+    if (r.status === 410) return { kind: 'gone' }
+    if (r.status === 403) return { kind: 'forbidden' }
+    if (r.status === 422) return { kind: 'needs-handle' }
+    if (r.status === 429) return { kind: 'rate-limited' }
+    return { kind: 'error' }
+  } catch {
+    return { kind: 'error' }
+  }
+}
+
 export type CheckHandleResult =
   | { kind: 'available' }
   | { kind: 'taken' }

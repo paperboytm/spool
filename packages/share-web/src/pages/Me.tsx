@@ -14,6 +14,7 @@ import {
   fetchMe,
   fetchMyShares,
   revokeShare,
+  setShareVisibility,
   scheduleAccountDeletion,
   signOut,
   type MeResponse,
@@ -195,11 +196,17 @@ function renderAvailability(
 function ShareRow({
   row,
   disabled,
+  hasHandle,
   onUnpublishRequest,
+  onToggleVisibility,
 }: {
   row: MeShareRow
   disabled?: boolean
+  /** Whether "List on profile" is offered — requires a live handle
+   *  (the server enforces the same gate). Unlisting is always offered. */
+  hasHandle: boolean
   onUnpublishRequest: (row: MeShareRow) => void
+  onToggleVisibility: (row: MeShareRow) => Promise<{ ok: boolean; reason?: string }>
 }) {
   const [copied, setCopied] = useState(false)
   const revoked = row.revoked_at !== null
@@ -246,39 +253,135 @@ function ShareRow({
             <Icon name={listed ? 'globe' : 'link-2'} size={12} />
           </span>
           <span>published {humanDate(row.published_at)}</span>
-          {revoked && (
-            <>
-              <span className="dot-sep">·</span>
-              <span className="sw-pill revoked">Unpublished</span>
-            </>
-          )}
         </span>
       </a>
-      {!disabled && (
-        <div className="sw-share-actions">
-          <button
-            type="button"
-            className={`sw-icon-btn${copied ? ' ok' : ''}`}
-            onClick={copy}
-            title={copied ? 'Copied' : 'Copy link'}
-            aria-label={copied ? 'Copied' : 'Copy link'}
-          >
-            <Icon name={copied ? 'check' : 'link'} size={14} />
-          </button>
-          {!revoked && (
-            <button
-              type="button"
-              className="sw-icon-btn danger"
-              onClick={() => onUnpublishRequest(row)}
-              title="Unpublish"
-              aria-label="Unpublish"
-            >
-              <Icon name="eye-off" size={14} />
-            </button>
-          )}
-        </div>
+      {/* Row actions live in a single ⋯ menu, mirroring the desktop
+       *  Published row: hover-revealed (always visible on touch — see
+       *  the hover:none media rule), pinned while open. Revoked rows
+       *  get no actions at all — the slug is permanently 410, so Copy
+       *  link would hand out a dead URL. */}
+      {!disabled && !revoked && (
+        <RowMenu
+          copied={copied}
+          listed={listed}
+          canList={hasHandle}
+          onCopy={() => void copy()}
+          onToggleVisibility={() => onToggleVisibility(row)}
+          onUnpublish={() => onUnpublishRequest(row)}
+        />
       )}
     </li>
+  )
+}
+
+function RowMenu({
+  copied,
+  listed,
+  canList,
+  onCopy,
+  onToggleVisibility,
+  onUnpublish,
+}: {
+  copied: boolean
+  listed: boolean
+  canList: boolean
+  onCopy: () => void
+  onToggleVisibility: () => Promise<{ ok: boolean; reason?: string }>
+  onUnpublish: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  async function toggleVisibility() {
+    if (busy) return
+    setBusy(true)
+    setErr(null)
+    const r = await onToggleVisibility()
+    setBusy(false)
+    if (r.ok) {
+      setOpen(false)
+    } else {
+      // No toast surface on the web — the failure renders inline in
+      // the open menu and clears when it closes.
+      setErr(r.reason ?? 'Could not change visibility.')
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="sw-rowmenu">
+      <button
+        type="button"
+        className="sw-rowmenu-trigger"
+        onClick={() => {
+          setErr(null)
+          setOpen((v) => !v)
+        }}
+        title="More actions"
+        aria-label="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Icon name="more-h" size={14} />
+      </button>
+      {open && (
+        <div role="menu" className="sw-rowmenu-pop">
+          {/* Copy keeps the menu open so the "Copied" confirmation is
+           *  visible where the click happened; the parent resets the
+           *  copied flag after 1.5s. */}
+          <button type="button" role="menuitem" className={`sw-rowmenu-item${copied ? ' ok' : ''}`} onClick={onCopy}>
+            <Icon name={copied ? 'check' : 'link'} size={13} />
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+          {/* Icon previews the TARGET state (globe = will appear on the
+           *  profile, link-2 = will go link-only) — same pairing as the
+           *  desktop row menu and the meta-line glyph. */}
+          {(listed || canList) && (
+            <button
+              type="button"
+              role="menuitem"
+              className="sw-rowmenu-item"
+              disabled={busy}
+              onClick={() => void toggleVisibility()}
+            >
+              <Icon name={listed ? 'link-2' : 'globe'} size={13} />
+              {listed ? 'Remove from profile' : 'List on profile'}
+            </button>
+          )}
+          <button
+            type="button"
+            role="menuitem"
+            className="sw-rowmenu-item danger"
+            disabled={busy}
+            onClick={() => {
+              setOpen(false)
+              onUnpublish()
+            }}
+          >
+            <Icon name="eye-off" size={13} />
+            Unpublish
+          </button>
+          {err && <p className="sw-rowmenu-err">{err}</p>}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -485,6 +588,7 @@ function UnpublishConfirmModal({
 
 export function Me() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const [showRevoked, setShowRevoked] = useState(false)
   // Re-entrancy lock on confirmUnpublish: the button is `disabled={busy}`
   // but a double-tap on a slow device can fire onClick twice before React
   // commits the `unpublishBusy: true` write. The ref blocks the second
@@ -519,6 +623,38 @@ export function Me() {
     document.title = 'Your account · spool.pro'
     load()
   }, [load])
+
+  async function onToggleVisibility(row: MeShareRow): Promise<{ ok: boolean; reason?: string }> {
+    const next = row.visibility === 'profile-listed' ? 'unlisted' as const : 'profile-listed' as const
+    const r = await setShareVisibility(row.id, next)
+    if (r.kind === 'ok') {
+      setState((s) => {
+        if (s.kind !== 'ok') return s
+        return {
+          ...s,
+          shares: s.shares.map((x) => (x.id === row.id ? { ...x, visibility: next } : x)),
+        }
+      })
+      return { ok: true }
+    }
+    if (r.kind === 'unauthenticated') {
+      window.location.assign('/sign-in?next=/me')
+      return { ok: true } // navigating away; don't paint an error first
+    }
+    if (r.kind === 'needs-handle') {
+      return { ok: false, reason: 'Claim a handle first — listing needs a profile page.' }
+    }
+    if (r.kind === 'forbidden') {
+      return { ok: false, reason: 'Your account is pending deletion — cancel it first.' }
+    }
+    if (r.kind === 'rate-limited') {
+      return { ok: false, reason: 'Too many changes — wait a minute.' }
+    }
+    if (r.kind === 'gone' || r.kind === 'not-found') {
+      return { ok: false, reason: 'Share not found (already unpublished?).' }
+    }
+    return { ok: false, reason: 'Could not change visibility — try again.' }
+  }
 
   async function onUnpublish(id: string): Promise<{ ok: boolean; reason?: string }> {
     const r = await revokeShare(id)
@@ -611,6 +747,12 @@ export function Me() {
   const { me, shares } = state
   const pendingUntil = me.deletion_pending_until
   const pending = pendingUntil !== null
+  // Live shares stay flat (server order: published_at desc); revoked
+  // history collapses into its own section, newest revoke first.
+  const liveShares = shares.filter((s) => s.revoked_at === null)
+  const revokedShares = shares
+    .filter((s) => s.revoked_at !== null)
+    .sort((a, b) => (b.revoked_at ?? 0) - (a.revoked_at ?? 0))
 
   function openDelete() {
     setState((s) => (s.kind === 'ok' ? { ...s, deleteOpen: true } : s))
@@ -735,25 +877,66 @@ export function Me() {
           <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
           <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
             Your shares
-            {!pending && shares.length > 0 && <span className="count">{shares.length}</span>}
+            {!pending && liveShares.length > 0 && <span className="count">{liveShares.length}</span>}
           </h2>
           {pending ? (
             <p className="sw-empty">
               Hidden while deletion is pending. Cancel deletion to restore the list.
             </p>
-          ) : shares.length === 0 ? (
-            <p className="sw-empty">You haven’t published anything yet.</p>
           ) : (
-            <ul className="sw-list">
-              {shares.map((row) => (
-                <ShareRow
-                  key={row.id}
-                  row={row}
-                  disabled={pending}
-                  onUnpublishRequest={requestUnpublish}
-                />
-              ))}
-            </ul>
+            <>
+              {liveShares.length === 0 && revokedShares.length === 0 ? (
+                <p className="sw-empty">You haven’t published anything yet.</p>
+              ) : (
+                liveShares.length > 0 && (
+                  <ul className="sw-list">
+                    {liveShares.map((row) => (
+                      <ShareRow
+                        key={row.id}
+                        row={row}
+                        disabled={pending}
+                        hasHandle={me.handle !== null}
+                        onUnpublishRequest={requestUnpublish}
+                        onToggleVisibility={onToggleVisibility}
+                      />
+                    ))}
+                  </ul>
+                )
+              )}
+              {/* Revoked shares are history records: collapsed by default
+               *  (they accumulate forever — only account deletion purges
+               *  them) and display-only, mirroring the desktop Published
+               *  tab. The section only exists when there's history. */}
+              {revokedShares.length > 0 && (
+                <div className="sw-collapse">
+                  <button
+                    type="button"
+                    className="sw-collapse-head"
+                    onClick={() => setShowRevoked((v) => !v)}
+                    aria-expanded={showRevoked}
+                  >
+                    <span>Unpublished · {revokedShares.length}</span>
+                    <span className={`sw-collapse-chev${showRevoked ? ' open' : ''}`} aria-hidden>
+                      <Icon name="arrow-right" size={11} />
+                    </span>
+                  </button>
+                  {showRevoked && (
+                    <ul className="sw-list">
+                      {revokedShares.map((row) => (
+                        <ShareRow
+                          key={row.id}
+                          row={row}
+                          disabled={pending}
+                          hasHandle={me.handle !== null}
+                          onUnpublishRequest={requestUnpublish}
+                          onToggleVisibility={onToggleVisibility}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <p className="sw-signed-in-as">

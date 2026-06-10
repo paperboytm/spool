@@ -146,6 +146,7 @@ type IconName =
   | 'sun'
   | 'moon'
   | 'google'
+  | 'more-h'
 
 export function Icon({
   name,
@@ -173,6 +174,16 @@ export function Icon({
           <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
           <path d="M9.5 2.5H13.5V6.5" />
           <path d="M13 3L7.5 8.5" />
+        </svg>
+      )
+    case 'more-h':
+      // Horizontal ellipsis — the row-actions menu trigger. Filled dots
+      // (not stroked circles) so it reads at 14px.
+      return (
+        <svg {...common} stroke="none" fill="currentColor">
+          <circle cx="3.5" cy="8" r="1.3" />
+          <circle cx="8" cy="8" r="1.3" />
+          <circle cx="12.5" cy="8" r="1.3" />
         </svg>
       )
     case 'link':

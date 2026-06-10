@@ -458,7 +458,9 @@ html[data-theme='dark'] .sw-root {
  * as siblings, so their own onClick wins. */
 .sw-share {
   display: flex;
-  align-items: center;
+  /* Top-aligned so the ⋯ trigger pins to the title's first line
+   * (desktop parity) instead of centering against title+meta. */
+  align-items: flex-start;
   gap: 10px;
   padding: 4px 12px;
   margin: 0 -12px;
@@ -506,9 +508,6 @@ html[data-theme='dark'] .sw-root {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sw-share:hover .sw-share-title {
-  color: var(--accent);
-}
 .sw-share-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -540,12 +539,140 @@ html[data-theme='dark'] .sw-root {
   color: var(--muted);
   white-space: nowrap;
 }
-.sw-share-actions {
+/* Row-actions ⋯ menu — mirrors the desktop Published row: a quiet
+ * borderless trigger (not the bordered sw-icon-btn), hover-revealed,
+ * pinned while its menu is open. Touch devices have no hover, so the
+ * trigger is always visible there. */
+.sw-rowmenu-trigger {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex: 0 0 auto;
+}
+/* One step darker than the row's own hover (card-2), mirroring the
+ * desktop surface → surface2 ladder — card-2 on card-2 was invisible. */
+.sw-rowmenu-trigger:hover,
+.sw-rowmenu-trigger[aria-expanded='true'] {
+  background: var(--border);
+  color: var(--text);
+}
+.sw-rowmenu {
+  position: relative;
+  flex: 0 0 auto;
+  /* Optically center the 24px trigger on the title's first line: the
+   * anchor carries 12px top padding and the 15.5px/1.35 title line is
+   * ~21px tall → 12 + (21 − 24) / 2 ≈ 10px. */
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sw-share:hover .sw-rowmenu,
+.sw-share:focus-within .sw-rowmenu,
+.sw-rowmenu:has([aria-expanded='true']) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sw-rowmenu {
+    opacity: 1;
+  }
+}
+.sw-rowmenu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  width: max-content;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  z-index: 30;
+}
+.sw-rowmenu-item {
   display: flex;
   align-items: center;
+  gap: 8px;
+  width: 100%;
+  white-space: nowrap;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.sw-rowmenu-item svg {
+  color: var(--muted);
+}
+.sw-rowmenu-item:hover {
+  background: var(--card-2);
+}
+.sw-rowmenu-item.danger:hover {
+  background: var(--err-soft);
+  color: var(--err);
+}
+.sw-rowmenu-item.danger:hover svg,
+.sw-rowmenu-item.ok svg {
+  color: inherit;
+}
+.sw-rowmenu-item.ok {
+  color: var(--ok);
+}
+.sw-rowmenu-item:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.sw-rowmenu-err {
+  margin: 4px 6px 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--err);
+}
+
+/* Collapsed history section — mirrors the desktop Published tab's
+ * "Unpublished · N" header: quiet mono label, chevron rotates open. */
+.sw-collapse {
+  margin-top: 6px;
+}
+.sw-collapse-head {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
-  padding: 8px 0;
+  padding: 8px 0 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  transition: color 0.12s;
+}
+.sw-collapse-head:hover {
+  color: var(--text);
+}
+.sw-collapse-chev {
+  display: inline-flex;
+  opacity: 0.5;
+  transition: transform 0.15s, opacity 0.12s;
+}
+.sw-collapse-head:hover .sw-collapse-chev {
+  opacity: 1;
+}
+.sw-collapse-chev.open {
+  transform: rotate(90deg);
 }
 
 /* compact icon buttons */
@@ -589,28 +716,6 @@ html[data-theme='dark'] .sw-root {
   border-color: color-mix(in srgb, var(--err) 55%, transparent);
   color: var(--err);
   background: var(--err-soft);
-}
-
-/* visibility / status pills */
-.sw-pill {
-  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 5px;
-  border: 1px solid var(--border-strong);
-  color: var(--muted);
-}
-.sw-pill.listed {
-  color: var(--accent);
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-}
-.sw-pill.revoked {
-  color: var(--err);
-  border-color: color-mix(in srgb, var(--err) 40%, transparent);
 }
 
 /* ── Handle claim ───────────────────────────────────────────── */
@@ -1241,10 +1346,6 @@ html[data-theme='dark'] .sw-modal-overlay {
   .sw-share {
     flex-wrap: wrap;
     gap: 10px;
-  }
-  .sw-share-actions {
-    width: 100%;
-    justify-content: flex-end;
   }
   .reader-canvas {
     padding: 24px 12px 0;
