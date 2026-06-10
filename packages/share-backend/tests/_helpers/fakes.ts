@@ -201,6 +201,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
           return (row ? ({ revoked_at: row.revoked_at } as T) : null)
         }
+        if (/^SELECT visibility, revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
+          const [id, uid] = params
+          const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
+          return (row ? ({ visibility: row.visibility, revoked_at: row.revoked_at } as T) : null)
+        }
         if (/^SELECT 1 FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
           const [id, uid] = params
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
@@ -424,6 +429,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const [revoked_at, id] = params as [number, string]
           const s = state.published_shares.find((x) => x.id === id)
           if (s) s.revoked_at = revoked_at
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (/^UPDATE published_shares SET visibility=\? WHERE id=\?/i.test(sql)) {
+          const [visibility, id] = params as [string, string]
+          const s = state.published_shares.find((x) => x.id === id)
+          if (s) s.visibility = visibility
           return { success: true, meta: { changes: 1 } }
         }
         if (/^UPDATE published_shares SET revoked_at=\? WHERE user_id=\? AND revoked_at IS NULL/i.test(sql)) {
