@@ -60,6 +60,8 @@ import type {
   HandleCheckResponse,
   HandleClaimResponse,
   ScheduleDeleteResponse,
+  SetVisibilityResult,
+  Visibility,
 } from '../shared/share-publish.js'
 
 export interface AgentInfo {
@@ -399,6 +401,8 @@ const spoolShare = {
     ipcRenderer.invoke('share-publish:publish', body),
   revoke: (id: string): Promise<{ ok: true }> =>
     ipcRenderer.invoke('share-publish:revoke', id),
+  setVisibility: (id: string, visibility: Visibility): Promise<SetVisibilityResult> =>
+    ipcRenderer.invoke('share-publish:set-visibility', id, visibility),
   myShares: (): Promise<MySharesResponse> =>
     ipcRenderer.invoke('share-publish:my-shares'),
   claimHandle: (handle: string): Promise<HandleClaimResponse> =>

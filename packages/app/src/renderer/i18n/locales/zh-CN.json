@@ -506,6 +506,11 @@
       "row_open_aria": "打开 {{title}}",
       "section_unpublished": "已取消发布",
       "action_copyLink": "复制链接",
+      "action_listOnProfile": "在个人主页展示",
+      "action_unlistFromProfile": "从个人主页移除",
+      "visibilityListedToast": "已在个人主页展示",
+      "visibilityUnlistedToast": "已从个人主页移除",
+      "visibilityError": "无法更改可见性",
       "action_unpublish": "取消发布",
       "action_unpublishing": "取消发布中"
     }

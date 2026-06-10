@@ -506,6 +506,11 @@
       "row_open_aria": "{{title}} を開く",
       "section_unpublished": "公開停止",
       "action_copyLink": "リンクをコピー",
+      "action_listOnProfile": "プロフィールに掲載",
+      "action_unlistFromProfile": "プロフィールから外す",
+      "visibilityListedToast": "プロフィールに掲載しました",
+      "visibilityUnlistedToast": "プロフィールから外しました",
+      "visibilityError": "公開範囲を変更できませんでした",
       "action_unpublish": "公開を取り消す",
       "action_unpublishing": "取り消し中"
     }

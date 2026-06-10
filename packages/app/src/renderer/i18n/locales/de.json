@@ -535,6 +535,11 @@
       "row_open_aria": "{{title}} öffnen",
       "section_unpublished": "Zurückgezogen",
       "action_copyLink": "Link kopieren",
+      "action_listOnProfile": "Auf Profil listen",
+      "action_unlistFromProfile": "Vom Profil entfernen",
+      "visibilityListedToast": "Auf deinem Profil gelistet",
+      "visibilityUnlistedToast": "Von deinem Profil entfernt",
+      "visibilityError": "Sichtbarkeit konnte nicht geändert werden",
       "action_unpublish": "Zurückziehen",
       "action_unpublishing": "Ziehe zurück"
     }

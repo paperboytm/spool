@@ -506,6 +506,11 @@
       "row_open_aria": "{{title}} 열기",
       "section_unpublished": "게시 취소됨",
       "action_copyLink": "링크 복사",
+      "action_listOnProfile": "프로필에 게시",
+      "action_unlistFromProfile": "프로필에서 제거",
+      "visibilityListedToast": "프로필에 게시했습니다",
+      "visibilityUnlistedToast": "프로필에서 제거했습니다",
+      "visibilityError": "공개 범위를 변경하지 못했습니다",
       "action_unpublish": "게시 취소",
       "action_unpublishing": "취소 중"
     }

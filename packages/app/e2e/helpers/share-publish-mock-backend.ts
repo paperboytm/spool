@@ -314,6 +314,26 @@ async function routeRequest(
     })
   }
 
+  // PATCH /api/me/shares/:id — visibility change. Mirrors the real
+  // handler's gates: 404 unknown, 410 revoked, 422 bad value or
+  // profile-listed without a handle.
+  const visMatch = method === 'PATCH' && url.pathname.match(/^\/api\/me\/shares\/([\w-]+)$/)
+  if (visMatch) {
+    const id = visMatch[1] as string
+    const row = state.shares.get(id)
+    if (!row) return json(res, 404, { detail: 'not found' })
+    if (row.revoked_at !== null) return json(res, 410, { detail: 'gone' })
+    const body = JSON.parse(await readBody(req)) as { visibility?: string }
+    if (body.visibility !== 'unlisted' && body.visibility !== 'profile-listed') {
+      return json(res, 422, { detail: 'invalid visibility' })
+    }
+    if (body.visibility === 'profile-listed' && !state.user.handle) {
+      return json(res, 422, { detail: 'profile-listed requires a handle' })
+    }
+    state.shares.set(id, { ...row, visibility: body.visibility })
+    return json(res, 200, { ok: true, visibility: body.visibility })
+  }
+
   // POST /api/revoke/:id
   const revokeMatch = method === 'POST' && url.pathname.match(/^\/api\/revoke\/([\w-]+)$/)
   if (revokeMatch) {

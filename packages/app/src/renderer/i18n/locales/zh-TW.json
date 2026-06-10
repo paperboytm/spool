@@ -506,6 +506,11 @@
       "row_open_aria": "開啟 {{title}}",
       "section_unpublished": "已取消發布",
       "action_copyLink": "複製連結",
+      "action_listOnProfile": "在個人主頁展示",
+      "action_unlistFromProfile": "從個人主頁移除",
+      "visibilityListedToast": "已在個人主頁展示",
+      "visibilityUnlistedToast": "已從個人主頁移除",
+      "visibilityError": "無法變更可見性",
       "action_unpublish": "取消發布",
       "action_unpublishing": "取消發布中"
     }

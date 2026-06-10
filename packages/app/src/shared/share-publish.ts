@@ -115,6 +115,13 @@ export type PublishResult =
     }
   | { ok: false; status: number; error: PublishErrorBody }
 
+/** Result of PATCH /api/me/shares/:id — listing state is metadata, so
+ *  errors come back as data (the renderer shows a toast) instead of a
+ *  thrown IPC error. */
+export type SetVisibilityResult =
+  | { ok: true; visibility: Visibility }
+  | { ok: false; status: number; error: PublishErrorBody }
+
 export interface MyShare {
   id: string
   title: string

@@ -535,6 +535,11 @@
       "row_open_aria": "Ouvrir {{title}}",
       "section_unpublished": "Dépubliés",
       "action_copyLink": "Copier le lien",
+      "action_listOnProfile": "Afficher sur le profil",
+      "action_unlistFromProfile": "Retirer du profil",
+      "visibilityListedToast": "Affiché sur votre profil",
+      "visibilityUnlistedToast": "Retiré de votre profil",
+      "visibilityError": "Impossible de modifier la visibilité",
       "action_unpublish": "Dépublier",
       "action_unpublishing": "Dépublication"
     }

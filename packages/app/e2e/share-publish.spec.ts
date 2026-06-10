@@ -285,12 +285,50 @@ test('Published tab lists a live share with open/copy/unpublish affordances', as
   await expect(
     window.getByRole('menuitem', { name: en.shares.publishedTab.action_unpublish }),
   ).toBeVisible()
+  // No handle on the mock user → no "List on profile" item (the server
+  // would 422 it; the menu doesn't offer what can't succeed).
+  await expect(
+    window.getByRole('menuitem', { name: en.shares.publishedTab.action_listOnProfile }),
+  ).toHaveCount(0)
   await window.keyboard.press('Escape')
   // Live row — no stale banner, no revoked styling.
   await expect(row).not.toHaveAttribute('data-revoked', '')
   await expect(
     window.locator('[data-testid="published-stale-banner"]'),
   ).toBeHidden()
+})
+
+test('Row menu lists a share on the profile and back', async () => {
+  const { window } = ctx
+  // Handle must exist before sign-in so /api/me carries it — listing
+  // is gated on it at both the menu and the backend.
+  mock.state.user.handle = 'e2e-user'
+  await signInAndPublish(window)
+
+  await window.keyboard.press('Escape')
+  await window.locator('[data-testid="share-editor-back"]').click()
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-published"]').click()
+
+  const row = window.locator('[data-testid="published-row"]')
+  await expect(row).toBeVisible({ timeout: 5_000 })
+  // Starts link-only.
+  await expect(row.getByLabel(en.shares.publishedTab.vis_unlisted)).toBeVisible()
+
+  // List it.
+  await row.hover()
+  await row.getByLabel(en.common.moreActions).click()
+  await window.getByRole('menuitem', { name: en.shares.publishedTab.action_listOnProfile }).click()
+  await expect(row.getByLabel(en.shares.publishedTab.vis_listed)).toBeVisible({ timeout: 5_000 })
+  const [share] = Array.from(mock.state.shares.values())
+  expect(share!.visibility).toBe('profile-listed')
+
+  // And back.
+  await row.hover()
+  await row.getByLabel(en.common.moreActions).click()
+  await window.getByRole('menuitem', { name: en.shares.publishedTab.action_unlistFromProfile }).click()
+  await expect(row.getByLabel(en.shares.publishedTab.vis_unlisted)).toBeVisible({ timeout: 5_000 })
+  expect(Array.from(mock.state.shares.values())[0]!.visibility).toBe('unlisted')
 })
 
 test('Revoked shares collapse into the Unpublished section, display-only', async () => {

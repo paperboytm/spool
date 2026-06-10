@@ -361,6 +361,36 @@ function PublishedList() {
     window.open(sharePublicUrl(it.id), '_blank', 'noopener,noreferrer')
   }
 
+  // List/unlist toggle. Reuses `busyId` so the row shows the trigger
+  // spinner and other rows' destructive controls lock, same as revoke.
+  // refresh() reconciles the cache; noteLocalMutation() keeps a racing
+  // focus-refresh from stomping the change in between.
+  const onToggleVisibility = async (it: PublishedShareCacheItem) => {
+    if (busyId) return
+    const next = it.visibility === 'profile-listed' ? 'unlisted' as const : 'profile-listed' as const
+    setBusyId(it.id)
+    noteLocalMutation()
+    try {
+      const res = await window.spoolShare.setVisibility(it.id, next)
+      if (!res.ok) {
+        toast.error(
+          t('shares.publishedTab.visibilityError'),
+          res.error.detail ? { description: res.error.detail } : undefined,
+        )
+        return
+      }
+      toast.success(next === 'profile-listed'
+        ? t('shares.publishedTab.visibilityListedToast')
+        : t('shares.publishedTab.visibilityUnlistedToast'))
+      await refresh()
+    } catch (err) {
+      console.error('Set visibility failed:', err)
+      toast.error(t('shares.publishedTab.visibilityError'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const requestUnpublish = (it: PublishedShareCacheItem) => {
     // Don't open a second confirm while one is in flight. The button
     // is also visually disabled across all rows when `busyId !== null`,
@@ -415,8 +445,13 @@ function PublishedList() {
               // the spinner via `busy`; other locked rows just appear
               // disabled.
               locked={busyId !== null && busyId !== it.id}
+              // Listing requires a live handle (the server enforces the
+              // same gate); unlisting is always allowed, so an
+              // already-listed share keeps its toggle regardless.
+              canList={user?.handle != null}
               onCopy={() => void onCopy(it)}
               onView={() => onView(it)}
+              onToggleVisibility={() => void onToggleVisibility(it)}
               onUnpublish={() => requestUnpublish(it)}
             />
           ))}
@@ -533,8 +568,10 @@ function PublishedRow({
   item,
   busy,
   locked = false,
+  canList,
   onCopy,
   onView,
+  onToggleVisibility,
   onUnpublish,
 }: {
   item: PublishedShareCacheItem
@@ -544,11 +581,16 @@ function PublishedRow({
    *  no-op behind the modal. The active row uses `busy` instead and
    *  shows its own spinner. */
   locked?: boolean
+  /** Whether "List on profile" is offered — requires a live handle.
+   *  Unlisting an already-listed share is offered regardless. */
+  canList: boolean
   onCopy: () => void
   onView: () => void
+  onToggleVisibility: () => void
   onUnpublish: () => void
 }) {
   const { t } = useTranslation()
+  const listed = item.visibility === 'profile-listed'
   const title = item.title || t('common.untitled')
   const publishedLabel = rowDateLabel(item.published_at)
   const expiresLabel = item.expires_at !== null
@@ -564,14 +606,14 @@ function PublishedRow({
   return (
     <li
       data-testid="published-row"
-      className="group flex items-center gap-3 rounded-[7px] pr-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75"
+      className="group flex items-start gap-3 rounded-[7px] pr-3 py-2.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75"
     >
       <button
         type="button"
         data-testid="published-row-open"
         onClick={onView}
         aria-label={t('shares.publishedTab.row_open_aria', { title })}
-        className="flex-1 min-w-0 text-left pl-3 py-2.5 cursor-default focus:outline-none"
+        className="flex-1 min-w-0 text-left pl-3 cursor-default focus:outline-none"
       >
         <span
           title={title}
@@ -580,7 +622,7 @@ function PublishedRow({
           {title}
         </span>
         <span className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
-          <VisIcon listed={item.visibility === 'profile-listed'} />
+          <VisIcon listed={listed} />
           <span>{t('shares.publishedTab.publishedOn', { when: publishedLabel })}</span>
           {expiresLabel && (
             <>
@@ -595,11 +637,14 @@ function PublishedRow({
        *  hover-reveal, and open-menu persistence all mirror SessionRow.
        *  The destructive Unpublish still escalates to its confirm
        *  modal. */}
+      {/* `items-start` + `-mt-0.5` pins the trigger to the title's first
+       *  line instead of the row's vertical center — same optical
+       *  alignment as SessionRow's action group. */}
       <span
         className={
           busy
-            ? 'flex-none opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'
-            : 'flex-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity'
+            ? 'flex-none -mt-0.5 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'
+            : 'flex-none -mt-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity'
         }
       >
         <Menu
@@ -625,6 +670,19 @@ function PublishedRow({
               icon: <LinkIcon size={14} strokeWidth={1.6} aria-hidden />,
               onSelect: onCopy,
             },
+            // Icon previews the TARGET state (globe = will appear on
+            // the profile, link-2 = will go link-only), matching the
+            // meta-line glyph the row lands on after the toggle.
+            ...(listed || canList ? [{
+              label: listed
+                ? t('shares.publishedTab.action_unlistFromProfile')
+                : t('shares.publishedTab.action_listOnProfile'),
+              icon: listed
+                ? <Link2 size={14} strokeWidth={1.6} aria-hidden />
+                : <Globe size={14} strokeWidth={1.6} aria-hidden />,
+              onSelect: onToggleVisibility,
+              disabled: busy || locked,
+            }] : []),
             {
               label: busy
                 ? t('shares.publishedTab.action_unpublishing')

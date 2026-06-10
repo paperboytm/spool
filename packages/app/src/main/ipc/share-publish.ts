@@ -17,6 +17,8 @@ import type {
   HandleCheckResponse,
   HandleClaimResponse,
   ScheduleDeleteResponse,
+  SetVisibilityResult,
+  Visibility,
 } from '../../shared/share-publish.js'
 
 async function readBody(res: Response): Promise<Record<string, unknown>> {
@@ -97,6 +99,28 @@ export function registerSharePublishIpc(): void {
     }
     return { ok: true }
   })
+
+  ipcMain.handle(
+    'share-publish:set-visibility',
+    async (_e, id: string, visibility: Visibility): Promise<SetVisibilityResult> => {
+      const r = await authedFetch(`/api/me/shares/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ visibility }),
+      })
+      const json = await readBody(r)
+      if (!r.ok) {
+        const error: PublishErrorBody = {
+          error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
+        }
+        if (typeof json['detail'] === 'string') error.detail = json['detail'] as string
+        return { ok: false, status: r.status, error }
+      }
+      // No local cache write here — the renderer follows up with a
+      // myShares refresh (guarded by its mutation generation), which
+      // reconciles the cache through the normal replaceAll path.
+      return { ok: true, visibility }
+    },
+  )
 
   ipcMain.handle(
     'share-publish:get-published-by-draft',
