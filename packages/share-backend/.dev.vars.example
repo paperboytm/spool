@@ -25,9 +25,18 @@
 #   reading the `users` row from the local D1 sqlite file; paste it back
 #   here and restart wrangler dev to admin yourself.
 
+# PUBLIC_BASE_URL
+#   The origin OAuth start/callback bake into the redirect_uri sent to
+#   Google. In dev this MUST be the share-web vite server (the /api/*
+#   proxy origin), not wrangler's own :8788 — and it must match the
+#   redirect URI registered on the web OAuth client, or every web
+#   sign-in 400s with redirect_uri_mismatch. Unset in prod (defaults
+#   to https://spool.pro).
+
 GOOGLE_CLIENT_ID_DESKTOP=
 GOOGLE_CLIENT_ID_WEB=
 GOOGLE_CLIENT_SECRET_WEB=
 SESSION_SIGNING_KEY=
 ABUSE_NOTIFY_EMAIL=dev@localhost
 ADMIN_USER_IDS=
+PUBLIC_BASE_URL=http://localhost:3002
