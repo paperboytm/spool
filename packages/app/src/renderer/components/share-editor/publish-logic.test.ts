@@ -3,7 +3,6 @@ import { hashValueForRedactExclude } from '@spool-lab/redact'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
 
 import {
-  computeExpiresAt,
   computeUnredactedMatches,
   truncatePreview,
 } from './publish-logic.js'
@@ -132,26 +131,6 @@ describe('computeUnredactedMatches', () => {
     const r = computeUnredactedMatches(c, opts({ redact: false }))
     const m = r.high.find((x) => x.kind === 'api-key')!
     expect(m.turn_index).toBe(1)
-  })
-})
-
-describe('computeExpiresAt', () => {
-  const NOW = Date.UTC(2026, 0, 1, 0, 0, 0) // 2026-01-01T00:00:00Z
-
-  it('returns undefined for "never"', () => {
-    expect(computeExpiresAt({ kind: 'never' }, NOW)).toBeUndefined()
-  })
-
-  it('returns now + 7 days for "7d"', () => {
-    expect(computeExpiresAt({ kind: '7d' }, NOW)).toBe('2026-01-08T00:00:00.000Z')
-  })
-
-  it('returns now + 30 days for "30d"', () => {
-    expect(computeExpiresAt({ kind: '30d' }, NOW)).toBe('2026-01-31T00:00:00.000Z')
-  })
-
-  it('returns now + 90 days for "90d"', () => {
-    expect(computeExpiresAt({ kind: '90d' }, NOW)).toBe('2026-04-01T00:00:00.000Z')
   })
 })
 

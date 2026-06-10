@@ -52,7 +52,6 @@ interface MetaForOg {
   // KV; we just render without a custom OG title in that case.
   title: string | null
   visibility?: string
-  expires_at?: number | null
   version?: number
 }
 

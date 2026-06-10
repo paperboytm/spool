@@ -15,11 +15,7 @@ import {
   Send,
 } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
-import {
-  computeExpiresAt,
-  computeUnredactedMatches,
-  type ExpiryOption,
-} from '../publish-logic.js'
+import { computeUnredactedMatches } from '../publish-logic.js'
 import { buildSnapshotFromEditor } from '../snapshot-adapter.js'
 import { ConnectCard } from '../ConnectCard.js'
 import { useShareAuth } from '../../../hooks/useShareAuth.js'
@@ -62,12 +58,10 @@ const HIGH_ROW_LIMIT = 6
  *   1. authLoading            → tiny skeleton
  *   2. !user (signed out)     → ConnectCard
  *   3. published              → manage view (URL, copy, view, republish, unpublish)
- *   4. draft + signed in      → publish form (visibility / expiry / PII / submit)
+ *   4. draft + signed in      → publish form (visibility / PII / submit)
  *
  * Errors (401 / 429 / network) render inline above the footer with a
- * "Try again" button. Custom expiry validation is wired through the
- * same `validateCustomExpiry` helper as before — past timestamps lock
- * the Publish button and surface a red hint.
+ * "Try again" button.
  */
 export function PublishTab({
   draftId,
@@ -82,7 +76,6 @@ export function PublishTab({
   const { t } = useTranslation()
   const { user, loading: authLoading, refresh: refreshAuth } = useShareAuth()
   const [visibility, setVisibility] = useState<Visibility>('unlisted')
-  const [expires, setExpires] = useState<ExpiryOption>('never')
   const [publishing, setPublishing] = useState(false)
   // Synchronous mutex against double-submit. React only flips the
   // disabled prop on the next render, so a rapid double-click on
@@ -130,22 +123,19 @@ export function PublishTab({
         conversation: pending.conversation,
         opts: pending.opts,
       })
-      const expires_at = computeExpiresAt({ kind: expires })
       // Deterministic key — a dropped-response retry of this exact
       // intent will hash to the same token and the backend will
       // short-circuit to the original slug. Any edit to the snapshot
-      // body / visibility / expiry produces a fresh key.
+      // body / visibility produces a fresh key.
       const idempotency_key = await computePublishIdempotencyKey({
         snapshot,
         visibility,
-        expires_at: expires_at ?? null,
       })
       const res = await window.spoolShare.publish({
         snapshot,
         visibility,
         draft_id: draftId,
         idempotency_key,
-        ...(expires_at !== undefined && { expires_at }),
         ...(published?.id !== undefined && { override_slug: published.id }),
       })
       if (!res.ok) {
@@ -279,35 +269,6 @@ export function PublishTab({
             onSelect={() => setVisibility('profile-listed')}
           />
         </div>
-      </fieldset>
-
-      {/* Expires — fixed presets only. Custom date picker dropped on
-       *  purpose:
-       *   - GitHub gists, Notion, Linear, Figma, Google Docs, Slack:
-       *     no expiry at all (revoke only).
-       *   - Dropbox, Loom, Vercel: fixed presets (7/30/90 days), no
-       *     custom date.
-       *  Nobody in the industry offers a datetime-local picker for
-       *  share-link expiry — the UI is heavy, the value proposition
-       *  is low (users don't pick "5:42pm on March 14"), and the
-       *  preview was clashing visually with the Spool aesthetic. If
-       *  a real ask for arbitrary dates lands later, reintroduce as
-       *  a date-only picker (no time component). */}
-      <fieldset disabled={publishing} className="px-4 pb-3">
-        <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
-          {t('shareEditor.publishTab.expires_legend')}
-        </legend>
-        <select
-          value={expires}
-          onChange={(e) => setExpires(e.target.value as ExpiryOption)}
-          data-testid="share-menu-expires"
-          className="mt-2 w-full h-8 px-2.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-[12px] text-warm-text dark:text-dark-text focus:outline-none focus:ring-1 focus:ring-accent dark:focus:ring-accent-dark"
-        >
-          <option value="never">{t('shareEditor.publishTab.expires_never')}</option>
-          <option value="7d">{t('shareEditor.publishTab.expires_7d')}</option>
-          <option value="30d">{t('shareEditor.publishTab.expires_30d')}</option>
-          <option value="90d">{t('shareEditor.publishTab.expires_90d')}</option>
-        </select>
       </fieldset>
 
       {error && (

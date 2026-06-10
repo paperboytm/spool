@@ -219,7 +219,6 @@ export default function ShareEditorPage({
             version: r.version,
             published_at: r.published_at,
             revoked_at: r.revoked_at,
-            expires_at: r.expires_at,
             draft_id: r.draft_id,
             client_request_id: r.client_request_id,
             updated_at: now,
@@ -295,10 +294,14 @@ export default function ShareEditorPage({
   // would actually push a new version (rather than short-circuit to
   // the existing one via the backend idempotency guard).
   //
-  // We hash with the row's existing visibility + expires_at so the
-  // comparison isolates content drift — visibility / expiry changes
-  // are explicit user actions in the publish form and will trigger
-  // their own re-hash on submit.
+  // We hash with the row's existing visibility so the comparison
+  // isolates content drift — a visibility change is an explicit user
+  // action in the publish form and triggers its own re-hash on submit.
+  //
+  // Legacy rows published with an expiry hashed the expiry into their
+  // token; the expiry feature is gone, so those rows show the badge
+  // once and the next republish normalises the token. Harmless, and
+  // limited to pre-removal dogfood data.
   //
   // Legacy rows with no `client_request_id` (pre-v0.5.0 publishes
   // that never landed the column) get no badge: we have nothing to
@@ -316,9 +319,6 @@ export default function ShareEditorPage({
     }
     let alive = true
     const rowVisibility = publishedRow.visibility as Visibility
-    const rowExpiresIso = publishedRow.expires_at
-      ? new Date(publishedRow.expires_at).toISOString()
-      : null
     const rowHash = publishedRow.client_request_id
     void (async () => {
       try {
@@ -329,7 +329,6 @@ export default function ShareEditorPage({
         const key = await computePublishIdempotencyKey({
           snapshot,
           visibility: rowVisibility,
-          expires_at: rowExpiresIso,
         })
         if (!alive) return
         setHasUnpublishedEdits(key !== rowHash)

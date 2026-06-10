@@ -31,15 +31,10 @@ describe('decideSnapshotState', () => {
     expect(r).toEqual({ kind: 'gone', reason: 'revoked', at: 1700000000000 })
   })
 
-  it('410 expired → gone/expired', () => {
-    const r = decideSnapshotState(410, { expired: true, at: 1700000000000 })
-    expect(r).toEqual({ kind: 'gone', reason: 'expired', at: 1700000000000 })
-  })
-
-  it('410 with empty body → gone/expired (safer default)', () => {
+  it('410 with empty body → gone/revoked (revoke is the only tombstone)', () => {
     const r = decideSnapshotState(410, null)
     expect(r.kind).toBe('gone')
-    if (r.kind === 'gone') expect(r.reason).toBe('expired')
+    if (r.kind === 'gone') expect(r.reason).toBe('revoked')
   })
 
   it('404 → not-found', () => {

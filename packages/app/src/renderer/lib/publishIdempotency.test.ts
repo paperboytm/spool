@@ -57,32 +57,25 @@ describe('computePublishIdempotencyKey', () => {
     expect(a).not.toBe(b)
   })
 
-  it('differs when expires_at changes', async () => {
-    const a = await computePublishIdempotencyKey({
+  it('keeps the frozen expires_at:null in the canonical form (legacy hash compatibility)', async () => {
+    // The expiry feature was removed, but every pre-removal "Never"
+    // publish hashed a canonical object that contained expires_at:null.
+    // The canonical form must keep that key frozen — dropping it would
+    // silently re-key every existing share, breaking the republish
+    // short-circuit and the editor's drift badge. This pins the exact
+    // bytes that feed the hash.
+    const canonical = stableStringify({
       snapshot: snap(),
       visibility: 'unlisted',
       expires_at: null,
     })
-    const b = await computePublishIdempotencyKey({
-      snapshot: snap(),
-      visibility: 'unlisted',
-      expires_at: '2026-12-01T00:00:00.000Z',
-    })
-    expect(a).not.toBe(b)
-  })
-
-  it('treats undefined expires_at and null expires_at as identical', async () => {
-    // "user picked Never" (undefined in some code paths) and the
-    // canonical "no expiry" (null) should not split into different
-    // keys — otherwise an unrelated normalisation shift in the
-    // publish path silently breaks the idempotency guarantee.
-    const a = await computePublishIdempotencyKey({ snapshot: snap(), visibility: 'unlisted' })
-    const b = await computePublishIdempotencyKey({
-      snapshot: snap(),
-      visibility: 'unlisted',
-      expires_at: null,
-    })
-    expect(a).toBe(b)
+    const bytes = new TextEncoder().encode(canonical)
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    const expected = [...new Uint8Array(digest)]
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+    const key = await computePublishIdempotencyKey({ snapshot: snap(), visibility: 'unlisted' })
+    expect(key).toBe(expected)
   })
 
   it('differs when the snapshot body changes', async () => {

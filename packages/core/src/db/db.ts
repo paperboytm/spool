@@ -714,7 +714,6 @@ export function runMigrations(db: Database.Database): void {
         version            INTEGER NOT NULL DEFAULT 1,
         published_at       INTEGER NOT NULL,
         revoked_at         INTEGER,
-        expires_at         INTEGER,
         draft_id           TEXT,
         client_request_id  TEXT,
         updated_at         INTEGER NOT NULL

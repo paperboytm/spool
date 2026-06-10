@@ -1,11 +1,11 @@
-// Shown for revoked, expired, and not-found shares. Distinct copy per
+// Shown for revoked and not-found shares. Distinct copy per
 // reason — users land here from a real link, so saying "this share was
 // taken down" is more honest than a generic 404.
 
 import { Footer, Header, Page } from '../components/Chrome'
 import { humanDateTime } from '../lib/dates'
 
-export type TombstoneReason = 'revoked' | 'expired' | 'not-found'
+export type TombstoneReason = 'revoked' | 'not-found'
 
 interface Props {
   reason: TombstoneReason
@@ -21,13 +21,6 @@ const COPY: Record<
     title: 'This share is no longer available',
     body: 'The author has unpublished it.',
     metaLabel: 'Removed',
-    tone: 'err',
-  },
-  expired: {
-    eyebrow: 'Share expired',
-    title: 'This share has expired',
-    body: 'The author set an expiration that has now passed.',
-    metaLabel: 'Expired',
     tone: 'err',
   },
   'not-found': {

@@ -51,11 +51,9 @@ export function registerSharePublishIpc(): void {
     // Write the new (or refreshed) row into the local cache so the
     // editor's on-mount draft lookup and the Shares list reflect this
     // publish without waiting for the next /api/me/shares poll.
-    // visibility / expires_at come straight from the request, title
-    // from the snapshot — the backend echoes none of these in the
-    // publish response.
+    // visibility comes straight from the request, title from the
+    // snapshot — the backend echoes neither in the publish response.
     const now = Date.now()
-    const expiresMs = body.expires_at ? Date.parse(body.expires_at) : null
     const item: PublishedShareCacheItem = {
       id,
       title: body.snapshot.conversation.title,
@@ -63,7 +61,6 @@ export function registerSharePublishIpc(): void {
       version,
       published_at: now,
       revoked_at: null,
-      expires_at: Number.isFinite(expiresMs as number) ? (expiresMs as number) : null,
       draft_id: body.draft_id,
       client_request_id: body.idempotency_key,
       updated_at: now,

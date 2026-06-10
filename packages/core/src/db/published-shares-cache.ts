@@ -16,14 +16,13 @@ export interface PublishedShareCacheItem {
   version: number
   published_at: number
   revoked_at: number | null
-  expires_at: number | null
   draft_id: string | null
   client_request_id: string | null
   updated_at: number
 }
 
 const COLS =
-  'id, title, visibility, version, published_at, revoked_at, expires_at, draft_id, client_request_id, updated_at'
+  'id, title, visibility, version, published_at, revoked_at, draft_id, client_request_id, updated_at'
 
 /** Returns all cached published shares ordered by publish date desc. */
 export function listAll(db: Database.Database): PublishedShareCacheItem[] {
@@ -60,14 +59,13 @@ export function upsertMany(
 ): void {
   const stmt = db.prepare(
     `INSERT INTO published_shares_cache (${COLS})
-     VALUES (@id, @title, @visibility, @version, @published_at, @revoked_at, @expires_at, @draft_id, @client_request_id, @updated_at)
+     VALUES (@id, @title, @visibility, @version, @published_at, @revoked_at, @draft_id, @client_request_id, @updated_at)
      ON CONFLICT(id) DO UPDATE SET
        title             = excluded.title,
        visibility        = excluded.visibility,
        version           = excluded.version,
        published_at      = excluded.published_at,
        revoked_at        = excluded.revoked_at,
-       expires_at        = excluded.expires_at,
        draft_id          = excluded.draft_id,
        client_request_id = excluded.client_request_id,
        updated_at        = excluded.updated_at`,
@@ -86,7 +84,7 @@ export function replaceAll(
     db.prepare('DELETE FROM published_shares_cache').run()
     const stmt = db.prepare(
       `INSERT INTO published_shares_cache (${COLS})
-       VALUES (@id, @title, @visibility, @version, @published_at, @revoked_at, @expires_at, @draft_id, @client_request_id, @updated_at)`,
+       VALUES (@id, @title, @visibility, @version, @published_at, @revoked_at, @draft_id, @client_request_id, @updated_at)`,
     )
     for (const it of items) stmt.run(it)
   })()

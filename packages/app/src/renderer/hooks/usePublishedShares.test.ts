@@ -6,7 +6,6 @@ const remote = (over: Partial<MyShare> = {}): MyShare => ({
   id: 'abc',
   title: 'Hello',
   visibility: 'unlisted',
-  expires_at: null,
   version: 1,
   published_at: 1000,
   republished_at: null,
@@ -26,7 +25,6 @@ describe('toCacheItem', () => {
       version: 1,
       published_at: 1000,
       revoked_at: null,
-      expires_at: null,
       draft_id: null,
       client_request_id: null,
       updated_at: 12345,
@@ -38,10 +36,9 @@ describe('toCacheItem', () => {
     expect(item.client_request_id).toBe('abcdef0123456789')
   })
 
-  it('passes through revoked_at and expires_at when present', () => {
-    const item = toCacheItem(remote({ revoked_at: 5000, expires_at: 9000 }), 1)
+  it('passes through revoked_at when present', () => {
+    const item = toCacheItem(remote({ revoked_at: 5000 }), 1)
     expect(item.revoked_at).toBe(5000)
-    expect(item.expires_at).toBe(9000)
   })
 
   it('passes through draft_id when present', () => {

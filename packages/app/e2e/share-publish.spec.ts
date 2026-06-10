@@ -11,7 +11,7 @@
 //     e2e-mode entry is dead-code-eliminated from production bundles
 //     and an invariant test (e2e-mode/e2e-mode-clean.test.ts) keeps
 //     it that way.
-//   - The signed-in publish form: visibility radios, expiry select,
+//   - The signed-in publish form: visibility radios,
 //     Publish button, the spinner during in-flight publish
 //   - The post-publish manage view: URL string with copy-link, the
 //     Unpublish action + the dedicated confirm modal (regression for

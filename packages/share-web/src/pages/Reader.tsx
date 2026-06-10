@@ -54,7 +54,7 @@ class SnapshotErrorBoundary extends Component<
 type State =
   | { kind: 'loading' }
   | { kind: 'ok'; snapshot: Snapshot }
-  | { kind: 'gone'; reason: 'revoked' | 'expired'; at: number }
+  | { kind: 'gone'; reason: 'revoked'; at: number }
   | { kind: 'not-found' }
   | { kind: 'error' }
 

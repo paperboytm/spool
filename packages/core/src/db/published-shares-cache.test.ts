@@ -26,7 +26,6 @@ function row(over: Partial<PublishedShareCacheItem> & { id: string }): Published
     version: 1,
     published_at: 0,
     revoked_at: null,
-    expires_at: null,
     draft_id: null,
     client_request_id: null,
     updated_at: 0,
@@ -45,7 +44,6 @@ describe('published_shares_cache schema (v15)', () => {
     expect(byName.get('visibility')?.notnull).toBe(1)
     expect(byName.get('published_at')?.notnull).toBe(1)
     expect(byName.get('revoked_at')?.notnull).toBe(0)
-    expect(byName.get('expires_at')?.notnull).toBe(0)
     expect(byName.get('draft_id')?.type.toUpperCase()).toBe('TEXT')
     expect(byName.get('draft_id')?.notnull).toBe(0)
   })
@@ -69,13 +67,12 @@ describe('published_shares_cache schema (v15)', () => {
     const { db, mod } = await load()
     mod.upsertMany(db, [
       row({ id: 'a', title: 'A', published_at: 100, updated_at: 100 }),
-      row({ id: 'b', title: 'B', visibility: 'profile-listed', published_at: 200, expires_at: 500, updated_at: 200 }),
+      row({ id: 'b', title: 'B', visibility: 'profile-listed', published_at: 200, updated_at: 200 }),
       row({ id: 'c', title: 'C', version: 2, published_at: 150, revoked_at: 175, updated_at: 200 }),
     ])
     const rows = mod.listAll(db)
     expect(rows.map((r) => r.id)).toEqual(['b', 'c', 'a'])
     expect(rows[1]?.revoked_at).toBe(175)
-    expect(rows[0]?.expires_at).toBe(500)
   })
 
   it('upsertMany updates existing rows in place', async () => {

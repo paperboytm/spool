@@ -61,7 +61,6 @@ export interface MockShareRow {
   id: string
   title: string
   visibility: 'unlisted' | 'profile-listed'
-  expires_at: number | null
   version: number
   published_at: number
   republished_at: number | null
@@ -201,7 +200,6 @@ async function routeRequest(
       id: s.id,
       title: s.title,
       visibility: s.visibility,
-      expires_at: s.expires_at,
       version: s.version,
       published_at: s.published_at,
       republished_at: s.republished_at,
@@ -236,7 +234,7 @@ async function routeRequest(
   }
 
   // POST /api/publish — body { snapshot, visibility, draft_id,
-  // idempotency_key, expires_at?, override_slug? }
+  // idempotency_key, override_slug? }
   if (method === 'POST' && url.pathname === '/api/publish') {
     if (state.failures.publish !== null) {
       // errors.ts-shaped body; the renderer branches on status alone
@@ -253,7 +251,6 @@ async function routeRequest(
     const idemp = body.idempotency_key
     const visibility = body.visibility
     const title = body.snapshot?.conversation?.title ?? 'Untitled'
-    const expiresAt = body.expires_at ? new Date(body.expires_at).getTime() : null
 
     // Idempotency short-circuit: if a non-revoked share carries the
     // same token, return that result without mutating state.
@@ -285,7 +282,6 @@ async function routeRequest(
         ...existing,
         title,
         visibility,
-        expires_at: expiresAt,
         version,
         republished_at: Date.now(),
         draft_id: draftId,
@@ -298,7 +294,6 @@ async function routeRequest(
         id: slug,
         title,
         visibility,
-        expires_at: expiresAt,
         version,
         published_at: Date.now(),
         republished_at: null,
@@ -368,7 +363,6 @@ interface PublishBody {
   visibility: 'unlisted' | 'profile-listed'
   draft_id?: string
   idempotency_key: string
-  expires_at?: string
   override_slug?: string
 }
 

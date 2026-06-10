@@ -14,7 +14,6 @@ export function toCacheItem(remote: MyShare, now: number = Date.now()): Publishe
     version: remote.version,
     published_at: remote.published_at,
     revoked_at: remote.revoked_at,
-    expires_at: remote.expires_at,
     draft_id: remote.draft_id,
     client_request_id: remote.client_request_id,
     updated_at: now,

@@ -59,13 +59,12 @@ export interface PublishRequestBody {
    *  snapshots. Required for all v0.5.0+ clients. */
   draft_id: string
   /** Idempotency token derived from the publish payload (snapshot +
-   *  visibility + expires_at). Retrying the same intent after a
-   *  dropped response reuses the same token, and the backend
-   *  short-circuits to the prior result instead of creating a
-   *  duplicate share. A re-edited intent produces a different hash,
-   *  so the backend treats it as a fresh publish. */
+   *  visibility). Retrying the same intent after a dropped response
+   *  reuses the same token, and the backend short-circuits to the
+   *  prior result instead of creating a duplicate share. A re-edited
+   *  intent produces a different hash, so the backend treats it as a
+   *  fresh publish. */
   idempotency_key: string
-  expires_at?: string
   /** When set, the backend overwrites the existing share at this slug
    *  (republish path). The slug, user, and draft_id must all match. */
   override_slug?: string
@@ -96,7 +95,6 @@ export interface PublishedRow {
   version: number
   published_at: number
   revoked_at: number | null
-  expires_at: number | null
   draft_id: string | null
   client_request_id: string | null
   updated_at: number
@@ -126,7 +124,6 @@ export interface MyShare {
   id: string
   title: string
   visibility: Visibility
-  expires_at: number | null
   version: number
   published_at: number
   republished_at: number | null

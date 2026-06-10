@@ -593,9 +593,6 @@ function PublishedRow({
   const listed = item.visibility === 'profile-listed'
   const title = item.title || t('common.untitled')
   const publishedLabel = rowDateLabel(item.published_at)
-  const expiresLabel = item.expires_at !== null
-    ? rowDateLabel(item.expires_at)
-    : null
 
   // Hover / action behavior mirrors SessionRow exactly: row hover is
   // warm-surface (one step, so the trigger's own surface2 hover still
@@ -624,12 +621,6 @@ function PublishedRow({
         <span className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
           <VisIcon listed={listed} />
           <span>{t('shares.publishedTab.publishedOn', { when: publishedLabel })}</span>
-          {expiresLabel && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{t('shares.publishedTab.meta_expires', { when: expiresLabel })}</span>
-            </>
-          )}
         </span>
       </button>
       {/* Row actions live in a single ⋯ menu — two bare hover icons read

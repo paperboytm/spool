@@ -203,7 +203,6 @@ function ShareRow({
 }) {
   const [copied, setCopied] = useState(false)
   const revoked = row.revoked_at !== null
-  const expiry = row.expires_at !== null ? humanDate(row.expires_at) : null
   const listed = row.visibility === 'profile-listed'
 
   async function copy() {
@@ -247,12 +246,6 @@ function ShareRow({
             <Icon name={listed ? 'globe' : 'link-2'} size={12} />
           </span>
           <span>published {humanDate(row.published_at)}</span>
-          {expiry && (
-            <>
-              <span className="dot-sep">·</span>
-              <span>expires {expiry}</span>
-            </>
-          )}
           {revoked && (
             <>
               <span className="dot-sep">·</span>

@@ -116,34 +116,3 @@ export function computeUnredactedMatches(
   })
   return { high, medium }
 }
-
-export type ExpiryOption = 'never' | '7d' | '30d' | '90d'
-
-const DAY_MS = 86_400_000
-
-/**
- * Resolve a fixed expiry preset to the absolute ISO timestamp the
- * backend expects, or undefined for "never". `now` is injectable for
- * deterministic tests.
- *
- * No custom date picker: GitHub gists, Notion, Linear, Figma, Google
- * Docs, Slack offer no expiry at all (revoke only); Dropbox, Loom,
- * Vercel use fixed presets. None offer arbitrary datetimes for
- * share-link expiry. If product wants more granularity later, switch
- * to a date-only picker — never a datetime-local.
- */
-export function computeExpiresAt(
-  args: { kind: ExpiryOption },
-  now: number = Date.now(),
-): string | undefined {
-  switch (args.kind) {
-    case 'never':
-      return undefined
-    case '7d':
-      return new Date(now + 7 * DAY_MS).toISOString()
-    case '30d':
-      return new Date(now + 30 * DAY_MS).toISOString()
-    case '90d':
-      return new Date(now + 90 * DAY_MS).toISOString()
-  }
-}

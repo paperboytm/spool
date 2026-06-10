@@ -9,13 +9,12 @@ import { clearCachedMe, writeCachedMe } from './me-cache'
 
 export type SnapshotFetchResult =
   | { kind: 'ok'; snapshot: Snapshot }
-  | { kind: 'gone'; reason: 'revoked' | 'expired'; at: number }
+  | { kind: 'gone'; reason: 'revoked'; at: number }
   | { kind: 'not-found' }
   | { kind: 'error' }
 
 interface TombstoneBody {
   revoked?: true
-  expired?: true
   at?: number
 }
 
@@ -29,8 +28,9 @@ export function decideSnapshotState(
   if (status === 410) {
     const b = (body && typeof body === 'object' ? body : {}) as TombstoneBody
     const at = typeof b.at === 'number' ? b.at : Date.now()
-    if (b.revoked) return { kind: 'gone', reason: 'revoked', at }
-    return { kind: 'gone', reason: 'expired', at }
+    // Revoke is the only tombstone the backend produces (the expiry
+    // feature was removed), so any 410 reads as revoked.
+    return { kind: 'gone', reason: 'revoked', at }
   }
   if (status === 404) return { kind: 'not-found' }
   return { kind: 'error' }
@@ -170,7 +170,6 @@ export interface MeShareRow {
   id: string
   title: string
   visibility: 'unlisted' | 'profile-listed'
-  expires_at: number | null
   version: number
   published_at: number
   republished_at: number | null
