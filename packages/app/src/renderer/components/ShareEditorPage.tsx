@@ -609,6 +609,7 @@ export default function ShareEditorPage({
     <div className="flex-1 min-w-0 flex items-center gap-2 px-3">
       <button
         type="button"
+        data-testid="share-editor-back"
         onClick={onBack}
         aria-label={t('common.back')}
         title={t('common.back')}

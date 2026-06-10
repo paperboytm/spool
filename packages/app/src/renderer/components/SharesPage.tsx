@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ExternalLink, EyeOff, Link as LinkIcon, Loader2, Newspaper, Plus, Trash2 } from 'lucide-react'
+import { CloudOff, EyeOff, Globe, Link as LinkIcon, Link2, Loader2, MoreHorizontal, Newspaper, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getMonthDayFormatter } from '../../shared/formatDate.js'
 import { useShareDrafts } from '../hooks/useShareDrafts'
@@ -8,8 +8,9 @@ import { useShareAuth } from '../hooks/useShareAuth.js'
 import { usePublishedShares } from '../hooks/usePublishedShares.js'
 import { useSharePublish } from '../featureFlags.js'
 import { useSpoolDrop } from '../hooks/useSpoolDrop.js'
-import { sharePublicOrigin, sharePublicUrl } from '../lib/sharePublicUrl.js'
+import { sharePublicUrl } from '../lib/sharePublicUrl.js'
 import { FeaturedEmptyState, SmallEmptyState } from './EmptyState.js'
+import Menu from './Menu.js'
 import NewDraftPicker from './NewDraftPicker.js'
 import { UnpublishConfirmModal } from './share-editor/UnpublishConfirmModal.js'
 import type { PublishedShareCacheItem, ShareDraftListItem } from '@spool-lab/core'
@@ -90,7 +91,7 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
       {isDragActive && <SpoolDropOverlay />}
       <div className="flex-none flex items-center gap-3 px-6 pt-1.5 pb-3">
         {publishEnabled ? (
-          <SharesTabStrip tab={tab} onTab={setTab} draftsCount={drafts.length} />
+          <SharesTabStrip tab={tab} onTab={setTab} />
         ) : (
           // sharePublish off: no tab strip, just a single "Drafts" label
           // in the same visual slot — matches the pre-publish baseline so
@@ -144,15 +145,13 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
 function SharesTabStrip({
   tab,
   onTab,
-  draftsCount,
 }: {
   tab: SharesTab
   onTab: (next: SharesTab) => void
-  draftsCount: number
 }) {
   const { t } = useTranslation()
-  const items: Array<{ id: SharesTab; label: string; count?: number }> = [
-    { id: 'drafts', label: t('shares.tab_drafts'), count: draftsCount },
+  const items: Array<{ id: SharesTab; label: string }> = [
+    { id: 'drafts', label: t('shares.tab_drafts') },
     { id: 'published', label: t('shares.tab_published') },
   ]
   return (
@@ -173,7 +172,6 @@ function SharesTabStrip({
             }`}
           >
             <span>{it.label}</span>
-            {typeof it.count === 'number' && it.count > 0 && <span>· {it.count}</span>}
           </button>
         )
       })}
@@ -184,8 +182,9 @@ function SharesTabStrip({
 function PublishedList() {
   const { t } = useTranslation()
   const { user, loading: authLoading, signIn } = useShareAuth()
-  const { items, loading, refresh, noteLocalMutation } = usePublishedShares()
+  const { items, loading, stale, refresh, noteLocalMutation } = usePublishedShares()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   // Confirmation state for the Unpublish action. Mirrors the Share
   // popover's UnpublishConfirmModal so a single click on the row's
   // Unpublish icon can't tombstone the share without a deliberate
@@ -195,6 +194,16 @@ function PublishedList() {
   // `items`.
   const [pendingUnpublish, setPendingUnpublish] = useState<PublishedShareCacheItem | null>(null)
   const [confirmError, setConfirmError] = useState<string | null>(null)
+  // Revoked shares accumulate forever (the backend keeps every revoked
+  // row; only account deletion purges them), so they'd eventually
+  // drown the live list. They live in a collapsed history section.
+  const [showRevoked, setShowRevoked] = useState(false)
+  const liveItems = useMemo(() => items
+    .filter((it) => it.revoked_at === null)
+    .sort((a, b) => b.published_at - a.published_at), [items])
+  const revokedItems = useMemo(() => items
+    .filter((it) => it.revoked_at !== null)
+    .sort((a, b) => (b.revoked_at ?? 0) - (a.revoked_at ?? 0)), [items])
 
   // Re-fetch the published list when this window regains focus — picks up
   // remote revocations (user opened spool.pro/me on the web and revoked)
@@ -291,13 +300,51 @@ function PublishedList() {
     )
   }
 
+  // Stale banner — the last remote fetch failed, so the rows below are
+  // the local cache and may be behind the backend (e.g. a revoke done
+  // on spool.pro/me). A persistent inline strip, not a toast: the
+  // condition persists until a refresh succeeds, and the focus-driven
+  // refresh would re-toast on every window switch.
+  const handleRetry = async () => {
+    if (retrying) return
+    setRetrying(true)
+    try {
+      await refresh()
+    } finally {
+      setRetrying(false)
+    }
+  }
+  const staleBanner = stale ? (
+    <div
+      data-testid="published-stale-banner"
+      role="status"
+      className="mx-3 mb-2 flex items-center gap-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3 py-2 text-[11.5px] text-warm-muted dark:text-dark-muted"
+    >
+      <CloudOff size={16} strokeWidth={1.6} className="flex-none" aria-hidden />
+      <span className="flex-1">{t('shares.publishedTab.stale_banner')}</span>
+      <button
+        type="button"
+        data-testid="published-stale-retry"
+        onClick={() => void handleRetry()}
+        disabled={retrying}
+        className="flex-none inline-flex items-center gap-1 font-medium text-accent dark:text-accent-dark hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+      >
+        {retrying && <Loader2 size={11} strokeWidth={1.8} className="animate-spin" aria-hidden />}
+        {t('shares.publishedTab.stale_retry')}
+      </button>
+    </div>
+  ) : null
+
   if (items.length === 0) {
     return (
-      <FeaturedEmptyState
-        icon={<Newspaper size={22} strokeWidth={1.5} />}
-        title={t('shares.publishedTab.empty_title')}
-        hint={t('shares.publishedTab.empty_hint')}
-      />
+      <>
+        {staleBanner}
+        <FeaturedEmptyState
+          icon={<Newspaper size={22} strokeWidth={1.5} />}
+          title={t('shares.publishedTab.empty_title')}
+          hint={t('shares.publishedTab.empty_hint')}
+        />
+      </>
     )
   }
 
@@ -354,24 +401,59 @@ function PublishedList() {
 
   return (
     <>
-      <ul data-testid="published-list" className="flex flex-col gap-1 px-3 pb-6">
-        {items.map((it) => (
-          <PublishedRow
-            key={it.id}
-            item={it}
-            busy={busyId === it.id}
-            // Lock every row's Unpublish button while any revoke is in
-            // flight, so clicking row B during row A's confirm/revoke
-            // can't silently no-op. The row that's actually busy gets
-            // the spinner via `busy`; other locked rows just appear
-            // disabled.
-            locked={busyId !== null && busyId !== it.id}
-            onCopy={() => void onCopy(it)}
-            onView={() => onView(it)}
-            onUnpublish={() => requestUnpublish(it)}
-          />
-        ))}
-      </ul>
+      {staleBanner}
+      {liveItems.length > 0 && (
+        <ul data-testid="published-list" className="flex flex-col gap-1 px-3 pb-3">
+          {liveItems.map((it) => (
+            <PublishedRow
+              key={it.id}
+              item={it}
+              busy={busyId === it.id}
+              // Lock every row's Unpublish button while any revoke is in
+              // flight, so clicking row B during row A's confirm/revoke
+              // can't silently no-op. The row that's actually busy gets
+              // the spinner via `busy`; other locked rows just appear
+              // disabled.
+              locked={busyId !== null && busyId !== it.id}
+              onCopy={() => void onCopy(it)}
+              onView={() => onView(it)}
+              onUnpublish={() => requestUnpublish(it)}
+            />
+          ))}
+        </ul>
+      )}
+      {revokedItems.length > 0 && (
+        <div className="px-3 pb-6">
+          {/* Same collapsed-section affordance as the session list's
+           *  Pinned header (VirtualSessionList SectionHeader). */}
+          <button
+            type="button"
+            data-testid="published-unpublished-toggle"
+            onClick={() => setShowRevoked((v) => !v)}
+            aria-expanded={showRevoked}
+            className="group w-full flex items-center gap-1.5 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
+          >
+            <span>{t('shares.publishedTab.section_unpublished')} · {revokedItems.length}</span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+              className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${showRevoked ? 'rotate-90' : ''}`}
+            >
+              <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {showRevoked && (
+            <ul data-testid="published-revoked-list" className="flex flex-col gap-1">
+              {revokedItems.map((it) => (
+                <RevokedRow key={it.id} item={it} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <UnpublishConfirmModal
         open={pendingUnpublish !== null}
         title={pendingUnpublish?.title || t('common.untitled')}
@@ -385,6 +467,65 @@ function PublishedList() {
         onConfirm={() => void confirmUnpublish()}
       />
     </>
+  )
+}
+
+/** Dates on Published rows follow the app's UI language (set on
+ *  `<html lang>`), not the OS locale — same convention as
+ *  `formatRelative` below. */
+function rowDateLabel(ts: number): string {
+  const locale = typeof document !== 'undefined' && document.documentElement.lang
+    ? document.documentElement.lang
+    : undefined
+  return new Date(ts).toLocaleDateString(locale)
+}
+
+function VisIcon({ listed }: { listed: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <span
+      className="inline-flex flex-none"
+      title={listed
+        ? t('shares.publishedTab.vis_listed_tip')
+        : t('shares.publishedTab.vis_unlisted_tip')}
+      aria-label={listed
+        ? t('shares.publishedTab.vis_listed')
+        : t('shares.publishedTab.vis_unlisted')}
+    >
+      {/* `link-2` (straight-edge chain) so it doesn't collide with the
+       *  copy-link action's curvy `link` icon — same glyph pairing as
+       *  the web row. */}
+      {listed
+        ? <Globe size={12} strokeWidth={1.6} aria-hidden />
+        : <Link2 size={12} strokeWidth={1.6} aria-hidden />}
+    </span>
+  )
+}
+
+/** Revoked rows are history records, nothing more: the slug is
+ *  permanently 410 (R2 content deleted on revoke), so Copy link would
+ *  hand out a dead URL and Open would land on a tombstone. No click
+ *  affordances at all; the collapsed "Unpublished" section header
+ *  carries the state, so no per-row pill either. */
+function RevokedRow({ item }: { item: PublishedShareCacheItem }) {
+  const { t } = useTranslation()
+  const title = item.title || t('common.untitled')
+  return (
+    <li
+      data-testid="published-row"
+      data-revoked=""
+      className="flex items-center gap-3 rounded-[7px] pr-3 opacity-55"
+    >
+      <div className="flex-1 min-w-0 pl-3 py-2.5">
+        <span title={title} className="block text-[14px] font-medium text-warm-text dark:text-dark-text truncate">
+          {title}
+        </span>
+        <span className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
+          <VisIcon listed={item.visibility === 'profile-listed'} />
+          <span>{t('shares.publishedTab.publishedOn', { when: rowDateLabel(item.published_at) })}</span>
+        </span>
+      </div>
+    </li>
   )
 }
 
@@ -408,92 +549,94 @@ function PublishedRow({
   onUnpublish: () => void
 }) {
   const { t } = useTranslation()
-  const revoked = item.revoked_at !== null
-  // "Soon" means within 7 days — flagging a year-from-now expiry as
-  // "expiring soon" defeats the badge's purpose. The Expires row in
-  // the UI still appears via this guard, so renamed to reflect the
-  // narrow window.
-  const EXPIRE_SOON_MS = 7 * 24 * 60 * 60 * 1000
-  const expiresSoon = item.expires_at !== null
-    && item.expires_at > Date.now()
-    && item.expires_at - Date.now() < EXPIRE_SOON_MS
-  const publishedLabel = new Date(item.published_at).toLocaleDateString()
+  const title = item.title || t('common.untitled')
+  const publishedLabel = rowDateLabel(item.published_at)
+  const expiresLabel = item.expires_at !== null
+    ? rowDateLabel(item.expires_at)
+    : null
+
+  // Hover / action behavior mirrors SessionRow exactly: row hover is
+  // warm-surface (one step, so the trigger's own surface2 hover still
+  // reads on top of it), the ⋯ is hover-revealed and pinned visible
+  // while its menu is open via `group-has-[[aria-expanded=true]]`, and
+  // the cursor stays default. Visibility is an icon-only glyph with a
+  // tooltip in the meta line — same pairing as the share-web /me row.
   return (
     <li
       data-testid="published-row"
-      data-revoked={revoked ? '' : undefined}
-      className={`group flex items-center gap-3 rounded-[7px] px-3 py-2.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors ${
-        revoked ? 'opacity-55' : ''
-      }`}
+      className="group flex items-center gap-3 rounded-[7px] pr-3 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors duration-75"
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[14px] font-medium text-warm-text dark:text-dark-text truncate">
-            {item.title || t('common.untitled')}
-          </span>
-          {revoked && (
-            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-faint dark:text-dark-muted">
-              {t('shares.publishedTab.badge_revoked')}
-            </span>
-          )}
-          {item.visibility === 'profile-listed' && !revoked && (
-            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-accent-bg dark:bg-[#2A1800] text-accent dark:text-accent-dark">
-              {t('shares.publishedTab.badge_listed')}
-            </span>
-          )}
-          {expiresSoon && !revoked && (
-            <span className="inline-flex items-center px-1.5 h-4 rounded-[3px] text-[9px] font-medium uppercase tracking-[0.06em] bg-warm-surface2 dark:bg-dark-surface2 text-warm-muted dark:text-dark-muted">
-              {t('shares.publishedTab.badge_expires', { when: new Date(item.expires_at as number).toLocaleDateString() })}
-            </span>
-          )}
-        </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
-          <span className="font-mono">{sharePublicOrigin().replace(/^https?:\/\//, '')}/s/{item.id}</span>
-          <span aria-hidden>·</span>
+      <button
+        type="button"
+        data-testid="published-row-open"
+        onClick={onView}
+        aria-label={t('shares.publishedTab.row_open_aria', { title })}
+        className="flex-1 min-w-0 text-left pl-3 py-2.5 cursor-default focus:outline-none"
+      >
+        <span
+          title={title}
+          className="block text-[14px] font-medium text-warm-text dark:text-dark-text truncate"
+        >
+          {title}
+        </span>
+        <span className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
+          <VisIcon listed={item.visibility === 'profile-listed'} />
           <span>{t('shares.publishedTab.publishedOn', { when: publishedLabel })}</span>
-        </div>
-      </div>
-      {/* Action icons always visible — matches the share-web Me page
-       *  Published-row design. Hover-to-reveal was strictly tidier
-       *  but produced a "what can I do here?" gap that the web list
-       *  doesn't have. */}
-      <div className="flex-none flex items-center gap-0.5">
-        <RowAction label={t('shares.publishedTab.action_view')} onClick={onView}><ExternalLink size={13} strokeWidth={1.6} /></RowAction>
-        <RowAction label={t('shares.publishedTab.action_copyLink')} onClick={onCopy}><LinkIcon size={13} strokeWidth={1.6} /></RowAction>
-        {!revoked && (
-          <RowAction label={busy ? t('shares.publishedTab.action_unpublishing') : t('shares.publishedTab.action_unpublish')} onClick={onUnpublish} disabled={busy || locked}>
-            {busy
-              ? <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
-              : <EyeOff size={13} strokeWidth={1.6} />}
-          </RowAction>
-        )}
-      </div>
+          {expiresLabel && (
+            <>
+              <span aria-hidden>·</span>
+              <span>{t('shares.publishedTab.meta_expires', { when: expiresLabel })}</span>
+            </>
+          )}
+        </span>
+      </button>
+      {/* Row actions live in a single ⋯ menu — two bare hover icons read
+       *  as ambiguous chrome; the menu names each action. Trigger,
+       *  hover-reveal, and open-menu persistence all mirror SessionRow.
+       *  The destructive Unpublish still escalates to its confirm
+       *  modal. */}
+      <span
+        className={
+          busy
+            ? 'flex-none opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity'
+            : 'flex-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity'
+        }
+      >
+        <Menu
+          align="right"
+          trigger={({ open, toggle }) => (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggle}
+              aria-label={t('common.moreActions')}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+            >
+              {busy
+                ? <Loader2 size={13} strokeWidth={1.6} className="animate-spin" aria-hidden />
+                : <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />}
+            </button>
+          )}
+          items={[
+            {
+              label: t('shares.publishedTab.action_copyLink'),
+              icon: <LinkIcon size={14} strokeWidth={1.6} aria-hidden />,
+              onSelect: onCopy,
+            },
+            {
+              label: busy
+                ? t('shares.publishedTab.action_unpublishing')
+                : t('shares.publishedTab.action_unpublish'),
+              icon: <EyeOff size={14} strokeWidth={1.6} aria-hidden />,
+              onSelect: onUnpublish,
+              disabled: busy || locked,
+            },
+          ]}
+        />
+      </span>
     </li>
-  )
-}
-
-function RowAction({
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center justify-center w-7 h-7 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-    >
-      {children}
-    </button>
   )
 }
 

@@ -34,6 +34,12 @@ export function remoteToCacheItems(
 export interface UsePublishedSharesResult {
   items: PublishedShareCacheItem[]
   loading: boolean
+  /** True when the most recent remote fetch failed — `items` is the
+   *  cached view and may be behind the backend (a share revoked from
+   *  the web won't show as revoked here). Cleared by the next refresh
+   *  that succeeds. Drives the "showing cached data" banner so the
+   *  user can tell stale-but-rendered apart from fresh. */
+  stale: boolean
   refresh: () => Promise<void>
   /** Notify the hook that a local mutation (revoke, etc.) is about to
    *  happen. Increments a generation counter; an in-flight `refresh`
@@ -46,6 +52,7 @@ export interface UsePublishedSharesResult {
 export function usePublishedShares(): UsePublishedSharesResult {
   const [items, setItems] = useState<PublishedShareCacheItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [stale, setStale] = useState(false)
   const aliveRef = useRef(true)
   // Mutation generation — bumped by `noteLocalMutation()` and read by
   // `refresh()`. The Published tab triggers a refresh on focus events;
@@ -73,12 +80,23 @@ export function usePublishedShares(): UsePublishedSharesResult {
         return
       }
       setItems(merged)
-      await window.spoolShare.cachePublished(merged)
+      setStale(false)
+      try {
+        await window.spoolShare.cachePublished(merged)
+      } catch (err) {
+        // Cache write failure ≠ stale data — the in-memory view above
+        // IS fresh; only the next cold start pays for the miss. Don't
+        // raise the stale banner over it.
+        console.warn('[usePublishedShares] cache write failed:', err)
+      }
     } catch (err) {
       // Network / auth failure leaves the cached view intact — the
       // Published tab keeps showing stale rows rather than blanking out
-      // when the user is offline.
+      // when the user is offline. `stale` tells the surface to say so;
+      // silently rendering a cache that may miss remote revocations
+      // looked identical to fresh data.
       console.warn('[usePublishedShares] refresh failed:', err)
+      if (aliveRef.current) setStale(true)
     }
   }, [])
 
@@ -99,5 +117,5 @@ export function usePublishedShares(): UsePublishedSharesResult {
     }
   }, [refresh])
 
-  return { items, loading, refresh, noteLocalMutation }
+  return { items, loading, stale, refresh, noteLocalMutation }
 }
