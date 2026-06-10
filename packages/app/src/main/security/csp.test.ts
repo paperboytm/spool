@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { __cspFixtures } from './csp.js'
+import { __cspFixtures, buildCsp } from './csp.js'
 
 // We don't import installRendererCsp itself in tests — wiring it would
 // require an Electron `session` stub. The string fixtures cover the
@@ -138,6 +138,37 @@ describe('Renderer CSP policy', () => {
         const connect = directives(csp).get('connect-src') ?? []
         expect(connect).toContain('blob:')
       }
+    })
+  })
+
+  describe('SPOOL_SHARE_BACKEND override origin', () => {
+    // The env var swings every main-process API call to another host
+    // (staging, e2e mock, future domain move). The renderer's direct
+    // fetches — avatar <img> loads and api calls — must follow, or CSP
+    // silently blocks them while main works fine and the bug looks
+    // like a broken image with an empty network tab.
+    const origin = 'https://staging.example.dev'
+
+    for (const dev of [true, false]) {
+      const name = dev ? 'dev' : 'prod'
+      it(`${name}: override origin lands in connect-src and img-src`, () => {
+        const dirs = directives(buildCsp({ dev, backendOrigin: origin }))
+        expect(dirs.get('connect-src')).toContain(origin)
+        expect(dirs.get('img-src')).toContain(origin)
+      })
+    }
+
+    it('prod keeps the canonical spool.pro family alongside the override', () => {
+      // Published-share URLs and avatar links keep pointing at
+      // spool.pro even when the API origin is overridden.
+      const connect = directives(buildCsp({ dev: false, backendOrigin: origin })).get('connect-src') ?? []
+      expect(connect).toContain('https://spool.pro')
+      expect(connect).toContain('https://*.spool.pro')
+    })
+
+    it('no override produces the default fixtures exactly', () => {
+      expect(buildCsp({ dev: true })).toBe(DEV_CSP)
+      expect(buildCsp({ dev: false, backendOrigin: null })).toBe(PROD_CSP)
     })
   })
 

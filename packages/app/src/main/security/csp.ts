@@ -1,5 +1,7 @@
 import { session as electronSession } from 'electron'
 
+import { backendUrl, DEFAULT_BACKEND } from '../share/backend-url.js'
+
 /**
  * Inject a `Content-Security-Policy` response header on every renderer
  * response from the default session. Industry pattern (Linear / Notion
@@ -66,34 +68,63 @@ const OBJECT_ALLOW = "'self' blob: chrome-extension:"
 // fetch" and the save dialog never gets bytes.
 const CONNECT_BLOB = 'blob:'
 
-const DEV_CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  `img-src ${IMG_ALLOW_DEV}`,
-  `connect-src 'self' ${CONNECT_BLOB} http://localhost:8788 http://localhost:5173 ws://localhost:5173 ws://127.0.0.1:5173`,
-  `frame-src ${FRAME_ALLOW}`,
-  `object-src ${OBJECT_ALLOW}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-].join('; ')
+// `SPOOL_SHARE_BACKEND` redirects every main-process API call to a
+// different backend (staging, local mock, future domain move) — the
+// renderer's direct fetches (avatars in img-src, api calls in
+// connect-src) must follow the same override or they silently 404
+// behind CSP while main happily talks to the new host. The canonical
+// spool.pro family stays in the prod allow-list unconditionally:
+// published-share URLs and avatar links keep pointing there even when
+// the API origin is overridden.
+function overrideBackendOrigin(): string | null {
+  try {
+    // Compare normalized origins, not raw strings — an override of
+    // `https://spool.pro/` (trailing slash) is still the default and
+    // must not duplicate the origin in the policy.
+    const origin = new URL(backendUrl()).origin
+    return origin === new URL(DEFAULT_BACKEND).origin ? null : origin
+  } catch {
+    // Malformed override — main's fetches will fail loudly on their
+    // own; don't let CSP construction crash the app over it.
+    return null
+  }
+}
 
-const PROD_CSP = [
-  "default-src 'self'",
-  // Inline styles only — no inline scripts in the production bundle.
-  // `unsafe-eval` is required by `vite-plugin-react`'s dev fast-refresh
-  // but the prod build strips that out.
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  `img-src ${IMG_ALLOW_PROD}`,
-  `connect-src 'self' ${CONNECT_BLOB} https://spool.pro https://*.spool.pro`,
-  `frame-src ${FRAME_ALLOW}`,
-  `object-src ${OBJECT_ALLOW}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-].join('; ')
+export function buildCsp(opts: { dev: boolean; backendOrigin?: string | null }): string {
+  const extra = opts.backendOrigin ? ` ${opts.backendOrigin}` : ''
+  if (opts.dev) {
+    return [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self' data:",
+      `img-src ${IMG_ALLOW_DEV}${extra}`,
+      `connect-src 'self' ${CONNECT_BLOB} http://localhost:8788 http://localhost:5173 ws://localhost:5173 ws://127.0.0.1:5173${extra}`,
+      `frame-src ${FRAME_ALLOW}`,
+      `object-src ${OBJECT_ALLOW}`,
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+    ].join('; ')
+  }
+  return [
+    "default-src 'self'",
+    // Inline styles only — no inline scripts in the production bundle.
+    // `unsafe-eval` is required by `vite-plugin-react`'s dev fast-refresh
+    // but the prod build strips that out.
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    `img-src ${IMG_ALLOW_PROD}${extra}`,
+    `connect-src 'self' ${CONNECT_BLOB} https://spool.pro https://*.spool.pro${extra}`,
+    `frame-src ${FRAME_ALLOW}`,
+    `object-src ${OBJECT_ALLOW}`,
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+  ].join('; ')
+}
+
+const DEV_CSP = buildCsp({ dev: true })
+const PROD_CSP = buildCsp({ dev: false })
 
 export function installRendererCsp(opts: { dev: boolean }): void {
   // Diagnostic escape hatch: setting SPOOL_DISABLE_CSP=1 skips the
@@ -101,7 +132,7 @@ export function installRendererCsp(opts: { dev: boolean }): void {
   // surface. Kept inside the module rather than at the call site so a
   // future Labs toggle could flip it via the renderer too.
   if (process.env['SPOOL_DISABLE_CSP'] === '1') return
-  const policy = opts.dev ? DEV_CSP : PROD_CSP
+  const policy = buildCsp({ dev: opts.dev, backendOrigin: overrideBackendOrigin() })
   electronSession.defaultSession.webRequest.onHeadersReceived(
     (details, callback) => {
       // Only inject CSP into responses for the documents we actually
