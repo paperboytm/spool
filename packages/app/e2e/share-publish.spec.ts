@@ -46,7 +46,7 @@ import {
   startSharePublishMockBackend,
   type SharePublishMockHandle,
 } from './helpers/share-publish-mock-backend'
-import { openShareEditorFromSessionDetail } from './helpers/share'
+import { navigateToShares, openShareEditorFromSessionDetail } from './helpers/share'
 
 // Error-copy assertions read the expected strings from the same en.json
 // the renderer renders from — the selector discipline below bans
@@ -229,6 +229,100 @@ test('Publish with an expired session (401) shows the sign-in error', async () =
   await expect(error).toContainText(en.shareEditor.publishTab.error_sessionExpired)
   await expect(window.locator('[data-testid="share-menu-form"]')).toBeVisible()
   expect(mock.state.shares.size).toBe(0)
+})
+
+test('Published tab flags a failed refresh as stale and retry clears it', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  // Backend down before the tab ever loads — the list renders from the
+  // (empty) cache and must say so rather than silently looking fresh.
+  mock.state.failures.myShares = 500
+
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-published"]').click()
+  await window.locator('[data-testid="published-signin"]').click()
+
+  const banner = window.locator('[data-testid="published-stale-banner"]')
+  await expect(banner).toBeVisible({ timeout: 5_000 })
+
+  // Backend recovers → Retry clears the banner.
+  mock.state.failures.myShares = null
+  await window.locator('[data-testid="published-stale-retry"]').click()
+  await expect(banner).toBeHidden({ timeout: 5_000 })
+})
+
+test('Published tab lists a live share with open/copy/unpublish affordances', async () => {
+  const { window } = ctx
+  await signInAndPublish(window)
+
+  // Leave the share editor — the full-page editor covers the sidebar,
+  // so close the popover (Esc) and back out before navigating.
+  await window.keyboard.press('Escape')
+  await expect(
+    window.locator('[data-testid="share-menu-popover"]'),
+  ).toBeHidden()
+  await window.locator('[data-testid="share-editor-back"]').click()
+  await expect(
+    window.locator('[data-testid="share-editor-page"]'),
+  ).toBeHidden()
+
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-published"]').click()
+
+  const row = window.locator('[data-testid="published-row"]')
+  await expect(row).toBeVisible({ timeout: 5_000 })
+  // Whole-row open affordance (replaces the external-link icon action).
+  await expect(row.locator('[data-testid="published-row-open"]')).toBeVisible()
+  // Copy / Unpublish live in the row's ⋯ menu (portal-rendered, so the
+  // menuitems are located on the window, not inside the row). The
+  // trigger is hover-revealed like SessionRow's, so hover first.
+  await row.hover()
+  await row.getByLabel(en.common.moreActions).click()
+  await expect(
+    window.getByRole('menuitem', { name: en.shares.publishedTab.action_copyLink }),
+  ).toBeVisible()
+  await expect(
+    window.getByRole('menuitem', { name: en.shares.publishedTab.action_unpublish }),
+  ).toBeVisible()
+  await window.keyboard.press('Escape')
+  // Live row — no stale banner, no revoked styling.
+  await expect(row).not.toHaveAttribute('data-revoked', '')
+  await expect(
+    window.locator('[data-testid="published-stale-banner"]'),
+  ).toBeHidden()
+})
+
+test('Revoked shares collapse into the Unpublished section, display-only', async () => {
+  const { window } = ctx
+  await signInAndPublish(window)
+
+  // Unpublish via the popover, then leave the editor.
+  await window.locator('[data-testid="share-menu-unpublish"]').click()
+  await window.locator('[data-testid="unpublish-confirm-yes"]').click()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeHidden()
+  await window.keyboard.press('Escape')
+  await window.locator('[data-testid="share-editor-back"]').click()
+
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-published"]').click()
+
+  // No live rows → no live list; history sits behind the collapsed
+  // section header instead of mixing into the main list.
+  const toggle = window.locator('[data-testid="published-unpublished-toggle"]')
+  await expect(toggle).toBeVisible({ timeout: 10_000 })
+  await expect(toggle).toContainText(en.shares.publishedTab.section_unpublished)
+  await expect(window.locator('[data-testid="published-list"]')).toBeHidden()
+  await expect(window.locator('[data-testid="published-revoked-list"]')).toBeHidden()
+
+  await toggle.click()
+  const row = window.locator('[data-testid="published-revoked-list"] [data-testid="published-row"]')
+  await expect(row).toBeVisible()
+  await expect(row).toHaveAttribute('data-revoked', '')
+  // Display-only: no whole-row open button, no ⋯ menu (the slug is
+  // permanently 410 — Copy link would hand out a dead URL).
+  await expect(row.locator('[data-testid="published-row-open"]')).toHaveCount(0)
+  await expect(row.getByLabel(en.common.moreActions)).toHaveCount(0)
 })
 
 // ───────────────────────────────────────────────────────────────────
