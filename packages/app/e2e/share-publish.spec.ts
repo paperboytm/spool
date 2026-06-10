@@ -48,6 +48,13 @@ import {
 } from './helpers/share-publish-mock-backend'
 import { openShareEditorFromSessionDetail } from './helpers/share'
 
+// Error-copy assertions read the expected strings from the same en.json
+// the renderer renders from — the selector discipline below bans
+// hand-typed text matches, but "which of the three error variants
+// rendered?" is only observable through copy, so we source it from the
+// single source of truth instead of duplicating it here.
+import en from '../src/renderer/i18n/locales/en.json'
+
 const SESSION_UUID = 'test-session-uuid-001'
 
 let mock: SharePublishMockHandle
@@ -183,6 +190,45 @@ test('Cancel on the unpublish modal leaves the share live', async () => {
   const shares = Array.from(mock.state.shares.values())
   expect(shares).toHaveLength(1)
   expect(shares[0]!.revoked_at).toBeNull()
+})
+
+test('Publish rate-limit (429) shows the error inline and retry succeeds', async () => {
+  const { window } = ctx
+  await signInAndOpenPublishForm(window)
+
+  mock.state.failures.publish = 429
+  await window.locator('[data-testid="share-menu-submit"]').click()
+
+  const error = window.locator('[data-testid="share-menu-error"]')
+  await expect(error).toBeVisible({ timeout: 5_000 })
+  await expect(error).toContainText(en.shareEditor.publishTab.error_rateLimited)
+  // The form survives the failure — the user can adjust and retry
+  // without reopening the popover.
+  await expect(window.locator('[data-testid="share-menu-form"]')).toBeVisible()
+  await expect(window.locator('[data-testid="share-menu-submit"]')).toBeEnabled()
+  expect(mock.state.shares.size).toBe(0)
+
+  // Backend recovers → the same submit button retries to success.
+  mock.state.failures.publish = null
+  await window.locator('[data-testid="share-menu-submit"]').click()
+  await expect(
+    window.locator('[data-testid="share-menu-manage-view"]'),
+  ).toBeVisible({ timeout: 10_000 })
+  expect(mock.state.shares.size).toBe(1)
+})
+
+test('Publish with an expired session (401) shows the sign-in error', async () => {
+  const { window } = ctx
+  await signInAndOpenPublishForm(window)
+
+  mock.state.failures.publish = 401
+  await window.locator('[data-testid="share-menu-submit"]').click()
+
+  const error = window.locator('[data-testid="share-menu-error"]')
+  await expect(error).toBeVisible({ timeout: 5_000 })
+  await expect(error).toContainText(en.shareEditor.publishTab.error_sessionExpired)
+  await expect(window.locator('[data-testid="share-menu-form"]')).toBeVisible()
+  expect(mock.state.shares.size).toBe(0)
 })
 
 // ───────────────────────────────────────────────────────────────────

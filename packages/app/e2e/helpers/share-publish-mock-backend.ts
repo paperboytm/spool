@@ -45,6 +45,16 @@ export interface SharePublishMockState {
   handleAvailability: Map<string, boolean>
   /** Last publish payload received — handy in assertions. */
   lastPublishPayload: Record<string, unknown> | null
+  /** Forced failure statuses. When set, the matching route responds
+   *  with that status (and an errors.ts-shaped body) instead of its
+   *  normal handler — lets specs exercise the renderer's 401/429/5xx
+   *  error surfaces without teaching the mock real rate limiting.
+   *  Cleared by `reset()`; tests can also null them mid-test to
+   *  exercise the retry path. */
+  failures: {
+    publish: number | null
+    myShares: number | null
+  }
 }
 
 export interface MockShareRow {
@@ -84,6 +94,7 @@ export async function startSharePublishMockBackend(): Promise<SharePublishMockHa
     shares: new Map(),
     handleAvailability: new Map(),
     lastPublishPayload: null,
+    failures: { publish: null, myShares: null },
   }
 
   const server = createServer(async (req, res) => {
@@ -122,6 +133,7 @@ export async function startSharePublishMockBackend(): Promise<SharePublishMockHa
       state.shares.clear()
       state.handleAvailability.clear()
       state.lastPublishPayload = null
+      state.failures = { publish: null, myShares: null }
     },
     close: async () => {
       await new Promise<void>((resolve, reject) => {
@@ -182,6 +194,9 @@ async function routeRequest(
   // /api/me/shares contract (not { shares: [...] }), and so the
   // renderer's MySharesResponse expects.
   if (method === 'GET' && url.pathname === '/api/me/shares') {
+    if (state.failures.myShares !== null) {
+      return json(res, state.failures.myShares, { error: 'forced_failure' })
+    }
     const items = Array.from(state.shares.values()).map((s) => ({
       id: s.id,
       title: s.title,
@@ -223,6 +238,14 @@ async function routeRequest(
   // POST /api/publish — body { snapshot, visibility, draft_id,
   // idempotency_key, expires_at?, override_slug? }
   if (method === 'POST' && url.pathname === '/api/publish') {
+    if (state.failures.publish !== null) {
+      // errors.ts-shaped body; the renderer branches on status alone
+      // for 401/429 but falls back to `detail` for other codes.
+      return json(res, state.failures.publish, {
+        error: 'forced_failure',
+        detail: 'forced failure (e2e)',
+      })
+    }
     const body = JSON.parse(await readBody(req)) as PublishBody
     state.lastPublishPayload = body as unknown as Record<string, unknown>
     const overrideSlug = body.override_slug
