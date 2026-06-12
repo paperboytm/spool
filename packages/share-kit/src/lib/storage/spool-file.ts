@@ -123,11 +123,24 @@ function fnv1a32(s: string): number {
 
 /** Backfill stable ids on any turns that lack one. Idempotent: turns
  *  with an existing `id` pass through untouched, so it's safe to call
- *  on every load path (`readSpoolFile`, draft open, session import). */
+ *  on every load path (`readSpoolFile`, draft open, session import).
+ *
+ *  Identity-preserving and memoized per input array: callers like the
+ *  publish drift check run this on every debounce tick, and id-less
+ *  conversations (session-composed drafts) used to get a FRESH clone
+ *  of every turn per call — which defeated the per-Turn detection
+ *  cache downstream and re-ran the full regex scan each tick. */
+const turnIdsCache = new WeakMap<Turn[], Turn[]>()
+
 export function ensureTurnIds(turns: Turn[]): Turn[] {
-  return turns.map((t, idx) =>
+  if (turns.every((t) => t.id)) return turns
+  const hit = turnIdsCache.get(turns)
+  if (hit) return hit
+  const withIds = turns.map((t, idx) =>
     t.id ? t : { ...t, id: `legacy-${idx}-${fnv1a32(t.body).toString(16)}` },
   )
+  turnIdsCache.set(turns, withIds)
+  return withIds
 }
 
 export async function downloadSpoolFile(

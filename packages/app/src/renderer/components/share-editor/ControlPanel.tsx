@@ -88,15 +88,10 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
   // Turn), so re-scans on conversation change don't flash the hint.
   const [pii, setPii] = useState<ReturnType<typeof detectPII> | null>(null)
   useEffect(() => {
-    let alive = true
-    const handle = window.setTimeout(() => {
-      const result = detectPII(convo.turns)
-      if (alive) setPii(result)
-    }, 0)
-    return () => {
-      alive = false
-      window.clearTimeout(handle)
-    }
+    // The callback is fully synchronous, so clearTimeout alone is a
+    // complete stale-set guard — no alive flag needed.
+    const handle = window.setTimeout(() => setPii(detectPII(convo.turns)), 0)
+    return () => window.clearTimeout(handle)
   }, [convo.turns])
   const totalRedactions = pii
     ? pii.groups.reduce((n, g) => n + g.count, 0) + pii.names.length
@@ -728,27 +723,19 @@ function PrivacyView({
   totalRedactions: number
 }) {
   const { t } = useTranslation()
-  if (!pii) {
-    return (
-      <div
-        data-testid="share-editor-privacy-panel"
-        className="flex-1 min-h-0 flex items-center justify-center"
-      >
-        <span className="text-[11px] text-warm-faint dark:text-dark-muted">
-          {t('shareEditorPanel.privacy_scanning')}
-        </span>
-      </div>
-    )
-  }
   // How many sensitive occurrences would be VISIBLE in the shared
   // / exported artifact under the current policy. Drives both the
   // header count line and decides whether to show the Reset button.
+  // While the initial scan is in flight (`pii === null`) the header —
+  // including the master redact toggle, a safety control that must
+  // never disappear — still renders; only the counts and the category
+  // list wait for the scan.
   const excludedKinds = new Set(opts.redactExclude?.kinds ?? [])
   const excludedHashes = new Set(opts.redactExclude?.valueHashes ?? [])
   const isValueAllowed = (v: string) =>
     excludedHashes.size > 0 && excludedHashes.has(hashValueForRedactExclude(v))
   let visibleOccurrences = 0
-  if (opts.redact) {
+  if (opts.redact && pii) {
     for (const g of pii.groups) {
       const kindIsAllowed = excludedKinds.has(g.kind)
       for (const v of g.values) {
@@ -775,7 +762,8 @@ function PrivacyView({
   // user really wants to know "what will leak?" — so only the
   // visible count carries the warning weight.
   let countLabel: string
-  if (totalRedactions === 0) countLabel = t('shareEditorPanel.redact_noneDetected')
+  if (!pii) countLabel = t('shareEditorPanel.privacy_scanning')
+  else if (totalRedactions === 0) countLabel = t('shareEditorPanel.redact_noneDetected')
   else if (!opts.redact) countLabel = t('shareEditorPanel.redact_willBeVisible', { count: totalRedactions })
   else if (visibleOccurrences === 0) countLabel = t('shareEditorPanel.redact_items_other', { count: totalRedactions })
   else countLabel = t('shareEditorPanel.redact_visible', { count: visibleOccurrences })
@@ -849,13 +837,19 @@ function PrivacyView({
        *  stay pinned above. */}
       {opts.redact && (
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none px-4 pb-4">
-          <RedactSummary
-            groups={pii.groups}
-            authorNames={pii.names}
-            manualValues={pii.manual}
-            opts={opts}
-            setOpts={setOpts}
-          />
+          {pii ? (
+            <RedactSummary
+              groups={pii.groups}
+              authorNames={pii.names}
+              manualValues={pii.manual}
+              opts={opts}
+              setOpts={setOpts}
+            />
+          ) : (
+            <div className="py-6 text-center text-[11px] text-warm-faint dark:text-dark-muted">
+              {t('shareEditorPanel.privacy_scanning')}
+            </div>
+          )}
         </div>
       )}
     </div>

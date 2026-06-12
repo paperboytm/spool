@@ -1,8 +1,20 @@
-import { useCallback, useMemo } from 'react'
+import { forwardRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, type Components } from 'react-virtuoso'
 import { Check, CheckCheck, Eraser } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
+
+// Restore the list semantics + breathing room the old <ul>/<li> markup
+// carried: Virtuoso renders bare divs by default, which drops the
+// screen-reader list context and the py-1 inset around the rows.
+const virtuosoComponents: Components<{ turn: { body: string }; originalIndex: number }> = {
+  List: forwardRef(function TurnList(props, ref) {
+    return <div role="list" {...props} ref={ref} className="py-1" />
+  }),
+  Item: function TurnItem(props) {
+    return <div role="listitem" {...props} />
+  },
+}
 
 type Props = {
   convo: Conversation
@@ -162,6 +174,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
         computeItemKey={(_idx, row) => row.originalIndex}
         defaultItemHeight={26}
         increaseViewportBy={200}
+        components={virtuosoComponents}
         className="flex-1 min-h-0 scrollbar-none"
         itemContent={(_idx, { turn, originalIndex: i }) => {
           const included = selectedSet === null ? true : selectedSet.has(i)

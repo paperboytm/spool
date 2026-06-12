@@ -15,24 +15,27 @@ import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
-import { collectRedactList } from './redact'
+import { collectRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
 import { Body } from './body'
 
 interface Props {
   convo: Conversation
   opts: EditorOpts
+  /** Host-provided stable redact list — see TemplateRender's prop doc. */
+  redactList?: RedactReplacement[] | undefined
 }
 
-export function Timeline({ convo, opts }: Props) {
+export function Timeline({ convo, opts, redactList: injectedRedactList }: Props) {
   const t = templateTokens(opts.paper)
   const accent = opts.accentHex
   const accentBg = accentBgFor(accent)
   const tf = typefaceFamily(opts.typeface)
-  const redactList = useMemo(
+  const computedRedactList = useMemo(
     () => collectRedactList(convo.turns, opts),
     [convo.turns, opts.redactExclude],
   )
+  const redactList = injectedRedactList ?? computedRedactList
   const segments = selectSegments(convo, opts)
   const turnGap = opts.density === 'compact' ? 18 : 28
 

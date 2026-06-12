@@ -37,12 +37,15 @@ describe('PREVIEW_INITIAL_TURNS covers every e2e fixture', () => {
   // the turn count (meta/sidechain lines get filtered out), so this
   // guard trips before a grown fixture can silently put the e2e suite
   // into mid-fill territory.
-  // Fixtures that intentionally exceed the first chunk AND are never
-  // opened in the share editor by any spec. If a share spec starts
-  // using one of these, remove it from the list and either shrink the
-  // fixture or make the spec await the progressive fill.
+  // Fixtures that intentionally exceed the first chunk. Specs that
+  // open one of these in the share editor MUST wait for the
+  // `[data-render-complete]` marker on share-preview-render before
+  // asserting on preview DOM (see share-turn-selector.spec.ts) — the
+  // document mounts progressively and mid-fill counts race.
   const EXEMPT = new Set([
-    'test-session-large.jsonl', // session-detail.spec.ts virtuoso coverage only
+    // session-detail.spec.ts (virtuoso) + share-turn-selector.spec.ts
+    // (fill-aware via data-render-complete).
+    'test-session-large.jsonl',
   ])
 
   it('every claude-projects fixture fits in the first chunk', () => {

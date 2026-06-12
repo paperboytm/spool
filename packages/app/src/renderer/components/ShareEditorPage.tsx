@@ -460,6 +460,12 @@ export default function ShareEditorPage({
     while (!previewCompleteRef.current && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 100))
     }
+    if (!previewCompleteRef.current) {
+      // Timed out — the capture proceeds with whatever is committed.
+      // Loud breadcrumb so a truncated export is diagnosable instead of
+      // silently indistinguishable from success.
+      console.warn('Preview did not reach render-complete within 10s; exporting the committed state.')
+    }
   }, [])
 
   const exportPng = useCallback(async () => {

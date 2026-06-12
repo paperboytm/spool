@@ -2,8 +2,11 @@
 // exercise the PII gate without standing up React. The modal is the
 // only consumer.
 
+// Cached per-Turn detection (same cache the templates / ControlPanel /
+// snapshot build warm) — a raw detectSensitiveSpans loop here re-ran
+// the full regex suite over every body on each publish-gate compute.
 import {
-  detectSensitiveSpans,
+  detectSensitiveSpansCached,
   hashValueForRedactExclude,
   SENSITIVE_KIND_LABEL,
   type SensitiveKind,
@@ -98,7 +101,7 @@ export function computeUnredactedMatches(
   const medium: UnredactedMatch[] = []
   conversation.turns.forEach((turn, idx) => {
     if (isHidden(idx)) return
-    const matches = detectSensitiveSpans(turn.body)
+    const matches = detectSensitiveSpansCached(turn)
     if (matches.length === 0) return
     for (const m of matches) {
       if (policyCovers(m)) continue

@@ -49,6 +49,27 @@ export function detectSensitiveSpans(text: string): SensitiveMatch[] {
   return detectWithRegex(text)
 }
 
+// Detection is a pure function of the text, but the regex suite is a
+// full multi-pattern scan — expensive when a caller re-scans thousands
+// of bodies per policy change. Holders (share-kit turns, app publish
+// gates) keep the SAME body-carrying objects across a session, so a
+// WeakMap keyed on the holder gives cross-surface hits with zero
+// invalidation hazard: the entry stores the body it was computed from
+// and is ignored when the body has since changed, and dropping the
+// holder drops the entry.
+const spanCache = new WeakMap<object, { body: string; matches: SensitiveMatch[] }>()
+
+/** Cached `detectSensitiveSpans`, keyed on a stable body-carrying
+ *  object (e.g. a share-kit Turn). Semantically identical to scanning
+ *  `holder.body` fresh. */
+export function detectSensitiveSpansCached(holder: { body: string }): SensitiveMatch[] {
+  const hit = spanCache.get(holder)
+  if (hit && hit.body === holder.body) return hit.matches
+  const matches = detectWithRegex(holder.body)
+  spanCache.set(holder, { body: holder.body, matches })
+  return matches
+}
+
 /** Group matches by kind, deduplicating identical literals so the
  *  editor's expanded list shows one row per decision (not one row
  *  per occurrence). `group.count` keeps the total occurrence sum so

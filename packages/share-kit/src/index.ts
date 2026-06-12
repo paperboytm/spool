@@ -132,6 +132,7 @@ export type {
 } from './lib/redaction-detect'
 export {
   detectPII,
+  detectSensitiveSpansCached,
   collectRedactList,
   applyRedactPolicy,
   SYNTHETIC_KIND_AUTHOR,

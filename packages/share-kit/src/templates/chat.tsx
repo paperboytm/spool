@@ -8,7 +8,7 @@ import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
-import { collectRedactList } from './redact'
+import { collectRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
 import { GapMarker } from './gap-marker'
 import { Body } from './body'
@@ -16,9 +16,11 @@ import { Body } from './body'
 interface Props {
   convo: Conversation
   opts: EditorOpts
+  /** Host-provided stable redact list — see TemplateRender's prop doc. */
+  redactList?: RedactReplacement[] | undefined
 }
 
-export function Chat({ convo, opts }: Props) {
+export function Chat({ convo, opts, redactList: injectedRedactList }: Props) {
   const t = templateTokens(opts.paper)
   const accent = opts.accentHex
   const accentBg = accentBgFor(accent)
@@ -26,10 +28,11 @@ export function Chat({ convo, opts }: Props) {
   // Memo so style-only opts changes (paper / typeface / colorway /
   // density / selection) don't re-trigger the 22-regex detection
   // pass. Re-runs only when source turns or redact policy moves.
-  const redactList = useMemo(
+  const computedRedactList = useMemo(
     () => collectRedactList(convo.turns, opts),
     [convo.turns, opts.redactExclude],
   )
+  const redactList = injectedRedactList ?? computedRedactList
   const segments = selectSegments(convo, opts)
   const turnGap = opts.density === 'compact' ? 20 : 30
 

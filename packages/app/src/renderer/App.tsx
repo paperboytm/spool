@@ -196,27 +196,28 @@ export default function App() {
     if (isNewDraft) {
       // Persist the freshly composed draft AFTER the view switch so a
       // large session doesn't stall the click on two megabyte-scale
-      // JSON.stringify calls plus an IPC round-trip. Deferred a tick to
-      // let the editor's first frame paint. Failure is non-fatal: the
-      // editor already holds the conversation, and the first edit's
-      // autosave (ShareEditorPage) writes the same payload.
-      const composed = conversation
-      const composedOpts = opts
-      window.setTimeout(() => {
+      // JSON.stringify calls plus an IPC round-trip. Double-rAF, not
+      // setTimeout(0): a zero timer fires before the compositor
+      // produces the first frame, which would block the very paint
+      // this defers past. Failure is non-fatal: the editor already
+      // holds the conversation, and the first edit's autosave
+      // (ShareEditorPage) writes the same payload.
+      const persistDraft = () => {
         try {
-          const doc = buildSpoolDocument(composed, composedOpts)
+          const doc = buildSpoolDocument(conversation, opts)
           void window.spool?.shareDraft?.upsert({
             draft_id: draftId,
             source_kind: 'spool-session',
             source_origin: session.sessionUuid,
-            title: composed.title,
+            title: conversation.title,
             snapshot_json: JSON.stringify(doc),
             preview_json: JSON.stringify(buildPreviewDocument(doc)),
           }).catch((err) => console.error('Persist new share draft failed:', err))
         } catch (err) {
           console.error('Persist new share draft failed:', err)
         }
-      }, 0)
+      }
+      requestAnimationFrame(() => requestAnimationFrame(persistDraft))
     }
   }, [openShareEditor])
 

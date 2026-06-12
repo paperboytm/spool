@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useDeferredValue, useEffect, useLayoutEffect, 
 import { useTranslation } from 'react-i18next'
 import { MoreHorizontal } from 'lucide-react'
 import {
+  collectRedactList,
   TemplateRender,
   TEMPLATE_RATIO,
   TEMPLATES,
@@ -64,7 +65,6 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
   ref,
 ) {
   const { t } = useTranslation()
-  const ratio = TEMPLATE_RATIO[opts.template]
 
   // Progressive mount + deferred render. `slicedConvo` grows by chunks
   // until the full document is in; `useDeferredValue` keeps the canvas
@@ -78,12 +78,34 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
     () => (filled ? convo : { ...convo, turns: convo.turns.slice(0, turnCount) }),
     [convo, filled, turnCount],
   )
+  // The redact list is computed from the FULL turn list so its identity
+  // is stable across chunk frames. Left to the templates, the list
+  // would recompute per chunk (the sliced turns array is new each
+  // frame), changing every mounted Body's `redact` prop identity and
+  // re-parsing the whole document once per chunk — O(n²) during fill.
+  const fullRedactList = useMemo(
+    () => collectRedactList(convo.turns, opts),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [convo.turns, opts.redactExclude],
+  )
   const renderConvo = useDeferredValue(slicedConvo)
   const renderOpts = useDeferredValue(opts)
-  const renderComplete = filled && renderConvo === slicedConvo && renderOpts === opts
+  const renderRedactList = useDeferredValue(fullRedactList)
+  const renderComplete =
+    filled &&
+    renderConvo === slicedConvo &&
+    renderOpts === opts &&
+    renderRedactList === fullRedactList
   useEffect(() => {
     onRenderState?.({ complete: renderComplete })
   }, [renderComplete, onRenderState])
+
+  // Canvas geometry follows the DEFERRED opts, not the urgent ones:
+  // on a template switch the content takes a moment to catch up, and
+  // resizing the box to the new template's ratio while the old
+  // template's DOM is still committed shows the document mangled into
+  // the wrong aspect for the whole catch-up window.
+  const ratio = TEMPLATE_RATIO[renderOpts.template]
 
   const innerRef = useRef<HTMLDivElement>(null)
   const [naturalH, setNaturalH] = useState(ratio.h)
@@ -91,6 +113,20 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
     if (!innerRef.current) return
     setNaturalH(Math.max(ratio.h, innerRef.current.scrollHeight))
   }, [renderConvo, renderOpts, ratio.h])
+
+  // Size transitions are enabled one frame AFTER the document is fully
+  // committed: gating on the fill counter alone re-armed them on the
+  // same render the counter finished, so the LAST (largest) naturalH
+  // jump still animated — the exact "pumping" the gate exists to avoid.
+  const [sizeTransitions, setSizeTransitions] = useState(false)
+  useEffect(() => {
+    if (!renderComplete) {
+      setSizeTransitions(false)
+      return
+    }
+    const raf = requestAnimationFrame(() => setSizeTransitions(true))
+    return () => cancelAnimationFrame(raf)
+  }, [renderComplete])
 
   // Pan: drag-to-scroll on the empty backdrop / padding around the
   // canvas. Holding Space extends pan over the canvas too — that's
@@ -249,7 +285,7 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
           {/* Header chrome above the canvas — template name + dims. */}
           <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.08em] font-mono text-warm-muted dark:text-dark-muted">
             <span className="w-4 h-px bg-warm-border dark:bg-dark-border" />
-            {TEMPLATES.find((x) => x.id === opts.template)?.name} · {ratio.w}×{Math.round(naturalH)}
+            {TEMPLATES.find((x) => x.id === renderOpts.template)?.name} · {ratio.w}×{Math.round(naturalH)}
             <span className="w-4 h-px bg-warm-border dark:bg-dark-border" />
           </div>
           {/* Scaled canvas — width/height transition for smooth zoom.
@@ -273,8 +309,9 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
               borderRadius: 2,
               // No size transition while the document is still filling
               // in — the canvas grows once per chunk and animating every
-              // step reads as the page "pumping".
-              transition: filled
+              // step reads as the page "pumping". Re-armed one frame
+              // after the final commit (see sizeTransitions above).
+              transition: sizeTransitions
                 ? 'width 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1)'
                 : 'none',
               cursor: spaceHeld || isPanning ? 'inherit' : 'default',
@@ -289,17 +326,28 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
                 willChange: 'transform',
               }}
             >
+              {/* data-* attrs mirror the DEFERRED opts so they always
+                  describe the DOM actually committed below — e2e and
+                  styling hooks read them next to the content. The
+                  data-render-complete marker is the e2e wait handle for
+                  "the full, caught-up document is committed". */}
               <div
                 ref={setRefs}
                 data-testid="share-preview-render"
-                data-template={opts.template}
-                data-paper={opts.paper}
-                data-typeface={opts.typeface}
-                data-colorway={opts.colorway}
-                data-density={opts.density}
+                data-template={renderOpts.template}
+                data-paper={renderOpts.paper}
+                data-typeface={renderOpts.typeface}
+                data-colorway={renderOpts.colorway}
+                data-density={renderOpts.density}
+                data-render-complete={renderComplete ? '' : undefined}
                 style={{ width: ratio.w, userSelect: 'text' }}
               >
-                <TemplateRender template={renderOpts.template} convo={renderConvo} opts={renderOpts} />
+                <TemplateRender
+                  template={renderOpts.template}
+                  convo={renderConvo}
+                  opts={renderOpts}
+                  redactList={renderRedactList}
+                />
               </div>
             </div>
           </div>

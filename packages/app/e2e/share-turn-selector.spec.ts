@@ -20,13 +20,20 @@ test('switch to Messages view, exclude turns, see preview reflect change', async
   await waitForSync(window)
   await openShareEditorFromSessionDetail(window, SESSION_UUID)
 
+  // The large fixture exceeds the preview's first progressive chunk, so
+  // wait for the full document to commit before taking DOM baselines —
+  // counting anchors mid-fill would race the chunked mount.
+  await expect(
+    window.locator('[data-testid="share-preview-render"][data-render-complete]'),
+  ).toBeVisible({ timeout: 15_000 })
+
   // Switch to Messages view on the right ControlPanel.
   await window.locator('[data-testid="share-editor-view-messages"]').click()
   const firstRow = window.locator('[data-testid="share-editor-turn-row"]').first()
   await expect(firstRow).toBeVisible({ timeout: 5000 })
 
-  // The preview renders the full conversation at first. We count its
-  // turn anchors as a baseline.
+  // With the fill complete, the preview holds the whole conversation.
+  // We count its turn anchors as a baseline.
   const previewTurns = window.locator('[data-share-preview-scroll] [data-turn-index]')
   const startCount = await previewTurns.count()
   expect(startCount).toBeGreaterThan(0)

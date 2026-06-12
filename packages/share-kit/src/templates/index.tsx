@@ -8,6 +8,7 @@
 import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
 import type { Conversation, EditorOpts, Template } from '@/lib/types'
 import { paperTokens } from '@/lib/types'
+import type { RedactReplacement } from './redact'
 import { Forum } from './forum'
 import { Letter } from './letter'
 import { Timeline } from './timeline'
@@ -17,6 +18,14 @@ interface Props {
   template: Template
   convo: Conversation
   opts: EditorOpts
+  /** Optional pre-computed redact list. Hosts that re-render the
+   *  template with changing turn-array identities (the app preview
+   *  mounts large documents progressively, growing a sliced copy each
+   *  frame) MUST pass a list computed from the FULL conversation so
+   *  its identity — and therefore every memoized Body — stays stable
+   *  across those re-renders. When omitted, templates compute their
+   *  own (reader / thumbnails, where the convo identity is stable). */
+  redactList?: RedactReplacement[] | undefined
 }
 
 // memo: hosts (PreviewPane, thumbnails) re-render on local state the
@@ -35,7 +44,7 @@ export const TemplateRender = memo(function TemplateRender(props: Props) {
   )
 })
 
-function TemplateDispatch({ template, convo, opts }: Props) {
+function TemplateDispatch({ template, convo, opts, redactList }: Props) {
   // Defensive guard for cases where the conversation got into a shape
   // the templates can't handle (no turns array, etc). Without this, the
   // first `.map()` inside the template would throw to the boundary —
@@ -46,19 +55,19 @@ function TemplateDispatch({ template, convo, opts }: Props) {
   }
   switch (template) {
     case 'forum':
-      return <Forum convo={convo} opts={opts} />
+      return <Forum convo={convo} opts={opts} redactList={redactList} />
     case 'letter':
-      return <Letter convo={convo} opts={opts} />
+      return <Letter convo={convo} opts={opts} redactList={redactList} />
     case 'timeline':
-      return <Timeline convo={convo} opts={opts} />
+      return <Timeline convo={convo} opts={opts} redactList={redactList} />
     case 'chat':
-      return <Chat convo={convo} opts={opts} />
+      return <Chat convo={convo} opts={opts} redactList={redactList} />
     default:
       // Belt-and-suspenders for snapshots saved with a since-retired
       // template id (e.g. 'interview' from pre-v0.5.0 drafts that
       // somehow slipped past normalizeOpts). Fall back to Chat rather
       // than rendering nothing.
-      return <Chat convo={convo} opts={opts} />
+      return <Chat convo={convo} opts={opts} redactList={redactList} />
   }
 }
 

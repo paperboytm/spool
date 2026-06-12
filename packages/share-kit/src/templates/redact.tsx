@@ -18,13 +18,18 @@
 
 import type { EditorOpts, RedactExclude, Turn } from '@/lib/types'
 import {
-  detectSensitiveSpans,
+  detectSensitiveSpansCached,
   groupBySensitiveKind,
   hashValueForRedactExclude,
   maskValueByKind,
   type SensitiveGroup,
   type SensitiveMatch,
 } from '@spool-lab/redact'
+
+// Re-export so existing share-kit consumers keep their import path;
+// the cache itself lives in @spool-lab/redact so non-React surfaces
+// (publish gate, future CLI/scan callers) share the same hits.
+export { detectSensitiveSpansCached }
 
 /** Synthetic "kind" tags for non-regex sources that the Privacy
  *  panel still wants to surface as filterable rows. Keep these
@@ -57,28 +62,15 @@ export interface PIIDetection {
   all: string[]
 }
 
-// Per-turn detection cache. `detectSensitiveSpans` is a pure function
-// of the body text but costs a full regex-suite scan; on a 7k-turn
-// conversation every redact-policy toggle used to re-scan all bodies.
-// Editor surfaces (templates, ControlPanel, autosave, snapshot build)
-// all hold the SAME Turn objects across a session, so a WeakMap keyed
-// on the Turn gives cross-surface hits with zero invalidation hazard:
-// the entry stores the body it was computed from and is ignored when
-// the body has since changed, and dropping the Turn drops the entry.
-const detectCache = new WeakMap<Turn, { body: string; matches: SensitiveMatch[] }>()
-
-function detectSpansCached(turn: Turn): SensitiveMatch[] {
-  const hit = detectCache.get(turn)
-  if (hit && hit.body === turn.body) return hit.matches
-  const matches = detectSensitiveSpans(turn.body)
-  detectCache.set(turn, { body: turn.body, matches })
-  return matches
-}
-
+// Detection goes through @spool-lab/redact's per-Turn cache: editor
+// surfaces (templates, ControlPanel, autosave, snapshot build, publish
+// gate) all hold the same Turn objects across a session, so a policy
+// toggle re-aggregates cached matches instead of re-scanning every
+// body with the full regex suite.
 export function detectPII(turns: Turn[]): PIIDetection {
   const matches: SensitiveMatch[] = []
   for (const t of turns) {
-    matches.push(...detectSpansCached(t))
+    matches.push(...detectSensitiveSpansCached(t))
   }
   const names = Array.from(
     new Set(
