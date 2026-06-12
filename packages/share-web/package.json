@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 3002",
     "build": "vite build",
+    "deploy:staging": "vite build && wrangler pages deploy dist --project-name spool-share-web-staging",
+    "deploy:prod": "vite build && wrangler pages deploy dist --project-name spool-share-web",
     "preview": "vite preview --port 3002",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -29,6 +31,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "^5.7.3",
     "vite": "^6.3.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.0.0"
   }
 }

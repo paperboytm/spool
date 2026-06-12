@@ -1,0 +1,31 @@
+# spool-pro-router — the single Worker bound to spool.pro/* that
+# dispatches each path to the right *.pages.dev origin so users only
+# ever see one domain. Vendored from the launch runbook (2026-06-12) so
+# route changes ride code review; previously the source lived only in
+# the Cloudflare dashboard.
+#
+# Deploy: pnpm --filter spool-pro-router deploy            (production)
+#         pnpm --filter spool-pro-router deploy:staging    (staging)
+
+name = "spool-pro-router"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+
+routes = [
+  { pattern = "spool.pro/*", zone_name = "spool.pro" },
+]
+
+[vars]
+ORIGIN_BACKEND = "spool-share-backend.pages.dev"
+ORIGIN_WEB = "spool-share-web.pages.dev"
+ORIGIN_LANDING = "spool-landing.pages.dev"
+
+[env.staging]
+routes = [
+  { pattern = "staging.spool.pro/*", zone_name = "spool.pro" },
+]
+
+[env.staging.vars]
+ORIGIN_BACKEND = "spool-share-backend-staging.pages.dev"
+ORIGIN_WEB = "spool-share-web-staging.pages.dev"
+ORIGIN_LANDING = "spool-landing.pages.dev"

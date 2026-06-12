@@ -426,6 +426,21 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
+      wrangler:
+        specifier: ^4.0.0
+        version: 4.90.0(@cloudflare/workers-types@4.20260511.1)
+
+  workers/spool-pro-router:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260101.0
+        version: 4.20260511.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.0.0
+        version: 4.90.0(@cloudflare/workers-types@4.20260511.1)
 
 packages:
 
