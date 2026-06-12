@@ -59,6 +59,34 @@ body {
   background: rgba(128, 128, 128, 0.55);
 }
 
+/* Markdown-table scroller inside .spool-body: thumb hidden until the
+ * pointer is over the table. Sibling copies live in the app's
+ * styles.css and share-web's styles.css (neither imports this sheet). */
+.spool-md-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.spool-md-scroll:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+.spool-md-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.spool-md-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.spool-md-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 160ms;
+}
+.spool-md-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+}
+.spool-md-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
+}
+
 /* Zero the leading / trailing margins on the first and last children
  * of a rendered body, so parent layouts can align cleanly via flex
  * baseline without having to compensate for markdown's default

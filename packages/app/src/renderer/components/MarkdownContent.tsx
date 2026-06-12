@@ -96,6 +96,16 @@ function MarkdownContent({
         </mark>
       )
     },
+    // Wrapper-scrolls, table at natural width: a block table that
+    // scrolls itself would crush wrappable columns to fit instead of
+    // ever overflowing. Hover-reveal scrollbar via .spool-md-scroll.
+    table({ node: _node, ...rest }) {
+      return (
+        <div className="spool-md-scroll my-2 overflow-x-auto">
+          <table className="w-max border-collapse" {...rest} />
+        </div>
+      )
+    },
     a({ children, href }) {
       return (
         <a
@@ -111,7 +121,7 @@ function MarkdownContent({
   }), [isDark, onActiveMatchRef])
 
   return (
-    <div className="markdown-body text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed break-words select-text cursor-text [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_li]:my-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-3 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_blockquote]:border-l-2 [&_blockquote]:border-warm-border [&_blockquote]:dark:border-dark-border [&_blockquote]:pl-3 [&_blockquote]:text-warm-muted [&_blockquote]:dark:text-dark-muted [&_table]:my-2 [&_th]:text-left [&_th]:font-semibold [&_td]:py-1 [&_td]:pr-3">
+    <div className="markdown-body text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed break-words select-text cursor-text [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_li]:my-0.5 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-3 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_blockquote]:border-l-2 [&_blockquote]:border-warm-border [&_blockquote]:dark:border-dark-border [&_blockquote]:pl-3 [&_blockquote]:text-warm-muted [&_blockquote]:dark:text-dark-muted [&_th]:text-left [&_th]:font-semibold [&_th]:py-1 [&_th]:px-2 [&_th]:max-w-[360px] [&_th]:border-b [&_th]:border-warm-border2 [&_th]:dark:border-dark-border2 [&_td]:py-1 [&_td]:px-2 [&_td]:max-w-[360px] [&_td]:border-b [&_td]:border-warm-border [&_td]:dark:border-dark-border">
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}

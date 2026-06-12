@@ -232,6 +232,45 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
       />
     ),
     hr: () => <hr style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.2, margin: '10px 0' }} />,
+    // Tables get explicit styles so desktop preview (Tailwind preflight
+    // zeroes cell padding) and share-web (UA centers th) render identically.
+    // react-markdown turns GFM column alignment into a `style` prop
+    // (tableCellAlignToStyle), so incoming style must merge over ours.
+    // `width: max-content` (no max-width) keeps every column at its
+    // natural width — short cells never wrap; only cells past the
+    // 360px cap do. Wide tables scroll inside the wrapper, whose
+    // hover-reveal scrollbar lives in each consumer's stylesheet
+    // (.spool-md-scroll).
+    table: ({ node: _node, style, ...props }: any) => (
+      <div className="spool-md-scroll" style={{ overflowX: 'auto', margin: '8px 0' }}>
+        <table style={{ borderCollapse: 'collapse', width: 'max-content', ...style }} {...props} />
+      </div>
+    ),
+    th: ({ node: _node, style, ...props }: any) => (
+      <th
+        style={{
+          textAlign: 'left',
+          fontWeight: 600,
+          padding: '4px 8px',
+          maxWidth: 360,
+          borderBottom: '1px solid rgba(128,128,128,0.4)',
+          ...style,
+        }}
+        {...props}
+      />
+    ),
+    td: ({ node: _node, style, ...props }: any) => (
+      <td
+        style={{
+          textAlign: 'left',
+          padding: '4px 8px',
+          maxWidth: 360,
+          borderBottom: '1px solid rgba(128,128,128,0.18)',
+          ...style,
+        }}
+        {...props}
+      />
+    ),
     a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => (
       <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}`, overflowWrap: 'anywhere' }}>
         {children}

@@ -1250,3 +1250,32 @@ html[data-theme='dark'] .sw-modal-overlay {
     padding: 24px 12px 0;
   }
 }
+
+/* Markdown-table scroller emitted by share-kit's Body component:
+ * thumb hidden until the pointer is over the table. Sibling copies
+ * live in share-kit global.css (which we deliberately don't import —
+ * it pulls in Tailwind) and the desktop app's styles.css. */
+.spool-md-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.spool-md-scroll:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+.spool-md-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.spool-md-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.spool-md-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 160ms;
+}
+.spool-md-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+}
+.spool-md-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
+}

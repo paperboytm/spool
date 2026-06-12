@@ -169,6 +169,33 @@ body {
   scrollbar-width: none;
 }
 
+/* Markdown-table scroller: thumb hidden until the pointer is over the
+ * table, so wide tables read as plain content at rest. Sibling copies
+ * live in share-kit global.css and share-web styles.css — share-web
+ * deliberately doesn't import either of these sheets. */
+.spool-md-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.spool-md-scroll:hover {
+  scrollbar-color: var(--spool-scrollbar-thumb) transparent;
+}
+.spool-md-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.spool-md-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border: none;
+  border-radius: 3px;
+  transition: background-color 160ms;
+}
+.spool-md-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--spool-scrollbar-thumb);
+}
+.spool-md-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--spool-scrollbar-thumb-hover);
+}
+
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
