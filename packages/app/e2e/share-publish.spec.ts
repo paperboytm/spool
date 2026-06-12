@@ -35,6 +35,8 @@
 // text-based selector would flake the moment the en.json copy edits.
 
 import { test, expect, type Page } from '@playwright/test'
+import { writeFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 import {
   launchApp,
@@ -57,6 +59,18 @@ import en from '../src/renderer/i18n/locales/en.json'
 
 const SESSION_UUID = 'test-session-uuid-001'
 
+// A session carrying a live-looking Stripe key, used only by the
+// high-risk PII gate test. It is injected into THIS suite's claude dir
+// via extraFixtures rather than living in e2e/fixtures/claude-projects/
+// — the shared base fixtures are copied into every launchApp test and
+// MUST stay free of sensitive values, or the Security "empty page"
+// specs scan it and stop reading as clean.
+const PII_SESSION_JSONL = [
+  '{"type":"user","sessionId":"test-session-pii-001","cwd":"/tmp/test-project","uuid":"pii-msg-001","timestamp":"2026-02-01T09:00:00Z","message":{"role":"user","content":"Here is my key so you can test the deploy: sk_live_abcdef1234567890ABCDEF"}}',
+  '{"type":"assistant","uuid":"pii-msg-002","parentUuid":"pii-msg-001","timestamp":"2026-02-01T09:00:05Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Thanks — I\'ll wire the deploy step. You should rotate that credential after we finish."}]}}',
+  '',
+].join('\n')
+
 let mock: SharePublishMockHandle
 let ctx: AppContext
 
@@ -65,6 +79,11 @@ test.beforeAll(async () => {
   ctx = await launchApp({
     extraEnv: {
       SPOOL_SHARE_BACKEND: mock.baseUrl,
+    },
+    extraFixtures: ({ claudeDir }) => {
+      const dir = join(claudeDir, 'test-project')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'test-session-pii.jsonl'), PII_SESSION_JSONL, 'utf8')
     },
   })
 })
