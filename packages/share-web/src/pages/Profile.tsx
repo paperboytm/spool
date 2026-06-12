@@ -8,6 +8,7 @@ import {
 } from '../components/Chrome'
 import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
 import { humanDate } from '../lib/dates'
+import { normalizeTabTitle } from '../lib/page-title'
 
 type State =
   | { kind: 'loading' }
@@ -31,7 +32,7 @@ export function Profile({ handle }: { handle: string }) {
       setState(next)
       if (next.kind === 'ok') {
         const display = next.profile.name ?? `@${next.profile.handle}`
-        document.title = `${display} · spool.pro`
+        document.title = `${normalizeTabTitle(display)} · spool.pro`
       } else {
         document.title = 'Profile not found · spool.pro'
       }

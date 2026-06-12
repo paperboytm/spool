@@ -10,6 +10,14 @@ import { Terms } from './pages/Terms'
 import { Tombstone } from './pages/Tombstone'
 
 export function App() {
+  // Route is computed once at mount. This is intentional: every
+  // in-app navigation uses full-page window.location.assign/replace
+  // (see Me.tsx, SignIn, the sign-out flow), and there is no
+  // history.pushState anywhere in the SPA. So the document fully
+  // reloads on each navigation and on browser back/forward — there is
+  // no client-side history for a popstate listener to react to. If a
+  // pushState-based navigation is ever introduced, add a popstate
+  // listener here to recompute the route.
   const route = useMemo(
     () => routeFor(window.location.pathname, window.location.search),
     [],

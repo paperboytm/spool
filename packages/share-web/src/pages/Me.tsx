@@ -17,8 +17,10 @@ import {
   setShareVisibility,
   scheduleAccountDeletion,
   signOut,
+  type MeFetchResult,
   type MeResponse,
   type MeShareRow,
+  type MySharesFetchResult,
 } from '../lib/api'
 import { humanDate, humanDateTime } from '../lib/dates'
 import { ProfileEditor } from '../components/ProfileEditor'
@@ -43,6 +45,44 @@ type LoadState =
       unpublishErr?: string | null
     }
   | { kind: 'error' }
+
+// Pure mapping from the two parallel fetch results to a load outcome.
+// Kept side-effect-free (no setState, no navigation) so the
+// /api/me-vs-/api/me/shares failure matrix can be unit-tested without a
+// DOM. The caller turns 'redirect' into a navigation and the rest into
+// a LoadState.
+//
+// The asymmetry that motivates this: a 5xx/network failure on
+// /api/me/shares must NOT collapse into the empty-state ("nothing
+// published") — that's a lie. Only a genuine 200-with-zero-rows is
+// empty. We reuse the same 'error' card the /api/me failure already
+// uses so the two are consistent. A shares-side 'unauthenticated' after
+// /api/me succeeded is a cookie race; treat it as an error+retry rather
+// than silently empty. 'forbidden' (deletion-pending) is NOT a failure
+// here — /api/me carries deletion_pending_until and the shares section
+// is hidden in that state, so we render with an empty list.
+export type LoadOutcome =
+  | { kind: 'redirect' }
+  | { kind: 'error' }
+  | { kind: 'ok'; me: MeResponse; shares: MeShareRow[] }
+
+export function resolveLoadOutcome(
+  meResult: MeFetchResult,
+  sharesResult: MySharesFetchResult,
+): LoadOutcome {
+  if (meResult.kind === 'unauthenticated') return { kind: 'redirect' }
+  if (meResult.kind !== 'ok') return { kind: 'error' }
+  if (sharesResult.kind === 'ok') {
+    return { kind: 'ok', me: meResult.me, shares: sharesResult.shares }
+  }
+  // deletion-pending: shares are hidden anyway, render with an empty list.
+  if (sharesResult.kind === 'forbidden') {
+    return { kind: 'ok', me: meResult.me, shares: [] }
+  }
+  // 'error' or a racing 'unauthenticated' — surface the retry card
+  // instead of a false empty-state.
+  return { kind: 'error' }
+}
 
 function shareUrl(id: string): string {
   return `${window.location.origin}/s/${encodeURIComponent(id)}`
@@ -594,19 +634,25 @@ export function Me() {
   // commits the `unpublishBusy: true` write. The ref blocks the second
   // call synchronously, before any async work.
   const unpublishingRef = useRef(false)
+  // confirmUnpublish closes over `state`, which can be stale if a
+  // background refreshMe() re-rendered between modal-open and the confirm
+  // click. Mirror the current target into a ref so the action always
+  // operates on what the modal is actually showing.
+  const unpublishTargetRef = useRef<MeShareRow | null>(null)
 
   const load = useCallback(async () => {
+    setState({ kind: 'loading' })
     const [meResult, sharesResult] = await Promise.all([fetchMe(), fetchMyShares()])
-    if (meResult.kind === 'unauthenticated') {
+    const outcome = resolveLoadOutcome(meResult, sharesResult)
+    if (outcome.kind === 'redirect') {
       window.location.replace('/sign-in?next=/me')
       return
     }
-    if (meResult.kind !== 'ok') {
+    if (outcome.kind === 'error') {
       setState({ kind: 'error' })
       return
     }
-    const shares = sharesResult.kind === 'ok' ? sharesResult.shares : []
-    setState({ kind: 'ok', me: meResult.me, shares })
+    setState({ kind: 'ok', me: outcome.me, shares: outcome.shares })
   }, [])
 
   // Re-fetch only /api/me (not /me/shares) after a profile edit so the
@@ -623,6 +669,13 @@ export function Me() {
     document.title = 'Your account · spool.pro'
     load()
   }, [load])
+
+  // Keep the unpublish-target ref in lockstep with the rendered target so
+  // confirmUnpublish never reads a stale closed-over value.
+  const currentTarget = state.kind === 'ok' ? state.unpublishTarget ?? null : null
+  useEffect(() => {
+    unpublishTargetRef.current = currentTarget
+  }, [currentTarget])
 
   async function onToggleVisibility(row: MeShareRow): Promise<{ ok: boolean; reason?: string }> {
     const next = row.visibility === 'profile-listed' ? 'unlisted' as const : 'profile-listed' as const
@@ -733,9 +786,9 @@ export function Me() {
               type="button"
               className="sw-btn sw-btn-ghost"
               style={{ marginTop: 20 }}
-              onClick={() => window.location.reload()}
+              onClick={() => void load()}
             >
-              Refresh
+              Try again
             </button>
           </div>
         </main>
@@ -774,10 +827,13 @@ export function Me() {
     )
   }
   async function confirmUnpublish() {
-    if (state.kind !== 'ok' || !state.unpublishTarget) return
+    // Read the target from the ref, not the closed-over `state`: a
+    // background refreshMe() between modal-open and click can leave this
+    // closure pointing at a stale snapshot.
+    const target = unpublishTargetRef.current
+    if (!target) return
     if (unpublishingRef.current) return
     unpublishingRef.current = true
-    const target = state.unpublishTarget
     setState((s) => (s.kind === 'ok' ? { ...s, unpublishBusy: true, unpublishErr: null } : s))
     try {
       const r = await onUnpublish(target.id)
@@ -885,23 +941,29 @@ export function Me() {
             </p>
           ) : (
             <>
-              {liveShares.length === 0 && revokedShares.length === 0 ? (
-                <p className="sw-empty">You haven’t published anything yet.</p>
-              ) : (
-                liveShares.length > 0 && (
-                  <ul className="sw-list">
-                    {liveShares.map((row) => (
-                      <ShareRow
-                        key={row.id}
-                        row={row}
-                        disabled={pending}
-                        hasHandle={me.handle !== null}
-                        onUnpublishRequest={requestUnpublish}
-                        onToggleVisibility={onToggleVisibility}
-                      />
-                    ))}
-                  </ul>
+              {liveShares.length === 0 ? (
+                // No live shares. With zero revoked history this is the
+                // genuine first-run empty-state (full CTA). With revoked
+                // history below, a short line is enough — the collapsed
+                // Unpublished section carries the rest of the story.
+                revokedShares.length === 0 ? (
+                  <p className="sw-empty">You haven’t published anything yet.</p>
+                ) : (
+                  <p className="sw-empty">No live shares.</p>
                 )
+              ) : (
+                <ul className="sw-list">
+                  {liveShares.map((row) => (
+                    <ShareRow
+                      key={row.id}
+                      row={row}
+                      disabled={pending}
+                      hasHandle={me.handle !== null}
+                      onUnpublishRequest={requestUnpublish}
+                      onToggleVisibility={onToggleVisibility}
+                    />
+                  ))}
+                </ul>
               )}
               {/* Revoked shares are history records: collapsed by default
                *  (they accumulate forever — only account deletion purges

@@ -17,7 +17,7 @@ export function Privacy() {
 
   return (
     <Page>
-      <Header auth="out" />
+      <Header />
       <main className="sw-main">
         <article className="sw-card w-600 sw-legal">
           <p className="sw-eyebrow">spool.pro</p>
