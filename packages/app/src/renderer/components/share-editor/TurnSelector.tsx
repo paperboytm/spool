@@ -116,7 +116,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
   return (
     <div className="flex flex-col min-h-0 flex-1">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <span className="text-[10px] uppercase tracking-wider font-medium text-warm-faint dark:text-dark-faint">
+        <span className="text-[10px] tracking-wider font-medium text-warm-faint dark:text-dark-faint">
           {t('shareEditorPanel.turnSelector_header', { kept: visibleKept, total: visibleTotal })}
         </span>
         <span className="flex items-center gap-0.5">

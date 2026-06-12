@@ -111,7 +111,7 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
       <div className="px-4 pt-3 pb-4">
         <div className="flex items-baseline justify-between mb-3">
-          <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
+          <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
             {t('shareEditorPanel.section_template')}
           </div>
           <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">
@@ -750,7 +750,7 @@ function PrivacyView({
        *  always has the master control + leak-count in view. */}
       <div className="flex-none px-4 pt-3">
         <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
+          <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
             {t('shareEditorPanel.section_redactions')}
           </div>
           <div className="flex items-center gap-2 min-w-0">
@@ -826,7 +826,7 @@ function Section({ label, hint, children }: { label: string; hint?: string; chil
   return (
     <div className="px-4 pt-1.5 pb-4">
       <div className="flex items-baseline justify-between mb-3">
-        <div className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted leading-none">
+        <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
           {label}
         </div>
         {hint && <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">{hint}</div>}
@@ -857,7 +857,7 @@ function Collapsible({
         aria-expanded={open}
         className="w-full text-left px-4 pt-2 pb-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
       >
-        <span className="text-[11px] font-medium tracking-[0.08em] uppercase text-warm-muted dark:text-dark-muted">
+        <span className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted">
           {label}
         </span>
         <span className="flex items-center gap-2.5">
