@@ -271,11 +271,24 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
         {...props}
       />
     ),
-    a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => (
-      <a href={href} style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}`, overflowWrap: 'anywhere' }}>
-        {children}
-      </a>
-    ),
+    a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => {
+      // In-page anchors stay same-frame; everything else opens in a new
+      // tab with `noreferrer noopener` so a reader click can't navigate
+      // the top frame and the destination can't reach back through
+      // `window.opener`. (react-markdown v10 already neutralizes
+      // `javascript:`/`data:` hrefs via its default urlTransform, so no
+      // extra sanitization is needed here.)
+      const inPage = !!href && href.startsWith('#')
+      return (
+        <a
+          href={href}
+          {...(inPage ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
+          style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}`, overflowWrap: 'anywhere' }}
+        >
+          {children}
+        </a>
+      )
+    },
     img: ({ src, alt }: { src?: string | undefined; alt?: string | undefined }) => <MarkdownImage src={src} alt={alt} accent={accent} />,
   }), [accent, accentBg, blockStroke])
   /* eslint-enable @typescript-eslint/no-explicit-any */

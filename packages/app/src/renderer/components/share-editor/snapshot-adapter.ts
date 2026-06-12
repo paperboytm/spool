@@ -64,21 +64,36 @@ export function buildSnapshotFromEditor(args: {
   // published, full stop."
   const hiddenIdSet = new Set(hiddenTurnIds)
 
-  const snapshotTurns = redactedConv.turns.map((t) => {
-    const id = t.id!
+  // Turn ids coming off `ensureTurnIds` are an fnv1a32 hash of the turn
+  // content. Emitting them on the wire would leak content-derived
+  // fingerprints (reversible for known content classes) and, via
+  // `hidden_turns`, enumerate exactly which turns the author excluded —
+  // contradicting the blank-body guarantee above. Remap every id to an
+  // OPAQUE POSITIONAL token (`t0`, `t1`, … by array index) before
+  // emitting. The reader only uses ids for ordering and hidden lookup,
+  // never for content, so positional ids are fully compatible.
+  const opaqueIdFor = new Map(
+    redactedConv.turns.map((t, idx) => [t.id!, `t${idx}`]),
+  )
+
+  const snapshotTurns = redactedConv.turns.map((t, idx) => {
+    const originalId = t.id!
+    const id = `t${idx}`
     const role = (t.role === 'user' || t.role === 'assistant'
       ? t.role
       : 'assistant') as 'user' | 'assistant'
-    if (hiddenIdSet.has(id)) {
+    if (hiddenIdSet.has(originalId)) {
       return { id, role, content: '' }
     }
     return {
       id,
       role,
       content: t.body,
-      ...(perTurnRedacted.has(id) ? { redacted: true as const } : {}),
+      ...(perTurnRedacted.has(originalId) ? { redacted: true as const } : {}),
     }
   })
+
+  const hiddenOpaqueIds = hiddenTurnIds.map((id) => opaqueIdFor.get(id)!)
 
   return {
     schema_version: 1,
@@ -97,7 +112,7 @@ export function buildSnapshotFromEditor(args: {
       title: rawConv.title || 'Untitled',
       turns: snapshotTurns,
       turn_order: snapshotTurns.map((t) => t.id),
-      hidden_turns: hiddenTurnIds,
+      hidden_turns: hiddenOpaqueIds,
     },
     editor_opts: {
       template: opts.template,

@@ -65,10 +65,11 @@ describe('buildSnapshotFromEditor — hidden-turn body redaction', () => {
       conversation: conv,
       opts: opts({ redact: false, selected: [0] }),
     })
-    expect(snap.conversation.turn_order).toEqual(['t-0', 't-1'])
-    expect(snap.conversation.hidden_turns).toEqual(['t-1'])
-    const t0 = snap.conversation.turns.find((t) => t.id === 't-0')!
-    const t1 = snap.conversation.turns.find((t) => t.id === 't-1')!
+    // IDs are remapped to opaque positional tokens.
+    expect(snap.conversation.turn_order).toEqual(['t0', 't1'])
+    expect(snap.conversation.hidden_turns).toEqual(['t1'])
+    const t0 = snap.conversation.turns.find((t) => t.id === 't0')!
+    const t1 = snap.conversation.turns.find((t) => t.id === 't1')!
     expect(t0.content).toBe('hello')
     expect(t1.content).toBe('')
     // The R2 JSON must not retain the credential anywhere.
@@ -100,7 +101,7 @@ describe('buildSnapshotFromEditor — hidden-turn body redaction', () => {
       conversation: conv,
       opts: opts({ redact: false, selected: [] }),
     })
-    expect(snap.conversation.hidden_turns).toEqual(['t-0', 't-1'])
+    expect(snap.conversation.hidden_turns).toEqual(['t0', 't1'])
     expect(snap.conversation.turns.every((t) => t.content === '')).toBe(true)
   })
 
@@ -114,8 +115,48 @@ describe('buildSnapshotFromEditor — hidden-turn body redaction', () => {
       conversation: conv,
       opts: opts({ redact: false, selected: [1] }),
     })
-    expect(snap.conversation.turn_order).toEqual(['a', 'b', 'c'])
+    // Positional remap: a→t0, b→t1, c→t2; b is the only kept turn.
+    expect(snap.conversation.turn_order).toEqual(['t0', 't1', 't2'])
     expect(snap.conversation.turns).toHaveLength(3)
-    expect(snap.conversation.hidden_turns.sort()).toEqual(['a', 'c'])
+    expect(snap.conversation.hidden_turns.sort()).toEqual(['t0', 't2'])
+  })
+})
+
+describe('buildSnapshotFromEditor — opaque positional ids', () => {
+  // Regression for the content-derived-id leak: the original turn ids
+  // (from `ensureTurnIds`, an fnv1a32 hash of the turn content) must
+  // never appear anywhere in the emitted snapshot. This test FAILS on
+  // the pre-fix code, which passed the original ids straight through to
+  // turns[].id / turn_order[] / hidden_turns[].
+  it('emits no content-derived id in turns, turn_order, or hidden_turns', () => {
+    const originalIds = ['hash-9f3a', 'hash-2b71', 'hash-c40d']
+    const conv = convo([
+      { id: originalIds[0], role: 'user', body: 'public question' },
+      { id: originalIds[1], role: 'assistant', body: `secret=${API_KEY}` },
+      { id: originalIds[2], role: 'user', body: 'another public turn' },
+    ])
+    const snap = buildSnapshotFromEditor({
+      conversation: conv,
+      // Hide the credential-bearing middle turn.
+      opts: opts({ redact: false, selected: [0, 2] }),
+    })
+
+    const emittedIds = [
+      ...snap.conversation.turns.map((t) => t.id),
+      ...snap.conversation.turn_order,
+      ...snap.conversation.hidden_turns,
+    ]
+    for (const original of originalIds) {
+      expect(emittedIds).not.toContain(original)
+    }
+    // The serialized wire object must not carry any original id either.
+    const wire = JSON.stringify(snap)
+    for (const original of originalIds) {
+      expect(wire).not.toContain(original)
+    }
+    // Ids are opaque positional tokens, internally consistent.
+    expect(snap.conversation.turn_order).toEqual(['t0', 't1', 't2'])
+    expect(snap.conversation.hidden_turns).toEqual(['t1'])
+    expect(snap.conversation.turns.find((t) => t.id === 't1')!.content).toBe('')
   })
 })

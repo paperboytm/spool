@@ -73,7 +73,23 @@ export interface DecodedSnapshot {
   opts: EditorOpts
 }
 
+const SUPPORTED_SCHEMA_VERSION = 1
+
 export function decodeSnapshot(snapshot: Snapshot): DecodedSnapshot {
+  // The wire object is server-validated at publish time, but a snapshot
+  // written by a newer client could carry a future schema_version. We
+  // best-effort decode (the field shapes the reader reads are stable)
+  // and log once rather than throwing — callers like `paperHexFor`
+  // invoke this outside the render error boundary, so a throw would
+  // blank the whole page instead of degrading visibly.
+  if (snapshot.schema_version !== SUPPORTED_SCHEMA_VERSION) {
+    console.warn(
+      `decodeSnapshot: unsupported schema_version ${String(
+        snapshot.schema_version,
+      )} (supported: ${SUPPORTED_SCHEMA_VERSION}); decoding best-effort.`,
+    )
+  }
+
   const hidden = new Set(snapshot.conversation.hidden_turns ?? [])
   const orderIdx = new Map(
     (snapshot.conversation.turn_order ?? []).map((id, idx) => [id, idx]),
