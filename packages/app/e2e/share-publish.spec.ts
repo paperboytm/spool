@@ -202,6 +202,12 @@ test('High-risk PII gate: override does not re-arm the same "Publish anyway" but
   const { window } = ctx
   await waitForSync(window)
   await openShareEditorFromSessionDetail(window, 'test-session-pii-001')
+  // The default redact policy would mask the Stripe key, so the gate
+  // never fires. Open the control panel's Privacy tab and turn redaction
+  // OFF to surface the high-risk match the same way a user opting out of
+  // redaction would.
+  await window.locator('[data-testid="share-editor-view-privacy"]').click()
+  await window.locator('[data-testid="share-editor-toggle-redact"]').click()
   await window.locator('[data-testid="share-menu-trigger"]').click()
   await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
   await window.locator('[data-testid="connect-card-signin"]').click()
