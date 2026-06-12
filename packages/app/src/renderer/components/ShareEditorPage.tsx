@@ -28,6 +28,7 @@ import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
 import { useUndoableState } from '../hooks/useUndoableState.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
+import { useSharedDebounce } from '../hooks/useSharedDebounce.js'
 import { sharePublicUrl } from '../lib/sharePublicUrl.js'
 import type { PublishedRow, PublishSuccess, Visibility } from '../../shared/share-publish.js'
 
@@ -307,6 +308,12 @@ export default function ShareEditorPage({
   // that never landed the column) get no badge: we have nothing to
   // compare against, so silently treating them as up-to-date is
   // better than crying wolf on every open.
+  // One shared 400ms window for the two heavy post-edit follow-ups
+  // (drift check + autosave): an edit wakes the main thread once and
+  // both builds run back-to-back, instead of two independent timers
+  // landing in the same breath.
+  const followUps = useSharedDebounce(400)
+
   const [hasUnpublishedEdits, setHasUnpublishedEdits] = useState(false)
   useEffect(() => {
     if (
@@ -320,11 +327,13 @@ export default function ShareEditorPage({
     let alive = true
     const rowVisibility = publishedRow.visibility as Visibility
     const rowHash = publishedRow.client_request_id
-    // Debounced (same window as autosave below): the hash runs the full
-    // snapshot build — redact pipeline included — which on large
-    // sessions is too heavy to fire on every keystroke / policy toggle.
-    // The badge appearing 400ms later is imperceptible.
-    const handle = window.setTimeout(() => {
+    // Debounced on the SAME window as the autosave below: the hash runs
+    // the full snapshot build — redact pipeline included — which on
+    // large sessions is too heavy to fire on every keystroke / policy
+    // toggle. Sharing one window means an edit wakes the main thread
+    // once for both follow-ups instead of two timers firing
+    // back-to-back. The badge appearing 400ms later is imperceptible.
+    followUps.schedule('drift', () => {
       void (async () => {
         try {
           const snapshot = buildSnapshotFromEditor({
@@ -344,12 +353,12 @@ export default function ShareEditorPage({
           setHasUnpublishedEdits(false)
         }
       })()
-    }, 400)
+    })
     return () => {
       alive = false
-      window.clearTimeout(handle)
+      followUps.cancel('drift')
     }
-  }, [publishedRow, liveConversation, opts])
+  }, [publishedRow, liveConversation, opts, followUps])
 
   // Autosave opts changes back into share_drafts. Debounced so a
   // rapid sequence of clicks (e.g. paging through colorways) collapses
@@ -402,14 +411,14 @@ export default function ShareEditorPage({
     pendingInputsRef.current = {
       draftId, sourceKind, sourceOrigin, effectiveTitle, liveConversation, opts,
     }
-    // The cleanup below clears any in-flight timer when a new edit
-    // arrives or the component unmounts, so only the latest stamped
-    // inputs ever feed flushPendingSave. If `handleDelete` has cleared
-    // pendingInputsRef in the meantime, flushPendingSave returns a
-    // no-op when it reads the ref.
-    const handle = window.setTimeout(flushPendingSave, 400)
-    return () => window.clearTimeout(handle)
-  }, [opts, liveConversation, draftId, sourceKind, sourceOrigin, effectiveTitle, flushPendingSave])
+    // Scheduled on the shared follow-up window (see `followUps` above).
+    // Re-scheduling on each edit replaces the pending callback, so only
+    // the latest stamped inputs ever feed flushPendingSave. If
+    // `handleDelete` has cleared pendingInputsRef in the meantime,
+    // flushPendingSave returns a no-op when it reads the ref. The
+    // unmount flush below is independent of this timer.
+    followUps.schedule('autosave', flushPendingSave)
+  }, [opts, liveConversation, draftId, sourceKind, sourceOrigin, effectiveTitle, flushPendingSave, followUps])
 
   // Flush the pending autosave on component unmount — user clicked
   // Back, navigated away, or the editor was replaced by another view.
