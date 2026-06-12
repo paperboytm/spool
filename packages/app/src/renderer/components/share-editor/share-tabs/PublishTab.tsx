@@ -356,7 +356,7 @@ function VisibilityCard({
       data-testid={testId}
       onClick={onSelect}
       disabled={disabled}
-      className={`relative text-left rounded-md p-2.5 border transition-colors disabled:cursor-not-allowed ${
+      className={`relative flex flex-col text-left rounded-md p-2.5 border transition-colors disabled:cursor-not-allowed ${
         checked
           ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
           : disabled
@@ -364,7 +364,7 @@ function VisibilityCard({
             : 'border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2'
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex w-full items-start justify-between gap-2">
         <span className={`inline-flex w-7 h-7 items-center justify-center rounded-md ${
           checked
             ? 'bg-accent text-white dark:bg-accent-dark'

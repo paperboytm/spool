@@ -604,7 +604,7 @@
     "publishTab": {
       "visibility_legend": "Visibility",
       "visibility_link_title": "Link only",
-      "visibility_link_description": "Anyone with the link can read the whole conversation.",
+      "visibility_link_description": "Anyone with the link can read it.",
       "visibility_profile_title": "On profile",
       "visibility_profile_description_listed": "Listed on your @handle.",
       "visibility_profile_description_needsHandle": "Needs a handle.",
