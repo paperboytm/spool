@@ -292,6 +292,33 @@ export default function App() {
     }
   }, [openShareEditor])
 
+  // Open a draft by id alone — the Published tab's revoked rows carry
+  // only the `draft_id` the backend stored at publish time, not a
+  // ShareDraftListItem. Unlike `handleOpenDraft` (clicked straight off
+  // the drafts list, where a missing row is a freak race), the draft
+  // behind a revoked share may well have been deleted since — surface
+  // that as a toast instead of failing silently.
+  const handleOpenDraftById = useCallback(async (draftId: string) => {
+    try {
+      const full = await window.spool?.shareDraft?.get(draftId)
+      if (!full) {
+        toast.error(t('shares.publishedTab.draftMissing'))
+        return
+      }
+      const doc = JSON.parse(full.snapshot_json) as SpoolDocument
+      openShareEditor({
+        draftId: full.draft_id,
+        sourceKind: full.source_kind,
+        sourceOrigin: full.source_origin,
+        conversation: doc.conversation,
+        opts: normalizeOpts(doc.opts),
+      }, 'shares')
+    } catch (err) {
+      console.error('Failed to open draft for revoked share:', err)
+      toast.error(t('shares.publishedTab.draftMissing'))
+    }
+  }, [openShareEditor, t])
+
   const handleCloseShareEditor = useCallback(() => {
     setShareEditor(null)
     setView(shareEditorReturnView)
@@ -933,6 +960,7 @@ export default function App() {
         {isSharesView ? (
           <SharesPage
             onOpenDraft={handleOpenDraft}
+            onOpenDraftById={handleOpenDraftById}
             {...(shareEnabled ? { onImportSpool: handleImportSpoolFile } : {})}
             {...(shareEnabled ? { onStartNewDraft: handleStartShareFromUuid } : {})}
           />

@@ -456,10 +456,70 @@ test('Revoked shares collapse into the Unpublished section, display-only', async
   const row = window.locator('[data-testid="published-revoked-list"] [data-testid="published-row"]')
   await expect(row).toBeVisible()
   await expect(row).toHaveAttribute('data-revoked', '')
-  // Display-only: no whole-row open button, no ⋯ menu (the slug is
-  // permanently 410 — Copy link would hand out a dead URL).
+  // The revoked timestamp, not the (now-moot) publish date.
+  await expect(row).toContainText(en.shares.publishedTab.unpublishedOn.split('{{')[0]!.trim())
+  // No live-share affordances: no whole-row open button, no ⋯ menu (the
+  // slug is permanently 410 — Copy link would hand out a dead URL).
   await expect(row.locator('[data-testid="published-row-open"]')).toHaveCount(0)
   await expect(row.getByLabel(en.common.moreActions)).toHaveCount(0)
+})
+
+test('Revoked row offers Open draft — back into the editor, or a toast when the draft is gone', async () => {
+  const { window } = ctx
+  await signInAndPublish(window)
+
+  await window.locator('[data-testid="share-menu-unpublish"]').click()
+  await window.locator('[data-testid="unpublish-confirm-yes"]').click()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeHidden()
+  await window.keyboard.press('Escape')
+  await window.locator('[data-testid="share-editor-back"]').click()
+
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-published"]').click()
+  await window.locator('[data-testid="published-unpublished-toggle"]').click()
+
+  // The way out of the dead end: Open draft drops back into the editor
+  // for the same conversation, so re-publishing (a NEW link) walks
+  // through the PII gate again.
+  const openDraft = window
+    .locator('[data-testid="published-row"][data-revoked] [data-testid="revoked-open-draft"]')
+    .first()
+  await expect(openDraft).toBeAttached()
+  await openDraft.click()
+  await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5_000 })
+
+  // Now delete the draft and try again — the action must fail loudly,
+  // not silently.
+  await window.locator('[data-testid="share-editor-back"]').click()
+  await navigateToShares(window)
+  await window.locator('[data-testid="shares-tab-drafts"]').click()
+  // Bind to THIS session's draft by title — other specs in the suite
+  // leave their own drafts in the shared tmpdir DB, so `.first()` can
+  // re-resolve to a survivor after the delete and fail the hidden
+  // assertion.
+  const card = window.locator(
+    '[data-testid="shares-draft-row"][aria-label*="XYLOPHONE_CANARY_42"]',
+  )
+  await expect(card).toBeVisible({ timeout: 5_000 })
+  // Hover the wrapping <div> so the DeleteChip mounts, then the
+  // click-twice-in-place confirm pattern.
+  const wrapper = card.locator('xpath=..')
+  await wrapper.hover()
+  const deleteChip = wrapper.locator('[data-testid="shares-draft-delete"]')
+  await deleteChip.click()
+  await expect(deleteChip).toHaveAttribute('data-confirming', '')
+  await deleteChip.click()
+  await expect(card).toBeHidden({ timeout: 5_000 })
+
+  await window.locator('[data-testid="shares-tab-published"]').click()
+  await window.locator('[data-testid="published-unpublished-toggle"]').click()
+  await window
+    .locator('[data-testid="published-row"][data-revoked] [data-testid="revoked-open-draft"]')
+    .first()
+    .click()
+  await expect(window.getByText(en.shares.publishedTab.draftMissing)).toBeVisible({ timeout: 5_000 })
+  // Still on the Shares page — no broken navigation into a dead editor.
+  await expect(window.locator('[data-testid="shares-page"]')).toBeVisible()
 })
 
 // ───────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CloudOff, EyeOff, Globe, Link as LinkIcon, Link2, Loader2, MoreHorizontal, Newspaper, Plus, Trash2 } from 'lucide-react'
+import { CloudOff, EyeOff, Globe, Link as LinkIcon, Link2, Loader2, MoreHorizontal, Newspaper, Plus, SquarePen, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getMonthDayFormatter } from '../../shared/formatDate.js'
 import { useShareDrafts } from '../hooks/useShareDrafts'
@@ -25,13 +25,16 @@ import { getSessionSourceColor } from '../../shared/sessionSources.js'
 
 type Props = {
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
+  /** Open a draft by id alone — used by the Published tab's revoked
+   *  rows, which only carry the draft_id stored at publish time. */
+  onOpenDraftById?: ((draftId: string) => void | Promise<void>) | undefined
   onImportSpool?: ((file: File) => void | Promise<void>) | undefined
   onStartNewDraft?: ((sessionUuid: string) => void | Promise<void>) | undefined
 }
 
 type SharesTab = 'drafts' | 'published'
 
-export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft }: Props) {
+export default function SharesPage({ onOpenDraft, onOpenDraftById, onImportSpool, onStartNewDraft }: Props) {
   const { t } = useTranslation()
   const { drafts, loading, error, removeDraft, restoreDraft } = useShareDrafts()
   const hasDrafts = drafts.length > 0
@@ -132,7 +135,7 @@ export default function SharesPage({ onOpenDraft, onImportSpool, onStartNewDraft
             {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
           />
         ) : (
-          <PublishedList />
+          <PublishedList onOpenDraftById={onOpenDraftById} />
         )}
       </div>
       {pickerOpen && onStartNewDraft && (
@@ -179,7 +182,7 @@ function SharesTabStrip({
   )
 }
 
-function PublishedList() {
+function PublishedList({ onOpenDraftById }: { onOpenDraftById?: ((draftId: string) => void | Promise<void>) | undefined }) {
   const { t } = useTranslation()
   const { user, loading: authLoading, signIn } = useShareAuth()
   const { items, loading, stale, refresh, noteLocalMutation } = usePublishedShares()
@@ -483,7 +486,7 @@ function PublishedList() {
           {showRevoked && (
             <ul data-testid="published-revoked-list" className="flex flex-col gap-1">
               {revokedItems.map((it) => (
-                <RevokedRow key={it.id} item={it} />
+                <RevokedRow key={it.id} item={it} onOpenDraft={onOpenDraftById} />
               ))}
             </ul>
           )}
@@ -542,24 +545,57 @@ function VisIcon({ listed }: { listed: boolean }) {
  *  hand out a dead URL and Open would land on a tombstone. No click
  *  affordances at all; the collapsed "Unpublished" section header
  *  carries the state, so no per-row pill either. */
-function RevokedRow({ item }: { item: PublishedShareCacheItem }) {
+function RevokedRow({
+  item,
+  onOpenDraft,
+}: {
+  item: PublishedShareCacheItem
+  onOpenDraft?: ((draftId: string) => void | Promise<void>) | undefined
+}) {
   const { t } = useTranslation()
   const title = item.title || t('common.untitled')
+  // The way out of a revoked share is its DRAFT: the draft survives the
+  // revoke, and re-publishing from the editor (new link — the revoked
+  // one is gone for good) walks back through the PII gate. Rows from
+  // publishes that never stored a draft_id stay display-only.
+  const draftId = item.draft_id
   return (
     <li
       data-testid="published-row"
       data-revoked=""
-      className="flex items-center gap-3 rounded-[7px] pr-3 opacity-55"
+      className="group flex items-start gap-3 rounded-[7px] pr-3 py-2.5 opacity-55 hover:opacity-100 transition-opacity"
     >
-      <div className="flex-1 min-w-0 pl-3 py-2.5">
+      <div className="flex-1 min-w-0 pl-3">
         <span title={title} className="block text-[14px] font-medium text-warm-text dark:text-dark-text truncate">
           {title}
         </span>
         <span className="mt-0.5 flex items-center gap-2 text-[11px] text-warm-faint dark:text-dark-muted">
           <VisIcon listed={item.visibility === 'profile-listed'} />
-          <span>{t('shares.publishedTab.publishedOn', { when: rowDateLabel(item.published_at) })}</span>
+          <span>
+            {item.revoked_at !== null
+              ? t('shares.publishedTab.unpublishedOn', { when: rowDateLabel(item.revoked_at) })
+              : t('shares.publishedTab.publishedOn', { when: rowDateLabel(item.published_at) })}
+          </span>
         </span>
       </div>
+      {/* Icon-only, styled and positioned exactly like PublishedRow's
+       *  ⋯ trigger: `items-start` + `-mt-0.5` pins it to the title's
+       *  first line, hover reveals it, the native title supplies the
+       *  tooltip. */}
+      {onOpenDraft && draftId && (
+        <span className="flex-none -mt-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <button
+            type="button"
+            data-testid="revoked-open-draft"
+            onClick={() => void onOpenDraft(draftId)}
+            title={t('shares.publishedTab.openDraft')}
+            aria-label={t('shares.publishedTab.openDraft')}
+            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+          >
+            <SquarePen size={13} strokeWidth={1.6} aria-hidden />
+          </button>
+        </span>
+      )}
     </li>
   )
 }
