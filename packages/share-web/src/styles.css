@@ -239,6 +239,80 @@ html[data-theme='dark'] .sw-root {
   max-width: 480px;
 }
 
+/* ── Legal pages (terms / privacy) ─────────────────────────── */
+.sw-legal {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.sw-legal h1 {
+  margin: 6px 0 0;
+}
+.sw-legal h2 {
+  margin: 28px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.sw-legal p {
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.sw-legal ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.sw-legal li {
+  margin: 4px 0;
+}
+.sw-legal a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-legal code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--card-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.sw-legal-date {
+  margin: 10px 0 22px;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sw-legal-summary {
+  margin: 0 0 24px;
+}
+.sw-legal-summary p {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.sw-legal-summary ul {
+  margin: 0;
+}
+.sw-legal-credit {
+  margin-top: 30px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.sw-signin-legal {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+.sw-signin-legal a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-signin-legal a:hover {
+  color: var(--accent);
+}
+
 /* ── Eyebrows / mastheads ───────────────────────────────────── */
 .sw-eyebrow {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;

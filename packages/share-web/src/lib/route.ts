@@ -11,6 +11,8 @@ export type Route =
   | { kind: 'profile'; handle: string }
   | { kind: 'me' }
   | { kind: 'sign-in'; next: string }
+  | { kind: 'terms' }
+  | { kind: 'privacy' }
   | { kind: 'tombstone'; reason: 'not-found' }
 
 // Slugs are nanoid(21) — URL-safe base64 alphabet
@@ -42,6 +44,10 @@ export function routeFor(pathname: string, search: string = ''): Route {
 
   // Me: /me
   if (path === '/me') return { kind: 'me' }
+
+  // Legal: /terms, /privacy
+  if (path === '/terms') return { kind: 'terms' }
+  if (path === '/privacy') return { kind: 'privacy' }
 
   // Sign-in: /sign-in?next=<safe>
   if (path === '/sign-in') {

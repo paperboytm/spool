@@ -33,6 +33,15 @@ describe('routeFor', () => {
     expect(routeFor('/me')).toEqual({ kind: 'me' })
   })
 
+  it('matches /terms and /privacy as legal pages', () => {
+    expect(routeFor('/terms')).toEqual({ kind: 'terms' })
+    expect(routeFor('/privacy')).toEqual({ kind: 'privacy' })
+    // Trailing slashes normalize like every other route.
+    expect(routeFor('/terms/')).toEqual({ kind: 'terms' })
+    // Subpaths are not legal pages.
+    expect(routeFor('/terms/extra').kind).toBe('tombstone')
+  })
+
   it('matches /@<handle> as profile', () => {
     expect(routeFor('/@alice')).toEqual({ kind: 'profile', handle: 'alice' })
   })

@@ -17,3 +17,13 @@
 
 /sign-in
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://spool.pro https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+# Legal pages are the one surface we WANT indexable (and Google's OAuth
+# brand verification fetches the privacy URL) — drop the site default.
+/terms
+  ! X-Robots-Tag
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+/privacy
+  ! X-Robots-Tag
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'

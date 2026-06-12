@@ -126,6 +126,10 @@ export function SignIn({ next }: Props) {
               name, and picture.
             </span>
           </div>
+          <p className="sw-signin-legal">
+            By signing in you agree to the <a href="/terms">Terms</a> and{' '}
+            <a href="/privacy">Privacy policy</a>.
+          </p>
         </div>
       </main>
       <Footer />
