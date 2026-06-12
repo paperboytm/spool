@@ -192,6 +192,80 @@ test('Cancel on the unpublish modal leaves the share live', async () => {
   expect(shares[0]!.revoked_at).toBeNull()
 })
 
+test('High-risk PII gate: override does not re-arm the same "Publish anyway" button', async () => {
+  // Regression for the single-misclick credential-publish bypass. Before
+  // the override, the only action is "Publish anyway" (the override
+  // button, testid share-menu-confirm-anyway). After clicking it, the
+  // live-publish button must be a DISTINCT control — different testid AND
+  // different label — so a second click on the same spot can't publish
+  // unredacted secrets.
+  const { window } = ctx
+  await waitForSync(window)
+  await openShareEditorFromSessionDetail(window, 'test-session-pii-001')
+  await window.locator('[data-testid="share-menu-trigger"]').click()
+  await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
+  await window.locator('[data-testid="connect-card-signin"]').click()
+  await window
+    .locator('[data-testid="share-menu-form"]')
+    .waitFor({ state: 'visible', timeout: 5_000 })
+
+  // The high-risk warning blocks publish: only the override button is
+  // present; the normal submit button is not yet rendered.
+  await expect(window.locator('[data-testid="share-menu-pii-high"]')).toBeVisible()
+  const override = window.locator('[data-testid="share-menu-confirm-anyway"]')
+  await expect(override).toBeVisible()
+  await expect(override).toHaveText(en.shareEditor.publishTab.publishAnyway)
+  await expect(window.locator('[data-testid="share-menu-submit"]')).toHaveCount(0)
+  await expect(window.locator('[data-testid="share-menu-submit-unredacted"]')).toHaveCount(0)
+
+  // Acknowledge the override. The live-publish control is now a SEPARATE
+  // button with a distinct testid + label — not the "Publish anyway" text
+  // sitting under the cursor.
+  await override.click()
+  await expect(window.locator('[data-testid="share-menu-confirm-anyway"]')).toHaveCount(0)
+  const confirm = window.locator('[data-testid="share-menu-submit-unredacted"]')
+  await expect(confirm).toBeVisible()
+  await expect(confirm).toHaveText(en.shareEditor.publishTab.publishUnredacted)
+  expect(en.shareEditor.publishTab.publishUnredacted).not.toBe(
+    en.shareEditor.publishTab.publishAnyway,
+  )
+  // Nothing published yet — the override click alone did not submit.
+  expect(mock.state.shares.size).toBe(0)
+
+  // The explicit confirm publishes.
+  await confirm.click()
+  await expect(
+    window.locator('[data-testid="share-menu-manage-view"]'),
+  ).toBeVisible({ timeout: 10_000 })
+  expect(mock.state.shares.size).toBe(1)
+})
+
+test('Unpublish with an expired session (401) shows the sign-in recovery copy, not a raw status', async () => {
+  // Regression for the revoke-401 path: main clears the token (so the UI
+  // can transition to signed-out) and the modal must surface the human
+  // "session expired — sign in again" copy instead of the raw "revoke 401"
+  // string with no recovery path.
+  const { window } = ctx
+  await signInAndPublish(window)
+
+  mock.state.failures.revoke = 401
+  await window.locator('[data-testid="share-menu-unpublish"]').click()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeVisible()
+  await window.locator('[data-testid="unpublish-confirm-yes"]').click()
+
+  // The modal stays open carrying the mapped error — same i18n key the
+  // publish path uses — and the share is untouched (revoke never landed).
+  const modal = window.locator('[data-testid="unpublish-confirm"]')
+  await expect(modal).toContainText(en.shareEditor.publishTab.error_sessionExpired, {
+    timeout: 5_000,
+  })
+  // The raw status string must NOT leak through.
+  await expect(modal).not.toContainText('revoke 401')
+  const shares = Array.from(mock.state.shares.values())
+  expect(shares).toHaveLength(1)
+  expect(shares[0]!.revoked_at).toBeNull()
+})
+
 test('Publish rate-limit (429) shows the error inline and retry succeeds', async () => {
   const { window } = ctx
   await signInAndOpenPublishForm(window)

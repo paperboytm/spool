@@ -9,6 +9,7 @@ import {
   type PublishedShareCacheItem,
 } from '@spool-lab/core'
 import { authedFetch } from '../share/api-client.js'
+import { clearToken } from '../auth/session-store.js'
 import type {
   PublishRequestBody,
   PublishResult,
@@ -37,6 +38,7 @@ export function registerSharePublishIpc(): void {
     })
     const json = await readBody(r)
     if (!r.ok) {
+      if (r.status === 401) clearToken()
       const error: PublishErrorBody = {
         error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
       }
@@ -85,7 +87,10 @@ export function registerSharePublishIpc(): void {
 
   ipcMain.handle('share-publish:revoke', async (_e, id: string): Promise<{ ok: true }> => {
     const r = await authedFetch(`/api/revoke/${encodeURIComponent(id)}`, { method: 'POST' })
-    if (!r.ok) throw new Error(`revoke ${r.status}`)
+    if (!r.ok) {
+      if (r.status === 401) clearToken()
+      throw new Error(`revoke ${r.status}`)
+    }
     // Flip the cache's revoked_at so the editor and Shares list
     // immediately surface the unpublish. Same non-fatal posture as
     // the publish path above.
@@ -106,6 +111,7 @@ export function registerSharePublishIpc(): void {
       })
       const json = await readBody(r)
       if (!r.ok) {
+        if (r.status === 401) clearToken()
         const error: PublishErrorBody = {
           error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
         }
@@ -128,7 +134,10 @@ export function registerSharePublishIpc(): void {
 
   ipcMain.handle('share-publish:my-shares', async (): Promise<MySharesResponse> => {
     const r = await authedFetch('/api/me/shares')
-    if (!r.ok) throw new Error(`me/shares ${r.status}`)
+    if (!r.ok) {
+      if (r.status === 401) clearToken()
+      throw new Error(`me/shares ${r.status}`)
+    }
     return (await r.json()) as MySharesResponse
   })
 
@@ -138,6 +147,7 @@ export function registerSharePublishIpc(): void {
       body: JSON.stringify({ handle }),
     })
     if (!r.ok) {
+      if (r.status === 401) clearToken()
       const body = await readBody(r)
       const detail = typeof body['detail'] === 'string' ? body['detail'] : `claim ${r.status}`
       throw new Error(detail)
@@ -147,7 +157,10 @@ export function registerSharePublishIpc(): void {
 
   ipcMain.handle('share-publish:check-handle', async (_e, handle: string): Promise<HandleCheckResponse> => {
     const r = await authedFetch(`/api/handles/check?h=${encodeURIComponent(handle)}`)
-    if (!r.ok) throw new Error(`check ${r.status}`)
+    if (!r.ok) {
+      if (r.status === 401) clearToken()
+      throw new Error(`check ${r.status}`)
+    }
     return (await r.json()) as HandleCheckResponse
   })
 
@@ -165,13 +178,19 @@ export function registerSharePublishIpc(): void {
 
   ipcMain.handle('share-publish:schedule-delete', async (): Promise<ScheduleDeleteResponse> => {
     const r = await authedFetch('/api/me/delete', { method: 'POST' })
-    if (!r.ok) throw new Error(`schedule-delete ${r.status}`)
+    if (!r.ok) {
+      if (r.status === 401) clearToken()
+      throw new Error(`schedule-delete ${r.status}`)
+    }
     return (await r.json()) as ScheduleDeleteResponse
   })
 
   ipcMain.handle('share-publish:cancel-delete', async (): Promise<{ ok: true }> => {
     const r = await authedFetch('/api/me/delete', { method: 'DELETE' })
-    if (!r.ok) throw new Error(`cancel-delete ${r.status}`)
+    if (!r.ok) {
+      if (r.status === 401) clearToken()
+      throw new Error(`cancel-delete ${r.status}`)
+    }
     return { ok: true }
   })
 }

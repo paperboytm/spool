@@ -169,7 +169,16 @@ export function ShareMenu({
       setConfirmingUnpublish(false)
       setPendingUnpublish(null)
     } catch (err) {
-      setUnpublishError(err instanceof Error ? err.message : 'Could not unpublish.')
+      // The revoke IPC throws `Error('revoke <status>')`. On a 401 the
+      // session is already cleared main-side (share-publish.ts) — surface
+      // the same "session expired, sign in again" copy the publish path
+      // uses instead of leaking the raw "revoke 401" status string.
+      const msg = err instanceof Error ? err.message : ''
+      setUnpublishError(
+        /\b401\b/.test(msg)
+          ? t('shareEditor.publishTab.error_sessionExpired')
+          : msg || 'Could not unpublish.',
+      )
     } finally {
       setUnpublishBusy(false)
     }

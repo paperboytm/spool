@@ -34,7 +34,15 @@ export interface SharePublishMockState {
     id: string
     email: string
     name: string
+    /** Server-resolved display name (override > provider > email-local). */
+    display_name: string
+    /** Raw override the user typed; null means "use the provider name". */
+    display_name_override: string | null
     avatar_url: string | null
+    /** Opaque id of a custom avatar in R2; null when none uploaded. */
+    custom_avatar_id: string | null
+    /** When false, the provider avatar is hidden even if one exists. */
+    avatar_visible: boolean
     handle: string | null
     deletion_pending_until: number | null
   }
@@ -54,6 +62,10 @@ export interface SharePublishMockState {
   failures: {
     publish: number | null
     myShares: number | null
+    /** Forced status for POST /api/revoke/:id — lets specs drive the
+     *  unpublish 401 recovery path (token clear + "session expired" copy)
+     *  without standing up real auth expiry. */
+    revoke: number | null
   }
 }
 
@@ -82,9 +94,32 @@ const DEFAULT_USER: SharePublishMockState['user'] = {
   id: 'mock-user-1',
   email: 'mock@example.com',
   name: 'E2E User',
+  display_name: 'E2E User',
+  display_name_override: null,
   avatar_url: null,
+  custom_avatar_id: null,
+  avatar_visible: true,
   handle: null,
   deletion_pending_until: null,
+}
+
+/** Flat ShareAuthUser payload — the exact shape
+ *  share-backend/functions/api/me/index.ts returns and the renderer's
+ *  ShareAuthUser type (hooks/useShareAuth.ts) expects. Used by both
+ *  /api/me and the sign-in-with-id-token response so neither drifts. */
+function meUser(state: SharePublishMockState) {
+  return {
+    id: state.user.id,
+    email: state.user.email,
+    name: state.user.name,
+    display_name: state.user.display_name,
+    display_name_override: state.user.display_name_override,
+    avatar_url: state.user.avatar_url,
+    custom_avatar_id: state.user.custom_avatar_id,
+    avatar_visible: state.user.avatar_visible,
+    handle: state.user.handle,
+    deletion_pending_until: state.user.deletion_pending_until,
+  }
 }
 
 export async function startSharePublishMockBackend(): Promise<SharePublishMockHandle> {
@@ -93,7 +128,7 @@ export async function startSharePublishMockBackend(): Promise<SharePublishMockHa
     shares: new Map(),
     handleAvailability: new Map(),
     lastPublishPayload: null,
-    failures: { publish: null, myShares: null },
+    failures: { publish: null, myShares: null, revoke: null },
   }
 
   const server = createServer(async (req, res) => {
@@ -132,7 +167,7 @@ export async function startSharePublishMockBackend(): Promise<SharePublishMockHa
       state.shares.clear()
       state.handleAvailability.clear()
       state.lastPublishPayload = null
-      state.failures = { publish: null, myShares: null }
+      state.failures = { publish: null, myShares: null, revoke: null }
     },
     close: async () => {
       await new Promise<void>((resolve, reject) => {
@@ -159,14 +194,7 @@ async function routeRequest(
     return json(res, 200, {
       session_token: 'mock-session-' + state.user.id,
       exp: Date.now() + 24 * 3600 * 1000,
-      user: {
-        id: state.user.id,
-        email: state.user.email,
-        name: state.user.name,
-        avatar_url: state.user.avatar_url,
-        handle: state.user.handle,
-        deletion_pending_until: state.user.deletion_pending_until,
-      },
+      user: meUser(state),
     })
   }
 
@@ -175,18 +203,13 @@ async function routeRequest(
     return json(res, 200, { ok: true })
   }
 
-  // GET /api/me
+  // GET /api/me — real backend returns a FLAT ShareAuthUser (see
+  // share-backend/functions/api/me/index.ts): display_name +
+  // display_name_override + custom_avatar_id + avatar_visible alongside
+  // the base claims. Mirror it so Settings/Profile e2e read real fields
+  // instead of `undefined`.
   if (method === 'GET' && url.pathname === '/api/me') {
-    return json(res, 200, {
-      user: {
-        id: state.user.id,
-        email: state.user.email,
-        name: state.user.name,
-        avatar_url: state.user.avatar_url,
-      },
-      handle: state.user.handle,
-      deletion_pending_until: state.user.deletion_pending_until,
-    })
+    return json(res, 200, meUser(state))
   }
 
   // GET /api/me/shares — backend returns { items: [...] } per the
@@ -332,6 +355,12 @@ async function routeRequest(
   // POST /api/revoke/:id
   const revokeMatch = method === 'POST' && url.pathname.match(/^\/api\/revoke\/([\w-]+)$/)
   if (revokeMatch) {
+    if (state.failures.revoke !== null) {
+      return json(res, state.failures.revoke, {
+        error: 'forced_failure',
+        detail: 'forced failure (e2e)',
+      })
+    }
     const id = revokeMatch[1] as string
     const row = state.shares.get(id)
     if (!row) return json(res, 404, { detail: 'not found' })
@@ -343,10 +372,12 @@ async function routeRequest(
     return json(res, 200, { ok: true })
   }
 
-  // POST /api/me/delete
+  // POST /api/me/delete — real backend responds { scheduled_at } (see
+  // share-backend/functions/api/me/delete.ts), which is exactly what
+  // ScheduleDeleteResponse declares. Return that, not deletion_pending_until.
   if (method === 'POST' && url.pathname === '/api/me/delete') {
     state.user.deletion_pending_until = Date.now() + 24 * 3600 * 1000
-    return json(res, 200, { deletion_pending_until: state.user.deletion_pending_until })
+    return json(res, 200, { scheduled_at: state.user.deletion_pending_until })
   }
   if (method === 'DELETE' && url.pathname === '/api/me/delete') {
     state.user.deletion_pending_until = null

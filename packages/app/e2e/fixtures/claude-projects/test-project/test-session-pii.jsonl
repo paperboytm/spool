@@ -1,0 +1,2 @@
+{"type":"user","sessionId":"test-session-pii-001","cwd":"/tmp/test-project","uuid":"pii-msg-001","timestamp":"2026-02-01T09:00:00Z","message":{"role":"user","content":"Here is my key so you can test the deploy: sk_live_abcdef1234567890ABCDEF"}}
+{"type":"assistant","uuid":"pii-msg-002","parentUuid":"pii-msg-001","timestamp":"2026-02-01T09:00:05Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Thanks — I'll wire the deploy step. You should rotate that credential after we finish."}]}}
