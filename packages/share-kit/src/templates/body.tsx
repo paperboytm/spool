@@ -79,7 +79,10 @@ function MarkdownImage({ src, alt, accent }: { src?: string | undefined; alt?: s
       )}
       {state !== 'ok' && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={accent} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          {/* stroke via style, not the SVG attribute — the accent may be
+              a `var(--sk-accent)` reference, which only resolves in CSS
+              contexts (presentation attributes don't evaluate var()). */}
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, stroke: accent }}>
             <rect x="2.5" y="2.5" width="13" height="13" rx="1.5" />
             <circle cx="6.5" cy="6.5" r="1.2" />
             <path d="M15 11l-3.5-3.5L4 14" />

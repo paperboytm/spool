@@ -7,7 +7,7 @@
 import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
-import { accentBgFor, templateTokens } from './tokens'
+import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
 import { collectRedactList } from './redact'
 import { selectSegments } from './selection'
 import { GapMarker } from './gap-marker'
@@ -36,6 +36,7 @@ export function Chat({ convo, opts }: Props) {
   return (
     <div
       style={{
+        ...bodyStyleVars({ accent, accentBg, bodyFont: tf, blockBorder: t.border }),
         fontFamily: tf,
         background: t.paper,
         color: t.text,
@@ -119,11 +120,9 @@ export function Chat({ convo, opts }: Props) {
                     <Body
                       text={turn.body}
                       redact={opts.redact ? redactList : undefined}
-                      sansFont={tf}
                       fontSize={13.5}
-                      accent={accent}
-                      accentBg={accentBg}
-                      blockBorder={t.border}
+                      {...BODY_VAR_PROPS}
+                      blockBorder={BODY_VAR_BLOCK_BORDER}
                     />
                   </div>
                 </div>
@@ -170,10 +169,8 @@ export function Chat({ convo, opts }: Props) {
                     <Body
                       text={turn.body}
                       redact={opts.redact ? redactList : undefined}
-                      sansFont={tf}
                       fontSize={13.5}
-                      accent={accent}
-                      accentBg={accentBg}
+                      {...BODY_VAR_PROPS}
                     />
                   </div>
                 </div>

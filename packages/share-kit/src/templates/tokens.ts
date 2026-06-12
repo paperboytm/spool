@@ -28,3 +28,34 @@ export function accentBgFor(accentHex: string, alphaHex = '26'): string {
   }
   return `#${hex}${alphaHex}`
 }
+
+/** CSS custom properties that carry the style-only Body inputs.
+ *
+ *  Templates set these on their ROOT element and hand `Body` literal
+ *  `var(--sk-*)` references (see BODY_VAR_PROPS). Because the prop
+ *  strings never change, a colorway / paper / typeface switch leaves
+ *  every memoized Body untouched — the restyle happens entirely in
+ *  CSS, instead of re-parsing the markdown of every turn. */
+export function bodyStyleVars(args: {
+  accent: string
+  accentBg: string
+  bodyFont: string
+  blockBorder: string
+}): Record<string, string> {
+  return {
+    '--sk-accent': args.accent,
+    '--sk-accent-bg': args.accentBg,
+    '--sk-body-font': args.bodyFont,
+    '--sk-block-border': args.blockBorder,
+  }
+}
+
+/** The literal var() references templates pass to `Body` so its props
+ *  stay referentially stable across style-only opts changes. */
+export const BODY_VAR_PROPS = {
+  accent: 'var(--sk-accent)',
+  accentBg: 'var(--sk-accent-bg)',
+  sansFont: 'var(--sk-body-font)',
+} as const
+
+export const BODY_VAR_BLOCK_BORDER = 'var(--sk-block-border)'

@@ -755,6 +755,7 @@
     "tab_style": "スタイル",
     "tab_messages": "メッセージ",
     "tab_privacy": "プライバシー",
+    "privacy_scanning": "機密データをスキャン中…",
     "panel_view": "パネルビュー",
     "section_template": "テンプレート",
     "section_template_count": "{{count}} 種類",

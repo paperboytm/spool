@@ -792,6 +792,7 @@
     "tab_style": "Style",
     "tab_messages": "Messages",
     "tab_privacy": "Confidentialité",
+    "privacy_scanning": "Recherche de données sensibles…",
     "panel_view": "Vue du panneau",
     "section_template": "Modèle",
     "section_template_count": "{{count}} styles",

@@ -14,7 +14,7 @@
 import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
-import { accentBgFor, templateTokens } from './tokens'
+import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 import { collectRedactList } from './redact'
 import { selectSegments } from './selection'
 import { Body } from './body'
@@ -39,6 +39,7 @@ export function Timeline({ convo, opts }: Props) {
   return (
     <div
       style={{
+        ...bodyStyleVars({ accent, accentBg, bodyFont: tf, blockBorder: t.border }),
         fontFamily: tf,
         background: t.paper,
         color: t.text,
@@ -244,9 +245,7 @@ export function Timeline({ convo, opts }: Props) {
                     <Body
                       text={turn.body}
                       redact={opts.redact ? redactList : undefined}
-                      sansFont={tf}
-                      accent={accent}
-                      accentBg={accentBg}
+                      {...BODY_VAR_PROPS}
                     />
                   </div>
                 </div>

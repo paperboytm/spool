@@ -755,6 +755,7 @@
     "tab_style": "스타일",
     "tab_messages": "메시지",
     "tab_privacy": "개인정보",
+    "privacy_scanning": "민감한 데이터 스캔 중…",
     "panel_view": "패널 보기",
     "section_template": "템플릿",
     "section_template_count": "{{count}}종",

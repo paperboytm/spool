@@ -792,6 +792,7 @@
     "tab_style": "Style",
     "tab_messages": "Messages",
     "tab_privacy": "Privacy",
+    "privacy_scanning": "Scanning for sensitive data…",
     "panel_view": "Panel view",
     "section_template": "Template",
     "section_template_count": "{{count}} looks",

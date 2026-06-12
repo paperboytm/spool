@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Virtuoso } from 'react-virtuoso'
 import { Check, CheckCheck, Eraser } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
 
@@ -80,29 +81,39 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
   }, [opts, setOpts])
 
   const jumpToTurn = useCallback((index: number) => {
-    const el = document.querySelector<HTMLElement>(`[data-turn-index="${index}"]`)
-    if (!el) return
-    // Compute scrollTop manually instead of `scrollIntoView` so we
-    // only touch the vertical axis. scrollIntoView walks up the DOM
-    // and (under zoom transform) ends up shifting the artifact card
-    // horizontally off-center too.
-    const sc = el.closest<HTMLElement>('[data-share-preview-scroll]')
-    if (sc) {
-      const turnRect = el.getBoundingClientRect()
-      const scRect = sc.getBoundingClientRect()
-      const offsetFromContainerTop = (turnRect.top - scRect.top) + sc.scrollTop
-      const centered = offsetFromContainerTop - (scRect.height - turnRect.height) / 2
-      sc.scrollTop = Math.max(0, centered)
-    } else {
-      // Fallback for anything not inside our preview pane.
-      el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
+    // The preview mounts large documents progressively, so a turn deep
+    // in the conversation may not be in the DOM yet right after the
+    // editor opens. Retry across frames (bounded) until the fill
+    // reaches it instead of silently doing nothing.
+    const tryJump = (attempt: number) => {
+      const el = document.querySelector<HTMLElement>(`[data-turn-index="${index}"]`)
+      if (!el) {
+        if (attempt < 120) requestAnimationFrame(() => tryJump(attempt + 1))
+        return
+      }
+      // Compute scrollTop manually instead of `scrollIntoView` so we
+      // only touch the vertical axis. scrollIntoView walks up the DOM
+      // and (under zoom transform) ends up shifting the artifact card
+      // horizontally off-center too.
+      const sc = el.closest<HTMLElement>('[data-share-preview-scroll]')
+      if (sc) {
+        const turnRect = el.getBoundingClientRect()
+        const scRect = sc.getBoundingClientRect()
+        const offsetFromContainerTop = (turnRect.top - scRect.top) + sc.scrollTop
+        const centered = offsetFromContainerTop - (scRect.height - turnRect.height) / 2
+        sc.scrollTop = Math.max(0, centered)
+      } else {
+        // Fallback for anything not inside our preview pane.
+        el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
+      }
+      // Brief flash so the user sees where they landed. Remove + force
+      // reflow + re-add so the animation restarts on repeated clicks.
+      el.removeAttribute('data-spool-share-flash')
+      void el.offsetWidth
+      el.setAttribute('data-spool-share-flash', '')
+      window.setTimeout(() => el.removeAttribute('data-spool-share-flash'), 1700)
     }
-    // Brief flash so the user sees where they landed. Remove + force
-    // reflow + re-add so the animation restarts on repeated clicks.
-    el.removeAttribute('data-spool-share-flash')
-    void el.offsetWidth
-    el.setAttribute('data-spool-share-flash', '')
-    window.setTimeout(() => el.removeAttribute('data-spool-share-flash'), 1700)
+    tryJump(0)
   }, [])
 
   if (total === 0) {
@@ -142,13 +153,21 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
           </button>
         </span>
       </div>
-      <ul className="flex-1 min-h-0 overflow-y-auto scrollbar-none py-1">
-        {visibleTurns.map(({ turn, originalIndex: i }) => {
+      {/* Virtualised: a session can carry thousands of turns and the
+          panel used to mount one row per turn in a single synchronous
+          commit — switching to this tab froze the editor for seconds.
+          Same react-virtuoso setup as SessionDetail's MessageList. */}
+      <Virtuoso
+        data={visibleTurns}
+        computeItemKey={(_idx, row) => row.originalIndex}
+        defaultItemHeight={26}
+        increaseViewportBy={200}
+        className="flex-1 min-h-0 scrollbar-none"
+        itemContent={(_idx, { turn, originalIndex: i }) => {
           const included = selectedSet === null ? true : selectedSet.has(i)
           const preview = firstLinePreview(turn.body)
           return (
-            <li
-              key={i}
+            <div
               data-testid="share-editor-turn-row"
               data-row-turn-index={i}
               data-included={included ? '' : undefined}
@@ -195,10 +214,10 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                   {preview || <span className="text-warm-faint dark:text-dark-faint italic">{t('shareEditorPanel.turnSelector_empty_body')}</span>}
                 </span>
               </button>
-            </li>
+            </div>
           )
-        })}
-      </ul>
+        }}
+      />
     </div>
   )
 }

@@ -755,6 +755,7 @@
     "tab_style": "样式",
     "tab_messages": "消息",
     "tab_privacy": "隐私",
+    "privacy_scanning": "正在扫描敏感数据…",
     "panel_view": "面板视图",
     "section_template": "模板",
     "section_template_count": "{{count}} 种",
