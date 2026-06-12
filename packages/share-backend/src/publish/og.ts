@@ -23,7 +23,11 @@ export function escapeHtml(s: string): string {
 // the rendered title and the font-subset fetch — otherwise a long title
 // would load glyphs we never paint.
 export function clampTitle(raw: string): string {
-  return escapeHtml(raw).slice(0, 140)
+  // Slice the RAW string first, THEN escape: escaping before slicing can
+  // cut through the middle of an entity (e.g. `&amp;` → `&am`), emitting
+  // a broken token into the OG image. Slicing the raw input keeps the
+  // ≤140-visible-char intent while guaranteeing every entity stays whole.
+  return escapeHtml(raw.slice(0, 140))
 }
 
 export function buildOgHtml(snap: SnapshotForOg): string {

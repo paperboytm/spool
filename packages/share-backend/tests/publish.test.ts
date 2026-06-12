@@ -7,6 +7,7 @@ import { onRequestGet as metaGet } from '../functions/api/meta/[id]'
 import { onRequestGet as snapshotGet } from '../functions/api/snapshots/[id]'
 import type { SessionRecord } from '../src/auth/session'
 import { isValidSlug, nanoidSlug } from '../src/publish/slug'
+import { PublishRequest } from '../src/publish/validators'
 
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
@@ -167,6 +168,45 @@ describe('isValidSlug', () => {
   it('rejects bad characters', () => {
     expect(isValidSlug('!'.repeat(21))).toBe(false)
     expect(isValidSlug('a/'.repeat(10) + 'a')).toBe(false)
+  })
+  it('rejects a 21-char string with a non-ASCII word char (no Unicode \\w widening)', () => {
+    // `\w` under a Unicode-aware engine can match letters like fullwidth
+    // chars; the explicit [A-Za-z0-9_-] class must reject them. Both are
+    // exactly 21 chars so only the alphabet — not the length — gates them.
+    expect(isValidSlug('a'.repeat(20) + 'ａ')).toBe(false) // U+FF41 fullwidth a
+    expect(isValidSlug('a'.repeat(20) + '·')).toBe(false) // U+00B7 middle dot
+    expect(isValidSlug('a'.repeat(20) + 'é')).toBe(false) // U+00E9 accented
+  })
+})
+
+describe('PublishRequest.override_slug', () => {
+  function base(overrideSlug: string) {
+    return {
+      snapshot: {
+        schema_version: 1,
+        source: { kind: 'spool-session', captured_at: new Date().toISOString() },
+        conversation: {
+          title: 'hi',
+          turns: [{ id: 't1', role: 'user', content: 'x' }],
+          turn_order: ['t1'],
+          hidden_turns: [],
+        },
+        editor_opts: {
+          template: 'forum', paper: 'cream', typeface: 'geist', colorway: 'amber',
+          density: 'relaxed', masthead: true, colophon: true, avatars: true, show_byline: true,
+        },
+      },
+      visibility: 'unlisted',
+      draft_id: 'd1',
+      idempotency_key: 'k'.repeat(8),
+      override_slug: overrideSlug,
+    }
+  }
+  it('accepts an ASCII 21-char override_slug', () => {
+    expect(PublishRequest.safeParse(base(nanoidSlug())).success).toBe(true)
+  })
+  it('rejects a 21-char override_slug containing a non-ASCII word char', () => {
+    expect(PublishRequest.safeParse(base('a'.repeat(20) + 'ａ')).success).toBe(false)
   })
 })
 

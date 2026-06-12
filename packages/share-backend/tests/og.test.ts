@@ -186,6 +186,23 @@ describe('renderOgPng', () => {
     expect(longest).toBeLessThanOrEqual(140)
   })
 
+  it('does not truncate inside an HTML entity when an & sits near the 140 boundary', async () => {
+    // Pre-fix `escapeHtml(raw).slice(0,140)` could cut `&amp;` mid-entity
+    // (e.g. into `&am`), emitting a garbled token. Slicing raw first then
+    // escaping keeps every entity whole. Place a literal `&` at raw index
+    // 139 so the escaped form `&amp;` would straddle the old 140 cutoff.
+    const { clampTitle } = await import('../src/publish/og')
+    const raw = 'a'.repeat(139) + '&' + 'b'.repeat(20)
+    const out = clampTitle(raw)
+    // The trailing `&` of the 140-char raw slice escapes to a full `&amp;`.
+    expect(out.endsWith('&amp;')).toBe(true)
+    // No dangling/partial entity anywhere: every `&` is the start of a
+    // complete known entity.
+    expect(out).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#39;)/)
+    // Raw visible-char intent preserved: 140 source chars in, escaped out.
+    expect(out).toBe('a'.repeat(139) + '&amp;')
+  })
+
   it('emits zero whitespace between tags so Satori does not count them as child text nodes', async () => {
     // workers-og throws `Expected <div> to have explicit "display: flex"
     // or "display: none" if it has more than one child node` when a

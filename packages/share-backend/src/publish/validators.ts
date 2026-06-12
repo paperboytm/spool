@@ -97,7 +97,7 @@ export const PublishRequest = z.object({
   // handler re-runs `isValidSlug()` after this, but enforcing at the
   // schema boundary lets us reject malformed slugs before any DB
   // round-trips fire (idempotency SELECT, ownership SELECT).
-  override_slug: z.string().regex(/^[\w-]{21}$/).optional(),
+  override_slug: z.string().regex(/^[A-Za-z0-9_-]{21}$/).optional(),
 })
 
 export type PublishRequestT = z.infer<typeof PublishRequest>

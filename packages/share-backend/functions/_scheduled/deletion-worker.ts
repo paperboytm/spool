@@ -71,7 +71,6 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
             JSON.stringify({
               owner: row.user_id,
               revoked_at: now,
-              expires_at: null,
               visibility: 'unlisted',
               version: 0,
             }),

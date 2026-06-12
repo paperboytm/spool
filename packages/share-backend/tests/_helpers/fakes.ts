@@ -430,6 +430,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (s) s.revoked_at = revoked_at
           return { success: true, meta: { changes: 1 } }
         }
+        if (/^UPDATE published_shares SET visibility=\? WHERE id=\? AND user_id=\?/i.test(sql)) {
+          const [visibility, id, user_id] = params as [string, string, string]
+          const s = state.published_shares.find((x) => x.id === id && x.user_id === user_id)
+          if (s) s.visibility = visibility
+          return { success: true, meta: { changes: s ? 1 : 0 } }
+        }
         if (/^UPDATE published_shares SET visibility=\? WHERE id=\?/i.test(sql)) {
           const [visibility, id] = params as [string, string]
           const s = state.published_shares.find((x) => x.id === id)

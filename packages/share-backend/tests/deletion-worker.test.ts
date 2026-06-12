@@ -98,6 +98,9 @@ describe('runDeletionSweep', () => {
     const meta = JSON.parse(metaRaw!) as { revoked_at: number | null; version: number }
     expect(typeof meta.revoked_at).toBe('number')
     expect(meta.version).toBe(0)
+    // expires_at was removed with the expiry feature (#385/#386); the
+    // tombstone must not resurrect the dead field.
+    expect('expires_at' in meta).toBe(false)
     // D1 share marked revoked
     expect(env.state.published_shares.find((s) => s.id === slug)?.revoked_at).toBeTruthy()
     // handle released

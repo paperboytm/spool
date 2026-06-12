@@ -13,5 +13,9 @@ export function nanoidSlug(): string {
 }
 
 export function isValidSlug(s: string): boolean {
-  return new RegExp(`^[\\w-]{${SLUG_LEN}}$`).test(s)
+  // Explicit ASCII alphabet rather than `\w`: under the `u` flag (or
+  // future engine changes) `\w` can match Unicode word chars, which would
+  // widen this public-facing gate. The generated alphabet is ASCII, so
+  // pinning it here only tightens the validator.
+  return new RegExp(`^[A-Za-z0-9_-]{${SLUG_LEN}}$`).test(s)
 }

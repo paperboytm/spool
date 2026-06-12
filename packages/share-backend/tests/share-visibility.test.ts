@@ -188,6 +188,43 @@ describe('PATCH /api/me/shares/:id (visibility)', () => {
     expect(share.visibility).toBe('profile-listed')
   })
 
+  it("UPDATE is scoped to user_id: a passing ownership SELECT still can't mutate another user's row", async () => {
+    // Defense-in-depth for the UPDATE itself. The ownership SELECT 404s a
+    // cross-user share today, so this forces the SELECT to pass (as a
+    // future refactor or a bug might) and asserts the WHERE id=? AND
+    // user_id=? clause keeps the victim's row untouched. On the pre-fix
+    // `WHERE id=?` UPDATE this mutates user-2's share and the test fails.
+    const state = emptyState()
+    seedUser(state, 'user-1')
+    seedUser(state, 'user-2')
+    state.handles.push({ handle: 'alice', user_id: 'user-1', claimed_at: Date.now(), released_at: null })
+    // Victim row belongs to user-2.
+    const victim = seedShare(state, { user_id: 'user-2', visibility: 'unlisted' })
+    const env = envFor(state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+
+    // Force the ownership SELECT to report success for the attacker
+    // (user-1) even though the row is user-2's. Every other prepared
+    // statement (the UPDATE included) runs against the real fake DB.
+    const realPrepare = env.DB.prepare.bind(env.DB)
+    const intercept = (sql: string) => {
+      if (/^SELECT visibility, revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
+        return {
+          bind: () => ({ first: async () => ({ visibility: 'unlisted', revoked_at: null }) }),
+        } as unknown as ReturnType<typeof realPrepare>
+      }
+      return realPrepare(sql)
+    }
+    ;(env.DB as unknown as { prepare: typeof realPrepare }).prepare =
+      intercept as unknown as typeof realPrepare
+
+    const res = await invoke(visibilityPatch, patchReq(victim.id, { visibility: 'profile-listed' }), env, { id: victim.id })
+    expect(res.status).toBe(200)
+    // The UPDATE's user_id=? clause matched no row for user-1, so the
+    // victim's visibility is unchanged.
+    expect(victim.visibility).toBe('unlisted')
+  })
+
   it('429s past the hourly per-user cap', async () => {
     const { env, share } = await setup()
     for (let i = 0; i < 60; i++) {

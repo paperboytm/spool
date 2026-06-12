@@ -91,9 +91,9 @@ export const onRequestPatch: PagesFunction<Env, 'id'> = async (ctx) => {
     // it, and rewriting a multi-MB object to flip one cosmetic field
     // isn't worth the partial-failure surface.
     await ctx.env.DB.prepare(
-      'UPDATE published_shares SET visibility=? WHERE id=?',
+      'UPDATE published_shares SET visibility=? WHERE id=? AND user_id=?',
     )
-      .bind(visibility, id)
+      .bind(visibility, id, user.id)
       .run()
 
     const metaRaw = await ctx.env.META.get(`meta/${id}`)
