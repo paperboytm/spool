@@ -915,7 +915,7 @@ function DraftCard({
             className="block w-1.5 h-1.5 rounded-full flex-none"
             style={{ background: getSessionSourceColor(doc.conversation.source) }}
           />
-          <span className="font-mono uppercase tracking-[0.04em] flex-none">{formatRelative(draft.updated_at, t as unknown as RelativeT)}</span>
+          <span className="font-mono tracking-[0.04em] flex-none">{formatRelative(draft.updated_at, t as unknown as RelativeT)}</span>
         </span>
       </span>
     </button>
