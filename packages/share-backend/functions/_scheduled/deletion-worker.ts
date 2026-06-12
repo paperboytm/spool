@@ -154,7 +154,10 @@ async function deleteAvatarPrefix(env: DeletionEnv, userId: string): Promise<voi
   const prefix = `avatars/${userId}/`
   let cursor: string | undefined
   for (let page = 0; page < 32; page++) {
-    const listing = await env.AVATARS.list({ prefix, limit: 1000, cursor })
+    // Conditional spread instead of `cursor` directly: with
+    // exactOptionalPropertyTypes, R2ListOptions doesn't accept an
+    // explicit `cursor: undefined`.
+    const listing = await env.AVATARS.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) })
     await Promise.all(
       listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)),
     )

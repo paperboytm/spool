@@ -46,6 +46,10 @@ jobs:
       - run: pnpm --filter @spool-lab/cli test
       - run: pnpm --filter @spool/share-kit build
       - run: pnpm --filter @spool/share-kit test
+      - run: pnpm --filter @spool/share-backend typecheck
+      - run: pnpm --filter @spool/share-backend test
+      - run: pnpm --filter @spool/share-web typecheck
+      - run: pnpm --filter @spool/share-web test
       - run: pnpm --filter @spool/app test
 
   e2e:
