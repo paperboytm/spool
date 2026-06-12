@@ -804,6 +804,7 @@
     "preview_pageOf": "{{current}} / {{total}} ページ",
     "preview_pageOf_short": "{{current}} / {{total}}",
     "preview_wordCount_other": "{{count}} 語",
+    "preview_rendering": "レンダリング中…",
     "preview_prevPage": "前のページ",
     "preview_nextPage": "次のページ",
     "turnSelector_selectAll": "すべてのメッセージを含める",

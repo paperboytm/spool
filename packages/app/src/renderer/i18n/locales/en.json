@@ -843,6 +843,7 @@
     "preview_pageOf_short": "{{current}} / {{total}}",
     "preview_wordCount_one": "{{count}} word",
     "preview_wordCount_other": "{{count}} words",
+    "preview_rendering": "Rendering…",
     "preview_prevPage": "Previous page",
     "preview_nextPage": "Next page",
     "turnSelector_selectAll": "Include all messages",

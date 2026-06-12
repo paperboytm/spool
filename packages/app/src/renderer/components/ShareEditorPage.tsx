@@ -320,27 +320,34 @@ export default function ShareEditorPage({
     let alive = true
     const rowVisibility = publishedRow.visibility as Visibility
     const rowHash = publishedRow.client_request_id
-    void (async () => {
-      try {
-        const snapshot = buildSnapshotFromEditor({
-          conversation: liveConversation,
-          opts,
-        })
-        const key = await computePublishIdempotencyKey({
-          snapshot,
-          visibility: rowVisibility,
-        })
-        if (!alive) return
-        setHasUnpublishedEdits(key !== rowHash)
-      } catch (err) {
-        if (!alive) return
-        // Hash compute failures shouldn't lie — default to no badge.
-        console.warn('Compute live draft hash for drift check failed:', err)
-        setHasUnpublishedEdits(false)
-      }
-    })()
+    // Debounced (same window as autosave below): the hash runs the full
+    // snapshot build — redact pipeline included — which on large
+    // sessions is too heavy to fire on every keystroke / policy toggle.
+    // The badge appearing 400ms later is imperceptible.
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const snapshot = buildSnapshotFromEditor({
+            conversation: liveConversation,
+            opts,
+          })
+          const key = await computePublishIdempotencyKey({
+            snapshot,
+            visibility: rowVisibility,
+          })
+          if (!alive) return
+          setHasUnpublishedEdits(key !== rowHash)
+        } catch (err) {
+          if (!alive) return
+          // Hash compute failures shouldn't lie — default to no badge.
+          console.warn('Compute live draft hash for drift check failed:', err)
+          setHasUnpublishedEdits(false)
+        }
+      })()
+    }, 400)
     return () => {
       alive = false
+      window.clearTimeout(handle)
     }
   }, [publishedRow, liveConversation, opts])
 
@@ -436,6 +443,25 @@ export default function ShareEditorPage({
     )
   }, [])
 
+  // PNG / PDF capture the LIVE preview DOM. The preview mounts large
+  // documents progressively and re-renders through a deferred value, so
+  // an export fired mid-fill (or right after an opts toggle) would
+  // capture a partial / stale frame. Gate every DOM capture on the
+  // pane's render-state callback; the timeout is a safety valve so a
+  // wedged render can't brick the export button (the capture then
+  // proceeds with whatever is committed, matching pre-progressive
+  // behavior).
+  const previewCompleteRef = useRef(true)
+  const handlePreviewRenderState = useCallback((s: { complete: boolean }) => {
+    previewCompleteRef.current = s.complete
+  }, [])
+  const waitForPreviewComplete = useCallback(async () => {
+    const deadline = Date.now() + 10_000
+    while (!previewCompleteRef.current && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 100))
+    }
+  }, [])
+
   const exportPng = useCallback(async () => {
     const node = previewRef.current
     if (!node) return
@@ -467,7 +493,15 @@ export default function ShareEditorPage({
 
     await beginSaving()
     try {
-      const blob = await rasterizeToPngBlob(node, { width, height })
+      // The slot is picked (gesture satisfied) — now wait for the
+      // preview to finish mounting/refreshing before measuring and
+      // capturing, then re-measure: the pre-picker height may have been
+      // taken mid-fill. rasterizeToPngBlob re-throws PngTooTallError if
+      // the full height busts the canvas cap; the catch below cleans up
+      // the picked slot.
+      await waitForPreviewComplete()
+      const fullHeight = node.scrollHeight
+      const blob = await rasterizeToPngBlob(node, { width, height: fullHeight })
       await writeToSlot(slot, blob, filename)
       setSaveState('idle')
       toast.success(t('shareEditor.savedFile', { filename }))
@@ -490,12 +524,15 @@ export default function ShareEditorPage({
         toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.seeConsole') })
       }
     }
-  }, [beginSaving, liveConversation, opts.template])
+  }, [beginSaving, waitForPreviewComplete, liveConversation, opts.template])
 
   const exportPdf = useCallback(async () => {
     const node = previewRef.current
     if (!node) return
     await beginSaving()
+    // Same progressive-mount gate as PNG: serialize the DOM only once
+    // the full, up-to-date document is committed.
+    await waitForPreviewComplete()
     const width = TEMPLATE_RATIO[opts.template].w
     const height = node.scrollHeight
     const filename = filenameForExport(liveConversation, opts.template, 'pdf')
@@ -511,7 +548,7 @@ export default function ShareEditorPage({
       setSaveState('error')
       toast.error(t('shareEditor.couldntExportPdf'), { description: t('shareEditor.seeConsole') })
     }
-  }, [beginSaving, liveConversation, opts.template])
+  }, [beginSaving, waitForPreviewComplete, liveConversation, opts.template])
 
   const savePdfFromPreview = useCallback(async () => {
     if (!pdfPreview) return
@@ -749,6 +786,7 @@ export default function ShareEditorPage({
             opts={opts}
             zoom={zoom}
             setZoom={setZoom}
+            onRenderState={handlePreviewRenderState}
           />
         </div>
       </div>

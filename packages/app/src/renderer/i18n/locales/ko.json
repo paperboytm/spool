@@ -804,6 +804,7 @@
     "preview_pageOf": "{{current}} / {{total}} 페이지",
     "preview_pageOf_short": "{{current}} / {{total}}",
     "preview_wordCount_other": "{{count}}단어",
+    "preview_rendering": "렌더링 중…",
     "preview_prevPage": "이전 페이지",
     "preview_nextPage": "다음 페이지",
     "turnSelector_selectAll": "모든 메시지 포함",

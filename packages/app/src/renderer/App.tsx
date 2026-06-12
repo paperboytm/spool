@@ -165,6 +165,7 @@ export default function App() {
     // one with DEFAULT_OPTS and persist it.
     let conversation: Conversation
     let opts: EditorOpts
+    let isNewDraft = false
     try {
       const existing = await window.spool?.shareDraft?.get(draftId)
       if (existing) {
@@ -178,15 +179,7 @@ export default function App() {
       } else {
         conversation = composeFromSession(session, messages)
         opts = DEFAULT_OPTS
-        const doc = buildSpoolDocument(conversation, opts)
-        await window.spool?.shareDraft?.upsert({
-          draft_id: draftId,
-          source_kind: 'spool-session',
-          source_origin: session.sessionUuid,
-          title: conversation.title,
-          snapshot_json: JSON.stringify(doc),
-          preview_json: JSON.stringify(buildPreviewDocument(doc)),
-        })
+        isNewDraft = true
       }
     } catch (err) {
       console.error('Failed to load or persist share draft, falling back to a fresh compose:', err)
@@ -200,6 +193,31 @@ export default function App() {
       conversation,
       opts,
     }, returnView)
+    if (isNewDraft) {
+      // Persist the freshly composed draft AFTER the view switch so a
+      // large session doesn't stall the click on two megabyte-scale
+      // JSON.stringify calls plus an IPC round-trip. Deferred a tick to
+      // let the editor's first frame paint. Failure is non-fatal: the
+      // editor already holds the conversation, and the first edit's
+      // autosave (ShareEditorPage) writes the same payload.
+      const composed = conversation
+      const composedOpts = opts
+      window.setTimeout(() => {
+        try {
+          const doc = buildSpoolDocument(composed, composedOpts)
+          void window.spool?.shareDraft?.upsert({
+            draft_id: draftId,
+            source_kind: 'spool-session',
+            source_origin: session.sessionUuid,
+            title: composed.title,
+            snapshot_json: JSON.stringify(doc),
+            preview_json: JSON.stringify(buildPreviewDocument(doc)),
+          }).catch((err) => console.error('Persist new share draft failed:', err))
+        } catch (err) {
+          console.error('Persist new share draft failed:', err)
+        }
+      }, 0)
+    }
   }, [openShareEditor])
 
   const handleStartShareFromUuid = useCallback(async (sessionUuid: string) => {

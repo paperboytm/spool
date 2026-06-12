@@ -14,7 +14,7 @@
 // invisible in the rendered output and survives the markdown export
 // round-trip cleanly.
 
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { RedactReplacement } from './redact'
@@ -110,17 +110,39 @@ function escapeRx(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function preprocess(text: string, redact?: RedactReplacement[]): string {
-  if (!redact || redact.length === 0) return text
+// One compiled matcher per redact list, shared across every Body in
+// the document. The list can carry thousands of entries (e.g. one per
+// absolute path in a large session); compiling the alternation inside
+// each Body made a single policy toggle recompile it once per turn.
+// Keyed on the array identity — templates memoize the list per policy
+// change and never mutate it. Sharing one `/g` RegExp across
+// `String.replace` calls is safe: replace resets lastIndex itself.
+const compiledRedact = new WeakMap<RedactReplacement[], { rx: RegExp; map: Map<string, string> }>()
+
+function compileRedact(redact: RedactReplacement[]): { rx: RegExp; map: Map<string, string> } {
+  const hit = compiledRedact.get(redact)
+  if (hit) return hit
   const map = new Map(redact.map((r) => [r.value, r.replacement]))
   const rx = new RegExp(Array.from(map.keys()).map(escapeRx).join('|'), 'g')
+  const compiled = { rx, map }
+  compiledRedact.set(redact, compiled)
+  return compiled
+}
+
+function preprocess(text: string, redact?: RedactReplacement[]): string {
+  if (!redact || redact.length === 0) return text
+  const { rx, map } = compileRedact(redact)
   return text.replace(rx, (match) => {
     const mask = map.get(match) ?? '[redacted]'
     return '`' + REDACT_CHIP_MARKER + mask + '`'
   })
 }
 
-export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, accent, accentBg, blockBorder }: BodyProps) {
+// memo: a turn's rendered markdown only depends on these scalar/stable
+// props. On large documents the markdown parse dominates render cost,
+// so bailing out here is what keeps unrelated state changes (zoom,
+// pan, progressive-mount growth) from re-parsing thousands of turns.
+export const Body = memo(function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, accent, accentBg, blockBorder }: BodyProps) {
   const processed = useMemo(() => preprocess(text, redact), [text, redact])
   const blockStroke = blockBorder ?? accent
 
@@ -303,7 +325,7 @@ export function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, acc
       </ReactMarkdown>
     </div>
   )
-}
+})
 
 function headStyle(size: number): React.CSSProperties {
   return {

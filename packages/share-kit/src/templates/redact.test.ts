@@ -130,3 +130,52 @@ describe('collectRedactList wires policy through', () => {
       .not.toContain('Maya')
   })
 })
+
+describe('detection cache', () => {
+  it('repeated detectPII over the same Turn objects returns identical results', () => {
+    const ts: Turn[] = [
+      turn('user', `key ${STRIPE_FIXTURE} and mail ${EMAIL_FIXTURE}`),
+      turn('assistant', 'nothing sensitive here'),
+    ]
+    const first = detectPII(ts)
+    const second = detectPII(ts)
+    // Same match content (cache hit must be semantically identical to a
+    // fresh scan)…
+    expect(second.matches.map((m) => [m.kind, m.value])).toEqual(
+      first.matches.map((m) => [m.kind, m.value]),
+    )
+    // …and actually served from cache: the per-turn match objects are
+    // the same instances on the second pass.
+    expect(second.matches[0]).toBe(first.matches[0])
+  })
+
+  it('invalidates when a turn body changes in place', () => {
+    const t = turn('user', `mail ${EMAIL_FIXTURE}`)
+    const before = detectPII([t])
+    expect(values(applyRedactPolicy(before, undefined))).toContain(EMAIL_FIXTURE)
+
+    // Mutate the SAME object — the cache must notice the body moved
+    // and rescan rather than serving the stale email match.
+    t.body = `key ${STRIPE_FIXTURE}`
+    const after = detectPII([t])
+    const list = applyRedactPolicy(after, undefined)
+    expect(values(list)).toContain(STRIPE_FIXTURE)
+    expect(values(list)).not.toContain(EMAIL_FIXTURE)
+  })
+
+  it('publish-path equivalence: collectRedactList is stable across repeated policy toggles', () => {
+    const ts: Turn[] = [
+      turn('user', `reply to ${EMAIL_FIXTURE}`),
+      turn('assistant', `creds ${STRIPE_FIXTURE} at /Users/chen/.aws/credentials`),
+    ]
+    const baseline = collectRedactList(ts, { redactExclude: undefined })
+    // Toggle a kind off and back on a few times (cache-hit path), then
+    // assert the final list is byte-identical to the first computation.
+    for (let i = 0; i < 3; i++) {
+      collectRedactList(ts, { redactExclude: { kinds: ['email'] } })
+      collectRedactList(ts, { redactExclude: undefined })
+    }
+    const final = collectRedactList(ts, { redactExclude: undefined })
+    expect(final).toEqual(baseline)
+  })
+})

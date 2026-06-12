@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { forwardRef, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MoreHorizontal } from 'lucide-react'
 import {
@@ -9,6 +9,7 @@ import {
   type EditorOpts,
 } from '@spool/share-kit'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
+import { useProgressiveCount } from './preview-progressive.js'
 
 export type Zoom = number | 'fit'
 
@@ -43,6 +44,12 @@ type Props = {
   opts: EditorOpts
   zoom: Zoom
   setZoom: (z: Zoom) => void
+  /** Reports whether the canvas currently shows the COMPLETE, up-to-
+   *  date document — all turns mounted AND the deferred render has
+   *  caught up with the latest convo/opts. DOM-capturing consumers
+   *  (PNG / PDF export) must wait for `complete` before reading the
+   *  preview node, or they capture a partially-filled / stale frame. */
+  onRenderState?: ((state: { complete: boolean }) => void) | undefined
 }
 
 /**
@@ -53,18 +60,37 @@ type Props = {
  * scroll.
  */
 export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPane(
-  { convo, opts, zoom, setZoom },
+  { convo, opts, zoom, setZoom, onRenderState },
   ref,
 ) {
   const { t } = useTranslation()
   const ratio = TEMPLATE_RATIO[opts.template]
+
+  // Progressive mount + deferred render. `slicedConvo` grows by chunks
+  // until the full document is in; `useDeferredValue` keeps the canvas
+  // re-render interruptible so a redact/opts toggle updates the control
+  // panel immediately while the document refreshes in the background
+  // (the previous frame stays visible — no blank flash).
+  const totalTurns = convo.turns.length
+  const turnCount = useProgressiveCount(totalTurns)
+  const filled = turnCount >= totalTurns
+  const slicedConvo = useMemo(
+    () => (filled ? convo : { ...convo, turns: convo.turns.slice(0, turnCount) }),
+    [convo, filled, turnCount],
+  )
+  const renderConvo = useDeferredValue(slicedConvo)
+  const renderOpts = useDeferredValue(opts)
+  const renderComplete = filled && renderConvo === slicedConvo && renderOpts === opts
+  useEffect(() => {
+    onRenderState?.({ complete: renderComplete })
+  }, [renderComplete, onRenderState])
 
   const innerRef = useRef<HTMLDivElement>(null)
   const [naturalH, setNaturalH] = useState(ratio.h)
   useLayoutEffect(() => {
     if (!innerRef.current) return
     setNaturalH(Math.max(ratio.h, innerRef.current.scrollHeight))
-  }, [convo, opts, ratio.h])
+  }, [renderConvo, renderOpts, ratio.h])
 
   // Pan: drag-to-scroll on the empty backdrop / padding around the
   // canvas. Holding Space extends pan over the canvas too — that's
@@ -245,7 +271,12 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
               height: naturalH * scale,
               boxShadow: '0 2px 6px rgba(0,0,0,.1), 0 20px 50px rgba(0,0,0,.08)',
               borderRadius: 2,
-              transition: 'width 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1)',
+              // No size transition while the document is still filling
+              // in — the canvas grows once per chunk and animating every
+              // step reads as the page "pumping".
+              transition: filled
+                ? 'width 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1)'
+                : 'none',
               cursor: spaceHeld || isPanning ? 'inherit' : 'default',
             }}
           >
@@ -268,13 +299,15 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
                 data-density={opts.density}
                 style={{ width: ratio.w, userSelect: 'text' }}
               >
-                <TemplateRender template={opts.template} convo={convo} opts={opts} />
+                <TemplateRender template={renderOpts.template} convo={renderConvo} opts={renderOpts} />
               </div>
             </div>
           </div>
           {/* Footer chrome below. */}
           <div className="text-[10px] font-mono tracking-[0.04em] text-warm-faint dark:text-dark-muted">
-            1 / 1 · {t('shareEditorPanel.preview_wordCount_other', { count: convo.wordCount })}
+            {filled
+              ? <>1 / 1 · {t('shareEditorPanel.preview_wordCount_other', { count: convo.wordCount })}</>
+              : t('shareEditorPanel.preview_rendering')}
           </div>
         </div>
       </div>

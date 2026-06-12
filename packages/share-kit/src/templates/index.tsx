@@ -5,7 +5,7 @@
 // the editor stays interactive and the user can switch template / opts
 // to recover.
 
-import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
 import type { Conversation, EditorOpts, Template } from '@/lib/types'
 import { paperTokens } from '@/lib/types'
 import { Forum } from './forum'
@@ -19,7 +19,11 @@ interface Props {
   opts: EditorOpts
 }
 
-export function TemplateRender(props: Props) {
+// memo: hosts (PreviewPane, thumbnails) re-render on local state the
+// document doesn't depend on — zoom, pan, hover. Without the bailout
+// every such tick reconciles the full turn tree, which on multi-
+// thousand-turn documents is visible jank.
+export const TemplateRender = memo(function TemplateRender(props: Props) {
   // Keying the boundary on `template` means switching templates
   // remounts a fresh boundary — a crash on one template doesn't leave
   // the user stuck looking at a fallback after they've already switched
@@ -29,7 +33,7 @@ export function TemplateRender(props: Props) {
       <TemplateDispatch {...props} />
     </TemplateBoundary>
   )
-}
+})
 
 function TemplateDispatch({ template, convo, opts }: Props) {
   // Defensive guard for cases where the conversation got into a shape

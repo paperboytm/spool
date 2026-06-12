@@ -843,6 +843,7 @@
     "preview_pageOf_short": "{{current}} / {{total}}",
     "preview_wordCount_one": "{{count}} Wort",
     "preview_wordCount_other": "{{count}} Wörter",
+    "preview_rendering": "Wird gerendert…",
     "preview_prevPage": "Vorherige Seite",
     "preview_nextPage": "Nächste Seite",
     "turnSelector_selectAll": "Alle Nachrichten einbeziehen",

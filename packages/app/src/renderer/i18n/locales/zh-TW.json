@@ -804,6 +804,7 @@
     "preview_pageOf": "第 {{current}} / {{total}} 頁",
     "preview_pageOf_short": "{{current}} / {{total}}",
     "preview_wordCount_other": "{{count}} 字",
+    "preview_rendering": "渲染中…",
     "preview_prevPage": "上一頁",
     "preview_nextPage": "下一頁",
     "turnSelector_selectAll": "包含全部訊息",
