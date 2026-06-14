@@ -33,7 +33,9 @@ export function getSessionRoots(source: SessionSource): string[] {
   }
 
   if (source === 'gemini') {
-    return dedupePaths([normalizeSourceRoot('gemini', join(getGeminiBaseDir(), 'tmp'))])
+    return dedupePaths([
+      normalizeSourceRoot('gemini', join(getGeminiBaseDir(), 'tmp')),
+    ])
   }
 
   if (source === 'opencode') {
@@ -81,11 +83,15 @@ export function getSessionWatchPatterns(
   source: SessionSource,
   roots = getSessionRoots(source),
 ): string[] {
-  const pattern = source === 'gemini'
-    ? 'session-*.json'
-    : source === 'opencode'
-      ? OPENCODE_DB_NAME
-      : '*.jsonl'
+  if (source === 'gemini') {
+    return roots.flatMap(root => [
+      join(root, '**', 'session-*.json'),
+      join(root, '**', 'session-*.jsonl'),
+    ])
+  }
+  const pattern = source === 'opencode'
+    ? OPENCODE_DB_NAME
+    : '*.jsonl'
   return roots.map(root => join(root, '**', pattern))
 }
 
@@ -100,6 +106,9 @@ function splitConfiguredPaths(value: string): string[] {
 function normalizeSourceRoot(source: SessionSource, filePath: string): string {
   const resolvedPath = resolve(expandHome(filePath))
   if (source === 'gemini') {
+    if (basename(resolvedPath) === 'tmp') {
+      return resolvedPath
+    }
     if (basename(resolvedPath) === '.gemini' || existsSync(join(resolvedPath, 'tmp'))) {
       return join(resolvedPath, 'tmp')
     }
@@ -155,7 +164,7 @@ function getOpenCodeBaseDir(): string {
 export function isSessionFileForSource(source: SessionSource, filePath: string, root: string): boolean {
   if (!isWithinRoot(filePath, root)) return false
   if (source === 'gemini') {
-    return filePath.endsWith('.json')
+    return (filePath.endsWith('.json') || filePath.endsWith('.jsonl'))
       && basename(filePath).startsWith('session-')
       && /(?:^|\/)chats\//.test(filePath)
   }

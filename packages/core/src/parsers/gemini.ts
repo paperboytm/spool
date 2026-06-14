@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
@@ -31,7 +31,66 @@ const GEMINI_INDEXABLE_TYPES = new Set(['user', 'gemini', 'info', 'warning', 'er
 
 export function loadGeminiSession(filePath: string): ParseSessionResult {
   const raw = readFileSync(filePath, 'utf8')
-  const record = JSON.parse(raw) as GeminiSessionRecord
+  let record: GeminiSessionRecord
+
+  if (filePath.endsWith('.jsonl')) {
+    record = { messages: [] }
+    const lines = raw.split('\n').filter(l => l.trim().length > 0)
+    for (const line of lines) {
+      let obj: any
+      try {
+        obj = JSON.parse(line)
+      } catch {
+        continue
+      }
+
+      if (!obj || typeof obj !== 'object') continue
+
+      // Handle standard metadata
+      if ('sessionId' in obj) {
+        if (obj.sessionId) record.sessionId = obj.sessionId
+        if (obj.startTime) record.startTime = obj.startTime
+        if (obj.lastUpdated) record.lastUpdated = obj.lastUpdated
+        if (obj.kind) record.kind = obj.kind
+        if (obj.summary) record.summary = obj.summary
+      }
+
+      // Helper to merge messages array
+      const mergeMessages = (msgsList: any[]) => {
+        for (const msg of msgsList) {
+          if (!msg || typeof msg !== 'object' || !msg.id) continue
+          const existingIdx = record.messages!.findIndex(m => m.id === msg.id)
+          if (existingIdx >= 0) {
+            record.messages![existingIdx] = { ...record.messages![existingIdx], ...msg }
+          } else {
+            record.messages!.push(msg)
+          }
+        }
+      }
+
+      // Handle $set operator
+      if ('$set' in obj && obj.$set && typeof obj.$set === 'object') {
+        const set = obj.$set
+        if (set.lastUpdated) record.lastUpdated = set.lastUpdated
+        if (set.summary) record.summary = set.summary
+        if (Array.isArray(set.messages)) {
+          mergeMessages(set.messages)
+        }
+      }
+
+      // Handle direct message entry
+      if ('id' in obj && 'type' in obj && obj.id) {
+        const existingIdx = record.messages!.findIndex(m => m.id === obj.id)
+        if (existingIdx >= 0) {
+          record.messages![existingIdx] = { ...record.messages![existingIdx], ...obj }
+        } else {
+          record.messages!.push(obj)
+        }
+      }
+    }
+  } else {
+    record = JSON.parse(raw) as GeminiSessionRecord
+  }
 
   if (record.kind === 'subagent') return { kind: 'filtered' }
   if (!Array.isArray(record.messages) || record.messages.length === 0) return { kind: 'skipped' }
@@ -43,7 +102,7 @@ export function loadGeminiSession(filePath: string): ParseSessionResult {
     const type = message.type
     if (!type || !GEMINI_INDEXABLE_TYPES.has(type)) continue
 
-    const contentText = extractText(message.content)
+    const contentText = stripSessionContext(extractText(message.content))
     const toolNames = extractToolNames(message.toolCalls)
     if (!contentText && toolNames.length === 0) continue
 
@@ -123,6 +182,18 @@ function extractText(content: unknown): string {
     .join('\n'))
 }
 
+function stripSessionContext(text: string): string {
+  let result = text
+  let open = result.indexOf('<session_context>')
+  while (open !== -1) {
+    const close = result.indexOf('</session_context>', open + '<session_context>'.length)
+    if (close === -1) break
+    result = result.slice(0, open) + result.slice(close + '</session_context>'.length)
+    open = result.indexOf('<session_context>')
+  }
+  return result.trim()
+}
+
 function extractToolNames(toolCalls: unknown): string[] {
   if (!Array.isArray(toolCalls)) return []
 
@@ -175,3 +246,5 @@ function expandHome(filePath: string): string {
   if (filePath.startsWith('~/')) return join(homedir(), filePath.slice(2))
   return filePath
 }
+
+
