@@ -19,7 +19,7 @@ import Toggle from './Toggle.js'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'labs' | 'security'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
-const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm'] as const
+const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'Ghostty', 'kitty', 'Alacritty', 'WezTerm'] as const
 
 interface Props {
   onClose: () => void

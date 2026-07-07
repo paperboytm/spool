@@ -35,11 +35,13 @@ const IS_LINUX = process.platform === 'linux'
  * Terminal identifiers. These double as the display names shown in settings
  * and the keys used in the runners map.
  */
-export const SUPPORTED_TERMINALS = ['Terminal', 'iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm'] as const
+export const SUPPORTED_TERMINALS = ['Terminal', 'iTerm2', 'Warp', 'Ghostty', 'kitty', 'Alacritty', 'WezTerm'] as const
 export type SupportedTerminal = (typeof SUPPORTED_TERMINALS)[number]
 
-/** Third-party terminals to probe, in order of popularity. */
-const THIRD_PARTY: SupportedTerminal[] = ['iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm']
+// Third-party terminals to probe, in order of popularity. New entries are
+// appended at the end so adding a terminal never changes which one an
+// existing user (with several running and no explicit preference) auto-detects.
+const THIRD_PARTY: SupportedTerminal[] = ['iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm', 'Ghostty']
 
 let autoDetectedTerminal: SupportedTerminal | undefined
 
@@ -125,6 +127,12 @@ windows:
     shell.openExternal(`warp://launch/${configName}`)
   },
 
+  // Ghostty — macOS has no direct CLI, so pass args through `open --args`.
+  // `-e` runs the command; `exec $SHELL` keeps the window alive afterwards.
+  'Ghostty': (cmd, cwd) => {
+    execSync(`open -a Ghostty --args -e sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
+  },
+
   // Kitty — `open --args`; `exec $SHELL` keeps the window alive
   'kitty': (cmd, cwd) => {
     execSync(`open -a kitty --args sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
@@ -146,6 +154,7 @@ const APP_PATHS: Record<SupportedTerminal, string> = {
   'Terminal': '/System/Applications/Utilities/Terminal.app',
   'iTerm2': '/Applications/iTerm.app',
   'Warp': '/Applications/Warp.app',
+  'Ghostty': '/Applications/Ghostty.app',
   'kitty': '/Applications/kitty.app',
   'Alacritty': '/Applications/Alacritty.app',
   'WezTerm': '/Applications/WezTerm.app',
