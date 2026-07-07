@@ -52,6 +52,15 @@ type Props = {
 
 const HIGH_ROW_LIMIT = 6
 
+// Public profiles (/@handle pages) are cut from the launch scope, and
+// the backend gates handle claiming off (share-backend
+// PROFILES_ENABLED env var). Without a claimable handle the
+// "On profile" card could never be enabled, so offering the picker
+// would only show a permanently-disabled option — every publish is
+// link-only instead. Flip together with the backend flag (and
+// PROFILES_ENABLED in share-web) if user feedback brings profiles back.
+const SHOW_VISIBILITY_PICKER = false
+
 /**
  * The Publish tab of the Share popover. State machine:
  *
@@ -244,7 +253,7 @@ export function PublishTab({
         />
       )}
 
-      <fieldset disabled={publishing} className="px-4 pb-3">
+      {SHOW_VISIBILITY_PICKER && <fieldset disabled={publishing} className="px-4 pb-3">
         <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
           {t('shareEditor.publishTab.visibility_legend')}
         </legend>
@@ -269,7 +278,7 @@ export function PublishTab({
             onSelect={() => setVisibility('profile-listed')}
           />
         </div>
-      </fieldset>
+      </fieldset>}
 
       {error && (
         <p

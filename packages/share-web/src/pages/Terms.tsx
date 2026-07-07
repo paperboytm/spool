@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'June 12, 2026'
+const LAST_UPDATED = 'July 7, 2026'
 
 export function Terms() {
   useEffect(() => {
@@ -36,8 +36,8 @@ export function Terms() {
           <h2>The service</h2>
           <p>
             spool.pro hosts conversation snapshots you explicitly publish
-            from the Spool app and serves them at public links, optionally
-            listed on a public profile page. The service is currently
+            from the Spool app and serves them at public links.
+            The service is currently
             free. We work hard to keep it fast and available, but it is
             provided <strong>as is</strong>, without warranties of any
             kind, and we may change or discontinue features — if we ever
@@ -57,8 +57,8 @@ export function Terms() {
           <p>
             What you publish stays yours. You grant us the non-exclusive
             license needed to operate the service — to store, copy,
-            display, and distribute your published shares at their links,
-            on your profile if listed, and in previews such as
+            display, and distribute your published shares at their links
+            and in previews such as
             social-media cards. This license ends for a share when you
             unpublish it, except where the privacy policy describes
             residual copies.

@@ -3,10 +3,10 @@ import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers
 import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../../src/errors'
-import { validateHandle } from '../../../src/handles'
+import { profilesEnabled, validateHandle } from '../../../src/handles'
 import { checkRate } from '../../../src/rate-limit'
 
-type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace }
+type Env = { DB: D1Database; SESSIONS: KVNamespace; RATE: KVNamespace; PROFILES_ENABLED?: string }
 
 // 5 attempts per user per day is enough for a real human exploring
 // available names, far short of bulk squatting.
@@ -21,6 +21,8 @@ function isUniqueViolation(e: unknown): boolean {
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
+    // Profiles are gated off at launch — see profilesEnabled().
+    if (!profilesEnabled(ctx.env)) throw new ApiError('NOT_FOUND')
     const user = await requireUser(ctx.request, ctx.env)
     const rate = await checkRate(ctx.env.RATE, {
       bucket: 'claim',

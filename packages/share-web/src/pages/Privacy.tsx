@@ -8,7 +8,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'June 12, 2026'
+const LAST_UPDATED = 'July 7, 2026'
 
 export function Privacy() {
   useEffect(() => {
@@ -63,9 +63,10 @@ export function Privacy() {
             password and we request no access to any other Google data.
           </p>
           <p>
-            <strong>Profile, if you set one up.</strong> A handle, an
-            optional display name, and an optional uploaded avatar.
-            These are public on your profile page.
+            <strong>Account customization, if you use it.</strong> An
+            optional display name and an optional uploaded avatar,
+            which replace the Google-provided name and picture wherever
+            the service shows your account.
           </p>
           <p>
             <strong>Content you publish.</strong> When you click Publish
@@ -91,8 +92,8 @@ export function Privacy() {
 
           <h2>How we use it</h2>
           <p>
-            To operate the service you asked for (signing you in, hosting
-            your shares, showing your profile — in GDPR terms, performance
+            To operate the service you asked for (signing you in and
+            hosting your shares — in GDPR terms, performance
             of a contract) and to keep the service safe (rate limiting and
             audit logging — our legitimate interest in preventing abuse).
             That's the whole list.
@@ -111,9 +112,8 @@ export function Privacy() {
 
           <h2>Published content is public</h2>
           <p>
-            That's the point of publishing. A link-only share is visible
-            to anyone who has the URL; a share listed on your profile is
-            visible to anyone who visits it. Third parties — search
+            That's the point of publishing. A share is visible to
+            anyone who has its URL. Third parties — search
             engines, social-media link previews — may make their own
             copies, and those copies can outlive an unpublish. Treat
             publishing as you would posting publicly anywhere.
@@ -128,8 +128,8 @@ export function Privacy() {
           <p>
             <strong>Deleting your account</strong> starts a 24-hour grace
             window (so a mistaken click can be undone), after which every
-            share is unpublished and its content deleted, your handle is
-            released, and your account record is stripped of personal
+            share is unpublished and its content deleted, and your
+            account record is stripped of personal
             information. Residual copies in our infrastructure provider's
             automatic backups expire within 30 days.
           </p>

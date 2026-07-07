@@ -1,3 +1,22 @@
+// Public profiles (/@handle pages) are cut from the launch scope: no
+// client offers handle claiming, and the claim/check endpoints behind
+// this gate return 404. Handles are the root of the whole profile
+// surface — publish and visibility-PATCH already reject profile-listed
+// without one, /@handle pages 404 without a row — so gating the claim
+// path keeps everything downstream unreachable without touching it.
+// That holds only while the handles table is empty: an existing row
+// would keep its /@handle page, /api/me handle, and List-on-profile
+// menu fully live. The production D1 launches with zero handle rows;
+// if any get seeded before this gate is deployed, release them.
+// If user feedback asks for public profiles, set PROFILES_ENABLED=1 on
+// the Pages project and restore the client entry points — grep for
+// PROFILES_ENABLED in share-web and SHOW_VISIBILITY_PICKER in the app,
+// and restore the handle-release wording cut from share-web's
+// DeleteAccountModal and the profile sections of /privacy and /terms.
+export function profilesEnabled(env: { PROFILES_ENABLED?: string }): boolean {
+  return env.PROFILES_ENABLED === '1'
+}
+
 // Two flavours of reserved name, merged into one set:
 //   1) URL-routing words that already mean something on spool.pro
 //      (collide with /api/*, /me, /settings, etc.)

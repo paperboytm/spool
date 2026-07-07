@@ -25,6 +25,14 @@ import {
 import { humanDate, humanDateTime } from '../lib/dates'
 import { ProfileEditor } from '../components/ProfileEditor'
 
+// Public profiles (/@handle pages) are cut from the launch scope. This
+// gates the handle-claim entry point; the backend gates the API side
+// (share-backend PROFILES_ENABLED env var — flip both together if user
+// feedback brings profiles back). Everything downstream — the profile
+// page, the per-share "List on profile" action — already keys off the
+// user having a handle, so it stays dark on its own.
+const PROFILES_ENABLED = false
+
 // Match the server-side handle regex (share-backend/src/handles.ts).
 // We pre-filter input so check requests + the submit button respond
 // to obvious mismatches without a round-trip.
@@ -527,11 +535,11 @@ function DeleteAccountModal({
       {pending && pendingUntil ? (
         <p className="sw-modal-body">
           Scheduled for <span className="sw-mono">{humanDateTime(pendingUntil)}</span>. Cancelling
-          keeps your shares, handle, and account intact.
+          keeps your shares and account intact.
         </p>
       ) : (
         <p className="sw-modal-body">
-          Unpublishes every share, releases your handle, and removes your account record after 24
+          Unpublishes every share and removes your account record after 24
           hours. You can undo this from the same place within that window.
         </p>
       )}
@@ -886,12 +894,10 @@ export function Me() {
               <Avatar src={me.avatar_url} name={me.display_name} size={54} />
               <div className="body">
                 <h1 className="name">{me.display_name}</h1>
-                {me.handle ? (
+                {me.handle && (
                   <p className="handle accent">
                     <a href={`/@${me.handle}`}>@{me.handle}</a>
                   </p>
-                ) : (
-                  <p className="handle">No public handle yet</p>
                 )}
               </div>
               <button
@@ -917,7 +923,7 @@ export function Me() {
             </div>
           )}
 
-          {!me.handle && !pending && (
+          {PROFILES_ENABLED && !me.handle && !pending && (
             <>
               <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
               <HandleClaim

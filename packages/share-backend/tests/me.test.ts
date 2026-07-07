@@ -65,6 +65,10 @@ function envFor(state?: FakeDbState) {
     DB: db,
     SESSIONS: makeKv(),
     RATE: makeKv(),
+    // Handle claim/check are gated off at launch (profiles cut from
+    // scope). Behavior tests run with the gate open; the gated-off
+    // 404s have their own cases below.
+    PROFILES_ENABLED: '1',
     state: s,
   }
 }
@@ -138,6 +142,13 @@ describe('requireUser', () => {
 })
 
 describe('GET /api/handles/check', () => {
+  it('404 when PROFILES_ENABLED is not set (launch default)', async () => {
+    const env = { ...envFor(), PROFILES_ENABLED: '' }
+    const req = new Request('https://x/api/handles/check?h=alice')
+    const res = await invoke(checkHandleGet, req, env)
+    expect(res.status).toBe(404)
+  })
+
   it('returns available=true for an unclaimed valid handle', async () => {
     const env = envFor()
     const req = new Request('https://x/api/handles/check?h=alice')
@@ -178,6 +189,20 @@ describe('GET /api/handles/check', () => {
 })
 
 describe('POST /api/handles/claim', () => {
+  it('404 when PROFILES_ENABLED is not set (launch default), even signed in', async () => {
+    const env = { ...envFor(), PROFILES_ENABLED: '' }
+    seedUser(env.state)
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+    const req = authedReq('https://x/api/handles/claim', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ handle: 'alice' }),
+    })
+    const res = await invoke(claimHandlePost, req, env)
+    expect(res.status).toBe(404)
+    expect(env.state.handles).toHaveLength(0)
+  })
+
   it('claims an available handle and writes audit', async () => {
     const env = envFor()
     seedUser(env.state)
