@@ -9,12 +9,19 @@
 // runs the matching verifier. The session token comes back the same
 // way regardless of which provider issued the id_token.
 
-import { shell } from 'electron'
+import { net, shell } from 'electron'
 import crypto from 'node:crypto'
 
 import { backendUrl } from '../share/backend-url.js'
 
 import { startLoopback } from './loopback-server.js'
+
+// Electron's `net.fetch` honours the OS proxy and trust store; the
+// global `fetch` (undici in main) bypasses both, so behind a system
+// proxy the Google token exchange times out on a direct connection
+// (bug_electron_proxy — same fix as authedFetch in share/api-client.ts).
+const netFetch: typeof globalThis.fetch = (url, init) =>
+  net.fetch(url as string, init as RequestInit)
 
 export type ProviderId = 'google'
 
@@ -123,7 +130,7 @@ export async function signInWith(providerId: ProviderId = 'google'): Promise<Sig
     code_verifier: verifier,
   })
   if (csecret) tokenBody.set('client_secret', csecret)
-  const tokenRes = await fetch(config.tokenUrl, {
+  const tokenRes = await netFetch(config.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: tokenBody,
@@ -133,7 +140,7 @@ export async function signInWith(providerId: ProviderId = 'google'): Promise<Sig
   }
   const tokens = (await tokenRes.json()) as { id_token: string }
 
-  const backendRes = await fetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
+  const backendRes = await netFetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ provider: providerId, id_token: tokens.id_token, nonce }),
