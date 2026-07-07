@@ -168,11 +168,7 @@ export function PublishTab({
 
   // ── State 1: auth loading ─────────────────────────────────────────
   if (authLoading) {
-    return (
-      <div className="px-4 pb-4">
-        <div className="h-32 rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
-      </div>
-    )
+    return <PublishTabSkeleton />
   }
 
   // ── State 2: signed out — embed the ConnectCard ──────────────────
@@ -229,6 +225,12 @@ export function PublishTab({
   }
 
   // ── State 4: signed in + draft — publish form ────────────────────
+  // How many turns actually publish: an active TurnSelector selection
+  // wins over the raw conversation length.
+  const publishTurnCount = pending
+    ? pending.opts.selected?.length ?? pending.conversation.turns.length
+    : null
+
   return (
     <div className="flex flex-col" data-testid="share-menu-form">
       {high.length > 0 && (
@@ -252,6 +254,39 @@ export function PublishTab({
           onToggle={() => setMediumOpen((v) => !v)}
         />
       )}
+
+      {/* Snapshot summary — with the visibility picker cut, this card
+       *  is what tells the user what's about to go out and who can see
+       *  it: title + published-turn count, then the link-only note
+       *  (reusing the retired picker's copy, so no new translations). */}
+      <div className="px-4 pb-3">
+        <div
+          data-testid="share-menu-snapshot-card"
+          className="flex items-center gap-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3 py-2"
+        >
+          <span className="inline-flex w-7 h-7 flex-none items-center justify-center rounded-md bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted">
+            <FileText size={15} strokeWidth={1.75} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[12px] font-medium text-warm-text dark:text-dark-text truncate">
+              {pending ? pending.conversation.title || t('common.untitled') : '—'}
+            </div>
+            <div className="text-[11px] font-mono text-warm-muted dark:text-dark-muted">
+              {publishTurnCount !== null
+                ? t('shareEditor.publishTab.snapshot_turns', { count: publishTurnCount })
+                : '—'}
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-warm-muted dark:text-dark-muted">
+          <LinkIcon size={12} strokeWidth={1.75} className="mt-0.5 flex-none" aria-hidden />
+          <span>
+            <span className="font-medium">{t('shareEditor.publishTab.visibility_link_title')}</span>
+            {' — '}
+            {t('shareEditor.publishTab.visibility_link_description')}
+          </span>
+        </p>
+      </div>
 
       {SHOW_VISIBILITY_PICKER && <fieldset disabled={publishing} className="px-4 pb-3">
         <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
@@ -339,6 +374,29 @@ export function PublishTab({
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────
+
+/**
+ * Loading placeholder mirroring the signed-in publish form's layout
+ * (snapshot card + note line + footer), so neither the cache-lookup
+ * skeleton (ShareMenu) nor the auth skeleton (state 1 above) causes a
+ * height jump when the real form swaps in. The previous flat h-32
+ * block was ~2× the post-picker-cut form height and made the popover
+ * visibly shrink on open.
+ */
+export function PublishTabSkeleton() {
+  return (
+    <div className="flex flex-col" aria-hidden>
+      <div className="px-4 pb-3">
+        <div className="h-[46px] rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
+        <div className="mt-2 h-4 w-2/3 rounded bg-warm-surface dark:bg-dark-surface animate-pulse" />
+      </div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40">
+        <div className="h-4 w-1/2 rounded bg-warm-surface dark:bg-dark-surface animate-pulse" />
+        <div className="h-8 w-24 rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
+      </div>
+    </div>
+  )
+}
 
 function VisibilityCard({
   icon,

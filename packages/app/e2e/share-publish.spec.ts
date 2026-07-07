@@ -128,10 +128,14 @@ test('Sign-in transitions the popover to the publish form', async () => {
   ).toBeVisible({ timeout: 5_000 })
   // Profiles are cut from launch: the visibility picker must stay
   // hidden and every publish goes out link-only (asserted on the mock
-  // backend in the publish test below).
+  // backend in the publish test below). The snapshot summary card
+  // replaces the picker as the form's body.
   await expect(
     window.locator('[data-testid="share-menu-visibility-link-only"]'),
   ).toHaveCount(0)
+  await expect(
+    window.locator('[data-testid="share-menu-snapshot-card"]'),
+  ).toBeVisible()
   await expect(
     window.locator('[data-testid="share-menu-submit"]'),
   ).toBeEnabled()

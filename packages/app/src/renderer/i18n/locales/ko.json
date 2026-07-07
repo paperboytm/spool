@@ -579,6 +579,7 @@
       "visibility_legend": "공개 범위",
       "visibility_link_title": "링크만",
       "visibility_link_description": "링크가 있으면 누구나 볼 수 있습니다.",
+      "snapshot_turns_other": "{{count}}개",
       "visibility_profile_title": "프로필에 게시",
       "visibility_profile_description_listed": "@핸들에 게시됩니다.",
       "visibility_profile_description_needsHandle": "핸들이 필요합니다.",

@@ -579,6 +579,7 @@
       "visibility_legend": "公開範囲",
       "visibility_link_title": "リンクのみ",
       "visibility_link_description": "リンクを知る人は誰でも閲覧できます。",
+      "snapshot_turns_other": "{{count}} 件",
       "visibility_profile_title": "プロフィールに掲載",
       "visibility_profile_description_listed": "@ハンドルに掲載されます。",
       "visibility_profile_description_needsHandle": "ハンドルが必要です。",

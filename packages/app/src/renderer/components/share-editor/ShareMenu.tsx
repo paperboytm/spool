@@ -5,7 +5,7 @@ import type { Conversation, EditorOpts } from '@spool/share-kit'
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { useSharePublish } from '../../featureFlags.js'
 import type { PublishedRow, PublishSuccess } from '../../../shared/share-publish.js'
-import { PublishTab } from './share-tabs/PublishTab.js'
+import { PublishTab, PublishTabSkeleton } from './share-tabs/PublishTab.js'
 import { ExportTab, type ExportFormat } from './share-tabs/ExportTab.js'
 import { UnpublishConfirmModal } from './UnpublishConfirmModal.js'
 
@@ -257,9 +257,7 @@ export function ShareMenu({
               against any future bug that flips `tab` from elsewhere. */}
           {publishEnabled && tab === 'publish' ? (
             lookupLoading ? (
-              <div className="px-4 pb-4">
-                <div className="h-32 rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
-              </div>
+              <PublishTabSkeleton />
             ) : (
               <PublishTab
                 draftId={draftId}

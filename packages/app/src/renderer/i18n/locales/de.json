@@ -608,6 +608,8 @@
       "visibility_legend": "Sichtbarkeit",
       "visibility_link_title": "Nur Link",
       "visibility_link_description": "Jeder mit dem Link kann es lesen.",
+      "snapshot_turns_one": "{{count}} Turn",
+      "snapshot_turns_other": "{{count}} Turns",
       "visibility_profile_title": "Auf Profil",
       "visibility_profile_description_listed": "Auf Ihrem @handle aufgeführt.",
       "visibility_profile_description_needsHandle": "Handle erforderlich.",

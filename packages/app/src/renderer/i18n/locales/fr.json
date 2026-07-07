@@ -608,6 +608,8 @@
       "visibility_legend": "Visibilité",
       "visibility_link_title": "Lien uniquement",
       "visibility_link_description": "Lisible par quiconque a le lien.",
+      "snapshot_turns_one": "{{count}} tour",
+      "snapshot_turns_other": "{{count}} tours",
       "visibility_profile_title": "Sur le profil",
       "visibility_profile_description_listed": "Listé sur votre @handle.",
       "visibility_profile_description_needsHandle": "Nécessite un handle.",
