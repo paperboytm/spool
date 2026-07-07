@@ -290,21 +290,26 @@ export function insertMessages(
 export function getMessageSnapshot(
   db: Database.Database,
   sessionUuid: string,
-): { firstUuid: string | null; total: number } {
-  // Single window-function query: pulls total and leading uuid in one
-  // index scan over (session_id, msg_uuid). `LIMIT 1` returns the
-  // smallest-seq row; `COUNT(*) OVER ()` annotates it with the total
-  // across the windowed partition (no GROUP BY needed since the
-  // WHERE already scopes to one session).
+): { firstUuid: string | null; lastUuid: string | null; total: number } {
+  // Single window-function query: pulls total plus leading and trailing
+  // uuids in one index scan over (session_id, msg_uuid). `LIMIT 1`
+  // returns the smallest-seq row; `COUNT(*) OVER ()` / `LAST_VALUE`
+  // annotate it with the partition-wide total and tail (no GROUP BY
+  // needed since the WHERE already scopes to one session).
   const row = db.prepare(
-    `SELECT m.msg_uuid AS msg_uuid, COUNT(*) OVER () AS total
+    `SELECT m.msg_uuid AS msg_uuid,
+            COUNT(*) OVER () AS total,
+            LAST_VALUE(m.msg_uuid) OVER (
+              ORDER BY m.seq, m.id
+              ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+            ) AS last_uuid
        FROM messages m
        JOIN sessions s ON s.id = m.session_id
       WHERE s.session_uuid = ? AND m.msg_uuid IS NOT NULL
       ORDER BY m.seq, m.id LIMIT 1`,
-  ).get(sessionUuid) as { msg_uuid: string; total: number } | undefined
-  if (!row) return { firstUuid: null, total: 0 }
-  return { firstUuid: row.msg_uuid, total: row.total }
+  ).get(sessionUuid) as { msg_uuid: string; last_uuid: string; total: number } | undefined
+  if (!row) return { firstUuid: null, lastUuid: null, total: 0 }
+  return { firstUuid: row.msg_uuid, lastUuid: row.last_uuid, total: row.total }
 }
 
 /** Refresh `sessions.message_count` for a single session from the

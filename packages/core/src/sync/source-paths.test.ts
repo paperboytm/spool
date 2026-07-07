@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { detectSessionSource, getSessionRoots } from './source-paths.js'
+import { detectSessionSource, getSessionRoots, getSessionWatchPatterns } from './source-paths.js'
 
 const tempDirs: string[] = []
 
@@ -52,6 +52,22 @@ describe('getSessionRoots', () => {
 
     mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
     vi.stubEnv('SPOOL_GEMINI_DIR', baseDir)
+
+    expect(getSessionRoots('gemini')).toEqual([
+      join(geminiHome, 'tmp'),
+    ])
+  })
+
+  test('does not re-nest the Gemini root when a workspace directory is named "tmp"', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-gemini-tmp-tmp-'))
+    const geminiHome = join(baseDir, '.gemini')
+    tempDirs.push(baseDir)
+
+    // Running gemini-cli inside a directory whose basename is "tmp" creates a
+    // workspace folder at <home>/.gemini/tmp/tmp — the root must stay at tmp/.
+    mkdirSync(join(geminiHome, 'tmp', 'tmp', 'chats'), { recursive: true })
+    mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
+    vi.stubEnv('GEMINI_CLI_HOME', baseDir)
 
     expect(getSessionRoots('gemini')).toEqual([
       join(geminiHome, 'tmp'),
@@ -176,5 +192,49 @@ describe('detectSessionSource', () => {
     expect(
       detectSessionSource(join(codexRoot, '2026', '05', '21', 'rollout-abc.jsonl'), sourceRoots),
     ).toBe('codex')
+  })
+
+  test('accepts Gemini JSONL sessions and skips a legacy .json with a migrated .jsonl sibling', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-gemini-jsonl-'))
+    tempDirs.push(baseDir)
+
+    const geminiRoot = join(baseDir, 'gemini', 'tmp')
+    const chatsDir = join(geminiRoot, 'workspace', 'chats')
+    mkdirSync(chatsDir, { recursive: true })
+
+    const sourceRoots = {
+      claude: [join(baseDir, 'claude-empty')],
+      codex: [join(baseDir, 'codex-empty')],
+      gemini: [geminiRoot],
+      opencode: [join(baseDir, 'opencode-empty')],
+    } as const
+
+    // New JSONL format is a gemini session.
+    const jsonlOnly = join(chatsDir, 'session-2026-04-08T00-00-aaaaaaaa.jsonl')
+    writeFileSync(jsonlOnly, '')
+    expect(detectSessionSource(jsonlOnly, sourceRoots)).toBe('gemini')
+
+    // A lone legacy .json is still indexed.
+    const jsonOnly = join(chatsDir, 'session-2026-04-08T00-00-bbbbbbbb.json')
+    writeFileSync(jsonOnly, '')
+    expect(detectSessionSource(jsonOnly, sourceRoots)).toBe('gemini')
+
+    // Resume-migration leaves the stale .json next to the live .jsonl with the
+    // same sessionId; only the .jsonl may be indexed or the two files clobber
+    // each other's session row on every scan.
+    writeFileSync(`${jsonOnly}l`, '')
+    expect(detectSessionSource(jsonOnly, sourceRoots)).toBeUndefined()
+    expect(detectSessionSource(`${jsonOnly}l`, sourceRoots)).toBe('gemini')
+  })
+})
+
+describe('getSessionWatchPatterns', () => {
+  test('watches both legacy .json and JSONL Gemini session files', () => {
+    const geminiRoot = join('/tmp', 'gemini', 'tmp')
+
+    expect(getSessionWatchPatterns('gemini', [geminiRoot])).toEqual([
+      join(geminiRoot, '**', 'session-*.json'),
+      join(geminiRoot, '**', 'session-*.jsonl'),
+    ])
   })
 })

@@ -899,6 +899,100 @@ describe('Syncer', () => {
     ).all(sessionId) as Array<{ msg_uuid: string }>
     expect(after.map(r => r.msg_uuid)).toEqual(['m1'])
   })
+
+  it('rewrites a Gemini session when a rewind plus new turns keeps the count from shrinking', async () => {
+    // $rewindTo can drop mid-stream messages while enough new turns land in
+    // the same sync that parsed.length >= stored total and the first uuid
+    // still matches. Head+count classification alone would say append,
+    // stranding the rewound rows next to the new ones with colliding seq
+    // values — the tail-uuid check must force rewrite instead.
+    const baseDir = makeTempDir('spool-syncer-gemini-rewind-')
+    const geminiCliHome = join(baseDir, 'gemini-home')
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(chatsDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
+
+    const filePath = join(chatsDir, 'session-2026-04-08T00-00-rewind.jsonl')
+    const meta = JSON.stringify({ sessionId: 'gemini-rewind-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' })
+    const msg = (id: string, text: string) => JSON.stringify({
+      id,
+      timestamp: '2026-04-08T00:00:00Z',
+      type: 'user',
+      content: [{ text }],
+    })
+    writeFileSync(filePath, [meta, msg('m1', 'first'), msg('m2', 'second'), msg('m3', 'third')].join('\n'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('added')
+
+    const sessionId = (db.prepare(
+      "SELECT id FROM sessions WHERE session_uuid = 'gemini-rewind-session'"
+    ).get() as { id: number }).id
+
+    // User rewinds to m2 and sends two new turns: replay is [m1, m4, m5] —
+    // same length as the stored rows, same head, different tail.
+    writeFileSync(filePath, [
+      meta,
+      msg('m1', 'first'), msg('m2', 'second'), msg('m3', 'third'),
+      JSON.stringify({ $rewindTo: 'm2' }),
+      msg('m4', 'new prompt'), msg('m5', 'newer prompt'),
+    ].join('\n'))
+    touchFile(filePath)
+    expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('updated')
+
+    const after = db.prepare(
+      'SELECT msg_uuid, seq FROM messages WHERE session_id = ? ORDER BY seq, id'
+    ).all(sessionId) as Array<{ msg_uuid: string; seq: number }>
+    expect(after.map(r => r.msg_uuid)).toEqual(['m1', 'm4', 'm5'])
+    expect(after.map(r => r.seq)).toEqual([0, 1, 2])
+  })
+
+  it('rewrites message rows when the stored index version differs from the current one', async () => {
+    // An index-version bump exists to re-derive contentText. The bump makes
+    // the stored mtime string mismatch so the file is re-visited, but the
+    // append path (INSERT … DO NOTHING) would touch nothing — a version
+    // change must force the rewrite path.
+    const baseDir = makeTempDir('spool-syncer-version-bump-')
+    const geminiCliHome = join(baseDir, 'gemini-home')
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(chatsDir, { recursive: true })
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
+
+    const filePath = join(chatsDir, 'session-2026-04-08T00-00-version.jsonl')
+    writeFileSync(filePath, [
+      JSON.stringify({ sessionId: 'gemini-version-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' }),
+      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'user', content: [{ text: 'derived from source' }] }),
+    ].join('\n'))
+
+    const { getDB, Syncer } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('added')
+
+    // Simulate rows indexed under a previous parser version: stale derived
+    // content plus the old version suffix in the stored mtime.
+    db.prepare(
+      "UPDATE messages SET content_text = 'stale v1 derivation' WHERE msg_uuid = 'm1'"
+    ).run()
+    db.prepare(
+      `UPDATE sessions
+          SET raw_file_mtime = replace(raw_file_mtime, '::', '::old-')
+        WHERE session_uuid = 'gemini-version-session'`,
+    ).run()
+
+    // File itself unchanged on disk — only the version suffix differs.
+    expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('updated')
+    const msg = db.prepare(
+      "SELECT content_text FROM messages WHERE msg_uuid = 'm1'"
+    ).get() as { content_text: string }
+    expect(msg.content_text).toBe('derived from source')
+  })
 })
 
 async function loadCoreModules() {

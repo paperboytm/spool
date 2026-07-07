@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
@@ -29,68 +29,88 @@ interface GeminiSessionRecord {
 
 const GEMINI_INDEXABLE_TYPES = new Set(['user', 'gemini', 'info', 'warning', 'error'])
 
-export function loadGeminiSession(filePath: string): ParseSessionResult {
-  const raw = readFileSync(filePath, 'utf8')
-  let record: GeminiSessionRecord
+/** Replays a Gemini CLI JSONL session log into a single session record.
+ *
+ *  Mirrors the upstream loader (gemini-cli chatRecordingService.ts
+ *  loadConversationRecord): a line is exactly one of — a `$rewindTo`
+ *  marker (drop that message and everything after it), a message
+ *  snapshot keyed by `id` (later snapshots replace earlier ones, e.g.
+ *  tool-call status updates), a `$set` metadata update whose
+ *  `messages` array is a checkpoint that REPLACES all prior messages,
+ *  or the initial metadata line. */
+function loadJsonlRecord(raw: string): GeminiSessionRecord {
+  const record: GeminiSessionRecord = {}
+  const messages = new Map<string, GeminiMessageRecord>()
 
-  if (filePath.endsWith('.jsonl')) {
-    record = { messages: [] }
-    const lines = raw.split('\n').filter(l => l.trim().length > 0)
-    for (const line of lines) {
-      let obj: any
-      try {
-        obj = JSON.parse(line)
-      } catch {
-        continue
+  const setMessage = (msg: unknown): void => {
+    if (!msg || typeof msg !== 'object') return
+    const message = msg as GeminiMessageRecord
+    if (typeof message.id !== 'string') return
+    messages.set(message.id, message)
+  }
+
+  const applyMetadata = (src: Record<string, unknown>): void => {
+    if (typeof src['sessionId'] === 'string') record.sessionId = src['sessionId']
+    if (typeof src['startTime'] === 'string') record.startTime = src['startTime']
+    if (typeof src['lastUpdated'] === 'string') record.lastUpdated = src['lastUpdated']
+    if (typeof src['kind'] === 'string') record.kind = src['kind']
+    if (typeof src['summary'] === 'string') record.summary = src['summary']
+  }
+
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
+    const obj = parsed as Record<string, unknown>
+
+    if (typeof obj['$rewindTo'] === 'string') {
+      let found = false
+      for (const id of messages.keys()) {
+        if (id === obj['$rewindTo']) found = true
+        if (found) messages.delete(id)
       }
+      if (!found) messages.clear()
+      continue
+    }
 
-      if (!obj || typeof obj !== 'object') continue
+    if (typeof obj['id'] === 'string') {
+      setMessage(obj)
+      continue
+    }
 
-      // Handle standard metadata
-      if ('sessionId' in obj) {
-        if (obj.sessionId) record.sessionId = obj.sessionId
-        if (obj.startTime) record.startTime = obj.startTime
-        if (obj.lastUpdated) record.lastUpdated = obj.lastUpdated
-        if (obj.kind) record.kind = obj.kind
-        if (obj.summary) record.summary = obj.summary
+    if (obj['$set'] && typeof obj['$set'] === 'object') {
+      const set = obj['$set'] as Record<string, unknown>
+      if (Array.isArray(set['messages'])) {
+        messages.clear()
+        for (const msg of set['messages']) setMessage(msg)
       }
+      applyMetadata(set)
+      continue
+    }
 
-      // Helper to merge messages array
-      const mergeMessages = (msgsList: any[]) => {
-        for (const msg of msgsList) {
-          if (!msg || typeof msg !== 'object' || !msg.id) continue
-          const existingIdx = record.messages!.findIndex(m => m.id === msg.id)
-          if (existingIdx >= 0) {
-            record.messages![existingIdx] = { ...record.messages![existingIdx], ...msg }
-          } else {
-            record.messages!.push(msg)
-          }
-        }
-      }
-
-      // Handle $set operator
-      if ('$set' in obj && obj.$set && typeof obj.$set === 'object') {
-        const set = obj.$set
-        if (set.lastUpdated) record.lastUpdated = set.lastUpdated
-        if (set.summary) record.summary = set.summary
-        if (Array.isArray(set.messages)) {
-          mergeMessages(set.messages)
-        }
-      }
-
-      // Handle direct message entry
-      if ('id' in obj && 'type' in obj && obj.id) {
-        const existingIdx = record.messages!.findIndex(m => m.id === obj.id)
-        if (existingIdx >= 0) {
-          record.messages![existingIdx] = { ...record.messages![existingIdx], ...obj }
-        } else {
-          record.messages!.push(obj)
-        }
+    if (typeof obj['sessionId'] === 'string') {
+      applyMetadata(obj)
+      // A legacy whole-file record can appear as a single JSONL line.
+      if (Array.isArray(obj['messages'])) {
+        for (const msg of obj['messages']) setMessage(msg)
       }
     }
-  } else {
-    record = JSON.parse(raw) as GeminiSessionRecord
   }
+
+  record.messages = Array.from(messages.values())
+  return record
+}
+
+export function loadGeminiSession(filePath: string): ParseSessionResult {
+  const raw = readFileSync(filePath, 'utf8')
+  const record = filePath.endsWith('.jsonl')
+    ? loadJsonlRecord(raw)
+    : JSON.parse(raw) as GeminiSessionRecord
 
   if (record.kind === 'subagent') return { kind: 'filtered' }
   if (!Array.isArray(record.messages) || record.messages.length === 0) return { kind: 'skipped' }
@@ -102,7 +122,10 @@ export function loadGeminiSession(filePath: string): ParseSessionResult {
     const type = message.type
     if (!type || !GEMINI_INDEXABLE_TYPES.has(type)) continue
 
-    const contentText = stripSessionContext(extractText(message.content))
+    // <session_context> is environment metadata gemini-cli injects into the
+    // first user turn — strip it so it never pollutes FTS or derived titles.
+    const rawText = extractText(message.content)
+    const contentText = type === 'user' ? stripSessionContext(rawText) : rawText
     const toolNames = extractToolNames(message.toolCalls)
     if (!contentText && toolNames.length === 0) continue
 
@@ -246,5 +269,3 @@ function expandHome(filePath: string): string {
   if (filePath.startsWith('~/')) return join(homedir(), filePath.slice(2))
   return filePath
 }
-
-

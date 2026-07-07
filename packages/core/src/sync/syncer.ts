@@ -205,6 +205,7 @@ export class Syncer {
   private classifySync(
     sessionUuid: string,
     parsed: ParsedMessage[],
+    source: SessionSource,
   ): UpsertSessionMode {
     // One join'd query — covers "session row missing", "session row
     // exists with no messages", and the leading-uuid / total-row
@@ -214,6 +215,16 @@ export class Syncer {
     if (parsed.length === 0) return 'rewrite'
     if (parsed.length < snapshot.total) return 'rewrite'
     if (parsed[0]!.uuid !== snapshot.firstUuid) return 'rewrite'
+    // Gemini's JSONL replay can drop mid-stream messages ($rewindTo) while
+    // new turns keep parsed.length >= total, so head+count alone misclassifies
+    // a rewound session as append and strands the dropped rows (with colliding
+    // seq values). Pure append requires the parsed message at the stored tail
+    // position to still be the stored tail. Gemini-only: claude parses emit
+    // duplicate uuids (tool-use shadow records) that the DB dedupes, so
+    // parsed[total-1] doesn't align with stored rows there.
+    if (source === 'gemini' && parsed[snapshot.total - 1]!.uuid !== snapshot.lastUuid) {
+      return 'rewrite'
+    }
     return 'append'
   }
 
@@ -268,6 +279,14 @@ export class Syncer {
       // the in-place updates some providers do without bumping
       // mtime on the spool side).
       if (!force && existingMtime === mtime) return 'skipped'
+
+      // An index-version bump (the `::<version>` suffix in the stored mtime)
+      // exists to re-derive content, but append-mode INSERT … DO NOTHING never
+      // updates uuid-matched rows — a version-only mismatch must rewrite, or
+      // the bump re-visits every file and changes nothing.
+      const versionChanged = existingMtime !== null
+        && existingMtime.includes('::')
+        && !existingMtime.endsWith(`::${getIndexVersion(source)}`)
 
       const parseResult = source === 'claude'
         ? loadClaudeSession(filePath)
@@ -328,7 +347,8 @@ export class Syncer {
       // Explicit force overrides classification — the user has
       // accepted that any per-message user-side state (Security Scan
       // purge, dismiss) on this session will be rebuilt from source.
-      const mode: UpsertSessionMode = force ?? this.classifySync(parsed.sessionUuid, parsed.messages)
+      const mode: UpsertSessionMode = force
+        ?? (versionChanged ? 'rewrite' : this.classifySync(parsed.sessionUuid, parsed.messages, source))
 
       let committedSessionId: number | null = null
       let insertedCount = 0
@@ -522,7 +542,9 @@ function getIndexedMtime(filePath: string, source: SessionSource): string {
 
 function getIndexVersion(source: SessionSource): string {
   if (source === 'codex') return CODEX_INDEX_VERSION
-  if (source === 'gemini') return 'gemini-v1-session-search-fts'
+  // v2: <session_context> stripping + JSONL support — force re-derivation of
+  // contentText/titles for sessions indexed before the format change.
+  if (source === 'gemini') return 'gemini-v2-session-search-fts'
   if (source === 'opencode') return OPENCODE_INDEX_VERSION
   return 'claude-v3-session-search-fts'
 }

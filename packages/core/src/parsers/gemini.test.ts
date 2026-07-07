@@ -141,5 +141,62 @@ describe('parseGeminiSession', () => {
     expect(parsed?.title).toBe('Actual user prompt')
   })
 
+  it('drops the rewound message and everything after it on $rewindTo', () => {
+    const geminiCliHome = makeGeminiHome()
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    mkdirSync(chatsDir, { recursive: true })
+    vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
 
+    const filePath = join(chatsDir, 'session-2026-04-08T00-00-rewind.jsonl')
+    writeFileSync(filePath, [
+      JSON.stringify({ sessionId: 'rewind-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' }),
+      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'user', content: [{ text: 'first prompt' }] }),
+      JSON.stringify({ id: 'm2', timestamp: '2026-04-08T00:00:10Z', type: 'user', content: [{ text: 'abandoned prompt' }] }),
+      JSON.stringify({ id: 'm3', timestamp: '2026-04-08T00:00:20Z', type: 'gemini', content: 'abandoned answer' }),
+      JSON.stringify({ $rewindTo: 'm2' }),
+      JSON.stringify({ id: 'm4', timestamp: '2026-04-08T00:00:30Z', type: 'user', content: [{ text: 'new prompt' }] }),
+    ].join('\n'))
+
+    const parsed = parseGeminiSession(filePath)
+    expect(parsed?.messages.map(m => m.uuid)).toEqual(['m1', 'm4'])
+  })
+
+  it('treats $set.messages as a checkpoint that replaces prior messages', () => {
+    const geminiCliHome = makeGeminiHome()
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    mkdirSync(chatsDir, { recursive: true })
+    vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
+
+    const filePath = join(chatsDir, 'session-2026-04-08T00-00-checkpoint.jsonl')
+    writeFileSync(filePath, [
+      JSON.stringify({ sessionId: 'checkpoint-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' }),
+      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'user', content: [{ text: 'kept' }] }),
+      JSON.stringify({ id: 'm2', timestamp: '2026-04-08T00:00:10Z', type: 'user', content: [{ text: 'dropped by checkpoint' }] }),
+      JSON.stringify({ $set: { messages: [{ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'user', content: [{ text: 'kept' }] }] } }),
+    ].join('\n'))
+
+    const parsed = parseGeminiSession(filePath)
+    expect(parsed?.messages.map(m => m.uuid)).toEqual(['m1'])
+  })
+
+  it('replaces a message when a later snapshot with the same id arrives', () => {
+    const geminiCliHome = makeGeminiHome()
+    const chatsDir = join(geminiCliHome, '.gemini', 'tmp', 'workspace', 'chats')
+    mkdirSync(chatsDir, { recursive: true })
+    vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
+
+    const filePath = join(chatsDir, 'session-2026-04-08T00-00-update.jsonl')
+    writeFileSync(filePath, [
+      JSON.stringify({ sessionId: 'update-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' }),
+      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'gemini', content: 'thinking…', toolCalls: [{ name: 'read_file' }] }),
+      // The later snapshot legitimately omits toolCalls — a shallow merge
+      // would wrongly keep the stale ones; upstream semantics are replace.
+      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:05Z', type: 'gemini', content: 'final answer' }),
+    ].join('\n'))
+
+    const parsed = parseGeminiSession(filePath)
+    expect(parsed?.messages).toHaveLength(1)
+    expect(parsed?.messages[0]?.contentText).toBe('final answer')
+    expect(parsed?.messages[0]?.toolNames).toEqual([])
+  })
 })

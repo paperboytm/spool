@@ -164,9 +164,15 @@ function getOpenCodeBaseDir(): string {
 export function isSessionFileForSource(source: SessionSource, filePath: string, root: string): boolean {
   if (!isWithinRoot(filePath, root)) return false
   if (source === 'gemini') {
-    return (filePath.endsWith('.json') || filePath.endsWith('.jsonl'))
-      && basename(filePath).startsWith('session-')
-      && /(?:^|\/)chats\//.test(filePath)
+    if (!filePath.endsWith('.json') && !filePath.endsWith('.jsonl')) return false
+    if (!basename(filePath).startsWith('session-')) return false
+    if (!/(?:^|\/)chats\//.test(filePath)) return false
+    // Resuming a legacy session in gemini-cli ≥0.39 migrates it to a sibling
+    // .jsonl with the same basename and sessionId, leaving the stale .json in
+    // place. Index only the live .jsonl — syncing both makes the two files
+    // clobber each other's session row via UNIQUE(session_uuid) on every scan.
+    if (filePath.endsWith('.json') && existsSync(`${filePath}l`)) return false
+    return true
   }
   if (source === 'opencode') {
     return isOpenCodeDatabaseFile(filePath)
