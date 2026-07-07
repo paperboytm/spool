@@ -75,6 +75,18 @@ function withCwd(cmd: string, cwd?: string): string {
   return cwd ? `cd ${shellQuote(cwd)} && ${cmd}` : cmd
 }
 
+/**
+ * Build the single `sh -c` argument for the `open --args` runners: run the
+ * command (in cwd) and keep the window alive with `exec $SHELL`. The whole
+ * payload is shell-quoted as one token so the outer shell (execSync) can't
+ * split it — otherwise a cwd or command containing a space (e.g. a project
+ * path like "/Users/x/My Project") or a single quote breaks apart the
+ * argument and the resume command is silently dropped.
+ */
+function keepAliveArg(cmd: string, cwd?: string): string {
+  return shellQuote(`${withCwd(cmd, cwd)}; exec $SHELL`)
+}
+
 import { shellQuote } from '../shared/resumeCommand.js'
 
 /**
@@ -130,22 +142,22 @@ windows:
   // Ghostty — macOS has no direct CLI, so pass args through `open --args`.
   // `-e` runs the command; `exec $SHELL` keeps the window alive afterwards.
   'Ghostty': (cmd, cwd) => {
-    execSync(`open -a Ghostty --args -e sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
+    execSync(`open -a Ghostty --args -e sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // Kitty — `open --args`; `exec $SHELL` keeps the window alive
   'kitty': (cmd, cwd) => {
-    execSync(`open -a kitty --args sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
+    execSync(`open -a kitty --args sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // Alacritty — uses `-e` flag for command execution
   'Alacritty': (cmd, cwd) => {
-    execSync(`open -a Alacritty --args -e sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
+    execSync(`open -a Alacritty --args -e sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // WezTerm — `start --` separates wezterm args from the spawned command
   'WezTerm': (cmd, cwd) => {
-    execSync(`open -a WezTerm --args start -- sh -c '${withCwd(cmd, cwd)}; exec $SHELL'`)
+    execSync(`open -a WezTerm --args start -- sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 }
 
