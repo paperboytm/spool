@@ -21,11 +21,18 @@ vi.mock('electron', () => ({
       void realFetch(cb.toString()).catch(() => undefined)
     }),
   },
-  // oauth.ts routes its outbound requests through net.fetch (system
-  // proxy support). Forward to globalThis.fetch so the per-test spies
-  // below keep intercepting the token exchange + backend sign-in.
+  // oauth.ts routes its outbound requests through robustFetch, whose
+  // first transport is net.fetch (system-proxy support). Forward to
+  // globalThis.fetch so the per-test spies below keep intercepting the
+  // token exchange + backend sign-in; the fallback transports (which
+  // would touch `session`) never engage because the first one works.
   net: {
     fetch: (url: string, init?: RequestInit) => globalThis.fetch(url, init),
+  },
+  session: {
+    fromPartition: () => {
+      throw new Error('fallback transport engaged unexpectedly in tests')
+    },
   },
 }))
 
