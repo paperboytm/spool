@@ -137,6 +137,41 @@ test('Sign-in transitions the popover to the publish form', async () => {
   ).toBeEnabled()
 })
 
+test('Settings → Account offers no handle claim while profiles are cut', async () => {
+  const { window } = ctx
+  await signInAndOpenPublishForm(window)
+  await window.keyboard.press('Escape')
+  await window.locator('[data-testid="share-editor-back"]').click()
+
+  await window.locator('[data-testid="settings-button"]').click()
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeVisible()
+  // The Account tab label is the hardcoded fallbackLabel (no i18n key
+  // authored yet), so the text match is stable — see SettingsPanel
+  // TAB_DEFS.
+  await window.getByRole('button', { name: 'Account', exact: true }).click()
+
+  // Signed in without a handle — the pre-cut UI showed the claim
+  // input here. Sign-out row proves the pane rendered (absence of the
+  // input isn't a pass if the whole pane failed to mount).
+  await expect(
+    window.locator('[data-testid="settings-account-signout"]'),
+  ).toBeVisible()
+  await expect(
+    window.locator('[data-testid="settings-account-handle-input"]'),
+  ).toHaveCount(0)
+
+  // The delete-account confirm must not mention a handle either: it
+  // renders exactly the two bullets that survive the profile cut.
+  await window.locator('[data-testid="settings-account-delete"]').click()
+  const modal = window.locator('[data-testid="delete-account-confirm"]')
+  await expect(modal).toBeVisible()
+  await expect(modal.locator('ul > li')).toHaveCount(2)
+  await expect(modal.locator('ul')).not.toContainText(
+    en.settings.account.deleteConfirm_item_handle,
+  )
+  await window.locator('[data-testid="delete-account-confirm-cancel"]').click()
+})
+
 test('Publish lands in the manage view with slug + copy-link + unpublish', async () => {
   const { window } = ctx
   await signInAndOpenPublishForm(window)

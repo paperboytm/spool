@@ -83,9 +83,12 @@ export function DeleteAccountConfirmModal({
           <p className="mt-3 text-[12.5px] leading-relaxed text-warm-text dark:text-dark-text">
             {t('settings.account.deleteConfirm_lead')} <strong>{t('settings.account.deleteConfirm_leadEmphasis')}</strong>{t('settings.account.deleteConfirm_leadSuffix')}
           </p>
+          {/* No handle bullet: public profiles are cut from the launch
+           *  scope (see PROFILES_ENABLED in SettingsAccount), so the
+           *  copy must not surface a handle concept — restore the
+           *  deleteConfirm_item_handle line with the profiles flip. */}
           <ul className="mt-2 ml-4 list-disc text-[12.5px] leading-relaxed text-warm-muted dark:text-dark-muted space-y-0.5">
             <li>{t('settings.account.deleteConfirm_item_shares_prefix')} <strong>{t('settings.account.deleteConfirm_item_shares_emphasis')}</strong></li>
-            <li>{t('settings.account.deleteConfirm_item_handle')}</li>
             <li>{t('settings.account.deleteConfirm_item_record')}</li>
           </ul>
           <p className="mt-3 text-[12px] leading-relaxed text-warm-muted dark:text-dark-muted">

@@ -7,6 +7,13 @@ import { DeleteAccountConfirmModal } from './DeleteAccountConfirmModal.js'
 import ProfileEditor from './ProfileEditor.js'
 import { useShareAuth } from '../hooks/useShareAuth.js'
 
+// Public profiles (/@handle pages) are cut from the launch scope —
+// this hides the claim section below, the backend 404s the claim/check
+// endpoints (share-backend PROFILES_ENABLED env var), and PublishTab
+// hides its visibility picker (SHOW_VISIBILITY_PICKER). Flip all of
+// them together if user feedback brings profiles back.
+const PROFILES_ENABLED = false
+
 // 320ms matches the web /me HandleClaim debounce — see share-web/Me.tsx.
 // Without it, every keystroke fires a backend IPC + network call, and
 // out-of-order responses can stamp a stale 'available' over a fresh
@@ -146,7 +153,7 @@ export default function SettingsAccount() {
       <ProfileEditor />
 
       {/* Handle claim */}
-      {!user.handle && (
+      {PROFILES_ENABLED && !user.handle && (
         <div>
           <h4 className="text-[12px] font-medium text-warm-text dark:text-dark-text mb-2">
             {t('settings.account.handle_title')}
