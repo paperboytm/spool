@@ -43,6 +43,13 @@ export interface ProviderEnv {
   GOOGLE_CLIENT_SECRET_WEB?: string
   // Native / desktop (Electron loopback) audience
   GOOGLE_CLIENT_ID_DESKTOP?: string
+  // Local-dev bindings injected by share-dev.sh; never set in prod.
+  // workerd's outbound fetch consults no proxy (workers-sdk#4515), so
+  // on proxy-only dev networks the JWKS fetch and the token exchange
+  // are rerouted: keys are host-prefetched, the exchange goes through
+  // the share-web vite dev middleware (/__dev/google-token).
+  DEV_JWKS?: string
+  DEV_GOOGLE_TOKEN_URL?: string
 }
 
 export interface OAuthProvider {

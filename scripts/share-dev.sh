@@ -63,8 +63,34 @@ done
 
 trap 'echo; echo "shutting down share-dev"; kill 0' INT TERM EXIT
 
+# Sign-in verifies the Google id_token server-side, which needs the
+# JWKS from www.googleapis.com — but workerd's outbound fetch consults
+# no proxy (cloudflare/workers-sdk#4515, backlog), so on proxy-only
+# networks (no TUN) that fetch hangs and every sign-in times out.
+# Standard emulator move: fetch the (public) signing keys on the host —
+# curl follows the shell's proxy env — and inject them via a binding so
+# the worker never has to leave the machine to verify. Best-effort: if
+# the fetch fails (fully offline), the worker falls back to fetching
+# JWKS itself, which works wherever workerd has direct connectivity.
+DEV_JWKS_ARGS=()
+if jwks_json=$(curl -sf --max-time 10 https://www.googleapis.com/oauth2/v3/certs) && [[ -n "$jwks_json" ]]; then
+  DEV_JWKS_ARGS=(--binding "DEV_JWKS=$jwks_json")
+  echo "→ JWKS           pre-fetched on host ($(printf '%s' "$jwks_json" | wc -c | tr -d ' ') bytes)"
+else
+  echo "→ JWKS           host pre-fetch failed; worker will fetch directly" >&2
+fi
+# Web sign-in's code→token exchange also runs inside workerd. When the
+# shell carries a proxy env, reroute it through the share-web vite dev
+# middleware (Node side, proxy-aware) — see devGoogleTokenRelay in
+# packages/share-web/vite.config.ts. Without a proxy env, workerd's
+# direct connection is assumed to work and the binding stays unset.
+if [[ -n "${https_proxy:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]]; then
+  DEV_JWKS_ARGS+=(--binding "DEV_GOOGLE_TOKEN_URL=http://localhost:3002/__dev/google-token")
+  echo "→ token relay    workerd → vite /__dev/google-token (proxy env detected)"
+fi
+
 echo "→ share-backend  http://localhost:8788"
-(cd packages/share-backend && corepack pnpm dev) &
+(cd packages/share-backend && corepack pnpm dev ${DEV_JWKS_ARGS[@]+"${DEV_JWKS_ARGS[@]}"}) &
 
 echo "→ share-web      http://localhost:3002"
 (cd packages/share-web && corepack pnpm dev) &

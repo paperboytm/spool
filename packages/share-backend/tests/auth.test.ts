@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   type Jwk,
   _resetJwksCacheForTests,
+  setDevJwks,
   setJwksFetcherForTests,
   verifyIdToken,
   verifyIdTokenWithKeys,
@@ -187,6 +188,43 @@ describe('PKCE helpers', () => {
     const a = randomUrlSafe(16)
     const b = randomUrlSafe(16)
     expect(a).not.toBe(b)
+  })
+})
+
+describe('setDevJwks — host-injected keys for local dev', () => {
+  it('verifies with the injected keys and never invokes a network fetcher', async () => {
+    const devKp = await generateKeypair('kid-dev')
+    let networkCalls = 0
+    setJwksFetcherForTests(async () => {
+      networkCalls++
+      return []
+    })
+    // setDevJwks replaces the fetcher wholesale — same slot share-dev.sh
+    // reaches through the DEV_JWKS binding.
+    setDevJwks(JSON.stringify({ keys: [devKp.publicJwk] }))
+    _resetJwksCacheForTests()
+
+    const tok = await mintTestJwt(devKp, {
+      iss: ISS,
+      aud: AUD,
+      sub: 'g-dev',
+      email: 'd@example.com',
+      email_verified: true,
+      name: 'D',
+      exp: future(600),
+      iat: past(0),
+    })
+    const claims = await verifyIdToken(tok, { audience: AUD })
+    expect(claims.sub).toBe('g-dev')
+    expect(networkCalls).toBe(0)
+
+    setJwksFetcherForTests(null)
+    _resetJwksCacheForTests()
+  })
+
+  it('throws on malformed injected JSON instead of silently falling back', () => {
+    expect(() => setDevJwks('not json')).toThrow()
+    setJwksFetcherForTests(null)
   })
 })
 

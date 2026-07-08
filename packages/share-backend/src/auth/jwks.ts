@@ -36,6 +36,19 @@ export function setJwksFetcherForTests(fn: ((force?: boolean) => Promise<Jwk[]>)
   jwksFetcher = fn ?? defaultFetchJwks
 }
 
+// Local-dev escape hatch: workerd's outbound fetch consults no proxy,
+// so on proxy-only dev networks (no TUN) the JWKS fetch above hangs
+// and every sign-in times out. share-dev.sh pre-fetches the certs on
+// the host (curl follows the shell proxy) and injects them via the
+// DEV_JWKS binding; when set, verification never leaves the machine.
+// Prod deployments don't define the binding, so this path is inert
+// there. Keys rotate on Google's schedule — a dev session running past
+// a rotation gets a clean 401, and restarting share-dev.sh refreshes.
+export function setDevJwks(json: string): void {
+  const { keys } = JSON.parse(json) as { keys: Jwk[] }
+  jwksFetcher = async () => keys
+}
+
 export async function fetchJwks(force = false): Promise<Jwk[]> {
   return jwksFetcher(force)
 }

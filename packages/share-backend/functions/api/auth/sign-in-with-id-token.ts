@@ -10,6 +10,7 @@
 
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
+import { setDevJwks } from '../../../src/auth/jwks'
 import { createSession } from '../../../src/auth/session'
 import { getProvider } from '../../../src/auth/providers/registry'
 import { audit } from '../../../src/audit'
@@ -24,6 +25,9 @@ type Env = {
   RATE: KVNamespace
   NONCE: KVNamespace
   GOOGLE_CLIENT_ID_DESKTOP: string
+  /** Local dev only — host-prefetched Google JWKS injected by
+   *  share-dev.sh (see setDevJwks). Never set in production. */
+  DEV_JWKS?: string
 }
 
 type Body = { provider: string; id_token: string; nonce: string }
@@ -40,6 +44,7 @@ const NONCE_TTL_SEC = 10 * 60
 
 export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
+    if (ctx.env.DEV_JWKS) setDevJwks(ctx.env.DEV_JWKS)
     const rate = await checkRate(ctx.env.RATE, {
       bucket: 'signin',
       key: clientIp(ctx.request),

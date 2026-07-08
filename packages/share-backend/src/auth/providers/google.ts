@@ -1,5 +1,5 @@
 import { ApiError } from '../../errors'
-import { verifyIdToken } from '../jwks'
+import { setDevJwks, verifyIdToken } from '../jwks'
 import type {
   BuildAuthRequestParams,
   ExchangeCodeParams,
@@ -49,7 +49,9 @@ export const googleProvider: OAuthProvider = {
   },
 
   async exchangeCode(params: ExchangeCodeParams, env: ProviderEnv): Promise<IdentityClaim> {
-    const tokenRes = await fetch(TOKEN_URL, {
+    // Local-dev reroutes — see ProviderEnv. No-ops in prod.
+    if (env.DEV_JWKS) setDevJwks(env.DEV_JWKS)
+    const tokenRes = await fetch(env.DEV_GOOGLE_TOKEN_URL ?? TOKEN_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
