@@ -1,11 +1,26 @@
 import { describe, expect, it, vi } from 'vitest'
 
+const directSessionFetch = vi.fn()
+
 vi.mock('electron', () => ({
   net: { fetch: vi.fn() },
-  session: { fromPartition: vi.fn() },
+  session: {
+    fromPartition: vi.fn(() => ({
+      setProxy: vi.fn(async () => undefined),
+      fetch: (...args: unknown[]) => directSessionFetch(...args),
+    })),
+  },
 }))
 
-import { isNetworkError, proxyRulesFromEnv, robustFetch, type Transport } from './robust-fetch.js'
+import {
+  fetchOnce,
+  isLoopbackUrl,
+  isNetworkError,
+  probeTransport,
+  proxyRulesFromEnv,
+  robustFetch,
+  type Transport,
+} from './robust-fetch.js'
 
 function transport(label: string, impl: () => Promise<Response>): Transport {
   return { label, fetch: vi.fn(impl) as unknown as Transport['fetch'] }
@@ -59,6 +74,78 @@ describe('robustFetch', () => {
     const second = transport('b', async () => { throw last })
     await expect(robustFetch('https://x.test/', {}, [first, second]))
       .rejects.toBe(last)
+  })
+})
+
+describe('fetchOnce', () => {
+  it('probes with a GET, then sends the real request exactly once on the winner', async () => {
+    const calls: { url: string; method?: string }[] = []
+    const dead = transport('dead', async () => { throw netErr() })
+    const alive: Transport = {
+      label: 'alive',
+      fetch: vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        calls.push({ url: String(url), ...(init?.method !== undefined && { method: init.method }) })
+        return new Response('ok', { status: init?.method === 'POST' ? 200 : 404 })
+      }) as unknown as Transport['fetch'],
+    }
+    const res = await fetchOnce(
+      'https://api.test/token',
+      { method: 'POST', body: 'code=once' },
+      [dead, alive],
+    )
+    expect(res.status).toBe(200)
+    // dead transport saw only the probe; the POST went out once, on alive.
+    expect(dead.fetch).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual([
+      { url: 'https://api.test/', method: 'GET' },
+      { url: 'https://api.test/token', method: 'POST' },
+    ])
+  })
+
+  it('a probe 4xx still selects the transport — status is irrelevant to reachability', async () => {
+    const t = transport('a', async () => new Response('nope', { status: 403 }))
+    const picked = await probeTransport('https://api.test/token', [t])
+    expect(picked).toBe(t)
+  })
+
+  it('does NOT retry the real request on another transport after the probe commits', async () => {
+    let probed = false
+    const flaky: Transport = {
+      label: 'flaky',
+      fetch: vi.fn(async () => {
+        if (!probed) { probed = true; return new Response('probe ok') }
+        throw netErr() // the committed POST dies mid-flight
+      }) as unknown as Transport['fetch'],
+    }
+    const second = transport('never', async () => new Response('never'))
+    await expect(fetchOnce('https://api.test/token', { method: 'POST' }, [flaky, second]))
+      .rejects.toThrow('fetch failed')
+    expect(second.fetch).not.toHaveBeenCalled()
+  })
+
+  it('throws when every probe fails', async () => {
+    const a = transport('a', async () => { throw netErr() })
+    const b = transport('b', async () => { throw netErr() })
+    await expect(fetchOnce('https://api.test/x', {}, [a, b])).rejects.toThrow('fetch failed')
+  })
+})
+
+describe('loopback handling', () => {
+  it.each(['http://localhost:8788/api', 'http://127.0.0.1:3002/', 'http://[::1]:8080/x'])(
+    '%s is loopback',
+    (url) => expect(isLoopbackUrl(url)).toBe(true),
+  )
+
+  it('public hosts are not loopback', () => {
+    expect(isLoopbackUrl('https://spool.pro/api')).toBe(false)
+  })
+
+  it('loopback targets skip the provided chain and go direct', async () => {
+    directSessionFetch.mockResolvedValue(new Response('local ok'))
+    const proxyish = transport('system', async () => new Response('via proxy'))
+    const res = await robustFetch('http://localhost:8788/api/health', {}, [proxyish])
+    expect(await res.text()).toBe('local ok')
+    expect(proxyish.fetch).not.toHaveBeenCalled()
   })
 })
 

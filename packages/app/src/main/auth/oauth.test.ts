@@ -80,6 +80,12 @@ describe('signInWith (loopback OAuth orchestrator)', () => {
         // Loopback: delegate to the real fetch (mock should be transparent here).
         return realFetch(input as Parameters<typeof realFetch>[0], init)
       }
+      // fetchOnce probes each target's origin with a GET before the
+      // real request; any HTTP response (status irrelevant) selects
+      // the transport.
+      if (url === 'https://oauth2.googleapis.com/' || url === 'https://example.test/') {
+        return new Response('probe', { status: 404 })
+      }
       if (url.startsWith('https://oauth2.googleapis.com/token')) {
         const body = init?.body as URLSearchParams
         capturedVerifier = body.get('code_verifier')

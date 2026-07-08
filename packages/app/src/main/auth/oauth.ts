@@ -12,7 +12,7 @@
 import { shell } from 'electron'
 import crypto from 'node:crypto'
 
-import { robustFetch } from '../net/robust-fetch.js'
+import { fetchOnce } from '../net/robust-fetch.js'
 import { backendUrl } from '../share/backend-url.js'
 
 import { startLoopback } from './loopback-server.js'
@@ -125,11 +125,13 @@ export async function signInWith(providerId: ProviderId = 'google'): Promise<Sig
   })
   if (csecret) tokenBody.set('client_secret', csecret)
   // Sign-in must work regardless of how (or whether) the user's
-  // traffic is proxied — robustFetch falls back across system-proxy /
-  // env-proxy / direct transports on connect-level failures. The body
-  // is a URLSearchParams (replayable), and HTTP errors never retry, so
-  // the single-use code can't double-spend.
-  const tokenRes = await robustFetch(config.tokenUrl, {
+  // traffic is proxied. Both requests below carry one-shot values (the
+  // auth code here, the nonce'd id_token next), so they go through
+  // fetchOnce: a side-effect-free probe picks the working transport
+  // (system proxy / env proxy / direct), then the real POST is sent
+  // exactly once — a blind cross-transport retry double-spends the
+  // code/nonce when a transport delivers but loses the response.
+  const tokenRes = await fetchOnce(config.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: tokenBody,
@@ -139,7 +141,7 @@ export async function signInWith(providerId: ProviderId = 'google'): Promise<Sig
   }
   const tokens = (await tokenRes.json()) as { id_token: string }
 
-  const backendRes = await robustFetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
+  const backendRes = await fetchOnce(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ provider: providerId, id_token: tokens.id_token, nonce }),
