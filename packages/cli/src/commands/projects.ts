@@ -10,25 +10,58 @@ export type ProjectResolution =
 
 /**
  * Resolve a free-text query to a single project group. An exact (case-
- * insensitive) hit on the display name or identity key wins outright, so
- * `projects spool` picks "spool" over the "spool-daemon" substring and a
- * pasted identity key always lands uniquely. Otherwise fall back to
- * substring matching, reporting ambiguity when more than one group matches.
+ * insensitive) hit on the display name, identity key, project path, or any
+ * session cwd wins outright, so `projects spool` picks "spool" over the
+ * "spool-daemon" substring and a pasted identity key always lands uniquely.
+ * Exact basename hits on identity keys or project paths win over substring
+ * matches, so a repo slug can disambiguate similarly named projects.
+ * Otherwise fall back to substring matching by field priority, reporting
+ * ambiguity when more than one group matches at the winning priority.
  */
 export function resolveProjectQuery(groups: ProjectGroup[], query: string): ProjectResolution {
   const q = query.toLowerCase()
 
-  const exact = groups.filter(
-    g => g.displayName.toLowerCase() === q || g.identityKey.toLowerCase() === q,
-  )
+  const exact = groups.filter(g => allSearchableProjectFields(g).some(v => v === q))
   if (exact.length > 0) return pick(exact)
 
-  const partial = groups.filter(
-    g => g.displayName.toLowerCase().includes(q) || g.identityKey.toLowerCase().includes(q),
-  )
-  if (partial.length === 0) return { kind: 'none' }
-  return pick(partial)
+  const exactBasename = groups.filter(g => basenameSearchableProjectFields(g).some(v => v === q))
+  if (exactBasename.length > 0) return pick(exactBasename)
+
+  for (const tier of partialSearchableProjectFieldTiers) {
+    const matches = groups.filter(g => tier(g).some(v => v.includes(q)))
+    if (matches.length > 0) return pick(matches)
+  }
+
+  return { kind: 'none' }
 }
+
+function allSearchableProjectFields(group: ProjectGroup): string[] {
+  return [
+    group.displayName,
+    group.identityKey,
+    ...group.displayPaths,
+    ...group.cwds,
+  ].map(v => v.toLowerCase())
+}
+
+function basenameSearchableProjectFields(group: ProjectGroup): string[] {
+  return [
+    group.identityKey,
+    ...group.displayPaths,
+  ].map(v => basename(v).toLowerCase()).filter(Boolean)
+}
+
+function basename(value: string): string {
+  const normalized = value.replace(/\.git$/i, '').replace(/\/+$/g, '')
+  const idx = normalized.lastIndexOf('/')
+  return idx >= 0 ? normalized.slice(idx + 1) : normalized
+}
+
+const partialSearchableProjectFieldTiers: Array<(group: ProjectGroup) => string[]> = [
+  group => [group.displayName, group.identityKey].map(v => v.toLowerCase()),
+  group => group.displayPaths.map(v => v.toLowerCase()),
+  group => group.cwds.map(v => v.toLowerCase()),
+]
 
 function pick(matches: ProjectGroup[]): ProjectResolution {
   const [first, ...rest] = matches
@@ -38,7 +71,7 @@ function pick(matches: ProjectGroup[]): ProjectResolution {
 
 export const projectsCommand = new Command('projects')
   .description('List your projects, or the sessions in one')
-  .argument('[query]', 'Show sessions in the project matching this name or identity key')
+  .argument('[query]', 'Show sessions in the project matching this name, identity key, project path, or cwd')
   .option('-n, --limit <n>', 'Max sessions to show (with a query)', '20')
   .option('--json', 'Output as JSON')
   .action((query: string | undefined, opts: { limit: string; json?: boolean }) => {
@@ -60,7 +93,7 @@ export const projectsCommand = new Command('projects')
       for (const g of resolved.groups) {
         console.error(`  ${g.displayName}  (${g.identityKey})`)
       }
-      console.error('Refine the query, or pass a full identity key.')
+      console.error('Refine the query, or pass a full identity key, project path, or cwd.')
       process.exit(1)
     }
 

@@ -85,6 +85,8 @@ export interface ProjectGroup {
   identityKind: ProjectIdentityKind
   identityKey: string
   displayName: string
+  displayPaths: string[]
+  cwds: string[]
   sources: SessionSource[]          // unique sources contributing
   sessionCount: number
   lastSessionAt: string | null
