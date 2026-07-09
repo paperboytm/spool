@@ -623,6 +623,7 @@
       "error_sessionExpired": "Ihre Sitzung ist abgelaufen — bitte erneut anmelden, um zu veröffentlichen.",
       "error_rateLimited": "Zu viele Veröffentlichungen. Bitte in wenigen Minuten erneut versuchen.",
       "error_generic": "Veröffentlichen fehlgeschlagen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+      "error_tooLarge": "Diese Freigabe ist zu groß zum Veröffentlichen. Wählen Sie einige Turns ab und versuchen Sie es erneut.",
       "pii_high_warning_one": "{{count}} anmeldedatenartiger Wert würde unmaskiert veröffentlicht",
       "pii_high_warning_other": "{{count}} anmeldedatenartige Werte würden unmaskiert veröffentlicht",
       "pii_more_one": "+{{count}} weitere",

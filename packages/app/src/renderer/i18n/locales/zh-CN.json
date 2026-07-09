@@ -593,6 +593,7 @@
       "error_sessionExpired": "登录已过期——请重新登录后再发布。",
       "error_rateLimited": "发布次数过多，请几分钟后重试。",
       "error_generic": "发布失败，请检查网络后重试。",
+      "error_tooLarge": "此分享内容过大，无法发布。请取消选择部分对话后重试。",
       "pii_high_warning_other": "{{count}} 个疑似凭证的值将以未脱敏方式发布",
       "pii_more_other": "另有 {{count}} 个",
       "pii_redactAll": "全部脱敏",

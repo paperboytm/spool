@@ -10,16 +10,17 @@ import {
 } from '@spool-lab/core'
 import { authedFetch } from '../share/api-client.js'
 import { clearToken } from '../auth/session-store.js'
-import type {
-  PublishRequestBody,
-  PublishResult,
-  PublishErrorBody,
-  MySharesResponse,
-  HandleCheckResponse,
-  HandleClaimResponse,
-  ScheduleDeleteResponse,
-  SetVisibilityResult,
-  Visibility,
+import {
+  MAX_PUBLISH_BODY_BYTES,
+  type PublishRequestBody,
+  type PublishResult,
+  type PublishErrorBody,
+  type MySharesResponse,
+  type HandleCheckResponse,
+  type HandleClaimResponse,
+  type ScheduleDeleteResponse,
+  type SetVisibilityResult,
+  type Visibility,
 } from '../../shared/share-publish.js'
 
 async function readBody(res: Response): Promise<Record<string, unknown>> {
@@ -32,9 +33,18 @@ async function readBody(res: Response): Promise<Record<string, unknown>> {
 
 export function registerSharePublishIpc(): void {
   ipcMain.handle('share-publish:publish', async (_e, body: PublishRequestBody): Promise<PublishResult> => {
+    const payload = JSON.stringify(body)
+    // Fail fast on oversized payloads rather than buffering the whole
+    // body up to the server just to get a 422 back. The renderer maps
+    // this 413 to a localized "too large" message. Measured in UTF-8
+    // bytes (what actually transits and what the server caps), not
+    // string length — those differ by up to 3x for CJK content.
+    if (Buffer.byteLength(payload, 'utf8') > MAX_PUBLISH_BODY_BYTES) {
+      return { ok: false, status: 413, error: { error: 'PAYLOAD_TOO_LARGE' } }
+    }
     const r = await authedFetch('/api/publish', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: payload,
     })
     const json = await readBody(r)
     if (!r.ok) {

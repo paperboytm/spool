@@ -15,7 +15,7 @@ import {
   Send,
 } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
-import { computeUnredactedMatches } from '../publish-logic.js'
+import { computeUnredactedMatches, publishErrorKey } from '../publish-logic.js'
 import { buildSnapshotFromEditor } from '../snapshot-adapter.js'
 import { ConnectCard } from '../ConnectCard.js'
 import { useShareAuth } from '../../../hooks/useShareAuth.js'
@@ -148,10 +148,9 @@ export function PublishTab({
         ...(published?.id !== undefined && { override_slug: published.id }),
       })
       if (!res.ok) {
-        if (res.status === 401) {
-          setError(t('shareEditor.publishTab.error_sessionExpired'))
-        } else if (res.status === 429) {
-          setError(t('shareEditor.publishTab.error_rateLimited'))
+        const key = publishErrorKey(res.status)
+        if (key) {
+          setError(t(key))
         } else {
           setError(res.error.detail ?? res.error.error ?? t('shareEditor.publishTab.error_generic'))
         }

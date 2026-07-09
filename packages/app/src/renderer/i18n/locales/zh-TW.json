@@ -593,6 +593,7 @@
       "error_sessionExpired": "登入已過期——請重新登入後再發布。",
       "error_rateLimited": "發布次數過多，請幾分鐘後重試。",
       "error_generic": "發布失敗，請檢查網路後重試。",
+      "error_tooLarge": "此分享內容過大，無法發布。請取消選取部分對話後再試一次。",
       "pii_high_warning_other": "{{count}} 個疑似憑證的值將以未脫敏方式發布",
       "pii_more_other": "另有 {{count}} 個",
       "pii_redactAll": "全部脫敏",

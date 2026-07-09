@@ -623,6 +623,7 @@
       "error_sessionExpired": "Your session expired — sign in again to publish.",
       "error_rateLimited": "Too many publishes. Try again in a few minutes.",
       "error_generic": "Publish failed. Check your connection and try again.",
+      "error_tooLarge": "This share is too large to publish. Deselect some turns and try again.",
       "pii_high_warning_one": "{{count}} credential-like value would publish unredacted",
       "pii_high_warning_other": "{{count}} credential-like values would publish unredacted",
       "pii_more_one": "+{{count}} more",

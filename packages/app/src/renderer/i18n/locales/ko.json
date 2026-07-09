@@ -593,6 +593,7 @@
       "error_sessionExpired": "세션이 만료되었습니다 — 게시하려면 다시 로그인하세요.",
       "error_rateLimited": "게시 횟수가 너무 많습니다. 몇 분 후 다시 시도하세요.",
       "error_generic": "게시에 실패했습니다. 연결을 확인하고 다시 시도하세요.",
+      "error_tooLarge": "이 공유는 너무 커서 게시할 수 없습니다. 일부 턴 선택을 해제하고 다시 시도하세요.",
       "pii_high_warning_other": "{{count}}개의 자격 증명 형식 값이 가리지 않고 게시됩니다",
       "pii_more_other": "+{{count}}개 더",
       "pii_redactAll": "모두 가리기",

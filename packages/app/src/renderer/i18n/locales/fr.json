@@ -623,6 +623,7 @@
       "error_sessionExpired": "Votre session a expiré — reconnectez-vous pour publier.",
       "error_rateLimited": "Trop de publications. Réessayez dans quelques minutes.",
       "error_generic": "Échec de la publication. Vérifiez votre connexion et réessayez.",
+      "error_tooLarge": "Ce partage est trop volumineux pour être publié. Désélectionnez quelques tours et réessayez.",
       "pii_high_warning_one": "{{count}} valeur de type identifiant serait publiée sans masque",
       "pii_high_warning_other": "{{count}} valeurs de type identifiant seraient publiées sans masque",
       "pii_more_one": "+{{count}} de plus",

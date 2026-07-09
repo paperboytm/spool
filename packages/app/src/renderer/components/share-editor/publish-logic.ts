@@ -119,3 +119,20 @@ export function computeUnredactedMatches(
   })
   return { high, medium }
 }
+
+/** Map a failed publish IPC result to the i18n key of the message the
+ *  error banner shows. Returns null when the backend's own detail
+ *  string should surface instead (generic server-side failures, where
+ *  the detail is more specific than any canned copy we have). */
+export function publishErrorKey(status: number): string | null {
+  switch (status) {
+    case 401:
+      return 'shareEditor.publishTab.error_sessionExpired'
+    case 413:
+      return 'shareEditor.publishTab.error_tooLarge'
+    case 429:
+      return 'shareEditor.publishTab.error_rateLimited'
+    default:
+      return null
+  }
+}

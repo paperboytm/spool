@@ -593,6 +593,7 @@
       "error_sessionExpired": "セッションの有効期限が切れました — 公開するには再度サインインしてください。",
       "error_rateLimited": "公開回数が多すぎます。数分後に再試行してください。",
       "error_generic": "公開に失敗しました。接続を確認して再試行してください。",
+      "error_tooLarge": "この共有は大きすぎて公開できません。一部のターンの選択を解除して、もう一度お試しください。",
       "pii_high_warning_other": "{{count}} 件の認証情報のような値がマスクされずに公開されます",
       "pii_more_other": "+{{count}} 件",
       "pii_redactAll": "すべてマスク",

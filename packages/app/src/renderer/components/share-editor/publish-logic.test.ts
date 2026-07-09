@@ -4,8 +4,10 @@ import type { Conversation, EditorOpts } from '@spool/share-kit'
 
 import {
   computeUnredactedMatches,
+  publishErrorKey,
   truncatePreview,
 } from './publish-logic.js'
+import enLocale from '../../i18n/locales/en.json'
 
 const API_KEY = 'sk_live_abcdef1234567890ABCDEF'
 
@@ -172,5 +174,28 @@ describe('computeUnredactedMatches — hidden turns', () => {
     )
     expect(r.high).toEqual([])
     expect(r.medium).toEqual([])
+  })
+})
+
+describe('publishErrorKey', () => {
+  it('maps the statuses with dedicated copy to i18n keys that exist', () => {
+    const en = enLocale as Record<string, unknown>
+    const resolve = (key: string): unknown =>
+      key.split('.').reduce<unknown>((node, part) => {
+        return node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined
+      }, en)
+    for (const status of [401, 413, 429]) {
+      const key = publishErrorKey(status)
+      expect(key, `status ${status}`).toBeTruthy()
+      // Guard against typo'd keys rendering raw like
+      // "shareEditor.publishTab.error_tooLarge" in the error banner.
+      expect(typeof resolve(key!), `key ${key} missing from en.json`).toBe('string')
+    }
+  })
+
+  it('returns null for statuses without dedicated copy (backend detail surfaces)', () => {
+    expect(publishErrorKey(422)).toBeNull()
+    expect(publishErrorKey(500)).toBeNull()
+    expect(publishErrorKey(0)).toBeNull()
   })
 })

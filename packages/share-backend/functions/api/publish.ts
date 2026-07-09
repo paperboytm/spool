@@ -56,13 +56,17 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     })
     if (!daily.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
-    const raw = await ctx.request.text()
-    if (raw.length > MAX_SNAPSHOT_BYTES) {
+    // Measure the actual request bytes, not string length — .text()
+    // decodes to UTF-16 code units, which undercounts multi-byte
+    // (CJK) content by up to 3x and would let a nominal "2MB" cap
+    // admit ~6MB of R2 storage per share.
+    const rawBytes = await ctx.request.arrayBuffer()
+    if (rawBytes.byteLength > MAX_SNAPSHOT_BYTES) {
       throw new ApiError('UNPROCESSABLE', 'payload too large')
     }
     let json: unknown
     try {
-      json = JSON.parse(raw)
+      json = JSON.parse(new TextDecoder().decode(rawBytes))
     } catch {
       throw new ApiError('UNPROCESSABLE', 'invalid json')
     }

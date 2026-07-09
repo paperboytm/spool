@@ -70,6 +70,17 @@ export interface PublishRequestBody {
   override_slug?: string
 }
 
+/** Hard cap on the serialized publish request body, in UTF-8 bytes.
+ *  Mirrors the backend's `MAX_SNAPSHOT_BYTES`
+ *  (packages/share-backend/functions/api/publish.ts) — a test in
+ *  share-publish.test.ts asserts the two stay equal. The main-process
+ *  IPC handler measures the payload against this before uploading, so an
+ *  oversized session fails fast with a friendly message instead of
+ *  buffering the whole body up to the server only to get a 422. Both
+ *  sides measure the encoded bytes of the same JSON body, so the client
+ *  gate and the server cap reject exactly the same payloads. */
+export const MAX_PUBLISH_BODY_BYTES = 2 * 1024 * 1024
+
 export interface PublishSuccess {
   id: string
   url: string
