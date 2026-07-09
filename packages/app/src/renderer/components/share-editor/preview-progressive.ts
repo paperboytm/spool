@@ -1,9 +1,13 @@
-// Progressive-mount chunking for the share-editor preview. Pure logic
-// + a small stateful hook, split out of PreviewPane so the math is
-// unit-testable without dragging the template/markdown render chain
-// (which needs a DOM) into the node test environment.
+// Progressive-mount chunking for the share-editor preview. The fill
+// state machine itself lives in @spool/share-kit (useProgressiveTurns)
+// and is shared with the public reader — one implementation, so fixes
+// to the scheduling/clamp semantics can't drift between surfaces. This
+// module only pins the editor-tuned constants.
 
-import { useEffect, useState } from 'react'
+import {
+  useProgressiveTurns,
+  nextReaderCount,
+} from '@spool/share-kit/progressive'
 
 /** First progressive chunk. Must stay comfortably above the e2e
  *  fixtures' turn counts so small documents render whole on the first
@@ -20,7 +24,7 @@ export function nextProgressiveCount(
   total: number,
   step: number = PREVIEW_TURNS_PER_FRAME,
 ): number {
-  return Math.min(current + step, total)
+  return nextReaderCount(current, total, step)
 }
 
 /**
@@ -36,19 +40,5 @@ export function useProgressiveCount(
   initial: number = PREVIEW_INITIAL_TURNS,
   step: number = PREVIEW_TURNS_PER_FRAME,
 ): number {
-  const [count, setCount] = useState(() => Math.min(initial, total))
-  useEffect(() => {
-    // Clamp when the document shrinks (e.g. fewer turns after a draft
-    // reload); never reset an already-filled view back to the first
-    // chunk on unrelated conversation identity churn.
-    setCount((c) => Math.min(c, total))
-  }, [total])
-  useEffect(() => {
-    if (count >= total) return
-    const raf = requestAnimationFrame(() => {
-      setCount((c) => nextProgressiveCount(c, total, step))
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [count, total, step])
-  return Math.min(count, total)
+  return useProgressiveTurns(total, initial, step)
 }

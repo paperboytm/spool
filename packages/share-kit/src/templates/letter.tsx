@@ -11,11 +11,10 @@
 // underscore and each user's byline — the colorway picker is visible
 // at a glance.
 
-import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
-import { collectRedactList, type RedactReplacement } from './redact'
+import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
 import { GapMarker } from './gap-marker'
 import { Body } from './body'
@@ -32,11 +31,7 @@ export function Letter({ convo, opts, redactList: injectedRedactList }: Props) {
   const accent = opts.accentHex
   const accentBg = accentBgFor(accent)
   const tf = typefaceFamily(opts.typeface)
-  const computedRedactList = useMemo(
-    () => collectRedactList(convo.turns, opts),
-    [convo.turns, opts.redactExclude],
-  )
-  const redactList = injectedRedactList ?? computedRedactList
+  const redactList = useResolvedRedactList(convo.turns, opts, injectedRedactList)
   const turnGap = opts.density === 'compact' ? 20 : 32
   const segments = selectSegments(convo, opts)
 

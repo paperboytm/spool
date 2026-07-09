@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
+    },
     "./styles.css": "./src/styles/global.css",
     "./styles/tokens.css": "./src/styles/tokens.css",
     "./styles/fonts.css": "./src/styles/fonts.css"

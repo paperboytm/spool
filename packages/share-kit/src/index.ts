@@ -55,6 +55,12 @@ export { SnapshotReader } from './reader/SnapshotReader'
 export type { SnapshotReaderProps } from './reader/SnapshotReader'
 export { decodeSnapshot } from './reader/snapshot-to-conversation'
 export type { DecodedSnapshot } from './reader/snapshot-to-conversation'
+export {
+  useProgressiveTurns,
+  nextReaderCount,
+  READER_INITIAL_TURNS,
+  READER_TURNS_PER_FRAME,
+} from './reader/use-progressive-turns'
 
 // ─── Template primitives (for hosts assembling custom layouts) ──
 export { Body } from './templates/body'

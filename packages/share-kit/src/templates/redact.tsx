@@ -16,6 +16,7 @@
 // and the per-kind mask to substitute. The body renderer and the
 // markdown / .spool exporters consume the same shape.
 
+import { useMemo } from 'react'
 import type { EditorOpts, RedactExclude, Turn } from '@/lib/types'
 import {
   detectSensitiveSpansCached,
@@ -139,4 +140,36 @@ export function collectRedactList(
   opts?: Pick<EditorOpts, 'redactExclude'>,
 ): RedactReplacement[] {
   return applyRedactPolicy(detectPII(turns), opts?.redactExclude)
+}
+
+// Stable identity for the empty case so a template's memoized Body
+// components bail out instead of reconciling on a fresh `[]` each frame.
+const EMPTY_REDACT_LIST: RedactReplacement[] = []
+
+/**
+ * Resolve the redact list a template should render with, computing the
+ * detection pass only when it will actually be used.
+ *
+ * - An injected list (from a host that mounts the document
+ *   progressively) always wins and short-circuits detection, keeping
+ *   the list identity stable across the host's per-frame re-renders.
+ * - Otherwise the pass runs ONLY when redaction is on. The public
+ *   reader decodes snapshots with `redact: false` (bodies are already
+ *   masked at publish time), so without this guard every page load
+ *   would run the full detection suite over the whole conversation and
+ *   then discard the result at the `opts.redact ? … : undefined` gate.
+ */
+export function useResolvedRedactList(
+  turns: Turn[],
+  opts: Pick<EditorOpts, 'redact' | 'redactExclude'>,
+  injected: RedactReplacement[] | undefined,
+): RedactReplacement[] {
+  const computed = useMemo(
+    () =>
+      injected || !opts.redact
+        ? EMPTY_REDACT_LIST
+        : collectRedactList(turns, opts),
+    [turns, opts.redact, opts.redactExclude, injected],
+  )
+  return injected ?? computed
 }

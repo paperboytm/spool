@@ -4,11 +4,10 @@
 // evoke the native chat UI of ChatGPT/Claude/Gemini while still
 // reading as a considered artifact.
 
-import { useMemo } from 'react'
 import type { Conversation, EditorOpts } from '@/lib/types'
 import { typefaceFamily } from '@/lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
-import { collectRedactList, type RedactReplacement } from './redact'
+import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
 import { GapMarker } from './gap-marker'
 import { Body } from './body'
@@ -25,14 +24,7 @@ export function Chat({ convo, opts, redactList: injectedRedactList }: Props) {
   const accent = opts.accentHex
   const accentBg = accentBgFor(accent)
   const tf = typefaceFamily(opts.typeface)
-  // Memo so style-only opts changes (paper / typeface / colorway /
-  // density / selection) don't re-trigger the 22-regex detection
-  // pass. Re-runs only when source turns or redact policy moves.
-  const computedRedactList = useMemo(
-    () => collectRedactList(convo.turns, opts),
-    [convo.turns, opts.redactExclude],
-  )
-  const redactList = injectedRedactList ?? computedRedactList
+  const redactList = useResolvedRedactList(convo.turns, opts, injectedRedactList)
   const segments = selectSegments(convo, opts)
   const turnGap = opts.density === 'compact' ? 20 : 30
 
