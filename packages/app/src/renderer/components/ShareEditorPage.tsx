@@ -772,6 +772,7 @@ export default function ShareEditorPage({
                 </button>
                 <button
                   type="button"
+                  data-testid="pdf-preview-save"
                   onClick={() => { void savePdfFromPreview() }}
                   className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
                 >

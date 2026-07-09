@@ -1131,7 +1131,18 @@ ipcMain.handle(
       width: A4_PAGE_WIDTH_PX,
       height: 1123,
       useContentSize: true,
-      webPreferences: { sandbox: false, offscreen: true },
+      // Keep the OS sandbox on: the injected artifact HTML is
+      // renderer-supplied and can carry hostile inline handlers /
+      // embeds. printToPDF, executeJavaScript and document.fonts all
+      // work sandboxed, and this window needs no Node/preload.
+      webPreferences: { sandbox: true, offscreen: true },
+    })
+    // The window only ever renders the caller's artifact for one
+    // printToPDF pass — deny any popup or navigation so a malicious
+    // href/embed in that HTML can't drive it off the loaded page.
+    printWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    printWin.webContents.on('will-navigate', (event, url) => {
+      if (url !== callerUrl) event.preventDefault()
     })
     try {
       await printWin.loadURL(callerUrl)
