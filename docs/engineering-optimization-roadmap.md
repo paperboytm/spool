@@ -259,6 +259,42 @@ Acceptance criteria:
 
 Goal: switch build and typecheck commands to native `typescript@7.0.2`.
 
+Implementation status: complete on `feat/typescript-7`; cross-platform CI and
+the full local E2E duration gate remain external verification.
+
+Implementation notes:
+
+1. Pin `typescript@7.0.2` once at the workspace root and remove four
+   package-local TypeScript ranges.
+2. Remove the TS7-invalid `esModuleInterop: false` and `baseUrl` options and
+   make both `@/*` substitutions explicitly relative.
+3. Add `oxlint-tsgolint@0.24.0`, run Oxlint with `--type-aware`, and enable
+   `typescript/no-floating-promises` with `ignoreVoid: true`.
+4. Review all 22 initial promise findings. Mark deliberate background work,
+   handle clipboard/worker/search rejection paths, and preserve existing UI
+   behavior.
+5. Keep share-kit declarations under TS7 by disabling only API Extractor's
+   `rollupTypes` pass. The latest API Extractor still embeds TypeScript 5.9 and
+   crashes on the TS7 declaration graph; entrypoint declarations and the full
+   internal declaration tree remain emitted.
+
+Verification on 2026-07-12:
+
+- `pnpm exec tsc --version`: `7.0.2`.
+- `pnpm typecheck`: all nine workspace packages passed.
+- `pnpm lint`: passed with type-aware linting and no tsconfig diagnostics.
+- Core, CLI, redact, share-kit, share-web, landing, and Electron bundle builds
+  passed under the centralized TS7 install.
+- Sequential unit assertions passed: redact 135, share-backend 247, share-kit
+  68, share-web 84, core 404 with 1 skipped, app 482, and CLI 53. Under the
+  current host load the CLI runner later emitted a Vitest worker RPC timeout
+  after all 53 assertions had passed.
+- Electron E2E built and launched successfully. It completed 65 tests with no
+  final assertion failures before the suite's 300-second host timeout; three
+  first-attempt failures passed on retry, cleanup timed out, one test was
+  skipped, and 100 tests did not run. Full macOS/Linux CI remains required.
+- The final Node ABI rebuild completed and `sp status` loaded the local index.
+
 Changes:
 
 1. Pin a single TypeScript version at the workspace root. Remove duplicated
@@ -277,11 +313,11 @@ Changes:
 
 Acceptance criteria:
 
-- [ ] `pnpm exec tsc --version` reports `7.0.2`.
-- [ ] All package typechecks and builds pass under TS7.
-- [ ] `oxlint --type-aware` reports no tsconfig errors.
+- [x] `pnpm exec tsc --version` reports `7.0.2`.
+- [x] All package typechecks and builds pass under TS7.
+- [x] `oxlint --type-aware` reports no tsconfig errors.
 - [ ] Unit and E2E suites pass on Linux and macOS.
-- [ ] CLI startup and the packaged Electron app both load `better-sqlite3`.
+- [x] CLI startup and the Electron E2E app both load `better-sqlite3`.
 
 ### PR 4: Separate Build, Package, and Native ABI Tasks
 

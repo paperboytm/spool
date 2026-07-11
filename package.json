@@ -13,7 +13,7 @@
     "test:share-backend": "pnpm --filter @spool/share-backend test",
     "rebuild:native:node": "pnpm --filter @spool-lab/core run rebuild:native:node",
     "rebuild:native:electron": "pnpm --filter @spool/app run rebuild:native:electron",
-    "lint": "oxlint .",
+    "lint": "oxlint --type-aware .",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "clean": "turbo clean",
     "check:phantom-independence": "scripts/phantom-independence-check.sh",
@@ -22,8 +22,9 @@
   },
   "devDependencies": {
     "oxlint": "1.73.0",
+    "oxlint-tsgolint": "0.24.0",
     "turbo": "^2.9.6",
-    "typescript": "^5.7.3"
+    "typescript": "7.0.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

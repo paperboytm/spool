@@ -181,10 +181,10 @@ function CodeBlock({ code }: { code: string }) {
 function InstallPill({ cmd }: { cmd: string }) {
   const [copied, setCopied] = useState(false);
   const onClick = () => {
-    navigator.clipboard?.writeText(cmd).then(() => {
+    void navigator.clipboard?.writeText(cmd).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
-    });
+    }).catch(() => {});
   };
   return (
     <button

@@ -76,7 +76,7 @@ export function Reader({ id }: { id: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetchSnapshot(id).then((result) => {
+    void fetchSnapshot(id).then((result) => {
       if (cancelled) return
       const next = fromFetch(result)
       setState(next)

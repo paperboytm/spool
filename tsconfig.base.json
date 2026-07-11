@@ -8,7 +8,6 @@
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-    "esModuleInterop": false,
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,

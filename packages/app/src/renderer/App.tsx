@@ -517,7 +517,7 @@ export default function App() {
       if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
       syncRefreshTimer.current = setTimeout(() => {
         syncRefreshTimer.current = null
-        doSearch(query)
+        void doSearch(query)
       }, 250)
     }
     const offProgress = window.spool.onSyncProgress((e) => {
@@ -531,7 +531,7 @@ export default function App() {
           syncRefreshTimer.current = null
         }
         setTimeout(() => setSyncStatus(null), 3000)
-        if (query.trim() && searchMode === 'fast') doSearch(query)
+        if (query.trim() && searchMode === 'fast') void doSearch(query)
       }
     })
     const offNew = window.spool.onNewSessions(() => {
@@ -552,6 +552,8 @@ export default function App() {
       startTransition(() => {
         setResults(res)
       })
+    } catch (error) {
+      console.error('[search] failed', error)
     } finally {
       if (requestId === searchRequestSeq.current) {
         setIsSearching(false)
@@ -580,7 +582,16 @@ export default function App() {
     if (!q || !window.spool?.aiSearch) return
 
     const scopedKey = searchScopeProject?.identityKey
-    const ftsResults = results.length > 0 ? results : (window.spool ? await window.spool.search(q, 20, undefined, false, scopedKey) : [])
+    let ftsResults = results
+    if (ftsResults.length === 0 && window.spool) {
+      try {
+        ftsResults = await window.spool.search(q, 20, undefined, false, scopedKey)
+      } catch (error) {
+        setAiError(String(error))
+        setAiStreaming(false)
+        return
+      }
+    }
     if (ftsResults.length > 0 && results.length === 0) setResults(ftsResults)
     const fragmentContext = ftsResults.filter((result): result is FragmentResult & { kind: 'fragment' } => result.kind === 'fragment')
 
@@ -602,7 +613,7 @@ export default function App() {
     if (!q.trim()) setHomeMode(true)
     if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
-      searchTimer.current = setTimeout(() => doSearch(q), 120)
+      searchTimer.current = setTimeout(() => { void doSearch(q) }, 120)
       void doPreviewSearch(q)
     }
     if (aiAnswer || aiError) {
@@ -619,9 +630,9 @@ export default function App() {
     setTargetMessageId(null)
     setView('search')
     if (searchMode === 'ai') {
-      doAiSearch()
+      void doAiSearch()
     } else {
-      doSearch(query)
+      void doSearch(query)
     }
   }, [searchMode, doAiSearch, doSearch, query])
 
@@ -638,7 +649,7 @@ export default function App() {
         setSelectedSession(null)
         setTargetMessageId(null)
         setView('search')
-        doSearch(query)
+        void doSearch(query)
       }
     } else {
       setResults([])

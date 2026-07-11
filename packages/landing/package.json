@@ -24,7 +24,6 @@
     "@types/react-dom": "^19.2.3",
     "@void/md": "^0.7.2",
     "@void/react": "^0.7.2",
-    "typescript": "^5.7.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
     "vite-plus": "^0.1.18",
     "void": "^0.7.2"

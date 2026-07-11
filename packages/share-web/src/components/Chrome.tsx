@@ -342,7 +342,7 @@ export function Header({ auth = 'auto' as AuthState }: { auth?: AuthState }) {
   useEffect(() => {
     if (auth !== 'auto') return
     let alive = true
-    resolveAuthState().then((next) => {
+    void resolveAuthState().then((next) => {
       if (alive) setResolved(next)
     })
     return () => {

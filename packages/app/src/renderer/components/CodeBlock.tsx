@@ -79,7 +79,7 @@ function CodeBlock({ code, lang, isDark }: Props) {
       setHtml(cached)
       return
     }
-    ;(async () => {
+    void (async () => {
       try {
         const highlighter = await getHighlighter()
         const loaded = highlighter.getLoadedLanguages()

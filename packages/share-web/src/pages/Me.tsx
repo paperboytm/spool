@@ -675,7 +675,7 @@ export function Me() {
 
   useEffect(() => {
     document.title = 'Your account · spool.pro'
-    load()
+    void load()
   }, [load])
 
   // Keep the unpublish-target ref in lockstep with the rendered target so
@@ -757,7 +757,7 @@ export function Me() {
     setState((s) =>
       s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: null } } : s,
     )
-    fetchMyShares().then((r) => {
+    void fetchMyShares().then((r) => {
       if (r.kind !== 'ok') return
       setState((s) => (s.kind === 'ok' ? { ...s, shares: r.shares } : s))
     })

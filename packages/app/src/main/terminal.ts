@@ -136,7 +136,9 @@ windows:
           commands:
             - exec: ${cmd}
 `)
-    shell.openExternal(`warp://launch/${configName}`)
+    void shell.openExternal(`warp://launch/${configName}`).catch((error) => {
+      console.error('[terminal] failed to open Warp launch configuration:', error)
+    })
   },
 
   // Ghostty — macOS has no direct CLI, so pass args through `open --args`.

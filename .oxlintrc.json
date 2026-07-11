@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [],
+  "plugins": [
+    "typescript"
+  ],
   "categories": {
     "correctness": "off"
   },
@@ -16,6 +18,14 @@
     "packages/app/release/**",
     "packages/connectors/**/dist/**"
   ],
+  "rules": {
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "ignoreVoid": true
+      }
+    ]
+  },
   "overrides": [
     {
       "files": [

@@ -56,7 +56,7 @@ export function SignIn({ next }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    fetchMe().then((r) => {
+    void fetchMe().then((r) => {
       if (cancelled) return
       if (r.kind === 'ok') {
         // Resolve `dest` through the URL constructor against the current

@@ -25,7 +25,10 @@ function runWorker(code: string, { timeoutMs = 4000 } = {}): Promise<Outcome> {
     // when we're explicitly probing failure paths.
     worker.on('error', () => {})
     const timer = setTimeout(() => {
-      worker.terminate().finally(() => resolve({ messages, exitCode: null, saw: 'timeout' }))
+      void worker.terminate().then(
+        () => resolve({ messages, exitCode: null, saw: 'timeout' }),
+        () => resolve({ messages, exitCode: null, saw: 'timeout' }),
+      )
     }, timeoutMs)
     worker.on('exit', (code) => {
       clearTimeout(timer)

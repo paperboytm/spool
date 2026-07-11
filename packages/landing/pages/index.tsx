@@ -272,10 +272,10 @@ function SessionRow({
 function InstallPill() {
   const [copied, setCopied] = useState(false);
   const onClick = () => {
-    navigator.clipboard.writeText(INSTALL_CMD).then(() => {
+    void navigator.clipboard.writeText(INSTALL_CMD).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-    });
+    }).catch(() => {});
   };
   return (
     <button

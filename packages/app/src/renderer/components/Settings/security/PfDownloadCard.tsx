@@ -38,7 +38,7 @@ export default function PfDownloadCard() {
     }
     let cancelled = false
     const tick = () => {
-      securityApi.pfGetRuntimeInfo()
+      void securityApi.pfGetRuntimeInfo()
         .catch(() => null)
         .then((info) => { if (!cancelled) setRuntime(info) })
     }

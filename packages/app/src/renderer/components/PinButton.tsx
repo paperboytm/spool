@@ -38,9 +38,9 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
       type="button"
       data-testid="pin-button"
       data-pinned={pinned ? '1' : '0'}
-      onClick={toggle}
+      onClick={(event) => { void toggle(event) }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') toggle(event)
+        if (event.key === 'Enter' || event.key === ' ') void toggle(event)
       }}
       title={pinned ? t('sidebar.unpinFromProject') : t('sidebar.pinToProject')}
       aria-label={pinned ? t('sidebar.unpinFromProject') : t('sidebar.pinToProject')}

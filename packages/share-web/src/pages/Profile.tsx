@@ -26,7 +26,7 @@ export function Profile({ handle }: { handle: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetchProfile(handle).then((r) => {
+    void fetchProfile(handle).then((r) => {
       if (cancelled) return
       const next = fromFetch(r)
       setState(next)

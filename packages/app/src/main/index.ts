@@ -450,9 +450,13 @@ function createWindow(): BrowserWindow {
   }
 
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL']).catch((error) => {
+      console.error('[window] failed to load renderer URL:', error)
+    })
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(join(__dirname, '../renderer/index.html')).catch((error) => {
+      console.error('[window] failed to load renderer file:', error)
+    })
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -671,13 +675,15 @@ app.whenReady().then(async () => {
     } else {
       mainWindow = createWindow()
     }
-    app.dock?.show()
+    void app.dock?.show()
   }
   focusExistingWindow = showOrCreateWindow
 
   if (!isDevMode) {
     setupTray(showOrCreateWindow, () => {
-      runSyncWorker()
+      void runSyncWorker().catch((error) => {
+        console.error('[sync-worker] tray sync failed:', error)
+      })
     })
   }
 
