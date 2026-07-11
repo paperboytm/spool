@@ -13,7 +13,7 @@
     "test:share-backend": "pnpm --filter @spool/share-backend test",
     "rebuild:native:node": "pnpm --filter @spool-lab/core run rebuild:native:node",
     "rebuild:native:electron": "pnpm --filter @spool/app run rebuild:native:electron",
-    "lint": "eslint .",
+    "lint": "oxlint .",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "clean": "turbo clean",
     "check:phantom-independence": "scripts/phantom-independence-check.sh",
@@ -21,8 +21,7 @@
     "spool": "node packages/cli/bin/spool.js"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.59.3",
-    "eslint": "^10.4.0",
+    "oxlint": "1.73.0",
     "turbo": "^2.9.6",
     "typescript": "^5.7.3"
   },

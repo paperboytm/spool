@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [],
+  "categories": {
+    "correctness": "off"
+  },
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/out/**",
+    "**/test-results/**",
+    "**/.turbo/**",
+    "packages/app/release/**",
+    "packages/connectors/**/dist/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "packages/app/src/main/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "node:child_process",
+                "importNames": [
+                  "execSync",
+                  "spawnSync",
+                  "execFileSync"
+                ],
+                "message": "Sync child_process APIs block the main-process event loop and produce a launch beachball. Use the async equivalents (and Promise.all when multiple lookups are independent), or move the work into a worker_thread."
+              },
+              {
+                "name": "child_process",
+                "importNames": [
+                  "execSync",
+                  "spawnSync",
+                  "execFileSync"
+                ],
+                "message": "Sync child_process APIs block the main-process event loop and produce a launch beachball. Use the async equivalents (and Promise.all when multiple lookups are independent), or move the work into a worker_thread."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "packages/app/src/main/e2e-mode/e2e-mode-clean.test.ts",
+        "packages/app/src/main/terminal.test.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Spool Engineering Optimization Roadmap
 
 > Status: Proposed  
-> Updated: 2026-07-11  
+> Updated: 2026-07-12  
 > Base: `main@049c4b2`  
 > Intended implementer: `sol high`
 
@@ -203,6 +203,32 @@ Acceptance criteria:
 Goal: remove the unsupported TypeScript parser dependency before adopting TS7
 and preserve the existing Electron main-thread safety rule.
 
+Implementation status: complete on `feat/oxlint-migration`.
+
+Implementation notes:
+
+1. Pin `oxlint@1.73.0` and use it for the root `lint` command.
+2. Commit the reviewed migration output in `.oxlintrc.json`, preserving every
+   ignore pattern, restricted module, import name, and custom diagnostic.
+3. Replace the unsupported nested test ignore with an exact final override for
+   the two intentional test fixtures.
+4. Remove ESLint, `@typescript-eslint/parser`, and `eslint.config.mjs`.
+5. Keep syntax-aware linting for this PR; type-aware linting remains owned by
+   PR 3 after the TS7-invalid tsconfigs are repaired.
+
+Verification on 2026-07-12:
+
+- `pnpm install --frozen-lockfile`: passed; ESLint and the TypeScript ESLint
+  parser are absent from the direct installation.
+- `pnpm typecheck`: passed for all workspace packages.
+- `pnpm lint`: passed.
+- A temporary prohibited production import failed with the preserved custom
+  diagnostic; both exact test fixtures passed lint.
+- Isolated CLI tests passed (53/53), and `sp status` loaded the local index.
+- Root `pnpm test` reproduced the already documented shared native rebuild
+  race: app rebuilt `better-sqlite3` while CLI tests were loading it. PR 4 owns
+  that isolation; the Node ABI was restored before the isolated CLI rerun.
+
 Changes:
 
 1. Add pinned dev dependencies for `oxlint@1.73.0`. Add
@@ -223,11 +249,11 @@ Changes:
 
 Acceptance criteria:
 
-- [ ] Oxlint catches a temporary prohibited import in production main code.
-- [ ] Oxlint allows the documented test fixtures only.
-- [ ] `pnpm lint` is green on the repository baseline.
-- [ ] ESLint and `@typescript-eslint/parser` are no longer installed.
-- [ ] The custom diagnostic message is preserved.
+- [x] Oxlint catches a temporary prohibited import in production main code.
+- [x] Oxlint allows the documented test fixtures only.
+- [x] `pnpm lint` is green on the repository baseline.
+- [x] ESLint and `@typescript-eslint/parser` are no longer installed.
+- [x] The custom diagnostic message is preserved.
 
 ### PR 3: Migrate to TypeScript 7 and Enable Type-Aware Linting
 
