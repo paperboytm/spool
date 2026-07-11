@@ -12,7 +12,7 @@
     "noEmit": true,
     "isolatedModules": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types", "vite/client"]
   },
   "include": ["pages", "routes", "middleware", "components", "vite.config.ts", "void.json"]
 }

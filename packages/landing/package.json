@@ -7,6 +7,7 @@
     "dev": "vp dev --port 3001",
     "prebuild": "node scripts/sync-registry.mjs",
     "build": "vp build",
+    "typecheck": "tsc --noEmit",
     "preview": "vp preview --port 3001",
     "deploy": "void deploy",
     "sync:registry": "node scripts/sync-registry.mjs",

@@ -38,6 +38,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
       - run: pnpm --filter @spool-lab/redact build
       - run: pnpm --filter @spool-lab/redact test
       - run: pnpm --filter @spool-lab/core build

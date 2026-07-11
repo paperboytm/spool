@@ -22,6 +22,7 @@
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
     "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
     "test": "pnpm run rebuild:native && vitest run",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"

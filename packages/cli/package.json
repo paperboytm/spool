@@ -22,6 +22,7 @@
   "scripts": {
     "build": "pnpm run clean && tsc && chmod +x bin/spool.js",
     "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "test": "vitest run",
     "prepack": "pnpm run build"

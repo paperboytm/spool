@@ -106,7 +106,14 @@ function Hero() {
   );
 }
 
-const HERO_PROJECTS = [
+interface HeroProject {
+  readonly name: string;
+  readonly count: number;
+  readonly dots: readonly string[];
+  readonly active?: boolean;
+}
+
+const HERO_PROJECTS: readonly HeroProject[] = [
   { name: "harbor", count: 142, dots: ["claude", "codex"], active: true },
   { name: "tide", count: 87, dots: ["claude", "gemini"] },
   { name: "prism", count: 53, dots: ["claude"] },
@@ -116,7 +123,7 @@ const HERO_PROJECTS = [
   { name: "terra", count: 22, dots: ["gemini"] },
   { name: "relay", count: 19, dots: ["claude", "codex"] },
   { name: "vault", count: 14, dots: ["codex"] },
-] as const;
+];
 
 function HeroSidebar() {
   return (
