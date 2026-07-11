@@ -273,9 +273,10 @@ Implementation notes:
 4. Review all 22 initial promise findings. Mark deliberate background work,
    handle clipboard/worker/search rejection paths, and preserve existing UI
    behavior.
-5. Keep share-kit declarations under TS7 by disabling only API Extractor's
-   `rollupTypes` pass. The latest API Extractor still embeds TypeScript 5.9 and
-   crashes on the TS7 declaration graph; entrypoint declarations and the full
+5. Keep share-kit declarations under TS7 with `vite-plugin-dts@5`, its
+   documented `@typescript/typescript6` compiler-API fallback, and no declaration
+   bundling. TypeScript 7 no longer exposes the JavaScript compiler API and API
+   Extractor still embeds TypeScript 5.9; entrypoint declarations and the full
    internal declaration tree remain emitted.
 
 Verification on 2026-07-12:

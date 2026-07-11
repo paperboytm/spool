@@ -10,9 +10,9 @@ export default defineConfig({
       entryRoot: 'src',
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-      // API Extractor still embeds TypeScript 5.9 and crashes on TS7 output.
-      // Keep the declaration tree instead; package entrypoints remain unchanged.
-      rollupTypes: false,
+      // Keep the declaration tree instead of API Extractor's bundled rollup;
+      // package entrypoints remain unchanged.
+      bundleTypes: false,
     }),
   ],
   resolve: {

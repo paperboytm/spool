@@ -46,12 +46,13 @@
     "@types/node": "^22.19.17",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript/typescript6": "6.0.2",
     "@vitejs/plugin-react": "^4.7.0",
     "lucide-react": "^0.460.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "vite": "^6.3.3",
-    "vite-plugin-dts": "^4.5.0",
+    "vite-plugin-dts": "^5.0.3",
     "vitest": "^3.2.4"
   }
 }
