@@ -7,6 +7,7 @@ type Props = {
   focusNonce: number
   resultNonce: number
   query: string
+  pending: boolean
   matches: number
   activeMatchOrdinal: number
   onChange: (query: string) => void
@@ -20,6 +21,7 @@ export default function SessionFindBar({
   focusNonce,
   resultNonce,
   query,
+  pending,
   matches,
   activeMatchOrdinal,
   onChange,
@@ -80,9 +82,11 @@ export default function SessionFindBar({
   const hasMatches = matches > 0
   const statusLabel = !hasQuery
     ? ''
-    : hasMatches
-      ? t('session.find_matches_other', { current: activeMatchOrdinal, total: matches })
-      : t('session.find_noMatch')
+    : pending
+      ? ''
+      : hasMatches
+        ? t('session.find_matches_other', { current: activeMatchOrdinal, total: matches })
+        : t('session.find_noMatch')
 
   return (
     <div
@@ -130,7 +134,7 @@ export default function SessionFindBar({
       <button
         type="button"
         onClick={onPrevious}
-        disabled={!hasQuery || !hasMatches}
+        disabled={pending || !hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`${t('session.find_prev')} (${previousShortcutLabel})`}
         title={`${t('session.find_prev')} (${previousShortcutLabel})`}
@@ -140,7 +144,7 @@ export default function SessionFindBar({
       <button
         type="button"
         onClick={onNext}
-        disabled={!hasQuery || !hasMatches}
+        disabled={pending || !hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`${t('session.find_next')} (${nextShortcutLabel})`}
         title={`${t('session.find_next')} (${nextShortcutLabel})`}

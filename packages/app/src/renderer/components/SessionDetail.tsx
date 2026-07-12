@@ -48,6 +48,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [findFocusNonce, setFindFocusNonce] = useState(0)
   const [findResultNonce, setFindResultNonce] = useState(0)
   const [findQuery, setFindQuery] = useState('')
+  const [settledFindQuery, setSettledFindQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
   const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
@@ -55,6 +56,20 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const hasDraft = useDraftCountForSession(sessionUuid) > 0
 
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
+  const normalizedSettledFindQuery = settledFindQuery.trim().toLocaleLowerCase()
+  const findPending = normalizedFindQuery !== normalizedSettledFindQuery
+  const effectiveFindQuery = findPending ? '' : normalizedSettledFindQuery
+
+  useEffect(() => {
+    if (!normalizedFindQuery) {
+      setSettledFindQuery('')
+      return undefined
+    }
+    const timer = window.setTimeout(() => {
+      setSettledFindQuery(findQuery)
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [findQuery, normalizedFindQuery])
 
   const {
     messageFindRanges,
@@ -65,11 +80,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
     // Only project markdown → rendered text when a query is active. For a 1500-message
     // session this saves ~1500 remark.parse calls on session open.
-    if (normalizedFindQuery) {
+    if (effectiveFindQuery) {
       for (const message of messages) {
         const source = message.contentText || (message.role === 'system' ? '(summary)' : '')
         const text = extractRenderedText(source)
-        const ranges = getFindRanges(text, normalizedFindQuery)
+        const ranges = getFindRanges(text, effectiveFindQuery)
         if (ranges.length > 0) {
           rangesByMessage.set(message.id, { ranges, offset })
           offset += ranges.length
@@ -81,12 +96,13 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       messageFindRanges: rangesByMessage,
       totalFindMatches: offset,
     }
-  }, [messages, normalizedFindQuery])
+  }, [messages, effectiveFindQuery])
 
   const activeMatchOrdinal = totalFindMatches > 0 ? activeMatchIndex + 1 : 0
 
   const clearFind = useCallback(() => {
     setFindQuery('')
+    setSettledFindQuery('')
     setActiveMatchIndex(0)
   }, [])
 
@@ -181,13 +197,13 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   }, [sessionUuid, clearFind])
 
   useEffect(() => {
-    if (!normalizedFindQuery || totalFindMatches === 0) {
+    if (!effectiveFindQuery || totalFindMatches === 0) {
       setActiveMatchIndex(0)
       return
     }
 
     setActiveMatchIndex((value) => Math.min(value, totalFindMatches - 1))
-  }, [normalizedFindQuery, totalFindMatches])
+  }, [effectiveFindQuery, totalFindMatches])
 
   useEffect(() => {
     if (!showFindBar) return
@@ -411,6 +427,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         focusNonce={findFocusNonce}
         resultNonce={findResultNonce}
         query={findQuery}
+        pending={findPending}
         matches={totalFindMatches}
         activeMatchOrdinal={activeMatchOrdinal}
         onChange={runFind}

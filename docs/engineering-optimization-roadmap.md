@@ -1,7 +1,7 @@
 # Spool Engineering Optimization Roadmap
 
-> Status: Implemented  
-> Updated: 2026-07-12  
+> Status: Implemented
+> Updated: 2026-07-12
 > Base: `main@049c4b2`  
 > Implementation: stacked branches `feat/typecheck-baseline` through
 > `feat/dependency-maintenance`
@@ -570,6 +570,10 @@ Implementation notes:
 6. Do not split orchestration modules or add React memoization without a
    functional ownership boundary or profiler evidence. File size alone does
    not justify either change.
+7. Debounce session-local find by 120 ms while keeping the controlled input
+   synchronous. The expensive Markdown-to-visible-text projection now runs
+   once after typing settles instead of once per keystroke; stale highlights
+   and counts are hidden during the debounce window.
 
 Verification on 2026-07-12:
 
@@ -584,6 +588,10 @@ Verification on 2026-07-12:
 - CLI build passed, the packaged macOS app passed deep strict codesign
   verification, and the globally linked `sp status` read the 393.6 MB local
   index after the final Node ABI restore.
+- App passed all 488 unit tests after the session-local debounce change. The 22
+  focused Electron E2E cases for global search and session detail passed,
+  including rendered-Markdown matching, keyboard navigation, and the
+  1,500-message deep-find fixture.
 
 Changes:
 
@@ -613,6 +621,7 @@ Acceptance criteria:
 - [x] Renderer/framework updates have an explicit risk lane.
 - [x] High-risk major and security updates remain independently reviewable.
 - [x] No unprofiled module split, memoization, or bulk major upgrade is added.
+- [x] Session-local find does not reparse every loaded message per keystroke.
 
 ## 4. Required Verification Matrix
 
