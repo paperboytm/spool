@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { __cspFixtures, buildCsp } from './csp.js'
+import { __cspFixtures, buildCsp, buildPfInferenceCsp, isPfInferenceDocument } from './csp.js'
 
 // We don't import installRendererCsp itself in tests — wiring it would
 // require an Electron `session` stub. The string fixtures cover the
@@ -186,6 +186,29 @@ describe('Renderer CSP policy', () => {
         const img = directives(csp).get('img-src') ?? []
         expect(img).toContain('https://lh3.googleusercontent.com')
       }
+    })
+  })
+
+  describe('Privacy Filter inference document', () => {
+    it('selects only the dedicated inference HTML entry', () => {
+      expect(isPfInferenceDocument('file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/pf-inference.html')).toBe(true)
+      expect(isPfInferenceDocument('http://localhost:5173/pf-inference.html')).toBe(true)
+      expect(isPfInferenceDocument('file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/index.html')).toBe(false)
+    })
+
+    it('allows the local model protocol and WASM execution', () => {
+      for (const dev of [true, false]) {
+        const dirs = directives(buildPfInferenceCsp({ dev }))
+        expect(dirs.get('connect-src')).toContain('pf-model:')
+        expect(dirs.get('script-src')).toContain("'wasm-unsafe-eval'")
+        expect(dirs.get('worker-src')).toContain('blob:')
+      }
+    })
+
+    it('keeps production inference offline except for local schemes', () => {
+      const connect = directives(buildPfInferenceCsp({ dev: false })).get('connect-src') ?? []
+      expect(connect).toEqual(["'self'", 'pf-model:', 'blob:'])
+      expect(connect.every(source => !source.startsWith('http') && !source.startsWith('ws'))).toBe(true)
     })
   })
 })

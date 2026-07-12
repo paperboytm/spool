@@ -163,6 +163,9 @@ export interface SecurityIpcDeps {
   runPromise: <A, E>(eff: Effect.Effect<A, E>) => Promise<A>
   /** Subscribe to per-window pushes; called once per main window. */
   getMainWindow: () => BrowserWindow | null
+  /** Purge rewrites indexed message content, so cached search results
+   *  must be discarded after the mutation commits. */
+  onSearchContentChanged?: () => void
   /** Privacy Filter download orchestrator. Optional in 5b — null means
    *  the PF channels return a default not-installed snapshot. PR 5c
    *  swaps in a real coordinator when the toggle flips on. */
@@ -206,7 +209,7 @@ export interface SecurityIpcHandle {
  *  worker is ready so the IPC layer becomes live before that boot
  *  completes. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
-  const { db, worker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged } = deps
+  const { db, worker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged, onSearchContentChanged } = deps
   // Closure-local ref read by every mutation handler at call time —
   // lets `attachMutationWorker` swap the worker in after IPC has
   // already started taking calls. Until it's set the handlers fall
@@ -307,21 +310,31 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
     },
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDING, async (_e, findingId: number) => {
-    if (currentMutationWorker) return currentMutationWorker.purgeFinding(findingId)
+    if (currentMutationWorker) {
+      const result = await currentMutationWorker.purgeFinding(findingId)
+      onSearchContentChanged?.()
+      return result
+    }
     const publish = (change: Parameters<NonNullable<typeof getMainWindow extends () => infer R ? R : never>['webContents']['send']>[1]) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-      })
+    })
     const result = await runPromise(purgeFinding(findingId, { db, publish: publish as never })) as PurgeResult
+    onSearchContentChanged?.()
     return result
   })
   ipcMain.handle(SECURITY_IPC_CHANNELS.PURGE_FINDINGS, async (_e, findingIds: number[]) => {
-    if (currentMutationWorker) return currentMutationWorker.purgeFindings(findingIds)
+    if (currentMutationWorker) {
+      const results = await currentMutationWorker.purgeFindings(findingIds)
+      onSearchContentChanged?.()
+      return results
+    }
     const publish = (change: unknown) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-      })
+    })
     const results = await runPromise(purgeFindings(findingIds, { db, publish: publish as never })) as PurgeResult[]
+    onSearchContentChanged?.()
     return results
   })
   ipcMain.handle(
@@ -329,6 +342,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
     async (_e, args: { kind: SensitiveKind; valueHash: string }) => {
       if (currentMutationWorker) {
         const out = await currentMutationWorker.purgeEverywhere(args.kind, args.valueHash)
+        onSearchContentChanged?.()
         return { count: out.results.length, sessionIds: out.sessionIds }
       }
       const publish = (change: unknown) =>
@@ -338,6 +352,7 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       const out = await runPromise(
         purgeEverywhere(args.kind, args.valueHash, { db, publish: publish as never }),
       ) as { results: PurgeResult[]; sessionIds: number[] }
+      onSearchContentChanged?.()
       return { count: out.results.length, sessionIds: out.sessionIds }
     },
   )

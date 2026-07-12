@@ -226,6 +226,39 @@ export function upsertSessionSearch(
   )
 }
 
+/** Rebuild the denormalized session-level search document from the authoritative
+ * session title and current message rows. Security purge calls this inside its
+ * transaction so raw values cannot survive in either session-level FTS index. */
+export function refreshSessionSearchFromMessages(
+  db: Database.Database,
+  sessionId: number,
+): void {
+  const session = db.prepare('SELECT title FROM sessions WHERE id = ?')
+    .get(sessionId) as { title: string | null } | undefined
+  if (!session) return
+
+  const rows = db.prepare(`
+    SELECT role, content_text AS contentText
+    FROM messages
+    WHERE session_id = ?
+      AND is_sidechain = 0
+      AND role IN ('user', 'assistant')
+    ORDER BY seq, id
+  `).all(sessionId) as Array<{ role: 'user' | 'assistant'; contentText: string }>
+  const byRole = { user: [] as string[], assistant: [] as string[] }
+  for (const row of rows) {
+    const text = row.contentText.trim()
+    if (text) byRole[row.role].push(text)
+  }
+
+  upsertSessionSearch(db, {
+    sessionId,
+    title: session.title ?? '',
+    userText: byRole.user.join('\n'),
+    assistantText: byRole.assistant.join('\n'),
+  })
+}
+
 /** Insert message rows, skipping any that collide with the partial
  *  UNIQUE index on (session_id, msg_uuid). Returns the count of rows
  *  actually inserted — callers use this to decide whether anything

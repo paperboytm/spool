@@ -22,7 +22,7 @@ import {
   getSessionMtime,
   getAllSessionMtimes,
   upsertSession,
-  upsertSessionSearch,
+  refreshSessionSearchFromMessages,
   insertMessages,
   getMessageSnapshot,
   recomputeMessageCount,
@@ -384,24 +384,13 @@ export class Syncer {
           recomputeMessageCount(this.db, sessionId)
         }
 
-        // Session-level search index. **Read content from the DB,
-        // not from `parsed.messages`** — Security Scan purge masks
-        // `messages.content_text` but never touches the source jsonl.
-        // Building search text from the parser output would re-index
-        // the raw secret in session_search_fts on every re-sync of an
-        // active session, leaking the purged value back into the
-        // "search across sessions" surface. Reading from DB instead
-        // makes session_search_fts a faithful projection of what
-        // messages_fts already protects. Skip on no-op re-syncs of an
-        // unchanged title — nothing to refresh.
+        // Session-level search is a projection of authoritative DB state,
+        // never parser output. Security purge masks both messages and a
+        // derived title while the source file remains unchanged; rebuilding
+        // from parsed data would leak either value back into search.
         const titleChanged = this.titleDiffersFromStored(sessionId, parsed.title)
         if (contentChanged || titleChanged) {
-          upsertSessionSearch(this.db, {
-            sessionId,
-            title: parsed.title,
-            userText: buildSessionSearchTextFromDb(this.db, sessionId, 'user'),
-            assistantText: buildSessionSearchTextFromDb(this.db, sessionId, 'assistant'),
-          })
+          refreshSessionSearchFromMessages(this.db, sessionId)
         }
 
         // Security Scan cascade — invalidate scan_profile so the
@@ -611,28 +600,6 @@ function loadCodexSessionIndex(): Map<string, string> {
     }
   } catch { /* file may not exist */ }
   return titles
-}
-
-/** Build the per-role text that backs `session_search_fts`, reading
- *  from `messages.content_text` so that Security Scan purge masks are
- *  honoured. The legacy `buildSessionSearchText(parsed.messages, …)`
- *  shape pulled directly from the parser output (i.e. from the source
- *  jsonl which still contains the raw secret), which leaked purged
- *  values back into the session-level FTS on every re-sync. */
-function buildSessionSearchTextFromDb(
-  db: Database.Database,
-  sessionId: number,
-  role: 'user' | 'assistant',
-): string {
-  const rows = db.prepare(
-    `SELECT content_text FROM messages
-      WHERE session_id = ? AND is_sidechain = 0 AND role = ?
-      ORDER BY seq, id`,
-  ).all(sessionId, role) as Array<{ content_text: string }>
-  return rows
-    .map(r => r.content_text.trim())
-    .filter(Boolean)
-    .join('\n')
 }
 
 function resolveProject(

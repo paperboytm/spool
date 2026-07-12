@@ -475,6 +475,52 @@ Acceptance criteria:
 Goal: remove demonstrably unused runtime payload without weakening Privacy
 Filter, ACP, or native database behavior.
 
+Implementation status: complete on `feat/package-size`; signed/notarized
+release artifacts remain CI-only verification.
+
+Implementation notes:
+
+1. Add `report:package-size`, which reports logical app, Frameworks, Resources,
+   asar, asar-unpacked, and the largest packaged modules without extracting the
+   archive. Hard-linked framework files are counted once.
+2. Prove that the inference renderer dynamically imports
+   `@huggingface/transformers` and explicitly selects WebGPU/WASM, while the
+   main-process model protocol resolves only `onnxruntime-web`. Exclude the
+   unreachable `onnxruntime-node` package from electron-builder files.
+3. Add a reproducible clean-profile packaged smoke. It launches the actual
+   `.app`, indexes fixtures through packaged `better-sqlite3`, searches, runs
+   mocked Claude and Codex ACP protocol turns while checking both packaged
+   extension assets, scans and purges a secret, and verifies the local ORT
+   resource protocol.
+4. Add `--full-pf` to the packaged smoke. It downloads and verifies the pinned
+   945 MB model, initializes the hidden inference renderer, waits for a
+   PF-enabled scan profile to drain, and removes the temporary profile.
+5. Fix two privacy defects exposed by that smoke: give the inference document
+   a dedicated CSP that permits only local `pf-model:`/blob resources, and make
+   purge rebuild message FTS, session FTS, session title, and the main-process
+   search cache atomically enough that a purged value cannot remain searchable.
+6. Include renderer feature flags in the app Turbo build cache key so a release
+   cannot reuse a bundle built without Security. Keep `onnxruntime-web` intact:
+   the package currently serves multiple WASM/WebGPU runtime variants from its
+   dist directory. Curating those files is a separate runtime-matrix change,
+   not required to remove the proven Node-only payload.
+
+Verification on 2026-07-12:
+
+- Before: 689.1 MB logical app, 210.1 MB asar, 246.9 MB unpacked;
+  `onnxruntime-node` contributed 87.5 MB of packaged files, including Linux and
+  Windows binaries.
+- After: 601.7 MB app, 210.1 MB asar, 159.5 MB unpacked. Net reduction is
+  87.4 MB, and the report contains no `onnxruntime-node` entry.
+- The clean-profile packaged smoke passed indexing/search, Claude/Codex ACP,
+  ORT resource loading, Security scan/purge, and post-purge FTS checks.
+- The full Privacy Filter smoke installed the pinned model, initialized WebGPU
+  in 12.1 seconds, completed a PF-profile scan, and exited with runtime
+  `ready` and model state `installed`.
+- App passed 488 tests; core passed 410 with one skipped. Nine-package
+  typecheck and type-aware lint passed. Ad-hoc packaging restored Node ABI and
+  the globally linked `sp status` remained healthy.
+
 Changes:
 
 1. Add a package-size report that records asar, unpacked resources, frameworks,
@@ -490,11 +536,11 @@ Changes:
 
 Acceptance criteria:
 
-- [ ] Packaged app starts on a clean macOS user profile.
-- [ ] Search and indexing work with the packaged native SQLite module.
-- [ ] Codex and Claude ACP launch paths work.
-- [ ] Privacy Filter downloads, initializes, scans, and purges locally.
-- [ ] The app bundle shrinks by at least the proven unused payload; expected
+- [x] Packaged app starts on a clean macOS user profile.
+- [x] Search and indexing work with the packaged native SQLite module.
+- [x] Codex and Claude ACP launch paths work.
+- [x] Privacy Filter downloads, initializes, scans, and purges locally.
+- [x] The app bundle shrinks by at least the proven unused payload; expected
       first target is approximately 80 MB from `onnxruntime-node`.
 
 ### PR 7: Dependency and Module Maintenance

@@ -323,6 +323,7 @@ async function ensureSecurityBooted(): Promise<void> {
     worker: scanWorker,
     runPromise: runWithObservability,
     getMainWindow: () => mainWindow,
+    onSearchContentChanged: () => searchCache.clear(),
     pfCoordinator,
     pfRuntime,
     onPfEnabledChanged: (enabled) => {

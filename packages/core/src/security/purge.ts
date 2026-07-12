@@ -21,6 +21,7 @@ import type Database from 'better-sqlite3'
 import type { SensitiveKind } from '@spool-lab/redact'
 import { maskValueByKind } from '@spool-lab/redact'
 import { updateSessionCounts } from './repo.js'
+import { refreshSessionSearchFromMessages } from '../db/queries.js'
 import type { FindingsChange, FindingState } from './types.js'
 
 export class PurgeError extends Data.TaggedError('PurgeError')<{
@@ -321,6 +322,11 @@ function applyBulkPurgeTxn(
         SET state = 'purged', state_changed_at = ?
       WHERE id = ?`,
   )
+  const maskSessionTitle = db.prepare(
+    `UPDATE sessions
+        SET title = replace(title, ?, ?), title_source = 'security'
+      WHERE id = ? AND instr(title, ?) > 0`,
+  )
 
   // One transaction wraps the whole batch: a single fsync at COMMIT
   // instead of one per finding. This is the load-bearing change for
@@ -345,6 +351,7 @@ function applyBulkPurgeTxn(
           mask +
           text.slice(finding.end_offset)
         updateFinding.run(purgedAt, finding.id)
+        maskSessionTitle.run(original, mask, finding.session_id, original)
         results.push({
           findingId: finding.id,
           sessionId: finding.session_id,
@@ -365,6 +372,7 @@ function applyBulkPurgeTxn(
     // had a large fan-in, which on its own ran two SELECTs +
     // an UPDATE per call.
     for (const sessionId of sessionsToRecount) {
+      refreshSessionSearchFromMessages(db, sessionId)
       updateSessionCounts(db, sessionId)
     }
   })()
@@ -402,6 +410,12 @@ function applyPurgeTxn(
               state_changed_at = ?
         WHERE id = ?`,
     ).run(purgedAt, finding.id)
+    db.prepare(`
+      UPDATE sessions
+         SET title = replace(title, ?, ?), title_source = 'security'
+       WHERE id = ? AND instr(title, ?) > 0
+    `).run(original, mask, finding.session_id, original)
+    refreshSessionSearchFromMessages(db, finding.session_id)
     updateSessionCounts(db, finding.session_id)
   })()
 

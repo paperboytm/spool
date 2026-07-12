@@ -78,6 +78,7 @@ interface Fixture {
   /** Each call records `rescanAll` / `backfill` / `enqueue` /
    *  `getStatus` invocations so tests can assert dispatch. */
   workerCalls: { rescanAll: number; backfill: number; enqueue: number[]; getStatus: number }
+  searchInvalidations: { count: number }
 }
 
 function setupDb(): Database.Database {
@@ -101,6 +102,7 @@ function setupDb(): Database.Database {
 async function setupFixture(): Promise<Fixture> {
   const db = setupDb()
   const workerCalls = { rescanAll: 0, backfill: 0, enqueue: [] as number[], getStatus: 0 }
+  const searchInvalidations = { count: 0 }
   // PubSub-backed stream so we can assert change-event forwarding.
   const pubsub = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
   const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
@@ -133,6 +135,7 @@ async function setupFixture(): Promise<Fixture> {
     worker,
     runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
     getMainWindow: () => fakeWindow,
+    onSearchContentChanged: () => { searchInvalidations.count += 1 },
   })
 
   return {
@@ -141,6 +144,7 @@ async function setupFixture(): Promise<Fixture> {
     push: (change) => Effect.runPromise(PubSub.publish(pubsub, change)).then(() => { /* void */ }),
     dispose,
     workerCalls,
+    searchInvalidations,
   }
 }
 
@@ -329,6 +333,7 @@ describe('registerSecurityIpc', () => {
       )
       expect(result.findingId).toBe(findingId)
       expect(result.sessionId).toBe(1)
+      expect(fixture.searchInvalidations.count).toBe(1)
       const msg = fixture.db.prepare('SELECT content_text FROM messages WHERE id = 10')
         .get() as { content_text: string }
       expect(msg.content_text.includes('AKIAIOSFODNN7EXAMPLE')).toBe(false)
@@ -528,6 +533,7 @@ describe('registerSecurityIpc with mutationWorker', () => {
     // Track every call so we can assert the right proxy method was
     // hit and the in-process path was not.
     const calls: Array<{ method: string; args: unknown[] }> = []
+    let searchInvalidations = 0
     const fakeProxy: MutationWorkerProxy = {
       purgeFinding: async (id) => { calls.push({ method: 'purgeFinding', args: [id] }); return { findingId: id, sessionId: 1, maskUsed: '[redacted]', purgedAt: 'now' } },
       purgeFindings: async (ids) => { calls.push({ method: 'purgeFindings', args: [ids] }); return [] },
@@ -548,6 +554,7 @@ describe('registerSecurityIpc with mutationWorker', () => {
       worker,
       runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
       getMainWindow: () => fakeWindow,
+      onSearchContentChanged: () => { searchInvalidations += 1 },
     })
     // Late-attach the fake proxy — mirrors how production wires the
     // mutation worker in after the IPC layer is already live.
@@ -569,6 +576,7 @@ describe('registerSecurityIpc with mutationWorker', () => {
         { method: 'dismissFindings', args: [[8, 9], 'global'] },
         { method: 'undismissFinding', args: [7] },
       ])
+      expect(searchInvalidations).toBe(3)
 
       // The proxy's per-mutation publishes ride a separate forwarder
       // (a Stream.empty proxy here emits nothing); the in-process

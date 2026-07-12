@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { Effect } from 'effect'
 import Database from 'better-sqlite3'
 import { runMigrations } from '../db/db.js'
+import { refreshSessionSearchFromMessages } from '../db/queries.js'
 import { insertFindings, listFindings, updateSessionCounts } from './repo.js'
 import { purgeFinding, purgeFindings, purgeEverywhere, orderForBulkPurge, PurgeError } from './purge.js'
 import { occurrencesByValueHash } from './repo.js'
@@ -65,7 +66,7 @@ describe('purgeFinding', () => {
     expect(counts.scan_high_count).toBe(0)
   })
 
-  it('removes the raw value from messages_fts so search no longer matches', async () => {
+  it('removes the raw value from message and session FTS indexes', async () => {
     const raw = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
     const content = `My token is ${raw} please rotate`
     insertMessage(db, 11, content)
@@ -75,12 +76,18 @@ describe('purgeFinding', () => {
       provider: 'regex', startOffset: start, endOffset: start + raw.length, state: 'active',
     }])
     const f = listFindings(db, { sessionId: 1 })[0]!
+    db.prepare('UPDATE sessions SET title = ? WHERE id = 1').run(`Token ${raw}`)
+    refreshSessionSearchFromMessages(db, 1)
 
     // FTS contains the raw value before purge
     const beforeHits = db.prepare(
       "SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?",
     ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(beforeHits.n).toBe(1)
+    const beforeSessionHits = db.prepare(
+      'SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?',
+    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    expect(beforeSessionHits.n).toBe(1)
 
     await Effect.runPromise(purgeFinding(f.id, deps(db)))
 
@@ -88,6 +95,17 @@ describe('purgeFinding', () => {
       "SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?",
     ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(afterHits.n).toBe(0)
+    const afterSessionHits = db.prepare(
+      'SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?',
+    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    expect(afterSessionHits.n).toBe(0)
+    const title = db.prepare(
+      'SELECT title, title_source AS titleSource FROM sessions WHERE id = 1',
+    ).get() as { title: string; titleSource: string }
+    expect(title).toEqual({
+      title: 'Token [redacted: GitHub key]',
+      titleSource: 'security',
+    })
   })
 
   it('refuses to re-purge an already purged finding', async () => {

@@ -123,8 +123,40 @@ export function buildCsp(opts: { dev: boolean; backendOrigin?: string | null }):
   ].join('; ')
 }
 
+export function buildPfInferenceCsp(opts: { dev: boolean }): string {
+  const scriptSrc = opts.dev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: pf-model:"
+    : "script-src 'self' 'wasm-unsafe-eval' blob: pf-model:"
+  const connectSrc = opts.dev
+    ? "connect-src 'self' pf-model: blob: http://localhost:5173 ws://localhost:5173 ws://127.0.0.1:5173"
+    : "connect-src 'self' pf-model: blob:"
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    "worker-src 'self' blob: pf-model:",
+    connectSrc,
+    "img-src 'none'",
+    "font-src 'none'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+  ].join('; ')
+}
+
+export function isPfInferenceDocument(url: string): boolean {
+  try {
+    return new URL(url).pathname.endsWith('/pf-inference.html')
+  } catch {
+    return false
+  }
+}
+
 const DEV_CSP = buildCsp({ dev: true })
 const PROD_CSP = buildCsp({ dev: false })
+const PF_DEV_CSP = buildPfInferenceCsp({ dev: true })
+const PF_PROD_CSP = buildPfInferenceCsp({ dev: false })
 
 export function installRendererCsp(opts: { dev: boolean }): void {
   // Diagnostic escape hatch: setting SPOOL_DISABLE_CSP=1 skips the
@@ -133,6 +165,7 @@ export function installRendererCsp(opts: { dev: boolean }): void {
   // future Labs toggle could flip it via the renderer too.
   if (process.env['SPOOL_DISABLE_CSP'] === '1') return
   const policy = buildCsp({ dev: opts.dev, backendOrigin: overrideBackendOrigin() })
+  const pfPolicy = opts.dev ? PF_DEV_CSP : PF_PROD_CSP
   electronSession.defaultSession.webRequest.onHeadersReceived(
     (details, callback) => {
       // Only inject CSP into responses for the documents we actually
@@ -165,7 +198,7 @@ export function installRendererCsp(opts: { dev: boolean }): void {
           delete responseHeaders[key]
         }
       }
-      responseHeaders['Content-Security-Policy'] = [policy]
+      responseHeaders['Content-Security-Policy'] = [isPfInferenceDocument(url) ? pfPolicy : policy]
       callback({ responseHeaders })
     },
   )
@@ -173,4 +206,4 @@ export function installRendererCsp(opts: { dev: boolean }): void {
 
 // Exported for snapshot tests so policy drift gets caught in CI without
 // spinning up an Electron app.
-export const __cspFixtures = { DEV_CSP, PROD_CSP }
+export const __cspFixtures = { DEV_CSP, PROD_CSP, PF_DEV_CSP, PF_PROD_CSP }

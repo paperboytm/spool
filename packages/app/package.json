@@ -20,6 +20,8 @@
     "package:mac": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --mac --arm64 --publish never",
     "package:linux": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --linux --publish never",
     "smoke:native:electron": "node ../../scripts/with-electron-native.mjs pnpm exec electron ../../scripts/check-electron-native.cjs",
+    "report:package-size": "node scripts/package-size-report.mjs",
+    "smoke:packaged": "node scripts/smoke-packaged.mjs",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
     "typecheck": "tsc --noEmit",
@@ -82,7 +84,9 @@
       "!e2e/**/*",
       "!artifacts/**/*",
       "!src/**/*",
-      "!**/*.map"
+      "!**/*.map",
+      "!node_modules/onnxruntime-node",
+      "!node_modules/onnxruntime-node/**"
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**",
@@ -153,6 +157,7 @@
     "acp-extension-codex-linux-x64": "^0.10.0"
   },
   "devDependencies": {
+    "@electron/asar": "^3.4.1",
     "@electron/rebuild": "^3.7.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.1.4",
