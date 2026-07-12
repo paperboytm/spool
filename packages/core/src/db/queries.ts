@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, ProjectIdentityKind } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
-import { buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
+import { buildPreviewFtsPlan, buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
 export function getOrCreateProject(
   db: Database.Database,
@@ -430,11 +430,11 @@ export function searchSessionPreview(
 ): FragmentResult[] {
   const { limit = 5, source, since } = opts
   const normalizedQuery = query.trim()
-  if (!normalizedQuery) return []
+  if (Array.from(normalizedQuery).length < 2) return []
 
   const terms = getNaturalSearchTerms(query)
   const previewTerms = terms.length > 0 ? terms : [normalizedQuery]
-  const rows = searchPreviewRows(db, previewTerms, limit, {
+  const rows = searchPreviewRows(db, normalizedQuery, previewTerms, limit, {
     ...(source ? { source } : {}),
     ...(since ? { since } : {}),
   })
@@ -442,6 +442,7 @@ export function searchSessionPreview(
     db,
     rows.map(row => row['sessionId'] as number),
     previewTerms,
+    buildPreviewFtsPlan(normalizedQuery),
   )
 
   return rows.map((row, index) => {
@@ -527,6 +528,73 @@ function searchFragmentRows(
 }
 
 function searchPreviewRows(
+  db: Database.Database,
+  query: string,
+  terms: string[],
+  limit: number,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const ftsPlan = buildPreviewFtsPlan(query)
+  if (ftsPlan) {
+    return searchPreviewRowsByFts(db, query, ftsPlan, limit, opts)
+  }
+
+  return searchPreviewRowsByLike(db, terms, limit, opts)
+}
+
+function searchPreviewRowsByFts(
+  db: Database.Database,
+  query: string,
+  plan: NonNullable<ReturnType<typeof buildPreviewFtsPlan>>,
+  limit: number,
+  opts: { source?: SessionSource; since?: string } = {},
+): Array<Record<string, unknown>> {
+  const { source, since } = opts
+  const ftsTable = plan.tableKind === 'trigram'
+    ? 'session_search_fts_trigram'
+    : 'session_search_fts'
+  const conditions = [`${ftsTable} MATCH ?`]
+  const filterParams: Array<string | number> = [plan.query]
+
+  if (source) {
+    conditions.push('src2.name = ?')
+    filterParams.push(source)
+  }
+  if (since) {
+    conditions.push('sess.started_at >= ?')
+    filterParams.push(since)
+  }
+
+  const sql = `
+    SELECT
+      sess.id AS sessionId,
+      sess.session_uuid AS sessionUuid,
+      sess.file_path AS filePath,
+      sess.title AS sessionTitle,
+      sess.started_at AS startedAt,
+      sess.cwd AS cwd,
+      p.display_path AS project,
+      src2.name AS source,
+      CASE WHEN ss.title LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END AS titlePrefixScore,
+      bm25(${ftsTable}, 5.0, 1.5, 0.8) AS ftsScore
+    FROM ${ftsTable}
+    JOIN session_search ss ON ss.session_id = ${ftsTable}.rowid
+    JOIN sessions sess ON sess.id = ss.session_id
+    JOIN projects p ON p.id = sess.project_id
+    JOIN sources src2 ON src2.id = sess.source_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY titlePrefixScore DESC, ftsScore ASC, sess.started_at DESC
+    LIMIT ?
+  `
+
+  return db.prepare(sql).all(
+    `${escapeLike(query)}%`,
+    ...filterParams,
+    limit,
+  ) as Array<Record<string, unknown>>
+}
+
+function searchPreviewRowsByLike(
   db: Database.Database,
   terms: string[],
   limit: number,
@@ -916,6 +984,7 @@ function selectBestSessionSnippets(
   db: Database.Database,
   sessionIds: number[],
   terms: string[],
+  ftsPlan: ReturnType<typeof buildPreviewFtsPlan> = null,
 ) {
   type SessionSnippetRow = {
     sessionId: number
@@ -927,26 +996,34 @@ function selectBestSessionSnippets(
     matchingMessageCount?: number
   }
   if (sessionIds.length === 0) return new Map<number, SessionSnippetRow>()
-  const coverageExpr = terms.map(() => `CASE WHEN content_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`).join(' + ')
-  const anyClauses = terms.map(() => 'content_text LIKE ? ESCAPE \'\\\'').join(' OR ')
+  const coverageExpr = terms.map(() => `CASE WHEN m.content_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`).join(' + ')
+  const anyClauses = terms.map(() => 'm.content_text LIKE ? ESCAPE \'\\\'').join(' OR ')
   const allPatterns = terms.map(toLikePattern)
   const anyPatterns = terms.map(toLikePattern)
   const sessionPlaceholders = sessionIds.map(() => '?').join(', ')
+  const messageSource = ftsPlan
+    ? `${ftsPlan.tableKind === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'} AS message_matches
+      JOIN messages AS m ON m.id = message_matches.rowid`
+    : 'messages AS m'
+  const matchCondition = ftsPlan
+    ? 'message_matches.content_text MATCH ?'
+    : `(${anyClauses})`
+  const matchParams = ftsPlan ? [ftsPlan.anyTermQuery] : anyPatterns
 
   const matchSql = `
     WITH raw AS (
       SELECT
-        id AS messageId,
-        session_id AS sessionId,
-        role AS messageRole,
-        timestamp AS messageTimestamp,
-        content_text AS contentText,
-        seq,
+        m.id AS messageId,
+        m.session_id AS sessionId,
+        m.role AS messageRole,
+        m.timestamp AS messageTimestamp,
+        m.content_text AS contentText,
+        m.seq,
         ${coverageExpr} AS termCoverage
-      FROM messages
-      WHERE session_id IN (${sessionPlaceholders})
-        AND is_sidechain = 0
-        AND (${anyClauses})
+      FROM ${messageSource}
+      WHERE m.session_id IN (${sessionPlaceholders})
+        AND m.is_sidechain = 0
+        AND ${matchCondition}
     ),
     ranked AS (
       SELECT
@@ -975,7 +1052,7 @@ function selectBestSessionSnippets(
     WHERE rn = 1
   `
 
-  const rows = db.prepare(matchSql).all(...allPatterns, ...sessionIds, ...anyPatterns) as SessionSnippetRow[]
+  const rows = db.prepare(matchSql).all(...allPatterns, ...sessionIds, ...matchParams) as SessionSnippetRow[]
   return new Map(rows.map(row => [row.sessionId, row]))
 }
 

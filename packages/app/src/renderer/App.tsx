@@ -35,6 +35,7 @@ import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
 import { primeSecurityPrefsCache } from './api/securityPrefsCache.js'
+import { resolveFastSearchRequest } from './lib/search-request-policy.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'security'
@@ -510,37 +511,6 @@ export default function App() {
     window.spool.getStatus().then(setStatus).catch(console.error)
   }, [syncStatus?.phase])
 
-  useEffect(() => {
-    if (!window.spool) return () => {}
-    const scheduleSearchRefresh = () => {
-      if (!query.trim() || searchMode !== 'fast') return
-      if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
-      syncRefreshTimer.current = setTimeout(() => {
-        syncRefreshTimer.current = null
-        void doSearch(query)
-      }, 250)
-    }
-    const offProgress = window.spool.onSyncProgress((e) => {
-      setSyncStatus(e)
-      if (e.phase === 'syncing' || e.phase === 'indexing') {
-        scheduleSearchRefresh()
-      }
-      if (e.phase === 'done') {
-        if (syncRefreshTimer.current) {
-          clearTimeout(syncRefreshTimer.current)
-          syncRefreshTimer.current = null
-        }
-        setTimeout(() => setSyncStatus(null), 3000)
-        if (query.trim() && searchMode === 'fast') void doSearch(query)
-      }
-    })
-    const offNew = window.spool.onNewSessions(() => {
-      window.spool.getStatus().then(setStatus).catch(console.error)
-      scheduleSearchRefresh()
-    })
-    return () => { offProgress(); offNew() }
-  }, [query, searchMode])
-
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); setIsSearching(false); return }
     const requestId = ++searchRequestSeq.current
@@ -562,20 +532,67 @@ export default function App() {
   }, [searchScopeProject])
 
   const doPreviewSearch = useCallback(async (q: string) => {
-    if (!q.trim() || !window.spool?.searchPreview) {
+    if (Array.from(q.trim()).length < 2 || !window.spool?.searchPreview) {
       setPreviewSuggestions([])
       setLastCompletedPreviewQuery(q)
       return
     }
 
     const requestId = ++previewRequestSeq.current
-    const suggestions = await window.spool.searchPreview(q, 5)
-    if (requestId !== previewRequestSeq.current) return
-    startTransition(() => {
-      setPreviewSuggestions(suggestions)
-    })
-    setLastCompletedPreviewQuery(q)
+    try {
+      const suggestions = await window.spool.searchPreview(q, 5)
+      if (requestId !== previewRequestSeq.current) return
+      startTransition(() => {
+        setPreviewSuggestions(suggestions)
+      })
+      setLastCompletedPreviewQuery(q)
+    } catch (error) {
+      if (requestId !== previewRequestSeq.current) return
+      console.error('[search-preview] failed', error)
+      setPreviewSuggestions([])
+      setLastCompletedPreviewQuery(q)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!window.spool) return () => {}
+    const scheduleSearchRefresh = () => {
+      if (!query.trim() || searchMode !== 'fast') return
+      if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
+      syncRefreshTimer.current = setTimeout(() => {
+        syncRefreshTimer.current = null
+        if (homeMode) void doPreviewSearch(query)
+        else void doSearch(query)
+      }, 250)
+    }
+    const offProgress = window.spool.onSyncProgress((e) => {
+      setSyncStatus(e)
+      if (e.phase === 'syncing' || e.phase === 'indexing') {
+        scheduleSearchRefresh()
+      }
+      if (e.phase === 'done') {
+        if (syncRefreshTimer.current) {
+          clearTimeout(syncRefreshTimer.current)
+          syncRefreshTimer.current = null
+        }
+        setTimeout(() => setSyncStatus(null), 3000)
+        if (query.trim() && searchMode === 'fast') {
+          if (homeMode) void doPreviewSearch(query)
+          else void doSearch(query)
+        }
+      }
+    })
+    const offNew = window.spool.onNewSessions(() => {
+      window.spool.getStatus().then(setStatus).catch(console.error)
+      scheduleSearchRefresh()
+    })
+    return () => {
+      offProgress()
+      offNew()
+      if (syncRefreshTimer.current) clearTimeout(syncRefreshTimer.current)
+      syncRefreshTimer.current = null
+    }
+  }, [doPreviewSearch, doSearch, query, searchMode, homeMode])
 
   const doAiSearch = useCallback(async (overrideQuery?: string) => {
     const q = (overrideQuery ?? query).trim()
@@ -613,18 +630,36 @@ export default function App() {
     if (!q.trim()) setHomeMode(true)
     if (searchMode === 'fast') {
       if (searchTimer.current) clearTimeout(searchTimer.current)
-      searchTimer.current = setTimeout(() => { void doSearch(q) }, 120)
-      void doPreviewSearch(q)
+      const request = resolveFastSearchRequest(homeMode, q)
+      if (request === 'preview') {
+        searchRequestSeq.current += 1
+        setIsSearching(false)
+        setResults([])
+        searchTimer.current = setTimeout(() => { void doPreviewSearch(q) }, 120)
+      } else if (request === 'full') {
+        previewRequestSeq.current += 1
+        setPreviewSuggestions([])
+        searchTimer.current = setTimeout(() => { void doSearch(q) }, 120)
+      } else {
+        searchRequestSeq.current += 1
+        previewRequestSeq.current += 1
+        setIsSearching(false)
+        setResults([])
+        setPreviewSuggestions([])
+        searchTimer.current = null
+      }
     }
     if (aiAnswer || aiError) {
       setAiAnswer('')
       setAiError(null)
       aiAnswerRef.current = ''
     }
-  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError])
+  }, [doPreviewSearch, doSearch, searchMode, aiAnswer, aiError, homeMode])
 
   const handleSubmit = useCallback(() => {
     if (!query.trim()) return
+    previewRequestSeq.current += 1
+    setPreviewSuggestions([])
     setHomeMode(false)
     setSelectedSession(null)
     setTargetMessageId(null)

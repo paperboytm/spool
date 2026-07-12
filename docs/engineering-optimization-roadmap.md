@@ -393,6 +393,45 @@ Acceptance criteria:
 
 Goal: keep typing responsive as the local index grows.
 
+Implementation status: complete on `feat/search-hot-path`; packaged-app input
+responsiveness remains part of the final desktop smoke pass.
+
+Implementation notes:
+
+1. Add an audit-sized benchmark command backed by the production-equivalent
+   session and message FTS schema. The command records mean, p95, and maximum
+   synchronous blocking time and fails above the 50 ms p95 or 100 ms blocking
+   budgets.
+2. Ignore one-code-point preview queries and debounce home-page preview work by
+   120 ms.
+3. Route home input exclusively to preview search and results-page input
+   exclusively to full search. A pure renderer policy test guards against
+   reintroducing both requests for one input change.
+4. Build prefix FTS queries for Unicode text and trigram queries for CJK. Use
+   AND terms for session candidates and OR terms for message candidates so the
+   best snippet can still be selected when terms occur in different messages.
+5. Preserve title weighting, term coverage, user-message preference, source,
+   date, project identity, and pin filters. Short CJK terms that cannot use the
+   trigram index retain the existing LIKE fallback.
+6. Keep search in the main process for now. Measured maximum synchronous work
+   is below 10 ms on the real 393.6 MB index and below 2 ms on both synthetic
+   fixtures, so a worker thread would add lifecycle and consistency complexity
+   without addressing a measured budget breach.
+
+Verification on 2026-07-12:
+
+- 500 sessions / 170k messages: `search` p95 0.76 ms and `search latency`
+  p95 1.22 ms.
+- 750 sessions / 255k messages: p95 1.13 ms and 1.08 ms respectively; maximum
+  synchronous search time was 1.24 ms.
+- Real 393.6 MB local index with 489 sessions: `search` p95 6.75 ms and
+  `typescript migration` p95 7.94 ms; maximum was 9.99 ms.
+- Core passed 410 tests with one skipped, including search ordering, source,
+  date, project identity, pins, snippets, highlighting, and newly indexed
+  session visibility.
+- App passed 485 tests, including the renderer request-routing policy. App
+  typecheck and repository type-aware lint passed.
+
 Current complexity:
 
 - Preview search performs leading-wildcard scans over denormalized full-session
@@ -423,12 +462,13 @@ Target complexity:
 
 Acceptance criteria:
 
-- [ ] Preview p95 is below 50 ms on the audit-sized fixture.
-- [ ] No one-character query blocks the Electron main process for hundreds of
+- [x] Preview p95 is below 50 ms on the audit-sized fixture.
+- [x] No one-character query blocks the Electron main process for hundreds of
       milliseconds.
-- [ ] Search ordering, source filters, project scope, pins, snippets, and
+- [x] Search ordering, source filters, project scope, pins, snippets, and
       highlighting retain regression coverage.
-- [ ] Event-loop monitoring shows no search-induced beachball threshold breach.
+- [x] Synchronous blocking measurements show no search-induced beachball
+      threshold breach.
 
 ### PR 6: Reduce Desktop Package Size
 

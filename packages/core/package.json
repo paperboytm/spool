@@ -24,6 +24,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "bench:search": "pnpm run build && node scripts/benchmark-search-preview.mjs",
     "clean": "rm -rf dist",
     "prepack": "pnpm run build"
   },

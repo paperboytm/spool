@@ -7,6 +7,12 @@ export type SearchPlanStep = {
   matchType: 'fts' | 'phrase' | 'all_terms'
 }
 
+export type PreviewFtsPlan = {
+  tableKind: FtsTableKind
+  query: string
+  anyTermQuery: string
+}
+
 export function buildSearchPlan(query: string): SearchPlanStep[] {
   const normalized = normalizeWhitespace(query)
   if (!normalized) return [{ query: '""', matchType: 'fts' }]
@@ -54,6 +60,22 @@ export function canUseSessionSearchFts(query: string): boolean {
   const terms = getNaturalSearchTerms(query)
   if (terms.length === 0) return false
   return terms.every(term => !containsShortCjkTerm(term))
+}
+
+export function buildPreviewFtsPlan(query: string): PreviewFtsPlan | null {
+  const terms = getNaturalSearchTerms(query)
+  if (terms.length === 0 || terms.some(containsShortCjkTerm)) return null
+
+  const tableKind = selectFtsTableKind(query)
+  const ftsTerms = tableKind === 'unicode'
+    ? terms.map(term => `${quoteFtsTerm(term)}*`)
+    : terms.map(quoteFtsTerm)
+
+  return {
+    tableKind,
+    query: ftsTerms.join(' AND '),
+    anyTermQuery: ftsTerms.join(' OR '),
+  }
 }
 
 function normalizeWhitespace(value: string): string {
