@@ -27,10 +27,8 @@ jobs:
 
       - name: Build app (arm64 DMG + ZIP)
         run: |
-          pnpm -F @spool/app build:deps
-          cd packages/app
-          npx electron-vite build
-          npx electron-builder --mac --arm64 --publish never
+          pnpm build
+          pnpm --filter @spool/app package:mac
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -81,10 +79,8 @@ jobs:
 
       - name: Build app (AppImage + tar.gz)
         run: |
-          pnpm -F @spool/app build:deps
-          cd packages/app
-          npx electron-vite build
-          npx electron-builder --linux --publish never
+          pnpm build
+          pnpm --filter @spool/app package:linux
 
       - name: Get version
         id: version

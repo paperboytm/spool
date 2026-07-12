@@ -38,21 +38,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm --filter @spool-lab/redact build
-      - run: pnpm --filter @spool-lab/redact test
-      - run: pnpm --filter @spool-lab/core build
-      - run: pnpm --filter @spool-lab/core test
-      - run: pnpm --filter @spool-lab/cli build
-      - run: pnpm --filter @spool-lab/cli test
-      - run: pnpm --filter @spool/share-kit build
-      - run: pnpm --filter @spool/share-kit test
-      - run: pnpm --filter @spool/share-backend typecheck
-      - run: pnpm --filter @spool/share-backend test
-      - run: pnpm --filter @spool/share-web typecheck
-      - run: pnpm --filter @spool/share-web test
-      - run: pnpm --filter @spool/app test
+      - run: pnpm check
 
   e2e:
     strategy:

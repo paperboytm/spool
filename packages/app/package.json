@@ -11,19 +11,22 @@
     "build:redact": "pnpm --filter @spool-lab/redact build",
     "build:share-kit": "pnpm --filter @spool/share-kit build",
     "build:deps": "pnpm run build:redact && pnpm run build:core && pnpm run build:share-kit",
-    "dev": "pnpm run build:deps && pnpm run rebuild:native && node scripts/dev.mjs",
+    "dev": "pnpm run build:deps && node ../../scripts/with-electron-native.mjs node scripts/dev.mjs",
     "dev:reset-db": "node scripts/dev-reset-db.mjs",
     "dev:seed-from-prod": "node scripts/dev-seed-from-prod.mjs",
-    "build": "pnpm run build:deps && electron-vite build && electron-builder --publish never",
-    "build:mac": "pnpm run build:deps && electron-vite build && electron-builder --mac --arm64",
-    "build:linux": "pnpm run build:deps && electron-vite build && electron-builder --linux",
+    "build": "electron-vite build",
     "build:electron": "pnpm run build:deps && electron-vite build",
+    "package": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --publish never",
+    "package:mac": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --mac --arm64 --publish never",
+    "package:linux": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --linux --publish never",
+    "smoke:native:electron": "node ../../scripts/with-electron-native.mjs pnpm exec electron ../../scripts/check-electron-native.cjs",
     "preview": "electron-vite preview",
     "clean": "rm -rf out dist-electron",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run rebuild:native:node && vitest run",
+    "test": "vitest run",
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
-    "test:e2e": "pnpm run build:deps && pnpm run rebuild:native:electron && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 electron-vite build && npx playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "node ../../scripts/with-electron-native.mjs pnpm run test:e2e:raw",
+    "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 electron-vite build && playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.17.1",
@@ -39,7 +42,7 @@
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
     "acp-extension-codex": "^0.10.0",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "11.10.0",
     "bindings": "^1.5.0",
     "effect": "^3.21.2",
     "electron-store": "^10.0.0",
@@ -66,6 +69,7 @@
   "build": {
     "appId": "com.linkclaw.spool",
     "productName": "Spool",
+    "npmRebuild": false,
     "publish": [
       {
         "provider": "github",

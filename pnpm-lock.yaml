@@ -68,7 +68,7 @@ importers:
         specifier: ^0.10.0
         version: 0.10.0
       better-sqlite3:
-        specifier: ^11.10.0
+        specifier: 11.10.0
         version: 11.10.0
       bindings:
         specifier: ^1.5.0
@@ -209,8 +209,8 @@ importers:
         specifier: ^22.19.17
         version: 22.19.17
       better-sqlite3:
-        specifier: ^12.9.0
-        version: 12.9.0
+        specifier: 11.10.0
+        version: 11.10.0
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
@@ -239,7 +239,7 @@ importers:
         specifier: workspace:*
         version: link:../redact
       better-sqlite3:
-        specifier: ^11.10.0
+        specifier: 11.10.0
         version: 11.10.0
       effect:
         specifier: ^3.21.2

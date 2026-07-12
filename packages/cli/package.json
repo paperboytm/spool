@@ -24,7 +24,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism --maxWorkers=1",
     "prepack": "pnpm run build"
   },
   "dependencies": {
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.17",
-    "better-sqlite3": "^12.9.0",
+    "better-sqlite3": "11.10.0",
     "vitest": "^3.2.4"
   }
 }

@@ -324,6 +324,42 @@ Acceptance criteria:
 
 Goal: remove duplicate work and make build outputs cacheable and deterministic.
 
+Implementation status: complete on `feat/build-native-isolation`; signed release
+artifacts remain CI-only verification.
+
+Implementation notes:
+
+1. Make the app's Turbo `build` task bundle-only and let `^build` own core,
+   redact, and share-kit ordering. A package-local Turbo config records
+   `out/**` instead of the generic `dist/**` output.
+2. Split bundle and release packaging into `build`, `package`, `package:mac`,
+   and `package:linux`. Release workflows now call those public tasks.
+3. Pin the app, core, and CLI test fixture to one `better-sqlite3@11.10.0`.
+   The landing toolchain's unrelated optional 12.x instance remains outside
+   the Spool database path.
+4. Rebuild the Node ABI once before the root test graph. Remove package-local
+   rebuilds so app, core, and CLI tests cannot mutate the native binary while
+   another test is loading it.
+5. Serialize the root test graph on constrained hosts and run CLI test files in
+   one worker. Turbo still provides dependency ordering and result caching.
+6. Wrap Electron dev, E2E, and packaging commands with an Electron rebuild and
+   unconditional Node ABI restoration. Disable electron-builder's second
+   implicit rebuild and add a reusable Electron native smoke command.
+
+Verification on 2026-07-12:
+
+- First `pnpm build`: seven tasks passed; app dependencies each built once.
+- Second unchanged `pnpm build`: 7/7 full Turbo cache hits in 92 ms.
+- Root build invoked no DMG, ZIP, AppImage, or electron-builder task.
+- `pnpm --filter @spool/app smoke:native:electron` loaded SQLite inside
+  Electron, restored the Node ABI, and the subsequent `sp status` succeeded.
+- After removing concurrent native rebuilds, root tests no longer produced a
+  missing-binding or ABI mismatch. On this host, core passed 404 tests with one
+  skipped and CLI passed all 53 assertions in isolated runs; a later root run
+  still hit existing 5-second CLI timeouts under sustained system load.
+- Release signing, notarization, and Linux packaging remain covered by the
+  unchanged electron-builder configuration and require CI credentials.
+
 Changes:
 
 1. Let Turbo own workspace dependency ordering. Remove manual dependency
@@ -346,11 +382,11 @@ Changes:
 
 Acceptance criteria:
 
-- [ ] A Turbo build does not build core/redact/share-kit twice.
-- [ ] A second unchanged build is a cache hit for all compile/bundle tasks.
-- [ ] Root build does not create DMG, ZIP, or AppImage artifacts.
+- [x] A Turbo build does not build core/redact/share-kit twice.
+- [x] A second unchanged build is a cache hit for all compile/bundle tasks.
+- [x] Root build does not create DMG, ZIP, or AppImage artifacts.
 - [ ] Release packaging remains signed/notarized exactly as before.
-- [ ] Running app tests followed by `sp status` succeeds without a manual ABI
+- [x] Running the Electron native smoke followed by `sp status` succeeds without a manual ABI
       repair.
 
 ### PR 5: Remove Search Work from the Electron Main-Thread Hot Path
