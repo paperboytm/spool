@@ -16,7 +16,7 @@ type Props = {
   onSortOrderChange: (next: ProjectSessionSortOrder) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
-  onShare?: (uuid: string) => void
+  onShare: (uuid: string) => void
 }
 
 const PAGE_SIZE = 50
@@ -544,7 +544,7 @@ export default function ProjectView({
           onPinChange={handlePinChange}
           onOpenSession={onOpenSession}
           onCopySessionId={onCopySessionId}
-          {...(onShare ? { onShare } : {})}
+          onShare={onShare}
           testId="project-view-scroll"
         />
       )}

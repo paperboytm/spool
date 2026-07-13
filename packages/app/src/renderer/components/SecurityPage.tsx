@@ -54,7 +54,7 @@ import { formatRelativeDate } from '../../shared/formatDate.js'
 interface Props {
   onOpenSession: (sessionUuid: string) => void
   /** Share-draft starter; rendered as a menu item. */
-  onShareSession?: (sessionUuid: string) => void
+  onShareSession: (sessionUuid: string) => void
   /** Open Settings panel pre-focused on the Security tab. Wired from
    *  App.tsx; used by the EmptyState "Detector settings" affordance so
    *  a clean archive isn't a dead end. */
@@ -829,7 +829,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                         activeKinds={activeKinds}
                         valuesHidden={valuesHidden}
                         onOpen={() => onOpenSession(s.sessionUuid)}
-                        {...(onShareSession ? { onShare: () => onShareSession(s.sessionUuid) } : {})}
+                        onShare={() => onShareSession(s.sessionUuid)}
                         onRefresh={refresh}
                       />
                     ))}
@@ -1242,7 +1242,7 @@ function SessionCard({
   activeKinds: readonly string[]
   valuesHidden: boolean
   onOpen: () => void
-  onShare?: () => void
+  onShare: () => void
   onRefresh: () => void
 }) {
   const { t } = useTranslation()

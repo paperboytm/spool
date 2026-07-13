@@ -24,7 +24,7 @@ type Props = {
   targetMessageId?: number | null
   onCopySessionId: (source: Session['source']) => void
   onBack?: () => void
-  onShare?: (session: Session, messages: Message[]) => void
+  onShare: (session: Session, messages: Message[]) => void
 }
 
 export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
@@ -345,7 +345,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             onChange={setPinned}
           />
 
-          {onShare && session && (
+          {session && (
             <button
               data-testid="detail-share"
               onClick={() => onShare(session, messages)}

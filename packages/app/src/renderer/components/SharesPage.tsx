@@ -28,8 +28,8 @@ type Props = {
   /** Open a draft by id alone — used by the Published tab's revoked
    *  rows, which only carry the draft_id stored at publish time. */
   onOpenDraftById?: ((draftId: string) => void | Promise<void>) | undefined
-  onImportSpool?: ((file: File) => void | Promise<void>) | undefined
-  onStartNewDraft?: ((sessionUuid: string) => void | Promise<void>) | undefined
+  onImportSpool: (file: File) => void | Promise<void>
+  onStartNewDraft: (sessionUuid: string) => void | Promise<void>
 }
 
 type SharesTab = 'drafts' | 'published'
@@ -48,11 +48,11 @@ export default function SharesPage({ onOpenDraft, onOpenDraftById, onImportSpool
   const handleClosePicker = useCallback(() => setPickerOpen(false), [])
   const handlePickSession = useCallback((uuid: string) => {
     setPickerOpen(false)
-    void onStartNewDraft?.(uuid)
+    void onStartNewDraft(uuid)
   }, [onStartNewDraft])
 
   const onImport = useCallback(
-    (file: File) => onImportSpool?.(file),
+    (file: File) => onImportSpool(file),
     [onImportSpool],
   )
   const onRejectDrop = useCallback((files: File[]) => {
@@ -62,7 +62,7 @@ export default function SharesPage({ onOpenDraft, onOpenDraftById, onImportSpool
     })
   }, [t])
   const { isDragActive, dragHandlers } = useSpoolDrop({
-    enabled: Boolean(onImportSpool),
+    enabled: true,
     onImport,
     onReject: onRejectDrop,
   })
@@ -111,7 +111,7 @@ export default function SharesPage({ onOpenDraft, onOpenDraftById, onImportSpool
             )}
           </div>
         )}
-        {(tab === 'drafts' || !publishEnabled) && onStartNewDraft && (
+        {(tab === 'drafts' || !publishEnabled) && (
           <button
             type="button"
             data-testid="shares-new-draft"
@@ -132,13 +132,13 @@ export default function SharesPage({ onOpenDraft, onOpenDraftById, onImportSpool
             error={error}
             onOpenDraft={onOpenDraft}
             onDeleteDraft={handleDelete}
-            {...(onStartNewDraft ? { onStartNewDraft: handleOpenPicker } : {})}
+            onStartNewDraft={handleOpenPicker}
           />
         ) : (
           <PublishedList onOpenDraftById={onOpenDraftById} />
         )}
       </div>
-      {pickerOpen && onStartNewDraft && (
+      {pickerOpen && (
         <NewDraftPicker onSelect={handlePickSession} onClose={handleClosePicker} />
       )}
     </div>
@@ -757,7 +757,7 @@ function DraftsList({
   error: string | null
   onOpenDraft?: ((draft: ShareDraftListItem) => void) | undefined
   onDeleteDraft: (draft: ShareDraftListItem) => void
-  onStartNewDraft?: (() => void) | undefined
+  onStartNewDraft: () => void
 }) {
   const { t } = useTranslation()
   const [skeletonCount] = useState(readSkeletonCount)
@@ -796,19 +796,17 @@ function DraftsList({
         icon={<Newspaper size={22} strokeWidth={1.5} />}
         title={t('shares.empty_title')}
         hint={t('shares.empty_body')}
-        {...(onStartNewDraft ? {
-          action: (
-            <button
-              type="button"
-              data-testid="shares-empty-start"
-              onClick={onStartNewDraft}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
-            >
-              <Plus size={14} strokeWidth={2} aria-hidden />
-              <span>{t('shares.newDraft')}</span>
-            </button>
-          ),
-        } : {})}
+        action={(
+          <button
+            type="button"
+            data-testid="shares-empty-start"
+            onClick={onStartNewDraft}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded text-sm font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+          >
+            <Plus size={14} strokeWidth={2} aria-hidden />
+            <span>{t('shares.newDraft')}</span>
+          </button>
+        )}
       />
     )
   }
