@@ -68,6 +68,8 @@ packages/*/src/**/*.js
 packages/*/src/**/*.d.ts
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts.map
+# Hand-written ambient declarations (exempt from the rule above)
+!packages/app/src/env.d.ts
 # Playwright
 test-results/
 playwright-report/
