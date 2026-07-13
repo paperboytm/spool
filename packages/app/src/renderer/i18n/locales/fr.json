@@ -205,7 +205,6 @@
     "about_section": "À propos",
     "about_tagline": "Spool — un moteur de recherche local pour votre réflexion.",
     "about_trademark": "Spool™ est une marque de TypeSafe Limited.",
-    "localData_footer": "Toutes les données restent en local dans ~/.spool/",
     "shortcuts_group_global": "Global",
     "shortcuts_group_search": "Recherche",
     "shortcuts_group_session": "Session",

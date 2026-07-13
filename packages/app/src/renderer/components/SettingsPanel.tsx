@@ -48,6 +48,19 @@ const TAB_DEFS: {
   fallbackLabel?: string
   icon: ReactNode
 }[] = [
+  // Account leads the rail; it stays hidden while the `sharePublish`
+  // flag is off (see visibleTabs), so flag-off builds start at General.
+  {
+    id: 'account',
+    labelKey: 'settings.tab_account',
+    fallbackLabel: 'Account',
+    icon: (
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    ),
+  },
   {
     id: 'general',
     labelKey: 'settings.tab_general',
@@ -129,21 +142,6 @@ const TAB_DEFS: {
       </svg>
     ),
   },
-  // Account is pinned to the bottom of the rail (after feature tabs) so
-  // toggling the `sharePublish` flag — which conditionally hides this
-  // row — doesn't shift Labs/Security up and down. Matches the GitHub
-  // and Slack settings convention: identity sits below configuration.
-  {
-    id: 'account',
-    labelKey: 'settings.tab_account',
-    fallbackLabel: 'Account',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-    ),
-  },
 ]
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -188,7 +186,7 @@ export default function SettingsPanel({
       <div className="w-[960px] h-[680px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-48px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar — width + paddings tuned to match the desktop handoff
             (220px rail, 22px vertical padding, 14px horizontal). */}
-        <div className="w-[220px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-[22px] pb-3">
+        <div data-testid="settings-sidebar" className="w-[220px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-[22px] pb-3">
           <div className="px-[14px] mb-[18px]">
             <h2 className="text-[22px] font-bold text-warm-text dark:text-dark-text leading-none">{t('settings.title')}</h2>
           </div>
@@ -197,6 +195,7 @@ export default function SettingsPanel({
               <button
                 key={def.id}
                 type="button"
+                data-testid={`settings-tab-${def.id}`}
                 aria-pressed={activeTab === def.id}
                 onClick={() => setTab(def.id)}
                 className={`flex w-full items-center gap-[11px] rounded-lg h-9 px-3 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
@@ -212,8 +211,6 @@ export default function SettingsPanel({
               </button>
             ))}
           </div>
-          <div className="flex-1" />
-          <FooterPath text={t('settings.localData_footer')} />
         </div>
 
         {/* Content */}
@@ -632,19 +629,6 @@ function SmallSelect({ value, onChange, options }: { value: string; onChange: (v
         </button>
       )}
     />
-  )
-}
-
-function FooterPath({ text }: { text: string }) {
-  const path = '~/.spool/'
-  const idx = text.indexOf(path)
-  const lead = idx >= 0 ? text.slice(0, idx).replace(/[\s,，:：]+$/, '').trim() : text
-  const trail = idx >= 0 ? text.slice(idx + path.length).trim() : ''
-  return (
-    <div className="px-4 py-2 text-[11px] leading-snug text-warm-faint dark:text-dark-muted">
-      <span className="block">{lead}{trail ? ` ${trail}` : ''}</span>
-      {idx >= 0 && <span className="block mt-0.5 font-mono">{path}</span>}
-    </div>
   )
 }
 

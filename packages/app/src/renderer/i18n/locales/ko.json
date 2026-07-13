@@ -199,7 +199,6 @@
     "about_section": "정보",
     "about_tagline": "Spool — 당신의 사고를 위한 로컬 검색 엔진.",
     "about_trademark": "Spool™은 TypeSafe Limited의 상표입니다.",
-    "localData_footer": "모든 데이터는 ~/.spool/에 로컬로 저장됩니다",
     "shortcuts_group_global": "전역",
     "shortcuts_group_search": "검색",
     "shortcuts_group_session": "세션",

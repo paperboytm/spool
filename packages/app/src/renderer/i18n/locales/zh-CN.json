@@ -199,7 +199,6 @@
     "about_section": "关于",
     "about_tagline": "Spool —— 一个本地的思维搜索引擎。",
     "about_trademark": "Spool™ 是 TypeSafe Limited 的商标。",
-    "localData_footer": "所有数据本地保存在 ~/.spool/",
     "shortcuts_group_global": "全局",
     "shortcuts_group_search": "搜索",
     "shortcuts_group_session": "会话",

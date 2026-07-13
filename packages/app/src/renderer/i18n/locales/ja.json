@@ -199,7 +199,6 @@
     "about_section": "Spool について",
     "about_tagline": "Spool — あなたの思考のためのローカル検索エンジン。",
     "about_trademark": "Spool™ は TypeSafe Limited の商標です。",
-    "localData_footer": "すべてのデータは ~/.spool/ にローカル保存されます",
     "shortcuts_group_global": "グローバル",
     "shortcuts_group_search": "検索",
     "shortcuts_group_session": "セッション",

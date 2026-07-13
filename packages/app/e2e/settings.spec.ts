@@ -37,6 +37,26 @@ test('cmd/ctrl+K opens search overlay on home', async () => {
   await expect(window.locator('[data-testid="search-overlay"]')).toBeHidden()
 })
 
+test('Account leads the settings rail; the local-data footer is gone', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="settings-button"]').click()
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeVisible()
+
+  const sidebar = window.locator('[data-testid="settings-sidebar"]')
+  await expect(sidebar.locator('[aria-pressed]').first()).toHaveAttribute(
+    'data-testid',
+    'settings-tab-account',
+  )
+  // Every locale's footer copy contained the literal ~/.spool/ path,
+  // so this probe is locale-independent.
+  await expect(sidebar.getByText('~/.spool/')).toHaveCount(0)
+
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
+})
+
 test('cmd/ctrl+K is suppressed while Settings is open', async () => {
   const { window } = ctx
   await waitForSync(window)
