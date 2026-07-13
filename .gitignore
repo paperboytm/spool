@@ -41,6 +41,7 @@ dist-electron/
 # (wrangler.toml committed has placeholders; the dashboard is the
 # source of truth for prod bindings).
 wrangler.toml.local
+wrangler.local.toml
 # Internal runbooks — kept out of git until the corresponding feature
 # ships. Authors live in ~/Documents/dev-docs/spool/; promote into
 # docs/ via a follow-up commit only after launch.

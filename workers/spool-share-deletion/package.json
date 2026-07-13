@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy --config wrangler.toml.local",
+    "deploy": "wrangler deploy --config wrangler.local.toml",
     "deploy:dry": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit"
   },

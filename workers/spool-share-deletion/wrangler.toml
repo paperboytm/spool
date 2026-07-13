@@ -7,10 +7,12 @@
 #
 # Unlike the Pages project (dashboard-bound), a plain Worker needs the
 # resource ids inline. The ids are NOT secrets, but we still keep prod
-# values out of the public repo: copy this file to wrangler.toml.local
-# (gitignored), fill the TODOs from the dashboard, and deploy with
-#   wrangler deploy --config wrangler.toml.local
-# See docs/runbooks/spool-share-launch.md §4.
+# values out of the public repo: copy this file to wrangler.local.toml
+# (gitignored; the name must end in .toml or wrangler's --config parser
+# silently falls back to the default config), fill the TODOs from the
+# dashboard, and deploy with
+#   wrangler deploy --config wrangler.local.toml
+# Local end-to-end verification: see README.md next to this file.
 #
 # Bindings are the subset the sweep needs — no SESSIONS / RATE / NONCE.
 
