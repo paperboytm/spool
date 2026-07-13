@@ -28,7 +28,6 @@ import {
 import { securityApi, type SecurityPreferences, type BackupFileInfo } from '../../api/security.js'
 import { useCachedSecurityPrefs, primeSecurityPrefsCache, patchSecurityPrefs } from '../../api/securityPrefsCache.js'
 import { formatBytes } from '../security/format.js'
-import { useSecurityEnabled } from '../../featureFlags.js'
 import Toggle from '../Toggle.js'
 import Menu from '../Menu.js'
 import AllowlistManageModal from '../security/AllowlistManageModal.js'
@@ -36,11 +35,6 @@ import PfDownloadCard from './security/PfDownloadCard.js'
 import { useSecurityReadiness } from '../../hooks/useSecurityReadiness.js'
 
 export default function SecurityPane() {
-  if (!useSecurityEnabled()) return null
-  return <SecurityPaneGate />
-}
-
-function SecurityPaneGate() {
   const { t } = useTranslation()
   const readiness = useSecurityReadiness()
   if (!readiness.ready) {

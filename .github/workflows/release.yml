@@ -32,12 +32,6 @@ jobs:
           npx electron-vite build
           npx electron-builder --mac --arm64 --publish never
         env:
-          # Compile Security Scan into the bundle. Without this, every
-          # Security surface is tree-shaken out of the prod build —
-          # `securityBuildCapable()` returns false, the worker never
-          # boots, and the default-on agents.json seed is a no-op
-          # because the resolver short-circuits.
-          VITE_FEATURE_SECURITY: '1'
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -86,10 +80,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app (AppImage + tar.gz)
-        env:
-          # See the mac build comment — VITE_FEATURE_SECURITY=1 is what
-          # compiles the Security surface into the bundle.
-          VITE_FEATURE_SECURITY: '1'
         run: |
           pnpm -F @spool/app build:deps
           cd packages/app

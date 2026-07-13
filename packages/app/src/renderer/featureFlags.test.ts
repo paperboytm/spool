@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   resolveFeatureRuntime,
-  resolveSecurityEnabled,
   resolveSharePublish,
-  securityBuildCapable,
   type FeatureRuntimeDeps,
 } from './featureFlags.js'
 import { __resetLabsFlagsForTest } from './lib/labsFlags.js'
@@ -93,51 +91,5 @@ describe('resolveSharePublish', () => {
         VITE_SHAREPUBLISH: '1',
       }),
     ).toBe(false)
-  })
-})
-
-describe('securityBuildCapable', () => {
-  it('false when neither DEV nor VITE_FEATURE_SECURITY', () => {
-    expect(securityBuildCapable(off)).toBe(false)
-  })
-  it('true in DEV', () => {
-    expect(securityBuildCapable({ ...off, dev: true })).toBe(true)
-  })
-  it('true when VITE_FEATURE_SECURITY is set', () => {
-    expect(securityBuildCapable({ ...off, envEnabled: (k) => k === 'SECURITY' })).toBe(true)
-  })
-})
-
-describe('resolveSecurityEnabled', () => {
-  const capable: Pick<FeatureRuntimeDeps, 'dev' | 'envEnabled'> = {
-    dev: false,
-    envEnabled: (k) => k === 'SECURITY',
-  }
-
-  it('false when the build is not security-capable, even if opted in', () => {
-    // No env, not dev → the code isn't shipped; a stale config opt-in
-    // must not resurrect a feature that was tree-shaken out.
-    expect(resolveSecurityEnabled(true, off)).toBe(false)
-  })
-
-  it('capable build, no explicit choice, not DEV → OFF (opt-in required)', () => {
-    // This is the beta-prod default: the Labs toggle gates exposure.
-    expect(resolveSecurityEnabled(undefined, capable)).toBe(false)
-  })
-
-  it('capable build + explicit opt-in → ON', () => {
-    expect(resolveSecurityEnabled(true, capable)).toBe(true)
-  })
-
-  it('capable build + explicit opt-out → OFF', () => {
-    expect(resolveSecurityEnabled(false, capable)).toBe(false)
-  })
-
-  it('DEV with no explicit choice → ON (dev default)', () => {
-    expect(resolveSecurityEnabled(undefined, { ...off, dev: true })).toBe(true)
-  })
-
-  it('explicit opt-out beats the DEV default', () => {
-    expect(resolveSecurityEnabled(false, { ...off, dev: true })).toBe(false)
   })
 })

@@ -34,7 +34,6 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi } from '../api/security.js'
-import { useSecurityEnabled } from '../featureFlags.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import AllowlistManageModal from './security/AllowlistManageModal.js'
@@ -66,15 +65,6 @@ interface Props {
 type Sess = SessionWithFindingCounts & { source: Session['source'] }
 
 export default function SecurityPage(props: Props) {
-  // Belt-and-suspenders gate at the wrapper so the inner component's
-  // hooks never run when the feature is off — keeping the conditional
-  // return ABOVE the hooks would violate Rules of Hooks the moment
-  // the flag becomes anything other than a build-time constant.
-  if (!useSecurityEnabled()) return null
-  return <SecurityPageGate {...props} />
-}
-
-function SecurityPageGate(props: Props) {
   const { t } = useTranslation()
   const readiness = useSecurityReadiness()
   if (!readiness.ready) {

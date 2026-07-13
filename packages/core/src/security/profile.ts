@@ -19,9 +19,8 @@
 // session needs a rescan". No semantic meaning outside that diff —
 // it's NOT a user-visible "version of the security feature".
 //
-// Scope: consumed only by code gated behind VITE_FEATURE_SECURITY.
-// Bump on every rule change once the feature ships so users with old
-// stamps automatically pick up the new rules.
+// Bump on every rule change so users with old stamps automatically
+// pick up the new rules.
 //   1 — initial release
 //   2 — 2026-05-28: env-var detector now rejects values containing
 //       non-ASCII letters (CJK / Cyrillic / Hangul / Arabic / emoji

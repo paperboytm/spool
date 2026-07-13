@@ -9,7 +9,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
 import SecurityPane from './Settings/SecurityPane.js'
-import { useSecurityEnabled, useSharePublish } from '../featureFlags.js'
+import { useSharePublish } from '../featureFlags.js'
 import LabsTab from './LabsTab.js'
 import SettingsAccount from './SettingsAccount.js'
 import Toggle from './Toggle.js'
@@ -162,14 +162,12 @@ export default function SettingsPanel({
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const { t } = useTranslation()
-  const securityEnabled = useSecurityEnabled()
   // Account tab is the spool.pro identity surface (sign-in, handle,
   // delete-account schedule). Sub-gated behind the share-publish flag
   // so the tab doesn't appear in pre-launch dev builds that don't
   // opt into the publish stack.
   const publishEnabled = useSharePublish()
   const visibleTabs = TAB_DEFS.filter(def => {
-    if (def.id === 'security' && !securityEnabled) return false
     if (def.id === 'account' && !publishEnabled) return false
     return true
   })
@@ -256,7 +254,7 @@ export default function SettingsPanel({
             {activeTab === 'agent' && <AgentTab />}
             {activeTab === 'account' && <SettingsAccount />}
             {activeTab === 'labs' && <LabsTab />}
-            {activeTab === 'security' && securityEnabled && <SecurityPane />}
+            {activeTab === 'security' && <SecurityPane />}
           </div>
         </div>
       </div>

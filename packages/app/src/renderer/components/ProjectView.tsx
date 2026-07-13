@@ -8,7 +8,6 @@ import { insertSessionSorted } from '../../shared/sessionSort.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
 import { formatRelativeDate } from '../../shared/formatDate.js'
 import { PROJECT_SORT_OPTIONS } from '../../shared/projectView.js'
-import { useSecurityEnabled } from '../featureFlags.js'
 import { securityApi } from '../api/security.js'
 
 type Props = {
@@ -31,7 +30,6 @@ export default function ProjectView({
   onShare,
 }: Props) {
   const { t, i18n } = useTranslation()
-  const securityEnabled = useSecurityEnabled()
   const projectSortLabel = (value: ProjectSessionSortOrder): string => {
     switch (value) {
       case 'recent': return t('project.sort_recent')
@@ -56,19 +54,12 @@ export default function ProjectView({
   // the Library row badge, and without a refetch the badge never
   // appears after the initial backfill.
   //
-  // Gated by useSecurityEnabled() so the IPC subscription, the
-  // mount-time bump, and the initial backfill check are all skipped
-  // when the feature is off — prod builds (where VITE_FEATURE_SECURITY
-  // isn't set) see this effect as a no-op.
-  //
   // Debounce: backfill of N sessions publishes N session-rescanned
   // events. Without coalescing, the renderer would refetch + re-render
   // N times. Trail-edge debounce so we refetch once 300ms after the
   // burst settles — fast enough that the badge feels live, slow
   // enough that 500-session backfill collapses to a single refetch.
   useEffect(() => {
-    if (!securityEnabled) return
-
     let timer: ReturnType<typeof setTimeout> | null = null
     const scheduleBump = () => {
       if (timer) clearTimeout(timer)

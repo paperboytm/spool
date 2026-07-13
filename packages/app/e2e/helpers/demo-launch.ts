@@ -22,10 +22,10 @@ export interface AppContext {
 
 export interface LaunchDemoOptions {
   /** Shallow JSON written to `agents.json` in SPOOL_HOME *before* Electron
-   *  boots. Use this to seed feature flags the main process reads from
-   *  the config file at startup — e.g. `{ securityEnabled: true }` for a
-   *  Security capture. Stays feature-agnostic so future flags drop in
-   *  without changing this signature. */
+   *  boots. Use this to seed config the main process reads from the
+   *  file at startup — e.g. a default agent or feature opt-in. Stays
+   *  feature-agnostic so future flags drop in without changing this
+   *  signature. */
   agentsConfig?: Record<string, unknown>
 }
 

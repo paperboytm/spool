@@ -8,7 +8,6 @@ import MessageList, { type MessageListHandle } from './MessageList.js'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
 import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
-import { useSecurityEnabled } from '../featureFlags.js'
 import { securityApi } from '../api/security.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
@@ -50,7 +49,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [findResultNonce, setFindResultNonce] = useState(0)
   const [findQuery, setFindQuery] = useState('')
   const [activeMatchIndex, setActiveMatchIndex] = useState(0)
-  const securityEnabled = useSecurityEnabled()
   const listRef = useRef<MessageListHandle>(null)
   const activeFindMatchRef = useRef<HTMLElement | null>(null)
   const isDark = useIsDark()
@@ -131,7 +129,6 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   // navigates away and back. Debounced because a Purge all of
   // N findings publishes N events.
   useEffect(() => {
-    if (!securityEnabled) return
     const sessionId = session?.id
     if (sessionId === undefined) return
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -149,7 +146,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       if (timer) clearTimeout(timer)
       off()
     }
-  }, [sessionUuid, session?.id, securityEnabled])
+  }, [sessionUuid, session?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -453,9 +450,8 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
  *  ("4 risks" alongside "84 messages") rather than another command.
  *  Click toggles the FindingsStrip open/closed.
  *
- *  Shown only when the feature flag is on AND the session has either
- *  active findings or a non-zero purged-history tally. Production
- *  builds without VITE_FEATURE_SECURITY render nothing. */
+ *  Shown only when the session has either active findings or a
+ *  non-zero purged-history tally. */
 function RiskPill({
   session,
   open,
@@ -466,7 +462,6 @@ function RiskPill({
   onToggle: () => void
 }) {
   const { t } = useTranslation()
-  if (!useSecurityEnabled()) return null
 
   const high = session.scanHighCount ?? 0
   const total = session.scanFindingCount ?? 0

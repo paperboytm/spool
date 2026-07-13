@@ -53,7 +53,7 @@ import type {
   ShareDraftRow, UpsertShareDraftInput,
 } from '@spool-lab/core'
 import { setupTray } from './tray.js'
-import { AcpManager, seedSecurityEnabledDefault } from './acp.js'
+import { AcpManager } from './acp.js'
 import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 import { openTerminal } from './terminal.js'
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
@@ -138,9 +138,8 @@ const pfRuntime = makePfRuntime({
 // Lazily resolved on first access — pfModelsRoot() reads app.getPath
 // which throws before app.ready, but this module evaluates at boot.
 let pfCoordinator: ReturnType<typeof makePfCoordinator> | null = null
-// Whether the Security worker + IPC are currently up. Flipped by the
-// idempotent ensureSecurityBooted / teardownSecurity pair so the Labs
-// toggle can start/stop the feature live (no restart).
+// Whether the Security worker + IPC are currently up. Set by the
+// idempotent ensureSecurityBooted.
 let securityBooted = false
 // The PF model URL-scheme handler is a process-lifetime singleton:
 // registering it twice throws, so we only ever register once and leave
@@ -183,38 +182,6 @@ class SearchCache {
 }
 
 const searchCache = new SearchCache()
-
-/** Main-process mirror of the renderer's `securityBuildCapable()`.
- *
- *  The renderer reads `import.meta.env.DEV` and
- *  `import.meta.env.VITE_FEATURE_SECURITY` (Vite inlines both at
- *  build time). Electron's main process bundle can read the same
- *  values — `electron-vite build` substitutes them just like for
- *  the renderer.
- *
- *  Kept inline here (rather than imported from
- *  `../renderer/featureFlags`) because main code mustn't import
- *  React-side modules: those pull in the whole renderer dep graph.
- *
- *  When this returns `false`, the scan worker and IPC handlers
- *  stay un-booted on production user machines. The DB migrations
- *  still run unconditionally — schema must be forward-compatible
- *  so that flipping the flag on later doesn't require a second
- *  upgrade pass. */
-function securityBuildCapable(): boolean {
-  const env = (import.meta as any).env as { DEV?: boolean; VITE_FEATURE_SECURITY?: string } | undefined
-  if (env?.DEV) return true
-  return env?.VITE_FEATURE_SECURITY === '1'
-}
-
-/** Runtime gate = build-capable AND the user opted in via the Labs
- *  toggle (persisted on agents.json `securityEnabled`). Undefined opt-in
- *  falls back to DEV, mirroring the renderer's resolveSecurityEnabled so
- *  dev keeps the feature on without an explicit choice. */
-function securityRuntimeEnabled(config: import('./acp.js').AgentsConfig): boolean {
-  if (!securityBuildCapable()) return false
-  return config.securityEnabled ?? Boolean((import.meta as any).env?.DEV)
-}
 
 async function bootScanWorker(): Promise<void> {
   try {
@@ -280,8 +247,7 @@ async function shutdownScanWorker(): Promise<void> {
 
 /** Idempotent boot of the Security feature: scan worker + its IPC, plus
  *  the process-lifetime PF protocol + coordinator (registered once).
- *  Called at startup when the runtime gate is on, and live when the user
- *  flips the Labs toggle on. */
+ *  Called once at startup. */
 async function ensureSecurityBooted(): Promise<void> {
   if (securityBooted) {
     console.log('[security.lifecycle] ensureSecurityBooted: already booted, skipping')
@@ -318,11 +284,9 @@ async function ensureSecurityBooted(): Promise<void> {
     pfCoordinator.subscribe((s) => {
       if (s.phase !== 'installed') return
       const prefs = loadSecurityPreferences()
-      // The coordinator (a process singleton) keeps downloading even
-      // after the user disables Security mid-download. shouldAutoActivatePf
-      // gates on securityBooted so we never resurrect a hidden inference
-      // window behind an OFF toggle (teardown clears pfActivationPending,
-      // so re-enabling starts clean).
+      // shouldAutoActivatePf gates on securityBooted so a download
+      // that completes in the brief pre-boot window can't spawn a
+      // hidden inference window before the feature is up.
       if (!shouldAutoActivatePf({
         phase: s.phase,
         securityBooted,
@@ -391,32 +355,6 @@ async function ensureSecurityBooted(): Promise<void> {
       console.error('[security] pf runtime boot failed:', err)
     })
   }
-}
-
-/** Idempotent inverse: stop the scan worker + tear down its IPC + the PF
- *  inference window (via shutdownScanWorker). Leaves the passive PF
- *  protocol + coordinator registered for a clean re-enable. Called when
- *  the user flips the Labs toggle off — immediate, no residual scanning,
- *  no restart. */
-async function teardownSecurity(): Promise<void> {
-  if (!securityBooted) {
-    console.log('[security.lifecycle] teardownSecurity: not booted, skipping')
-    return
-  }
-  securityBooted = false
-  console.log('[security.lifecycle] tearing down — terminating worker + disposing IPC')
-  // Clear any pending PF activation (e.g. a model download kicked off
-  // from the callout that's still in flight): without this the
-  // coordinator's completion handler is now gated off (see subscribe),
-  // and the callout would otherwise hang on "Activating…" if the user
-  // re-enables. Re-enabling starts PF fresh from the persisted pfEnabled.
-  const prefs = loadSecurityPreferences()
-  if (prefs.pfActivationPending) {
-    const next = saveSecurityPreferences({ pfActivationPending: false })
-    mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
-  }
-  await shutdownScanWorker()
-  console.log('[security.lifecycle] torn down — scanner stopped, zero residual')
 }
 
 /** Bring the Privacy Filter inference window up or down to match the
@@ -636,13 +574,6 @@ app.whenReady().then(async () => {
   db = getDB()
   acpManager = new AcpManager()
 
-  // Default-on for security-capable builds: write `securityEnabled: true`
-  // into agents.json the first time we see a config without an explicit
-  // choice. Keeps the resolver semantics clean — `undefined` still means
-  // "no opinion" — while making the GA default explicit on disk. Users
-  // who opt out via Labs persist as `false` and are not re-seeded.
-  if (securityBuildCapable()) seedSecurityEnabledDefault()
-
   syncer = new Syncer(db, undefined, (sessionId) => {
     // Sync mutated this session's messages; existing findings now have
     // stale offsets. The Syncer already nulled scan_profile inside the
@@ -710,17 +641,7 @@ app.whenReady().then(async () => {
   // guarded by `if (scanWorker)`, so any session changes that fire
   // before the worker is ready are no-ops — backfill catches up once
   // boot completes.
-  //
-  // Two gates (see securityRuntimeEnabled): VITE_FEATURE_SECURITY keeps
-  // the code out of non-opted builds; the runtime `securityEnabled`
-  // (Labs toggle) is the user's opt-in. The boot/teardown is idempotent
-  // so the Labs toggle can start/stop it live — see the set-config IPC.
-  if (securityRuntimeEnabled(acpManager.getAgentsConfig())) {
-    console.log('[security.lifecycle] opt-in on at boot → starting')
-    void ensureSecurityBooted()
-  } else {
-    console.log('[security.lifecycle] opt-in off at boot → scanner not started')
-  }
+  void ensureSecurityBooted()
 
   // Share-auth IPC (PKCE loopback OAuth + safeStorage session).
   // The build-time __SPOOL_E2E__ switch is the ONE place the production
@@ -1047,20 +968,7 @@ ipcMain.handle('spool:ai-get-config', () => {
 })
 
 ipcMain.handle('spool:ai-set-config', (_e, { config }: { config: import('./acp.js').AgentsConfig }) => {
-  // Detect a Security opt-in transition and start/stop the worker live
-  // so the Labs toggle takes effect without a restart. Off truly stops
-  // scanning (teardownSecurity terminates the worker thread + IPC); on
-  // boots it + backfills existing sessions.
-  const wasEnabled = securityRuntimeEnabled(acpManager.getAgentsConfig())
   acpManager.saveAgentsConfig(config)
-  const nowEnabled = securityRuntimeEnabled(config)
-  if (nowEnabled && !wasEnabled) {
-    console.log('[security.lifecycle] opt-in toggled ON → booting live')
-    void ensureSecurityBooted()
-  } else if (!nowEnabled && wasEnabled) {
-    console.log('[security.lifecycle] opt-in toggled OFF → tearing down live')
-    void teardownSecurity()
-  }
   return { ok: true }
 })
 
