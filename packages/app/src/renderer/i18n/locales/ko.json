@@ -154,7 +154,6 @@
     "tab_shortcuts": "단축키",
     "tab_sources": "데이터 소스",
     "tab_agent": "Agent",
-    "tab_labs": "실험실",
     "tab_security": "보안",
     "language_label": "언어",
     "language_help": "Spool 인터페이스에서 사용할 언어를 선택하세요.",
@@ -849,14 +848,5 @@
   },
   "palette": {
     "toggleOptions": "옵션"
-  },
-  "labs": {
-    "intro": "초기 기능. 출시 전에 바뀌거나 사라질 수 있습니다.",
-    "share": {
-      "title": "세션 공유",
-      "description": "세션을 깔끔한 이미지, PDF, Markdown으로 내보내기 — 개인정보 보호 옵션 포함.",
-      "feedback": "느낌을 들려주세요",
-      "disabled_toast": "공유를 껐습니다."
-    }
   }
 }

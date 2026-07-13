@@ -18,8 +18,7 @@ export type ShortcutGroup = {
   shortcuts: ShortcutEntry[]
 }
 
-export function getShortcutGroups(shareEnabled: boolean): ShortcutGroup[] {
-  const groups: ShortcutGroup[] = [
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     {
       id: 'global',
       shortcuts: [
@@ -45,9 +44,7 @@ export function getShortcutGroups(shareEnabled: boolean): ShortcutGroup[] {
         { id: 'closeFind', combo: 'escape' },
       ],
     },
-  ]
-  if (shareEnabled) {
-    groups.push({
+    {
       id: 'shareEditor',
       shortcuts: [
         { id: 'undo', combo: 'mod+z' },
@@ -57,10 +54,8 @@ export function getShortcutGroups(shareEnabled: boolean): ShortcutGroup[] {
         { id: 'zoomFit', combo: 'mod+0' },
         { id: 'pan', combo: 'space' },
       ],
-    })
-  }
-  return groups
-}
+    },
+]
 
 const MAC_SYMBOLS: Record<string, string> = {
   mod: '⌘',

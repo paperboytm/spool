@@ -34,11 +34,10 @@ import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
-import { useFeature } from './featureFlags.js'
 import { primeSecurityPrefsCache } from './api/securityPrefsCache.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs' | 'security'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'security'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -58,7 +57,6 @@ interface RuntimeInfo {
 
 export default function App() {
   const { t } = useTranslation()
-  const shareEnabled = useFeature('share')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [previewSuggestions, setPreviewSuggestions] = useState<SearchResult[]>([])
@@ -361,30 +359,9 @@ export default function App() {
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
-  const isSharesView = shareEnabled && view === 'shares'
+  const isSharesView = view === 'shares'
   const isSecurityView = view === 'security'
-  const isShareEditorView = shareEnabled && view === 'share-editor'
-
-  // Bounce out of share-only views when the user disables the flag from
-  // Settings → Labs. Mirror the Back button's behaviour for the editor:
-  // return to wherever the user came from. /shares is a top-level entry
-  // with no remembered source, so it falls through to Library.
-  useEffect(() => {
-    if (shareEnabled) return
-    if (view !== 'shares' && view !== 'share-editor') return
-    setShareEditor(null)
-    const editorReturnsToShareSurface =
-      shareEditorReturnView === 'shares' || shareEditorReturnView === 'share-editor'
-    if (view === 'share-editor' && !editorReturnsToShareSurface) {
-      setView(shareEditorReturnView)
-    } else {
-      setSelectedSession(null)
-      setTargetMessageId(null)
-      setHomeMode(true)
-      setView('search')
-    }
-    toast(t('labs.share.disabled_toast'))
-  }, [shareEnabled, view, shareEditorReturnView, t])
+  const isShareEditorView = view === 'share-editor'
 
   useEffect(() => {
     loadThemeEditorState()
@@ -815,16 +792,14 @@ export default function App() {
         setView('search')
         setQuery('')
       }}
-      {...(shareEnabled ? {
-        onSelectShares: () => {
-          setActiveProjectKey(null)
-          setHomeMode(false)
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setView('shares')
-          setQuery('')
-        },
-      } : {})}
+      onSelectShares={() => {
+        setActiveProjectKey(null)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('shares')
+        setQuery('')
+      }}
       isSharesActive={isSharesView}
       onSelectSecurity={() => {
         setSelectedSession(null)
@@ -846,7 +821,7 @@ export default function App() {
       pinnedSortOrder={pinnedSortOrder}
       onPinnedSortOrderChange={handlePinnedSortChange}
       onCopySessionId={handleCopySessionId}
-      {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+      onShareSession={handleStartShareFromUuid}
       {...(!trafficLightInset ? {
         sidebarToggle: {
           collapsed: sidebarCollapsed,
@@ -941,14 +916,14 @@ export default function App() {
           <SharesPage
             onOpenDraft={handleOpenDraft}
             onOpenDraftById={handleOpenDraftById}
-            {...(shareEnabled ? { onImportSpool: handleImportSpoolFile } : {})}
-            {...(shareEnabled ? { onStartNewDraft: handleStartShareFromUuid } : {})}
+            onImportSpool={handleImportSpoolFile}
+            onStartNewDraft={handleStartShareFromUuid}
           />
         ) : isSecurityView ? (
           <SecurityPage
             onOpenSession={handleOpenSession}
             onOpenSettings={() => { setSettingsTab('security'); setShowSettings(true) }}
-            {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+            onShareSession={handleStartShareFromUuid}
           />
         ) : isHomeMode ? (
           <LibraryLanding
@@ -962,7 +937,7 @@ export default function App() {
             }}
             onOpenSession={handleOpenSession}
             onCopySessionId={handleCopySessionId}
-            {...(shareEnabled ? { onShare: handleStartShareFromUuid } : {})}
+            onShare={handleStartShareFromUuid}
           />
         ) : (
           <>
@@ -1005,9 +980,7 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
-                  {...(shareEnabled ? {
-                    onShare: handleStartShareFromSession,
-                  } : {})}
+                  onShare={handleStartShareFromSession}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
@@ -1016,7 +989,7 @@ export default function App() {
                   onSortOrderChange={handleProjectSortChange}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
-                  {...(shareEnabled ? { onShare: handleStartShareFromUuid } : {})}
+                  onShare={handleStartShareFromUuid}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
@@ -1061,7 +1034,7 @@ export default function App() {
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
-                        {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+                        onShareSession={handleStartShareFromUuid}
                       />
                     </div>
                   )}

@@ -154,7 +154,6 @@
     "tab_shortcuts": "快捷键",
     "tab_sources": "数据源",
     "tab_agent": "Agent",
-    "tab_labs": "实验中",
     "tab_security": "安全",
     "language_label": "语言",
     "language_help": "选择 Spool 界面所使用的语言。",
@@ -849,14 +848,5 @@
   },
   "palette": {
     "toggleOptions": "选项"
-  },
-  "labs": {
-    "intro": "早期功能。可能在发布前变化或消失。",
-    "share": {
-      "title": "分享会话",
-      "description": "把会话导出成一张精致的图片、PDF 或 Markdown 文件，自带隐私控制。",
-      "feedback": "告诉我们感受",
-      "disabled_toast": "分享已关闭。"
-    }
   }
 }

@@ -53,8 +53,7 @@ import { formatRelativeDate } from '../../shared/formatDate.js'
 
 interface Props {
   onOpenSession: (sessionUuid: string) => void
-  /** Optional share-draft starter; rendered as a menu item when share
-   *  feature is enabled. App.tsx wires this only when shareEnabled. */
+  /** Share-draft starter; rendered as a menu item. */
   onShareSession?: (sessionUuid: string) => void
   /** Open Settings panel pre-focused on the Security tab. Wired from
    *  App.tsx; used by the EmptyState "Detector settings" affordance so

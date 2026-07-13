@@ -37,6 +37,22 @@ test('cmd/ctrl+K opens search overlay on home', async () => {
   await expect(window.locator('[data-testid="search-overlay"]')).toBeHidden()
 })
 
+test('Share and Security ship on: sidebar entries present, no Labs tab', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  // Neither entry needs an env flag or an agents.json opt-in anymore.
+  await expect(window.locator('[data-testid="sidebar-shares"]')).toBeVisible()
+  await expect(window.locator('[data-testid="sidebar-security"]')).toBeVisible()
+
+  await window.locator('[data-testid="settings-button"]').click()
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeVisible()
+  await expect(window.locator('[data-testid="settings-tab-labs"]')).toHaveCount(0)
+
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
+})
+
 test('Account leads the settings rail; the local-data footer is gone', async () => {
   const { window } = ctx
   await waitForSync(window)

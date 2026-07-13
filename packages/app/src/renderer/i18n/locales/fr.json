@@ -160,7 +160,6 @@
     "tab_shortcuts": "Raccourcis",
     "tab_sources": "Sources",
     "tab_agent": "Agent",
-    "tab_labs": "Labos",
     "tab_security": "Sécurité",
     "language_label": "Langue",
     "language_help": "Choisissez la langue utilisée dans l'interface de Spool.",
@@ -891,14 +890,5 @@
   },
   "palette": {
     "toggleOptions": "Options"
-  },
-  "labs": {
-    "intro": "Fonctionnalités précoces. Peuvent évoluer ou disparaître avant la sortie.",
-    "share": {
-      "title": "Partager les sessions",
-      "description": "Exportez n'importe quelle session en image, PDF ou Markdown soigné — avec contrôles de confidentialité.",
-      "feedback": "Dites-nous ce que vous en pensez",
-      "disabled_toast": "Partage désactivé."
-    }
   }
 }

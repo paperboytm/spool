@@ -10,13 +10,12 @@ import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
 import SecurityPane from './Settings/SecurityPane.js'
 import { useSharePublish } from '../featureFlags.js'
-import LabsTab from './LabsTab.js'
 import SettingsAccount from './SettingsAccount.js'
 import Toggle from './Toggle.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'labs' | 'security'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'security'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'Ghostty', 'kitty', 'Alacritty', 'WezTerm'] as const
@@ -117,17 +116,6 @@ const TAB_DEFS: {
     icon: (
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'labs',
-    labelKey: 'settings.tab_labs',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2v6a2 2 0 00.245.96l5.51 10.08A2 2 0 0118 22H6a2 2 0 01-1.755-2.96l5.51-10.08A2 2 0 0010 8V2"/>
-        <path d="M6.453 15h11.094"/>
-        <path d="M8.5 2h7"/>
       </svg>
     ),
   },
@@ -250,7 +238,6 @@ export default function SettingsPanel({
             {activeTab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
             {activeTab === 'agent' && <AgentTab />}
             {activeTab === 'account' && <SettingsAccount />}
-            {activeTab === 'labs' && <LabsTab />}
             {activeTab === 'security' && <SecurityPane />}
           </div>
         </div>

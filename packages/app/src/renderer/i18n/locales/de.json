@@ -160,7 +160,6 @@
     "tab_shortcuts": "Tastenkürzel",
     "tab_sources": "Quellen",
     "tab_agent": "Agent",
-    "tab_labs": "Labs",
     "tab_security": "Sicherheit",
     "language_label": "Sprache",
     "language_help": "Wählen Sie die in der Spool-Oberfläche verwendete Sprache.",
@@ -891,14 +890,5 @@
   },
   "palette": {
     "toggleOptions": "Optionen anzeigen"
-  },
-  "labs": {
-    "intro": "Frühe Features. Können sich vor der Veröffentlichung ändern oder wegfallen.",
-    "share": {
-      "title": "Sitzungen teilen",
-      "description": "Exportiere jede Sitzung als ansprechendes Bild, PDF oder Markdown — mit Datenschutzoptionen.",
-      "feedback": "Sag uns, wie es sich anfühlt",
-      "disabled_toast": "Teilen ist aus."
-    }
   }
 }
