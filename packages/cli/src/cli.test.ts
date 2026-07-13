@@ -63,7 +63,7 @@ function createSeededDir(): { dir: string; cleanup: () => void } {
   insertSession.run(1, src, SESSION_UUID_1, '/fake/session1.jsonl',
     'Debugging authentication flow', '2026-04-10T10:00:00Z', '2026-04-10T11:00:00Z', 3, '/Users/test/my-project', 'claude-4', '2026-04-10')
   insertSession.run(1, src, SESSION_UUID_2, '/fake/session2.jsonl',
-    'Refactoring database queries', '2026-04-12T14:00:00Z', '2026-04-12T15:00:00Z', 2, '/Users/test/my-project', 'claude-4', '2026-04-12')
+    'Refactoring database queries', '2026-04-12T14:00:00Z', '2026-04-12T15:00:00Z', 2, '/Users/test/my-project/packages/api', 'claude-4', '2026-04-12')
 
   const insertMsg = db.prepare(`
     INSERT INTO messages (session_id, source_id, msg_uuid, role, content_text, timestamp, tool_names, seq)
@@ -427,6 +427,18 @@ describe('projects', () => {
 
   it('lists the sessions in a project when given a query', () => {
     const out = run(['projects', 'my-project'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Debugging authentication flow')
+    expect(out).toContain('Refactoring database queries')
+  })
+
+  it('matches a project by display path', () => {
+    const out = run(['projects', '/Users/test/my-project'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Debugging authentication flow')
+    expect(out).toContain('Refactoring database queries')
+  })
+
+  it('matches a project by session cwd', () => {
+    const out = run(['projects', 'packages/api'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain('Refactoring database queries')
   })

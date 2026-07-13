@@ -1,25 +1,22 @@
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  getShortcutGroups,
+  SHORTCUT_GROUPS,
   formatComboParts,
   splitAlternatives,
   type ShortcutEntry,
 } from '../data/shortcuts.js'
-import { useFeature } from '../featureFlags.js'
 
 export default function ShortcutsTab() {
   const { t } = useTranslation()
-  const shareEnabled = useFeature('share')
   const isMac = useMemo(
     () => typeof navigator !== 'undefined' && /mac/i.test(navigator.platform),
     [],
   )
-  const groups = useMemo(() => getShortcutGroups(shareEnabled), [shareEnabled])
 
   return (
     <div className="space-y-6">
-      {groups.map((g) => (
+      {SHORTCUT_GROUPS.map((g) => (
         <Section key={g.id} title={t(`settings.shortcuts_group_${g.id}`)}>
           <ul>
             {g.shortcuts.map((s) => (

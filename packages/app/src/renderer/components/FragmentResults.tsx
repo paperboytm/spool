@@ -17,7 +17,7 @@ type Props = {
   onOpenSession: (uuid: string, messageId?: number) => void
   defaultSortOrder: SearchSortOrder
   onCopySessionId: (source: FragmentResult['source']) => void
-  onShareSession?: (uuid: string) => void
+  onShareSession: (uuid: string) => void
 }
 
 export default function FragmentResults({ results, query, onOpenSession, defaultSortOrder, onCopySessionId, onShareSession }: Props) {
@@ -119,7 +119,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
               result={result}
               onOpenSession={onOpenSession}
               onCopySessionId={onCopySessionId}
-              {...(onShareSession ? { onShareSession } : {})}
+              onShareSession={onShareSession}
             />
           ))}
         </div>
@@ -144,7 +144,7 @@ function FragmentRow({
   result: FragmentRowResult
   onOpenSession: (uuid: string, messageId?: number) => void
   onCopySessionId: (source: FragmentResult['source']) => void
-  onShareSession?: (uuid: string) => void
+  onShareSession: (uuid: string) => void
 }) {
   const { t } = useTranslation()
   const snippet = snippetToStrongHtml(result.snippet)
@@ -168,7 +168,7 @@ function FragmentRow({
           result={result}
           onOpenSession={onOpenSession}
           onCopySessionId={onCopySessionId}
-          {...(onShareSession ? { onShare: () => onShareSession(result.sessionUuid) } : {})}
+          onShare={() => onShareSession(result.sessionUuid)}
         />
       </div>
 

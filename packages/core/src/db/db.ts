@@ -729,6 +729,38 @@ export function runMigrations(db: Database.Database): void {
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
+
+  recreateProjectGroupsView(db)
+}
+
+/**
+ * project_groups_v is the single definition of cross-source project grouping
+ * (consumed by projects/groups.ts). It holds no data, so instead of being
+ * frozen at its migration-time definition (v6) it is dropped and recreated on
+ * every launch — old and new installs always run the definition below.
+ *
+ * The path/cwd aggregates use JSON_GROUP_ARRAY rather than GROUP_CONCAT so
+ * paths containing commas survive round-tripping (e.g. "/Users/me/foo,bar").
+ */
+function recreateProjectGroupsView(db: Database.Database): void {
+  db.exec(`
+    DROP VIEW IF EXISTS project_groups_v;
+    CREATE VIEW project_groups_v AS
+    SELECT
+      p.identity_kind,
+      p.identity_key,
+      MIN(p.display_name)             AS display_name,
+      GROUP_CONCAT(DISTINCT src.name) AS sources_csv,
+      JSON_GROUP_ARRAY(DISTINCT p.display_path) FILTER (WHERE p.display_path IS NOT NULL AND p.display_path <> '') AS display_paths_json,
+      JSON_GROUP_ARRAY(DISTINCT s.cwd)          FILTER (WHERE s.cwd IS NOT NULL AND s.cwd <> '')                   AS cwds_json,
+      COUNT(s.id)                     AS session_count,
+      MAX(s.started_at)               AS last_session_at
+    FROM projects p
+    JOIN sources src ON src.id = p.source_id
+    LEFT JOIN sessions s ON s.project_id = p.id AND s.message_count > 0
+    WHERE p.identity_kind IS NOT NULL
+    GROUP BY p.identity_kind, p.identity_key;
+  `)
 }
 
 export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs) {

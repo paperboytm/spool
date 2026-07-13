@@ -154,7 +154,6 @@
     "tab_shortcuts": "快捷键",
     "tab_sources": "数据源",
     "tab_agent": "Agent",
-    "tab_labs": "实验中",
     "tab_security": "安全",
     "language_label": "语言",
     "language_help": "选择 Spool 界面所使用的语言。",
@@ -199,7 +198,7 @@
     "about_section": "关于",
     "about_tagline": "Spool —— 一个本地的思维搜索引擎。",
     "about_trademark": "Spool™ 是 TypeSafe Limited 的商标。",
-    "localData_footer": "所有数据本地保存在 ~/.spool/",
+    "about_feedback": "提供反馈",
     "shortcuts_group_global": "全局",
     "shortcuts_group_search": "搜索",
     "shortcuts_group_session": "会话",
@@ -850,19 +849,5 @@
   },
   "palette": {
     "toggleOptions": "选项"
-  },
-  "labs": {
-    "intro": "早期功能。可能在发布前变化或消失。",
-    "share": {
-      "title": "分享会话",
-      "description": "把会话导出成一张精致的图片、PDF 或 Markdown 文件，自带隐私控制。",
-      "feedback": "告诉我们感受",
-      "disabled_toast": "分享已关闭。"
-    },
-    "security": {
-      "title": "安全扫描",
-      "description": "找出已索引会话里的 API 密钥、令牌和个人信息，一键跳转去轮换泄露的密钥，并把敏感值从 Spool 的搜索/AI 索引中清除。基于模式匹配、纯本地——你的原始会话文件永不被改动。",
-      "feedback": "告诉我们感受"
-    }
   }
 }

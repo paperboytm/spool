@@ -2,8 +2,7 @@
 //
 // Stored in ~/.spool/security.json next to ui.json. Kept in its own
 // file (vs. piggybacking on ui.json) because the schema is feature-
-// scoped and this lets the rest of Spool ignore security state when
-// running with VITE_FEATURE_SECURITY off.
+// scoped.
 //
 // Read pattern is tolerant of unknown / missing fields — older builds
 // can write the file with extra keys and newer builds preserve them

@@ -154,7 +154,6 @@
     "tab_shortcuts": "快速鍵",
     "tab_sources": "資料來源",
     "tab_agent": "Agent",
-    "tab_labs": "實驗中",
     "tab_security": "安全",
     "language_label": "語言",
     "language_help": "選擇 Spool 介面所使用的語言。",
@@ -199,7 +198,7 @@
     "about_section": "關於",
     "about_tagline": "Spool —— 一個本機的思維搜尋引擎。",
     "about_trademark": "Spool™ 是 TypeSafe Limited 的商標。",
-    "localData_footer": "所有資料本機保存在 ~/.spool/",
+    "about_feedback": "提供回饋",
     "shortcuts_group_global": "全域",
     "shortcuts_group_search": "搜尋",
     "shortcuts_group_session": "會話",
@@ -850,19 +849,5 @@
   },
   "palette": {
     "toggleOptions": "選項"
-  },
-  "labs": {
-    "intro": "早期功能。可能在發佈前變化或消失。",
-    "share": {
-      "title": "分享會話",
-      "description": "把會話導出成一張精緻的圖片、PDF 或 Markdown 文件，自帶隱私控制。",
-      "feedback": "告訴我們感受",
-      "disabled_toast": "分享已關閉。"
-    },
-    "security": {
-      "title": "安全掃描",
-      "description": "找出已索引工作階段裡的 API 金鑰、權杖和個人資訊，一鍵跳轉去輪換洩露的金鑰，並把敏感值從 Spool 的搜尋/AI 索引中清除。基於模式比對、純本機——你的原始工作階段檔案永不被改動。",
-      "feedback": "告訴我們感受"
-    }
   }
 }

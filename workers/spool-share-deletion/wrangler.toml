@@ -1,0 +1,48 @@
+# spool-share-deletion — the cron companion Worker for the share
+# backend. Pages Functions can't register cron triggers, so the
+# scheduled deletion sweep (account deletion + R2 orphan cleanup,
+# implemented in packages/share-backend/functions/_scheduled/
+# deletion-worker.ts) deploys as this standalone Worker sharing the
+# backend's D1 / KV / R2 resources.
+#
+# Unlike the Pages project (dashboard-bound), a plain Worker needs the
+# resource ids inline. The ids are NOT secrets, but we still keep prod
+# values out of the public repo: copy this file to wrangler.local.toml
+# (gitignored; the name must end in .toml or wrangler's --config parser
+# silently falls back to the default config), fill the TODOs from the
+# dashboard, and deploy with
+#   wrangler deploy --config wrangler.local.toml
+# Local end-to-end verification: see README.md next to this file.
+#
+# Bindings are the subset the sweep needs — no SESSIONS / RATE / NONCE.
+
+name = "spool-share-deletion"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+# Every 6 hours. The delete endpoint schedules with a 24h grace window,
+# so the sweep cadence only affects how promptly eligible rows drain.
+crons = ["0 */6 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spool-share-db"
+database_id = "TODO-fill-from-dashboard"
+
+[[kv_namespaces]]
+binding = "META"
+id = "TODO-fill-from-dashboard"
+
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "spool-snapshots"
+
+[[r2_buckets]]
+binding = "OG"
+bucket_name = "spool-og"
+
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "spool-avatars"

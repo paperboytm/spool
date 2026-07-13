@@ -160,7 +160,6 @@
     "tab_shortcuts": "Shortcuts",
     "tab_sources": "Sources",
     "tab_agent": "Agent",
-    "tab_labs": "Labs",
     "tab_security": "Security",
     "language_label": "Language",
     "language_help": "Choose the language used across Spool's interface.",
@@ -205,7 +204,7 @@
     "about_section": "About",
     "about_tagline": "Spool — a local search engine for your thinking.",
     "about_trademark": "Spool™ is a trademark of TypeSafe Limited.",
-    "localData_footer": "All data stays local in ~/.spool/",
+    "about_feedback": "Give feedback",
     "shortcuts_group_global": "Global",
     "shortcuts_group_search": "Search",
     "shortcuts_group_session": "Session",
@@ -892,19 +891,5 @@
   },
   "palette": {
     "toggleOptions": "Show options"
-  },
-  "labs": {
-    "intro": "Early features. May change or disappear before they ship.",
-    "share": {
-      "title": "Share sessions",
-      "description": "Export any session as a polished image, PDF, or Markdown file — with privacy controls.",
-      "feedback": "Tell us how it feels",
-      "disabled_toast": "Share is off."
-    },
-    "security": {
-      "title": "Security Scan",
-      "description": "Surface API keys, tokens, and personal data inside your indexed sessions, jump straight to rotate a leaked key, and purge values from Spool's search/AI index. Pattern-based, local-only — your original session files are never touched.",
-      "feedback": "Tell us how it feels"
-    }
   }
 }

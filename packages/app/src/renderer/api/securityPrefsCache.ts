@@ -1,7 +1,6 @@
 // Module-level cache for SecurityPreferences exposed via a
-// useSyncExternalStore hook. Mirrors the pattern in `featureFlags.ts`
-// (useFeature) — that's the React-18-blessed shape for "external,
-// non-React state that components read synchronously".
+// useSyncExternalStore hook — the React-18-blessed shape for
+// "external, non-React state that components read synchronously".
 //
 // Why a cache at all: every "Settings → Security" open used to mount
 // Toggle controls with a `?? false` fallback before the async

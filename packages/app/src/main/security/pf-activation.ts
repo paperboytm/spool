@@ -14,8 +14,7 @@
 export interface PfAutoActivateInput {
   /** Latest PF coordinator phase. */
   phase: string
-  /** Whether the Security feature is currently booted (worker + IPC up).
-   *  False once teardownSecurity has run. */
+  /** Whether the Security feature is currently booted (worker + IPC up). */
   securityBooted: boolean
   /** User asked to activate PF (set when they clicked Enable in the callout). */
   pfActivationPending: boolean

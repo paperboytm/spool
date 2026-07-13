@@ -154,7 +154,6 @@
     "tab_shortcuts": "ショートカット",
     "tab_sources": "データソース",
     "tab_agent": "Agent",
-    "tab_labs": "Labs",
     "tab_security": "セキュリティ",
     "language_label": "言語",
     "language_help": "Spool のインターフェースで使用する言語を選択します。",
@@ -199,7 +198,7 @@
     "about_section": "Spool について",
     "about_tagline": "Spool — あなたの思考のためのローカル検索エンジン。",
     "about_trademark": "Spool™ は TypeSafe Limited の商標です。",
-    "localData_footer": "すべてのデータは ~/.spool/ にローカル保存されます",
+    "about_feedback": "フィードバックを送る",
     "shortcuts_group_global": "グローバル",
     "shortcuts_group_search": "検索",
     "shortcuts_group_session": "セッション",
@@ -850,19 +849,5 @@
   },
   "palette": {
     "toggleOptions": "オプション"
-  },
-  "labs": {
-    "intro": "初期機能。リリース前に変更されたり、なくなることがあります。",
-    "share": {
-      "title": "セッションを共有",
-      "description": "セッションを洗練された画像・PDF・Markdown としてエクスポート。プライバシー設定も使えます。",
-      "feedback": "感想を教えてください",
-      "disabled_toast": "共有をオフにしました。"
-    },
-    "security": {
-      "title": "セキュリティスキャン",
-      "description": "インデックス済みセッション内の API キー・トークン・個人情報を可視化し、漏洩したキーのローテーション先へ直接ジャンプ、Spool の検索/AI インデックスから値をパージします。パターンベース・ローカルのみ — 元のセッションファイルには一切手を加えません。",
-      "feedback": "感想を教えてください"
-    }
   }
 }

@@ -34,7 +34,6 @@ import {
   type SensitiveKind,
 } from '@spool-lab/redact'
 import { securityApi } from '../api/security.js'
-import { useSecurityEnabled } from '../featureFlags.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
 import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
 import AllowlistManageModal from './security/AllowlistManageModal.js'
@@ -54,9 +53,8 @@ import { formatRelativeDate } from '../../shared/formatDate.js'
 
 interface Props {
   onOpenSession: (sessionUuid: string) => void
-  /** Optional share-draft starter; rendered as a menu item when share
-   *  feature is enabled. App.tsx wires this only when shareEnabled. */
-  onShareSession?: (sessionUuid: string) => void
+  /** Share-draft starter; rendered as a menu item. */
+  onShareSession: (sessionUuid: string) => void
   /** Open Settings panel pre-focused on the Security tab. Wired from
    *  App.tsx; used by the EmptyState "Detector settings" affordance so
    *  a clean archive isn't a dead end. */
@@ -66,15 +64,6 @@ interface Props {
 type Sess = SessionWithFindingCounts & { source: Session['source'] }
 
 export default function SecurityPage(props: Props) {
-  // Belt-and-suspenders gate at the wrapper so the inner component's
-  // hooks never run when the feature is off — keeping the conditional
-  // return ABOVE the hooks would violate Rules of Hooks the moment
-  // the flag becomes anything other than a build-time constant.
-  if (!useSecurityEnabled()) return null
-  return <SecurityPageGate {...props} />
-}
-
-function SecurityPageGate(props: Props) {
   const { t } = useTranslation()
   const readiness = useSecurityReadiness()
   if (!readiness.ready) {
@@ -840,7 +829,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                         activeKinds={activeKinds}
                         valuesHidden={valuesHidden}
                         onOpen={() => onOpenSession(s.sessionUuid)}
-                        {...(onShareSession ? { onShare: () => onShareSession(s.sessionUuid) } : {})}
+                        onShare={() => onShareSession(s.sessionUuid)}
                         onRefresh={refresh}
                       />
                     ))}
@@ -1253,7 +1242,7 @@ function SessionCard({
   activeKinds: readonly string[]
   valuesHidden: boolean
   onOpen: () => void
-  onShare?: () => void
+  onShare: () => void
   onRefresh: () => void
 }) {
   const { t } = useTranslation()

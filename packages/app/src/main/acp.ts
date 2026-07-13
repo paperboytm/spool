@@ -51,12 +51,6 @@ export interface AgentsConfig {
   defaultSearchSort?: 'relevance' | 'newest' | 'oldest'
   /** Preferred terminal app for session resume (e.g. "iTerm2", "Warp"). Auto-detected if unset. */
   terminal?: string
-  /** Opt-in to the experimental Security Scan feature (Labs). Undefined
-   *  = no choice yet (resolver falls back to DEV). Read by main at boot
-   *  to gate the scan worker, and by the renderer to gate every Security
-   *  surface. Only meaningful in a build compiled with
-   *  VITE_FEATURE_SECURITY=1 (otherwise the code is tree-shaken out). */
-  securityEnabled?: boolean
   /** Show colored source dots in sidebar project rows (default: true) */
   sidebarShowSourceDots?: boolean
   /** Show session count in sidebar project rows (default: true) */
@@ -217,29 +211,6 @@ function saveAgentsConfig(config: AgentsConfig): void {
   const dir = spoolHomeDir()
   mkdirSync(dir, { recursive: true })
   writeFileSync(AGENTS_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8')
-}
-
-/** Pure: if the config has no explicit `securityEnabled`, seed it to `true`.
- *  Returns the (possibly-mutated) config and whether the caller should
- *  persist. An explicit `false` is preserved — users who opted out stay
- *  opted out across upgrades. */
-export function applySecurityEnabledSeed(
-  input: AgentsConfig | null,
-): { changed: boolean; config: AgentsConfig } {
-  const config: AgentsConfig = input ? { ...input } : {}
-  if (config.securityEnabled === undefined) {
-    config.securityEnabled = true
-    return { changed: true, config }
-  }
-  return { changed: false, config }
-}
-
-/** Side-effectful boot hook: seed `securityEnabled: true` into agents.json
- *  on first launch of a security-capable build, so the feature is on by
- *  default without conflating "no opinion" with "ON" inside the resolver. */
-export function seedSecurityEnabledDefault(): void {
-  const { changed, config } = applySecurityEnabledSeed(loadAgentsConfig())
-  if (changed) saveAgentsConfig(config)
 }
 
 /** Merge builtin + custom agent configs */

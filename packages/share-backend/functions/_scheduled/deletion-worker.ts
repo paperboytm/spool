@@ -22,6 +22,18 @@ export type DeletionEnv = {
   AVATARS: R2Bucket
 }
 
+// Runtime mirror of DeletionEnv's keys. The companion Worker's
+// wrangler.toml must declare exactly these bindings; the deploy-shape
+// test compares the two so a binding added here (or renamed there)
+// fails CI instead of failing at 3am in the cron.
+export const DELETION_BINDING_NAMES = [
+  'DB',
+  'META',
+  'SNAPSHOTS',
+  'OG',
+  'AVATARS',
+] as const satisfies readonly (keyof DeletionEnv)[]
+
 // Bounded window for the R2 orphan sweep — long enough to catch a
 // waitUntil failure that the user wouldn't notice, short enough that the
 // per-cron workload stays predictable. Anything older is assumed already

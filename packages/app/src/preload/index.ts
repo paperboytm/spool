@@ -85,8 +85,6 @@ export interface AgentsConfig {
   defaultAgent?: string
   defaultSearchSort?: SearchSortOrder
   terminal?: string
-  /** Labs opt-in for the Security Scan feature. See main/acp.ts. */
-  securityEnabled?: boolean
   sidebarShowSourceDots?: boolean
   sidebarShowSessionCount?: boolean
   sidebarSortOrder?: SidebarSortOrder

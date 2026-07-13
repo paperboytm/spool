@@ -160,7 +160,6 @@
     "tab_shortcuts": "Raccourcis",
     "tab_sources": "Sources",
     "tab_agent": "Agent",
-    "tab_labs": "Labos",
     "tab_security": "Sécurité",
     "language_label": "Langue",
     "language_help": "Choisissez la langue utilisée dans l'interface de Spool.",
@@ -205,7 +204,7 @@
     "about_section": "À propos",
     "about_tagline": "Spool — un moteur de recherche local pour votre réflexion.",
     "about_trademark": "Spool™ est une marque de TypeSafe Limited.",
-    "localData_footer": "Toutes les données restent en local dans ~/.spool/",
+    "about_feedback": "Donner votre avis",
     "shortcuts_group_global": "Global",
     "shortcuts_group_search": "Recherche",
     "shortcuts_group_session": "Session",
@@ -892,19 +891,5 @@
   },
   "palette": {
     "toggleOptions": "Options"
-  },
-  "labs": {
-    "intro": "Fonctionnalités précoces. Peuvent évoluer ou disparaître avant la sortie.",
-    "share": {
-      "title": "Partager les sessions",
-      "description": "Exportez n'importe quelle session en image, PDF ou Markdown soigné — avec contrôles de confidentialité.",
-      "feedback": "Dites-nous ce que vous en pensez",
-      "disabled_toast": "Partage désactivé."
-    },
-    "security": {
-      "title": "Analyse de sécurité",
-      "description": "Repère les clés API, jetons et données personnelles dans vos sessions indexées, ouvre directement la page de rotation d'une clé fuitée et purge les valeurs de l'index de recherche/IA de Spool. Basé sur des motifs, 100 % local — vos fichiers de session d'origine ne sont jamais modifiés.",
-      "feedback": "Dites-nous ce que vous en pensez"
-    }
   }
 }

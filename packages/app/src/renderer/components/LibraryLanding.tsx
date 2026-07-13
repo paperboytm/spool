@@ -12,7 +12,7 @@ type Props = {
   onSelectProject: (identityKey: string) => void
   onOpenSession: (uuid: string) => void
   onCopySessionId: (source: Session['source']) => void
-  onShare?: (uuid: string) => void
+  onShare: (uuid: string) => void
 }
 
 type DateBucket = {
@@ -243,7 +243,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
           onPinChange={handlePinChange}
           onOpenSession={onOpenSession}
           onCopySessionId={onCopySessionId}
-          {...(onShare ? { onShare } : {})}
+          onShare={onShare}
           testId="library-landing-scroll"
         />
       )}

@@ -34,12 +34,10 @@ import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import type { LanguagePreference } from '../preload/index.js'
-import { useFeature, useSecurityEnabled } from './featureFlags.js'
-import { setSecurityEnabledConfig } from './api/securityEnabledCache.js'
 import { primeSecurityPrefsCache } from './api/securityPrefsCache.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'labs' | 'security'
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'security'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -59,8 +57,6 @@ interface RuntimeInfo {
 
 export default function App() {
   const { t } = useTranslation()
-  const shareEnabled = useFeature('share')
-  const securityEnabled = useSecurityEnabled()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [previewSuggestions, setPreviewSuggestions] = useState<SearchResult[]>([])
@@ -334,13 +330,10 @@ export default function App() {
   // Warm the SecurityPreferences cache at app boot so every Toggle in
   // Settings → Security renders with its persisted state from frame 1.
   // Without this, opening the tab cold would trigger a fetch on mount
-  // and the controls would pop in (or, before the toggle gate, flash
-  // off → on). When the feature flag is off the prime resolves to null
-  // and nothing renders — harmless.
+  // and the controls would pop in.
   useEffect(() => {
-    if (!securityEnabled) return
     void primeSecurityPrefsCache()
-  }, [securityEnabled])
+  }, [])
 
   // Restore the pre-editor sidebar state when the user leaves the
   // share editor — by Back button, by clicking into a sidebar
@@ -366,34 +359,9 @@ export default function App() {
   const showProjectView = activeProjectKey !== null && view === 'search' && !selectedSession && !query.trim()
   const showSearchResults = view === 'search' && !selectedSession && !!query.trim()
   const isHomeMode = homeMode && view === 'search' && !selectedSession && !showProjectView && !showSearchResults
-  const isSharesView = shareEnabled && view === 'shares'
-  // Mirrors `isSharesView`'s shareEnabled gate — defense in depth so
-  // a stale `view='security'` from persisted state (or a future
-  // deep link) can't surface the Security page when the feature
-  // flag is off in production.
-  const isSecurityView = securityEnabled && view === 'security'
-  const isShareEditorView = shareEnabled && view === 'share-editor'
-
-  // Bounce out of share-only views when the user disables the flag from
-  // Settings → Labs. Mirror the Back button's behaviour for the editor:
-  // return to wherever the user came from. /shares is a top-level entry
-  // with no remembered source, so it falls through to Library.
-  useEffect(() => {
-    if (shareEnabled) return
-    if (view !== 'shares' && view !== 'share-editor') return
-    setShareEditor(null)
-    const editorReturnsToShareSurface =
-      shareEditorReturnView === 'shares' || shareEditorReturnView === 'share-editor'
-    if (view === 'share-editor' && !editorReturnsToShareSurface) {
-      setView(shareEditorReturnView)
-    } else {
-      setSelectedSession(null)
-      setTargetMessageId(null)
-      setHomeMode(true)
-      setView('search')
-    }
-    toast(t('labs.share.disabled_toast'))
-  }, [shareEnabled, view, shareEditorReturnView, t])
+  const isSharesView = view === 'shares'
+  const isSecurityView = view === 'security'
+  const isShareEditorView = view === 'share-editor'
 
   useEffect(() => {
     loadThemeEditorState()
@@ -425,12 +393,6 @@ export default function App() {
     return () => window.clearTimeout(t)
   }, [themeEditor])
 
-  // The Security opt-in mirror is seeded once from disk at boot; after
-  // that the Labs toggle is its sole writer (optimistic). Re-seeding on
-  // every refreshAgents (which also fires on Settings close) would race
-  // a just-flipped toggle and clobber it with a stale disk read.
-  const securityConfigSeeded = useRef(false)
-
   // Load agents + config, apply configured default
   const refreshAgents = useCallback(() => {
     if (!window.spool?.getAiAgents) return
@@ -447,11 +409,6 @@ export default function App() {
       setPinnedSortOrder(config.pinnedSortOrder ?? DEFAULT_PINNED_SORT_ORDER)
       setProjectSortOrder(config.projectSortOrder ?? DEFAULT_PROJECT_SORT_ORDER)
       setLanguage(config.language ?? 'system')
-      // Seed the Security opt-in mirror once (see securityConfigSeeded).
-      if (!securityConfigSeeded.current) {
-        securityConfigSeeded.current = true
-        setSecurityEnabledConfig(config.securityEnabled)
-      }
       const defaultId = config.defaultAgent && ready.find(a => a.id === config.defaultAgent)
         ? config.defaultAgent
         : ready[0]?.id
@@ -835,16 +792,14 @@ export default function App() {
         setView('search')
         setQuery('')
       }}
-      {...(shareEnabled ? {
-        onSelectShares: () => {
-          setActiveProjectKey(null)
-          setHomeMode(false)
-          setSelectedSession(null)
-          setTargetMessageId(null)
-          setView('shares')
-          setQuery('')
-        },
-      } : {})}
+      onSelectShares={() => {
+        setActiveProjectKey(null)
+        setHomeMode(false)
+        setSelectedSession(null)
+        setTargetMessageId(null)
+        setView('shares')
+        setQuery('')
+      }}
       isSharesActive={isSharesView}
       onSelectSecurity={() => {
         setSelectedSession(null)
@@ -866,7 +821,7 @@ export default function App() {
       pinnedSortOrder={pinnedSortOrder}
       onPinnedSortOrderChange={handlePinnedSortChange}
       onCopySessionId={handleCopySessionId}
-      {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+      onShareSession={handleStartShareFromUuid}
       {...(!trafficLightInset ? {
         sidebarToggle: {
           collapsed: sidebarCollapsed,
@@ -961,14 +916,14 @@ export default function App() {
           <SharesPage
             onOpenDraft={handleOpenDraft}
             onOpenDraftById={handleOpenDraftById}
-            {...(shareEnabled ? { onImportSpool: handleImportSpoolFile } : {})}
-            {...(shareEnabled ? { onStartNewDraft: handleStartShareFromUuid } : {})}
+            onImportSpool={handleImportSpoolFile}
+            onStartNewDraft={handleStartShareFromUuid}
           />
         ) : isSecurityView ? (
           <SecurityPage
             onOpenSession={handleOpenSession}
             onOpenSettings={() => { setSettingsTab('security'); setShowSettings(true) }}
-            {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+            onShareSession={handleStartShareFromUuid}
           />
         ) : isHomeMode ? (
           <LibraryLanding
@@ -982,7 +937,7 @@ export default function App() {
             }}
             onOpenSession={handleOpenSession}
             onCopySessionId={handleCopySessionId}
-            {...(shareEnabled ? { onShare: handleStartShareFromUuid } : {})}
+            onShare={handleStartShareFromUuid}
           />
         ) : (
           <>
@@ -1025,9 +980,7 @@ export default function App() {
                   targetMessageId={targetMessageId}
                   onCopySessionId={handleCopySessionId}
                   onBack={handleBack}
-                  {...(shareEnabled ? {
-                    onShare: handleStartShareFromSession,
-                  } : {})}
+                  onShare={handleStartShareFromSession}
                 />
               ) : showProjectView && activeProjectKey ? (
                 <ProjectView
@@ -1036,7 +989,7 @@ export default function App() {
                   onSortOrderChange={handleProjectSortChange}
                   onOpenSession={handleOpenSession}
                   onCopySessionId={handleCopySessionId}
-                  {...(shareEnabled ? { onShare: handleStartShareFromUuid } : {})}
+                  onShare={handleStartShareFromUuid}
                 />
               ) : (
                 <div className="h-full flex flex-col overflow-hidden">
@@ -1081,7 +1034,7 @@ export default function App() {
                         onOpenSession={handleOpenSession}
                         defaultSortOrder={defaultSearchSort}
                         onCopySessionId={handleCopySessionId}
-                        {...(shareEnabled ? { onShareSession: handleStartShareFromUuid } : {})}
+                        onShareSession={handleStartShareFromUuid}
                       />
                     </div>
                   )}

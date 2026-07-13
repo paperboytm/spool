@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { MessageSquare } from 'lucide-react'
 import type { AgentInfo, AgentsConfig, LanguagePreference } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
@@ -9,14 +10,17 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 import Menu from './Menu.js'
 import ShortcutsTab from './ShortcutsTab.js'
 import SecurityPane from './Settings/SecurityPane.js'
-import { useSecurityEnabled, useSharePublish } from '../featureFlags.js'
-import LabsTab from './LabsTab.js'
+import { useSharePublish } from '../featureFlags.js'
 import SettingsAccount from './SettingsAccount.js'
 import Toggle from './Toggle.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'labs' | 'security'
+// Permanent Discord invite (same one used in README / CONTRIBUTING /
+// landing). Auto-joins the user to the server on click.
+const FEEDBACK_URL = 'https://discord.gg/aqeDxQUs5E'
+
+type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'security'
 
 /** Must match SUPPORTED_TERMINALS in main/terminal.ts */
 const TERMINAL_VALUES = ['', 'Terminal', 'iTerm2', 'Warp', 'Ghostty', 'kitty', 'Alacritty', 'WezTerm'] as const
@@ -48,6 +52,19 @@ const TAB_DEFS: {
   fallbackLabel?: string
   icon: ReactNode
 }[] = [
+  // Account leads the rail; it stays hidden while the `sharePublish`
+  // flag is off (see visibleTabs), so flag-off builds start at General.
+  {
+    id: 'account',
+    labelKey: 'settings.tab_account',
+    fallbackLabel: 'Account',
+    icon: (
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    ),
+  },
   {
     id: 'general',
     labelKey: 'settings.tab_general',
@@ -108,17 +125,6 @@ const TAB_DEFS: {
     ),
   },
   {
-    id: 'labs',
-    labelKey: 'settings.tab_labs',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2v6a2 2 0 00.245.96l5.51 10.08A2 2 0 0118 22H6a2 2 0 01-1.755-2.96l5.51-10.08A2 2 0 0010 8V2"/>
-        <path d="M6.453 15h11.094"/>
-        <path d="M8.5 2h7"/>
-      </svg>
-    ),
-  },
-  {
     id: 'security',
     labelKey: 'settings.tab_security',
     icon: (
@@ -126,21 +132,6 @@ const TAB_DEFS: {
         <path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4z"/>
         <path d="M12 8v4"/>
         <path d="M12 16h.01"/>
-      </svg>
-    ),
-  },
-  // Account is pinned to the bottom of the rail (after feature tabs) so
-  // toggling the `sharePublish` flag — which conditionally hides this
-  // row — doesn't shift Labs/Security up and down. Matches the GitHub
-  // and Slack settings convention: identity sits below configuration.
-  {
-    id: 'account',
-    labelKey: 'settings.tab_account',
-    fallbackLabel: 'Account',
-    icon: (
-      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-        <circle cx="12" cy="7" r="4"/>
       </svg>
     ),
   },
@@ -162,14 +153,12 @@ export default function SettingsPanel({
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const { t } = useTranslation()
-  const securityEnabled = useSecurityEnabled()
   // Account tab is the spool.pro identity surface (sign-in, handle,
   // delete-account schedule). Sub-gated behind the share-publish flag
   // so the tab doesn't appear in pre-launch dev builds that don't
   // opt into the publish stack.
   const publishEnabled = useSharePublish()
   const visibleTabs = TAB_DEFS.filter(def => {
-    if (def.id === 'security' && !securityEnabled) return false
     if (def.id === 'account' && !publishEnabled) return false
     return true
   })
@@ -188,7 +177,7 @@ export default function SettingsPanel({
       <div className="w-[960px] h-[680px] max-w-[calc(100vw-48px)] max-h-[calc(100vh-48px)] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border rounded-[10px] shadow-xl overflow-hidden flex">
         {/* Sidebar — width + paddings tuned to match the desktop handoff
             (220px rail, 22px vertical padding, 14px horizontal). */}
-        <div className="w-[220px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-[22px] pb-3">
+        <div data-testid="settings-sidebar" className="w-[220px] flex-none bg-warm-surface dark:bg-dark-surface border-r border-warm-border dark:border-dark-border flex flex-col pt-[22px] pb-3">
           <div className="px-[14px] mb-[18px]">
             <h2 className="text-[22px] font-bold text-warm-text dark:text-dark-text leading-none">{t('settings.title')}</h2>
           </div>
@@ -197,6 +186,7 @@ export default function SettingsPanel({
               <button
                 key={def.id}
                 type="button"
+                data-testid={`settings-tab-${def.id}`}
                 aria-pressed={activeTab === def.id}
                 onClick={() => setTab(def.id)}
                 className={`flex w-full items-center gap-[11px] rounded-lg h-9 px-3 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:ring-offset-0 ${
@@ -212,8 +202,6 @@ export default function SettingsPanel({
               </button>
             ))}
           </div>
-          <div className="flex-1" />
-          <FooterPath text={t('settings.localData_footer')} />
         </div>
 
         {/* Content */}
@@ -255,8 +243,7 @@ export default function SettingsPanel({
             {activeTab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
             {activeTab === 'agent' && <AgentTab />}
             {activeTab === 'account' && <SettingsAccount />}
-            {activeTab === 'labs' && <LabsTab />}
-            {activeTab === 'security' && securityEnabled && <SecurityPane />}
+            {activeTab === 'security' && <SecurityPane />}
           </div>
         </div>
       </div>
@@ -393,6 +380,16 @@ function GeneralTab({
         <p className="text-[11px] text-warm-faint dark:text-dark-faint mt-1">
           {t('settings.about_trademark')}
         </p>
+        <a
+          href={FEEDBACK_URL}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="settings-feedback-link"
+          className="mt-3 inline-flex items-center gap-2 text-[12px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        >
+          <MessageSquare size={12} strokeWidth={1.5} aria-hidden />
+          {t('settings.about_feedback')}
+        </a>
       </Section>
     </div>
   )
@@ -632,19 +629,6 @@ function SmallSelect({ value, onChange, options }: { value: string; onChange: (v
         </button>
       )}
     />
-  )
-}
-
-function FooterPath({ text }: { text: string }) {
-  const path = '~/.spool/'
-  const idx = text.indexOf(path)
-  const lead = idx >= 0 ? text.slice(0, idx).replace(/[\s,，:：]+$/, '').trim() : text
-  const trail = idx >= 0 ? text.slice(idx + path.length).trim() : ''
-  return (
-    <div className="px-4 py-2 text-[11px] leading-snug text-warm-faint dark:text-dark-muted">
-      <span className="block">{lead}{trail ? ` ${trail}` : ''}</span>
-      {idx >= 0 && <span className="block mt-0.5 font-mono">{path}</span>}
-    </div>
   )
 }
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
 import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, PanelLeft } from 'lucide-react'
-import { useSecurityEnabled } from '../featureFlags.js'
 import { useTranslation } from 'react-i18next'
 import PinIcon from './PinIcon.js'
 import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
@@ -25,9 +24,9 @@ type Props = {
   onSelectSession?: (sessionUuid: string) => void
   onSelectHome?: () => void
   isLibraryActive?: boolean
-  onSelectShares?: () => void
+  onSelectShares: () => void
   isSharesActive?: boolean
-  onSelectSecurity?: () => void
+  onSelectSecurity: () => void
   isSecurityActive?: boolean
   onOpenSearch?: () => void
   syncStatus?: { phase: string; count: number; total: number } | null
@@ -40,7 +39,7 @@ type Props = {
   pinnedSortOrder?: PinnedSortOrder
   onPinnedSortOrderChange?: (next: PinnedSortOrder) => void
   onCopySessionId?: (source: SessionSource) => void
-  onShareSession?: (uuid: string) => void
+  onShareSession: (uuid: string) => void
   sidebarToggle?: {
     collapsed: boolean
     onToggle: () => void
@@ -50,7 +49,6 @@ type Props = {
 
 export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession, sidebarToggle, chromeOnly = false }: Props) {
   const { t } = useTranslation()
-  const securityEnabled = useSecurityEnabled()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
     switch (value) {
       case 'recent': return t('sidebar.sort_recent')
@@ -147,24 +145,20 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
             onClick={onSelectHome}
           />
         )}
-        {onSelectSecurity && securityEnabled && (
-          <NavRow
-            testId="sidebar-security"
-            icon={<SecurityIcon size={14} strokeWidth={1.75} />}
-            label={t('sidebar.security')}
-            active={isSecurityActive}
-            onClick={onSelectSecurity}
-          />
-        )}
-        {onSelectShares && (
-          <NavRow
-            testId="sidebar-shares"
-            icon={<SharesIcon size={14} strokeWidth={1.75} />}
-            label={t('sidebar.shares')}
-            active={isSharesActive}
-            onClick={onSelectShares}
-          />
-        )}
+        <NavRow
+          testId="sidebar-security"
+          icon={<SecurityIcon size={14} strokeWidth={1.75} />}
+          label={t('sidebar.security')}
+          active={isSecurityActive}
+          onClick={onSelectSecurity}
+        />
+        <NavRow
+          testId="sidebar-shares"
+          icon={<SharesIcon size={14} strokeWidth={1.75} />}
+          label={t('sidebar.shares')}
+          active={isSharesActive}
+          onClick={onSelectShares}
+        />
         {onOpenSearch && (
           <NavRow
             testId="sidebar-search"
@@ -222,7 +216,7 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
                   active={session.sessionUuid === activeSessionUuid}
                   onClick={() => onSelectSession(session.sessionUuid)}
                   {...(onCopySessionId ? { onCopySessionId } : {})}
-                  {...(onShareSession ? { onShare: onShareSession } : {})}
+                  onShare={onShareSession}
                 />
               ))}
             </div>
@@ -666,7 +660,7 @@ function PinnedRow({
   active: boolean
   onClick: () => void
   onCopySessionId?: (source: SessionSource) => void
-  onShare?: (uuid: string) => void
+  onShare: (uuid: string) => void
 }) {
   const { t } = useTranslation()
   const [resuming, setResuming] = useState(false)

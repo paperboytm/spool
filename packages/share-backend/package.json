@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler pages dev ./public --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG --r2 AVATARS",
-    "deploy:staging": "wrangler pages deploy public --project-name spool-share-staging",
-    "deploy:prod": "wrangler pages deploy public --project-name spool-share",
+    "deploy:staging": "wrangler pages deploy public --project-name spool-share-backend-staging",
+    "deploy:prod": "wrangler pages deploy public --project-name spool-share-backend",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local",
-    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db --env staging",
-    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --env production"
+    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db-staging --remote",
+    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --remote"
   },
   "dependencies": {
     "workers-og": "^0.0.27",
