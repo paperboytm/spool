@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { MessageSquare } from 'lucide-react'
 import type { AgentInfo, AgentsConfig, LanguagePreference } from '../../preload/index.js'
 import { DEFAULT_SEARCH_SORT_ORDER, SEARCH_SORT_OPTIONS, type SearchSortOrder } from '../../shared/searchSort.js'
 import type { ThemeEditorStateV1 } from '../theme/editorTypes.js'
@@ -14,6 +15,10 @@ import SettingsAccount from './SettingsAccount.js'
 import Toggle from './Toggle.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────
+
+// Permanent Discord invite (same one used in README / CONTRIBUTING /
+// landing). Auto-joins the user to the server on click.
+const FEEDBACK_URL = 'https://discord.gg/aqeDxQUs5E'
 
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'account' | 'security'
 
@@ -375,6 +380,16 @@ function GeneralTab({
         <p className="text-[11px] text-warm-faint dark:text-dark-faint mt-1">
           {t('settings.about_trademark')}
         </p>
+        <a
+          href={FEEDBACK_URL}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="settings-feedback-link"
+          className="mt-3 inline-flex items-center gap-2 text-[12px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        >
+          <MessageSquare size={12} strokeWidth={1.5} aria-hidden />
+          {t('settings.about_feedback')}
+        </a>
       </Section>
     </div>
   )

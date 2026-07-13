@@ -53,6 +53,22 @@ test('Share and Security ship on: sidebar entries present, no Labs tab', async (
   await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
 })
 
+test('General → About keeps the feedback link after the Labs tab removal', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="settings-button"]').click()
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeVisible()
+
+  const link = window.locator('[data-testid="settings-feedback-link"]')
+  await expect(link).toBeVisible()
+  await expect(link).toHaveAttribute('href', /discord\.com|discord\.gg/)
+  await expect(link).toHaveAttribute('target', '_blank')
+
+  await window.keyboard.press('Escape')
+  await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
+})
+
 test('Account leads the settings rail; the local-data footer is gone', async () => {
   const { window } = ctx
   await waitForSync(window)
