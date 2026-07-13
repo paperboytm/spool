@@ -99,7 +99,7 @@ function printHuman(results: CheckResult[], verbose: boolean): void {
   for (const category of CATEGORY_ORDER) {
     const rows = results.filter(r => r.category === category)
     if (rows.length === 0) continue
-    console.log(c('bold', CATEGORY_LABEL[category]))
+    console.log(c('bold', CATEGORY_LABEL[category] ?? category))
     for (const r of rows) {
       const icon = c(r.severity, ICONS[r.severity])
       console.log(`  ${icon} ${r.title.padEnd(32)} ${r.message}`)
