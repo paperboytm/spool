@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { ProjectGroup } from '@spool-lab/core'
+import type { ProjectGroupWithPaths } from '@spool-lab/core'
 import { resolveProjectQuery } from './projects.js'
 
-function group(displayName: string, identityKey: string): ProjectGroup {
+function group(displayName: string, identityKey: string): ProjectGroupWithPaths {
   return {
     identityKind: 'path',
     identityKey,
@@ -15,7 +15,7 @@ function group(displayName: string, identityKey: string): ProjectGroup {
   }
 }
 
-const groups: ProjectGroup[] = [
+const groups: ProjectGroupWithPaths[] = [
   group('spool', 'github.com/spool-lab/spool'),
   group('spool-daemon', 'github.com/spool-lab/spool-daemon'),
   group('quilt', 'github.com/graydawnc/quilt'),
@@ -76,6 +76,19 @@ describe('resolveProjectQuery', () => {
     if (res.kind === 'ambiguous') {
       expect(res.groups).toEqual([service, worker])
     }
+  })
+
+  it('an exact project-path basename preempts a previously-unique name substring match', () => {
+    // Before the basename tier existed, "api" resolved uniquely to
+    // gateway-api-service by name substring. A project whose directory is
+    // literally named "api" now wins — pin that flip so it stays deliberate.
+    const gateway = group('gateway-api-service', 'github.com/acme/gateway-api-service')
+    const apiDir = {
+      ...group('backend', 'github.com/acme/backend'),
+      displayPaths: ['/Users/me/api'],
+    }
+
+    expect(resolveProjectQuery([gateway, apiDir], 'api')).toEqual({ kind: 'match', group: apiDir })
   })
 
   it('prefers exact identity basename matches over display name substrings', () => {

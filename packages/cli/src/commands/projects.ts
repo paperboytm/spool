@@ -1,11 +1,11 @@
 import { Command } from 'commander'
 import { getDB, listProjectGroups, listSessionsByIdentity } from '@spool-lab/core'
-import type { ProjectGroup } from '@spool-lab/core'
+import type { ProjectGroup, ProjectGroupWithPaths } from '@spool-lab/core'
 import { formatDate, printSession } from '../format.js'
 
 export type ProjectResolution =
-  | { kind: 'match'; group: ProjectGroup }
-  | { kind: 'ambiguous'; groups: ProjectGroup[] }
+  | { kind: 'match'; group: ProjectGroupWithPaths }
+  | { kind: 'ambiguous'; groups: ProjectGroupWithPaths[] }
   | { kind: 'none' }
 
 /**
@@ -18,7 +18,7 @@ export type ProjectResolution =
  * Otherwise fall back to substring matching by field priority, reporting
  * ambiguity when more than one group matches at the winning priority.
  */
-export function resolveProjectQuery(groups: ProjectGroup[], query: string): ProjectResolution {
+export function resolveProjectQuery(groups: ProjectGroupWithPaths[], query: string): ProjectResolution {
   const q = query.toLowerCase()
 
   const exact = groups.filter(g => allSearchableProjectFields(g).some(v => v === q))
@@ -35,7 +35,7 @@ export function resolveProjectQuery(groups: ProjectGroup[], query: string): Proj
   return { kind: 'none' }
 }
 
-function allSearchableProjectFields(group: ProjectGroup): string[] {
+function allSearchableProjectFields(group: ProjectGroupWithPaths): string[] {
   return [
     group.displayName,
     group.identityKey,
@@ -44,7 +44,7 @@ function allSearchableProjectFields(group: ProjectGroup): string[] {
   ].map(v => v.toLowerCase())
 }
 
-function basenameSearchableProjectFields(group: ProjectGroup): string[] {
+function basenameSearchableProjectFields(group: ProjectGroupWithPaths): string[] {
   return [
     group.identityKey,
     ...group.displayPaths,
@@ -57,13 +57,13 @@ function basename(value: string): string {
   return idx >= 0 ? normalized.slice(idx + 1) : normalized
 }
 
-const partialSearchableProjectFieldTiers: Array<(group: ProjectGroup) => string[]> = [
+const partialSearchableProjectFieldTiers: Array<(group: ProjectGroupWithPaths) => string[]> = [
   group => [group.displayName, group.identityKey].map(v => v.toLowerCase()),
   group => group.displayPaths.map(v => v.toLowerCase()),
   group => group.cwds.map(v => v.toLowerCase()),
 ]
 
-function pick(matches: ProjectGroup[]): ProjectResolution {
+function pick(matches: ProjectGroupWithPaths[]): ProjectResolution {
   const [first, ...rest] = matches
   if (first && rest.length === 0) return { kind: 'match', group: first }
   return { kind: 'ambiguous', groups: matches }
@@ -76,14 +76,13 @@ export const projectsCommand = new Command('projects')
   .option('--json', 'Output as JSON')
   .action((query: string | undefined, opts: { limit: string; json?: boolean }) => {
     const db = getDB(true)
-    const groups = listProjectGroups(db)
 
     if (!query) {
-      listGroups(groups, opts.json === true)
+      listGroups(listProjectGroups(db), opts.json === true)
       return
     }
 
-    const resolved = resolveProjectQuery(groups, query)
+    const resolved = resolveProjectQuery(listProjectGroups(db, { withPaths: true }), query)
     if (resolved.kind === 'none') {
       console.error(`No project matching: ${query}`)
       process.exit(1)

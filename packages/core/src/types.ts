@@ -85,11 +85,17 @@ export interface ProjectGroup {
   identityKind: ProjectIdentityKind
   identityKey: string
   displayName: string
-  displayPaths: string[]
-  cwds: string[]
   sources: SessionSource[]          // unique sources contributing
   sessionCount: number
   lastSessionAt: string | null
+}
+
+// Filesystem paths stay out of the base type so app IPC payloads don't carry
+// every distinct cwd on each sidebar refetch; only the CLI query resolver
+// needs them (listProjectGroups with { withPaths: true }).
+export interface ProjectGroupWithPaths extends ProjectGroup {
+  displayPaths: string[]            // distinct project display_path values
+  cwds: string[]                    // distinct session cwd values
 }
 
 export interface Message {
