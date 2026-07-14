@@ -35,7 +35,7 @@
     "@opentelemetry/sdk-trace-node": "^2.7.1",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "@spool-lab/redact": "workspace:*",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.10.0",
     "effect": "^3.21.2"
   },
   "devDependencies": {
