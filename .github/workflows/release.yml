@@ -26,9 +26,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app (arm64 DMG + ZIP)
-        run: |
-          pnpm build
-          pnpm --filter @spool/app package:mac
+        run: pnpm run package:mac
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -78,9 +76,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build app (AppImage + tar.gz)
-        run: |
-          pnpm build
-          pnpm --filter @spool/app package:linux
+        run: pnpm run package:linux
 
       - name: Get version
         id: version

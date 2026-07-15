@@ -94,7 +94,8 @@ Build + signing happen in GitHub Actions (see `.github/workflows/release.yml`) s
 releases are never tied to a local developer certificate. The script blocks
 until CI finishes; artifacts appear on the release page when it returns.
 
-To test a local build without cutting a release, use `pnpm --filter @spool/app build:mac`.
+To test a local build without cutting a release, use `pnpm run package:mac` (or
+`pnpm dev:install:mac` to build and install straight into /Applications).
 
 ## License
 

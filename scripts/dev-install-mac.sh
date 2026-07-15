@@ -17,8 +17,8 @@ BUILT="packages/app/dist/mac-arm64/${APP_NAME}.app"
 echo "==> Quitting running ${APP_NAME}…"
 osascript -e "quit app \"${APP_NAME}\"" 2>/dev/null || true
 
-echo "==> Building (pnpm -F @spool/app build:mac)…"
-pnpm -F @spool/app build:mac
+echo "==> Building (pnpm run package:mac)…"
+pnpm run package:mac
 
 [[ -d "$BUILT" ]] || { echo "dev-install-mac: build output not found at $BUILT"; exit 1; }
 
