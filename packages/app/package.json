@@ -51,7 +51,7 @@
     "electron-updater": "^6.8.3",
     "fast-check": "^3.23.2",
     "file-uri-to-path": "^2.0.0",
-    "i18next": "^25.10.10",
+    "i18next": "^26.3.6",
     "lucide-react": "^1.8.0",
     "mdast-util-to-string": "^4",
     "pure-rand": "^6.1.0",
