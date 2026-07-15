@@ -14,7 +14,7 @@
     "clean": "rm -rf dist .void node_modules/.vite"
   },
   "dependencies": {
-    "hono": "^4.12.14",
+    "hono": "^4.12.30",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
