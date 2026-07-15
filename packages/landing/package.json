@@ -25,7 +25,7 @@
     "@void/md": "^0.7.2",
     "@void/react": "^0.7.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
-    "vite-plus": "^0.1.18",
+    "vite-plus": "^0.2.4",
     "void": "^0.7.2"
   }
 }
