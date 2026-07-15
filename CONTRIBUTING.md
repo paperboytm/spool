@@ -13,14 +13,17 @@ pnpm dev
 
 ## Native module runtimes
 
-`better-sqlite3` is used from both Node-based tests and the Electron app. Rebuild it for the runtime you are about to use:
+`better-sqlite3` is used from both Node-based tests and the Electron app, and the workspace keeps a single copy that must match the runtime in use. The scripts manage the switching for you:
+
+- `pnpm test` (and `pnpm check`) rebuild for Node first via the root `pretest`.
+- `pnpm dev`, `pnpm test:e2e`, and the `package:*` scripts run through `scripts/with-electron-native.mjs`, which flips the binary to the Electron ABI for the wrapped command and restores the Node ABI afterwards.
+
+An interrupted run (Ctrl-C skips the restore) can leave the wrong ABI behind. If you hit a `NODE_MODULE_VERSION` mismatch, rebuild manually for the runtime you are about to use:
 
 ```bash
 pnpm run rebuild:native:node      # Node / vitest / core tests
 pnpm run rebuild:native:electron  # Electron app / Playwright e2e
 ```
-
-If you hit a `NODE_MODULE_VERSION` mismatch, rerun the matching rebuild command and try again.
 
 ## Installing a local build (macOS)
 
@@ -94,8 +97,28 @@ in `~/.spool-dev/` as usual.
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes
-3. Run `pnpm test` to make sure nothing is broken
+3. Run `pnpm check` to make sure nothing is broken
 4. Open a pull request
+
+## Verifying changes
+
+Run the checks for the surface you touched; before merging anything substantial, run the full matrix:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm check                          # typecheck + lint + unit tests
+pnpm --filter @spool/app test:e2e   # Playwright, needs a desktop session
+```
+
+For desktop packaging changes, also verify the packaged app — never remove a packaged asset based on import search alone; dynamic loading hides from grep:
+
+```bash
+pnpm run package:mac                # build + electron-builder (arm64)
+codesign --verify --deep --strict --verbose=2 \
+  packages/app/dist/mac-arm64/Spool.app
+node packages/app/scripts/smoke-packaged.mjs packages/app/dist/mac-arm64/Spool.app
+node packages/app/scripts/package-size-report.mjs packages/app/dist/mac-arm64/Spool.app
+```
 
 ## What to work on
 
@@ -105,7 +128,7 @@ in `~/.spool-dev/` as usual.
 
 ## Style
 
-- No linter config yet — just match the surrounding code style
+- `pnpm lint` runs oxlint (config in `.oxlintrc.json`); beyond that, match the surrounding code style
 - Commit messages: `feat:`, `fix:`, `docs:`, `ci:`, `refactor:`
 
 ## Community
