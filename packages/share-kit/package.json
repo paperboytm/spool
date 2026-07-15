@@ -47,7 +47,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@typescript/typescript6": "6.0.2",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "lucide-react": "^0.460.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
