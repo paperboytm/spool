@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["VITE_FEATURE_SECURITY", "VITE_FEATURE_SHARE", "VITE_FEATURE_SHAREPUBLISH"],
+      "env": ["VITE_FEATURE_SHAREPUBLISH"],
       "outputs": ["out/**"]
     }
   }
