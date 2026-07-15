@@ -15,10 +15,10 @@ pnpm dev
 
 `better-sqlite3` is used from both Node-based tests and the Electron app, and the workspace keeps a single copy that must match the runtime in use. The scripts manage the switching for you:
 
-- `pnpm test` (and `pnpm check`) rebuild for Node first via the root `pretest`.
+- `pnpm test` (and `pnpm check`) verifies the Node ABI via the root `pretest` and rebuilds only when it does not match.
 - `pnpm dev`, `pnpm test:e2e`, and the `package:*` scripts run through `scripts/with-electron-native.mjs`, which flips the binary to the Electron ABI for the wrapped command and restores the Node ABI afterwards.
 
-An interrupted run (Ctrl-C skips the restore) can leave the wrong ABI behind. If you hit a `NODE_MODULE_VERSION` mismatch, rebuild manually for the runtime you are about to use:
+The wrapper forwards interruption signals to the active child and restores the Node ABI before it exits. If a hard kill or machine shutdown interrupts that restoration and you hit a `NODE_MODULE_VERSION` mismatch, rebuild manually for the runtime you are about to use:
 
 ```bash
 pnpm run rebuild:native:node      # Node / vitest / core tests

@@ -38,8 +38,6 @@
 
 ## Known follow-ups
 
-Tracked in the PR descriptions: #415 — Ctrl-C skips the wrapper's ABI
-restore; unconditional `pretest` rebuild costs ~1 min per run. #416 —
-diacritic-folded FTS hits can render an unhighlighted snippet. #417 —
-truncated-title mask residue; a re-mask migration for pre-#417 purges;
-bulk-purge throughput at #344 scale.
+Tracked in the PR descriptions: #416 — diacritic-folded FTS hits can render
+an unhighlighted snippet. #417 — truncated-title mask residue; a re-mask
+migration for pre-#417 purges; bulk-purge throughput at #344 scale.
