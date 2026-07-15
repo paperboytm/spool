@@ -15,7 +15,7 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/geist": "^5.2.9",
     "@fontsource/geist-mono": "^5.2.7",
     "@spool/share-kit": "workspace:*",
     "lucide-react": "^0.460.0",
