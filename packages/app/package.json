@@ -54,7 +54,7 @@
     "i18next": "^25.10.10",
     "lucide-react": "^1.8.0",
     "mdast-util-to-string": "^4",
-    "pure-rand": "^6.1.0",
+    "pure-rand": "^8.4.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^16.6.6",
