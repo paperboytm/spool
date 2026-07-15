@@ -50,6 +50,10 @@ export function selectFtsTableKind(query: string): FtsTableKind {
   return CJK_SEARCH_CHAR.test(query) ? 'trigram' : 'unicode'
 }
 
+export function containsCjk(value: string): boolean {
+  return CJK_SEARCH_CHAR.test(value)
+}
+
 export function shouldUseSessionFallback(query: string): boolean {
   const terms = getNaturalSearchTerms(query)
   if (terms.length < 2) return false
@@ -64,9 +68,18 @@ export function canUseSessionSearchFts(query: string): boolean {
 
 export function buildPreviewFtsPlan(query: string): PreviewFtsPlan | null {
   const terms = getNaturalSearchTerms(query)
-  if (terms.length === 0 || terms.some(containsShortCjkTerm)) return null
+  if (terms.length === 0) return null
 
   const tableKind = selectFtsTableKind(query)
+  // Plan terms are ANDed, so a single unmatchable term zeroes out the whole
+  // preview. Trigram phrases never match below 3 codepoints (`错误码 42`),
+  // and unicode61 tokenizes punctuation-only terms to an empty phrase
+  // (`foo =>`). Either shape falls back to the LIKE scan.
+  const unmatchable = tableKind === 'trigram'
+    ? (term: string) => Array.from(term).length < 3
+    : (term: string) => !/[\p{L}\p{N}]/u.test(term)
+  if (terms.some(unmatchable)) return null
+
   const ftsTerms = tableKind === 'unicode'
     ? terms.map(term => `${quoteFtsTerm(term)}*`)
     : terms.map(quoteFtsTerm)

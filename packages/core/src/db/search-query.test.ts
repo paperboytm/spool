@@ -55,6 +55,25 @@ describe('buildFtsQuery', () => {
     })
     expect(buildPreviewFtsPlan('查看 42')).toBeNull()
   })
+
+  it('falls back to LIKE when a trigram plan would carry a sub-trigram term', () => {
+    // Trigram phrases never match below 3 codepoints and plan terms are
+    // ANDed, so one short term would zero out the whole preview.
+    expect(buildPreviewFtsPlan('错误码 42')).toBeNull()
+    expect(buildPreviewFtsPlan('迁移记录 v2')).toBeNull()
+    expect(buildPreviewFtsPlan('错误码 日志文件')).toEqual({
+      tableKind: 'trigram',
+      query: '"错误码" AND "日志文件"',
+      anyTermQuery: '"错误码" OR "日志文件"',
+    })
+  })
+
+  it('falls back to LIKE when a term has no unicode61 tokens', () => {
+    // `=>` tokenizes to nothing under unicode61; the resulting empty phrase
+    // matches no rows and would AND-away every other term.
+    expect(buildPreviewFtsPlan('foo =>')).toBeNull()
+    expect(buildPreviewFtsPlan('null ??')).toBeNull()
+  })
 })
 
 describe('buildLikeSnippet', () => {
@@ -143,9 +162,47 @@ describe('searchFragments', () => {
 })
 
 describe('searchSessionPreview', () => {
-  it('does not scan for one-character queries', () => {
+  it('does not scan for one-character ascii queries', () => {
     const db = createSearchTestDb()
     expect(searchSessionPreview(db, '4')).toEqual([])
+  })
+
+  it('serves single CJK character queries through the LIKE fallback', () => {
+    // A single Han character is a meaningful query; before the FTS preview
+    // landed these went through the LIKE scan and must keep working.
+    const db = createSearchTestDb()
+    const results = searchSessionPreview(db, '查', { limit: 5 })
+    expect(results.length).toBeGreaterThan(0)
+  })
+
+  it('finds sessions when a CJK query carries a short latin or digit term', () => {
+    const db = createSearchTestDb()
+    insertSession(db, {
+      id: 6,
+      uuid: 'session-error-42',
+      filePath: '/tmp/test-project/error-42.jsonl',
+      title: 'error-code-42',
+      startedAt: '2026-04-05T13:00:00Z',
+      messages: ['错误码 42 出现在同步日志里。'],
+    })
+
+    const results = searchSessionPreview(db, '错误码 42', { limit: 5 })
+    expect(results.map(result => result.sessionUuid)).toContain('session-error-42')
+  })
+
+  it('finds sessions when one term is punctuation-only', () => {
+    const db = createSearchTestDb()
+    insertSession(db, {
+      id: 7,
+      uuid: 'session-arrow-fn',
+      filePath: '/tmp/test-project/arrow-fn.jsonl',
+      title: 'arrow-fn-refactor',
+      startedAt: '2026-04-05T14:00:00Z',
+      messages: ['const pick = foo => bar'],
+    })
+
+    const results = searchSessionPreview(db, 'foo =>', { limit: 5 })
+    expect(results.map(result => result.sessionUuid)).toContain('session-arrow-fn')
   })
 
   it('finds indexed partial tokens and preserves title weighting', () => {

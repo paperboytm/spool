@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, ProjectIdentityKind } from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
-import { buildPreviewFtsPlan, buildSearchPlan, canUseSessionSearchFts, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
+import { buildPreviewFtsPlan, buildSearchPlan, canUseSessionSearchFts, containsCjk, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
 
 export function getOrCreateProject(
   db: Database.Database,
@@ -430,7 +430,10 @@ export function searchSessionPreview(
 ): FragmentResult[] {
   const { limit = 5, source, since } = opts
   const normalizedQuery = query.trim()
-  if (Array.from(normalizedQuery).length < 2) return []
+  // Single-character ascii previews stay gated (a per-keystroke full scan
+  // buys nothing), but a single CJK character is a meaningful query — it
+  // takes the LIKE fallback below, as it did before the FTS preview landed.
+  if (Array.from(normalizedQuery).length < 2 && !containsCjk(normalizedQuery)) return []
 
   const terms = getNaturalSearchTerms(query)
   const previewTerms = terms.length > 0 ? terms : [normalizedQuery]
