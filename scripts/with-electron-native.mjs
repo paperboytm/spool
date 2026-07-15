@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import { constants as osConstants } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -13,17 +14,48 @@ if (!command) {
   process.exit(2)
 }
 
+let activeChild
+let receivedSignal
+
+const signalHandlers = new Map(
+  ['SIGHUP', 'SIGINT', 'SIGTERM'].map((signal) => [
+    signal,
+    () => {
+      receivedSignal ??= signal
+      if (activeChild?.exitCode === null && activeChild.signalCode === null) {
+        activeChild.kill(signal)
+      }
+    },
+  ]),
+)
+
+for (const [signal, handler] of signalHandlers) {
+  process.on(signal, handler)
+}
+
 function run(program, programArgs, cwd = repoRoot) {
-  return spawnSync(program, programArgs, {
-    cwd,
-    env: process.env,
-    stdio: 'inherit',
+  return new Promise((resolve) => {
+    const child = spawn(program, programArgs, {
+      cwd,
+      env: process.env,
+      stdio: 'inherit',
+    })
+    activeChild = child
+
+    child.once('error', (error) => {
+      console.error(`[with-electron-native] failed to start ${program}:`, error)
+    })
+    child.once('close', (status, signal) => {
+      if (activeChild === child) activeChild = undefined
+      resolve({ status, signal })
+    })
   })
 }
 
-let commandStatus = 1
+let commandResult = { status: 1, signal: null }
+let restoreResult
 try {
-  const electronRebuild = run(pnpmBin, [
+  const electronRebuild = await run(pnpmBin, [
     '--filter',
     '@spool/app',
     'exec',
@@ -33,18 +65,29 @@ try {
     'better-sqlite3',
   ])
 
-  if (electronRebuild.status === 0) {
-    const result = run(command, args, process.cwd())
-    commandStatus = result.status ?? 1
+  if (electronRebuild.status === 0 && electronRebuild.signal === null) {
+    commandResult = await run(command, args, process.cwd())
   } else {
-    commandStatus = electronRebuild.status ?? 1
+    commandResult = electronRebuild
   }
 } finally {
-  const restore = run(process.execPath, [join(scriptDir, 'rebuild-better-sqlite3-node.mjs')])
-  if (restore.status !== 0) {
+  restoreResult = await run(process.execPath, [join(scriptDir, 'rebuild-better-sqlite3-node.mjs')])
+  for (const [signal, handler] of signalHandlers) {
+    process.off(signal, handler)
+  }
+
+  if (restoreResult.status !== 0 || restoreResult.signal !== null) {
     console.error('[with-electron-native] failed to restore the Node ABI')
-    commandStatus = restore.status ?? 1
   }
 }
 
-process.exit(commandStatus)
+const restoreFailed = restoreResult.status !== 0 || restoreResult.signal !== null
+const exitSignal = receivedSignal ?? commandResult.signal ?? restoreResult.signal
+const signalNumber = exitSignal ? osConstants.signals[exitSignal] : undefined
+const exitStatus = restoreFailed
+  ? (restoreResult.status ?? (signalNumber ? 128 + signalNumber : 1))
+  : signalNumber
+    ? 128 + signalNumber
+    : (commandResult.status ?? 1)
+
+process.exit(exitStatus)
