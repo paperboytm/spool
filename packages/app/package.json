@@ -42,7 +42,7 @@
     "@spool-lab/redact": "workspace:^",
     "@spool/share-kit": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
-    "acp-extension-claude": "^0.21.0",
+    "acp-extension-claude": "^0.54.3",
     "acp-extension-codex": "^0.10.0",
     "better-sqlite3": "11.10.0",
     "bindings": "^1.5.0",
@@ -153,8 +153,8 @@
     }
   },
   "optionalDependencies": {
-    "acp-extension-codex-darwin-arm64": "^0.10.0",
-    "acp-extension-codex-linux-x64": "^0.10.0"
+    "acp-extension-codex-darwin-arm64": "^0.16.0",
+    "acp-extension-codex-linux-x64": "^0.16.0"
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
