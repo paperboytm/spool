@@ -43,7 +43,7 @@
     "@spool/share-kit": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",
     "acp-extension-claude": "^0.21.0",
-    "acp-extension-codex": "^0.10.0",
+    "acp-extension-codex": "^1.1.2",
     "better-sqlite3": "11.10.0",
     "bindings": "^1.5.0",
     "effect": "^3.21.2",
