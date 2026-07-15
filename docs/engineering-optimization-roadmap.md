@@ -572,8 +572,9 @@ Implementation notes:
    not justify either change.
 7. Debounce session-local find by 120 ms while keeping the controlled input
    synchronous. The expensive Markdown-to-visible-text projection now runs
-   once after typing settles instead of once per keystroke; stale highlights
-   and counts are hidden during the debounce window.
+   once after typing settles instead of once per keystroke; the previous
+   query's highlights and count stay visible (dimmed) and navigable until
+   the new projection lands, and only "No matches" waits for the settle.
 
 Verification on 2026-07-12:
 

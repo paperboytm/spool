@@ -124,6 +124,88 @@ test('find-in-page matches rendered text, not markdown source', async () => {
   await expect(window.locator('[data-testid="session-find-status"]')).toContainText('No matches')
 })
 
+test('find keeps the previous result visible and navigable while retyping', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator('[data-testid="session-row"][data-session-uuid="test-session-uuid-001"]')
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 5000 })
+
+  const isMac = process.platform === 'darwin'
+  await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
+
+  const input = window.locator('[data-testid="session-find-input"]')
+  const status = window.locator('[data-testid="session-find-status"]')
+
+  await input.fill('XYZMARKDOWN')
+  await expect(status).toContainText(/^\d+ of \d+$/)
+  const settled = await status.textContent()
+
+  // Record every status transition in-page: the previous count must stay
+  // visible through the debounce window (no blank flash) until the new
+  // result replaces it. A MutationObserver sees each DOM change
+  // synchronously, so this cannot race the 120 ms debounce.
+  await window.evaluate(() => {
+    const el = document.querySelector('[data-testid="session-find-status"]')
+    if (!el) throw new Error('find status missing')
+    const w = window as unknown as { __findLog?: (string | null)[]; __findObs?: MutationObserver }
+    w.__findLog = [el.textContent]
+    w.__findObs = new MutationObserver(() => { w.__findLog?.push(el.textContent) })
+    w.__findObs.observe(el, { childList: true, characterData: true, subtree: true })
+  })
+
+  await input.fill('XYZMARKDOWN-no-such-text')
+  // Enter during the debounce window must act on the still-visible previous
+  // result instead of being swallowed.
+  await window.keyboard.press('Enter')
+  await expect(status).toContainText('No matches', { timeout: 5000 })
+
+  const log = await window.evaluate(() => {
+    const w = window as unknown as { __findLog?: (string | null)[]; __findObs?: MutationObserver }
+    w.__findObs?.disconnect()
+    return w.__findLog ?? []
+  })
+  expect(log[0]).toBe(settled)
+  expect(log).not.toContain('')
+})
+
+test('find refocuses after its own buttons but not after clicks into the list', async () => {
+  const { window } = ctx
+  await waitForSync(window)
+
+  await window.locator('[data-testid="sidebar-project-row"]').first().click()
+  await window
+    .locator(`[data-testid="session-row"][data-session-uuid="${LARGE_SESSION_UUID}"]`)
+    .click()
+  await expect(window.locator('[data-testid="session-detail"]')).toBeVisible({ timeout: 10000 })
+
+  const isMac = process.platform === 'darwin'
+  await window.keyboard.press(isMac ? 'Meta+f' : 'Control+f')
+
+  const status = window.locator('[data-testid="session-find-status"]')
+  await window.locator('[data-testid="session-find-input"]').fill('Message 14')
+  await expect(status).toContainText(/^1 of \d+$/, { timeout: 5000 })
+
+  const focusedTestId = () =>
+    window.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset?.['testid'] ?? document.activeElement?.tagName ?? '')
+
+  // Clicking the bar's own next button advances and hands focus back to the
+  // input so typing stays seamless.
+  await window.locator('[data-testid="session-find-next"]').click()
+  await expect(status).toContainText(/^2 of \d+$/)
+  await expect.poll(focusedTestId).toBe('session-find-input')
+
+  // Focus moved into the message list stays there: navigating via the
+  // hotkey must not yank it back to the find input.
+  await window.locator('[data-testid="message-list-scroll"]').click({ position: { x: 10, y: 10 } })
+  await window.keyboard.press(isMac ? 'Meta+ArrowRight' : 'Control+ArrowRight')
+  await expect(status).toContainText(/^3 of \d+$/)
+  await expect.poll(focusedTestId).not.toBe('session-find-input')
+})
+
 test('handles 1500-message session: virtualization + deep find', async () => {
   const { window } = ctx
   await waitForSync(window)

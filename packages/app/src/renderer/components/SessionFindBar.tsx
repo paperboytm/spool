@@ -30,6 +30,7 @@ export default function SessionFindBar({
   onClose,
 }: Props) {
   const { t } = useTranslation()
+  const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
   const isMacLike = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
@@ -71,6 +72,10 @@ export default function SessionFindBar({
     if (!visible) return
     const input = inputRef.current
     if (!input || document.activeElement === input) return
+    // Reclaim focus only when it sits on the bar's own controls (prev/next
+    // button clicks) so typing stays seamless — focus the user moved into
+    // the message list must stay there.
+    if (!containerRef.current?.contains(document.activeElement)) return
     requestAnimationFrame(() => {
       focusInput('preserve')
     })
@@ -80,16 +85,20 @@ export default function SessionFindBar({
 
   const hasQuery = query.trim().length > 0
   const hasMatches = matches > 0
+  // While a new query is pending the previous count stays visible (dimmed)
+  // and navigable; only "No matches" waits for the settle, so it never
+  // flashes mid-typing.
   const statusLabel = !hasQuery
     ? ''
-    : pending
-      ? ''
-      : hasMatches
-        ? t('session.find_matches_other', { current: activeMatchOrdinal, total: matches })
+    : hasMatches
+      ? t('session.find_matches_other', { current: activeMatchOrdinal, total: matches })
+      : pending
+        ? ''
         : t('session.find_noMatch')
 
   return (
     <div
+      ref={containerRef}
       className="absolute top-8 right-4 z-20 flex items-center gap-0.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] pl-2 pr-1 py-0.5 w-[320px] animate-in fade-in transition-[border-color,box-shadow] focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 focus-within:shadow-[0_0_0_3px_rgba(200,90,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:focus-within:shadow-[0_0_0_3px_rgba(240,112,32,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
       role="search"
     >
@@ -125,8 +134,9 @@ export default function SessionFindBar({
         data-testid="session-find-input"
       />
       <span
-        className="flex-none font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted whitespace-nowrap pl-1"
+        className={`flex-none font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted whitespace-nowrap pl-1 transition-opacity ${pending ? 'opacity-60' : ''}`}
         data-testid="session-find-status"
+        data-pending={pending ? 'true' : undefined}
       >
         {statusLabel}
       </span>
@@ -134,20 +144,22 @@ export default function SessionFindBar({
       <button
         type="button"
         onClick={onPrevious}
-        disabled={pending || !hasQuery || !hasMatches}
+        disabled={!hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`${t('session.find_prev')} (${previousShortcutLabel})`}
         title={`${t('session.find_prev')} (${previousShortcutLabel})`}
+        data-testid="session-find-prev"
       >
         <ChevronUp size={12} strokeWidth={1.8} aria-hidden />
       </button>
       <button
         type="button"
         onClick={onNext}
-        disabled={pending || !hasQuery || !hasMatches}
+        disabled={!hasQuery || !hasMatches}
         className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
         aria-label={`${t('session.find_next')} (${nextShortcutLabel})`}
         title={`${t('session.find_next')} (${nextShortcutLabel})`}
+        data-testid="session-find-next"
       >
         <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
       </button>

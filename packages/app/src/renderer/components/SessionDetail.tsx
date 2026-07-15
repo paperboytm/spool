@@ -27,6 +27,10 @@ type Props = {
   onShare: (session: Session, messages: Message[]) => void
 }
 
+// Keystrokes inside this window coalesce into one find projection — the
+// projection re-parses every message's markdown, so it must not run per key.
+const FIND_DEBOUNCE_MS = 120
+
 export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
   const { t } = useTranslation()
   const [session, setSession] = useState<Session | null>(null)
@@ -58,7 +62,10 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const normalizedFindQuery = findQuery.trim().toLocaleLowerCase()
   const normalizedSettledFindQuery = settledFindQuery.trim().toLocaleLowerCase()
   const findPending = normalizedFindQuery !== normalizedSettledFindQuery
-  const effectiveFindQuery = findPending ? '' : normalizedSettledFindQuery
+  // While a new query is pending, the previous query's highlights and count
+  // stay visible and navigable (Chrome-style) instead of blanking for the
+  // debounce window.
+  const effectiveFindQuery = normalizedSettledFindQuery
 
   useEffect(() => {
     if (!normalizedFindQuery) {
@@ -67,7 +74,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     }
     const timer = window.setTimeout(() => {
       setSettledFindQuery(findQuery)
-    }, 120)
+    }, FIND_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
   }, [findQuery, normalizedFindQuery])
 
