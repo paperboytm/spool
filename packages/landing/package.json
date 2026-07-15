@@ -15,17 +15,17 @@
   },
   "dependencies": {
     "hono": "^4.12.14",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260415.1",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@void/md": "^0.7.2",
-    "@void/react": "^0.7.2",
+    "@void/md": "^0.10.10",
+    "@void/react": "^0.10.10",
     "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
     "vite-plus": "^0.1.18",
-    "void": "^0.7.2"
+    "void": "^0.10.10"
   }
 }
