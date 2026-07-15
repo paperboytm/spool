@@ -158,7 +158,7 @@
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
-    "@electron/rebuild": "^3.7.1",
+    "@electron/rebuild": "^4.2.0",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.1.4",
     "@types/better-sqlite3": "^7.6.13",
