@@ -1,4 +1,0 @@
-{"timestamp":"2026-01-17T12:34:56Z","type":"session_meta","payload":{"id":"11111111-2222-4333-8444-555555555555","cwd":"/tmp/test-project"}}
-{"timestamp":"2026-01-17T12:34:57Z","type":"turn_context","payload":{"model":"gpt-5-codex","cwd":"/tmp/test-project"}}
-{"timestamp":"2026-01-17T12:35:00Z","type":"event_msg","payload":{"type":"user_message","message":"Where does BASSOON_CANARY_77 get initialized?"}}
-{"timestamp":"2026-01-17T12:35:04Z","type":"event_msg","payload":{"type":"agent_message","message":"BASSOON_CANARY_77 is initialized in src/main.ts during app startup."}}

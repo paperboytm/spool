@@ -1,2 +1,0 @@
-{"type":"user","sessionId":"test-session-uuid-003","cwd":"/tmp/test-project","uuid":"msg-201","timestamp":"2026-01-17T09:00:00Z","message":{"role":"user","content":"可以帮我查看一下这个变更单 4242 的结论吗？"}}
-{"type":"assistant","uuid":"msg-202","parentUuid":"msg-201","timestamp":"2026-01-17T09:00:10Z","message":{"role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"我看过变更单 4242 了。主要问题集中在搜索语义和结果排序，需要把 fast search 从连续短语匹配放宽到多关键词匹配。"}]}}

@@ -1,5 +1,0 @@
-#!/bin/bash
-# Fake claude binary so detectAgents() finds it via `which claude`.
-# The actual ACP communication goes through acp-extension-claude,
-# which is replaced by acp-mock-agent.mjs in the test setup.
-echo "mock claude cli"
