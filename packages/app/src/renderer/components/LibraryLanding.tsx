@@ -210,6 +210,8 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         label: bucket.label,
         testId: 'library-bucket-header',
         dataAttr: { 'data-bucket': bucket.key },
+        sticky: true,
+        collapsible: false,
       })
       for (const s of bucket.sessions) {
         out.push({
@@ -245,6 +247,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
           onCopySessionId={onCopySessionId}
           onShare={onShare}
           testId="library-landing-scroll"
+          stickyHeaders
         />
       )}
     </div>
