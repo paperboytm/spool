@@ -54,7 +54,7 @@ session in the app's library on its next refresh, and vice versa.
 ### Sync
 
 ```bash
-spool sync                     # Index new AI sessions (Claude, Codex, Gemini, OpenCode)
+spool sync                     # Index new AI sessions (Claude, Codex, Gemini, OpenCode, Pi)
 spool sync --watch             # Keep watching for new sessions
 ```
 

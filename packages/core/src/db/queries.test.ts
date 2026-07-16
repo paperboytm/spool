@@ -239,5 +239,6 @@ describe('getStatus', () => {
     expect(status.codexSessions).toBe(1)
     expect(status.geminiSessions).toBe(0)
     expect(status.opencodeSessions).toBe(0)
+    expect(status.piSessions).toBe(0)
   })
 })

@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3'
 import { loadClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
 import { loadCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
 import { loadGeminiSession } from '../parsers/gemini.js'
+import { decodePiSessionDirSlug, loadPiSession, PI_INDEX_VERSION } from '../parsers/pi.js'
 import {
   getOpenCodeSessionIndexedMtime,
   isOpenCodeDatabaseFile,
@@ -80,7 +81,7 @@ export class Syncer {
     const seenPaths = new Set<string>()
     const files: Array<{ path: string; source: SessionSource }> = []
 
-    for (const source of ['claude', 'codex', 'gemini', 'opencode'] as const) {
+    for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
       for (const dir of getSessionRoots(source)) {
         try { addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source)) } catch { /* dir may not exist */ }
       }
@@ -294,7 +295,9 @@ export class Syncer {
           ? loadCodexSession(filePath)
           : source === 'gemini'
             ? loadGeminiSession(filePath)
-            : loadOpenCodeSession(filePath)
+            : source === 'pi'
+              ? loadPiSession(filePath)
+              : loadOpenCodeSession(filePath)
 
       if (parseResult.kind !== 'parsed') {
         // The "filtered" path normally removes a session whose source
@@ -535,6 +538,7 @@ function getIndexVersion(source: SessionSource): string {
   // contentText/titles for sessions indexed before the format change.
   if (source === 'gemini') return 'gemini-v2-session-search-fts'
   if (source === 'opencode') return OPENCODE_INDEX_VERSION
+  if (source === 'pi') return PI_INDEX_VERSION
   return 'claude-v3-session-search-fts'
 }
 
@@ -569,10 +573,10 @@ function walkDir(
     const fullPath = join(dir, entry.name)
     if (entry.isDirectory()) {
       if (source === 'gemini' && !shouldTraverseGeminiDir(dir, fullPath, entry.name)) continue
-      // For claude, session files only live at <root>/<slug>/<uuid>.jsonl. Anything
-      // deeper is subagent / future-nested scratch data that hijacks the parent
-      // sessionId — see isSessionFileForSource for the matching read-side check.
-      if (source === 'claude' && dirname(fullPath) !== root) continue
+      // For claude and pi, session files only live at <root>/<slug>/<uuid>.jsonl.
+      // Anything deeper is subagent / future-nested scratch data that hijacks the
+      // parent sessionId — see isSessionFileForSource for the matching read-side check.
+      if ((source === 'claude' || source === 'pi') && dirname(fullPath) !== root) continue
       walkDir(fullPath, root, results, source)
     } else if (entry.isFile() && isSessionFileForSource(source, fullPath, root)) {
       results.push({ path: fullPath, source })
@@ -628,6 +632,14 @@ function resolveProject(
     const displayPath = cwd || home
     const parts = displayPath.split('/').filter(Boolean)
     const displayName = parts[parts.length - 1] ?? 'opencode'
+    const slug = displayPath.replace(/^\//, '').replace(/\//g, '-') || 'default'
+    return { slug, displayPath, displayName }
+  } else if (source === 'pi') {
+    // ~/.pi/agent/sessions/{cwd-slug}/{timestamp}_{uuid}.jsonl — the header cwd
+    // is authoritative; the directory slug is a lossy fallback.
+    const displayPath = cwd || decodePiSessionDirSlug(basename(dirname(filePath)))
+    const parts = displayPath.split('/').filter(Boolean)
+    const displayName = parts[parts.length - 1] ?? 'pi'
     const slug = displayPath.replace(/^\//, '').replace(/\//g, '-') || 'default'
     return { slug, displayPath, displayName }
   }

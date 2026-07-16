@@ -3,6 +3,7 @@ import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
+  appendFileSync,
   mkdtempSync,
   mkdirSync,
   rmSync,
@@ -281,6 +282,7 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
     vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
     vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
+    vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'missing-pi'))
 
     const dbPath = join(opencodeDir, 'opencode.db')
     const openCodeDb = new Database(dbPath)
@@ -325,6 +327,51 @@ describe('Syncer', () => {
     ])
   })
 
+  it('indexes pi sessions from the agent sessions directory and appends new turns on re-sync', async () => {
+    const baseDir = makeTempDir('spool-syncer-pi-')
+    const piRoot = join(baseDir, 'pi-sessions')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    const slugDir = join(piRoot, '--tmp-pi-project--')
+    mkdirSync(slugDir, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('SPOOL_CLAUDE_DIR', join(baseDir, 'missing-claude'))
+    vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
+    vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
+    vi.stubEnv('SPOOL_OPENCODE_DIR', join(baseDir, 'missing-opencode'))
+    vi.stubEnv('SPOOL_PI_DIR', piRoot)
+
+    const sessionUuid = 'f41a7803-b075-4b88-8d74-f46a3a06f67d'
+    const filePath = join(slugDir, `2026-04-02T09-05-13-662Z_${sessionUuid}.jsonl`)
+    writeFileSync(filePath, [
+      JSON.stringify({ type: 'session', version: 3, id: sessionUuid, timestamp: '2026-04-02T09:05:13.662Z', cwd: '/tmp/pi-project' }),
+      JSON.stringify({ type: 'message', id: 'u1', parentId: null, timestamp: '2026-04-02T09:05:20.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Evaluate the database sharding tradeoffs' }] } }),
+      JSON.stringify({ type: 'message', id: 'a1', parentId: 'u1', timestamp: '2026-04-02T09:05:30.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Range sharding keeps scans cheap.' }], model: 'claude-opus-4-6' } }),
+    ].join('\n') + '\n')
+
+    const { getDB, Syncer, searchFragments } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    const syncer = new Syncer(db)
+
+    expect(syncer.syncAll()).toMatchObject({ added: 1, updated: 0, errors: 0 })
+    expect(searchFragments(db, 'sharding tradeoffs', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'pi',
+        sessionUuid,
+        project: '/tmp/pi-project',
+      }),
+    ])
+
+    appendFileSync(filePath, JSON.stringify({ type: 'message', id: 'u2', parentId: 'a1', timestamp: '2026-04-02T09:06:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'What about resharding hotspots?' }] } }) + '\n')
+    touchFile(filePath)
+
+    expect(syncer.syncFile(filePath, 'pi')).toBe('updated')
+    expect(searchFragments(db, 'resharding hotspots', { limit: 5 })).toEqual([
+      expect.objectContaining({ source: 'pi', sessionUuid }),
+    ])
+  })
+
   it('folds OpenCode subagent sessions into the parent and removes stale standalone child rows', async () => {
     const baseDir = makeTempDir('spool-syncer-opencode-subagents-')
     const opencodeDir = join(baseDir, 'opencode')
@@ -336,6 +383,7 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
     vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
     vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
+    vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'missing-pi'))
 
     const dbPath = join(opencodeDir, 'opencode.db')
     const openCodeDb = new Database(dbPath)

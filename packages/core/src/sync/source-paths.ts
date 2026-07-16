@@ -4,7 +4,7 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep 
 import type { SessionSource } from '../types.js'
 import { OPENCODE_DB_NAME, isOpenCodeDatabaseFile } from '../parsers/opencode.js'
 
-const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
   claude: 'projects',
   codex: 'sessions',
 }
@@ -14,14 +14,15 @@ const SOURCE_ENV_VARS: Record<SessionSource, string> = {
   codex: 'SPOOL_CODEX_DIR',
   gemini: 'SPOOL_GEMINI_DIR',
   opencode: 'SPOOL_OPENCODE_DIR',
+  pi: 'SPOOL_PI_DIR',
 }
 
-const SOURCE_DEFAULT_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_DEFAULT_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
   claude: '.claude',
   codex: '.codex',
 }
 
-const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
   claude: '.claude-profiles',
   codex: '.codex-profiles',
 }
@@ -40,6 +41,12 @@ export function getSessionRoots(source: SessionSource): string[] {
 
   if (source === 'opencode') {
     return dedupePaths([normalizeSourceRoot('opencode', getOpenCodeBaseDir())])
+  }
+
+  if (source === 'pi') {
+    return dedupePaths([
+      normalizeSourceRoot('pi', join(homedir(), '.pi', 'agent', 'sessions')),
+    ])
   }
 
   const home = homedir()
@@ -69,9 +76,10 @@ export function detectSessionSource(
     codex: getSessionRoots('codex'),
     gemini: getSessionRoots('gemini'),
     opencode: getSessionRoots('opencode'),
+    pi: getSessionRoots('pi'),
   },
 ): SessionSource | undefined {
-  for (const source of ['claude', 'codex', 'gemini', 'opencode'] as const) {
+  for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
     if (sourceRoots[source]?.some(root => isSessionFileForSource(source, filePath, root))) {
       return source
     }
@@ -127,6 +135,13 @@ function normalizeSourceRoot(source: SessionSource, filePath: string): string {
     return resolvedPath
   }
 
+  if (source === 'pi') {
+    if (basename(resolvedPath) === 'sessions') return resolvedPath
+    if (existsSync(join(resolvedPath, 'agent', 'sessions'))) return join(resolvedPath, 'agent', 'sessions')
+    if (existsSync(join(resolvedPath, 'sessions'))) return join(resolvedPath, 'sessions')
+    return resolvedPath
+  }
+
   const childDir = SOURCE_DIR_NAMES[source]
   if (basename(resolvedPath) === childDir) return resolvedPath
 
@@ -178,11 +193,12 @@ export function isSessionFileForSource(source: SessionSource, filePath: string, 
     return isOpenCodeDatabaseFile(filePath)
   }
   if (!filePath.endsWith('.jsonl')) return false
-  if (source === 'claude') {
+  if (source === 'claude' || source === 'pi') {
     // Claude sessions live at <root>/<slug>/<uuid>.jsonl — exactly two segments
     // relative to root. Nested files (e.g. <slug>/<uuid>/subagents/agent-*.jsonl)
     // are subagent scratchpads that share the parent's sessionId; indexing them
     // clobbers the parent row via UNIQUE(session_uuid) and zeros message_count.
+    // Pi uses the same <root>/<cwd-slug>/<timestamp>_<uuid>.jsonl layout.
     const rel = relative(root, filePath)
     return rel.length > 0 && rel.split(sep).length === 2
   }

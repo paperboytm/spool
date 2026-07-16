@@ -17,6 +17,7 @@ const SOURCE_LABEL: Record<SessionSource, string> = {
   codex: 'Codex',
   gemini: 'Gemini',
   opencode: 'OpenCode',
+  pi: 'Pi',
 }
 
 interface ComposeOpts {
