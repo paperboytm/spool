@@ -11,11 +11,11 @@ import { loadHubCredentials, type HubCredentialOptions } from '../hub/credential
 import { materializeClaudeSession } from '../hub/materialize.js'
 import { resolveSessionRef } from '../hub/ref.js'
 
-// `spool resume <url|sid>[@<n>]` — materialize, don't graft (design §3):
+// `spool resume <url|sid>[<@n>]` — materialize, don't graft (design §3):
 // fetch the shared records, verify integrity client-side, write a brand-new
-// provider-native session under ~/.claude/projects, then hand off to the
-// native `claude --resume`. Nothing is executed on the user's behalf unless
-// they pass --exec.
+// provider-native session under ~/.claude/projects, then launch the native
+// `claude --resume` (which opens waiting for input — no model turn runs).
+// `--no-exec` prints the command instead of launching.
 
 const READ_PAGE = 500
 
@@ -95,19 +95,27 @@ export async function handleResumeCommand(
       log(`Workspace card (author's last observed repo state): ${meta.cardJson}`)
     }
     log('')
-    log('Continue with:')
+    // Always print the command — it stays in scrollback for re-opening
+    // the session after this claude run ends.
     log(`  cd ${workspaceRoot} && claude --resume ${sessionId}`)
 
-    if (options.exec === true) {
-      const spawn = dependencies.spawn ?? spawnSync
-      const result = spawn('claude', ['--resume', sessionId], {
-        cwd: workspaceRoot,
-        stdio: 'inherit',
-      })
-      if (result.error) throw result.error
-      return result.status === 0 ? 0 : 1
+    if (options.exec === false) return 0
+
+    log('')
+    const spawn = dependencies.spawn ?? spawnSync
+    const result = spawn('claude', ['--resume', sessionId], {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+    })
+    if (result.error) {
+      const code = (result.error as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') {
+        error('claude CLI not found on PATH — the session is materialized; run the command above manually.')
+        return 1
+      }
+      throw result.error
     }
-    return 0
+    return result.status === 0 ? 0 : 1
   } catch (cause) {
     if (cause instanceof HubHttpError) {
       error(friendlyHubError(cause, input))
@@ -122,11 +130,11 @@ export const resumeCommand = new Command('resume')
   .description('Materialize a shared session locally and resume it natively')
   .argument('<sid|url>', 'Shared session ID or URL, optionally @<n>')
   .option('--workspace <dir>', 'Workspace root to resume in (default: current directory)')
-  .option('--exec', 'Launch `claude --resume` after materializing')
-  .action(async (input: string, opts: { workspace?: string; exec?: boolean }) => {
+  .option('--no-exec', 'Print the `claude --resume` command instead of launching it')
+  .action(async (input: string, opts: { workspace?: string; exec: boolean }) => {
     const exitCode = await handleResumeCommand(input, {
       ...(opts.workspace === undefined ? {} : { workspace: opts.workspace }),
-      ...(opts.exec === undefined ? {} : { exec: opts.exec }),
+      exec: opts.exec,
     })
     if (exitCode !== 0) process.exitCode = exitCode
   })

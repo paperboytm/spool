@@ -182,12 +182,18 @@ describe('spool share → spool resume round trip', () => {
     symlinkSync(resumerWs, aliasWs)
     const logs: string[] = []
     const errors: string[] = []
+    const spawnCalls: Array<{ cmd: string; args: readonly string[]; cwd: unknown }> = []
+    const fakeSpawn = ((cmd: string, args: readonly string[], opts: { cwd?: unknown }) => {
+      spawnCalls.push({ cmd, args, cwd: opts.cwd })
+      return { status: 0 }
+    }) as unknown as typeof import('node:child_process').spawnSync
     const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${sid}`, { workspace: aliasWs }, {
       fetch: hub.fetchImpl,
       homeDir: resumerHome,
       env: {} as NodeJS.ProcessEnv,
       log: (message: string) => logs.push(message),
       error: (message: string) => errors.push(message),
+      spawn: fakeSpawn,
     })
     expect(errors).toEqual([])
     expect(resumeExit).toBe(0)
@@ -209,6 +215,12 @@ describe('spool share → spool resume round trip', () => {
     expect(birth.parentUuid).toBe('u-4')
     expect(birth.message.content[0].text).toContain('<spool-resume-note>')
     expect(logs.join('\n')).toContain(`claude --resume ${newSessionId}`)
+
+    // Default behavior hands off to the native CLI, in the REAL workspace
+    // path even though a symlink was passed in.
+    expect(spawnCalls).toEqual([
+      { cmd: 'claude', args: ['--resume', newSessionId], cwd: resumerWs },
+    ])
   })
 
   it('aborts the share when the redact gate finds secrets and the user declines', async () => {

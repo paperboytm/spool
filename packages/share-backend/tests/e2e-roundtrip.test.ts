@@ -167,15 +167,23 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     const resumerWs = realpathSync(mkdtempSync(join(tmpdir(), 'spool-e2e-resumer-')))
     const resumerHome = mkdtempSync(join(tmpdir(), 'spool-e2e-resumer-home-'))
     const resumeErrors: string[] = []
+    const spawnCalls: Array<{ cmd: string; args: readonly string[] }> = []
+    const fakeSpawn = ((cmd: string, args: readonly string[]) => {
+      spawnCalls.push({ cmd, args })
+      return { status: 0 }
+    }) as unknown as typeof import('node:child_process').spawnSync
     const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${SID}`, { workspace: resumerWs }, {
       fetch: fetchAdapter,
       homeDir: resumerHome,
       env: {} as NodeJS.ProcessEnv,
       log: () => {},
       error: (message) => resumeErrors.push(message),
+      spawn: fakeSpawn,
     })
     expect(resumeErrors).toEqual([])
     expect(resumeExit).toBe(0)
+    expect(spawnCalls).toHaveLength(1)
+    expect(spawnCalls[0]?.cmd).toBe('claude')
 
     const projectDir = join(resumerHome, '.claude', 'projects', resumerWs.replace(/[^a-zA-Z0-9]/g, '-'))
     const files = readdirSync(projectDir)
