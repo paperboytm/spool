@@ -1,4 +1,12 @@
 export { splitRecords, canonicalizeRecord } from './records.js'
+export { parseClaudeSessionText, parseCodexSessionLines } from './messages.js'
+export type { ParseProviderResult, ParsedMessage, ParsedProviderSession } from './messages.js'
+export {
+  SPOOL_SYSTEM_PRELUDE_CLOSE,
+  SPOOL_SYSTEM_PRELUDE_OPEN,
+  stripSpoolSystemPrelude,
+  wrapSpoolSystemPrelude,
+} from './spool-prelude.js'
 export { sequenceRoot, chainRoots } from './sequence.js'
 export { extractEditEvents } from './edits.js'
 export { deriveView } from './view.js'

@@ -11,6 +11,9 @@ import '@fontsource-variable/geist/index.css'
 import '@fontsource/geist-mono/400.css'
 import '@fontsource/geist-mono/500.css'
 import '@fontsource/geist-mono/600.css'
+// Prebuilt utilities for the shared conversation components (session-view
+// compiles its own Tailwind pass; dark: is bound to html[data-theme]).
+import '@spool-lab/session-view/styles.css'
 import './styles.css'
 
 import { App } from './App'

@@ -8,7 +8,7 @@ import {
   type RangeFetcher,
 } from './hub-api'
 import { buildSessionOgTagBlock } from './og-meta'
-import { renderRecordSegments } from './record-render'
+import { parseHubConversation } from './session-messages'
 import { routeFor } from './route'
 import {
   deepLinkHash,
@@ -124,31 +124,66 @@ describe('deep links and helpers', () => {
   })
 })
 
-describe('record segments', () => {
-  it('renders claude text, tool_use, and tool_result blocks', () => {
-    const data = JSON.stringify({
-      message: {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: 'hello' },
-          { type: 'tool_use', name: 'Edit', input: { file_path: 'a.ts' } },
-          { type: 'tool_result', content: [{ type: 'text', text: 'done' }] },
-        ],
-      },
-    })
-    const segments = renderRecordSegments('claude', data)
-    expect(segments.map((s) => s.kind)).toEqual(['text', 'tool-call', 'tool-result'])
-    expect(segments[1]?.label).toBe('Edit')
-    expect(segments[2]?.text).toBe('done')
+describe('hub records → desktop-identical conversation', () => {
+  const record = (i: number, data: Record<string, unknown>): { i: number; oid: string; data: string } =>
+    ({ i, oid: `oid-${i}`, data: JSON.stringify(data) })
+
+  const claudeRecords = [
+    record(0, {
+      type: 'user', uuid: 'u-1', sessionId: 's', timestamp: '2026-07-16T10:00:00.000Z',
+      message: { role: 'user', content: 'rename alpha to beta' },
+    }),
+    record(1, {
+      type: 'assistant', uuid: 'u-2', parentUuid: 'u-1', sessionId: 's', timestamp: '2026-07-16T10:00:05.000Z',
+      message: { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: {} }] },
+    }),
+    record(2, {
+      type: 'user', uuid: 'u-3', parentUuid: 'u-2', sessionId: 's', timestamp: '2026-07-16T10:00:06.000Z',
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] },
+    }),
+    record(3, {
+      type: 'assistant', uuid: 'u-4', parentUuid: 'u-3', sessionId: 's', timestamp: '2026-07-16T10:00:09.000Z',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] },
+    }),
+  ]
+
+  it('parses via the shared session-kit parser (tool plumbing collapses)', () => {
+    const conversation = parseHubConversation('claude', claudeRecords)
+    expect(conversation.title).toBe('rename alpha to beta')
+    expect(conversation.messages.map((m) => [m.role, m.contentText])).toEqual([
+      ['user', 'rename alpha to beta'],
+      ['assistant', ''],
+      ['assistant', 'Done.'],
+    ])
+    expect(conversation.messages[1]?.toolNames).toEqual(['Edit'])
   })
 
-  it('renders codex payloads and degrades unknown shapes to raw JSON', () => {
-    expect(renderRecordSegments('codex', JSON.stringify({
-      payload: { type: 'user_message', message: 'hi' },
-    }))).toEqual([{ kind: 'text', text: 'hi' }])
-    const raw = renderRecordSegments('codex', JSON.stringify({ unknown: true }))
-    expect(raw[0]?.kind).toBe('raw')
-    expect(renderRecordSegments('claude', 'not json')[0]?.kind).toBe('raw')
+  it('maps record indices onto conversation messages, carrying gaps backward', () => {
+    const { recordToMessageId } = parseHubConversation('claude', claudeRecords)
+    expect(recordToMessageId.get(0)).toBe(0) // user prompt → message 0
+    expect(recordToMessageId.get(1)).toBe(1) // edit call → tool message
+    expect(recordToMessageId.get(2)).toBe(1) // tool result collapses → nearest previous message
+    expect(recordToMessageId.get(3)).toBe(2) // reply
+  })
+
+  it('parses codex event messages by timestamp mapping', () => {
+    const codexRecords = [
+      record(0, {
+        type: 'event_msg', timestamp: '2026-07-16T10:00:00.000Z',
+        payload: { type: 'user_message', message: 'hello codex' },
+      }),
+      record(1, {
+        type: 'event_msg', timestamp: '2026-07-16T10:00:09.000Z',
+        payload: { type: 'agent_message', message: 'hi!' },
+      }),
+    ]
+    const conversation = parseHubConversation('codex', codexRecords)
+    expect(conversation.messages.map((m) => m.contentText)).toEqual(['hello codex', 'hi!'])
+    expect(conversation.recordToMessageId.get(1)).toBe(1)
+  })
+
+  it('degrades to an empty conversation for unparseable sessions', () => {
+    expect(parseHubConversation('claude', []).messages).toEqual([])
   })
 })
 

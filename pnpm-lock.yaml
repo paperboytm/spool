@@ -250,6 +250,9 @@ importers:
       '@spool-lab/redact':
         specifier: workspace:*
         version: link:../redact
+      '@spool-lab/session-kit':
+        specifier: workspace:^
+        version: link:../session-kit
       better-sqlite3:
         specifier: 11.10.0
         version: 11.10.0
@@ -471,6 +474,9 @@ importers:
       '@spool-lab/session-kit':
         specifier: workspace:*
         version: link:../session-kit
+      '@spool-lab/session-view':
+        specifier: workspace:*
+        version: link:../session-view
       '@spool/share-kit':
         specifier: workspace:*
         version: link:../share-kit

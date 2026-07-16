@@ -1090,6 +1090,46 @@ html[data-theme='dark'] .sw-google-btn:hover {
   margin-top: 1px;
 }
 
+/* ── CLI auth approval ──────────────────────────────────────── */
+/* The confirmation code is indexed-content-adjacent → Geist Mono,
+   spaced out so it can be compared against the terminal at a glance. */
+.sw-cliauth-code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  margin-top: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+.sw-cliauth-hint {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.sw-cliauth-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.sw-cliauth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 24px;
+}
+.sw-cliauth-input {
+  text-align: center;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 /* ── Loading / spin ─────────────────────────────────────────── */
 .sw-loading {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1876,3 +1916,19 @@ html[data-theme='dark'] .sw-modal-overlay {
 .sw-session-diff .hunk-lines .line { display: block; white-space: pre; }
 .sw-session-diff .hunk-lines .line.add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
 .sw-session-diff .hunk-lines .line.del { background: color-mix(in srgb, var(--err) 12%, transparent); }
+
+/* Conversation pane: hosts the shared session-view MessageList (the same
+ * component the desktop session detail uses). The list virtualizes inside
+ * a fixed-height flex column. */
+.sw-session-conversation {
+  display: flex;
+  flex-direction: column;
+  height: 72vh;
+  min-height: 320px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  padding: 8px 0;
+}
