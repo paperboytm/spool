@@ -39,6 +39,7 @@
     "@fontsource/geist-mono": "^5.2.7",
     "@huggingface/transformers": "^4.2.0",
     "@spool-lab/core": "workspace:*",
+    "@spool-lab/session-view": "workspace:*",
     "@spool-lab/redact": "workspace:^",
     "@spool/share-kit": "workspace:*",
     "@tanstack/react-virtual": "^3.13.6",

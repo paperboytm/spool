@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { remark } from 'remark'
 import remarkGfm from 'remark-gfm'
 import { toString } from 'mdast-util-to-string'
-import { findHighlightPlugin } from './findHighlightPlugin.js'
+import { findHighlightPlugin } from './find-highlight-plugin.js'
 
 function buildTree(markdown: string, ranges: Array<{ start: number; end: number }>, offset = 0, active = -1) {
   const processor = remark().use(remarkGfm).use(findHighlightPlugin, {

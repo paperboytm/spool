@@ -2,8 +2,8 @@ import { Children, isValidElement, memo, useMemo, type ComponentProps, type Reac
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
-import { findHighlightPlugin, type Range } from '../markdown/findHighlightPlugin.js'
-import CodeBlock from './CodeBlock.js'
+import { findHighlightPlugin, type Range } from './find-highlight-plugin.js'
+import CodeBlock from './code-block.js'
 
 const sanitizeSchema = {
   ...defaultSchema,

@@ -1,9 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
-import type { Message } from '@spool-lab/core'
-import MessageBubble, { type FindRange } from './MessageBubble.js'
+import MessageBubble, { type FindRange } from './message-bubble.js'
+import { DEFAULT_LABELS, type ConversationMessage, type MessageListLabels } from './types.js'
 
 type DividerLabel = (iso: string, now: Date) => string
 
@@ -11,26 +10,30 @@ export interface MessageListHandle {
   scrollToMessageId: (id: number) => void
 }
 
-interface MatchState {
+export interface MatchState {
   ranges: FindRange[]
   offset: number
 }
 
 interface Props {
-  messages: Message[]
+  messages: ConversationMessage[]
   isDark: boolean
-  showFindBar: boolean
-  messageFindRanges: Map<number, MatchState>
-  activeMatchIndex: number
-  onActiveMatchRef: (node: HTMLElement | null) => void
+  showFindBar?: boolean
+  messageFindRanges?: Map<number, MatchState>
+  activeMatchIndex?: number
+  onActiveMatchRef?: (node: HTMLElement | null) => void
   targetMessageId?: number | null
-  showTargetHighlight: boolean
+  showTargetHighlight?: boolean
+  /** Localized strings; defaults are English. */
+  labels?: MessageListLabels
+  /** BCP-47 locale for dates/times; defaults to the browser locale. */
+  locale?: string
 }
 
 /** A virtualised row is either an actual message or a day-divider header. */
-type Row =
-  | { kind: 'msg'; msg: Message; showAvatar: boolean }
-  | { kind: 'sidechain'; key: string; label: string; timestamp: string; messages: Message[] }
+export type Row =
+  | { kind: 'msg'; msg: ConversationMessage; showAvatar: boolean }
+  | { kind: 'sidechain'; key: string; label: string; timestamp: string; messages: ConversationMessage[] }
   | { kind: 'divider'; key: string; isoDay: string; label: string }
 
 /** Stable per-local-day key used for divider grouping + dedup. */
@@ -47,7 +50,7 @@ function sameLocalDay(a: Date, b: Date): boolean {
   )
 }
 
-function makeDividerLabel(today: string, yesterday: string, locale: string | undefined): DividerLabel {
+export function makeDividerLabel(today: string, yesterday: string, locale: string | undefined): DividerLabel {
   return (iso, now) => {
     const d = new Date(iso)
     if (sameLocalDay(d, now)) return today
@@ -63,26 +66,26 @@ function makeDividerLabel(today: string, yesterday: string, locale: string | und
 
 const OPENCODE_SUBAGENT_HEADER_PREFIX = 'OpenCode subagent:'
 
-function sidechainKey(message: Message): string {
+function sidechainKey(message: ConversationMessage): string {
   return message.parentUuid ?? `sidechain:${message.id}`
 }
 
-function isSubagentHeader(message: Message): boolean {
+function isSubagentHeader(message: ConversationMessage): boolean {
   return message.role === 'system' && message.contentText.startsWith(OPENCODE_SUBAGENT_HEADER_PREFIX)
 }
 
-function makeSidechainLabel(messages: Message[]): string {
+function makeSidechainLabel(messages: ConversationMessage[]): string {
   const header = messages.find(isSubagentHeader)
   if (!header) return 'Subagent'
   return header.contentText.slice(OPENCODE_SUBAGENT_HEADER_PREFIX.length).trim() || 'Subagent'
 }
 
-function visibleSidechainMessages(messages: Message[]): Message[] {
+function visibleSidechainMessages(messages: ConversationMessage[]): ConversationMessage[] {
   return messages.filter(message => !isSubagentHeader(message))
 }
 
-function groupSidechainMessages(messages: Message[]): Map<string, Message[]> {
-  const groups = new Map<string, Message[]>()
+function groupSidechainMessages(messages: ConversationMessage[]): Map<string, ConversationMessage[]> {
+  const groups = new Map<string, ConversationMessage[]>()
   for (const message of messages) {
     if (!message.isSidechain) continue
     const key = sidechainKey(message)
@@ -100,7 +103,7 @@ function groupSidechainMessages(messages: Message[]): Map<string, Message[]> {
  *  `showAvatar` is pre-computed here so itemContent stays cheap and so
  *  role-grouping resets across day boundaries (the first message after
  *  a divider always shows its avatar). */
-function buildRows(messages: Message[], label: DividerLabel): Row[] {
+export function buildRows(messages: ConversationMessage[], label: DividerLabel): Row[] {
   const rows: Row[] = []
   const sidechainGroups = groupSidechainMessages(messages)
   const emittedSidechains = new Set<string>()
@@ -108,7 +111,7 @@ function buildRows(messages: Message[], label: DividerLabel): Row[] {
   // only fires on actual day transitions — the leading divider above
   // the very first message is suppressed without a separate guard.
   let prevDay: string | null = messages[0] ? localDayKey(messages[0].timestamp) : null
-  let prevMsg: Message | null = null
+  let prevMsg: ConversationMessage | null = null
   const now = new Date()
   for (const msg of messages) {
     let row: Row
@@ -149,13 +152,13 @@ function buildRows(messages: Message[], label: DividerLabel): Row[] {
   return rows
 }
 
-function shouldShowAvatarInGroup(messages: Message[], index: number): boolean {
+function shouldShowAvatarInGroup(messages: ConversationMessage[], index: number): boolean {
   const message = messages[index]
   const previous = index > 0 ? messages[index - 1] : null
   return !message || !previous || previous.role !== message.role || previous.role === 'system'
 }
 
-function hasFindMatch(messages: Message[], messageFindRanges: Map<number, MatchState>): boolean {
+function hasFindMatch(messages: ConversationMessage[], messageFindRanges: Map<number, MatchState>): boolean {
   return messages.some(message => messageFindRanges.has(message.id))
 }
 
@@ -167,11 +170,23 @@ function formatRowTime(iso: string, locale: string | undefined): string {
   }
 }
 
+const EMPTY_FIND_RANGES = new Map<number, MatchState>()
+
 const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
-  { messages, isDark, showFindBar, messageFindRanges, activeMatchIndex, onActiveMatchRef, targetMessageId, showTargetHighlight },
+  {
+    messages,
+    isDark,
+    showFindBar = false,
+    messageFindRanges = EMPTY_FIND_RANGES,
+    activeMatchIndex = -1,
+    onActiveMatchRef = () => {},
+    targetMessageId,
+    showTargetHighlight = false,
+    labels = DEFAULT_LABELS,
+    locale,
+  },
   ref,
 ) {
-  const { t, i18n } = useTranslation()
   const virtuosoRef = useRef<VirtuosoHandle | null>(null)
   const [expandedSidechains, setExpandedSidechains] = useState<Set<string>>(() => new Set())
   const [virtuosoScroller, setVirtuosoScroller] = useState<HTMLElement | null>(null)
@@ -184,8 +199,8 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   }, [])
 
   const dividerLabel = useMemo(
-    () => makeDividerLabel(t('session.divider_today'), t('session.divider_yesterday'), i18n.language),
-    [t, i18n.language],
+    () => makeDividerLabel(labels.today, labels.yesterday, locale),
+    [labels.today, labels.yesterday, locale],
   )
   const rows = useMemo(() => buildRows(messages, dividerLabel), [messages, dividerLabel])
 
@@ -266,7 +281,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
       const rowHasFindMatch = showFindBar && hasFindMatch(row.messages, messageFindRanges)
       const rowHasTarget = targetMessageId != null && row.messages.some(message => message.id === targetMessageId)
       const expanded = expandedSidechains.has(row.key) || rowHasFindMatch || rowHasTarget
-      const rowTime = formatRowTime(row.timestamp, i18n.language)
+      const rowTime = formatRowTime(row.timestamp, locale)
 
       return (
         <div data-index={index} className="px-6 py-2">
@@ -291,7 +306,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
               {row.label}
             </span>
             <span className="flex-none text-[10px] font-mono text-warm-faint dark:text-dark-muted">
-              {t('session.messages_other', { count: row.messages.length })}
+              {labels.messagesCount(row.messages.length)}
               {rowTime ? ` · ${rowTime}` : ''}
             </span>
           </button>

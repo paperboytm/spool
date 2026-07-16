@@ -1,12 +1,12 @@
 import { memo } from 'react'
-import type { Message } from '@spool-lab/core'
-import MarkdownContent from './MarkdownContent.js'
-import type { Range as FindRange } from '../markdown/findHighlightPlugin.js'
+import MarkdownContent from './markdown-content.js'
+import type { Range as FindRange } from './find-highlight-plugin.js'
+import type { ConversationMessage } from './types.js'
 
 export type { FindRange }
 
 interface Props {
-  message: Message
+  message: ConversationMessage
   isDark: boolean
   showAvatar?: boolean
   findRanges?: ReadonlyArray<FindRange>
@@ -104,9 +104,9 @@ function MessageBubble({
 
 function formatTime(iso: string): string {
   try {
-    // Respect the app's UI language (set on <html lang>) instead of
-    // inheriting the OS region setting — otherwise an English macOS
-    // produces "10:35:02 PM" even when the app is in Chinese.
+    // Respect the host page's UI language (set on <html lang>) instead of
+    // inheriting the OS region setting — otherwise an English OS produces
+    // "10:35:02 PM" even when the surrounding UI is in Chinese.
     const locale = typeof document !== 'undefined' && document.documentElement.lang
       ? document.documentElement.lang
       : undefined

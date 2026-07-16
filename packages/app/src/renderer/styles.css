@@ -40,6 +40,11 @@
 @import "@fontsource/geist-mono/latin-500.css";
 @import "tailwindcss";
 
+/* The shared conversation components live outside this package; point
+ * Tailwind's source scanner at them so their utilities compile here with
+ * the app's own dark-variant semantics. */
+@source "../../../session-view/src";
+
 @theme {
   /* Warm palette — light */
   --color-warm-bg: #FAFAF8;

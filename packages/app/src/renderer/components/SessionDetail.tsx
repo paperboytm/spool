@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check, RotateCcw } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
-import { type FindRange } from './MessageBubble.js'
-import MessageList, { type MessageListHandle } from './MessageList.js'
+import { MessageList, type FindRange, type MessageListHandle } from '@spool-lab/session-view'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
 import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
@@ -32,7 +31,7 @@ type Props = {
 const FIND_DEBOUNCE_MS = 120
 
 export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -464,6 +463,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         onActiveMatchRef={bindActiveFindMatch}
         targetMessageId={targetMessageId ?? null}
         showTargetHighlight={showTargetHighlight}
+        labels={{
+          today: t('session.divider_today'),
+          yesterday: t('session.divider_yesterday'),
+          messagesCount: (count) => t('session.messages_other', { count }),
+        }}
+        locale={i18n.language}
       />
     </div>
   )
