@@ -38,7 +38,11 @@ export async function validateHead(
     throw new ApiError('UNPROCESSABLE', 'manifest does not fold to root')
   }
 
-  const wanted = [...new Set([...body.manifest, body.viewOid])]
+  const wanted = [...new Set([
+    ...body.manifest,
+    body.viewOid,
+    ...(body.spoolFileOid === null ? [] : [body.spoolFileOid]),
+  ])]
   const present = await presentOids(db, userId, wanted)
   return { missing: wanted.filter((oid) => !present.has(oid)) }
 }

@@ -1032,7 +1032,7 @@ html[data-theme='dark'] .sw-root {
   max-width: 32ch;
   text-wrap: pretty;
 }
-.sw-google-btn {
+.sw-provider-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1053,22 +1053,22 @@ html[data-theme='dark'] .sw-root {
     0 6px 18px rgba(40, 34, 26, 0.06);
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
 }
-.sw-google-btn:hover {
+.sw-provider-btn:hover {
   border-color: var(--accent);
   box-shadow: 0 2px 4px rgba(40, 34, 26, 0.06),
     0 10px 26px rgba(40, 34, 26, 0.10);
   color: #2A2620;
 }
-.sw-google-btn:active {
+.sw-provider-btn:active {
   transform: translateY(0.5px);
 }
-html[data-theme='dark'] .sw-google-btn {
+html[data-theme='dark'] .sw-provider-btn {
   background: var(--card-2);
   border-color: var(--border-strong);
   color: var(--text);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
-html[data-theme='dark'] .sw-google-btn:hover {
+html[data-theme='dark'] .sw-provider-btn:hover {
   color: var(--text);
 }
 .sw-signin-foot {
@@ -1931,4 +1931,42 @@ html[data-theme='dark'] .sw-modal-overlay {
   box-shadow: var(--shadow-card);
   overflow: hidden;
   padding: 8px 0;
+}
+
+/* Conversation ↔ Document mode tabs (Document = the attached .spool
+ * publication artifact, rendered by share-kit's SnapshotReader). */
+.sw-session-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sw-session-tabs button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sw-session-tabs button:hover { border-color: var(--accent); color: var(--accent); }
+.sw-session-tabs button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+  font-weight: 500;
+}
+.sw-session-tabs .download {
+  margin-left: auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.sw-session-document {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  overflow-x: auto;
 }

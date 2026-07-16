@@ -16,6 +16,7 @@ export type HubSessionRow = {
   note_md: string | null
   lineage_json: string | null
   view_oid: string | null
+  spool_file_oid: string | null
   visibility: string
   withdrawn_at: number | null
   created_at: number
@@ -45,6 +46,7 @@ export async function upsertHubSession(
     noteMd: string | null
     lineageJson: string | null
     viewOid: string
+    spoolFileOid: string | null
     now: number
   },
 ): Promise<void> {
@@ -52,9 +54,9 @@ export async function upsertHubSession(
   // tombstone: an author re-sharing a withdrawn session is an explicit
   // re-publish decision.
   await db.prepare(
-    'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, visibility, withdrawn_at, created_at, updated_at) '
-    + "VALUES (?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) "
-    + 'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, withdrawn_at=NULL, updated_at=excluded.updated_at',
+    'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at) '
+    + "VALUES (?,?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) "
+    + 'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, spool_file_oid=excluded.spool_file_oid, withdrawn_at=NULL, updated_at=excluded.updated_at',
   )
     .bind(
       row.sid,
@@ -66,6 +68,7 @@ export async function upsertHubSession(
       row.noteMd,
       row.lineageJson,
       row.viewOid,
+      row.spoolFileOid,
       row.now,
       row.now,
     )

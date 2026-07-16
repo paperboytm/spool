@@ -39,6 +39,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       noteMd: body.noteMd,
       lineageJson: body.lineageJson,
       viewOid: body.viewOid,
+      spoolFileOid: body.spoolFileOid,
       now: Date.now(),
     })
 

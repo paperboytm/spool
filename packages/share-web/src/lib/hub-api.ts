@@ -4,6 +4,7 @@
 // tests without a DOM or a worker.
 
 import type { SessionViewV1 } from '@spool-lab/session-kit'
+import type { SpoolDocument } from '@spool/share-kit'
 
 export interface HubAuthor {
   handle: string | null
@@ -20,6 +21,7 @@ export interface HubSessionMeta {
   cardJson: string | null
   lineageJson: string | null
   viewOid: string | null
+  spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
   author: HubAuthor
@@ -63,6 +65,21 @@ export async function fetchHubView(sid: string): Promise<SessionViewV1 | null> {
     })
     if (r.status !== 200) return null
     return (await r.json()) as SessionViewV1
+  } catch {
+    return null
+  }
+}
+
+/** The attached .spool document, when the share carries one. */
+export async function fetchHubSpoolFile(sid: string): Promise<SpoolDocument | null> {
+  try {
+    const r = await fetch(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/spool-file`, {
+      headers: { accept: 'application/spool+json' },
+    })
+    if (r.status !== 200) return null
+    const doc = (await r.json()) as SpoolDocument
+    if ((doc.version !== 1 && doc.version !== 2) || typeof doc.conversation !== 'object') return null
+    return doc
   } catch {
     return null
   }

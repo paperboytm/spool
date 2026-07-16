@@ -35,6 +35,9 @@ export const HeadBody = z.object({
   noteMd: boundedText(MAX_NOTE_BYTES).nullable(),
   lineageJson: boundedText(MAX_LINEAGE_BYTES).nullable(),
   viewOid: z.string().regex(OID_RE),
+  // Optional curated .spool document (content-addressed, rides through
+  // objects/batch like the view). Default keeps older clients valid.
+  spoolFileOid: z.string().regex(OID_RE).nullable().default(null),
 })
 export type HeadBodyT = z.infer<typeof HeadBody>
 

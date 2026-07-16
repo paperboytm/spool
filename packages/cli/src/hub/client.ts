@@ -15,6 +15,8 @@ export interface HubSessionWriteRequest {
   noteMd: string | null
   lineageJson: string | null
   viewOid: string
+  /** Optional curated .spool document attached to the share. */
+  spoolFileOid: string | null
 }
 
 export interface HubPushResponse {
@@ -50,6 +52,7 @@ export interface HubSessionMeta {
   noteMd: string | null
   lineageJson: string | null
   viewOid: string
+  spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
   author: HubAuthor

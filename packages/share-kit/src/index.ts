@@ -92,6 +92,7 @@ export {
   ensureTurnIds,
   redactConversation,
 } from './lib/storage/spool-file'
+export { snapshotFromSpoolDocument } from './lib/spool-to-snapshot'
 
 // Markdown export ─────────────────────────────────────────────────
 export {

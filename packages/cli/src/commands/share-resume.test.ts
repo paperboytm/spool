@@ -24,6 +24,7 @@ interface StoredHead {
   noteMd: string | null
   lineageJson: string | null
   viewOid: string
+  spoolFileOid?: string | null
   withdrawn?: boolean
 }
 
@@ -57,7 +58,11 @@ function makeHub() {
       const action = sidMatch[2]
       if (method === 'POST' && (action === 'push' || action === 'head')) {
         const body = JSON.parse(String(init?.body)) as StoredHead
-        const wanted = [...new Set([...body.manifest, body.viewOid])]
+        const wanted = [...new Set([
+          ...body.manifest,
+          body.viewOid,
+          ...(body.spoolFileOid ? [body.spoolFileOid] : []),
+        ])]
         const missing = wanted.filter((oid) => !objects.has(oid))
         if (action === 'push') return json({ missing })
         if (missing.length > 0) return json({ error: 'CONFLICT', detail: 'objects missing' }, 409)
@@ -221,6 +226,44 @@ describe('spool share → spool resume round trip', () => {
     expect(spawnCalls).toEqual([
       { cmd: 'claude', args: ['--resume', newSessionId], cwd: resumerWs },
     ])
+  })
+
+  it('attaches a .spool document when --spool-file is given', async () => {
+    const hub = makeHub()
+    const ws = mkdtempSync(join(tmpdir(), 'spool-attach-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-attach-home-'))
+    const filePath = writeFixtureSession(ws)
+    const docPath = join(ws, 'doc.spool')
+    writeFileSync(docPath, JSON.stringify({
+      version: 2,
+      exportedAt: '2026-07-16T12:00:00.000Z',
+      conversation: { title: 'curated doc', turns: [{ role: 'user', body: 'hi' }] },
+      opts: { template: 'letter' },
+    }), 'utf8')
+    const share = shareDeps(hub, ws, filePath, home)
+
+    const exit = await handleShareCommand(undefined, { noEdit: true, spoolFile: docPath }, share.deps)
+    expect(share.errors).toEqual([])
+    expect(exit).toBe(0)
+
+    const head = hub.sessions.get(`claude_${SESSION_UUID}`)
+    expect(head?.spoolFileOid).toBeTruthy()
+    expect(hub.objects.get(head?.spoolFileOid ?? '')).toContain('curated doc')
+  })
+
+  it('rejects a malformed --spool-file before touching the hub', async () => {
+    const hub = makeHub()
+    const ws = mkdtempSync(join(tmpdir(), 'spool-attach-bad-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-attach-bad-home-'))
+    const filePath = writeFixtureSession(ws)
+    const docPath = join(ws, 'not-a-doc.spool')
+    writeFileSync(docPath, '{"nope":true}', 'utf8')
+    const share = shareDeps(hub, ws, filePath, home)
+
+    const exit = await handleShareCommand(undefined, { noEdit: true, spoolFile: docPath }, share.deps)
+    expect(exit).toBe(1)
+    expect(share.errors.join('\n')).toContain('unrecognized shape')
+    expect(hub.sessions.size).toBe(0)
   })
 
   it('aborts the share when the redact gate finds secrets and the user declines', async () => {

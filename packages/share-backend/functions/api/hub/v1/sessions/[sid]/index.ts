@@ -23,6 +23,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
       cardJson: session.card_json,
       lineageJson: session.lineage_json,
       viewOid: session.view_oid,
+      spoolFileOid: session.spool_file_oid,
       createdAt: session.created_at,
       updatedAt: session.updated_at,
       author,

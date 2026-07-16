@@ -109,6 +109,7 @@ type HubSessionRow = {
   note_md: string | null
   lineage_json: string | null
   view_oid: string | null
+  spool_file_oid: string | null
   visibility: string
   withdrawn_at: number | null
   created_at: number
@@ -316,7 +317,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
       // races (mirrored real D1 surfaces the same value).
       async run(): Promise<{ success: boolean; meta: { changes: number } }> {
 
-        if (/^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(sql)) {
+        if (/^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(sql)) {
           const [
             sid,
             ownerUserId,
@@ -327,6 +328,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             noteMd,
             lineageJson,
             viewOid,
+            spoolFileOid,
             createdAt,
             updatedAt,
           ] = params as [
@@ -339,6 +341,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string | null,
             string | null,
             string,
+            string | null,
             number,
             number,
           ]
@@ -351,6 +354,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             existing.note_md = noteMd
             existing.lineage_json = lineageJson
             existing.view_oid = viewOid
+            existing.spool_file_oid = spoolFileOid
             existing.withdrawn_at = null
             existing.updated_at = updatedAt
           } else {
@@ -364,6 +368,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               note_md: noteMd,
               lineage_json: lineageJson,
               view_oid: viewOid,
+              spool_file_oid: spoolFileOid,
               visibility: 'unlisted',
               withdrawn_at: null,
               created_at: createdAt,

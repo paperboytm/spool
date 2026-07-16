@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { getDB, getSessionWithMessages } from '@spool-lab/core'
-import type { SessionProvider } from '@spool-lab/session-kit'
+import { canonicalizeRecord, type SessionProvider } from '@spool-lab/session-kit'
 
 import { HubClient, HubHttpError, type HubFetch, type HubObjectUpload } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
@@ -28,6 +28,8 @@ export interface ShareCommandOptions {
   message?: string
   noEdit?: boolean
   yes?: boolean
+  /** Path to a .spool document to attach to the share. */
+  spoolFile?: string
 }
 
 export interface ShareCommandDependencies extends HubCredentialOptions {
@@ -97,6 +99,10 @@ export async function handleShareCommand(
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
 
+    const spoolFile = options.spoolFile === undefined
+      ? null
+      : await readSpoolFileObject(options.spoolFile)
+
     const head = {
       root: prepared.root,
       count: prepared.count,
@@ -106,6 +112,7 @@ export async function handleShareCommand(
       noteMd: note.trim() === '' ? null : note,
       lineageJson: prepared.lineageJson,
       viewOid: prepared.viewOid,
+      spoolFileOid: spoolFile === null ? null : spoolFile.oid,
     }
 
     const { missing } = await client.pushSession(prepared.sid, head)
@@ -113,6 +120,7 @@ export async function handleShareCommand(
     const uploads: HubObjectUpload[] = [
       ...prepared.records.map((record) => ({ oid: record.oid, data: record.data })),
       { oid: prepared.viewOid, data: prepared.viewData },
+      ...(spoolFile === null ? [] : [spoolFile]),
     ].filter((object) => missingSet.has(object.oid))
 
     let uploaded = 0
@@ -143,15 +151,35 @@ export const shareCommand = new Command('share')
   .option('-m, --message <note>', 'Note text (skips the editor)')
   .option('--no-edit', 'Publish the prefilled draft without opening the editor')
   .option('--yes', 'Skip the secret-findings confirmation')
-  .action(async (session: string | undefined, opts: { message?: string; edit?: boolean; yes?: boolean }) => {
+  .option('--spool-file <path>', 'Attach a .spool document to the share')
+  .action(async (session: string | undefined, opts: { message?: string; edit?: boolean; yes?: boolean; spoolFile?: string }) => {
     const exitCode = await handleShareCommand(session, {
       ...(opts.message === undefined ? {} : { message: opts.message }),
       // commander maps --no-edit to edit:false.
       ...(opts.edit === false ? { noEdit: true } : {}),
       ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+      ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
     })
     if (exitCode !== 0) process.exitCode = exitCode
   })
+
+/** Read + canonicalize a .spool document for attachment. Shape-checked
+ *  only (version + conversation) — the document is a display artifact,
+ *  not wire-critical data. */
+async function readSpoolFileObject(path: string): Promise<{ oid: string; data: string }> {
+  const raw = readFileSync(path, 'utf8')
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error(`Not a valid .spool file (malformed JSON): ${path}`)
+  }
+  const doc = parsed as { version?: unknown; conversation?: unknown }
+  if ((doc.version !== 1 && doc.version !== 2) || typeof doc.conversation !== 'object' || doc.conversation === null) {
+    throw new Error(`Not a valid .spool file (unrecognized shape): ${path}`)
+  }
+  return canonicalizeRecord(raw)
+}
 
 function parseShareRef(input: string | undefined): { sessionUuid?: string; position?: number } {
   if (input === undefined) return {}

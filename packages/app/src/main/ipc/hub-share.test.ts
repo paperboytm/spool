@@ -30,6 +30,7 @@ interface StoredHead {
   count: number
   manifest: string[]
   viewOid: string
+  spoolFileOid: string | null
   noteMd: string | null
 }
 
@@ -53,7 +54,11 @@ function makeHub() {
     const match = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)\/(push|head)$/)
     if (match && method === 'POST') {
       const body = JSON.parse(String(init?.body)) as StoredHead
-      const wanted = [...new Set([...body.manifest, body.viewOid])]
+      const wanted = [...new Set([
+        ...body.manifest,
+        body.viewOid,
+        ...(body.spoolFileOid ? [body.spoolFileOid] : []),
+      ])]
       const missing = wanted.filter((oid) => !objects.has(oid))
       if (match[2] === 'push') return json({ missing })
       if (missing.length > 0) return json({ error: 'CONFLICT' }, 409)
@@ -132,6 +137,14 @@ describe('hub-share IPC', () => {
     expect(head?.noteMd).toBe('take a look')
     expect(head?.root).toBe(await sequenceRoot(head?.manifest ?? []))
     expect(hub.objects.has(head?.viewOid ?? '')).toBe(true)
+
+    // Every desktop share auto-attaches a sanitized .spool document.
+    expect(head?.spoolFileOid).toBeTruthy()
+    const doc = hub.objects.get(head?.spoolFileOid ?? '') ?? ''
+    expect(doc).toContain('"version":2')
+    expect(doc).toContain('hello, ship the demo')
+    // The fixture's AWS key must be masked in the attached document.
+    expect(doc).not.toContain('AKIAABCDEFGHIJKLMNOP')
   })
 
   it('publish without a signed-in session reports UNAUTHENTICATED', async () => {

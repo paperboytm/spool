@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageList, type MessageListHandle } from '@spool-lab/session-view'
 import type { SessionViewV1 } from '@spool-lab/session-kit'
+import { SnapshotReader, snapshotFromSpoolDocument, type SpoolDocument } from '@spool/share-kit'
 
 import { Footer, Header, Page } from '../components/Chrome'
 import { DiffPane } from '../components/session/diff-pane'
@@ -26,6 +27,7 @@ import { deepLinkIndex, providerOf } from '../lib/session-page'
 import { parseHubConversation } from '../lib/session-messages'
 import { Tombstone } from './Tombstone'
 
+  fetchHubSpoolFile,
 const FETCH_PAGE = 500
 
 type PageState =
@@ -71,6 +73,8 @@ export function SessionReader({ sid }: { sid: string }) {
       const meta = await fetchHubMeta(sid)
       if (cancelled) return
       if (meta.kind === 'not-found') return setState({ phase: 'not-found' })
+  const [viewMode, setViewMode] = useState<'conversation' | 'document'>('conversation')
+  const [spoolDoc, setSpoolDoc] = useState<SpoolDocument | null>(null)
       if (meta.kind === 'withdrawn') return setState({ phase: 'withdrawn', at: meta.at })
       if (meta.kind === 'error') return setState({ phase: 'error' })
 
@@ -133,6 +137,7 @@ export function SessionReader({ sid }: { sid: string }) {
     // Virtuoso mounts with initialTopMostItemIndex via targetMessageId,
     // but if the list is already mounted, scroll imperatively too.
     requestAnimationFrame(() => listRef.current?.scrollToMessageId(messageId))
+    setViewMode('conversation')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase, conversation])
 
@@ -140,6 +145,26 @@ export function SessionReader({ sid }: { sid: string }) {
 
   if (state.phase === 'withdrawn') {
     return (
+  // The attached .spool document loads lazily on the first switch to the
+  // Document view.
+  const openDocument = () => {
+    setViewMode('document')
+    if (spoolDoc === null) {
+      void fetchHubSpoolFile(sid).then((doc) => { if (doc) setSpoolDoc(doc) })
+    }
+  }
+
+  const downloadSpoolDoc = () => {
+    if (spoolDoc === null) return
+    const blob = new Blob([JSON.stringify(spoolDoc, null, 2)], { type: 'application/spool+json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${(spoolDoc.conversation.title || 'session').replace(/[^\w\d-]+/g, '-').slice(0, 60)}.spool`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
       <Page>
         <Header />
         <main className="sw-main center">
@@ -196,7 +221,41 @@ export function SessionReader({ sid }: { sid: string }) {
               onOpenFile={setOpenFile}
               onJumpToRecord={jumpToRecord}
             />
-            <div className="sw-session-layers">
+            {state.meta.spoolFileOid != null && (
+              <div className="sw-session-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === 'conversation'}
+                  className={viewMode === 'conversation' ? 'active' : ''}
+                  onClick={() => setViewMode('conversation')}
+                >
+                  Conversation
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === 'document'}
+                  className={viewMode === 'document' ? 'active' : ''}
+                  onClick={openDocument}
+                >
+                  Document
+                </button>
+                {viewMode === 'document' && spoolDoc !== null && (
+                  <button type="button" className="download" onClick={downloadSpoolDoc}>
+                    Download .spool
+                  </button>
+                )}
+              </div>
+            )}
+            {viewMode === 'document' && (
+              <section className="sw-session-document">
+                {spoolDoc === null
+                  ? <p className="sw-session-loading">Loading document…</p>
+                  : <SnapshotReader snapshot={snapshotFromSpoolDocument(spoolDoc)} />}
+              </section>
+            )}
+            <div className="sw-session-layers" style={viewMode === 'document' ? { display: 'none' } : undefined}>
               <section className="sw-session-conversation">
                 {conversation && conversation.messages.length > 0
                   ? (
