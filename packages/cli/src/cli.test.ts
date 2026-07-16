@@ -233,6 +233,25 @@ describe('status', () => {
   })
 })
 
+describe('share session-id prefixes', () => {
+  let seeded: ReturnType<typeof createSeededDir>
+  beforeAll(() => { seeded = createSeededDir() })
+  afterAll(() => { seeded.cleanup() })
+
+  it('rejects an ambiguous prefix and names the candidates', () => {
+    // Both seeded uuids share their first 8 chars.
+    const out = runFail(['share', SESSION_UUID_1.slice(0, 8)], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Ambiguous session id prefix')
+    expect(out).toContain(SESSION_UUID_1)
+    expect(out).toContain(SESSION_UUID_2)
+  })
+
+  it('reports unknown prefixes as not found in the index', () => {
+    const out = runFail(['share', 'deadbeef'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('not found in the local index')
+  })
+})
+
 describe('list', () => {
   let seeded: ReturnType<typeof createSeededDir>
   beforeAll(() => { seeded = createSeededDir() })
@@ -242,6 +261,11 @@ describe('list', () => {
     const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain('Refactoring database queries')
+  })
+
+  it('prints an actionable short id per row (what spool share/show consume)', () => {
+    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain(`#${SESSION_UUID_1.slice(0, 8)}`)
   })
 
   it('limits results with -n', () => {

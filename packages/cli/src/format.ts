@@ -1,11 +1,14 @@
 import type { Session } from '@spool-lab/core'
 
 export function printSession(s: Session): void {
+  // Short id first: it is what `spool share <id>` / `spool show <uuid>`
+  // consume — a listing you can't act on is a dead end.
+  const id = `#${s.sessionUuid.slice(0, 8)}`
   const date = formatDate(s.startedAt)
   const source = s.source.padEnd(7)
   const project = s.projectDisplayName.slice(0, 20).padEnd(20)
   const title = (s.title ?? '(no title)').slice(0, 50)
-  console.log(`${source} ${date}  ${project}  ${title}`)
+  console.log(`${id}  ${source} ${date}  ${project}  ${title}`)
 }
 
 export function formatDate(iso: string): string {

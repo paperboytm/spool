@@ -170,7 +170,9 @@ function parseShareRef(input: string | undefined): { sessionUuid?: string; posit
 
 function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): ShareTarget {
   const db = getDB(true)
-  const uuid = sessionUuid ?? latestSessionUuidFor(db, cwd)
+  const uuid = sessionUuid === undefined
+    ? latestSessionUuidFor(db, cwd)
+    : expandUuidPrefix(db, sessionUuid)
   const found = getSessionWithMessages(db, uuid)
   if (!found) throw new Error(`Session not found in the local index: ${uuid} (run \`spool sync\`?)`)
   const { session } = found
@@ -186,6 +188,20 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
     filePath: session.filePath,
     cwd: session.cwd,
   }
+}
+
+/** Accept `spool list`'s short ids: expand a uuid prefix to the full uuid. */
+function expandUuidPrefix(db: ReturnType<typeof getDB>, input: string): string {
+  const rows = db.prepare(
+    'SELECT session_uuid FROM sessions WHERE session_uuid LIKE ? ORDER BY ended_at DESC LIMIT 3',
+  ).all(`${input}%`) as Array<{ session_uuid: string }>
+  if (rows.length === 0) return input // fall through to the exact-match error
+  if (rows.length > 1 && rows[0]?.session_uuid !== input) {
+    throw new Error(
+      `Ambiguous session id prefix ${input} — matches ${rows.map((row) => row.session_uuid).join(', ')}${rows.length === 3 ? ', …' : ''}. Use more characters.`,
+    )
+  }
+  return rows[0]?.session_uuid ?? input
 }
 
 function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string): string {
