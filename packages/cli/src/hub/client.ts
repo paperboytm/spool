@@ -182,7 +182,7 @@ export class HubClient {
         ? (cause.cause instanceof Error ? cause.cause.message : cause.message)
         : String(cause)
       const localHint = /127\.0\.0\.1|localhost/.test(this.hubUrl)
-        ? ' Is the local hub running? Start it with `pnpm --filter @spool/share-backend dev` (and `pnpm --filter @spool/share-web dev` when using port 3002).'
+        ? ' Is the local hub running? Start it with `pnpm --filter @spool/share-backend dev` (and `pnpm --filter @spool/share-web dev` when using port 3002). Note: vite often binds IPv6-only — if the server is up but 127.0.0.1 is refused, use http://localhost:<port> instead.'
         : ''
       throw new Error(`Cannot reach the hub at ${this.hubUrl} (${detail}).${localHint}`)
     }
