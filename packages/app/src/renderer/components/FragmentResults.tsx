@@ -129,7 +129,7 @@ export default function FragmentResults({ results, query, onOpenSession, default
 }
 
 function formatSourceFilterLabel(source: string): string {
-  if (source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode') {
+  if (source === 'claude' || source === 'codex' || source === 'gemini' || source === 'antigravity' || source === 'opencode') {
     return getSessionSourceLabel(source)
   }
   return source

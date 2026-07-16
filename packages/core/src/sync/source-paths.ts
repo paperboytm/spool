@@ -4,7 +4,7 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep 
 import type { SessionSource } from '../types.js'
 import { OPENCODE_DB_NAME, isOpenCodeDatabaseFile } from '../parsers/opencode.js'
 
-const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'antigravity' | 'opencode'>, string> = {
   claude: 'projects',
   codex: 'sessions',
 }
@@ -13,15 +13,16 @@ const SOURCE_ENV_VARS: Record<SessionSource, string> = {
   claude: 'SPOOL_CLAUDE_DIR',
   codex: 'SPOOL_CODEX_DIR',
   gemini: 'SPOOL_GEMINI_DIR',
+  antigravity: 'SPOOL_ANTIGRAVITY_DIR',
   opencode: 'SPOOL_OPENCODE_DIR',
 }
 
-const SOURCE_DEFAULT_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_DEFAULT_BASES: Record<Exclude<SessionSource, 'gemini' | 'antigravity' | 'opencode'>, string> = {
   claude: '.claude',
   codex: '.codex',
 }
 
-const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode'>, string> = {
+const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'antigravity' | 'opencode'>, string> = {
   claude: '.claude-profiles',
   codex: '.codex-profiles',
 }
@@ -36,6 +37,10 @@ export function getSessionRoots(source: SessionSource): string[] {
     return dedupePaths([
       normalizeSourceRoot('gemini', join(getGeminiBaseDir(), 'tmp')),
     ])
+  }
+
+  if (source === 'antigravity') {
+    return dedupePaths([normalizeSourceRoot('antigravity', join(getAntigravityCliBaseDir(), 'brain'))])
   }
 
   if (source === 'opencode') {
@@ -68,10 +73,11 @@ export function detectSessionSource(
     claude: getSessionRoots('claude'),
     codex: getSessionRoots('codex'),
     gemini: getSessionRoots('gemini'),
+    antigravity: getSessionRoots('antigravity'),
     opencode: getSessionRoots('opencode'),
   },
 ): SessionSource | undefined {
-  for (const source of ['claude', 'codex', 'gemini', 'opencode'] as const) {
+  for (const source of ['claude', 'codex', 'gemini', 'antigravity', 'opencode'] as const) {
     if (sourceRoots[source]?.some(root => isSessionFileForSource(source, filePath, root))) {
       return source
     }
@@ -88,6 +94,9 @@ export function getSessionWatchPatterns(
       join(root, '**', 'session-*.json'),
       join(root, '**', 'session-*.jsonl'),
     ])
+  }
+  if (source === 'antigravity') {
+    return roots.map(root => join(root, '**', 'transcript.jsonl'))
   }
   const pattern = source === 'opencode'
     ? OPENCODE_DB_NAME
@@ -115,6 +124,10 @@ function normalizeSourceRoot(source: SessionSource, filePath: string): string {
     if (existsSync(join(resolvedPath, '.gemini', 'tmp'))) {
       return join(resolvedPath, '.gemini', 'tmp')
     }
+    return resolvedPath
+  }
+
+  if (source === 'antigravity') {
     return resolvedPath
   }
 
@@ -151,6 +164,24 @@ function getGeminiBaseDir(): string {
     : join(homedir(), '.gemini')
 }
 
+function getGeminiCliBaseDir(): string {
+  const explicit = process.env['ANTIGRAVITY_CLI_HOME']?.trim()
+  if (explicit) return resolve(expandHome(explicit))
+
+  const configuredHome = process.env['GEMINI_CLI_HOME']?.trim()
+  if (configuredHome) {
+    const resolved = resolve(expandHome(configuredHome))
+    if (basename(resolved) === 'antigravity-cli') return resolved
+    return join(resolved, '.gemini', 'antigravity-cli')
+  }
+
+  return join(homedir(), '.gemini', 'antigravity-cli')
+}
+
+function getAntigravityCliBaseDir(): string {
+  return getGeminiCliBaseDir()
+}
+
 function getOpenCodeBaseDir(): string {
   const configuredHome = process.env['OPENCODE_DATA_DIR']?.trim()
   if (configuredHome) return resolve(expandHome(configuredHome))
@@ -173,6 +204,9 @@ export function isSessionFileForSource(source: SessionSource, filePath: string, 
     // clobber each other's session row via UNIQUE(session_uuid) on every scan.
     if (filePath.endsWith('.json') && existsSync(`${filePath}l`)) return false
     return true
+  }
+  if (source === 'antigravity') {
+    return filePath.endsWith('transcript.jsonl')
   }
   if (source === 'opencode') {
     return isOpenCodeDatabaseFile(filePath)

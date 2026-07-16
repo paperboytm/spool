@@ -195,7 +195,7 @@ function ensureAgentSearchCwd(): string {
  * the Spool-authored session write.
  */
 function agentIdToSource(agentId: string): SessionSource | null {
-  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini' || agentId === 'opencode') return agentId
+  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini' || agentId === 'antigravity' || agentId === 'opencode') return agentId
   return null
 }
 
@@ -844,12 +844,12 @@ export class AcpManager {
     // after stripping the prelude only the bare query remains as the first
     // user message — clean derived title, clean FTS, clean session detail.
     const systemBody = [
-      'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI, OpenCode).',
+      'You have access to a local knowledge base called Spool that indexes the user\'s AI coding sessions (Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, OpenCode).',
       '',
       'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
       '',
       '── Schema ──',
-      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", "gemini", or "opencode"',
+      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", "gemini", "antigravity", or "opencode"',
       '  projects(id, source_id, slug, display_path, display_name, last_synced)',
       '  sessions(id, project_id, source_id, session_uuid TEXT, title TEXT, started_at TEXT, ended_at TEXT, message_count INT, has_tool_use INT)',
       '  messages(id, session_id, source_id, role TEXT, content_text TEXT, timestamp TEXT, tool_names TEXT)',
@@ -864,7 +864,7 @@ export class AcpManager {
       '',
       'Important:',
       '- Interpret the user\'s intent and decide what to search. Don\'t just match their exact words.',
-      '- If the user names a specific source (claude/codex/gemini/opencode), only return results from that source unless they explicitly ask for cross-source search.',
+      '- If the user names a specific source (claude/codex/gemini/antigravity/opencode), only return results from that source unless they explicitly ask for cross-source search.',
       '- For cross-source questions, first identify the relevant sources, then query each source separately, confirm hits or no-hits per source, and only then merge them into one answer.',
       '- For temporal queries ("what did I do recently"), use explicit date filters and be conservative when comparing times across different sources.',
       '- You may run multiple queries to find relevant information.',

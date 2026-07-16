@@ -31,6 +31,7 @@ interface Props {
   claudeCount: number | null
   codexCount: number | null
   geminiCount: number | null
+  antigravityCount: number | null
   opencodeCount: number | null
   themeEditor: ThemeEditorStateV1
   onThemeEditorChange: (next: ThemeEditorStateV1) => void
@@ -145,6 +146,7 @@ export default function SettingsPanel({
   claudeCount,
   codexCount,
   geminiCount,
+  antigravityCount,
   opencodeCount,
   themeEditor,
   onThemeEditorChange,
@@ -240,7 +242,7 @@ export default function SettingsPanel({
               <AppearanceTab themeEditor={themeEditor} onThemeEditorChange={onThemeEditorChange} />
             )}
             {activeTab === 'shortcuts' && <ShortcutsTab />}
-            {activeTab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} opencodeCount={opencodeCount} />}
+            {activeTab === 'sources' && <SourcesTab claudeCount={claudeCount} codexCount={codexCount} geminiCount={geminiCount} antigravityCount={antigravityCount} opencodeCount={opencodeCount} />}
             {activeTab === 'agent' && <AgentTab />}
             {activeTab === 'account' && <SettingsAccount />}
             {activeTab === 'security' && <SecurityPane />}
@@ -436,11 +438,13 @@ function SourcesTab({
   claudeCount,
   codexCount,
   geminiCount,
+  antigravityCount,
   opencodeCount,
 }: {
   claudeCount: number | null
   codexCount: number | null
   geminiCount: number | null
+  antigravityCount: number | null
   opencodeCount: number | null
 }) {
   const { t } = useTranslation()
@@ -450,6 +454,7 @@ function SourcesTab({
         <BuiltInSource name={getSessionSourceLabel('claude')} color={getSessionSourceColor('claude')} count={claudeCount} />
         <BuiltInSource name={getSessionSourceLabel('codex')} color={getSessionSourceColor('codex')} count={codexCount} />
         <BuiltInSource name={getSessionSourceLabel('gemini')} color={getSessionSourceColor('gemini')} count={geminiCount} />
+        <BuiltInSource name={getSessionSourceLabel('antigravity')} color={getSessionSourceColor('antigravity')} count={antigravityCount} />
         <BuiltInSource name={getSessionSourceLabel('opencode')} color={getSessionSourceColor('opencode')} count={opencodeCount} />
       </Section>
     </div>

@@ -162,7 +162,7 @@ describe('migration v5 (connector subsystem removal)', () => {
 
     // 'connector' source row also dropped
     const sources = db.prepare('SELECT name FROM sources').all() as Array<{ name: string }>
-    expect(sources.map(s => s.name).sort()).toEqual(['claude', 'codex', 'gemini', 'opencode'])
+    expect(sources.map(s => s.name).sort()).toEqual(['antigravity', 'claude', 'codex', 'gemini', 'opencode'])
 
     // After v7: stars dropped, session star preserved as pin, capture star gone
     expect(tableNames.has('stars')).toBe(false)

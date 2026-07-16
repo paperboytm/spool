@@ -1,7 +1,7 @@
 # Design System — Spool
 
 ## Product Context
-- **What this is:** A local AI session library — an Electron macOS app that collects, organizes, and lets you revisit every Claude Code, Codex, and Gemini session you've ever had.
+- **What this is:** A local AI session library — an Electron macOS app that collects, organizes, and lets you revisit every Claude Code, Codex, Gemini, Antigravity, and OpenCode session you've ever had.
 - **Who it's for:** Developers who think with AI daily and have accumulated hundreds of sessions across multiple tools. The persona is overwhelmed by the archive itself, not only by re-explaining context.
 - **Space/industry:** Developer productivity / local-first tooling. Peers: Raycast, Spotlight, Obsidian, DevonThink — but none of them treat AI sessions as first-class library items.
 - **Project type:** macOS Electron app — sidebar + main pane shell, the shape of a library client.
@@ -89,6 +89,7 @@ Only currently-supported agent sources are listed. New sources arrive via the da
 | Claude Code | `#C26A4E` | `#E89A7C` |
 | Codex CLI | `#4A9670` | `#7CC9A2` |
 | Gemini | `#5887D0` | `#8AB0E5` |
+| Antigravity | `#6B5CA5` | `#9B8FD0` |
 | OpenCode | `#8A6F3D` | `#C9A761` |
 
 ### Semantic States
@@ -282,5 +283,5 @@ In list contexts (Library Home, Project View, search results), trust the surroun
 | 2026-05-08 | Warm-tuned status colors replace Tailwind defaults | `green-400 / amber-400 / red-400` were the only un-tuned colors in the system. Replaced with warm green `#6BAF6B`, warm amber `#E4A640`, terracotta `#C95A4F` so status reads as part of the same palette. |
 | 2026-05-08 | Page title type added (20px) | Library Home and Settings need a real h1 — previous scale topped at sidebar wordmark 16px, leaving the home pane labelless. |
 | 2026-05-08 | First-person rule softened from "all metadata" to "where it adds signal" | Literal "You discussed this · Mar 15" prefix on every row was repetitive once a user had hundreds of sessions. Library context already conveys ownership; reserve first-person for empty states, detail headers, and confirmations. |
-| 2026-05-08 | Source badge list trimmed to active agents only | Twitter / GitHub / YouTube / ChatGPT were carryover from the connector era. Spool ships only Claude Code / Codex CLI / Gemini today; new sources arrive via the daemon and get a row when shipped, not preemptively. |
+| 2026-05-08 | Source badge list trimmed to active agents only | Twitter / GitHub / YouTube / ChatGPT were carryover from the connector era. Spool ships only Claude Code / Codex CLI / Gemini / Antigravity today; new sources arrive via the daemon and get a row when shipped, not preemptively. |
 | 2026-05-26 | Retire the "icons only 12/14/16/20, stroke 1.5" rule — describe reality instead | The 2026-05-08 lock never held: the renderer actually uses 11/12/13/14 (13 & 14 dominant) at strokes 1.6–1.8 (1.6 most common, 1.5 a minority). The aspirational whitelist was actively misleading new work into picking sizes that clashed with adjacent icons. Replaced with a role-based working set + a "match adjacent icons" rule. Sizes/strokes are now chosen for local consistency, not global uniformity. |

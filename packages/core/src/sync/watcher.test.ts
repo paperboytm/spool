@@ -28,15 +28,18 @@ function makeTempRoots() {
   const codexRoot = join(baseDir, 'codex', 'sessions')
   const geminiRoot = join(baseDir, 'gemini', 'tmp')
   const opencodeRoot = join(baseDir, 'opencode')
+  const antigravityRoot = join(baseDir, 'antigravity')
   mkdirSync(join(claudeRoot, 'project-a'), { recursive: true })
   mkdirSync(join(codexRoot, '2026', '04', '20'), { recursive: true })
   mkdirSync(join(geminiRoot, 'workspace', 'chats'), { recursive: true })
   mkdirSync(opencodeRoot, { recursive: true })
+  mkdirSync(antigravityRoot, { recursive: true })
   vi.stubEnv('SPOOL_CLAUDE_DIR', claudeRoot)
   vi.stubEnv('SPOOL_CODEX_DIR', codexRoot)
   vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'gemini'))
+  vi.stubEnv('SPOOL_ANTIGRAVITY_DIR', antigravityRoot)
   vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeRoot)
-  return { baseDir, claudeRoot, codexRoot, geminiRoot, opencodeRoot }
+  return { baseDir, claudeRoot, codexRoot, geminiRoot, antigravityRoot, opencodeRoot }
 }
 
 interface SyncCall { path: string; source: SessionSource }

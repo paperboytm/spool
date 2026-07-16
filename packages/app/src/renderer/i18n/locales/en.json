@@ -140,7 +140,7 @@
     "pinnedSessions": "Pinned",
     "viewAll": "View all",
     "empty_title": "No sessions yet",
-    "empty_body": "Open Claude Code, Codex, Gemini, or OpenCode to start a session — Spool indexes it automatically.",
+    "empty_body": "Open Claude Code, Codex, Gemini, Antigravity, or OpenCode to start a session — Spool indexes it automatically.",
     "section_pinned": "Pinned · {{count}} session",
     "section_pinned_other": "Pinned · {{count}} sessions",
     "section_recent": "RECENT",

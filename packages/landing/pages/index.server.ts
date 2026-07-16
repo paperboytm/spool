@@ -38,7 +38,7 @@ export const head = defineHead(() => ({
         "@type": "SoftwareApplication",
         name: "Spool",
         description:
-          "Your local AI session library. Browse, pin, and search every Claude Code, Codex, Gemini, and OpenCode session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
+          "Your local AI session library. Browse, pin, and search every Claude Code, Codex, Gemini, Antigravity, and OpenCode session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
         url: "https://spool.pro",
         applicationCategory: "DeveloperApplication",
         operatingSystem: "macOS",

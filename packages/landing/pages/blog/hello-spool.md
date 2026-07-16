@@ -6,7 +6,7 @@ author: Yifeng
 tags: [announcement, product]
 ---
 
-If you use Claude Code, Codex, Gemini CLI, or any AI coding agent daily, you've accumulated hundreds of sessions. Each one contains decisions, debugging breakthroughs, architectural discussions — your best thinking, scattered across session files on your machine.
+If you use Claude Code, Codex, Gemini CLI, Antigravity CLI, or any AI coding agent daily, you've accumulated hundreds of sessions. Each one contains decisions, debugging breakthroughs, architectural discussions — your best thinking, scattered across session files on your machine.
 
 Spool makes all of that searchable.
 

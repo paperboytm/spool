@@ -136,7 +136,7 @@
     "pinnedSessions": "고정됨",
     "viewAll": "전체 보기",
     "empty_title": "아직 세션이 없습니다",
-    "empty_body": "Claude Code, Codex, Gemini, OpenCode를 열어 세션을 시작하세요 — Spool이 자동으로 인덱싱합니다.",
+    "empty_body": "Claude Code, Codex, Gemini, Antigravity, OpenCode를 열어 세션을 시작하세요 — Spool이 자동으로 인덱싱합니다.",
     "section_pinned_other": "고정됨 · {{count}}개",
     "section_recent": "최근",
     "bucket_today": "오늘",

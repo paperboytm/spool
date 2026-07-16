@@ -1,7 +1,7 @@
 // Regex detection pipeline for @spool-lab/redact.
 //
 // Primary scenario: Spool sessions captured from local coding agents
-// (Claude Code, codex, gemini) — terminal output, tool results, files
+// (Claude Code, codex, gemini, antigravity) — terminal output, tool results, files
 // the agent read, error logs. The patterns favour structured leaks
 // that *appear in this kind of content*: a stray `cat ~/.aws/creds`
 // line, `gh auth status` dumping a token, a `kubectl config view`

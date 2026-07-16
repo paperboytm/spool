@@ -151,7 +151,7 @@ describe('migration v1-v3 (historical connector path)', () => {
 
     // 'connector' source row dropped by v5
     const sources = (db.prepare('SELECT name FROM sources').all() as { name: string }[]).map(s => s.name)
-    expect(sources.sort()).toEqual(['claude', 'codex', 'gemini', 'opencode'])
+    expect(sources.sort()).toEqual(['antigravity', 'claude', 'codex', 'gemini', 'opencode'])
 
     // Session preserved
     const sess = db.prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'").get() as { session_uuid: string }

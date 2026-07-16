@@ -2,6 +2,7 @@ const RESUME_COMMAND_PREFIXES: Record<string, string> = {
   claude: 'claude --resume',
   codex: 'codex resume',
   gemini: 'gemini --resume',
+  antigravity: 'agy --conversation',
   opencode: 'opencode --session',
 }
 

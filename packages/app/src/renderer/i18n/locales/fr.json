@@ -140,7 +140,7 @@
     "pinnedSessions": "Épinglés",
     "viewAll": "Tout afficher",
     "empty_title": "Aucune session pour l'instant",
-    "empty_body": "Ouvrez Claude Code, Codex, Gemini ou OpenCode pour démarrer une session — Spool l'indexe automatiquement.",
+    "empty_body": "Ouvrez Claude Code, Codex, Gemini, Antigravity ou OpenCode pour démarrer une session — Spool l'indexe automatiquement.",
     "section_pinned": "Épinglé · {{count}} session",
     "section_pinned_other": "Épinglés · {{count}} sessions",
     "section_recent": "RÉCENT",

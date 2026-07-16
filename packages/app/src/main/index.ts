@@ -730,7 +730,7 @@ ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned, ide
     if (cached) return cached
   }
 
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
+  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'antigravity' || source === 'opencode'
     ? source
     : undefined
   const results = searchFragments(db, query, {
@@ -752,7 +752,7 @@ ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { quer
   const cached = searchCache.get(cacheKey)
   if (cached) return cached
 
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
+  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'antigravity' || source === 'opencode'
     ? source
     : undefined
   const fragments = searchSessionPreview(db, query, {
@@ -911,11 +911,11 @@ ipcMain.handle('spool:force-resync-session', (_e, { sessionUuid }: { sessionUuid
 
 ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
   try {
+    const session = getSessionWithMessages(db, sessionUuid)?.session
     const command = getSessionResumeCommand(source, sessionUuid)
     if (!command) {
       return { ok: false, error: `Session source "${source}" cannot be resumed from the CLI.` }
     }
-    const session = getSessionWithMessages(db, sessionUuid)?.session
     const resumeCwd = session
       ? resolveResumeWorkingDirectory(session)
       : resolveResumeWorkingDirectory({

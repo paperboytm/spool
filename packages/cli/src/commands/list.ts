@@ -2,12 +2,12 @@ import { Command } from 'commander'
 import { getDB, listRecentSessionsPage } from '@spool-lab/core'
 import { printSession } from '../format.js'
 
-const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode'])
+const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'antigravity', 'opencode'])
 
 export const listCommand = new Command('list')
   .description('List recent AI sessions')
   .option('-n, --limit <n>', 'Max results', '20')
-  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|opencode')
+  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|antigravity|opencode')
   .option('-p, --project <path>', 'Filter by project path substring')
   .option('--json', 'Output as JSON')
   .action((opts: { limit: string; source?: string; project?: string; json?: boolean }) => {

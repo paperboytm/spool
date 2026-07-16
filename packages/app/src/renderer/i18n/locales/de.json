@@ -140,7 +140,7 @@
     "pinnedSessions": "Angeheftet",
     "viewAll": "Alle anzeigen",
     "empty_title": "Noch keine Sitzungen",
-    "empty_body": "Öffnen Sie Claude Code, Codex, Gemini oder OpenCode, um eine Sitzung zu starten – Spool indexiert sie automatisch.",
+    "empty_body": "Öffnen Sie Claude Code, Codex, Gemini, Antigravity oder OpenCode, um eine Sitzung zu starten – Spool indexiert sie automatisch.",
     "section_pinned": "Angeheftet · {{count}} Sitzung",
     "section_pinned_other": "Angeheftet · {{count}} Sitzungen",
     "section_recent": "ZULETZT",

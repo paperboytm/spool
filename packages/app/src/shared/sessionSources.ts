@@ -17,6 +17,12 @@ const SESSION_SOURCE_META = {
     color: '#5887D0',
     colorDark: '#8AB0E5',
   },
+  antigravity: {
+    label: 'Antigravity',
+    shortLabel: 'agy',
+    color: '#6B5CA5',
+    colorDark: '#9B8FD0',
+  },
   opencode: {
     label: 'OpenCode',
     shortLabel: 'opencode',

@@ -1,10 +1,10 @@
 ---
 name: spool
-description: Search your local Claude Code, Codex CLI, Gemini CLI, and OpenCode session history
+description: Search your local Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, and OpenCode session history
 allowed-tools: Bash
 ---
 
-Search your thinking with spool — a local search engine over your Claude Code, Codex CLI, Gemini CLI, and OpenCode sessions.
+Search your thinking with spool — a local search engine over your Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, and OpenCode sessions.
 
 ## Steps
 
@@ -30,7 +30,7 @@ where `$ARGS` is everything the user passed to `/spool`.
 
 For each result in the JSON array, show:
 - **Session title** and date (`startedAt`)
-- **Source** (claude, codex, gemini, or opencode) and **project** path
+- **Source** (claude, codex, gemini, antigravity, or opencode) and **project** path
 - The **snippet** with highlighted terms (strip `<mark>` / `</mark>` tags for plain display)
 - A note of the session UUID
 

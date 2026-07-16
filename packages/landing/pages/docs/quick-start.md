@@ -7,11 +7,11 @@ After [installing Spool](/docs/installation), you're a few clicks away from a br
 
 ## 1. Launch Spool
 
-Open Spool from your Applications folder. It starts indexing your Claude Code, Codex CLI, Gemini CLI, and OpenCode sessions automatically — new sessions become visible the moment they're written.
+Open Spool from your Applications folder. It starts indexing your Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, and OpenCode sessions automatically — new sessions become visible the moment they're written.
 
 ## 2. Browse your library
 
-The left sidebar lists **projects** — derived from the working directories your agents ran in, so a project called `api-core` collects every Claude / Codex / Gemini session you ever opened from that repo. Click a project to see its sessions in the main pane.
+The left sidebar lists **projects** — derived from the working directories your agents ran in, so a project called `api-core` collects every Claude / Codex / Gemini / Antigravity session you ever opened from that repo. Click a project to see its sessions in the main pane.
 
 The Library Home (the default main-pane view) shows your most recent sessions across **all** projects, bucketed by date.
 

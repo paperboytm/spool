@@ -79,6 +79,7 @@ export function runMigrations(db: Database.Database): void {
       ('claude', '~/.claude/projects'),
       ('codex',  '~/.codex/sessions'),
       ('gemini', '~/.gemini/tmp'),
+      ('antigravity', '~/.gemini/antigravity-cli/brain'),
       ('opencode', '~/.local/share/opencode/opencode.db');
 
     CREATE TABLE IF NOT EXISTS projects (

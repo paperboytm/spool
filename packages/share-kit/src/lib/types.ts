@@ -16,7 +16,7 @@ export type Platform = 'ChatGPT' | 'Claude' | 'Gemini'
  *    claude.ai / gemini.google.com). The shared URL is the user's
  *    own published artifact — public-by-design.
  *  - `agent-session`: user opened a local `.spool` session captured
- *    from a coding agent (Claude Code, codex, gemini-cli). The
+ *    from a coding agent (Claude Code, codex, gemini-cli, antigravity-cli). The
  *    transcript was never public — agent transcripts can contain
  *    secrets the agent read off disk and that the user never
  *    intended to publish, which is why the Privacy panel exists.
