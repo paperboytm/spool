@@ -1,0 +1,133 @@
+export type SessionProvider = 'claude' | 'codex'
+
+export type JsonPrimitive = boolean | number | string | null
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+
+export interface CanonicalizeOptions {
+  workspaceRoot?: string
+  homeDir?: string
+}
+
+export interface CanonicalRecord {
+  oid: string
+  data: string
+}
+
+/**
+ * A record fetched sparsely (e.g. the reader pulling only a file's edit
+ * records from the hub): `i` is the record's position in the full
+ * sequence and overrides the array position for index attribution.
+ */
+export interface IndexedRecord {
+  i: number
+  data: string
+}
+
+export type SessionRecord = string | CanonicalRecord | IndexedRecord
+
+export interface SessionRecordsOptions {
+  provider: SessionProvider
+  workspaceRoot?: string
+}
+
+export type EditTool = 'Edit' | 'Write' | 'MultiEdit' | 'NotebookEdit' | 'apply_patch'
+
+export interface TextReplacement {
+  oldText: string
+  newText: string
+  replaceAll?: boolean
+  oldStart?: number
+  oldLines?: number
+  newStart?: number
+  newLines?: number
+}
+
+export interface EditEvent {
+  provider: SessionProvider
+  recordIndex: number
+  resultRecordIndex: number
+  tool: EditTool
+  path: string
+  timestamp?: string
+  before?: string
+  after?: string
+  replacements: TextReplacement[]
+}
+
+export type ViewRecordKind = 'user' | 'assistant' | 'tool' | 'edit' | 'other'
+
+export interface ViewIndexEntry {
+  i: number
+  kind: ViewRecordKind
+  size: number
+  ts?: string
+  file?: string
+  tool?: string
+  excerpt?: string
+}
+
+export interface ViewFileEntry {
+  path: string
+  /**
+   * Every record index needed to reconstruct this file's edits client-side:
+   * tool-call records and their paired result records.
+   */
+  events: number[]
+  adds: number
+  dels: number
+}
+
+export interface ViewOutlineEntry {
+  i: number
+  excerpt: string
+}
+
+export interface Diffstat {
+  files: number
+  adds: number
+  dels: number
+}
+
+export interface SessionViewV1 {
+  v: 1
+  index: ViewIndexEntry[]
+  files: ViewFileEntry[]
+  outline: ViewOutlineEntry[]
+  firstPrompt: string
+  lastReply: string
+  diffstat: Diffstat
+}
+
+export type DiffLineKind = 'context' | 'add' | 'del'
+
+export interface DiffLine {
+  kind: DiffLineKind
+  text: string
+  recordIndices: number[]
+  oldLine?: number
+  newLine?: number
+}
+
+export interface DiffHunk {
+  oldStart: number
+  oldLines: number
+  newStart: number
+  newLines: number
+  lines: DiffLine[]
+  recordIndices: number[]
+}
+
+export interface SessionFileDiff {
+  path: string
+  events: number[]
+  oldText: string
+  newText: string
+  hunks: DiffHunk[]
+  adds: number
+  dels: number
+}
+
+export interface SessionDiff {
+  files: SessionFileDiff[]
+  diffstat: Diffstat
+}
