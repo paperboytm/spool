@@ -4,6 +4,10 @@ const { app } = require('electron')
 
 const requireFromApp = createRequire(join(__dirname, '..', 'packages', 'app', 'package.json'))
 
+console.log(
+  `Electron ${process.versions.electron} / Node ${process.versions.node} / V8 ${process.versions.v8} / ABI ${process.versions.modules}`,
+)
+
 app.whenReady().then(() => {
   const Database = requireFromApp('better-sqlite3')
   const db = new Database(':memory:')
