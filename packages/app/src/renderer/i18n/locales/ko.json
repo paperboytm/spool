@@ -849,5 +849,20 @@
   },
   "palette": {
     "toggleOptions": "옵션"
+  },
+  "hubShare": {
+    "menuLabel": "spool.pro에 공유",
+    "pretitle": "spool.pro에 공유",
+    "title": "이 세션을 게시할까요?",
+    "lead": "전체 트랜스크립트({{records}}개 레코드)를 spool.pro 계정에 게시합니다. 링크가 있는 누구나 읽고 이어서 작업할 수 있습니다.",
+    "secretsWarning": "민감 정보로 의심되는 항목 {{total}}건이 감지되었습니다(고위험 {{high}}건). 공유하면 해당 값이 공개됩니다.",
+    "noteLabel": "독자에게 남길 메모",
+    "publish": "게시",
+    "publishing": "게시 중…",
+    "doneTitle": "공유됨",
+    "doneLead": "링크가 있는 누구나 세션을 읽거나 Spool CLI로 이어서 작업할 수 있습니다.",
+    "doneClose": "완료",
+    "errorTitle": "공유하지 못했습니다",
+    "signInHint": "로그인되어 있지 않습니다. 공유 편집기에서 로그인한 뒤 다시 시도하세요."
   }
 }

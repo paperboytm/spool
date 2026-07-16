@@ -849,5 +849,20 @@
   },
   "palette": {
     "toggleOptions": "オプション"
+  },
+  "hubShare": {
+    "menuLabel": "spool.pro に共有",
+    "pretitle": "spool.pro に共有",
+    "title": "このセッションを公開しますか?",
+    "lead": "完全なトランスクリプト({{records}} 件のレコード)を spool.pro アカウントに公開します。リンクを知っている人は誰でも閲覧・再開できます。",
+    "secretsWarning": "{{total}} 件の機密情報の可能性が検出されました(うち {{high}} 件が高リスク)。共有するとこれらの値が公開されます。",
+    "noteLabel": "読者へのメモ",
+    "publish": "公開",
+    "publishing": "公開中…",
+    "doneTitle": "共有しました",
+    "doneLead": "リンクを知っている人はセッションを閲覧するか、Spool CLI で再開できます。",
+    "doneClose": "完了",
+    "errorTitle": "共有できませんでした",
+    "signInHint": "サインインしていません。共有エディタからサインインして再試行してください。"
   }
 }

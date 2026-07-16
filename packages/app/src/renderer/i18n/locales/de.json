@@ -891,5 +891,20 @@
   },
   "palette": {
     "toggleOptions": "Optionen anzeigen"
+  },
+  "hubShare": {
+    "menuLabel": "Auf spool.pro teilen",
+    "pretitle": "Auf spool.pro teilen",
+    "title": "Diese Session veröffentlichen?",
+    "lead": "Veröffentlicht das vollständige Transkript ({{records}} Einträge) in deinem spool.pro-Konto. Jeder mit dem Link kann es lesen und fortsetzen.",
+    "secretsWarning": "{{total}} mögliche Geheimnisse erkannt ({{high}} mit hohem Risiko). Beim Teilen werden diese Werte veröffentlicht.",
+    "noteLabel": "Notiz für Leser",
+    "publish": "Veröffentlichen",
+    "publishing": "Wird veröffentlicht…",
+    "doneTitle": "Geteilt",
+    "doneLead": "Jeder mit diesem Link kann die Session lesen oder mit der Spool-CLI fortsetzen.",
+    "doneClose": "Fertig",
+    "errorTitle": "Teilen fehlgeschlagen",
+    "signInHint": "Du bist nicht angemeldet. Melde dich im Share-Editor an und versuche es erneut."
   }
 }

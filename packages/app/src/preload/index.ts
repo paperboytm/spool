@@ -63,6 +63,10 @@ import type {
   SetVisibilityResult,
   Visibility,
 } from '../shared/share-publish.js'
+import type {
+  HubSharePrepareResult,
+  HubSharePublishResult,
+} from '../shared/hub-share.js'
 
 export interface AgentInfo {
   id: string
@@ -428,6 +432,12 @@ const spoolShare = {
     ipcRenderer.invoke('share-profile:upload-avatar', bytes, mime),
   deleteAvatar: (): Promise<{ ok: true }> =>
     ipcRenderer.invoke('share-profile:delete-avatar'),
+
+  // v2 hub share (records, not styled snapshots) — one-click publish.
+  hubSharePrepare: (sessionUuid: string): Promise<HubSharePrepareResult> =>
+    ipcRenderer.invoke('hub-share:prepare', { sessionUuid }),
+  hubSharePublish: (sessionUuid: string, note: string): Promise<HubSharePublishResult> =>
+    ipcRenderer.invoke('hub-share:publish', { sessionUuid, note }),
 }
 
 export type SpoolShareAPI = typeof spoolShare

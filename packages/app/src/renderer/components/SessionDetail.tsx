@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check, RotateCcw } from 'lucide-react'
+import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check, RotateCcw, Globe } from 'lucide-react'
 import type { Session, Message } from '@spool-lab/core'
 import { MessageList, type FindRange, type MessageListHandle } from '@spool-lab/session-view'
 import SessionFindBar from './SessionFindBar.js'
 import FindingsStrip from './security/FindingsStrip.js'
 import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
+import HubShareDialog from './hub-share-dialog.js'
 import { securityApi } from '../api/security.js'
 import PinButton from './PinButton.js'
 import Menu from './Menu.js'
@@ -45,6 +46,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   const [resuming, setResuming] = useState(false)
   const [commandCopied, setCommandCopied] = useState(false)
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false)
+  const [hubShareOpen, setHubShareOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [showFindBar, setShowFindBar] = useState(false)
   const [showTargetHighlight, setShowTargetHighlight] = useState(false)
@@ -418,6 +420,11 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => { void handleCopyCommand() },
               }] : []),
+              ...(session.source === 'claude' || session.source === 'codex' ? [{
+                label: t('hubShare.menuLabel'),
+                icon: <Globe size={14} strokeWidth={1.6} aria-hidden />,
+                onSelect: () => { setHubShareOpen(true) },
+              }] : []),
               {
                 label: t('session.refreshFromSource'),
                 icon: <RotateCcw size={14} strokeWidth={1.6} aria-hidden />,
@@ -449,6 +456,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
         busy={refreshing}
         onConfirm={() => { void handleRefreshFromSource() }}
         onCancel={() => { if (!refreshing) setRefreshDialogOpen(false) }}
+      />
+
+      <HubShareDialog
+        open={hubShareOpen}
+        sessionUuid={sessionUuid}
+        onClose={() => setHubShareOpen(false)}
       />
 
       {/* Messages */}

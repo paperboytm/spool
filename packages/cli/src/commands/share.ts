@@ -9,16 +9,13 @@ import { HubClient, HubHttpError, type HubFetch, type HubObjectUpload } from '..
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { editNote } from '../hub/note-editor.js'
 import { buildNotePrefill } from '../hub/note.js'
-import { prepareShare } from '../hub/share-pipeline.js'
+import { UPLOAD_MAX_LINES, chunkUploads, prepareShare } from '../hub/share-pipeline.js'
 import { formatRedactSummary, scanRecordsForSecrets } from '../hub/redact-gate.js'
 import { buildWorkspaceCard, detectWorkspaceRoot } from '../hub/workspace.js'
 
 // `spool share [<session-id>][@<n>]` — canonicalize the provider session,
 // run the redact gate, collect the note, then the 3-step hub handshake:
 // push (learn missing) → objects/batch (upload) → head (commit, get URL).
-
-const UPLOAD_MAX_LINES = 2000
-const UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 
 export interface ShareTarget {
   provider: SessionProvider
@@ -212,22 +209,6 @@ function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string): string
     throw new Error(`No indexed sessions for ${cwd}. Pass a session UUID or run \`spool sync\`.`)
   }
   return row.session_uuid
-}
-
-function* chunkUploads(uploads: readonly HubObjectUpload[]): Generator<HubObjectUpload[]> {
-  let batch: HubObjectUpload[] = []
-  let bytes = 0
-  for (const upload of uploads) {
-    const size = upload.data.length + upload.oid.length + 32
-    if (batch.length > 0 && (batch.length >= UPLOAD_MAX_LINES || bytes + size > UPLOAD_MAX_BYTES)) {
-      yield batch
-      batch = []
-      bytes = 0
-    }
-    batch.push(upload)
-    bytes += size
-  }
-  if (batch.length > 0) yield batch
 }
 
 async function promptConfirm(question: string): Promise<boolean> {

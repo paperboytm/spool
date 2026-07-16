@@ -849,5 +849,20 @@
   },
   "palette": {
     "toggleOptions": "选项"
+  },
+  "hubShare": {
+    "menuLabel": "分享到 spool.pro",
+    "pretitle": "分享到 spool.pro",
+    "title": "发布这个会话?",
+    "lead": "将完整转录({{records}} 条记录)发布到你的 spool.pro 账号。拿到链接的人可以阅读并从中恢复会话。",
+    "secretsWarning": "检测到 {{total}} 处疑似敏感信息(其中 {{high}} 处高危)。分享会公开这些内容——不确定时请先用安全扫描检查。",
+    "noteLabel": "给读者的说明",
+    "publish": "发布",
+    "publishing": "发布中…",
+    "doneTitle": "已分享",
+    "doneLead": "拿到链接的人可以阅读该会话,或用 Spool CLI 恢复它。",
+    "doneClose": "完成",
+    "errorTitle": "分享失败",
+    "signInHint": "尚未登录。请先在分享编辑器中登录,然后重试。"
   }
 }

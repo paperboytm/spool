@@ -65,6 +65,7 @@ import { registerShareAuthIpc } from './ipc/share-auth.js'
 import { registerShareProfileIpc } from './ipc/share-profile.js'
 import { installRendererCsp } from './security/csp.js'
 import { registerSharePublishIpc } from './ipc/share-publish.js'
+import { registerHubShareIpc } from './ipc/hub-share.js'
 import type Database from 'better-sqlite3'
 import type { SyncWorkerMessage } from './sync-worker.js'
 
@@ -665,6 +666,8 @@ app.whenReady().then(async () => {
   registerSharePublishIpc()
   // Share-profile IPC (display name + avatar upload / delete / visibility)
   registerShareProfileIpc()
+  // v2 hub share IPC (one-click records share to spool.pro)
+  registerHubShareIpc()
 
   // Auto-updater (only runs in packaged builds)
   setupAutoUpdater(() => mainWindow)

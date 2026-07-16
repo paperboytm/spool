@@ -18,6 +18,10 @@
     "./resume": {
       "types": "./dist/commands/resume.d.ts",
       "import": "./dist/commands/resume.js"
+    },
+    "./hub": {
+      "types": "./dist/hub/index.d.ts",
+      "import": "./dist/hub/index.js"
     }
   },
   "files": [

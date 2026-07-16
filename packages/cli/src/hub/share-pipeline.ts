@@ -27,6 +27,28 @@ export interface PreparedShare {
   lineageJson: string | null
 }
 
+/** Upload batching shared by every hub publisher (CLI and app). */
+export const UPLOAD_MAX_LINES = 2000
+export const UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+
+export function* chunkUploads(
+  uploads: readonly { oid: string; data: string }[],
+): Generator<{ oid: string; data: string }[]> {
+  let batch: { oid: string; data: string }[] = []
+  let bytes = 0
+  for (const upload of uploads) {
+    const size = upload.data.length + upload.oid.length + 32
+    if (batch.length > 0 && (batch.length >= UPLOAD_MAX_LINES || bytes + size > UPLOAD_MAX_BYTES)) {
+      yield batch
+      batch = []
+      bytes = 0
+    }
+    batch.push(upload)
+    bytes += size
+  }
+  if (batch.length > 0) yield batch
+}
+
 export async function prepareShare(opts: {
   provider: SessionProvider
   sessionUuid: string
