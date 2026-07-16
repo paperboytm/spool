@@ -59,6 +59,35 @@ export function buildOgTagBlock(meta: OgMeta): string {
   ].join('\n    ')
 }
 
+export interface SessionOgMeta {
+  /** First line of the note, or a first-prompt excerpt. */
+  title: string
+  /** Author + diffstat line. */
+  description: string
+  canonicalUrl: string
+}
+
+/** OG block for /session/<sid> pages: no OG image in this iteration, so
+ *  the card degrades to a plain summary card instead of pointing
+ *  scrapers at a broken image URL. */
+export function buildSessionOgTagBlock(meta: SessionOgMeta): string {
+  const title = escapeHtmlAttr((meta.title ?? '').slice(0, MAX_TITLE_LEN) || 'Shared session')
+  const desc = escapeHtmlAttr(meta.description || 'A shared coding-agent session on Spool.')
+  const canonical = escapeHtmlAttr(meta.canonicalUrl)
+  return [
+    `<title>${title} · spool.pro</title>`,
+    `<meta name="description" content="${desc}">`,
+    `<link rel="canonical" href="${canonical}">`,
+    `<meta property="og:type" content="article">`,
+    `<meta property="og:title" content="${title}">`,
+    `<meta property="og:description" content="${desc}">`,
+    `<meta property="og:url" content="${canonical}">`,
+    `<meta name="twitter:card" content="summary">`,
+    `<meta name="twitter:title" content="${title}">`,
+    `<meta name="twitter:description" content="${desc}">`,
+  ].join('\n    ')
+}
+
 /** Replace the static template <title>spool.pro</title> with the
  *  caller's tag block, inserted immediately before </head>. Also strip
  *  the static `<meta name="robots" content="noindex">` — the SPA shell

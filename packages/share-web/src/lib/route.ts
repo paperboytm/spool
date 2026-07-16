@@ -8,6 +8,7 @@
 
 export type Route =
   | { kind: 'reader'; id: string }
+  | { kind: 'session'; sid: string }
   | { kind: 'profile'; handle: string }
   | { kind: 'me' }
   | { kind: 'sign-in'; next: string }
@@ -19,6 +20,10 @@ export type Route =
 // (A–Z a–z 0–9 _ -). Enforce the exact length so a wandering
 // `/s/foo` returns a clean 404 tombstone instead of a 30-second fetch.
 const SLUG_RE = /^[A-Za-z0-9_-]{21}$/
+
+// v2 hub session ids: '<provider>_<provider-session-uuid>'. Mirrors the
+// backend's SID_RE in share-backend/src/hub/wire.ts.
+const SID_RE = /^(claude|codex)_[0-9A-Za-z-]{8,64}$/
 
 // Mirror of the server-side validator in share-backend/src/handles.ts.
 // We check on the client too so `/@bogus!!` falls through to tombstone
@@ -33,6 +38,13 @@ export function routeFor(pathname: string, search: string = ''): Route {
     const id = decodeURIComponent(path.slice(3))
     if (!SLUG_RE.test(id)) return { kind: 'tombstone', reason: 'not-found' }
     return { kind: 'reader', id }
+  }
+
+  // v2 session reader: /session/<sid>
+  if (path.startsWith('/session/')) {
+    const sid = decodeURIComponent(path.slice('/session/'.length))
+    if (!SID_RE.test(sid)) return { kind: 'tombstone', reason: 'not-found' }
+    return { kind: 'session', sid }
   }
 
   // Profile: /@<handle>

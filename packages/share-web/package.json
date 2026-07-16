@@ -17,6 +17,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource/geist-mono": "^5.2.7",
+    "@spool-lab/session-kit": "workspace:*",
     "@spool/share-kit": "workspace:*",
     "lucide-react": "^0.460.0",
     "react": "^19.0.0",

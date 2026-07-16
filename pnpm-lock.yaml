@@ -401,6 +401,9 @@ importers:
       '@fontsource/geist-mono':
         specifier: ^5.2.7
         version: 5.2.7
+      '@spool-lab/session-kit':
+        specifier: workspace:*
+        version: link:../session-kit
       '@spool/share-kit':
         specifier: workspace:*
         version: link:../share-kit
