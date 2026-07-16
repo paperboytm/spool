@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { sequenceRoot } from '@spool-lab/session-kit'
@@ -172,12 +172,17 @@ describe('spool share → spool resume round trip', () => {
     }
     expect(share.logs.join('\n')).toContain(`${HUB_URL}/session/${sid}`)
 
-    // Resume on a "different machine": new HOME, new workspace.
-    const resumerWs = mkdtempSync(join(tmpdir(), 'spool-resumer-ws-'))
+    // Resume on a "different machine": new HOME, new workspace. The
+    // workspace is passed through a SYMLINK on purpose — Claude Code
+    // names project dirs after the real path (macOS /tmp → /private/tmp),
+    // so materialization must resolve it or --resume never finds the file.
+    const resumerWs = realpathSync(mkdtempSync(join(tmpdir(), 'spool-resumer-ws-')))
     const resumerHome = mkdtempSync(join(tmpdir(), 'spool-resumer-home-'))
+    const aliasWs = join(mkdtempSync(join(tmpdir(), 'spool-alias-')), 'ws-link')
+    symlinkSync(resumerWs, aliasWs)
     const logs: string[] = []
     const errors: string[] = []
-    const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${sid}`, { workspace: resumerWs }, {
+    const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${sid}`, { workspace: aliasWs }, {
       fetch: hub.fetchImpl,
       homeDir: resumerHome,
       env: {} as NodeJS.ProcessEnv,

@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { sequenceRoot } from '@spool-lab/session-kit'
@@ -65,7 +65,7 @@ export async function handleResumeCommand(
     const records = await fetchRecords(client, ref.sid, wanted)
     await verifyRecords(records, wanted === meta.count ? meta.root : null)
 
-    const workspaceRoot = resolve(options.workspace ?? dependencies.cwd ?? process.cwd())
+    const workspaceRoot = resolveWorkspaceRoot(options.workspace ?? dependencies.cwd ?? process.cwd())
     const homeDir = dependencies.homeDir ?? homedir()
     const sessionId = crypto.randomUUID()
 
@@ -130,6 +130,22 @@ export const resumeCommand = new Command('resume')
     })
     if (exitCode !== 0) process.exitCode = exitCode
   })
+
+/**
+ * Claude Code names project dirs after the REAL cwd — on macOS `/tmp/x`
+ * records as `/private/tmp/x`. Materializing under the unresolved path
+ * puts the session where `claude --resume` never looks, so resolve
+ * symlinks first. A workspace that doesn't exist yet (the agent may
+ * clone it after resume) keeps the resolved-but-unverified path.
+ */
+function resolveWorkspaceRoot(input: string): string {
+  const absolute = resolve(input)
+  try {
+    return realpathSync(absolute)
+  } catch {
+    return absolute
+  }
+}
 
 async function fetchRecords(
   client: HubClient,

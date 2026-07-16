@@ -6,7 +6,7 @@
 // session on "another machine"; and a reader recomputes the same diff
 // from the served records that the author saw locally.
 
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -161,7 +161,10 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     expect(diff?.hunks[0]?.recordIndices).toContain(1)
 
     // ── "Another machine": spool resume
-    const resumerWs = mkdtempSync(join(tmpdir(), 'spool-e2e-resumer-'))
+    // realpath: materialization resolves symlinks (macOS tmpdir lives
+    // under /var → /private/var), and the project-dir assertion below
+    // must agree with it.
+    const resumerWs = realpathSync(mkdtempSync(join(tmpdir(), 'spool-e2e-resumer-')))
     const resumerHome = mkdtempSync(join(tmpdir(), 'spool-e2e-resumer-home-'))
     const resumeErrors: string[] = []
     const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${SID}`, { workspace: resumerWs }, {
