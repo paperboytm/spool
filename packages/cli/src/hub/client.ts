@@ -1,0 +1,270 @@
+export type HubFetch = typeof globalThis.fetch
+
+export interface HubClientOptions {
+  hubUrl: string
+  token?: string
+  fetch?: HubFetch
+}
+
+export interface HubSessionWriteRequest {
+  root: string
+  count: number
+  manifest: string[]
+  sig: null
+  cardJson: string | null
+  noteMd: string | null
+  lineageJson: string | null
+  viewOid: string
+}
+
+export interface HubPushResponse {
+  missing: string[]
+}
+
+export interface HubObjectUpload {
+  oid: string
+  data: string
+}
+
+export interface HubObjectBatchResponse {
+  stored: number
+  duplicate?: number
+}
+
+export interface HubHeadResponse {
+  url: string
+}
+
+export interface HubAuthor {
+  handle: string | null
+  displayName: string | null
+  avatarUrl: string | null
+}
+
+export interface HubSessionMeta {
+  sid: string
+  root: string
+  count: number
+  sig: string | null
+  cardJson: string | null
+  noteMd: string | null
+  lineageJson: string | null
+  viewOid: string
+  createdAt: number
+  updatedAt: number
+  author: HubAuthor
+}
+
+export interface HubTokenResponse {
+  token: string
+}
+
+export interface HubRecord {
+  i: number
+  oid: string
+  data: string
+}
+
+export interface HubRecordRange {
+  from: number
+  to: number
+}
+
+export class HubHttpError extends Error {
+  readonly status: number
+  readonly bodyMessage: string
+
+  constructor(status: number, bodyMessage: string) {
+    super(`Hub request failed with HTTP ${status}: ${bodyMessage}`)
+    this.name = 'HubHttpError'
+    this.status = status
+    this.bodyMessage = bodyMessage
+  }
+}
+
+export class HubClient {
+  private readonly hubUrl: string
+  private readonly token: string | undefined
+  private readonly fetchImpl: HubFetch
+
+  constructor(options: HubClientOptions) {
+    this.hubUrl = normalizeHubUrl(options.hubUrl)
+    this.token = options.token
+    this.fetchImpl = options.fetch ?? globalThis.fetch
+  }
+
+  pushSession(sid: string, body: HubSessionWriteRequest): Promise<HubPushResponse> {
+    return this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/push`, body)
+  }
+
+  uploadObjects(objects: Iterable<HubObjectUpload>): Promise<HubObjectBatchResponse> {
+    const body = Array.from(objects, object => JSON.stringify(object)).join('\n')
+    return this.postNdjson(
+      '/api/hub/v1/objects/batch',
+      body === '' ? body : `${body}\n`,
+    )
+  }
+
+  commitSessionHead(sid: string, body: HubSessionWriteRequest): Promise<HubHeadResponse> {
+    return this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/head`, body)
+  }
+
+  async withdrawSession(sid: string): Promise<void> {
+    await this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/withdraw`, undefined)
+  }
+
+  createToken(): Promise<HubTokenResponse> {
+    return this.postJson('/api/hub/v1/tokens', undefined)
+  }
+
+  getSession(sid: string): Promise<HubSessionMeta> {
+    return this.getJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}`)
+  }
+
+  getSessionView<TView = unknown>(sid: string): Promise<TView> {
+    return this.getJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/view`)
+  }
+
+  getSessionRecords(sid: string, range: HubRecordRange): AsyncGenerator<HubRecord> {
+    const query = new URLSearchParams({
+      from: String(range.from),
+      to: String(range.to),
+    })
+    return this.getNdjson(
+      `/api/hub/v1/sessions/${encodeURIComponent(sid)}/records?${query.toString()}`,
+    )
+  }
+
+  async getJson<T>(path: string): Promise<T> {
+    const response = await this.request(path, { method: 'GET' })
+    return parseJsonResponse<T>(response)
+  }
+
+  async postJson<T>(path: string, body: unknown): Promise<T> {
+    const response = await this.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+    return parseJsonResponse<T>(response)
+  }
+
+  async postNdjson<T>(path: string, body: string): Promise<T> {
+    const response = await this.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-ndjson' },
+      body,
+    })
+    return parseJsonResponse<T>(response)
+  }
+
+  async *getNdjson<T>(path: string): AsyncGenerator<T> {
+    const response = await this.request(path, {
+      method: 'GET',
+      headers: { Accept: 'application/x-ndjson' },
+    })
+    yield* readNdjsonLines<T>(response.body)
+  }
+
+  private async request(path: string, init: RequestInit): Promise<Response> {
+    const headers = new Headers(init.headers)
+    if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+    if (this.token) headers.set('Authorization', `Bearer ${this.token}`)
+
+    const response = await this.fetchImpl(`${this.hubUrl}${path}`, { ...init, headers })
+    if (!response.ok) {
+      throw new HubHttpError(response.status, await readErrorMessage(response))
+    }
+    return response
+  }
+}
+
+export async function* readNdjsonLines<T>(
+  body: ReadableStream<Uint8Array> | null,
+): AsyncGenerator<T> {
+  if (!body) return
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let lineNumber = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        lineNumber += 1
+        const parsed = parseNdjsonLine<T>(line, lineNumber)
+        if (parsed !== undefined) yield parsed
+      }
+
+      if (done) break
+    }
+
+    if (buffer !== '') {
+      lineNumber += 1
+      const parsed = parseNdjsonLine<T>(buffer, lineNumber)
+      if (parsed !== undefined) yield parsed
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+function parseNdjsonLine<T>(line: string, lineNumber: number): T | undefined {
+  const value = line.endsWith('\r') ? line.slice(0, -1) : line
+  if (value.trim() === '') return undefined
+  try {
+    return JSON.parse(value) as T
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Invalid NDJSON on line ${lineNumber}: ${message}`)
+  }
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text()
+  if (text === '') return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`Invalid JSON response from hub: ${message}`)
+  }
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const text = (await response.text()).trim()
+  if (text !== '') {
+    try {
+      const body: unknown = JSON.parse(text)
+      if (typeof body === 'string') return body
+      if (isRecord(body)) {
+        if (typeof body['detail'] === 'string') return body['detail']
+        if (typeof body['message'] === 'string') return body['message']
+        if (typeof body['error'] === 'string') return body['error']
+      }
+    } catch {
+      return text
+    }
+    return text
+  }
+  return response.statusText || 'Unknown hub error'
+}
+
+function normalizeHubUrl(value: string): string {
+  const normalized = value.trim().replace(/\/+$/, '')
+  const url = new URL(normalized)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Hub URL must use http or https')
+  }
+  return normalized
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}

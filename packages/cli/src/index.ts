@@ -10,6 +10,8 @@ import { showCommand } from './commands/show.js'
 import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
 import { projectsCommand } from './commands/projects.js'
 import { doctorCommand } from './commands/doctor.js'
+import { loginCommand } from './commands/login.js'
+import { withdrawCommand } from './commands/withdraw.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version: string }
@@ -29,5 +31,7 @@ program.addCommand(unpinCommand)
 program.addCommand(pinnedCommand)
 program.addCommand(projectsCommand)
 program.addCommand(doctorCommand)
+program.addCommand(loginCommand)
+program.addCommand(withdrawCommand)
 
-program.parse()
+await program.parseAsync()

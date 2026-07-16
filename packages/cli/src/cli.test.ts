@@ -192,6 +192,8 @@ describe('cli entry point', () => {
     expect(out).toContain('Usage: spool')
     expect(out).toContain('search')
     expect(out).toContain('sync')
+    expect(out).toContain('login')
+    expect(out).toContain('withdraw')
   })
 
   it('--version prints version from package.json', () => {
