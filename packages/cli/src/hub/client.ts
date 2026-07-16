@@ -171,7 +171,21 @@ export class HubClient {
     if (!headers.has('Accept')) headers.set('Accept', 'application/json')
     if (this.token) headers.set('Authorization', `Bearer ${this.token}`)
 
-    const response = await this.fetchImpl(`${this.hubUrl}${path}`, { ...init, headers })
+    let response: Response
+    try {
+      response = await this.fetchImpl(`${this.hubUrl}${path}`, { ...init, headers })
+    } catch (cause) {
+      // undici's bare "fetch failed" names neither host nor cause —
+      // useless at a terminal. Say where we tried to go and, for local
+      // hubs, what is probably missing.
+      const detail = cause instanceof Error
+        ? (cause.cause instanceof Error ? cause.cause.message : cause.message)
+        : String(cause)
+      const localHint = /127\.0\.0\.1|localhost/.test(this.hubUrl)
+        ? ' Is the local hub running? Start it with `pnpm --filter @spool/share-backend dev` (and `pnpm --filter @spool/share-web dev` when using port 3002).'
+        : ''
+      throw new Error(`Cannot reach the hub at ${this.hubUrl} (${detail}).${localHint}`)
+    }
     if (!response.ok) {
       throw new HubHttpError(response.status, await readErrorMessage(response))
     }

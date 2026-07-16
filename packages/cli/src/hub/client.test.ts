@@ -116,4 +116,16 @@ describe('HubClient', () => {
     expect(error).toBeInstanceOf(HubHttpError)
     expect(error).toMatchObject({ status, bodyMessage: message })
   })
+
+  it('names the hub and hints at local dev when the connection fails', async () => {
+    const refused = new TypeError('fetch failed')
+    ;(refused as { cause?: Error }).cause = new Error('connect ECONNREFUSED 127.0.0.1:3002')
+    const client = new HubClient({
+      hubUrl: 'http://127.0.0.1:3002',
+      fetch: (async () => { throw refused }) as typeof fetch,
+    })
+    await expect(client.getSession(SID)).rejects.toThrow(
+      /Cannot reach the hub at http:\/\/127\.0\.0\.1:3002 \(connect ECONNREFUSED.*Is the local hub running/,
+    )
+  })
 })

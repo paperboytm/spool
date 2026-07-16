@@ -26,7 +26,8 @@ export function editNote(prefillDraft: string, options: NoteEditorOptions = {}):
   const notePath = join(directory, 'SPOOL_NOTE.md')
 
   try {
-    writeFileSync(notePath, `\n${commentPrefill(prefillDraft)}\n`, 'utf8')
+    const initial = `\n${commentPrefill(prefillDraft)}\n`
+    writeFileSync(notePath, initial, 'utf8')
     const result = spawnSync(editor, [notePath], {
       env,
       stdio: 'inherit',
@@ -34,13 +35,21 @@ export function editNote(prefillDraft: string, options: NoteEditorOptions = {}):
     })
 
     if (result.error) {
-      throw new Error(`Could not launch editor "${editor}": ${result.error.message}`)
-    }
-    if (result.status !== 0) {
-      throw new Error(`Editor "${editor}" exited with status ${result.status ?? 'unknown'}`)
+      throw new Error(`Could not launch editor "${editor}": ${result.error.message} (set $EDITOR)`)
     }
 
-    return stripCommentLines(readFileSync(notePath, 'utf8'))
+    const saved = readFileSync(notePath, 'utf8')
+    // A nonzero exit only aborts when the author saved nothing: editors
+    // exit nonzero for reasons unrelated to the note (vimrc errors, :cq
+    // habits), and discarding a note someone actually wrote is worse
+    // than tolerating a grumpy editor.
+    if (result.status !== 0 && saved === initial) {
+      throw new Error(
+        `Editor "${editor}" exited with status ${result.status ?? 'unknown'} and the note was not modified — aborting. Use -m "<note>" or --no-edit to skip the editor.`,
+      )
+    }
+
+    return stripCommentLines(saved)
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
