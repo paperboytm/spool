@@ -17,6 +17,7 @@ export function routeFor(pathname: string): 'backend' | 'web' | 'landing' {
   if (pathname.startsWith('/api/')) return 'backend'
   if (
     pathname.startsWith('/s/') ||
+    pathname.startsWith('/session/') || // v2 hub session pages
     pathname.startsWith('/@') ||
     pathname === '/me' ||
     pathname === '/sign-in' ||

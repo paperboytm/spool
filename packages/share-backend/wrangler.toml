@@ -54,6 +54,10 @@ bucket_name = "spool-og"
 binding = "AVATARS"
 bucket_name = "spool-avatars"
 
+[[r2_buckets]]
+binding = "HUB"
+bucket_name = "spool-hub"
+
 [vars]
 ENV = "development"
 

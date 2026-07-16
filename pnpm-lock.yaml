@@ -307,8 +307,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
 
+  packages/session-kit:
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
+
   packages/share-backend:
     dependencies:
+      '@spool-lab/session-kit':
+        specifier: workspace:*
+        version: link:../session-kit
       workers-og:
         specifier: ^0.0.27
         version: 0.0.27
@@ -374,12 +383,6 @@ importers:
       vite-plugin-dts:
         specifier: ^5.0.3
         version: 5.0.3(@microsoft/api-extractor@7.58.7(@types/node@22.19.17))(esbuild@0.27.3)(rollup@4.60.0)(typescript@7.0.2)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0))
-      vitest:
-        specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
-
-  packages/session-kit:
-    devDependencies:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)
@@ -11419,8 +11422,7 @@ snapshots:
 
   type-fest@4.41.0: {}
 
-  typescript@5.9.3:
-    optional: true
+  typescript@5.9.3: {}
 
   typescript@6.0.3: {}
 
