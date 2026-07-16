@@ -99,6 +99,41 @@ type DeletionQueueRow = {
   cancelled: number
 }
 
+type HubSessionRow = {
+  sid: string
+  owner_user_id: string
+  root: string
+  record_count: number
+  sig: string | null
+  card_json: string | null
+  note_md: string | null
+  lineage_json: string | null
+  view_oid: string | null
+  visibility: string
+  withdrawn_at: number | null
+  created_at: number
+  updated_at: number
+}
+
+type HubObjectRow = {
+  owner_user_id: string
+  oid: string
+  size: number
+  pack_key: string
+  offset: number
+  length: number
+  created_at: number
+}
+
+type ApiTokenRow = {
+  id: string
+  user_id: string
+  token_hash: string
+  label: string | null
+  created_at: number
+  last_used_at: number | null
+}
+
 export type FakeDbState = {
   users: UserRow[]
   audit: AuditRow[]
@@ -106,6 +141,9 @@ export type FakeDbState = {
   handles: HandleRow[]
   published_shares: PublishedShareRow[]
   deletion_queue: DeletionQueueRow[]
+  hub_sessions: HubSessionRow[]
+  hub_objects: HubObjectRow[]
+  api_tokens: ApiTokenRow[]
 }
 
 export function emptyState(): FakeDbState {
@@ -116,6 +154,9 @@ export function emptyState(): FakeDbState {
     handles: [],
     published_shares: [],
     deletion_queue: [],
+    hub_sessions: [],
+    hub_objects: [],
+    api_tokens: [],
   }
 }
 
@@ -131,6 +172,34 @@ export function makeDb(state: FakeDbState = emptyState()): {
         return stmt
       },
       async first<T = unknown>(): Promise<T | null> {
+        if (/^SELECT \* FROM hub_sessions WHERE sid=\?$/i.test(sql)) {
+          const [sid] = params as [string]
+          return (state.hub_sessions.find((row) => row.sid === sid) as T) ?? null
+        }
+        if (/^SELECT COALESCE\(SUM\(size\),0\) AS total FROM hub_objects WHERE owner_user_id=\?$/i.test(sql)) {
+          const [ownerUserId] = params as [string]
+          const total = state.hub_objects
+            .filter((row) => row.owner_user_id === ownerUserId)
+            .reduce((sum, row) => sum + row.size, 0)
+          return { total } as T
+        }
+        if (/^SELECT user_id FROM api_tokens WHERE token_hash=\?$/i.test(sql)) {
+          const [tokenHash] = params as [string]
+          const row = state.api_tokens.find((token) => token.token_hash === tokenHash)
+          return (row ? ({ user_id: row.user_id } as T) : null)
+        }
+        if (/^SELECT name, avatar_url, display_name, custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL$/i.test(sql)) {
+          const [id] = params as [string]
+          const user = state.users.find((row) => row.id === id && row.deleted_at === null)
+          if (!user) return null
+          return ({
+            name: user.name,
+            avatar_url: user.avatar_url,
+            display_name: user.display_name ?? null,
+            custom_avatar_id: user.custom_avatar_id ?? null,
+            avatar_visible: user.avatar_visible ?? 1,
+          } as T)
+        }
         if (/^SELECT u\.\* FROM users u JOIN user_identities i ON i\.user_id = u\.id WHERE i\.provider = \? AND i\.provider_sub = \?/i.test(sql)) {
           const [provider, sub] = params as [string, string]
           const link = state.user_identities.find(
@@ -246,6 +315,128 @@ export function makeDb(state: FakeDbState = emptyState()): {
       // matched nothing so optimistic-concurrency callers can detect
       // races (mirrored real D1 surfaces the same value).
       async run(): Promise<{ success: boolean; meta: { changes: number } }> {
+
+        if (/^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(sql)) {
+          const [
+            sid,
+            ownerUserId,
+            root,
+            recordCount,
+            sig,
+            cardJson,
+            noteMd,
+            lineageJson,
+            viewOid,
+            createdAt,
+            updatedAt,
+          ] = params as [
+            string,
+            string,
+            string,
+            number,
+            string | null,
+            string | null,
+            string | null,
+            string | null,
+            string,
+            number,
+            number,
+          ]
+          const existing = state.hub_sessions.find((row) => row.sid === sid)
+          if (existing) {
+            existing.root = root
+            existing.record_count = recordCount
+            existing.sig = sig
+            existing.card_json = cardJson
+            existing.note_md = noteMd
+            existing.lineage_json = lineageJson
+            existing.view_oid = viewOid
+            existing.withdrawn_at = null
+            existing.updated_at = updatedAt
+          } else {
+            state.hub_sessions.push({
+              sid,
+              owner_user_id: ownerUserId,
+              root,
+              record_count: recordCount,
+              sig,
+              card_json: cardJson,
+              note_md: noteMd,
+              lineage_json: lineageJson,
+              view_oid: viewOid,
+              visibility: 'unlisted',
+              withdrawn_at: null,
+              created_at: createdAt,
+              updated_at: updatedAt,
+            })
+          }
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (/^UPDATE hub_sessions SET withdrawn_at=\?, updated_at=\? WHERE sid=\? AND owner_user_id=\?$/i.test(sql)) {
+          const [withdrawnAt, updatedAt, sid, ownerUserId] = params as [
+            number,
+            number,
+            string,
+            string,
+          ]
+          const row = state.hub_sessions.find(
+            (session) => session.sid === sid && session.owner_user_id === ownerUserId,
+          )
+          if (!row) return { success: true, meta: { changes: 0 } }
+          row.withdrawn_at = withdrawnAt
+          row.updated_at = updatedAt
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (/^INSERT OR IGNORE INTO hub_objects \(owner_user_id, oid, size, pack_key, offset, length, created_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?\)$/i.test(sql)) {
+          const [ownerUserId, oid, size, packKey, offset, length, createdAt] = params as [
+            string,
+            string,
+            number,
+            string,
+            number,
+            number,
+            number,
+          ]
+          const duplicate = state.hub_objects.some(
+            (row) => row.owner_user_id === ownerUserId && row.oid === oid,
+          )
+          if (duplicate) return { success: true, meta: { changes: 0 } }
+          state.hub_objects.push({
+            owner_user_id: ownerUserId,
+            oid,
+            size,
+            pack_key: packKey,
+            offset,
+            length,
+            created_at: createdAt,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (/^UPDATE api_tokens SET last_used_at=\? WHERE token_hash=\?$/i.test(sql)) {
+          const [lastUsedAt, tokenHash] = params as [number, string]
+          const token = state.api_tokens.find((row) => row.token_hash === tokenHash)
+          if (!token) return { success: true, meta: { changes: 0 } }
+          token.last_used_at = lastUsedAt
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (/^INSERT INTO api_tokens \(id, user_id, token_hash, label, created_at\) VALUES \(\?,\?,\?,\?,\?\)$/i.test(sql)) {
+          const [id, userId, tokenHash, label, createdAt] = params as [
+            string,
+            string,
+            string,
+            string | null,
+            number,
+          ]
+          state.api_tokens.push({
+            id,
+            user_id: userId,
+            token_hash: tokenHash,
+            label,
+            created_at: createdAt,
+            last_used_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
 
         if (/^INSERT INTO users/i.test(sql)) {
           const [id, email, name, avatar, created, last] = params as [
@@ -476,6 +667,27 @@ export function makeDb(state: FakeDbState = emptyState()): {
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
       async all<T = unknown>(): Promise<{ results: T[] }> {
+        if (/^SELECT oid FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(sql)) {
+          const [ownerUserId, ...oids] = params as [string, ...string[]]
+          const wanted = new Set(oids)
+          const items = state.hub_objects
+            .filter((row) => row.owner_user_id === ownerUserId && wanted.has(row.oid))
+            .map((row) => ({ oid: row.oid }))
+          return { results: items as T[] }
+        }
+        if (/^SELECT oid, pack_key, offset, length FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(sql)) {
+          const [ownerUserId, ...oids] = params as [string, ...string[]]
+          const wanted = new Set(oids)
+          const items = state.hub_objects
+            .filter((row) => row.owner_user_id === ownerUserId && wanted.has(row.oid))
+            .map((row) => ({
+              oid: row.oid,
+              pack_key: row.pack_key,
+              offset: row.offset,
+              length: row.length,
+            }))
+          return { results: items as T[] }
+        }
         if (/^SELECT user_id FROM deletion_queue WHERE scheduled_at <= \? AND cancelled = 0/i.test(sql)) {
           const [cutoff] = params as [number]
           const items = state.deletion_queue
@@ -559,7 +771,14 @@ export function makeDb(state: FakeDbState = emptyState()): {
     }
     return stmt
   }
-  const db = { prepare } as unknown as D1Database
+  const db = {
+    prepare,
+    async batch(statements: Array<{ run(): Promise<unknown> }>) {
+      const results = []
+      for (const statement of statements) results.push(await statement.run())
+      return results
+    },
+  } as unknown as D1Database
   return { db, state }
 }
 
@@ -590,10 +809,15 @@ export function makeR2(): { bucket: R2Bucket; store: Map<string, { bytes: Uint8A
       store.set(key, entry)
       return { key }
     },
-    async get(key: string): Promise<R2Object | null> {
+    async get(
+      key: string,
+      opts?: { range?: { offset: number; length: number } },
+    ): Promise<R2Object | null> {
       const v = store.get(key)
       if (!v) return null
-      const bytes = v.bytes
+      const bytes = opts?.range
+        ? v.bytes.slice(opts.range.offset, opts.range.offset + opts.range.length)
+        : v.bytes
       return {
         get body() {
           return new ReadableStream<Uint8Array>({
