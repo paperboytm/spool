@@ -12,7 +12,7 @@ export interface ResolvedSessionRef {
 export function resolveSessionRef(input: string): ResolvedSessionRef {
   const value = input.trim()
 
-  if (value.startsWith('https://')) {
+  if (value.startsWith('https://') || value.startsWith('http://')) {
     return resolveShareUrl(value)
   }
 
@@ -27,8 +27,11 @@ function resolveShareUrl(value: string): ResolvedSessionRef {
     return invalidSessionRef(value)
   }
 
+  // http is tolerated only for loopback hosts — local `wrangler pages dev`
+  // hubs; anything else must be https.
+  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   if (
-    url.protocol !== 'https:'
+    (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))
     || url.username !== ''
     || url.password !== ''
     || url.search !== ''

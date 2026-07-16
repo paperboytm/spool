@@ -13,6 +13,7 @@ export type {
   Diffstat,
   EditEvent,
   EditTool,
+  IndexedRecord,
   JsonPrimitive,
   JsonValue,
   SessionDiff,

@@ -198,6 +198,12 @@ importers:
       '@spool-lab/core':
         specifier: workspace:^
         version: link:../core
+      '@spool-lab/redact':
+        specifier: workspace:^
+        version: link:../redact
+      '@spool-lab/session-kit':
+        specifier: workspace:^
+        version: link:../session-kit
       commander:
         specifier: ^13.1.0
         version: 13.1.0

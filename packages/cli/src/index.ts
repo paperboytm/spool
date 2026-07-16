@@ -11,6 +11,8 @@ import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
 import { projectsCommand } from './commands/projects.js'
 import { doctorCommand } from './commands/doctor.js'
 import { loginCommand } from './commands/login.js'
+import { shareCommand } from './commands/share.js'
+import { resumeCommand } from './commands/resume.js'
 import { withdrawCommand } from './commands/withdraw.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -32,6 +34,8 @@ program.addCommand(pinnedCommand)
 program.addCommand(projectsCommand)
 program.addCommand(doctorCommand)
 program.addCommand(loginCommand)
+program.addCommand(shareCommand)
+program.addCommand(resumeCommand)
 program.addCommand(withdrawCommand)
 
 await program.parseAsync()

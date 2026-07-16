@@ -29,6 +29,8 @@
   },
   "dependencies": {
     "@spool-lab/core": "workspace:^",
+    "@spool-lab/redact": "workspace:^",
+    "@spool-lab/session-kit": "workspace:^",
     "commander": "^13.1.0",
     "undici": "^6.23.0"
   },
