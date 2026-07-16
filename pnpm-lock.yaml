@@ -334,6 +334,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20260415.1
         version: 4.20260511.1
+      '@spool-lab/cli':
+        specifier: workspace:*
+        version: link:../cli
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.13)(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)

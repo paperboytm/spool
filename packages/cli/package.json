@@ -10,6 +10,14 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./share": {
+      "types": "./dist/commands/share.d.ts",
+      "import": "./dist/commands/share.js"
+    },
+    "./resume": {
+      "types": "./dist/commands/resume.d.ts",
+      "import": "./dist/commands/resume.js"
     }
   },
   "files": [
