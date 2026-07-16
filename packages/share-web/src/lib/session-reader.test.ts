@@ -119,8 +119,8 @@ describe('deep links and helpers', () => {
   it('derives provider and resume command', () => {
     expect(providerOf('codex_abc12345')).toBe('codex')
     expect(providerOf('claude_abc12345')).toBe('claude')
-    expect(resumeCommandFor('https://spool.pro/session/claude_x'))
-      .toBe('spool resume https://spool.pro/session/claude_x')
+    expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69'))
+      .toBe('spool resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')
   })
 })
 

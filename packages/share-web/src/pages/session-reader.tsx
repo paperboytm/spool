@@ -122,7 +122,6 @@ export function SessionReader({ sid }: { sid: string }) {
             <FirstScreen
               meta={state.meta}
               view={state.view}
-              pageUrl={window.location.origin + window.location.pathname}
               onOpenFile={selectFile}
               onJumpToRecord={jumpToRecord}
             />

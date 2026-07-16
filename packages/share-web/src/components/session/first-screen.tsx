@@ -17,16 +17,15 @@ import {
 interface Props {
   meta: HubSessionMeta
   view: SessionViewV1 | null
-  pageUrl: string
   onOpenFile: (path: string) => void
   onJumpToRecord: (index: number) => void
 }
 
-export function FirstScreen({ meta, view, pageUrl, onOpenFile, onJumpToRecord }: Props) {
+export function FirstScreen({ meta, view, onOpenFile, onJumpToRecord }: Props) {
   const note = noteDisplayFor(meta.noteMd, view)
   const card = parseWorkspaceCard(meta.cardJson)
   const lineage = parseLineage(meta.lineageJson)
-  const resumeCommand = resumeCommandFor(pageUrl)
+  const resumeCommand = resumeCommandFor(meta.sid)
 
   return (
     <section className="sw-session-first">

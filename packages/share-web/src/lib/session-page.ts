@@ -83,8 +83,11 @@ export function deepLinkHash(index: number): string {
   return `#r/${index}`
 }
 
-export function resumeCommandFor(pageUrl: string): string {
-  return `spool resume ${pageUrl}`
+/** The sid alone resumes against the reader's configured hub (spool.pro
+ *  by default) — shorter to copy than the full page URL, which stays
+ *  accepted by the CLI for cross-hub cases. */
+export function resumeCommandFor(sid: string): string {
+  return `spool resume ${sid}`
 }
 
 export function providerOf(sid: string): 'claude' | 'codex' {
