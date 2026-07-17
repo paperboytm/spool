@@ -9,7 +9,7 @@ import {
   type RedactReplacement,
 } from './redact'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../lib/types'
 
 function turn(role: 'user' | 'assistant', body: string, opts: Partial<Turn> = {}): Turn {
   return { role, body, ...opts } as Turn

@@ -7,7 +7,7 @@
 // each kept turn — so they can render "⋯ N turns skipped" markers
 // when `opts.showGaps` is on.
 
-import type { Conversation, EditorOpts, Turn } from '@/lib/types'
+import type { Conversation, EditorOpts, Turn } from '../lib/types'
 
 export interface KeptTurn extends Turn {
   /** Index in the original `convo.turns` array. */

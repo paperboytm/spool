@@ -11,8 +11,8 @@
 // underscore and each user's byline — the colorway picker is visible
 // at a glance.
 
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'

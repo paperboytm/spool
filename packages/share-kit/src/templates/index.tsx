@@ -6,8 +6,8 @@
 // to recover.
 
 import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
-import type { Conversation, EditorOpts, Template } from '@/lib/types'
-import { paperTokens } from '@/lib/types'
+import type { Conversation, EditorOpts, Template } from '../lib/types'
+import { paperTokens } from '../lib/types'
 import type { RedactReplacement } from './redact'
 import { Forum } from './forum'
 import { Letter } from './letter'

@@ -12,9 +12,9 @@
 // degrade: the gutter shows a dash and no gaps are drawn.
 
 import { useMemo } from 'react'
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
-import { useProgressiveTurns } from '@/reader/use-progressive-turns'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
+import { useProgressiveTurns } from '../reader/use-progressive-turns'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments, type SelectedSegments } from './selection'

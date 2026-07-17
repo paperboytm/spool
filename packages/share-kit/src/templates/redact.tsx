@@ -17,7 +17,7 @@
 // markdown / .spool exporters consume the same shape.
 
 import { useMemo } from 'react'
-import type { EditorOpts, RedactExclude, Turn } from '@/lib/types'
+import type { EditorOpts, RedactExclude, Turn } from '../lib/types'
 import {
   detectSensitiveSpansCached,
   groupBySensitiveKind,

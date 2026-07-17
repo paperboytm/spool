@@ -5,8 +5,8 @@
 // post numbers on the right margin. Reads like a forum thread or a
 // session-detail panel rather than chat bubbles or editorial prose.
 
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'

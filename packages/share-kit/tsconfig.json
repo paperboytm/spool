@@ -14,10 +14,7 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node", "vite/client"],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "types": ["node", "vite/client"]
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }

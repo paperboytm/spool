@@ -15,8 +15,8 @@
 // UX via the browser's Save-as-PDF dialog inside window.print().
 
 import { toBlob } from 'html-to-image'
-import type { Conversation, Template } from '@/lib/types'
-import { sanitizeFilename } from '@/lib/filename'
+import type { Conversation, Template } from '../types'
+import { sanitizeFilename } from '../filename'
 
 export type ExportFormat = 'png' | 'pdf'
 

@@ -13,7 +13,7 @@
 //    turn boundaries; if the user turn is missing from the markdown
 //    entirely, the sr-only heading supplies the prompt text directly.
 
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../../types'
 import {
   ParseError,
   decodeEntities,
@@ -231,4 +231,3 @@ function deriveTitleFromTurns(turns: Turn[]): string | undefined {
   if (flat.length >= 120) return flat.slice(0, 60) + '…'
   return undefined
 }
-

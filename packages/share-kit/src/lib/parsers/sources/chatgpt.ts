@@ -11,7 +11,7 @@
 // Every turn is delimited by the `#### <role> said:` heading on its own
 // line. ChatGPT's title is preserved by Jina as `data.title`.
 
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../../types'
 import { ParseError, humanDate, normalizeBlock, stats, truncate, type ParserSource } from '../source'
 
 const TURN_RX = /^####\s+(?:(You said):|(ChatGPT said):)\s*$/gm

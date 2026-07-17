@@ -21,7 +21,7 @@
 // then split on `^You said\s*$`. For each segment, the first paragraph
 // is the user prompt; the rest is the assistant reply.
 
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../../types'
 import { ParseError, humanDate, normalizeBlock, stats, type ParserSource } from '../source'
 
 // Jina emits the line as ` You said ` (leading + trailing spaces) because

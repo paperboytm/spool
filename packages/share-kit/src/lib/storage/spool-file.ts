@@ -13,8 +13,8 @@
 import type { Conversation, EditorOpts, SpoolDocument, Turn } from '../types'
 import { saveBlob } from '../export'
 import { sanitizeFilename } from '../filename'
-import { collectRedactList } from '@/templates/redact'
-import { parseSpoolDocument } from '@/lib/spool-document'
+import { collectRedactList } from '../../templates/redact'
+import { parseSpoolDocument } from '../spool-document'
 
 const MIME = 'application/spool+json'
 

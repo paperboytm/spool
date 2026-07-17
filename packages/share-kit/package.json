@@ -8,18 +8,22 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
       "import": "./dist/index.js"
     },
     "./progressive": {
       "types": "./dist/progressive.d.ts",
+      "development": "./src/progressive.ts",
       "import": "./dist/progressive.js"
     },
     "./timeline": {
       "types": "./dist/timeline.d.ts",
+      "development": "./src/timeline.ts",
       "import": "./dist/timeline.js"
     },
     "./spool-document": {
       "types": "./dist/spool-document.d.ts",
+      "development": "./src/spool-document.ts",
       "import": "./dist/spool-document.js"
     },
     "./styles.css": "./src/styles/global.css",

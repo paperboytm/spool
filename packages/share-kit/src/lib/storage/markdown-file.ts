@@ -11,8 +11,8 @@
 // chip in any markdown renderer.
 
 import type { Conversation, EditorOpts } from '../types'
-import { selectSegments } from '@/templates/selection'
-import { collectRedactList } from '@/templates/redact'
+import { selectSegments } from '../../templates/selection'
+import { collectRedactList } from '../../templates/redact'
 import { saveBlob } from '../export'
 import { sanitizeFilename } from '../filename'
 
