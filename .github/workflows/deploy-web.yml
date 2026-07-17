@@ -1,0 +1,46 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/session-kit/**"
+      - "packages/session-view/**"
+      - "packages/share-kit/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # void deploy runs the app's own vite build, but the workspace
+      # libraries it imports (@spool/share-kit, @spool-lab/session-*)
+      # ship dist/ artifacts that must exist first.
+      - name: Build workspace dependencies
+        run: pnpm turbo run build --filter=@spool/web^...
+
+      - name: Deploy to Void
+        env:
+          VOID_TOKEN: ${{ secrets.VOID_TOKEN }}
+          # The void project kept the pre-merge `spool-landing` resource
+          # name so the public origin (see workers/spool-pro-router)
+          # didn't move when share-web merged into this app.
+          VOID_PROJECT: spool-landing
+        run: pnpm --filter @spool/web run deploy

@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm run clean && vite build && tailwindcss -i ./src/tailwind.css -o ./dist/styles.css --minify",
+    "build": "pnpm run clean && vite build",
     "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -36,7 +36,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.19.17",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

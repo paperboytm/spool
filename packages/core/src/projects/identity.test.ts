@@ -31,6 +31,21 @@ describe('normalizeGitRemote', () => {
 })
 
 describe('computeIdentity', () => {
+  it('prefers a provider-recorded Git remote even when cwd is gone', () => {
+    const id = computeIdentity(
+      '/Users/me/.codex/worktrees/6ae2/im',
+      noFs,
+      noResolvers,
+      noSynthesizers,
+      'git@github.com:paperboytm/im.git',
+    )
+    expect(id).toMatchObject({
+      kind: 'git_remote',
+      key: 'github.com/paperboytm/im',
+      displayName: 'im',
+    })
+  })
+
   it('returns loose for null cwd', () => {
     const id = computeIdentity(null, noFs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('loose')

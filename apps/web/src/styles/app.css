@@ -1,0 +1,1972 @@
+/* spool.pro share-web — unified design system.
+ * Tokens are scoped to .sw-root so the page can opt into a per-paper
+ * surface (Reader) without leaking into 3rd-party DOM. data-theme
+ * controls light/dark; default reads from the html[data-theme] root
+ * set by Chrome's ThemeToggle (which itself defers to the OS until
+ * the user overrides). */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  background: #FAFAF8;
+  color-scheme: light;
+}
+html[data-theme='dark'] {
+  background: #141410;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-family: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+.sw-root {
+  --bg: #FAFAF8;
+  --bg-sink: #F4F4F0;
+  --card: #FFFFFF;
+  --card-2: #F4F4F0;
+  --border: #E8E8E2;
+  --border-strong: #D8D8D0;
+  --text: #1C1C18;
+  --muted: #6B6B60;
+  --faint: #ADADAA;
+  --accent: #C85A00;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #FFF3E8;
+  --accent-line: rgba(200, 90, 0, 0.30);
+  --ok: #3E7D52;
+  --err: #B23A1E;
+  --err-soft: #FBE9DF;
+  --src-claude: #C26A4E;
+  --src-chatgpt: #10A37F;
+  --src-gemini: #5887D0;
+  --paper: #FAF7F0;
+  --shadow-card: 0 1px 2px rgba(28, 28, 24, 0.04),
+    0 8px 24px rgba(28, 28, 24, 0.06);
+  --radius: 14px;
+
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-theme='dark'] .sw-root {
+  --bg: #141410;
+  --bg-sink: #0F0F0C;
+  --card: #1C1C18;
+  --card-2: #242420;
+  --border: #2E2E28;
+  --border-strong: #3A3A34;
+  --text: #F2F2EC;
+  --muted: #8A8A80;
+  --faint: #505048;
+  --accent: #F07020;
+  --accent-ink: #1A1206;
+  --accent-soft: #2A1800;
+  --accent-line: rgba(240, 112, 32, 0.34);
+  --ok: #6FB286;
+  --err: #E07A4E;
+  --err-soft: #2A1508;
+  --src-claude: #E89A7C;
+  --src-chatgpt: #20C38F;
+  --src-gemini: #8AB0E5;
+  --paper: #1A1A16;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30),
+    0 10px 30px rgba(0, 0, 0, 0.40);
+}
+
+.sw-root,
+.sw-root * {
+  box-sizing: border-box;
+}
+
+.sw-root a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sw-root a:hover {
+  color: var(--accent);
+}
+
+/* ── Page frame ─────────────────────────────────────────────── */
+.sw-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ── Header chrome ──────────────────────────────────────────── */
+/* Matches spool.pro landing — solid --bg, hairline bottom border, no
+ * blur, no semi-transparent overlay. Solid color reads as "site chrome"
+ * across light + dark; the frosted-glass look fought with the warm
+ * parchment palette and confused the reader's paper card. */
+.sw-header {
+  flex: 0 0 auto;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.sw-wordmark {
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text);
+  display: inline-flex;
+  align-items: baseline;
+}
+.sw-wordmark .dot {
+  color: var(--accent);
+}
+.sw-header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.sw-signin-link {
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 500;
+  transition: color 0.15s;
+}
+.sw-signin-link:hover {
+  color: var(--accent);
+}
+.sw-theme-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  flex: 0 0 auto;
+}
+.sw-theme-toggle:hover {
+  background: var(--card-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ── Footer chrome ──────────────────────────────────────────── */
+/* Solid --bg, hairline top border. Same chrome treatment as header. */
+.sw-footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 28px 16px 30px;
+  background: var(--bg);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+.sw-footer a {
+  color: var(--muted);
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.sw-footer a:hover {
+  color: var(--accent);
+}
+.sw-footer .sep {
+  margin: 0 10px;
+  opacity: 0.55;
+}
+
+/* ── Content scroll area ────────────────────────────────────── */
+.sw-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 20px 8px;
+}
+.sw-main.center {
+  justify-content: center;
+  padding-top: 20px;
+}
+.sw-main.gap {
+  gap: 18px;
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.sw-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 36px 36px 32px;
+}
+.sw-card.tight {
+  padding: 32px 32px;
+}
+.sw-card.w-600 {
+  max-width: 600px;
+}
+.sw-card.w-420 {
+  max-width: 420px;
+}
+.sw-card.w-480 {
+  max-width: 480px;
+}
+
+/* ── Legal pages (terms / privacy) ─────────────────────────── */
+.sw-legal {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.sw-legal h1 {
+  margin: 6px 0 0;
+}
+.sw-legal h2 {
+  margin: 28px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.sw-legal p {
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.sw-legal ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.sw-legal li {
+  margin: 4px 0;
+}
+.sw-legal a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-legal code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--card-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.sw-legal-date {
+  margin: 10px 0 22px;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sw-legal-summary {
+  margin: 0 0 24px;
+}
+.sw-legal-summary p {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+.sw-legal-summary ul {
+  margin: 0;
+}
+.sw-legal-credit {
+  margin-top: 30px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.sw-signin-legal {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+.sw-signin-legal a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-signin-legal a:hover {
+  color: var(--accent);
+}
+
+/* ── Eyebrows / mastheads ───────────────────────────────────── */
+.sw-eyebrow {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sw-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+.sw-rule .line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+.sw-rule .tag {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.sw-rule .tag.muted {
+  color: var(--muted);
+}
+.sw-rule .tag.err {
+  color: var(--err);
+}
+.sw-rule .meta {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Titles ─────────────────────────────────────────────────── */
+.sw-title {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  margin: 0;
+  color: var(--text);
+}
+.sw-title.lg {
+  font-size: 27px;
+}
+.sw-accent-underline {
+  width: 38px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  margin: 14px 0 0;
+}
+.sw-lede {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+  text-wrap: pretty;
+}
+.sw-lede.muted {
+  color: var(--muted);
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.sw-btn {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 9px;
+  padding: 9px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.sw-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.sw-btn-primary:hover {
+  filter: brightness(1.05);
+  color: var(--accent-ink);
+}
+.sw-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+.sw-btn-ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.sw-btn-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sw-btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--muted);
+  border-color: var(--border);
+}
+.sw-btn-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  color: var(--err);
+}
+.sw-btn-danger:hover {
+  background: var(--err-soft);
+  color: var(--err);
+}
+.sw-btn-sm {
+  font-size: 12.5px;
+  padding: 5px 11px;
+  border-radius: 7px;
+}
+
+/* ── Avatar ─────────────────────────────────────────────────── */
+.sw-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--muted);
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+/* ── Identity header (profile / me) ─────────────────────────── */
+.sw-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.sw-identity .body {
+  flex: 1;
+  min-width: 0;
+}
+.sw-identity .name {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 3px;
+  line-height: 1.15;
+}
+.sw-identity .handle {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+.sw-identity .handle.accent {
+  color: var(--accent);
+}
+.sw-identity .email {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin: 0 0 2px;
+}
+
+/* ── Section label ──────────────────────────────────────────── */
+.sw-section-label {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  margin: 0;
+}
+.sw-section-label .count {
+  color: var(--accent);
+}
+
+/* ── Share rows (list + each row) ───────────────────────────── */
+.sw-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Two row variants share `.sw-share`:
+ *   - /me  (owner) — multi-line: title + meta (visibility icon + dates
+ *     + state pill), actions on the right
+ *   - /@handle (public) — single line: title left + mono date right
+ *
+ * Whole-row click affordance: `<a class="sw-share-link">` wraps the
+ * title + meta column on /me and the title + date on /@handle. The
+ * anchor itself is the click target, so hovering any child (incl.
+ * the visibility icon) shows that child's `title=` tooltip naturally
+ * — no `::after` overlay to fight. Actions live OUTSIDE the anchor
+ * as siblings, so their own onClick wins. */
+.sw-share {
+  display: flex;
+  /* Top-aligned so the ⋯ trigger pins to the title's first line
+   * (desktop parity) instead of centering against title+meta. */
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 12px;
+  margin: 0 -12px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+.sw-share:hover {
+  background: var(--card-2);
+}
+.sw-share.revoked {
+  opacity: 0.55;
+}
+.sw-share.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.sw-share-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  color: inherit;
+  text-decoration: none;
+}
+/* /me variant: title + meta stack vertically inside the anchor.
+ * Triggered by the meta line's presence — public /@handle rows
+ * have no meta line so they keep the row layout (title + date). */
+.sw-share-link:has(> .sw-share-meta) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.sw-share-title {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  font-weight: 600;
+  font-size: 15.5px;
+  line-height: 1.35;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-share-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.sw-share-meta {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.sw-share-meta .dot-sep {
+  opacity: 0.5;
+}
+.sw-share-vis {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  cursor: help;
+}
+.sw-share-date {
+  flex: 0 0 auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Row-actions ⋯ menu — mirrors the desktop Published row: a quiet
+ * borderless trigger (not the bordered sw-icon-btn), hover-revealed,
+ * pinned while its menu is open. Touch devices have no hover, so the
+ * trigger is always visible there. */
+.sw-rowmenu-trigger {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex: 0 0 auto;
+}
+/* One step darker than the row's own hover (card-2), mirroring the
+ * desktop surface → surface2 ladder — card-2 on card-2 was invisible. */
+.sw-rowmenu-trigger:hover,
+.sw-rowmenu-trigger[aria-expanded='true'] {
+  background: var(--border);
+  color: var(--text);
+}
+.sw-rowmenu {
+  position: relative;
+  flex: 0 0 auto;
+  /* Optically center the 24px trigger on the title's first line: the
+   * anchor carries 12px top padding and the 15.5px/1.35 title line is
+   * ~21px tall → 12 + (21 − 24) / 2 ≈ 10px. */
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sw-share:hover .sw-rowmenu,
+.sw-share:focus-within .sw-rowmenu,
+.sw-rowmenu:has([aria-expanded='true']) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sw-rowmenu {
+    opacity: 1;
+  }
+}
+.sw-rowmenu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  width: max-content;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  z-index: 30;
+}
+.sw-rowmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  white-space: nowrap;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.sw-rowmenu-item svg {
+  color: var(--muted);
+}
+.sw-rowmenu-item:hover {
+  background: var(--card-2);
+}
+.sw-rowmenu-item.danger:hover {
+  background: var(--err-soft);
+  color: var(--err);
+}
+.sw-rowmenu-item.danger:hover svg,
+.sw-rowmenu-item.ok svg {
+  color: inherit;
+}
+.sw-rowmenu-item.ok {
+  color: var(--ok);
+}
+.sw-rowmenu-item:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.sw-rowmenu-err {
+  margin: 4px 6px 4px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--err);
+}
+
+/* Collapsed history section — mirrors the desktop Published tab's
+ * "Unpublished · N" header: quiet mono label, chevron rotates open. */
+.sw-collapse {
+  margin-top: 6px;
+}
+.sw-collapse-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  transition: color 0.12s;
+}
+.sw-collapse-head:hover {
+  color: var(--text);
+}
+.sw-collapse-chev {
+  display: inline-flex;
+  opacity: 0.5;
+  transition: transform 0.15s, opacity 0.12s;
+}
+.sw-collapse-head:hover .sw-collapse-chev {
+  opacity: 1;
+}
+.sw-collapse-chev.open {
+  transform: rotate(90deg);
+}
+
+/* compact icon buttons */
+.sw-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+.sw-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.sw-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+.sw-icon-btn.ok,
+.sw-icon-btn.ok:hover {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: transparent;
+}
+.sw-icon-btn.busy {
+  cursor: progress;
+}
+.sw-icon-btn.danger:hover {
+  border-color: color-mix(in srgb, var(--err) 55%, transparent);
+  color: var(--err);
+  background: var(--err-soft);
+}
+
+/* ── Handle claim ───────────────────────────────────────────── */
+.sw-claim {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.sw-claim label {
+  flex: 1;
+  min-width: 0;
+}
+.sw-claim label span {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.sw-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sw-input-wrap .at {
+  position: absolute;
+  left: 12px;
+  color: var(--faint);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  pointer-events: none;
+}
+.sw-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 9px 12px 9px 26px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sw-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.sw-claim-status {
+  flex-basis: 100%;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sw-claim-status.muted {
+  color: var(--muted);
+}
+.sw-claim-status.ok {
+  color: var(--ok);
+}
+.sw-claim-status.warn {
+  color: var(--err);
+}
+.sw-claim-status .ico {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+}
+.sw-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--accent);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* ── Banner ─────────────────────────────────────────────────── */
+.sw-banner {
+  width: 100%;
+  max-width: 600px;
+  border-radius: 11px;
+  padding: 13px 16px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.sw-banner.pending {
+  background: var(--err-soft);
+  border: 1px solid color-mix(in srgb, var(--err) 32%, transparent);
+  color: var(--text);
+}
+.sw-banner .ico {
+  flex: 0 0 auto;
+  color: var(--err);
+  margin-top: 1px;
+}
+.sw-banner strong {
+  font-weight: 600;
+}
+
+/* ── Signed-in-as footer (inside /me card) ──────────────────── */
+.sw-signed-in-as {
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sw-signed-in-as .ico {
+  color: var(--faint);
+  display: inline-flex;
+}
+/* Wrap the user identity span so its ellipsis behaviour works
+ * without stealing the flex slot from the Delete account link. */
+.sw-signed-in-as > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Push the destructive trigger to the right edge of the row so the
+ * left side reads as a stable identity line. */
+.sw-signed-in-as .sw-link-quiet {
+  margin-left: auto;
+}
+/* Quiet text link — used for the Delete account / Cancel deletion
+ * trigger next to "Signed in as …". Reads as ancillary metadata
+ * unless hovered. */
+.sw-link-quiet {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--faint);
+  cursor: pointer;
+  text-underline-offset: 2px;
+  transition: color 0.12s;
+}
+.sw-link-quiet:hover,
+.sw-link-quiet:focus-visible {
+  color: var(--err);
+  text-decoration: underline;
+}
+.sw-banner-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sw-banner-action:hover {
+  color: var(--accent);
+}
+.sw-unpublish-err {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--err);
+}
+
+/* ── Danger zone ────────────────────────────────────────────── */
+.sw-danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+  margin-top: 4px;
+}
+.sw-confirm-box {
+  background: var(--err-soft);
+  border: 1px solid color-mix(in srgb, var(--err) 28%, transparent);
+  border-radius: 11px;
+  padding: 16px;
+}
+.sw-confirm-box p {
+  margin: 0 0 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.sw-scheduled-box {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 11px;
+  padding: 16px;
+}
+.sw-scheduled-box p {
+  margin: 0 0 13px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* ── Sign-in ────────────────────────────────────────────────── */
+.sw-signin {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sw-signin-emblem {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+.sw-signin .sw-eyebrow {
+  margin-bottom: 12px;
+}
+.sw-signin-title {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.sw-signin-sub {
+  margin: 14px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 32ch;
+  text-wrap: pretty;
+}
+.sw-provider-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  margin-top: 26px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  color: #2A2620;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(40, 34, 26, 0.05),
+    0 6px 18px rgba(40, 34, 26, 0.06);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
+}
+.sw-provider-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 4px rgba(40, 34, 26, 0.06),
+    0 10px 26px rgba(40, 34, 26, 0.10);
+  color: #2A2620;
+}
+.sw-provider-btn:active {
+  transform: translateY(0.5px);
+}
+html[data-theme='dark'] .sw-provider-btn {
+  background: var(--card-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+html[data-theme='dark'] .sw-provider-btn:hover {
+  color: var(--text);
+}
+.sw-signin-foot {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-align: left;
+}
+.sw-signin-foot .ico {
+  flex: 0 0 auto;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+/* ── CLI auth approval ──────────────────────────────────────── */
+/* The confirmation code is indexed-content-adjacent → Geist Mono,
+   spaced out so it can be compared against the terminal at a glance. */
+.sw-cliauth-code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  margin-top: 24px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+.sw-cliauth-hint {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.sw-cliauth-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.sw-cliauth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 24px;
+}
+.sw-cliauth-input {
+  text-align: center;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ── Loading / spin ─────────────────────────────────────────── */
+.sw-loading {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sw-loading .sw-spin {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+.sw-spin-anim {
+  animation: sw-spin 0.7s linear infinite;
+}
+@keyframes sw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Skeleton ───────────────────────────────────────────────── */
+.sw-skel {
+  background: var(--card-2);
+  border-radius: 6px;
+  display: block;
+}
+
+/* ── Empty state ────────────────────────────────────────────── */
+.sw-empty {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+  padding: 6px 0;
+  margin: 0;
+}
+
+/* ── misc ───────────────────────────────────────────────────── */
+.sw-divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+}
+.sw-mono {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sw-hidden {
+  display: none;
+}
+
+/* ── Profile editor (notion-style identity surface) ─────────── */
+.sw-me-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+.sw-me-header-main {
+  flex: 1;
+  min-width: 0;
+}
+.sw-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.sw-avatar-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.sw-avatar-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.sw-avatar-wrap:hover .sw-avatar-remove,
+.sw-avatar-wrap:focus-within .sw-avatar-remove {
+  opacity: 1;
+}
+.sw-avatar-remove:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+.sw-avatar-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sw-avatar-btn {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: var(--card-2);
+  border: 1px solid var(--border-strong);
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.sw-avatar-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.sw-avatar-btn > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sw-avatar-initial {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+}
+.sw-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.sw-avatar-btn:hover .sw-avatar-overlay,
+.sw-avatar-btn:focus-visible .sw-avatar-overlay {
+  opacity: 1;
+}
+.sw-profile-body {
+  flex: 1;
+  min-width: 0;
+}
+.sw-name-input {
+  display: block;
+  width: 100%;
+  margin: -4px -8px 0;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  outline: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.sw-name-input::placeholder {
+  color: var(--muted);
+  font-weight: 600;
+}
+.sw-name-input:hover {
+  background: var(--card-2);
+}
+.sw-name-input:focus {
+  background: var(--card-2);
+  border-color: var(--border-strong);
+}
+.sw-name-input:disabled {
+  opacity: 0.7;
+}
+.sw-profile-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-profile-email {
+  margin-top: 18px;
+}
+.sw-profile-email-label {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.75;
+}
+.sw-profile-email-value {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-error {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--danger, #b14a4a);
+}
+
+/* ── Reader canvas ──────────────────────────────────────────── */
+/* The Reader page hosts a share-kit template that owns its own
+ * typography + padding. We just center it under the chrome and let
+ * its natural width drive layout. */
+.reader-canvas {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px 0;
+}
+.reader-paper {
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(40, 34, 26, 0.05),
+    0 18px 50px rgba(40, 34, 26, 0.10);
+}
+html[data-theme='dark'] .reader-paper {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Modal shell (Delete / Unpublish confirm) ───────────────── */
+.sw-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 16, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+html[data-theme='dark'] .sw-modal-overlay {
+  background: rgba(0, 0, 0, 0.65);
+}
+.sw-modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  padding: 26px 26px 22px;
+}
+.sw-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+.sw-modal-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+.sw-modal-target {
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  margin: 0 0 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sw-modal-error {
+  font-size: 12.5px;
+  color: var(--err);
+  margin: 0 0 12px;
+}
+.sw-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Narrow viewport adjustments ────────────────────────────── */
+@media (max-width: 480px) {
+  .sw-header {
+    padding: 0 18px;
+  }
+  .sw-main {
+    padding: 32px 14px 8px;
+  }
+  .sw-card {
+    padding: 24px 22px 22px;
+    border-radius: 12px;
+  }
+  .sw-card.tight {
+    padding: 22px 20px;
+  }
+  .sw-identity {
+    gap: 12px;
+  }
+  .sw-identity .name {
+    font-size: 19px;
+  }
+  .sw-claim {
+    flex-wrap: wrap;
+  }
+  .sw-claim button {
+    flex: 1;
+  }
+  .sw-share {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .reader-canvas {
+    padding: 24px 12px 0;
+  }
+}
+
+/* Markdown-table scroller emitted by share-kit's Body component:
+ * thumb hidden until the pointer is over the table. Sibling copies
+ * live in share-kit global.css (which we deliberately don't import —
+ * it pulls in Tailwind) and the desktop app's styles.css. */
+.spool-md-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.spool-md-scroll:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+.spool-md-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.spool-md-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.spool-md-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 160ms;
+}
+.spool-md-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+}
+.spool-md-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
+}
+
+/* ── v2 session reader (/session/<sid>) ─────────────────────────────
+ * Three layers per the v2 design: first screen (note vs machine
+ * evidence), timeline ↔ diff, deep links. Tokens come from .sw-root;
+ * record content is always Geist Mono (DESIGN.md: monospace separates
+ * "your content" from chrome). Radius scale: 10 cards / 6 buttons /
+ * 4 badges. Spacing stays on the 4px grid. */
+
+.sw-session-main {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sw-session-mono {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-session-loading {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 48px 0;
+}
+
+/* Layer 1 — first screen */
+.sw-session-first {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sw-session-byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.sw-session-byline .who { color: var(--text); font-weight: 500; }
+.sw-session-byline .dot { color: var(--faint); }
+.sw-session-byline .avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.sw-session-byline .avatar.fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.sw-session-byline .count { font-size: 11px; }
+.sw-session-byline .lineage a { color: var(--accent); text-decoration: none; }
+.sw-session-byline .lineage a:hover { text-decoration: underline; }
+
+.sw-session-note-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sw-session-note-zone .note-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.sw-session-note-zone .note-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+.sw-session-note-zone .note-fallback .label,
+.sw-session-evidence .label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* The machine-evidence zone is visually sunk + separated from the
+ * author's subjective note (§3.2: note never overrides evidence). */
+.sw-session-evidence {
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sw-session-evidence .evidence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sw-session-evidence .evidence-head .label { margin-bottom: 0; }
+.sw-session-evidence .diffstat { font-size: 12px; color: var(--muted); }
+.sw-session-first .adds { color: var(--ok); }
+.sw-session-first .dels { color: var(--err); }
+
+.sw-session-evidence .evidence-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sw-session-evidence .evidence-files .file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sw-session-evidence .evidence-files .file:hover { background: var(--card); }
+.sw-session-evidence .evidence-files .stat { font-size: 11px; }
+
+.sw-session-evidence .evidence-outline ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sw-session-evidence .evidence-outline button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+.sw-session-evidence .evidence-outline button:hover { background: var(--card); color: var(--text); }
+.sw-session-evidence .evidence-outline .idx { color: var(--accent); font-size: 11px; }
+.sw-session-evidence .evidence-outline .excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-session-evidence .evidence-outline .more { font-size: 11px; color: var(--faint); padding: 4px 8px; }
+.sw-session-evidence .evidence-card .card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.sw-session-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.sw-session-resume code {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sw-session-resume .copy {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.sw-session-resume .copy:hover { background: var(--accent); color: var(--accent-ink); }
+
+/* Layer 2 — timeline ↔ diff */
+.sw-session-layers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .sw-session-layers { grid-template-columns: minmax(0, 1fr); }
+}
+
+.sw-session-timeline,
+.sw-session-diff {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 12px;
+  min-height: 120px;
+}
+.sw-session-timeline ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sw-session-row {
+  border-radius: 6px;
+  padding: 8px;
+  border-left: 2px solid transparent;
+  transition: background 80ms;
+}
+.sw-session-row:hover { background: var(--card-2); }
+.sw-session-row.highlighted {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+.sw-session-row .row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sw-session-row .idx {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--faint);
+  cursor: pointer;
+}
+.sw-session-row .idx:hover { color: var(--accent); }
+.sw-session-row .kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: var(--muted);
+  background: var(--card-2);
+}
+.sw-session-row .kind.kind-user { color: var(--accent); background: var(--accent-soft); }
+.sw-session-row .kind.kind-edit { color: var(--ok); }
+.sw-session-row .tool { font-size: 11px; color: var(--muted); }
+.sw-session-row .file {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.sw-session-row .expand {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--faint);
+  cursor: pointer;
+}
+.sw-session-row .expand:hover { color: var(--accent); }
+.sw-session-row .row-excerpt {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sw-session-row.kind-user .row-excerpt { color: var(--text); }
+.sw-session-row .row-loading,
+.sw-session-row .row-error {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--faint);
+}
+.sw-session-row .row-error { color: var(--err); }
+.sw-session-row .row-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sw-session-row .segment { min-width: 0; }
+.sw-session-row .segment-label {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.sw-session-row .segment-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-sink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 480px;
+  overflow: auto;
+}
+.sw-session-row .segment-text::-webkit-scrollbar { width: 8px; }
+
+.sw-session-more {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sw-session-more:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Diff pane */
+.sw-session-diff.empty,
+.sw-session-diff .diff-hint {
+  color: var(--faint);
+  font-size: 12px;
+  padding: 8px;
+}
+.sw-session-diff .diff-error { color: var(--err); font-size: 12px; padding: 8px; }
+.sw-session-diff .diff-files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.sw-session-diff .diff-file {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sw-session-diff .diff-file:hover { background: var(--card-2); }
+.sw-session-diff .diff-file.active { background: var(--accent-soft); color: var(--accent); }
+.sw-session-diff .diff-file .stat { font-size: 11px; }
+.sw-session-diff .adds { color: var(--ok); }
+.sw-session-diff .dels { color: var(--err); }
+
+.sw-session-diff .diff-hunk {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.sw-session-diff .diff-hunk.highlighted { border-color: var(--accent); }
+.sw-session-diff .hunk-head {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--card-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sw-session-diff .hunk-head:hover { color: var(--accent); }
+.sw-session-diff .hunk-head .records { color: var(--accent); }
+.sw-session-diff .hunk-lines {
+  margin: 0;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+.sw-session-diff .hunk-lines .line { display: block; white-space: pre; }
+.sw-session-diff .hunk-lines .line.add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.sw-session-diff .hunk-lines .line.del { background: color-mix(in srgb, var(--err) 12%, transparent); }
+
+/* Conversation pane: hosts the shared session-view MessageList (the same
+ * component the desktop session detail uses). The list virtualizes inside
+ * a fixed-height flex column. */
+.sw-session-conversation {
+  display: flex;
+  flex-direction: column;
+  height: 72vh;
+  min-height: 320px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  padding: 8px 0;
+}
+
+/* Conversation ↔ Document mode tabs (Document = the attached .spool
+ * publication artifact, rendered by share-kit's SnapshotReader). */
+.sw-session-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sw-session-tabs button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sw-session-tabs button:hover { border-color: var(--accent); color: var(--accent); }
+.sw-session-tabs button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+  font-weight: 500;
+}
+.sw-session-tabs .download {
+  margin-left: auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.sw-session-document {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  overflow-x: auto;
+}

@@ -1,7 +1,7 @@
 # spool-share-deletion — the cron companion Worker for the share
 # backend. Pages Functions can't register cron triggers, so the
 # scheduled deletion sweep (account deletion + R2 orphan cleanup,
-# implemented in packages/share-backend/functions/_scheduled/
+# implemented in apps/backend/functions/_scheduled/
 # deletion-worker.ts) deploys as this standalone Worker sharing the
 # backend's D1 / KV / R2 resources.
 #

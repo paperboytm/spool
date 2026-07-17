@@ -731,6 +731,15 @@ export function runMigrations(db: Database.Database): void {
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts')
   rebuildFtsTableIfEmpty(db, 'session_search', 'session_search_fts_trigram')
 
+  // Identity resolution depends on live checkouts and worktree-tool state,
+  // which can improve independently of the DB schema (for example, Orca is
+  // installed after Spool, or a previously missing worktree is recreated).
+  // Reconcile cheap `path` fallbacks on every open instead of stranding them
+  // behind a one-time schema migration forever.
+  db.transaction(() => {
+    upgradeWorktreeIdentities(db, realFs)
+  })()
+
   recreateProjectGroupsView(db)
 }
 

@@ -15,17 +15,23 @@ routes = [
   { pattern = "spool.pro/*", zone_name = "spool.pro" },
 ]
 
+# ORIGIN_WEB points at the merged web app (apps/web, @spool/web). The
+# void project kept the historical `spool-landing` resource name so the
+# public origin didn't move during the landing/share-web merge; the old
+# spool-share-web.pages.dev origin is retired.
 [vars]
 ORIGIN_BACKEND = "spool-share-backend.pages.dev"
-ORIGIN_WEB = "spool-share-web.pages.dev"
-ORIGIN_LANDING = "spool-landing.pages.dev"
+ORIGIN_WEB = "spool-landing.pages.dev"
 
 [env.staging]
 routes = [
   { pattern = "staging.spool.pro/*", zone_name = "spool.pro" },
 ]
 
+# Staging has no dedicated web deploy (the old spool-share-web-staging
+# Pages project predates the merge); staging web routes serve the prod
+# shell while /api/* still hits the staging backend. Create a dedicated
+# staging void project if shell divergence ever matters.
 [env.staging.vars]
 ORIGIN_BACKEND = "spool-share-backend-staging.pages.dev"
-ORIGIN_WEB = "spool-share-web-staging.pages.dev"
-ORIGIN_LANDING = "spool-landing.pages.dev"
+ORIGIN_WEB = "spool-landing.pages.dev"

@@ -5,8 +5,10 @@ node_modules/
 dist/
 out/
 packages/*/dist/
+apps/*/dist/
 packages/*/out/
-packages/app/out/
+apps/*/out/
+apps/app/out/
 
 # Electron build
 dist-electron/
@@ -61,16 +63,20 @@ e2e-output/
 
 # Native binaries (rebuilt per-platform via electron-rebuild)
 build/
-!packages/app/build/
+!apps/app/build/
 *.node
 
 # Compiled artifacts that may end up in src/ by mistake
 packages/*/src/**/*.js
+apps/*/src/**/*.js
 packages/*/src/**/*.d.ts
+apps/*/src/**/*.d.ts
 packages/*/src/**/*.js.map
+apps/*/src/**/*.js.map
 packages/*/src/**/*.d.ts.map
+apps/*/src/**/*.d.ts.map
 # Hand-written ambient declarations (exempt from the rule above)
-!packages/app/src/env.d.ts
+!apps/app/src/env.d.ts
 # Playwright
 test-results/
 playwright-report/
@@ -81,7 +87,7 @@ playwright-report/
 docs/superpowers/
 
 # Demo capture artifacts (rebuilt per release video; not source)
-packages/app/artifacts/
+apps/app/artifacts/
 
 # Release video build outputs (per-release; never committed)
 # Source of truth is index.html + scripts. Assets (clips, audio, logos) are

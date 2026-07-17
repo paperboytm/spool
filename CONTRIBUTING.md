@@ -38,25 +38,28 @@ Requires Apple Silicon. The script quits any running Spool instance before repla
 ## Project structure
 
 ```
-packages/
+apps/
   app/            Electron macOS app (React + Vite + Tailwind)
-  core/           Indexing engine (SQLite + FTS5)
   cli/            CLI interface
-  landing/        spool.pro website
-  redact/         Sensitive-data detection shared by app + share surfaces
-  share-kit/      Share templates + snapshot rendering (app + share-web)
+  web/            spool.pro website (TanStack Start: landing, docs, blog,
+                  share reader, profile + account pages)
   share-backend/  spool.pro publish API (Cloudflare Pages Functions: D1/KV/R2)
-  share-web/      spool.pro public reader + profile + account pages
+packages/
+  core/           Indexing engine (SQLite + FTS5)
+  redact/         Sensitive-data detection shared by app + share surfaces
+  session-kit/    Session data model shared by app + web
+  session-view/   Conversation renderer shared by app + web
+  share-kit/      Share templates + snapshot rendering (app + web)
 ```
 
 ## Share publish: local dev stack
 
 Most contributions never need this — `pnpm dev` runs the app fine without
-it. Set it up only when working on the publish flow (share-backend,
-share-web, or the app's publish surfaces).
+it. Set it up only when working on the publish flow (share-backend, the
+web app's share pages, or the app's publish surfaces).
 
-The stack is three processes: share-backend (wrangler, :8788), share-web
-(vite, :3002), and the Electron app pointed at the local backend.
+The stack is three processes: share-backend (wrangler, :8788), the web
+app (vite, :3002), and the Electron app pointed at the local backend.
 `./scripts/share-dev.sh` boots all three. One-time setup first:
 
 1. **WorkOS dev environment** — create one at
@@ -75,8 +78,8 @@ The stack is three processes: share-backend (wrangler, :8788), share-web
 2. **Two gitignored config files** (wrangler and electron-vite each have
    their own loader):
    ```bash
-   cp packages/share-backend/.dev.vars.example packages/share-backend/.dev.vars
-   cp packages/app/.env.development.local.example packages/app/.env.development.local
+   cp apps/backend/.dev.vars.example apps/backend/.dev.vars
+   cp apps/app/.env.development.local.example apps/app/.env.development.local
    ```
    Fill in the WorkOS values per the comments in each file — the API key
    goes only in `.dev.vars`; the app env needs just the (public) client
@@ -84,7 +87,7 @@ The stack is three processes: share-backend (wrangler, :8788), share-web
 
 3. **Local D1 schema**:
    ```bash
-   cd packages/share-backend
+   cd apps/backend
    corepack pnpm wrangler d1 migrations apply spool-share-db --local
    ```
 
@@ -95,7 +98,7 @@ The stack is three processes: share-backend (wrangler, :8788), share-web
 
 Sign in with any method AuthKit offers (email code works out of the box);
 data lands in the local D1/KV/R2 under
-`packages/share-backend/.wrangler/state/`. The app keeps its dev library
+`apps/backend/.wrangler/state/`. The app keeps its dev library
 in `~/.spool-dev/` as usual.
 
 ## Making changes
@@ -120,9 +123,9 @@ For desktop packaging changes, also verify the packaged app — never remove a p
 ```bash
 pnpm run package:mac                # build + electron-builder (arm64)
 codesign --verify --deep --strict --verbose=2 \
-  packages/app/dist/mac-arm64/Spool.app
-node packages/app/scripts/smoke-packaged.mjs packages/app/dist/mac-arm64/Spool.app
-node packages/app/scripts/package-size-report.mjs packages/app/dist/mac-arm64/Spool.app
+  apps/app/dist/mac-arm64/Spool.app
+node apps/app/scripts/smoke-packaged.mjs apps/app/dist/mac-arm64/Spool.app
+node apps/app/scripts/package-size-report.mjs apps/app/dist/mac-arm64/Spool.app
 ```
 
 ## What to work on

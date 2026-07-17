@@ -251,7 +251,7 @@ function initialsFor(name: string): string {
 }
 
 // Cross-day timestamp label. Mirrors the app's formatRelativeDate logic
-// from packages/app/src/shared/formatDate.ts: same day → HH:MM; yesterday
+// from apps/app/src/shared/formatDate.ts: same day → HH:MM; yesterday
 // → "yesterday, HH:MM"; same year → "Mon DD"; otherwise → "Mon DD, YYYY".
 function formatRelativeTimestamp(iso: string): string {
   try {

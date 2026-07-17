@@ -6,7 +6,7 @@
 // per animation frame until the whole document is in.
 //
 // This is the single implementation shared by the public reader and
-// the editor preview (packages/app/.../preview-progressive.ts wraps it
+// the editor preview (apps/app/.../preview-progressive.ts wraps it
 // with editor-tuned constants) — the fill semantics are load-bearing
 // on both surfaces and must not drift.
 

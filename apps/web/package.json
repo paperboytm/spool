@@ -1,0 +1,44 @@
+{
+  "name": "@spool/web",
+  "version": "0.5.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev --port 3002",
+    "prebuild": "node scripts/sync-registry.mjs",
+    "build": "vp build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vp preview --port 3002",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deploy": "void deploy",
+    "sync:registry": "node scripts/sync-registry.mjs",
+    "clean": "rm -rf dist .void node_modules/.vite"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource/geist-mono": "^5.2.7",
+    "@spool-lab/session-kit": "workspace:*",
+    "@spool-lab/session-view": "workspace:*",
+    "@spool/share-kit": "workspace:*",
+    "@tanstack/react-router": "^1.168.28",
+    "@tanstack/react-start": "^1.168.28",
+    "lucide-react": "^0.460.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260415.1",
+    "@types/node": "^22.19.17",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "undici": "^6.25.0",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
+    "vite-plus": "^0.1.18",
+    "vitest": "^3.2.4",
+    "void": "^0.7.2"
+  }
+}

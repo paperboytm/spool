@@ -19,7 +19,7 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 
 Every bug fix and feature PR must:
 
-1. **Add tests for the change.** Bug fix → a regression test that fails on the pre-fix code. Feature → primary path + non-obvious edges (empty / error / boundary). UI changes use Playwright e2e under `packages/app/e2e/`; pure logic uses vitest under `packages/*/src/**.test.ts`.
+1. **Add tests for the change.** Bug fix → a regression test that fails on the pre-fix code. Feature → primary path + non-obvious edges (empty / error / boundary). UI changes use Playwright e2e under `apps/app/e2e/`; pure logic uses vitest under `{apps,packages}/*/src/**.test.ts`.
 2. **Run the adjacent suite, not just the new tests, before declaring done.** Changes ripple: virtualization breaks DOM-count assertions, selector renames break old e2e, fixture changes shift sort order. Fix any cascading failures in the same PR — never ship a regression with a TODO.
 3. **Don't fight flakiness.** A flake is a test that's lying. Diagnose root cause once; if it can't be made reliable without fighting the framework, drop it and document the coverage gap in the PR body rather than papering over with `--repeat-each`.
 
@@ -32,7 +32,7 @@ invoke the `launch-video` skill. It covers the capture pipeline, the
 HyperFrames composition layout, common pitfalls, and the social-media
 poster trick.
 
-- Capture primitives live in `packages/app/e2e/helpers/`
+- Capture primitives live in `apps/app/e2e/helpers/`
   (`native-window-capture.ts`, `demo-fixtures.ts`, `demo-launch.ts`,
   `demo-interactions.ts`).
 - The composition skeleton lives at `videos/launch-template/`.

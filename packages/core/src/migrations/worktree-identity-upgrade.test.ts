@@ -81,6 +81,47 @@ describe('upgradeWorktreeIdentities', () => {
     expect(row.identity_key).toBe('github.com/owner/foo')
   })
 
+  it('groups deleted main and worktree paths from Codex session remote metadata', () => {
+    const mainId = seedProject({
+      slug: 'im-main', displayPath: '/Users/me/work/im', displayName: 'im',
+      identityKind: 'path', identityKey: '/Users/me/work/im',
+    })
+    const worktreeId = seedProject({
+      slug: 'im-worktree', displayPath: '/Users/me/.codex/worktrees/6ae2/im', displayName: 'im',
+      identityKind: 'path', identityKey: '/Users/me/.codex/worktrees/6ae2/im',
+    })
+    const insertSession = db.prepare(`
+      INSERT INTO sessions
+        (project_id, source_id, session_uuid, file_path, started_at, ended_at, message_count)
+      VALUES (?, 2, ?, ?, '2026-05-01', '2026-05-01', 1)
+    `)
+    insertSession.run(mainId, 'im-main-session', '/sessions/im-main.jsonl')
+    insertSession.run(worktreeId, 'im-worktree-session', '/sessions/im-worktree.jsonl')
+
+    const result = upgradeWorktreeIdentities(
+      db,
+      makeFs({}),
+      () => 'git@github.com:paperboytm/im.git',
+    )
+    expect(result).toEqual({ examined: 2, upgraded: 2 })
+
+    const rows = db.prepare(`
+      SELECT identity_kind, identity_key
+      FROM projects WHERE id IN (?, ?)
+      ORDER BY id
+    `).all(mainId, worktreeId)
+    expect(rows).toEqual([
+      { identity_kind: 'git_remote', identity_key: 'github.com/paperboytm/im' },
+      { identity_kind: 'git_remote', identity_key: 'github.com/paperboytm/im' },
+    ])
+    const groups = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM project_groups_v
+      WHERE identity_key = 'github.com/paperboytm/im'
+    `).get() as { count: number }
+    expect(groups.count).toBe(1)
+  })
+
   it('leaves rows alone when computeIdentity still returns path', () => {
     // No live git root at this path — recompute also yields path-kind. Don't
     // touch the row (keeps migration idempotent on legitimately ad-hoc dirs).

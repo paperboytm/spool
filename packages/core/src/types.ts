@@ -19,6 +19,8 @@ export interface ParsedSession {
   filePath: string
   title: string
   cwd: string
+  /** Provider-recorded Git remote, when available. */
+  gitRemote?: string
   model: string
   startedAt: string
   endedAt: string

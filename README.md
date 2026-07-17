@@ -21,7 +21,7 @@ Or grab the prebuilt DMG (macOS arm64) / AppImage (Linux x86_64) directly from t
 ```bash
 pnpm install
 pnpm build
-# DMG is in packages/app/dist/
+# DMG is in apps/app/dist/
 ```
 
 ## What it does
@@ -42,12 +42,17 @@ Everything stays on your machine. Nothing leaves.
 ## Architecture
 
 ```
+apps/
+  app/            Electron app (React + Vite + Tailwind) — macOS + Linux
+  cli/            CLI interface (`spool search ...`)
+  web/            spool.pro website (TanStack Start: landing + docs + share reader)
+  share-backend/  spool.pro API (Cloudflare Pages Functions, D1/KV/R2)
 packages/
-  app/      Electron app (React + Vite + Tailwind) — macOS + Linux
-  core/     Indexing engine (SQLite + FTS5)
-  cli/      CLI interface (`spool search ...`)
-  redact/   Secret-detection regex library (published as @spool-lab/redact)
-  landing/  spool.pro website
+  core/           Indexing engine (SQLite + FTS5)
+  redact/         Secret-detection regex library (published as @spool-lab/redact)
+  session-kit/    Session data model shared by app/web
+  session-view/   Conversation renderer shared by app/web
+  share-kit/      Share snapshot reader/templates
 ```
 
 ## Development
@@ -55,7 +60,7 @@ packages/
 ```bash
 pnpm install
 pnpm exec electron-rebuild -f -w better-sqlite3   # rebuild native modules for Electron
-pnpm dev          # starts app + landing in dev mode
+pnpm dev          # starts app + web in dev mode
 pnpm test         # runs all tests
 ```
 

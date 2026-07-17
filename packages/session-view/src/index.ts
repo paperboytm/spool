@@ -1,3 +1,5 @@
+import './tailwind.css'
+
 export { default as MessageList, buildRows, makeDividerLabel } from './message-list.js'
 export type { MessageListHandle, MatchState, Row } from './message-list.js'
 export { default as MessageBubble } from './message-bubble.js'
