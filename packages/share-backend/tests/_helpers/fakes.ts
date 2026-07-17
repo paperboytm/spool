@@ -189,6 +189,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const row = state.api_tokens.find((token) => token.token_hash === tokenHash)
           return (row ? ({ user_id: row.user_id } as T) : null)
         }
+        if (/^SELECT id, user_id FROM api_tokens WHERE token_hash=\?$/i.test(sql)) {
+          const [tokenHash] = params as [string]
+          const row = state.api_tokens.find((token) => token.token_hash === tokenHash)
+          return (row ? ({ id: row.id, user_id: row.user_id } as T) : null)
+        }
         if (/^SELECT name, avatar_url, display_name, custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL$/i.test(sql)) {
           const [id] = params as [string]
           const user = state.users.find((row) => row.id === id && row.deleted_at === null)
@@ -423,6 +428,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (!token) return { success: true, meta: { changes: 0 } }
           token.last_used_at = lastUsedAt
           return { success: true, meta: { changes: 1 } }
+        }
+        if (/^DELETE FROM api_tokens WHERE token_hash=\?$/i.test(sql)) {
+          const [tokenHash] = params as [string]
+          const before = state.api_tokens.length
+          state.api_tokens = state.api_tokens.filter((row) => row.token_hash !== tokenHash)
+          return { success: true, meta: { changes: before - state.api_tokens.length } }
         }
         if (/^INSERT INTO api_tokens \(id, user_id, token_hash, label, created_at\) VALUES \(\?,\?,\?,\?,\?\)$/i.test(sql)) {
           const [id, userId, tokenHash, label, createdAt] = params as [

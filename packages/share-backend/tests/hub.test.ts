@@ -10,7 +10,7 @@ import {
 } from '@spool-lab/session-kit'
 
 import { onRequestPost as batchPost } from '../functions/api/hub/v1/objects/batch'
-import { onRequestPost as tokensPost } from '../functions/api/hub/v1/tokens'
+import { onRequestDelete as tokensDelete, onRequestPost as tokensPost } from '../functions/api/hub/v1/tokens'
 import { onRequestPost as headPost } from '../functions/api/hub/v1/sessions/[sid]/head'
 import { onRequestGet as metaGet } from '../functions/api/hub/v1/sessions/[sid]/index'
 import { onRequestPost as pushPost } from '../functions/api/hub/v1/sessions/[sid]/push'
@@ -148,6 +148,13 @@ async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) 
   return { records, view, viewValue, head, entries: [...records, view] }
 }
 
+function tokensDeleteRequest(token: string): Request {
+  return new Request(`${BASE_URL}/api/hub/v1/tokens`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${token}` },
+  })
+}
+
 function jsonPost(url: string, body: unknown, token?: string): Request {
   const headers = new Headers({ 'content-type': 'application/json' })
   if (token) headers.set('authorization', `Bearer ${token}`)
@@ -278,6 +285,56 @@ describe('hub authentication', () => {
       env,
     )
     expect(chained.status).toBe(401)
+  })
+
+  it('revokes a token via DELETE and refuses it afterwards', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-a')
+    await seedSession(env.SESSIONS, USER_A_TOKEN, 'user-a')
+    const fixture = await makeFixture()
+
+    const minted = await invoke(
+      tokensPost,
+      jsonPost(`${BASE_URL}/api/hub/v1/tokens`, { label: 'test CLI' }, USER_A_TOKEN),
+      env,
+    )
+    expect(minted.status).toBe(200)
+    const { token } = await minted.json() as { token: string }
+
+    const revoked = await invoke(tokensDelete, tokensDeleteRequest(token), env)
+    expect(revoked.status).toBe(200)
+    await expect(revoked.json()).resolves.toEqual({ revoked: true })
+    expect(env.state.api_tokens).toHaveLength(0)
+    expect(env.state.audit).toContainEqual(
+      expect.objectContaining({ action: 'hub-token-revoke', user_id: 'user-a' }),
+    )
+
+    const reuse = await push(env, fixture, token)
+    expect(reuse.status).toBe(401)
+  })
+
+  it('DELETE is 401 without a bearer or with an unknown token', async () => {
+    const env = envFor()
+
+    const bare = await invoke(
+      tokensDelete,
+      new Request(`${BASE_URL}/api/hub/v1/tokens`, { method: 'DELETE' }),
+      env,
+    )
+    expect(bare.status).toBe(401)
+
+    const unknown = await invoke(tokensDelete, tokensDeleteRequest('sph_never_minted'), env)
+    expect(unknown.status).toBe(401)
+    expect(env.state.audit).toHaveLength(0)
+  })
+
+  it('DELETE with HUB_DEV_TOKEN is an ok no-op (nothing stored to revoke)', async () => {
+    const env = envFor({ devToken: DEV_TOKEN })
+
+    const response = await invoke(tokensDelete, tokensDeleteRequest(DEV_TOKEN), env)
+
+    expect(response.status).toBe(200)
+    expect(env.state.api_tokens).toHaveLength(0)
   })
 
   it('accepts HUB_DEV_TOKEN and provisions the synthetic dev user', async () => {
