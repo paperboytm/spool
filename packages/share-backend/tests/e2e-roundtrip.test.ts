@@ -196,6 +196,69 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     expect(materialized).toContain('<spool-resume-note>')
   })
 
+  it('codex: share → hub → resume materializes a date-partitioned rollout', async () => {
+    const env = makeEnv()
+    const fetchAdapter = makeFetchAdapter(env)
+    const authorWs = mkdtempSync(join(tmpdir(), 'spool-e2e-codex-'))
+    const authorHome = mkdtempSync(join(tmpdir(), 'spool-e2e-codex-home-'))
+    const line = (record: Record<string, unknown>) => JSON.stringify(record)
+    const jsonl = [
+      line({ timestamp: '2026-07-16T10:00:00Z', type: 'session_meta', payload: { id: SESSION_UUID, cwd: authorWs } }),
+      line({ timestamp: '2026-07-16T10:00:01Z', type: 'event_msg', payload: { type: 'user_message', message: `fix the demo in ${authorWs}/src/demo.ts` } }),
+      line({ timestamp: '2026-07-16T10:00:02Z', type: 'event_msg', payload: { type: 'agent_message', message: 'Fixed.' } }),
+    ].join('\n') + '\n'
+    const filePath = join(authorWs, 'rollout.jsonl')
+    writeFileSync(filePath, jsonl, 'utf8')
+
+    const codexSid = `codex_${SESSION_UUID}`
+    const exit = await handleShareCommand(undefined, { noEdit: true, yes: true }, {
+      fetch: fetchAdapter,
+      homeDir: authorHome,
+      env: { SPOOL_HUB_URL: HUB_URL, SPOOL_HUB_TOKEN: DEV_TOKEN } as NodeJS.ProcessEnv,
+      cwd: authorWs,
+      log: () => {},
+      error: (message) => { throw new Error(message) },
+      resolveTarget: () => ({
+        provider: 'codex', sessionUuid: SESSION_UUID, filePath, cwd: authorWs,
+      }),
+    })
+    expect(exit).toBe(0)
+
+    const resumerWs = realpathSync(mkdtempSync(join(tmpdir(), 'spool-e2e-codex-resumer-')))
+    const resumerHome = mkdtempSync(join(tmpdir(), 'spool-e2e-codex-home2-'))
+    const spawnCalls: Array<{ cmd: string; args: readonly string[] }> = []
+    const fakeSpawn = ((cmd: string, args: readonly string[]) => {
+      spawnCalls.push({ cmd, args })
+      return { status: 0 }
+    }) as unknown as typeof import('node:child_process').spawnSync
+    const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${codexSid}`, { workspace: resumerWs }, {
+      fetch: fetchAdapter,
+      homeDir: resumerHome,
+      env: {} as NodeJS.ProcessEnv,
+      log: () => {},
+      error: (message) => { throw new Error(message) },
+      spawn: fakeSpawn,
+    })
+    expect(resumeExit).toBe(0)
+    expect(spawnCalls[0]?.cmd).toBe('codex')
+    expect(spawnCalls[0]?.args[0]).toBe('resume')
+
+    // Date-partitioned rollout location + rewritten identity + birth record.
+    const sessionsRoot = join(resumerHome, '.codex', 'sessions')
+    const year = readdirSync(sessionsRoot)[0] as string
+    const month = readdirSync(join(sessionsRoot, year))[0] as string
+    const day = readdirSync(join(sessionsRoot, year, month))[0] as string
+    const files = readdirSync(join(sessionsRoot, year, month, day))
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatch(/^rollout-.*\.jsonl$/)
+    const materialized = readFileSync(join(sessionsRoot, year, month, day, files[0] as string), 'utf8')
+    expect(materialized).toContain(`${resumerWs}/src/demo.ts`)
+    expect(materialized).not.toContain(authorWs)
+    expect(materialized).not.toContain('$SPOOL_WS')
+    expect(materialized).toContain('<spool-resume-note>')
+    expect(materialized).not.toContain(`"id":"${SESSION_UUID}"`)
+  })
+
   it('prefix share @2 publishes exactly two records and clamps reads', async () => {
     const env = makeEnv()
     const fetchAdapter = makeFetchAdapter(env)
