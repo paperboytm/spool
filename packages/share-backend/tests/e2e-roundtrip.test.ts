@@ -241,7 +241,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     })
     expect(resumeExit).toBe(0)
     expect(spawnCalls[0]?.cmd).toBe('codex')
-    expect(spawnCalls[0]?.args[0]).toBe('resume')
+    expect(spawnCalls[0]?.args[0]).toBe('fork')
 
     // Date-partitioned rollout location + rewritten identity + birth record.
     const sessionsRoot = join(resumerHome, '.codex', 'sessions')

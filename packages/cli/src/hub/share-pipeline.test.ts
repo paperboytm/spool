@@ -124,7 +124,7 @@ describe('materialize → share lineage round-trip', () => {
     expect(materialized.lines).toHaveLength(5)
     expect(materialized.dirSegments).toEqual(['.claude', 'projects', '-home-resumer-checkout'])
     expect(materialized.fileName).toBe('new-session-id.jsonl')
-    expect(materialized.resumeArgv).toEqual(['claude', '--resume', 'new-session-id'])
+    expect(materialized.resumeArgv).toEqual(['claude', '--resume', 'new-session-id', '--fork-session'])
     for (const line of materialized.lines) {
       expect(line).not.toContain('$SPOOL_WS')
       expect(line).not.toContain('orig-session')
@@ -171,7 +171,7 @@ describe('materialize → share lineage round-trip', () => {
 
     expect(materialized.dirSegments).toEqual(['.codex', 'sessions', '2026', '07', '16'])
     expect(materialized.fileName).toBe('rollout-2026-07-16T12-34-56-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jsonl')
-    expect(materialized.resumeArgv).toEqual(['codex', 'resume', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'])
+    expect(materialized.resumeArgv).toEqual(['codex', 'fork', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'])
     expect(materialized.lines).toHaveLength(5)
     for (const line of materialized.lines) {
       expect(line).not.toContain('$SPOOL_WS')

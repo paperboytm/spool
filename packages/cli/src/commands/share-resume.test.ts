@@ -219,12 +219,12 @@ describe('spool share → spool resume round trip', () => {
     const birth = JSON.parse(lines[4] as string) as { message: { content: [{ text: string }] }; parentUuid: string }
     expect(birth.parentUuid).toBe('u-4')
     expect(birth.message.content[0].text).toContain('<spool-resume-note>')
-    expect(logs.join('\n')).toContain(`claude --resume ${newSessionId}`)
+    expect(logs.join('\n')).toContain(`claude --resume ${newSessionId} --fork-session`)
 
-    // Default behavior hands off to the native CLI, in the REAL workspace
-    // path even though a symlink was passed in.
+    // Default behavior hands off to the native CLI's fork entry point, in
+    // the REAL workspace path even though a symlink was passed in.
     expect(spawnCalls).toEqual([
-      { cmd: 'claude', args: ['--resume', newSessionId], cwd: resumerWs },
+      { cmd: 'claude', args: ['--resume', newSessionId, '--fork-session'], cwd: resumerWs },
     ])
   })
 
@@ -308,9 +308,9 @@ describe('spool share → spool resume round trip', () => {
     expect(birth.type).toBe('response_item')
     expect(birth.payload.content[0].text).toContain('<spool-resume-note>')
 
-    expect(logs.join('\n')).toContain(`codex resume ${newSessionId}`)
+    expect(logs.join('\n')).toContain(`codex fork ${newSessionId}`)
     expect(spawnCalls).toEqual([
-      { cmd: 'codex', args: ['resume', newSessionId], cwd: resumerWs },
+      { cmd: 'codex', args: ['fork', newSessionId], cwd: resumerWs },
     ])
   })
 

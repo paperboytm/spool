@@ -8,7 +8,11 @@ import { buildBirthText, type BirthPayload } from './birth.js'
 // rewritten, the $SPOOL_WS/$SPOOL_HOME placeholders map to the resumer's
 // paths, and exactly one clearly-marked Spool birth record is appended.
 // The file is written where the provider CLI keeps sessions for the
-// target workspace, so its native resume command picks it up.
+// target workspace, and is launched through the provider's native FORK
+// entry point (`claude --resume --fork-session` / `codex fork`), so the
+// materialized file stays an immutable anchor: it keeps folding to the
+// shared integrity root forever, and re-running the printed command
+// branches another fresh session off the share point.
 
 export interface MaterializeOptions {
   records: readonly { i: number; data: string }[]
@@ -26,7 +30,7 @@ export interface MaterializedSession {
   /** Directory the file belongs in, as path segments under the resumer's home. */
   dirSegments: string[]
   fileName: string
-  /** The provider-native command that opens the session, e.g. ['claude', '--resume', <id>]. */
+  /** The provider-native fork invocation, e.g. ['claude', '--resume', <id>, '--fork-session']. */
   resumeArgv: string[]
 }
 
@@ -73,7 +77,7 @@ export function materializeClaudeSession(opts: MaterializeOptions): Materialized
     lines,
     dirSegments: ['.claude', 'projects', claudeProjectDirName(opts.workspaceRoot)],
     fileName: `${opts.sessionId}.jsonl`,
-    resumeArgv: ['claude', '--resume', opts.sessionId],
+    resumeArgv: ['claude', '--resume', opts.sessionId, '--fork-session'],
   }
 }
 
@@ -114,12 +118,14 @@ export function materializeCodexSession(opts: MaterializeOptions): MaterializedS
   lines.push(JSON.stringify(birthRecord))
 
   // Codex partitions rollouts by date: sessions/YYYY/MM/DD/rollout-<stamp>-<uuid>.jsonl.
+  // `codex fork` copies the anchor into a new rollout whose session_meta
+  // carries forked_from_id — codex's own lineage pointer back to it.
   const stamp = iso.slice(0, 19).replace(/:/g, '-')
   return {
     lines,
     dirSegments: ['.codex', 'sessions', iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10)],
     fileName: `rollout-${stamp}-${opts.sessionId}.jsonl`,
-    resumeArgv: ['codex', 'resume', opts.sessionId],
+    resumeArgv: ['codex', 'fork', opts.sessionId],
   }
 }
 

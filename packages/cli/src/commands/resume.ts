@@ -14,9 +14,12 @@ import { resolveSessionRef } from '../hub/ref.js'
 // `spool resume <url|sid>[<@n>]` — materialize, don't graft (design §3):
 // fetch the shared records, verify integrity client-side, write a brand-new
 // provider-native session (claude → ~/.claude/projects, codex →
-// ~/.codex/sessions), then launch the provider's native resume command
-// (`claude --resume` / `codex resume` — both open waiting for input; no
-// model turn runs). `--no-exec` prints the command instead of launching.
+// ~/.codex/sessions), then launch the provider's native FORK entry point
+// (`claude --resume --fork-session` / `codex fork` — both open waiting
+// for input; no model turn runs). The materialized file is an immutable
+// anchor: continued work lands in the forked session, so the anchor keeps
+// matching the shared integrity root and every launch branches fresh from
+// the share point. `--no-exec` prints the command instead of launching.
 
 const READ_PAGE = 500
 
@@ -91,8 +94,8 @@ export async function handleResumeCommand(
       log(`Workspace card (author's last observed repo state): ${meta.cardJson}`)
     }
     log('')
-    // Always print the command — it stays in scrollback for re-opening
-    // the session after this native run ends.
+    // Always print the command — it stays in scrollback, and re-running
+    // it forks another fresh branch off the materialized anchor.
     log(`  cd ${workspaceRoot} && ${materialized.resumeArgv.join(' ')}`)
 
     if (options.exec === false) return 0
