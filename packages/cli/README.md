@@ -25,6 +25,10 @@ spool list -s opencode -n 10   # Filter by source
 spool list --json              # Output as JSON
 
 spool show <uuid>              # Print full session content
+spool show <sid|url>           # Shared session: first-screen summary
+spool show <session> --log     # Record timeline
+spool show <session> --diff    # Composed net diff across the session
+spool show <session>@r3        # Land on record 3
 spool show <uuid> --json       # Output as JSON
 
 spool status                   # Show index stats (session count, DB size)
@@ -51,6 +55,37 @@ spool pinned --json            # Output as JSON
 Pins are shared with the Spool desktop app — pinning here surfaces the
 session in the app's library on its next refresh, and vice versa.
 
+### Share & resume
+
+Share a session to [spool.pro](https://spool.pro) and pick it up on
+another machine — or someone else's.
+
+```bash
+spool login                    # Sign in via browser approval (works over SSH)
+spool login --token <t>        # Paste a hub API token instead (CI / scripts)
+spool logout                   # Revoke this machine's token + delete local credentials
+
+spool share                    # Share the latest session in the current directory
+spool share <uuid>             # Share a specific session (uuid prefixes work)
+spool share <uuid>@12          # Share only the first 12 records
+spool share -m "note"          # Set the note without opening the editor
+spool share --no-edit          # Publish the prefilled draft as-is
+spool share --yes              # Skip the secret-findings confirmation
+
+spool resume <sid|url>         # Materialize a shared session and fork it natively
+spool resume <sid>@12          # Fork at record 12 (first 12 records only)
+spool resume --workspace <dir> # Resume in a specific workspace root
+spool resume --no-exec         # Print the native resume command instead of launching
+
+spool withdraw <sid|url>       # Take a shared session down (tombstone)
+```
+
+`spool share` scans for secrets before anything leaves the machine and
+opens your editor to write a note. `spool resume` writes a brand-new
+provider-native session (Claude → `~/.claude/projects`, Codex →
+`~/.codex/sessions`) and launches the provider's fork entry point, so
+continued work branches off cleanly from the share point.
+
 ### Sync
 
 ```bash
@@ -72,6 +107,7 @@ spool doctor --fix --force     # Also apply destructive fixes
 
 All data is stored locally in `~/.spool/`:
 - `spool.db` — SQLite database with sessions and messages
+- `hub-credentials.json` — hub URL + API token from `spool login`
 
 ## License
 
