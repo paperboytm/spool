@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react'
-import { BookOpen } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -51,22 +50,14 @@ export function SessionNote({
 
   return (
     <section
-      className={`overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--card)]${className ? ` ${className}` : ''}`}
+      className={className}
       aria-labelledby="session-summary-title"
     >
-      <header className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
-        <BookOpen
-          className="shrink-0 text-[var(--accent)]"
-          aria-hidden="true"
-          size={14}
-          strokeWidth={1.7}
-        />
-        <h2 id="session-summary-title" className="m-0 text-[13px] font-semibold leading-4 text-[var(--text)]">
-          Summary
-        </h2>
-      </header>
+      <h2 id="session-summary-title" className="m-0 text-base font-semibold text-[var(--text)]">
+        Summary
+      </h2>
       <div
-        className="w-full max-w-[840px] [overflow-wrap:anywhere] p-4 text-sm leading-[1.65] text-[var(--text)] md:px-6 md:pb-6 md:pt-5
+        className="mt-4 w-full [overflow-wrap:anywhere] text-sm leading-[1.65] text-[var(--text)]
           [&>:first-child]:mt-0 [&>:last-child]:mb-0
           [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:border-b [&_h1]:border-[var(--border)] [&_h1]:pb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:leading-6 [&_h1]:tracking-[-0.01em]
           [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:border-b [&_h2]:border-[var(--border)] [&_h2]:pb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-6 [&_h2]:tracking-[-0.01em]

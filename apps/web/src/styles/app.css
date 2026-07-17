@@ -64,6 +64,7 @@ body {
 }
 
 .sw-root {
+  --sw-header-height: 60px;
   --bg: #FAFAF8;
   --bg-sink: #F4F4F0;
   --card: #FFFFFF;
@@ -154,13 +155,21 @@ html[data-theme='dark'] .sw-root {
  * parchment palette and confused the reader's paper card. */
 .sw-header {
   flex: 0 0 auto;
-  height: 60px;
+  height: var(--sw-header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
+}
+.sw-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+.sw-session-sticky {
+  top: calc(var(--sw-header-height) + 24px);
 }
 .sw-wordmark {
   font-weight: 700;

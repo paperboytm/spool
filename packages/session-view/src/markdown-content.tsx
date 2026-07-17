@@ -74,7 +74,7 @@ function MarkdownContent({
       // Only inline code reaches here visibly — `pre` handles fenced cases.
       // Re-rendering of the inner `<code>` inside `pre`'s CodeBlock branch is discarded.
       return (
-        <code className="font-mono text-[0.92em] px-1 py-0.5 rounded bg-warm-surface dark:bg-dark-surface" {...rest}>
+        <code {...rest} className="whitespace-pre-wrap break-all font-mono text-[0.92em] px-1 py-0.5 rounded bg-warm-surface dark:bg-dark-surface">
           {children}
         </code>
       )

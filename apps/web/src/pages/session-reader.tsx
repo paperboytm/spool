@@ -170,7 +170,7 @@ export function SessionReader({ sid }: { sid: string }) {
   if (state.phase === 'withdrawn') {
     return (
       <Page>
-        <Header />
+        <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
             <div className="mb-6 flex items-center gap-3">
@@ -198,7 +198,7 @@ export function SessionReader({ sid }: { sid: string }) {
   if (state.phase === 'error') {
     return (
       <Page>
-        <Header />
+        <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
             <h1 className="m-0 text-xl font-semibold leading-8 tracking-[-0.01em] text-[var(--text)]">
@@ -217,7 +217,7 @@ export function SessionReader({ sid }: { sid: string }) {
   if (state.phase === 'ready' && conversation !== null) {
     return (
       <Page>
-        <Header />
+        <Header sticky />
         <SessionWorkbench
           key={sid}
           meta={state.meta}
@@ -235,7 +235,7 @@ export function SessionReader({ sid }: { sid: string }) {
 
   return (
     <Page>
-      <Header />
+      <Header sticky />
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
         {state.phase === 'loading' && (
           <p className="m-0 text-center text-[13px] text-[var(--muted)]">

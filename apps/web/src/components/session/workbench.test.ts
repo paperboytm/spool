@@ -8,7 +8,14 @@ import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
 
 vi.mock('@spool-lab/session-view', () => ({
-  MessageList: () => createElement('div', { 'data-testid': 'message-list' }, 'Conversation'),
+  MessageList: ({ useWindowScroll }: { useWindowScroll?: boolean }) => createElement(
+    'div',
+    {
+      'data-testid': 'message-list',
+      'data-window-scroll': String(useWindowScroll === true),
+    },
+    'Conversation',
+  ),
 }))
 
 vi.mock('@spool/share-kit/timeline', async (importOriginal) => {
@@ -264,7 +271,7 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('transition-[width,background-color]')
   })
 
-  it('keeps the legacy MessageList fallback sized and compacts long titles', () => {
+  it('lets the page scroll the legacy MessageList fallback and compacts long titles', () => {
     const longFirstLine = `Review ${'the session workbench layout '.repeat(8)}`.trim()
     const html = renderWorkbench({
       spool: null,
@@ -274,14 +281,14 @@ describe('SessionWorkbench', () => {
       },
     })
 
-    expect(html).toContain('class="flex h-[70vh] min-h-96 overflow-hidden"')
-    expect(html).not.toContain('class="flex h-[70vh] min-h-96 overflow-hidden border-t')
+    expect(html).toContain('class="min-w-0"><div data-testid="message-list"')
+    expect(html).toContain('data-window-scroll="true"')
     expect(html).toContain('data-testid="message-list"')
     expect(html).toContain('…</h1>')
     expect(html).not.toContain('This line belongs in the full title only</h1>')
   })
 
-  it('explains how to resume locally and links browser-addressable remotes', () => {
+  it('keeps the resume command compact and links browser-addressable remotes', () => {
     const html = renderWorkbench({
       cardJson: JSON.stringify({
         remotes: ['origin: git@github.com:paperboytm/spool.git'],
@@ -292,14 +299,17 @@ describe('SessionWorkbench', () => {
       }),
     })
 
-    expect(html).toContain('Resume in your own agent')
-    expect(html).toContain('Run this command locally to pick up where this session left off.')
+    expect(html).not.toContain('Resume in your own agent')
+    expect(html).not.toContain('Run this command locally to pick up where this session left off.')
+    expect(html).toContain('aria-label="Resume command"')
+    expect(html).toContain('spool resume claude_test-session')
     expect(html).toContain('Don&#x27;t have the Spool CLI?')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('>Install it</button>')
     expect(html).toContain('href="https://github.com/paperboytm/spool"')
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
+    expect(html).toContain('class="sw-session-sticky min-w-0 lg:sticky"')
   })
 
   it('keeps the raw fallback usable without a note, view, or messages', () => {

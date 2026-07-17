@@ -34,6 +34,16 @@ describe('SessionNote', () => {
     expect(html).toContain('<td>Find prior work</td>')
   })
 
+  it('renders the summary inline without card chrome or an icon', () => {
+    const html = render('Keep the context readable.')
+
+    expect(html).toContain('<h2 id="session-summary-title"')
+    expect(html).not.toContain('<header')
+    expect(html).not.toContain('<svg')
+    expect(html).not.toContain('rounded-[10px]')
+    expect(html).not.toContain('bg-[var(--card)]')
+  })
+
   it('opens external links in a new tab without sharing the opener', () => {
     const html = render('[Spool](https://spool.dev/docs)')
     const anchor = html.match(/<a\b[^>]*>/)?.[0]

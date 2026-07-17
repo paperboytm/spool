@@ -18,6 +18,8 @@ export interface MatchState {
 interface Props {
   messages: ConversationMessage[]
   isDark: boolean
+  /** Let the document own vertical scrolling instead of this list. */
+  useWindowScroll?: boolean
   showFindBar?: boolean
   messageFindRanges?: Map<number, MatchState>
   activeMatchIndex?: number
@@ -176,6 +178,7 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   {
     messages,
     isDark,
+    useWindowScroll = false,
     showFindBar = false,
     messageFindRanges = EMPTY_FIND_RANGES,
     activeMatchIndex = -1,
@@ -376,25 +379,32 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   }
 
   return (
-    <div className="relative flex-1 min-h-0">
+    <div className={useWindowScroll
+      ? 'relative min-w-0 max-w-full overflow-x-hidden'
+      : 'relative flex-1 min-h-0'}>
       <Virtuoso
         ref={virtuosoRef}
-        scrollerRef={bindVirtuosoScroller}
+        {...(useWindowScroll ? {} : { scrollerRef: bindVirtuosoScroller })}
         data={rows}
         computeItemKey={(_index, row) => row.kind === 'msg' ? `m-${row.msg.id}` : row.key}
         defaultItemHeight={64}
         {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
         increaseViewportBy={400}
-        totalListHeightChanged={requestScrollbarSync}
+        {...(useWindowScroll ? {} : { totalListHeightChanged: requestScrollbarSync })}
+        useWindowScroll={useWindowScroll}
         data-testid="message-list-scroll"
-        className="h-full scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]"
+        className={useWindowScroll
+          ? 'scrollbar-none'
+          : 'h-full scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]'}
         itemContent={renderRowContent}
       />
-      <MessageScrollbar
-        scroller={virtuosoScroller}
-        syncNonce={scrollbarSyncNonce}
-        scrollToRatio={scrollToRatio}
-      />
+      {!useWindowScroll && (
+        <MessageScrollbar
+          scroller={virtuosoScroller}
+          syncNonce={scrollbarSyncNonce}
+          scrollToRatio={scrollToRatio}
+        />
+      )}
     </div>
   )
 })

@@ -6,7 +6,6 @@ import {
   GitBranch,
   GitCommitHorizontal,
   MessageSquareText,
-  SquareTerminal,
   UserRound,
 } from 'lucide-react'
 import {
@@ -309,23 +308,7 @@ export function SessionWorkbench({
           </div>
 
           <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
-            <div className="flex items-start gap-2">
-              <SquareTerminal
-                className="shrink-0 text-[var(--accent)]"
-                size={14}
-                strokeWidth={1.7}
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <p className="m-0 text-[11px] font-semibold leading-4 text-[var(--text)]">
-                  Resume in your own agent
-                </p>
-                <p className="m-0 text-[11px] leading-4 text-[var(--muted)]">
-                  Run this command locally to pick up where this session left off.
-                </p>
-              </div>
-            </div>
-            <div className="mt-2 flex h-8 min-w-0" aria-label="Resume command">
+            <div className="flex h-8 min-w-0" aria-label="Resume command">
               <code
                 className="flex h-8 min-w-0 flex-1 items-center truncate rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
                 title={resume}
@@ -387,7 +370,7 @@ export function SessionWorkbench({
                         {prompts.length}
                       </span>
                     </div>
-                    <div className="lg:sticky lg:top-6 lg:py-1">
+                    <div className="sw-session-sticky lg:sticky lg:py-1">
                       <h3 className="sr-only">User prompts</h3>
                       <ol className="m-0 flex list-none snap-x gap-2 overflow-x-auto p-0 pb-2 lg:block lg:overflow-visible lg:pb-0">
                         {prompts.map((entry, index) => {
@@ -477,11 +460,12 @@ export function SessionWorkbench({
                       </p>
                     )
                   ) : conversation.messages.length > 0 ? (
-                    <div className="flex h-[70vh] min-h-96 overflow-hidden">
+                    <div className="min-w-0">
                       <MessageList
                         ref={listRef}
                         messages={conversation.messages}
                         isDark={isDark}
+                        useWindowScroll
                         targetMessageId={targetMessageId}
                         showTargetHighlight={targetMessageId !== null}
                       />
@@ -496,7 +480,7 @@ export function SessionWorkbench({
             </section>
           </div>
 
-          <aside aria-label="Workspace" className="min-w-0 lg:sticky lg:top-6">
+          <aside aria-label="Workspace" className="sw-session-sticky min-w-0 lg:sticky">
             <div>
               <h2
                 id="workspace-title"

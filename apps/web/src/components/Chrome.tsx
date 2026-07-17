@@ -289,7 +289,13 @@ export function ThemeToggle() {
   )
 }
 
-export function Header({ auth = 'auto' as AuthState }: { auth?: AuthState }) {
+export function Header({
+  auth = 'auto' as AuthState,
+  sticky = false,
+}: {
+  auth?: AuthState
+  sticky?: boolean
+}) {
   // 'auto' = SWR pattern: first frame paints from the localStorage
   // cache, background fetchMe revalidates and rewrites. 'out' or an
   // explicit object lets a page short-circuit (SignIn knows the user
@@ -317,7 +323,7 @@ export function Header({ auth = 'auto' as AuthState }: { auth?: AuthState }) {
   }, [auth])
 
   return (
-    <header className="sw-header">
+    <header className={`sw-header${sticky ? ' sw-header-sticky' : ''}`}>
       {/* Same-origin since the landing/share merge — works in dev too. */}
       <a href="/" aria-label="Spool home">
         <Wordmark />
