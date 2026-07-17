@@ -61,12 +61,12 @@ bucket_name = "spool-hub"
 [vars]
 ENV = "development"
 
-# Cron trigger for the deletion sweep. Pages Functions ignore this in
-# the Pages runtime — the deletion worker is intended to run as a
+# Cron cadence for the deletion sweep ("0 */6 * * *"). Pages configs
+# reject a [triggers] block outright (wrangler ≥4.9x validates it), so
+# this lives here as documentation only — the deletion worker is a
 # companion Worker (functions/_scheduled/deletion-worker.ts) sharing the
-# same D1/KV/R2 bindings. Kept here for documentation.
-[triggers]
-crons = ["0 */6 * * *"]
+# same D1/KV/R2 bindings, and its cron is set in
+# workers/spool-share-deletion/wrangler.toml.
 
 # Secrets (set ONCE per environment via wrangler — never commit):
 #   wrangler pages secret put WORKOS_CLIENT_ID         --project-name spool-share-backend
