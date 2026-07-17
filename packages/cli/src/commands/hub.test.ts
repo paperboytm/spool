@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { handleLoginCommand } from './login.js'
@@ -46,16 +46,45 @@ describe('login command handler', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('prompts for a token when the flag is omitted', async () => {
+  it('runs the browser approval flow when the flag is omitted', async () => {
     const home = tempHome()
+    const output: string[] = []
+    const opened: string[] = []
+    let polls = 0
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/cli-auth/start')) {
+        return new Response(JSON.stringify({
+          device_code: 'dev-secret',
+          user_code: 'XKCD-2941',
+          verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+          expires_in: 900,
+          interval: 3,
+        }), { status: 200 })
+      }
+      if (url.endsWith('/api/cli-auth/poll')) {
+        polls += 1
+        return polls < 3
+          ? new Response(JSON.stringify({ status: 'pending', interval: 3 }), { status: 200 })
+          : new Response(JSON.stringify({ status: 'approved', token: 'sph_browser' }), { status: 200 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
 
     await expect(handleLoginCommand(
       {},
       {
         homeDir: home,
         env: {},
-        promptToken: async () => ' interactive-token\n',
-        log: () => undefined,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        openBrowser: async (url) => {
+          opened.push(url)
+          return true
+        },
+        sleep: async () => undefined,
+        label: 'testbox',
+        log: message => output.push(message),
       },
     )).resolves.toBe(0)
 
@@ -64,8 +93,85 @@ describe('login command handler', () => {
       'utf8',
     ))).toEqual({
       hubUrl: 'https://spool.pro',
-      token: 'interactive-token',
+      token: 'sph_browser',
     })
+    expect(opened).toEqual(['https://spool.pro/cli-auth?code=XKCD-2941'])
+    expect(output[0]).toContain('XKCD-2941')
+    // The start call carries the approval-page label.
+    const startCall = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/api/cli-auth/start'))!
+    const startInit = startCall[1] as RequestInit
+    expect(JSON.parse(String(startInit.body))).toEqual({ label: 'testbox' })
+  })
+
+  it('reports a denied / expired request as a failure', async () => {
+    const home = tempHome()
+    const errors: string[] = []
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/cli-auth/start')) {
+        return new Response(JSON.stringify({
+          device_code: 'dev-secret',
+          user_code: 'XKCD-2941',
+          verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+          expires_in: 900,
+          interval: 3,
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: 'NOT_FOUND', detail: 'expired or denied' }), { status: 404 })
+    })
+
+    await expect(handleLoginCommand(
+      {},
+      {
+        homeDir: home,
+        env: {},
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        openBrowser: async () => true,
+        sleep: async () => undefined,
+        label: 'testbox',
+        log: () => undefined,
+        error: message => errors.push(message),
+      },
+    )).resolves.toBe(1)
+
+    expect(errors.join('\n')).toMatch(/expired or was denied/)
+    expect(existsSync(join(home, '.spool', 'hub-credentials.json'))).toBe(false)
+  })
+
+  it('times out when nobody approves before the deadline', async () => {
+    const home = tempHome()
+    const errors: string[] = []
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/cli-auth/start')) {
+        return new Response(JSON.stringify({
+          device_code: 'dev-secret',
+          user_code: 'XKCD-2941',
+          verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+          expires_in: 0, // deadline already passed → zero poll iterations
+          interval: 3,
+        }), { status: 200 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    await expect(handleLoginCommand(
+      {},
+      {
+        homeDir: home,
+        env: {},
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        openBrowser: async () => false,
+        sleep: async () => undefined,
+        label: 'testbox',
+        log: () => undefined,
+        error: message => errors.push(message),
+      },
+    )).resolves.toBe(1)
+
+    expect(errors.join('\n')).toMatch(/timed out waiting for browser approval/)
   })
 })
 

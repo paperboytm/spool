@@ -62,6 +62,20 @@ export interface HubTokenResponse {
   token: string
 }
 
+export interface HubCliAuthStartResponse {
+  device_code: string
+  user_code: string
+  verification_uri: string
+  expires_in: number
+  interval: number
+}
+
+export interface HubCliAuthPollResponse {
+  status: 'pending' | 'approved'
+  token?: string
+  interval?: number
+}
+
 export interface HubRecord {
   i: number
   oid: string
@@ -118,6 +132,16 @@ export class HubClient {
 
   createToken(): Promise<HubTokenResponse> {
     return this.postJson('/api/hub/v1/tokens', undefined)
+  }
+
+  // Both cli-auth calls are deliberately unauthenticated — they run
+  // before the CLI holds any credential.
+  startCliAuth(label: string | null): Promise<HubCliAuthStartResponse> {
+    return this.postJson('/api/cli-auth/start', label === null ? undefined : { label })
+  }
+
+  pollCliAuth(deviceCode: string): Promise<HubCliAuthPollResponse> {
+    return this.postJson('/api/cli-auth/poll', { device_code: deviceCode })
   }
 
   getSession(sid: string): Promise<HubSessionMeta> {
