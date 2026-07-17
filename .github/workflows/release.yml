@@ -191,18 +191,21 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Build dist for every package we publish so the prepack step has a tree
-      # to ship. Order matters only for redact → core → cli because the upstream
-      # consumer reads dist/index.d.ts at typecheck time during downstream build.
+      # to ship. Order matters for redact/session-kit → core → cli because the
+      # upstream consumer reads dist/index.d.ts at typecheck time during
+      # downstream build.
       - name: Build publish targets
         run: |
           pnpm -F @spool-lab/redact build
+          pnpm -F @spool-lab/session-kit build
           pnpm -F @spool-lab/core build
           pnpm -F @spool-lab/cli build
 
       # Publish in dependency order. Each step is idempotent: if the registry
       # already has this version (re-run after a partial-fail), we skip rather
-      # than error. redact is bumped in lockstep with core/cli by release.sh,
-      # so a fresh release always produces a new version per package.
+      # than error. redact and session-kit are bumped in lockstep with core/cli
+      # by release.sh, so a fresh release always produces a new version per
+      # package.
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
@@ -221,5 +224,6 @@ jobs:
             fi
           }
           publish_if_missing packages/redact
+          publish_if_missing packages/session-kit
           publish_if_missing packages/core
           publish_if_missing apps/cli
