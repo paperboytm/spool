@@ -1,7 +1,6 @@
 // /session/<sid> — the v2 hub session reader. Curated publications render
 // through share-kit's TimelineBody; legacy sessions fall back to the desktop
-// MessageList fed by the same session-kit parsers. The diff pane recomputes
-// per-file changes client-side.
+// MessageList fed by the same session-kit parsers.
 
 import { useEffect, useMemo, useState } from 'react'
 import type { SessionViewV1 } from '@spool-lab/session-kit'
@@ -166,17 +165,6 @@ export function SessionReader({ sid }: { sid: string }) {
     [state, provider],
   )
 
-  // Raw-fallback sessions already have every record in memory. Curated
-  // .spool sessions skip that download, so the diff pane fetches only the
-  // sparse ranges it opens.
-  const localFetchRange: RangeFetcher = useMemo(() => {
-    if (state.phase === 'ready' && state.records.length === state.meta.count) {
-      const records = state.records
-      return (from, to) => Promise.resolve(records.slice(from, to))
-    }
-    return makeRangeFetcher(sid)
-  }, [sid, state])
-
   if (state.phase === 'not-found') return <Tombstone reason="not-found" />
 
   if (state.phase === 'withdrawn') {
@@ -238,7 +226,6 @@ export function SessionReader({ sid }: { sid: string }) {
           conversation={conversation}
           spoolDocument={state.spoolDocument}
           isDark={isDark}
-          fetchRange={localFetchRange}
           initialRecordIndex={initialRecordIndex}
         />
         <Footer />

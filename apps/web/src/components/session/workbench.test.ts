@@ -223,7 +223,6 @@ function renderWorkbench(options: {
     provider: 'claude',
     conversation: options.messages ?? conversation,
     isDark: false,
-    fetchRange: async () => [],
     initialRecordIndex: null,
     spoolDocument: options.spool === undefined
       ? spoolDocument([{ role: 'user', body: 'Published full prompt\nwith private detail removed' }])
@@ -239,7 +238,40 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('data-progressive="true"')
     expect(html).toContain('Published full prompt')
     expect(html).toContain('<h1>Purpose</h1>')
-    expect(html).toContain('apps/web/src/session.tsx')
+    expect(html).not.toContain('>Files<')
+  })
+
+  it('uses one Workspace section and omits the file browser', () => {
+    const html = renderWorkbench()
+
+    expect(html.match(/id="workspace-title"/g)).toHaveLength(1)
+    expect(html).not.toContain('>Metadata<')
+    expect(html).not.toContain('>Files<')
+    expect(html).not.toContain('apps/web/src/session.tsx')
+  })
+
+  it('keeps prompt markers uniform at rest and expands them on interaction', () => {
+    const html = renderWorkbench()
+
+    expect(html).toContain('w-4 bg-[var(--border-strong)]')
+    expect(html).toContain('group-hover:w-6')
+    expect(html).toContain('transition-[width,background-color]')
+  })
+
+  it('keeps the legacy MessageList fallback sized and compacts long titles', () => {
+    const longFirstLine = `Review ${'the session workbench layout '.repeat(8)}`.trim()
+    const html = renderWorkbench({
+      spool: null,
+      messages: {
+        ...conversation,
+        title: `${longFirstLine}\nThis line belongs in the full title only`,
+      },
+    })
+
+    expect(html).toContain('class="flex h-[70vh]')
+    expect(html).toContain('data-testid="message-list"')
+    expect(html).toContain('…</h1>')
+    expect(html).not.toContain('This line belongs in the full title only</h1>')
   })
 
   it('keeps the raw fallback usable without a note, view, or messages', () => {

@@ -1,6 +1,9 @@
 /* Spool landing — global tokens + base reset. Per DESIGN.md. */
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.page-shell,
+.page-shell *,
+.page-shell *::before,
+.page-shell *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   --bg: #FAFAF8;
@@ -80,17 +83,22 @@
 }
 
 html {
-  font-family: 'Geist Variable', 'Geist', -apple-system, sans-serif;
-  font-size: 15px;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
 }
 
+.page-shell {
+  font-family: 'Geist Variable', 'Geist', -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 body {
+  margin: 0;
+  padding: 0;
   min-height: 100vh;
   overflow-x: hidden;
 }

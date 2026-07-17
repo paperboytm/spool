@@ -141,12 +141,16 @@
   border-radius: 50%;
 }
 
-/* Bare <section> primitive — daemon's `.sect` blocks rely on this */
-section {
+/* Marketing-only section primitive. This stylesheet can be collected into
+ * app-route CSS by the dev server, so a bare `section` selector leaks 112px
+ * padding into session Summary/Workspace/Files. */
+.home-page section,
+section.sect {
   padding: 112px 0;
   border-bottom: 1px solid var(--border);
 }
-section:last-of-type { border-bottom: none; }
+.home-page section:last-of-type,
+section.sect:last-of-type { border-bottom: none; }
 
 /* Section head primitive (kicker | title+sub) — daemon uses this */
 .s-head {

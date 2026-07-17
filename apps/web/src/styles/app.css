@@ -1,12 +1,35 @@
 @import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/utilities.css" important;
 
 @custom-variant dark (&:where(html[data-theme="dark"], html[data-theme="dark"] *));
 @source "../";
+/* Compile the same shared conversation component source as desktop instead
+ * of importing session-view's prebuilt Tailwind bundle. One utility pass is
+ * essential here: a second pass can place `.hidden` after `lg:block` and
+ * silently undo the workbench's desktop layout. */
+@source "../../../../packages/session-view/src";
 
 @theme {
   --font-sans: 'Geist Variable', 'Geist', -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+  --color-warm-bg: #FAFAF8;
+  --color-warm-surface: #F4F4F0;
+  --color-warm-surface2: #EEEEE9;
+  --color-warm-border: #E8E8E2;
+  --color-warm-border2: #D8D8D0;
+  --color-warm-text: #1C1C18;
+  --color-warm-muted: #6B6B60;
+  --color-warm-faint: #ADADAA;
+  --color-accent: #C85A00;
+  --color-dark-bg: #141410;
+  --color-dark-surface: #1C1C18;
+  --color-dark-surface2: #242420;
+  --color-dark-border: #2E2E28;
+  --color-dark-border2: #3A3A34;
+  --color-dark-text: #F2F2EC;
+  --color-dark-muted: #9A9A8E;
+  --color-dark-faint: #505048;
+  --color-accent-dark: #F07020;
 }
 
 /* spool.pro share-web — unified design system.
@@ -61,6 +84,8 @@ body {
   --src-chatgpt: #10A37F;
   --src-gemini: #5887D0;
   --paper: #FAF7F0;
+  --spool-scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --spool-scrollbar-thumb-hover: rgba(0, 0, 0, 0.16);
   --shadow-card: 0 1px 2px rgba(28, 28, 24, 0.04),
     0 8px 24px rgba(28, 28, 24, 0.06);
   --radius: 14px;
@@ -93,6 +118,8 @@ html[data-theme='dark'] .sw-root {
   --src-chatgpt: #20C38F;
   --src-gemini: #8AB0E5;
   --paper: #1A1A16;
+  --spool-scrollbar-thumb: rgba(255, 255, 255, 0.10);
+  --spool-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30),
     0 10px 30px rgba(0, 0, 0, 0.40);
 }
@@ -1475,6 +1502,15 @@ html[data-theme='dark'] .sw-modal-overlay {
   .reader-canvas {
     padding: 24px 12px 0;
   }
+}
+
+/* Shared MessageList hides the native scrollbar and renders its own thumb. */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* Markdown-table scroller emitted by share-kit's Body component:
