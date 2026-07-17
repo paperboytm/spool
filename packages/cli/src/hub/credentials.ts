@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -64,6 +64,35 @@ export function saveHubCredentials(
     mode: 0o600,
   })
   chmodSync(path, 0o600)
+  return path
+}
+
+/** The credentials file only — env overrides deliberately ignored.
+ *  Logout manages the file; an env token is the caller's to unset. */
+export function loadStoredHubCredentials(
+  options: HubCredentialOptions = {},
+): StoredHubCredentials | undefined {
+  const path = hubCredentialsPath(options)
+  const stored = readStoredCredentialObject(path)
+  if (stored === undefined) return undefined
+  return {
+    hubUrl: normalizeHubUrl(requireNonEmpty(stored['hubUrl'], 'hubUrl')),
+    token: requireNonEmpty(stored['token'], 'token'),
+  }
+}
+
+/** Delete the credentials file. Returns its path, or undefined when
+ *  there was nothing to delete. */
+export function clearHubCredentials(
+  options: HubCredentialOptions = {},
+): string | undefined {
+  const path = hubCredentialsPath(options)
+  try {
+    unlinkSync(path)
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') return undefined
+    throw error
+  }
   return path
 }
 

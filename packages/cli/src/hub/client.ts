@@ -134,6 +134,11 @@ export class HubClient {
     return this.postJson('/api/hub/v1/tokens', undefined)
   }
 
+  /** Revoke the token this client authenticates with (`spool logout`). */
+  async revokeToken(): Promise<void> {
+    await this.request('/api/hub/v1/tokens', { method: 'DELETE' })
+  }
+
   // Both cli-auth calls are deliberately unauthenticated — they run
   // before the CLI holds any credential.
   startCliAuth(label: string | null): Promise<HubCliAuthStartResponse> {

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { handleLoginCommand } from './login.js'
+import { handleLogoutCommand } from './logout.js'
 import { handleWithdrawCommand } from './withdraw.js'
 import { saveHubCredentials } from '../hub/credentials.js'
 
@@ -172,6 +173,128 @@ describe('login command handler', () => {
     )).resolves.toBe(1)
 
     expect(errors.join('\n')).toMatch(/timed out waiting for browser approval/)
+  })
+})
+
+describe('logout command handler', () => {
+  it('revokes the hub token and deletes the credentials file', async () => {
+    const home = tempHome()
+    saveHubCredentials(
+      { hubUrl: 'https://stored.example', token: 'sph_machine' },
+      { homeDir: home },
+    )
+    const output: string[] = []
+    const errors: string[] = []
+    const fetchMock = vi.fn(async () => Response.json({ revoked: true }))
+
+    await expect(handleLogoutCommand({
+      homeDir: home,
+      env: {},
+      fetch: fetchMock as typeof fetch,
+      log: message => output.push(message),
+      error: message => errors.push(message),
+    })).resolves.toBe(0)
+
+    const [input, init] = fetchMock.mock.calls[0]! as [string | URL | Request, RequestInit]
+    expect(String(input)).toBe('https://stored.example/api/hub/v1/tokens')
+    expect(init.method).toBe('DELETE')
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer sph_machine')
+    const path = join(home, '.spool', 'hub-credentials.json')
+    expect(existsSync(path)).toBe(false)
+    expect(output).toEqual([
+      "You revoked this machine's token on https://stored.example.",
+      `You signed out; removed ${path}.`,
+    ])
+    expect(errors).toEqual([])
+  })
+
+  it('still signs out locally when the hub is unreachable', async () => {
+    const home = tempHome()
+    saveHubCredentials(
+      { hubUrl: 'https://stored.example', token: 'sph_machine' },
+      { homeDir: home },
+    )
+    const output: string[] = []
+    const errors: string[] = []
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED')
+    })
+
+    await expect(handleLogoutCommand({
+      homeDir: home,
+      env: {},
+      fetch: fetchMock as typeof fetch,
+      log: message => output.push(message),
+      error: message => errors.push(message),
+    })).resolves.toBe(0)
+
+    expect(existsSync(join(home, '.spool', 'hub-credentials.json'))).toBe(false)
+    expect(errors.join('\n')).toMatch(/could not revoke the token/)
+    expect(output.join('\n')).toMatch(/You signed out; removed /)
+  })
+
+  it('treats an already-invalid token as signed out', async () => {
+    const home = tempHome()
+    saveHubCredentials(
+      { hubUrl: 'https://stored.example', token: 'sph_stale' },
+      { homeDir: home },
+    )
+    const output: string[] = []
+    const errors: string[] = []
+    const fetchMock = vi.fn(async () =>
+      Response.json({ error: 'UNAUTHENTICATED' }, { status: 401 }))
+
+    await expect(handleLogoutCommand({
+      homeDir: home,
+      env: {},
+      fetch: fetchMock as typeof fetch,
+      log: message => output.push(message),
+      error: message => errors.push(message),
+    })).resolves.toBe(0)
+
+    expect(existsSync(join(home, '.spool', 'hub-credentials.json'))).toBe(false)
+    expect(output.join('\n')).toMatch(/already invalidated/)
+    expect(errors).toEqual([])
+  })
+
+  it('fails when not logged in and makes no request', async () => {
+    const home = tempHome()
+    const errors: string[] = []
+    const fetchMock = vi.fn()
+
+    await expect(handleLogoutCommand({
+      homeDir: home,
+      env: {},
+      fetch: fetchMock as typeof fetch,
+      log: () => undefined,
+      error: message => errors.push(message),
+    })).resolves.toBe(1)
+
+    expect(errors.join('\n')).toMatch(/Not logged in/)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('points out a lingering SPOOL_HUB_TOKEN env override', async () => {
+    const home = tempHome()
+    saveHubCredentials(
+      { hubUrl: 'https://stored.example', token: 'sph_machine' },
+      { homeDir: home },
+    )
+    const output: string[] = []
+    const fetchMock = vi.fn(async () => Response.json({ revoked: true }))
+
+    await expect(handleLogoutCommand({
+      homeDir: home,
+      env: { SPOOL_HUB_TOKEN: 'sph_env' },
+      fetch: fetchMock as typeof fetch,
+      log: message => output.push(message),
+      error: () => undefined,
+    })).resolves.toBe(0)
+
+    // The stored token is the one revoked — never the env override.
+    const [, init] = fetchMock.mock.calls[0]! as [string | URL | Request, RequestInit]
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer sph_machine')
+    expect(output.join('\n')).toMatch(/SPOOL_HUB_TOKEN is set/)
   })
 })
 
