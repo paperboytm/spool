@@ -8,14 +8,15 @@ import { sequenceRoot } from '@spool-lab/session-kit'
 
 import { HubClient, HubHttpError, type HubFetch, type HubRecord } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
-import { materializeClaudeSession } from '../hub/materialize.js'
+import { materializeSession } from '../hub/materialize.js'
 import { resolveSessionRef } from '../hub/ref.js'
 
 // `spool resume <url|sid>[<@n>]` — materialize, don't graft (design §3):
 // fetch the shared records, verify integrity client-side, write a brand-new
-// provider-native session under ~/.claude/projects, then launch the native
-// `claude --resume` (which opens waiting for input — no model turn runs).
-// `--no-exec` prints the command instead of launching.
+// provider-native session (claude → ~/.claude/projects, codex →
+// ~/.codex/sessions), then launch the provider's native resume command
+// (`claude --resume` / `codex resume` — both open waiting for input; no
+// model turn runs). `--no-exec` prints the command instead of launching.
 
 const READ_PAGE = 500
 
@@ -42,11 +43,6 @@ export async function handleResumeCommand(
 
   try {
     const ref = resolveSessionRef(input)
-    if (!ref.sid.startsWith('claude_')) {
-      error('Only claude sessions can be resumed in this version (codex is a follow-up).')
-      return 1
-    }
-
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     const hubUrl = ref.hubUrl ?? credentials.hubUrl
     const client = new HubClient({
@@ -69,7 +65,7 @@ export async function handleResumeCommand(
     const homeDir = dependencies.homeDir ?? homedir()
     const sessionId = crypto.randomUUID()
 
-    const materialized = materializeClaudeSession({
+    const materialized = materializeSession(ref.provider, {
       records,
       sessionId,
       workspaceRoot,
@@ -84,33 +80,34 @@ export async function handleResumeCommand(
       cardJson: meta.cardJson,
     })
 
-    const projectDir = join(homeDir, '.claude', 'projects', materialized.projectDirName)
-    mkdirSync(projectDir, { recursive: true })
-    const filePath = join(projectDir, materialized.fileName)
+    const sessionDir = join(homeDir, ...materialized.dirSegments)
+    mkdirSync(sessionDir, { recursive: true })
+    const filePath = join(sessionDir, materialized.fileName)
     if (existsSync(filePath)) throw new Error(`Refusing to overwrite ${filePath}`)
     writeFileSync(filePath, materialized.lines.join('\n') + '\n', 'utf8')
 
-    log(`Materialized ${records.length} record(s) as a new claude session ${sessionId}.`)
+    log(`Materialized ${records.length} record(s) as a new ${ref.provider} session ${sessionId}.`)
     if (meta.cardJson) {
       log(`Workspace card (author's last observed repo state): ${meta.cardJson}`)
     }
     log('')
     // Always print the command — it stays in scrollback for re-opening
-    // the session after this claude run ends.
-    log(`  cd ${workspaceRoot} && claude --resume ${sessionId}`)
+    // the session after this native run ends.
+    log(`  cd ${workspaceRoot} && ${materialized.resumeArgv.join(' ')}`)
 
     if (options.exec === false) return 0
 
     log('')
     const spawn = dependencies.spawn ?? spawnSync
-    const result = spawn('claude', ['--resume', sessionId], {
+    const [command, ...args] = materialized.resumeArgv as [string, ...string[]]
+    const result = spawn(command, args, {
       cwd: workspaceRoot,
       stdio: 'inherit',
     })
     if (result.error) {
       const code = (result.error as NodeJS.ErrnoException).code
       if (code === 'ENOENT') {
-        error('claude CLI not found on PATH — the session is materialized; run the command above manually.')
+        error(`${command} CLI not found on PATH — the session is materialized; run the command above manually.`)
         return 1
       }
       throw result.error
@@ -130,7 +127,7 @@ export const resumeCommand = new Command('resume')
   .description('Materialize a shared session locally and resume it natively')
   .argument('<sid|url>', 'Shared session ID or URL, optionally @<n>')
   .option('--workspace <dir>', 'Workspace root to resume in (default: current directory)')
-  .option('--no-exec', 'Print the `claude --resume` command instead of launching it')
+  .option('--no-exec', 'Print the native resume command instead of launching it')
   .action(async (input: string, opts: { workspace?: string; exec: boolean }) => {
     const exitCode = await handleResumeCommand(input, {
       ...(opts.workspace === undefined ? {} : { workspace: opts.workspace }),

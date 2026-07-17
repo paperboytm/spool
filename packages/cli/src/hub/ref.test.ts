@@ -6,17 +6,17 @@ const CODEX_SID = 'codex_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
 describe('resolveSessionRef', () => {
   it.each([
-    ['bare sid', CLAUDE_SID, { sid: CLAUDE_SID }],
-    ['bare sid with position', `${CODEX_SID}@42`, { sid: CODEX_SID, position: 42 }],
+    ['bare sid', CLAUDE_SID, { sid: CLAUDE_SID, provider: 'claude' }],
+    ['bare sid with position', `${CODEX_SID}@42`, { sid: CODEX_SID, provider: 'codex', position: 42 }],
     [
       'share URL',
       `https://spool.pro/session/${CLAUDE_SID}`,
-      { sid: CLAUDE_SID, hubUrl: 'https://spool.pro' },
+      { sid: CLAUDE_SID, provider: 'claude', hubUrl: 'https://spool.pro' },
     ],
     [
       'share URL with position',
       `https://hub.example:8443/session/${CODEX_SID}@7`,
-      { sid: CODEX_SID, position: 7, hubUrl: 'https://hub.example:8443' },
+      { sid: CODEX_SID, provider: 'codex', position: 7, hubUrl: 'https://hub.example:8443' },
     ],
   ])('parses a %s', (_label, input, expected) => {
     expect(resolveSessionRef(input)).toEqual(expected)

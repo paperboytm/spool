@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { sequenceRoot } from '@spool-lab/session-kit'
 
 import type { HubFetch } from '../hub/client.js'
@@ -225,6 +225,92 @@ describe('spool share → spool resume round trip', () => {
     // path even though a symlink was passed in.
     expect(spawnCalls).toEqual([
       { cmd: 'claude', args: ['--resume', newSessionId], cwd: resumerWs },
+    ])
+  })
+
+  it('shares and resumes a codex session into ~/.codex/sessions with the native command', async () => {
+    const hub = makeHub()
+    const authorWs = mkdtempSync(join(tmpdir(), 'spool-codex-author-'))
+    const authorHome = mkdtempSync(join(tmpdir(), 'spool-codex-author-home-'))
+    const line = (record: Record<string, unknown>) => JSON.stringify(record)
+    const jsonl = [
+      line({ timestamp: '2026-07-16T10:00:00Z', type: 'session_meta', payload: { id: 'orig-codex', cwd: authorWs } }),
+      line({ timestamp: '2026-07-16T10:00:01Z', type: 'turn_context', payload: { model: 'gpt-5-codex', cwd: authorWs } }),
+      line({ timestamp: '2026-07-16T10:00:02Z', type: 'event_msg', payload: { type: 'user_message', message: `rename alpha to beta in ${authorWs}/src/demo.ts` } }),
+      line({ timestamp: '2026-07-16T10:00:03Z', type: 'event_msg', payload: { type: 'agent_message', message: 'Done: renamed alpha to beta.' } }),
+    ].join('\n') + '\n'
+    const filePath = join(authorWs, 'rollout.jsonl')
+    writeFileSync(filePath, jsonl, 'utf8')
+    const share = shareDeps(hub, authorWs, filePath, authorHome)
+
+    const shareExit = await handleShareCommand(undefined, { noEdit: true }, {
+      ...share.deps,
+      resolveTarget: () => ({
+        provider: 'codex' as const,
+        sessionUuid: SESSION_UUID,
+        filePath,
+        cwd: authorWs,
+      }),
+    })
+    expect(share.errors).toEqual([])
+    expect(shareExit).toBe(0)
+
+    const sid = `codex_${SESSION_UUID}`
+    expect(hub.sessions.get(sid)).toBeDefined()
+    for (const oid of hub.sessions.get(sid)?.manifest ?? []) {
+      expect(hub.objects.get(oid)).not.toContain(authorWs)
+    }
+
+    const resumerWs = realpathSync(mkdtempSync(join(tmpdir(), 'spool-codex-resumer-ws-')))
+    const resumerHome = mkdtempSync(join(tmpdir(), 'spool-codex-resumer-home-'))
+    const logs: string[] = []
+    const errors: string[] = []
+    const spawnCalls: Array<{ cmd: string; args: readonly string[]; cwd: unknown }> = []
+    const fakeSpawn = ((cmd: string, args: readonly string[], opts: { cwd?: unknown }) => {
+      spawnCalls.push({ cmd, args, cwd: opts.cwd })
+      return { status: 0 }
+    }) as unknown as typeof import('node:child_process').spawnSync
+    const resumeExit = await handleResumeCommand(`${HUB_URL}/session/${sid}`, { workspace: resumerWs }, {
+      fetch: hub.fetchImpl,
+      homeDir: resumerHome,
+      env: {} as NodeJS.ProcessEnv,
+      log: (message: string) => logs.push(message),
+      error: (message: string) => errors.push(message),
+      spawn: fakeSpawn,
+    })
+    expect(errors).toEqual([])
+    expect(resumeExit).toBe(0)
+
+    // The rollout lands under the date-partitioned codex sessions tree.
+    const sessionsRoot = join(resumerHome, '.codex', 'sessions')
+    const files = (readdirSync(sessionsRoot, { recursive: true }) as string[])
+      .filter((entry) => entry.endsWith('.jsonl'))
+    expect(files).toHaveLength(1)
+    const relPath = files[0] as string
+    expect(relPath.split(sep)).toHaveLength(4) // YYYY/MM/DD/rollout-….jsonl
+    const fileName = relPath.split(sep).at(-1) as string
+    const nameMatch = fileName.match(/^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(.+)\.jsonl$/)
+    expect(nameMatch).not.toBeNull()
+    const newSessionId = (nameMatch as RegExpMatchArray)[1] as string
+
+    const materialized = readFileSync(join(sessionsRoot, relPath), 'utf8')
+    const lines = materialized.trim().split('\n')
+    expect(lines).toHaveLength(5)
+    expect(materialized).not.toContain('$SPOOL_WS')
+    expect(materialized).toContain(`${resumerWs}/src/demo.ts`)
+    const meta = JSON.parse(lines[0] as string) as { payload: { id: string; cwd: string } }
+    expect(meta.payload.id).toBe(newSessionId)
+    expect(meta.payload.cwd).toBe(resumerWs)
+    const birth = JSON.parse(lines[4] as string) as {
+      type: string
+      payload: { role: string; content: [{ type: string; text: string }] }
+    }
+    expect(birth.type).toBe('response_item')
+    expect(birth.payload.content[0].text).toContain('<spool-resume-note>')
+
+    expect(logs.join('\n')).toContain(`codex resume ${newSessionId}`)
+    expect(spawnCalls).toEqual([
+      { cmd: 'codex', args: ['resume', newSessionId], cwd: resumerWs },
     ])
   })
 

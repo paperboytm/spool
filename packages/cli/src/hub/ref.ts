@@ -1,10 +1,13 @@
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 const SESSION_REF_PATTERN = new RegExp(
-  `^((?:claude|codex)_${UUID_PATTERN})(?:@(0|[1-9][0-9]*))?$`,
+  `^((claude|codex)_${UUID_PATTERN})(?:@(0|[1-9][0-9]*))?$`,
 )
+
+export type SessionRefProvider = 'claude' | 'codex'
 
 export interface ResolvedSessionRef {
   sid: string
+  provider: SessionRefProvider
   position?: number
   hubUrl?: string
 }
@@ -52,13 +55,14 @@ function parseSidAndPosition(value: string): ResolvedSessionRef | undefined {
   const match = value.match(SESSION_REF_PATTERN)
   const sid = match?.[1]
   if (!sid) return undefined
+  const provider = match[2] as SessionRefProvider
 
-  const rawPosition = match[2]
-  if (rawPosition === undefined) return { sid }
+  const rawPosition = match[3]
+  if (rawPosition === undefined) return { sid, provider }
 
   const position = Number(rawPosition)
   if (!Number.isSafeInteger(position)) return undefined
-  return { sid, position }
+  return { sid, provider, position }
 }
 
 function invalidSessionRef(input: string): never {
