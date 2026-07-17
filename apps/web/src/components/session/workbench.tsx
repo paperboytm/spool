@@ -6,6 +6,7 @@ import {
   GitBranch,
   GitCommitHorizontal,
   MessageSquareText,
+  SquareTerminal,
   UserRound,
 } from 'lucide-react'
 import {
@@ -26,7 +27,12 @@ import {
 
 import { humanDateTime, relativeDate } from '../../lib/dates'
 import type { HubSessionMeta } from '../../lib/hub-api'
-import { authorLabel, parseWorkspaceCard, resumeCommandFor } from '../../lib/session-page'
+import {
+  authorLabel,
+  parseWorkspaceCard,
+  repositoryUrlForRemote,
+  resumeCommandFor,
+} from '../../lib/session-page'
 import type { ParsedConversation } from '../../lib/session-messages'
 import { SessionNote } from './session-note'
 
@@ -300,25 +306,43 @@ export function SessionWorkbench({
             <span className="sr-only">Session ID: {meta.sid}</span>
           </div>
 
-          <div className="flex h-8 min-w-0 shrink-0 md:max-w-[320px]" aria-label="Resume command">
-            <code
-              className="flex h-8 min-w-0 flex-1 items-center truncate rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
-              title={resume}
-            >
-              {resume}
-            </code>
-            <button
-              type="button"
-              className="m-0 inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-r-md border border-[var(--border-strong)] bg-[var(--card)] p-0 text-[var(--muted)] transition-colors duration-[80ms] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-              title={copied ? 'Copied' : 'Copy resume command'}
-              aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
-              onClick={copy}
-            >
-              {copied
-                ? <Check size={14} strokeWidth={1.8} aria-hidden="true" />
-                : <Copy size={14} strokeWidth={1.8} aria-hidden="true" />}
-              <span className="sr-only" aria-live="polite">{copied ? 'Copied' : ''}</span>
-            </button>
+          <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
+            <div className="flex items-start gap-2">
+              <SquareTerminal
+                className="shrink-0 text-[var(--accent)]"
+                size={14}
+                strokeWidth={1.7}
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="m-0 text-[11px] font-semibold leading-4 text-[var(--text)]">
+                  Resume in your own agent
+                </p>
+                <p className="m-0 text-[11px] leading-4 text-[var(--muted)]">
+                  Run this command locally to pick up where this session left off.
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex h-8 min-w-0" aria-label="Resume command">
+              <code
+                className="flex h-8 min-w-0 flex-1 items-center truncate rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
+                title={resume}
+              >
+                {resume}
+              </code>
+              <button
+                type="button"
+                className="m-0 inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-r-md border border-[var(--border-strong)] bg-[var(--card)] p-0 text-[var(--muted)] transition-colors duration-[80ms] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                title={copied ? 'Copied' : 'Copy resume command'}
+                aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
+                onClick={copy}
+              >
+                {copied
+                  ? <Check size={14} strokeWidth={1.8} aria-hidden="true" />
+                  : <Copy size={14} strokeWidth={1.8} aria-hidden="true" />}
+                <span className="sr-only" aria-live="polite">{copied ? 'Copied' : ''}</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -440,7 +464,7 @@ export function SessionWorkbench({
                       </p>
                     )
                   ) : conversation.messages.length > 0 ? (
-                    <div className="flex h-[70vh] min-h-96 overflow-hidden border-t border-[var(--border)]">
+                    <div className="flex h-[70vh] min-h-96 overflow-hidden">
                       <MessageList
                         ref={listRef}
                         messages={conversation.messages}
@@ -460,7 +484,7 @@ export function SessionWorkbench({
           </div>
 
           <aside aria-label="Workspace" className="min-w-0 lg:sticky lg:top-6">
-            <div className="border-t border-[var(--border)]">
+            <div>
               <h2
                 id="workspace-title"
                 className="m-0 border-b border-[var(--border)] py-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]"
@@ -517,9 +541,7 @@ export function SessionWorkbench({
                       {card.remotes.length > 0 ? (
                         <span className="flex min-w-0 flex-col gap-1">
                           {card.remotes.map((remote) => (
-                            <span key={remote} className="[overflow-wrap:anywhere] font-mono" title={remote}>
-                              {remote}
-                            </span>
+                            <RemoteValue key={remote} remote={remote} />
                           ))}
                         </span>
                       ) : '—'}
@@ -565,5 +587,28 @@ function MetadataRow({ label, children }: { label: string; children: React.React
       <dt className="m-0 text-[var(--faint)]">{label}</dt>
       <dd className="m-0 min-w-0 [overflow-wrap:anywhere] text-[var(--muted)]">{children}</dd>
     </div>
+  )
+}
+
+function RemoteValue({ remote }: { remote: string }) {
+  const href = repositoryUrlForRemote(remote)
+  if (!href) {
+    return (
+      <span className="[overflow-wrap:anywhere] font-mono" title={remote}>
+        {remote}
+      </span>
+    )
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="[overflow-wrap:anywhere] font-mono text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      title={`Open ${remote}`}
+    >
+      {remote}
+    </a>
   )
 }

@@ -46,6 +46,40 @@ export function resumeCommandFor(sid: string): string {
   return `spool resume ${sid}`
 }
 
+/** Turn the fetch remote recorded in a workspace card into a browser link.
+ * Local paths stay plain text because they have no meaningful public target. */
+export function repositoryUrlForRemote(remote: string): string | null {
+  const separator = remote.indexOf(': ')
+  if (separator <= 0) return null
+
+  const gitUrl = remote.slice(separator + 2).trim()
+  let browserUrl: string
+
+  if (/^https?:\/\//i.test(gitUrl)) {
+    browserUrl = gitUrl
+  } else if (/^(?:ssh|git):\/\//i.test(gitUrl)) {
+    try {
+      const parsed = new URL(gitUrl)
+      browserUrl = `https://${parsed.host}${parsed.pathname}`
+    } catch {
+      return null
+    }
+  } else {
+    const scpStyle = gitUrl.match(/^(?:[^@\s/]+@)?([^:/\s]+):(.+)$/)
+    if (!scpStyle) return null
+    browserUrl = `https://${scpStyle[1]}/${scpStyle[2]}`
+  }
+
+  try {
+    const parsed = new URL(browserUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.pathname === '/') return null
+    parsed.pathname = parsed.pathname.replace(/\.git\/?$/, '')
+    return parsed.toString()
+  } catch {
+    return null
+  }
+}
+
 export function providerOf(sid: string): 'claude' | 'codex' {
   return sid.startsWith('codex_') ? 'codex' : 'claude'
 }

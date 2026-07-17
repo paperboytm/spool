@@ -215,10 +215,15 @@ function renderWorkbench(options: {
   spool?: SpoolDocument | null
   messages?: ParsedConversation
   noteMd?: string | null
+  cardJson?: string | null
   view?: SessionViewV1 | null
 } = {}): string {
   return renderToStaticMarkup(createElement(SessionWorkbench, {
-    meta: { ...meta, noteMd: options.noteMd === undefined ? meta.noteMd : options.noteMd },
+    meta: {
+      ...meta,
+      noteMd: options.noteMd === undefined ? meta.noteMd : options.noteMd,
+      cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
+    },
     view: options.view === undefined ? view : options.view,
     provider: 'claude',
     conversation: options.messages ?? conversation,
@@ -245,6 +250,7 @@ describe('SessionWorkbench', () => {
     const html = renderWorkbench()
 
     expect(html.match(/id="workspace-title"/g)).toHaveLength(1)
+    expect(html).not.toContain('<div class="border-t border-[var(--border)]"><h2 id="workspace-title"')
     expect(html).not.toContain('>Metadata<')
     expect(html).not.toContain('>Files<')
     expect(html).not.toContain('apps/web/src/session.tsx')
@@ -268,10 +274,29 @@ describe('SessionWorkbench', () => {
       },
     })
 
-    expect(html).toContain('class="flex h-[70vh]')
+    expect(html).toContain('class="flex h-[70vh] min-h-96 overflow-hidden"')
+    expect(html).not.toContain('class="flex h-[70vh] min-h-96 overflow-hidden border-t')
     expect(html).toContain('data-testid="message-list"')
     expect(html).toContain('…</h1>')
     expect(html).not.toContain('This line belongs in the full title only</h1>')
+  })
+
+  it('explains how to resume locally and links browser-addressable remotes', () => {
+    const html = renderWorkbench({
+      cardJson: JSON.stringify({
+        remotes: ['origin: git@github.com:paperboytm/spool.git'],
+        branch: 'main',
+        head: 'abc123',
+        dirty: [],
+        observed: '2026-07-17T07:00:00.000Z',
+      }),
+    })
+
+    expect(html).toContain('Resume in your own agent')
+    expect(html).toContain('Run this command locally to pick up where this session left off.')
+    expect(html).toContain('href="https://github.com/paperboytm/spool"')
+    expect(html).toContain('target="_blank"')
+    expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
   })
 
   it('keeps the raw fallback usable without a note, view, or messages', () => {

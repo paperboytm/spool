@@ -16,6 +16,7 @@ import {
   deepLinkIndex,
   parseWorkspaceCard,
   providerOf,
+  repositoryUrlForRemote,
   resumeCommandFor,
 } from './session-page'
 
@@ -109,6 +110,20 @@ describe('deep links and helpers', () => {
     expect(providerOf('claude_abc12345')).toBe('claude')
     expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69'))
       .toBe('spool resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')
+  })
+
+  it('turns browser-addressable git remotes into repository links', () => {
+    expect(repositoryUrlForRemote('origin: git@github.com:paperboytm/spool.git'))
+      .toBe('https://github.com/paperboytm/spool')
+    expect(repositoryUrlForRemote('upstream: ssh://git@gitlab.com/spool-lab/spool.git'))
+      .toBe('https://gitlab.com/spool-lab/spool')
+    expect(repositoryUrlForRemote('origin: https://github.com/paperboytm/spool.git'))
+      .toBe('https://github.com/paperboytm/spool')
+  })
+
+  it('does not link local or malformed git remotes', () => {
+    expect(repositoryUrlForRemote('origin: ../spool.git')).toBeNull()
+    expect(repositoryUrlForRemote('not a remote')).toBeNull()
   })
 })
 
