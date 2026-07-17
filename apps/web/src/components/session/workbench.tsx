@@ -100,11 +100,7 @@ export function SessionWorkbench({
         </button>
       </header>
 
-      {meta.noteMd?.trim() && (
-        <div className="sw-workbench-note">
-          <SessionNote markdown={meta.noteMd} />
-        </div>
-      )}
+      <SessionNote markdown={meta.noteMd} className="sw-workbench-note" />
 
       <div className="sw-workbench-body">
         <nav className="sw-workbench-navigation" aria-label="Session navigation">
@@ -164,6 +160,7 @@ export function SessionWorkbench({
               )}
               <span className="sw-workbench-mono sw-workbench-workspace-fact">
                 {card.branch ?? '(detached)'} @ {card.head ? card.head.slice(0, 7) : '?'}
+                {card.dirty.length > 0 && ` · ${card.dirty.length} dirty`}
               </span>
             </section>
           )}

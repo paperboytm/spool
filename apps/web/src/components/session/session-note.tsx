@@ -39,12 +39,22 @@ const markdownComponents: ComponentProps<typeof ReactMarkdown>['components'] = {
   },
 }
 
-export function SessionNote({ markdown }: { markdown: string | null }) {
+export function SessionNote({
+  markdown,
+  className,
+}: {
+  markdown: string | null
+  className?: string
+}) {
   const note = markdown?.trim()
   if (!note) return null
 
   return (
-    <div className="session-note" role="region" aria-label="Session note">
+    <div
+      className={`session-note${className ? ` ${className}` : ''}`}
+      role="region"
+      aria-label="Session note"
+    >
       <div className="session-note__header">
         <BookOpen aria-hidden="true" size={14} strokeWidth={1.7} />
         <span>Session note</span>
