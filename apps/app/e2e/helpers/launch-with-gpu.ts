@@ -27,10 +27,15 @@ export async function launchAppWithGpu(): Promise<AppContext> {
   const codexDir = join(tmpDir, 'codex', 'sessions')
   const geminiCliHome = join(tmpDir, 'gemini-cli-home')
   const opencodeDir = join(tmpDir, 'opencode')
+  // See launch.ts's launchApp for why this must be isolated: an unset
+  // SPOOL_PI_DIR falls back to the real ~/.pi/agent/sessions and leaks
+  // real, non-fixture sessions into the test DB.
+  const piDir = join(tmpDir, 'pi', 'agent', 'sessions')
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'gemini-cli-home'), geminiCliHome, { recursive: true })
   mkdirSync(opencodeDir, { recursive: true })
+  mkdirSync(piDir, { recursive: true })
 
   const spoolHome = join(tmpDir, 'spool-home')
   mkdirSync(spoolHome, { recursive: true })
@@ -46,6 +51,7 @@ export async function launchAppWithGpu(): Promise<AppContext> {
     SPOOL_GEMINI_DIR: geminiCliHome,
     GEMINI_CLI_HOME: geminiCliHome,
     SPOOL_OPENCODE_DIR: opencodeDir,
+    SPOOL_PI_DIR: piDir,
     SPOOL_E2E_TEST: '1',
     // Intentionally NOT setting ELECTRON_DISABLE_GPU — Chromium's PDF
     // viewer needs GPU rasterisation to paint.

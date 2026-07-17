@@ -25,7 +25,7 @@ export async function launchApp(opts: {
   mockAgent?: 'success' | 'error'
   /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
    * have been copied and before Electron starts. Receives the resolved dirs. */
-  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string; opencodeDir: string }) => void
+  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string; opencodeDir: string; piDir: string }) => void
   /** Extra env to merge into the Electron child process env. Used by the
    * share-publish e2e to point SPOOL_SHARE_BACKEND at the in-process
    * mock backend, which binds to a random port per test run and so
@@ -44,12 +44,20 @@ export async function launchApp(opts: {
   // ordering/counts and stalling first-launch sync (the "30s timeout"
   // flake that only reproduced on machines with real OpenCode data).
   const opencodeDir = join(tmpDir, 'opencode')
+  // Same isolation hazard as opencode above: when SPOOL_PI_DIR is unset,
+  // the source resolver falls back to the real `~/.pi/agent/sessions`.
+  // On a dev machine that's actually used pi, that leaks real sessions
+  // (with real, non-fixture uuids/paths) into the test DB — observed as
+  // e.g. a real `pi --fork <uuid>` resume command winning the "first
+  // session" / "most recent" slot instead of a fixture session.
+  const piDir = join(tmpDir, 'pi', 'agent', 'sessions')
   cpSync(join(FIXTURES_DIR, 'claude-projects'), claudeDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'codex-sessions'), codexDir, { recursive: true })
   cpSync(join(FIXTURES_DIR, 'gemini-cli-home'), geminiCliHome, { recursive: true })
   mkdirSync(opencodeDir, { recursive: true })
+  mkdirSync(piDir, { recursive: true })
 
-  opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome, opencodeDir })
+  opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome, opencodeDir, piDir })
 
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
@@ -61,6 +69,7 @@ export async function launchApp(opts: {
     SPOOL_GEMINI_DIR: geminiCliHome,
     GEMINI_CLI_HOME: geminiCliHome,
     SPOOL_OPENCODE_DIR: opencodeDir,
+    SPOOL_PI_DIR: piDir,
     ELECTRON_DISABLE_GPU: '1',
     SPOOL_E2E_TEST: '1',
   }
