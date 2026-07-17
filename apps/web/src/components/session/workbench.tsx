@@ -34,6 +34,7 @@ import {
   resumeCommandFor,
 } from '../../lib/session-page'
 import type { ParsedConversation } from '../../lib/session-messages'
+import { CliInstallDialog } from './cli-install-dialog'
 import { SessionNote } from './session-note'
 
 interface Props {
@@ -140,6 +141,7 @@ export function SessionWorkbench({
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
   const [targetTurnIndex, setTargetTurnIndex] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showCliInstall, setShowCliInstall] = useState(false)
   const [previewPromptKey, setPreviewPromptKey] = useState<string | null>(null)
   const listRef = useRef<MessageListHandle>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -343,6 +345,17 @@ export function SessionWorkbench({
                 <span className="sr-only" aria-live="polite">{copied ? 'Copied' : ''}</span>
               </button>
             </div>
+            <p className="mb-0 mt-2 text-[11px] leading-4 text-[var(--muted)]">
+              Don&apos;t have the Spool CLI?{' '}
+              <button
+                type="button"
+                className="m-0 cursor-pointer border-0 bg-transparent p-0 font-medium text-[var(--accent)] underline-offset-2 hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                aria-haspopup="dialog"
+                onClick={() => setShowCliInstall(true)}
+              >
+                Install it
+              </button>
+            </p>
           </div>
         </header>
 
@@ -577,6 +590,11 @@ export function SessionWorkbench({
           </aside>
         </div>
       </div>
+      <CliInstallDialog
+        open={showCliInstall}
+        resumeCommand={resume}
+        onClose={() => setShowCliInstall(false)}
+      />
     </main>
   )
 }

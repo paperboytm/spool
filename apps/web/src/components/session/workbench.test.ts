@@ -294,6 +294,9 @@ describe('SessionWorkbench', () => {
 
     expect(html).toContain('Resume in your own agent')
     expect(html).toContain('Run this command locally to pick up where this session left off.')
+    expect(html).toContain('Don&#x27;t have the Spool CLI?')
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('>Install it</button>')
     expect(html).toContain('href="https://github.com/paperboytm/spool"')
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
