@@ -62,6 +62,11 @@ import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollaps
 import { hydrateBinaryCache } from './binaryCache.js'
 import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import { registerShareAuthIpc } from './ipc/share-auth.js'
+import {
+  dispatchDeepLink,
+  dispatchDeepLinkFromArgv,
+  registerDeepLinkScheme,
+} from './auth/deep-link.js'
 import { registerShareProfileIpc } from './ipc/share-profile.js'
 import { installRendererCsp } from './security/csp.js'
 import { registerSharePublishIpc } from './ipc/share-publish.js'
@@ -108,8 +113,18 @@ if (!gotSingleInstanceLock) {
   app.quit()
 }
 
-app.on('second-instance', () => {
+// spool:// deep links (today: the WorkOS sign-in callback). macOS
+// delivers via 'open-url'; Windows/Linux relaunch with the URL in argv,
+// which the single-instance lock forwards through 'second-instance'.
+registerDeepLinkScheme()
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  dispatchDeepLink(url)
+})
+
+app.on('second-instance', (_event, argv) => {
   focusExistingWindow()
+  dispatchDeepLinkFromArgv(argv)
 })
 
 let mainWindow: BrowserWindow | null = null

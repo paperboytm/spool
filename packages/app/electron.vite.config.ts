@@ -48,13 +48,11 @@ function nativeExternalPlugin(): Plugin {
 // To add a new one: append the env var name here AND add the entry to
 // `.env.development.local.example`.
 const MAIN_INLINE_ENV: readonly string[] = [
-  'SPOOL_GOOGLE_CLIENT_ID_DESKTOP',
-  'SPOOL_GOOGLE_CLIENT_ID_WEB',
-  // Google's installed-app OAuth requires client_secret at the token
-  // endpoint even with PKCE. Google's docs explicitly note it isn't
-  // truly secret for distributed binaries — fine to inline.
-  'SPOOL_GOOGLE_CLIENT_SECRET_DESKTOP',
-  // Backend origin for `/api/auth/sign-in-with-id-token`, `/api/me`, etc.
+  // WorkOS environment client id for the desktop PKCE sign-in
+  // (system browser + spool:// callback). Public-client id, not a
+  // secret; the PKCE verifier is what protects the exchange.
+  'SPOOL_WORKOS_CLIENT_ID',
+  // Backend origin for `/api/auth/sign-in-with-code`, `/api/me`, etc.
   // In dev this is the local wrangler `http://localhost:8788`; in prod
   // it's the spool.pro Pages deployment. Without this inlined the main
   // bundle defaults to https://spool.pro and dev sign-in 404s.
@@ -151,11 +149,20 @@ export default defineConfig(({ mode }) => ({
     // throws "Store is not a constructor". Bundling lets Vite handle the
     // interop. better-sqlite3 still has to stay external (it loads a .node
     // native addon via the 'bindings' shim).
-    //   - @spool-lab/core / @spool-lab/redact: in-tree workspace ESM.
+    //   - @spool-lab/cli / @spool-lab/core / @spool-lab/redact /
+    //     @spool-lab/session-kit: in-tree workspace ESM.
     //   - electron-store@10: pure ESM upstream.
     plugins: [
       inlineMainEnvPlugin(resolveMainEnv(mode)),
-      externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact', 'electron-store'] }),
+      externalizeDepsPlugin({
+        exclude: [
+          '@spool-lab/cli',
+          '@spool-lab/core',
+          '@spool-lab/redact',
+          '@spool-lab/session-kit',
+          'electron-store',
+        ],
+      }),
       nativeExternalPlugin(),
     ],
     build: {

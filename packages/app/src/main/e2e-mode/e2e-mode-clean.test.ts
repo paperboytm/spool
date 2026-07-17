@@ -9,7 +9,7 @@
 // Failure modes this catches:
 //   - Someone adds a runtime `if (process.env.SPOOL_E2E_TEST === '1')`
 //     check directly into production source — the bundled output would
-//     contain the literal 'SPOOL_E2E_TEST' or 'e2e-fake-id-token'
+//     contain the literal 'SPOOL_E2E_TEST' or 'e2e-fake-code'
 //   - Someone forgets the dynamic-import pattern and statically imports
 //     share-auth-e2e from main/index.ts — the e2e module is bundled
 //     even with the build-time guard
@@ -32,9 +32,9 @@ const OUT_DIR = resolve(APP_ROOT, 'out-e2e-clean-check')
 const FORBIDDEN_TOKENS = [
   // Strings unique to share-auth-e2e.ts. If any of these survive into
   // the production bundle, the dead-code-elimination guarantee is
-  // broken and prod users carry an in-memory token store + fake-id-
-  // token POST around as latent code.
-  'e2e-fake-id-token',
+  // broken and prod users carry an in-memory token store + fake-code
+  // POST around as latent code.
+  'e2e-fake-code',
   'registerShareAuthIpcForE2E',
   'share-auth-e2e',
 ]

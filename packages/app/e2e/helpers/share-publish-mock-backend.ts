@@ -106,7 +106,7 @@ const DEFAULT_USER: SharePublishMockState['user'] = {
 /** Flat ShareAuthUser payload — the exact shape
  *  share-backend/functions/api/me/index.ts returns and the renderer's
  *  ShareAuthUser type (hooks/useShareAuth.ts) expects. Used by both
- *  /api/me and the sign-in-with-id-token response so neither drifts. */
+ *  /api/me and the sign-in-with-code response so neither drifts. */
 function meUser(state: SharePublishMockState) {
   return {
     id: state.user.id,
@@ -185,11 +185,11 @@ async function routeRequest(
   const url = new URL(req.url ?? '', 'http://127.0.0.1')
   const method = req.method ?? 'GET'
 
-  // POST /api/auth/sign-in-with-id-token
+  // POST /api/auth/sign-in-with-code
   // The renderer's signIn IPC → e2e-mode's e2eSignIn() → here. We
-  // accept any id_token payload (the e2e entry hard-codes the
-  // 'e2e-fake-id-token' marker) and mint a session token.
-  if (method === 'POST' && url.pathname === '/api/auth/sign-in-with-id-token') {
+  // accept any code payload (the e2e entry hard-codes the
+  // 'e2e-fake-code' marker) and mint a session token.
+  if (method === 'POST' && url.pathname === '/api/auth/sign-in-with-code') {
     await readBody(req)
     return json(res, 200, {
       session_token: 'mock-session-' + state.user.id,

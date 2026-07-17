@@ -12,16 +12,14 @@
 //   1. Swaps the session-store impl to an in-memory backend (CI Linux
 //      runners lack libsecret/keyring; production safeStorage path
 //      would throw).
-//   2. Registers the share-auth IPC channels with a fake-id-token POST
-//      override for the OAuth dance. The rest of performSignIn —
+//   2. Registers the share-auth IPC channels with a fake-code POST
+//      override for the WorkOS PKCE dance. The rest of performSignIn —
 //      prior-revoke, saveToken, EventTarget broadcast — runs exactly
 //      as in production, only against the swapped storage and a mock
 //      backend.
 
-import crypto from 'node:crypto'
-
 import { _setImpl as setSessionStoreImpl, type SessionStoreImpl } from '../auth/session-store.js'
-import type { ProviderId, SignInResult } from '../auth/oauth.js'
+import type { SignInResult } from '../auth/workos-auth.js'
 import { registerShareAuthIpc } from '../ipc/share-auth.js'
 import { backendUrl } from '../share/backend-url.js'
 
@@ -38,23 +36,16 @@ const memoryStore: SessionStoreImpl = {
   },
 }
 
-function b64url(buf: Buffer): string {
-  return buf
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-async function e2eSignIn(providerId: ProviderId): Promise<SignInResult> {
-  const nonce = b64url(crypto.randomBytes(24))
-  const res = await fetch(`${backendUrl()}/api/auth/sign-in-with-id-token`, {
+async function e2eSignIn(): Promise<SignInResult> {
+  // No browser, no WorkOS: the mock backend accepts the fake-code
+  // marker on the same wire contract the real PKCE flow uses.
+  const res = await fetch(`${backendUrl()}/api/auth/sign-in-with-code`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      provider: providerId,
-      id_token: 'e2e-fake-id-token',
-      nonce,
+      provider: 'workos',
+      code: 'e2e-fake-code',
+      code_verifier: 'e2e-fake-verifier',
     }),
   })
   if (!res.ok) {

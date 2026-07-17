@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { signInWith, type ProviderId, type SignInResult } from '../auth/oauth.js'
+import { signInWithWorkos, type SignInResult } from '../auth/workos-auth.js'
 import { saveToken, loadToken, clearToken, isAvailable } from '../auth/session-store.js'
 import { authedFetch } from '../share/api-client.js'
 
@@ -31,29 +31,24 @@ export async function performSignIn(deps: SignInDeps): Promise<SignInResult['use
   return result.user
 }
 
-// Renderer payload for share-auth:signin. The provider arg is optional
-// — clients that pre-date the multi-provider switch keep working
-// because the IPC defaults to Google.
-type SignInArg = { provider?: ProviderId } | undefined
-
-/** Optional override for the OAuth dance. Default is the production
- *  loopback-PKCE flow against the configured provider. Override exists
- *  so the e2e composition root can pass a fake-id-token POST that
- *  exercises the rest of the IPC + backend chain without a real browser. */
-export type SignInImpl = (provider: ProviderId) => Promise<SignInResult>
+/** Optional override for the sign-in dance. Default is the production
+ *  WorkOS PKCE flow (system browser + spool:// callback). Override
+ *  exists so the e2e composition root can substitute a fake code POST
+ *  that exercises the rest of the IPC + backend chain without a real
+ *  browser. */
+export type SignInImpl = () => Promise<SignInResult>
 
 export function registerShareAuthIpc(
-  signInImpl: SignInImpl = signInWith,
+  signInImpl: SignInImpl = signInWithWorkos,
 ): void {
   ipcMain.handle('share-auth:available', () => isAvailable())
 
-  ipcMain.handle('share-auth:signin', async (_e, arg: SignInArg) => {
+  ipcMain.handle('share-auth:signin', async () => {
     if (!isAvailable()) throw new Error('OS keychain unavailable')
-    const provider: ProviderId = arg?.provider ?? 'google'
     return performSignIn({
       loadToken,
       saveToken,
-      signIn: () => signInImpl(provider),
+      signIn: signInImpl,
       revokePrior: async () => {
         await authedFetch('/api/auth/sign-out', { method: 'POST' })
       },

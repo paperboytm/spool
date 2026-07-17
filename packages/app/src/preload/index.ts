@@ -389,11 +389,11 @@ export interface ShareAuthUser {
 const spoolShare = {
   authAvailable: (): Promise<boolean> =>
     ipcRenderer.invoke('share-auth:available'),
-  // Optional provider: defaults to Google when omitted. Caller hard-codes
-  // the choice (no auto-picking) so an outdated renderer can't accidentally
-  // sign the user in with a provider they didn't pick from the SignIn UI.
-  signIn: (arg?: { provider?: 'google' }): Promise<ShareAuthUser> =>
-    ipcRenderer.invoke('share-auth:signin', arg),
+  // Single sign-in path: WorkOS AuthKit via the system browser (PKCE +
+  // spool:// callback). Method choice (Google, email, ...) happens on
+  // the hosted AuthKit page, not here.
+  signIn: (): Promise<ShareAuthUser> =>
+    ipcRenderer.invoke('share-auth:signin'),
   me: (): Promise<ShareAuthUser | null> =>
     ipcRenderer.invoke('share-auth:me'),
   signOut: (): Promise<{ ok: boolean }> =>

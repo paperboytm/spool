@@ -59,24 +59,28 @@ The stack is three processes: share-backend (wrangler, :8788), share-web
 (vite, :3002), and the Electron app pointed at the local backend.
 `./scripts/share-dev.sh` boots all three. One-time setup first:
 
-1. **Google OAuth dev clients** — create a "Spool Dev" project in
-   [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-   with TWO OAuth clients (never reuse prod ids):
-   - a **Desktop app** client (the Electron loopback sign-in). Note both
-     the client id and the client secret (download the JSON to find it).
-   - a **Web application** client (share-web sign-in) with
-     `http://localhost:3002/api/auth/google/callback` registered as an
-     authorised redirect URI — without this, web sign-in fails with
-     `redirect_uri_mismatch`.
+1. **WorkOS dev environment** — create one at
+   [dashboard.workos.com](https://dashboard.workos.com) (never reuse prod
+   credentials). Note the environment client id (`client_...`) and an API
+   key (`sk_...`), and register TWO redirect URIs:
+   - `http://localhost:3002/api/auth/workos/callback` (web sign-in) —
+     without this, web sign-in fails with a redirect_uri mismatch.
+   - `spool://auth/callback` (desktop sign-in) — the app runs the PKCE
+     authorize in the system browser and gets the code back on this
+     custom scheme.
 
-2. **Two gitignored config files**, one per runtime (wrangler and
-   electron-vite each have their own loader — the values overlap but the
-   files don't):
+   The CLI needs no credentials of its own: `spool login` uses the
+   browser-approval flow at `/cli-auth`, which rides on the web session.
+
+2. **Two gitignored config files** (wrangler and electron-vite each have
+   their own loader):
    ```bash
    cp packages/share-backend/.dev.vars.example packages/share-backend/.dev.vars
    cp packages/app/.env.development.local.example packages/app/.env.development.local
    ```
-   Fill in the Google ids/secrets per the comments in each file.
+   Fill in the WorkOS values per the comments in each file — the API key
+   goes only in `.dev.vars`; the app env needs just the (public) client
+   id as `SPOOL_WORKOS_CLIENT_ID`.
 
 3. **Local D1 schema**:
    ```bash
@@ -89,7 +93,8 @@ The stack is three processes: share-backend (wrangler, :8788), share-web
    ./scripts/share-dev.sh
    ```
 
-Sign in with any Google account; data lands in the local D1/KV/R2 under
+Sign in with any method AuthKit offers (email code works out of the box);
+data lands in the local D1/KV/R2 under
 `packages/share-backend/.wrangler/state/`. The app keeps its dev library
 in `~/.spool-dev/` as usual.
 
