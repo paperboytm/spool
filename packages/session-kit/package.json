@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/session-kit",
-  "version": "0.0.1",
+  "version": "0.6.0",
   "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and session diffs for Spool v2.",
   "type": "module",
   "main": "./dist/index.js",

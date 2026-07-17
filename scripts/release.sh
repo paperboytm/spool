@@ -60,7 +60,7 @@ NEW_VERSION="$major.$minor.$patch"
 TAG="v$NEW_VERSION"
 green "Bumping to $NEW_VERSION"
 
-for f in package.json apps/app/package.json packages/core/package.json apps/cli/package.json apps/web/package.json packages/redact/package.json; do
+for f in package.json apps/app/package.json packages/core/package.json apps/cli/package.json apps/web/package.json packages/redact/package.json packages/session-kit/package.json; do
   if [[ -f "$f" ]]; then
     jq --arg v "$NEW_VERSION" '.version = $v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   fi
