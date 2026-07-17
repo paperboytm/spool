@@ -99,3 +99,82 @@ describe('parseClaudeSessionText — tag stripping', () => {
     expect(result.session.messages[0]?.contentText).toBe('system stuff without a close tag\n\nwhat did I do today?')
   })
 })
+
+describe('parseClaudeSessionText — slash-command record stripping', () => {
+  it('strips a full <command-name>/<command-message>/<command-args> triplet as one unit', () => {
+    const result = parse([
+      baseRecord({
+        type: 'user',
+        uuid: 'u1',
+        message: {
+          role: 'user',
+          content: '<command-name>/foo</command-name>\n<command-message>foo</command-message>\n<command-args>bar baz</command-args>\n\nafter text',
+        },
+      }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+    ])
+
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+    expect(result.session.messages[0]?.contentText).toBe('after text')
+  })
+
+  it('strips a name-only record (no message/args blocks) and preserves surrounding text', () => {
+    const result = parse([
+      baseRecord({
+        type: 'user',
+        uuid: 'u1',
+        message: {
+          role: 'user',
+          content: 'before text <command-name>/model</command-name> after text',
+        },
+      }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+    ])
+
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+    // Matches the old regex's exact output for this input (verified against
+    // the pre-fix pattern): the unconsumed whitespace on either side of the
+    // stripped tag survives, producing a double space where the tag was.
+    expect(result.session.messages[0]?.contentText).toBe('before text  after text')
+  })
+
+  it('leaves a bare <command-args> in legitimate content alone until the final tag strip (no preceding <command-name>)', () => {
+    const result = parse([
+      baseRecord({
+        type: 'user',
+        uuid: 'u1',
+        message: {
+          role: 'user',
+          content: 'I saw <command-args>weird-payload</command-args> in the logs, what does it mean?',
+        },
+      }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+    ])
+
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+    // No <command-name> precedes it, so stripSlashCommandRecords never
+    // matches; the <command-args>/</command-args> tag markers themselves
+    // are removed later by the final generic tag strip, but "weird-payload"
+    // survives — same as the old regex path.
+    expect(result.session.messages[0]?.contentText).toBe('I saw weird-payload in the logs, what does it mean?')
+  })
+
+  it('does not hang on a long run of unterminated <command-name> opens (ReDoS probe)', () => {
+    // The old regex's lazy `[\s\S]*?` groups backtrack polynomially when
+    // `</command-name>` never appears (measured ~2.5s @ 40k repeats on the
+    // pre-fix regex vs. sub-millisecond here).
+    const hostile = '<command-name>'.repeat(40_000)
+    const start = Date.now()
+    const result = parse([
+      baseRecord({ type: 'user', uuid: 'u1', message: { role: 'user', content: hostile } }),
+      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+    ])
+    const elapsedMs = Date.now() - start
+
+    expect(elapsedMs).toBeLessThan(1_000)
+    expect(result.kind).toBe('parsed')
+  })
+})

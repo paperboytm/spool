@@ -158,7 +158,53 @@ export function parseClaudeSessionText(raw: string, filePath: string): ParseProv
 // Strip the whole record as one unit so bare <command-args> appearing in
 // legitimate user content (e.g. a user pasting log output that contains
 // these tags) is preserved.
-const SLASH_COMMAND_RECORD = /<command-name>[\s\S]*?<\/command-name>(?:\s*<command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?<\/command-args>)?/g
+//
+// This used to be one regex (`<command-name>[\s\S]*?<\/command-name>(?:\s*
+// <command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?
+// <\/command-args>)?`). CodeQL flagged it as js/polynomial-redos — a run of
+// unterminated `<command-name>` opens backtracks quadratically across the
+// lazy `[\s\S]*?` groups. Rewritten below as an indexOf scan, preserving the
+// original's exact optional-group semantics: an optional block is consumed
+// only when it's separated from the preceding one by nothing but whitespace
+// and has a matching close tag; otherwise nothing is consumed there (the
+// whitespace and any dangling tags are left in place), matching how an
+// unmatched `(?:...)?` group contributes zero characters.
+function stripSlashCommandRecords(s: string): string {
+  const NAME_OPEN = '<command-name>'
+  const NAME_CLOSE = '</command-name>'
+  const MESSAGE_OPEN = '<command-message>'
+  const MESSAGE_CLOSE = '</command-message>'
+  const ARGS_OPEN = '<command-args>'
+  const ARGS_CLOSE = '</command-args>'
+
+  let start = s.indexOf(NAME_OPEN)
+  while (start !== -1) {
+    const nameClose = s.indexOf(NAME_CLOSE, start + NAME_OPEN.length)
+    if (nameClose === -1) break // unterminated <command-name> — leave the rest intact
+
+    let recordEnd = nameClose + NAME_CLOSE.length
+    recordEnd = consumeOptionalBlock(s, recordEnd, MESSAGE_OPEN, MESSAGE_CLOSE)
+    recordEnd = consumeOptionalBlock(s, recordEnd, ARGS_OPEN, ARGS_CLOSE)
+
+    s = s.slice(0, start) + s.slice(recordEnd)
+    start = s.indexOf(NAME_OPEN, start)
+  }
+  return s
+}
+
+// If, starting at `pos`, some run of whitespace is immediately followed by
+// `open`, and a matching `close` exists afterward, returns the index just
+// past `close`. Otherwise returns `pos` unchanged (nothing consumed) — the
+// same as an unmatched `(?:\s*<open>...<\/close>)?` group in the original
+// regex.
+function consumeOptionalBlock(s: string, pos: number, open: string, close: string): number {
+  let i = pos
+  while (i < s.length && /\s/.test(s[i]!)) i++
+  if (!s.startsWith(open, i)) return pos
+  const closeIdx = s.indexOf(close, i + open.length)
+  if (closeIdx === -1) return pos
+  return closeIdx + close.length
+}
 
 // Strip tag-like spans (`<...>`) to a fixed point. A single-pass `/<[^>]+>/g`
 // is both an incomplete sanitizer (nested/nested-looking markup can survive
@@ -201,7 +247,7 @@ function extractText(content: unknown): string {
     return ''
   }
   let text = stripBlocks(raw, '<spool-system-prelude>', '</spool-system-prelude>')
-  text = text.replace(SLASH_COMMAND_RECORD, '')
+  text = stripSlashCommandRecords(text)
   text = stripBlocks(text, '<local-command-stdout>', '</local-command-stdout>')
   text = stripBlocks(text, '<local-command-caveat>', '</local-command-caveat>')
   text = stripBlocks(text, '<system-reminder>', '</system-reminder>')
