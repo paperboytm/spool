@@ -43,7 +43,7 @@
 /* The shared conversation components live outside this package; point
  * Tailwind's source scanner at them so their utilities compile here with
  * the app's own dark-variant semantics. */
-@source "../../../session-view/src";
+@source "../../../../packages/session-view/src";
 
 @theme {
   /* Warm palette — light */

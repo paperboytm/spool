@@ -3,7 +3,11 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: '.',
   timeout: 30_000,
-  globalTimeout: 300_000,
+  // Suite-wide wall clock. 51 spec files each cold-launch Electron in
+  // beforeAll, and CI Linux runs workers=1 — 300s was only ever enough
+  // for ~2/3 of the suite. Keep headroom under the workflow job's
+  // timeout-minutes instead of racing it.
+  globalTimeout: 900_000,
   expect: {
     // Default 5s leaves no headroom for sidebar→session-row sync under
     // workers=2 CPU contention. Helpers use this implicitly via toBeVisible().
