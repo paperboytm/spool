@@ -301,6 +301,7 @@ describe('SessionWorkbench', () => {
 
     expect(html).not.toContain('Resume in your own agent')
     expect(html).not.toContain('Run this command locally to pick up where this session left off.')
+    expect(html).toContain('md:items-center')
     expect(html).toContain('aria-label="Resume command"')
     expect(html).toContain('spool resume claude_test-session')
     expect(html).toContain('Don&#x27;t have the Spool CLI?')
