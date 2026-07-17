@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   batchEventRanges,
+  fetchHubSpoolFile,
   fetchRecordsExact,
   parseNdjsonRecords,
   type HubRecordLine,
@@ -17,6 +18,10 @@ import {
   providerOf,
   resumeCommandFor,
 } from './session-page'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('route /session/:sid', () => {
   it('matches valid sids and rejects junk', () => {
@@ -67,6 +72,17 @@ describe('record fetching', () => {
     ])
     // Duplicates and disorder are tolerated.
     expect(batchEventRanges([7, 3, 3], 8)).toEqual([{ from: 3, to: 8 }])
+  })
+})
+
+describe('hub spool document', () => {
+  it('turns an invalid attached document into the raw-record fallback signal', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      version: 2,
+      conversation: { turns: [{ role: 'user', body: 42 }] },
+    }), { status: 200 })))
+
+    await expect(fetchHubSpoolFile('claude_12345678')).resolves.toBeNull()
   })
 })
 

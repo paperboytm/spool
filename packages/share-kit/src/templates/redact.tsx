@@ -142,6 +142,38 @@ export function collectRedactList(
   return applyRedactPolicy(detectPII(turns), opts?.redactExclude)
 }
 
+/** Apply an already-resolved redact list to plain-text projections such as
+ * prompt directories. Renderers may decorate masks as chips; navigation and
+ * export surfaces need the same substitutions without Markdown markup. */
+export function redactPlainText(
+  text: string,
+  redactList: readonly RedactReplacement[],
+): string {
+  if (redactList.length === 0) return text
+  let compiled = plainTextRedactCache.get(redactList)
+  if (compiled === undefined) {
+    const replaceMap = new Map(redactList.map((entry) => [entry.value, entry.replacement]))
+    compiled = {
+      replaceMap,
+      rx: new RegExp(redactList.map((entry) => escapeRx(entry.value)).join('|'), 'g'),
+    }
+    plainTextRedactCache.set(redactList, compiled)
+  }
+  return text.replace(
+    compiled.rx,
+    (match) => compiled.replaceMap.get(match) ?? '[redacted]',
+  )
+}
+
+const plainTextRedactCache = new WeakMap<
+  readonly RedactReplacement[],
+  { rx: RegExp; replaceMap: Map<string, string> }
+>()
+
+function escapeRx(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Stable identity for the empty case so a template's memoized Body
 // components bail out instead of reconciling on a fresh `[]` each frame.
 const EMPTY_REDACT_LIST: RedactReplacement[] = []

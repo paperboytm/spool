@@ -26,11 +26,25 @@ export default defineConfig({
         index: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
         // Lean DOM-free entry — see src/progressive.ts.
         progressive: fileURLToPath(new URL('./src/progressive.ts', import.meta.url)),
+        timeline: fileURLToPath(new URL('./src/timeline.ts', import.meta.url)),
+        'spool-document': fileURLToPath(new URL('./src/spool-document.ts', import.meta.url)),
       },
       formats: ['es'],
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      // Runtime peers stay external so each host supplies one copy and Node
+      // resolves their server-safe export conditions. Bundling react-markdown
+      // under Vite's browser condition pulls in a named-entity decoder that
+      // creates a DOM element at module evaluation time, defeating the lean
+      // `./timeline` entry's SSR/CLI contract.
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'lucide-react',
+        'react-markdown',
+        'remark-gfm',
+      ],
     },
     sourcemap: true,
     emptyOutDir: true,

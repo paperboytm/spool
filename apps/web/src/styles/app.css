@@ -1,3 +1,14 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@custom-variant dark (&:where(html[data-theme="dark"], html[data-theme="dark"] *));
+@source "../";
+
+@theme {
+  --font-sans: 'Geist Variable', 'Geist', -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+}
+
 /* spool.pro share-web — unified design system.
  * Tokens are scoped to .sw-root so the page can opt into a per-paper
  * surface (Reader) without leaking into 3rd-party DOM. data-theme
@@ -1494,93 +1505,3 @@ html[data-theme='dark'] .sw-modal-overlay {
 .spool-md-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.55);
 }
-
-/* ── v2 session reader (/session/<sid>) ─────────────────────────────
- * Shared Workbench primitives. Record content stays in Geist Mono;
- * the Workbench layout itself lives with its component. */
-
-.sw-session-mono {
-  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-.sw-session-loading {
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
-  padding: 48px 0;
-}
-
-.sw-session-diff {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow-card);
-  padding: 12px;
-  min-height: 120px;
-}
-
-/* Diff pane */
-.sw-session-diff.empty,
-.sw-session-diff .diff-hint {
-  color: var(--faint);
-  font-size: 12px;
-  padding: 8px;
-}
-.sw-session-diff .diff-error { color: var(--err); font-size: 12px; padding: 8px; }
-.sw-session-diff .diff-files {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
-}
-.sw-session-diff .diff-file {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-.sw-session-diff .diff-file:hover { background: var(--card-2); }
-.sw-session-diff .diff-file.active { background: var(--accent-soft); color: var(--accent); }
-.sw-session-diff .diff-file .stat { font-size: 11px; }
-.sw-session-diff .adds { color: var(--ok); }
-.sw-session-diff .dels { color: var(--err); }
-
-.sw-session-diff .diff-hunk {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-.sw-session-diff .diff-hunk.highlighted { border-color: var(--accent); }
-.sw-session-diff .hunk-head {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: var(--card-2);
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  padding: 4px 8px;
-  font-size: 11px;
-  color: var(--muted);
-  cursor: pointer;
-}
-.sw-session-diff .hunk-head:hover { color: var(--accent); }
-.sw-session-diff .hunk-head .records { color: var(--accent); }
-.sw-session-diff .hunk-lines {
-  margin: 0;
-  padding: 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-x: auto;
-}
-.sw-session-diff .hunk-lines .line { display: block; white-space: pre; }
-.sw-session-diff .hunk-lines .line.add { background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.sw-session-diff .hunk-lines .line.del { background: color-mix(in srgb, var(--err) 12%, transparent); }

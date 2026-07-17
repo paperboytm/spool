@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Virtuoso, type Components } from 'react-virtuoso'
 import { Check, CheckCheck, Eraser } from 'lucide-react'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
+import { firstLinePreview } from '@spool/share-kit/timeline'
 
 // Restore the list semantics + breathing room the old <ul>/<li> markup
 // carried: Virtuoso renders bare divs by default, which drops the
@@ -242,23 +243,6 @@ function previewTooltip(body: string): string {
   const collapsed = body.replace(/\s+/g, ' ').trim()
   if (collapsed.length <= 240) return collapsed
   return collapsed.slice(0, 240).trimEnd() + '…'
-}
-
-/** Strip a few obvious markdown markers from the first non-empty line. */
-function firstLinePreview(body: string): string {
-  const lines = body.split('\n')
-  for (const raw of lines) {
-    const trimmed = raw.trim()
-    if (!trimmed) continue
-    return trimmed
-      .replace(/^`{3,}.*$/, '')
-      .replace(/^#{1,6}\s+/, '')
-      .replace(/^>\s?/, '')
-      .replace(/^[-*+]\s+/, '')
-      .replace(/`/g, '')
-      .trim()
-  }
-  return ''
 }
 
 /** Zero-pad to the digit width of `total` so columns align. */

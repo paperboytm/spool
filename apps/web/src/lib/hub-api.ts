@@ -5,6 +5,7 @@
 
 import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
+import { parseSpoolDocument } from '@spool/share-kit/spool-document'
 
 export interface HubAuthor {
   handle: string | null
@@ -77,9 +78,7 @@ export async function fetchHubSpoolFile(sid: string): Promise<SpoolDocument | nu
       headers: { accept: 'application/spool+json' },
     })
     if (r.status !== 200) return null
-    const doc = (await r.json()) as SpoolDocument
-    if ((doc.version !== 1 && doc.version !== 2) || typeof doc.conversation !== 'object') return null
-    return doc
+    return parseSpoolDocument(await r.json())
   } catch {
     return null
   }

@@ -31,10 +31,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260415.1",
+    "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^22.19.17",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "tailwindcss": "^4.2.2",
     "undici": "^6.25.0",
     "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.18",
     "vite-plus": "^0.1.18",

@@ -14,6 +14,14 @@
       "types": "./dist/progressive.d.ts",
       "import": "./dist/progressive.js"
     },
+    "./timeline": {
+      "types": "./dist/timeline.d.ts",
+      "import": "./dist/timeline.js"
+    },
+    "./spool-document": {
+      "types": "./dist/spool-document.d.ts",
+      "import": "./dist/spool-document.js"
+    },
     "./styles.css": "./src/styles/global.css",
     "./styles/tokens.css": "./src/styles/tokens.css",
     "./styles/fonts.css": "./src/styles/fonts.css"

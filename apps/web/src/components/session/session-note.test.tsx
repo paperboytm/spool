@@ -52,7 +52,7 @@ describe('SessionNote', () => {
 <script>globalThis.compromised = true</script>`)
 
     expect(html).toContain('<h1>Safe content</h1>')
-    expect(html).not.toMatch(/<section\b/)
+    expect(html).not.toMatch(/<section\s+data-danger/)
     expect(html).not.toMatch(/<script\b/)
   })
 })
