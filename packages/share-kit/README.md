@@ -4,7 +4,7 @@ Internal React library that powers Spool Share — the editor surface for turnin
 
 Consumed by:
 - `@spool/app` — Electron renderer assembles its own three-column editor on top of these primitives
-- `@spool/share-web` (Phase 1) — the public spool.pro web app uses the same primitives
+- `@spool/web` (Phase 1) — the public spool.pro web app uses the same primitives
 
 ## What's in the box
 
@@ -30,7 +30,7 @@ export function PreviewExample() {
 }
 ```
 
-The styles entry expects a Tailwind v4 + Fontsource-aware bundler (Vite with `@tailwindcss/vite`, which both `@spool/app` and `@spool/share-web` already configure).
+The styles entry expects a Tailwind v4 + Fontsource-aware bundler (Vite with `@tailwindcss/vite`, which both `@spool/app` and `@spool/web` already configure).
 
 ## Scripts
 

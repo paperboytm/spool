@@ -36,26 +36,26 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(jq -r .version packages/app/package.json)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Rename artifacts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          DMG=$(find packages/app/dist -name "*.dmg" ! -name "*.blockmap" | head -1)
-          mv "$DMG" "packages/app/dist/Spool-${VERSION}-arm64.dmg"
+          DMG=$(find apps/app/dist -name "*.dmg" ! -name "*.blockmap" | head -1)
+          mv "$DMG" "apps/app/dist/Spool-${VERSION}-arm64.dmg"
 
-          ZIP=$(find packages/app/dist -name "*.zip" | head -1)
-          mv "$ZIP" "packages/app/dist/Spool-${VERSION}-arm64-mac.zip"
+          ZIP=$(find apps/app/dist -name "*.zip" | head -1)
+          mv "$ZIP" "apps/app/dist/Spool-${VERSION}-arm64-mac.zip"
 
       - name: Upload mac artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mac-artifacts
           path: |
-            packages/app/dist/Spool-*.dmg
-            packages/app/dist/Spool-*-mac.zip
-            packages/app/dist/latest-mac.yml
+            apps/app/dist/Spool-*.dmg
+            apps/app/dist/Spool-*-mac.zip
+            apps/app/dist/latest-mac.yml
 
   build-linux:
     runs-on: ubuntu-latest
@@ -80,22 +80,22 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(jq -r .version packages/app/package.json)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Rename artifacts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          APPIMAGE=$(find packages/app/dist -name "*.AppImage" | head -1)
-          mv "$APPIMAGE" "packages/app/dist/Spool-${VERSION}-x86_64.AppImage"
+          APPIMAGE=$(find apps/app/dist -name "*.AppImage" | head -1)
+          mv "$APPIMAGE" "apps/app/dist/Spool-${VERSION}-x86_64.AppImage"
 
       - name: Upload linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
           path: |
-            packages/app/dist/Spool-*.AppImage
-            packages/app/dist/latest-linux.yml
+            apps/app/dist/Spool-*.AppImage
+            apps/app/dist/latest-linux.yml
 
   release:
     needs: [build-mac, build-linux]
@@ -108,7 +108,7 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(jq -r .version packages/app/package.json)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -222,4 +222,4 @@ jobs:
           }
           publish_if_missing packages/redact
           publish_if_missing packages/core
-          publish_if_missing packages/cli
+          publish_if_missing apps/cli

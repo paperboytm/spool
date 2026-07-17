@@ -13,7 +13,7 @@
 //    turn boundaries; if the user turn is missing from the markdown
 //    entirely, the sr-only heading supplies the prompt text directly.
 
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../../types'
 import {
   ParseError,
   decodeEntities,
@@ -185,8 +185,19 @@ function findAnchor(md: string, needle: string): number {
   return -1
 }
 
+// Strip tag-like spans to a fixed point rather than in a single pass: a
+// single `/<[^>]+>/g` pass is both an incomplete sanitizer (nested markup
+// can survive one pass) and a polynomial-ReDoS risk (`[^>]` matches `<`,
+// so a run of `<<<<...` backtracks quadratically). Excluding `<` from the
+// character class removes the backtracking, and the loop closes the
+// completeness gap.
 function stripTags(s: string): string {
-  return s.replace(/<[^>]+>/g, '')
+  let prev: string
+  do {
+    prev = s
+    s = s.replace(/<[^<>]*>/g, '')
+  } while (s !== prev)
+  return s
 }
 
 function collapseWhitespace(s: string): string {
@@ -231,4 +242,3 @@ function deriveTitleFromTurns(turns: Turn[]): string | undefined {
   if (flat.length >= 120) return flat.slice(0, 60) + '…'
   return undefined
 }
-

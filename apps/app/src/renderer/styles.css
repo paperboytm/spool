@@ -1,0 +1,232 @@
+/* Latin-only @font-face for variable fonts. fontsource's index.css bundles
+ * every subset (cyrillic/greek/vietnamese/etc.) which would all be packed
+ * into the .asar even though Spool's UI is latin + CJK (CJK falls back to
+ * system anyway). Hand-rolling these saves ~190 KB of unused woff2 in the
+ * Electron bundle. Geist Mono uses fontsource's static per-subset entries
+ * which are already latin-scoped, so it's imported normally. */
+@font-face {
+  font-family: 'Geist Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Hanken Grotesk Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@import "@fontsource/geist-mono/latin-400.css";
+@import "@fontsource/geist-mono/latin-500.css";
+@import "tailwindcss";
+
+/* The shared conversation components live outside this package; point
+ * Tailwind's source scanner at them so their utilities compile here with
+ * the app's own dark-variant semantics. */
+@source "../../../../packages/session-view/src";
+
+@theme {
+  /* Warm palette — light */
+  --color-warm-bg: #FAFAF8;
+  --color-warm-surface: #F4F4F0;
+  --color-warm-surface2: #EEEEE9;
+  --color-warm-border: #E8E8E2;
+  --color-warm-border2: #D8D8D0;
+  --color-warm-text: #1C1C18;
+  --color-warm-muted: #6B6B60;
+  --color-warm-faint: #ADADAA;
+  --color-accent: #C85A00;
+  --color-accent-bg: #FFF3E8;
+  --color-accent-bg-strong: #FFE5CC;
+
+  /* Warm palette — dark */
+  --color-dark-bg: #141410;
+  --color-dark-surface: #1C1C18;
+  --color-dark-surface2: #242420;
+  --color-dark-border: #2E2E28;
+  --color-dark-border2: #3A3A34;
+  --color-dark-text: #F2F2EC;
+  --color-dark-muted: #9A9A8E;
+  --color-dark-faint: #505048;
+  --color-accent-dark: #F07020;
+  /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
+  --color-accent-bg-dark: #2a1800;
+  --color-accent-bg-strong-dark: #3d2400;
+
+  /* Status — warm-tuned, never Tailwind defaults (see DESIGN.md) */
+  --color-status-success: #6BAF6B;
+  --color-status-warning: #E4A640;
+  --color-status-error:   #C95A4F;
+  --color-status-success-dark: #7DC07D;
+  --color-status-warning-dark: #F0B854;
+  --color-status-error-dark:   #D67259;
+
+  /* Source badges */
+  --color-src-claude: #C26A4E;
+  --color-src-codex: #4A9670;
+  --color-src-gemini: #5887D0;
+  --color-src-opencode: #8A6F3D;
+
+  /* Typography */
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+:root {
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-sans);
+  color-scheme: light dark;
+  background: var(--color-warm-bg);
+  color: var(--color-warm-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: var(--color-dark-bg);
+    color: var(--color-dark-text);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-in.fade-in {
+  animation: fadeIn var(--tw-duration, 150ms) ease-out;
+}
+
+
+.duration-150 {
+  --tw-duration: 150ms;
+}
+
+/* ── Scrollbars: subtle thumb, theme-aware (≈10% black in light / white in dark) ── */
+:root {
+  --spool-scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --spool-scrollbar-thumb-hover: rgba(0, 0, 0, 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --spool-scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --spool-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--spool-scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--spool-scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--spool-scrollbar-thumb-hover);
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Markdown-table scroller: thumb hidden until the pointer is over the
+ * table, so wide tables read as plain content at rest. Sibling copies
+ * live in share-kit global.css and share-web styles.css — share-web
+ * deliberately doesn't import either of these sheets. */
+.spool-md-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.spool-md-scroll:hover {
+  scrollbar-color: var(--spool-scrollbar-thumb) transparent;
+}
+.spool-md-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.spool-md-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border: none;
+  border-radius: 3px;
+  transition: background-color 160ms;
+}
+.spool-md-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--spool-scrollbar-thumb);
+}
+.spool-md-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--spool-scrollbar-thumb-hover);
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Brief highlight applied to a share-editor turn after the user clicks
+ * jump-to-message in the TurnSelector. Replaces a smooth-scroll
+ * animation (which over long distances felt sluggish) with an instant
+ * snap + an overlay flash so the user gets a confirmation that they
+ * arrived. Implemented as a `::after` overlay so the bubble's own
+ * background / border / shadow are left untouched (animating
+ * background-color directly was clobbering the user bubble's surface
+ * fill at the end of the keyframe). */
+@keyframes spool-share-jump-flash {
+  0%   { opacity: 0.22; }
+  60%  { opacity: 0.16; }
+  100% { opacity: 0; }
+}
+[data-spool-share-flash] [data-turn-body] {
+  position: relative;
+}
+[data-spool-share-flash] [data-turn-body]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #F07020;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: spool-share-jump-flash 1600ms ease-out forwards;
+}

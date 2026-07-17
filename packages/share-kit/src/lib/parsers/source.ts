@@ -5,7 +5,7 @@
 // a normalized `Conversation`. Adding a new source = new file in
 // `sources/`, register it in `registry.ts`. Nothing else has to change.
 
-import type { Conversation, Platform } from '@/lib/types'
+import type { Conversation, Platform } from '../types'
 import type { FetchedContent } from './fetcher'
 
 export type SourceId = 'chatgpt' | 'claude' | 'gemini'

@@ -1,127 +1,12 @@
 import { readFileSync } from 'node:fs'
-import type { ParseSessionResult, ParsedSession, ParsedMessage } from '../types.js'
+import { parseClaudeSessionText } from '@spool-lab/session-kit'
+import type { ParseSessionResult, ParsedSession } from '../types.js'
 
-interface ContentItem {
-  type: string
-  text?: string
-  name?: string
-  input?: unknown
-}
+// The parsing brain lives in @spool-lab/session-kit (browser-safe, shared
+// with the web reader); this wrapper owns only the file I/O.
 
 export function loadClaudeSession(filePath: string): ParseSessionResult {
-  const raw = readFileSync(filePath, 'utf8')
-  const lines = raw.split('\n').filter(l => l.trim().length > 0)
-  const messages: ParsedMessage[] = []
-  let sessionUuid = ''
-  let cwd = ''
-  let model = ''
-  let customTitle = ''
-
-  const SKIP_TYPES = new Set([
-    'file-history-snapshot',
-    'progress',
-    'queue-operation',
-    'last-prompt',
-  ])
-
-  for (const line of lines) {
-    let record: Record<string, unknown>
-    try {
-      record = JSON.parse(line) as Record<string, unknown>
-    } catch {
-      continue
-    }
-
-    const type = record['type'] as string | undefined
-    if (!type || SKIP_TYPES.has(type)) continue
-
-    if (!sessionUuid && record['sessionId']) sessionUuid = record['sessionId'] as string
-    if (!cwd && record['cwd']) cwd = record['cwd'] as string
-
-    if (type === 'custom-title') {
-      const ct = record['customTitle'] as string | undefined
-      if (ct) customTitle = ct
-      continue
-    }
-
-    if (type === 'assistant') {
-      const msg = record['message'] as Record<string, unknown> | undefined
-      if (msg?.['model']) model = msg['model'] as string
-    }
-
-    if (type === 'summary') {
-      const summaryText = record['summary'] as string | undefined
-      if (summaryText) {
-        messages.push({
-          uuid: (record['uuid'] as string | undefined) ?? `summary-${messages.length}`,
-          parentUuid: (record['parentUuid'] as string | null | undefined) ?? null,
-          role: 'system',
-          contentText: summaryText.trim(),
-          timestamp: record['timestamp'] as string,
-          isSidechain: Boolean(record['isSidechain']),
-          toolNames: [],
-          seq: messages.length,
-        })
-      }
-      continue
-    }
-
-    const msgObj = record['message'] as Record<string, unknown> | undefined
-    if (!msgObj) continue
-
-    const role = msgObj['role'] as string | undefined
-    if (role !== 'user' && role !== 'assistant') continue
-
-    const contentRaw = msgObj['content']
-    const contentText = extractText(contentRaw)
-    const toolNames = extractToolNames(contentRaw)
-
-    // Skip empty messages (e.g. tool result placeholders with no text)
-    if (!contentText && toolNames.length === 0) continue
-
-    messages.push({
-      uuid: (record['uuid'] as string | undefined) ?? `msg-${messages.length}`,
-      parentUuid: (record['parentUuid'] as string | null | undefined) ?? null,
-      role: role as 'user' | 'assistant',
-      contentText,
-      timestamp: record['timestamp'] as string,
-      isSidechain: Boolean(record['isSidechain']),
-      toolNames,
-      seq: messages.length,
-    })
-  }
-
-  if (messages.length === 0) return { kind: 'skipped' }
-
-  // Use cwd from messages if not in top-level fields
-  if (!cwd) {
-    for (const m of messages) {
-      // cwd is on the record level, not message level — already captured above
-    }
-  }
-
-  const firstUserMsg = messages.find(m => m.role === 'user' && m.contentText.length > 0 && !m.isSidechain)
-  const title = customTitle
-    || (firstUserMsg
-      ? firstUserMsg.contentText.replace(/<[^>]+>/g, '').trim().slice(0, 120)
-      : '(no title)')
-
-  const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort()
-
-  return {
-    kind: 'parsed',
-    session: {
-      source: 'claude',
-      sessionUuid: sessionUuid || filePath,
-      filePath,
-      title,
-      cwd,
-      model,
-      startedAt: timestamps[0] ?? new Date().toISOString(),
-      endedAt: timestamps[timestamps.length - 1] ?? new Date().toISOString(),
-      messages,
-    },
-  }
+  return parseClaudeSessionText(readFileSync(filePath, 'utf8'), filePath)
 }
 
 export function parseClaudeSession(filePath: string): ParsedSession | null {
@@ -131,44 +16,6 @@ export function parseClaudeSession(filePath: string): ParsedSession | null {
   } catch {
     return null
   }
-}
-
-// Slash-command records in Claude Code JSONL come as a triplet:
-//   <command-name>/X</command-name>
-//   <command-message>X</command-message>
-//   <command-args>Y</command-args>
-// Strip the whole record as one unit so bare <command-args> appearing in
-// legitimate user content (e.g. a user pasting log output that contains
-// these tags) is preserved.
-const SLASH_COMMAND_RECORD = /<command-name>[\s\S]*?<\/command-name>(?:\s*<command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?<\/command-args>)?/g
-
-function extractText(content: unknown): string {
-  let raw: string
-  if (typeof content === 'string') {
-    raw = content
-  } else if (Array.isArray(content)) {
-    raw = (content as ContentItem[])
-      .filter(item => item.type === 'text')
-      .map(item => item.text ?? '')
-      .join('\n')
-  } else {
-    return ''
-  }
-  return raw
-    .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
-    .replace(SLASH_COMMAND_RECORD, '')
-    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
-    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
-    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
-    .replace(/<[^>]+>/g, '')
-    .trim()
-}
-
-function extractToolNames(content: unknown): string[] {
-  if (!Array.isArray(content)) return []
-  return (content as ContentItem[])
-    .filter(item => item.type === 'tool_use' && item.name)
-    .map(item => item.name!)
 }
 
 /** Decode a Claude project slug to a display path.

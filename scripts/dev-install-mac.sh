@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Spool"
 DEST="/Applications/${APP_NAME}.app"
-BUILT="packages/app/dist/mac-arm64/${APP_NAME}.app"
+BUILT="apps/app/dist/mac-arm64/${APP_NAME}.app"
 
 echo "==> Quitting running ${APP_NAME}…"
 osascript -e "quit app \"${APP_NAME}\"" 2>/dev/null || true

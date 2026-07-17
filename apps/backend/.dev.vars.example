@@ -1,0 +1,46 @@
+# Local dev secrets for `wrangler pages dev`. Copy to `.dev.vars` (gitignored)
+# and fill in real values. Do NOT commit `.dev.vars`.
+#
+# How to obtain each:
+#
+# WORKOS_CLIENT_ID / WORKOS_API_KEY
+#   All sign-in runs through WorkOS AuthKit (/api/auth/workos/*).
+#   Create a dev environment at https://dashboard.workos.com → grab the
+#   client id ("client_...") and an API key ("sk_..."), and register
+#   http://localhost:3002/api/auth/workos/callback as a redirect URI.
+#   Use a SEPARATE dev environment from prod — never share credentials.
+#
+# SESSION_SIGNING_KEY
+#   Any 32-byte random string. Reserved for future HMAC of state cookies.
+#   `openssl rand -base64 32` works.
+#
+# ABUSE_NOTIFY_EMAIL
+#   In dev anything is fine (e.g. dev@localhost). Production points at
+#   abuse@spool.pro and gets the manual D1 polling treatment until v1.1
+#   wires Mailchannels.
+#
+# ADMIN_USER_IDS
+#   Comma-separated list of user ids allowed to hit /api/admin/audit.
+#   In dev you'll discover your own user id by signing in once and
+#   reading the `users` row from the local D1 sqlite file; paste it back
+#   here and restart wrangler dev to admin yourself.
+
+# PUBLIC_BASE_URL
+#   The origin OAuth start/callback bake into the redirect_uri sent to
+#   WorkOS. In dev this MUST be the share-web vite server (the /api/*
+#   proxy origin), not wrangler's own :8788 — and it must match the
+#   redirect URI registered in the WorkOS dashboard, or every web
+#   sign-in fails with a redirect_uri mismatch. Unset in prod (defaults
+#   to https://spool.pro).
+
+# DEV_WORKOS_API_URL (optional — normally injected by share-dev.sh)
+#   workerd ignores proxy envs (workers-sdk#4515); on proxy-only dev
+#   networks point server-side WorkOS calls at the share-web vite relay:
+#   http://localhost:3002/__dev/workos. Leave unset otherwise.
+
+WORKOS_CLIENT_ID=
+WORKOS_API_KEY=
+SESSION_SIGNING_KEY=
+ABUSE_NOTIFY_EMAIL=dev@localhost
+ADMIN_USER_IDS=
+PUBLIC_BASE_URL=http://localhost:3002

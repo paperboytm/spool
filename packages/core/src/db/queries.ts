@@ -12,10 +12,26 @@ export function getOrCreateProject(
   identity: { identityKind: ProjectIdentityKind; identityKey: string },
 ): number {
   const existing = db
-    .prepare('SELECT id FROM projects WHERE source_id = ? AND slug = ?')
-    .get(sourceId, slug) as { id: number } | undefined
+    .prepare('SELECT id, identity_kind FROM projects WHERE source_id = ? AND slug = ?')
+    .get(sourceId, slug) as { id: number; identity_kind: ProjectIdentityKind | null } | undefined
 
-  if (existing) return existing.id
+  if (existing) {
+    // Project rows predate identity grouping and are keyed by source + slug.
+    // A worktree may have been missing on first sync (stored as `path`) and
+    // become resolvable later. Refresh the row when the new signal is at least
+    // as strong, but never let a temporarily missing checkout downgrade a
+    // stable git/manifest identity back to `path`.
+    if (identityRank(identity.identityKind) >= identityRank(existing.identity_kind)) {
+      db.prepare(`
+        UPDATE projects
+        SET display_path = ?, display_name = ?, identity_kind = ?, identity_key = ?
+        WHERE id = ?
+      `).run(
+        displayPath, displayName, identity.identityKind, identity.identityKey, existing.id,
+      )
+    }
+    return existing.id
+  }
 
   const result = db
     .prepare(
@@ -24,6 +40,19 @@ export function getOrCreateProject(
     .run(sourceId, slug, displayPath, displayName, identity.identityKind, identity.identityKey)
 
   return Number(result.lastInsertRowid)
+}
+
+function identityRank(kind: ProjectIdentityKind | null): number {
+  switch (kind) {
+    case 'git_remote': return 5
+    case 'git_common_dir': return 4
+    case 'manifest_path': return 3
+    case 'synthetic':
+    case 'spool_internal': return 2
+    case 'loose': return 1
+    case 'path':
+    case null: return 0
+  }
 }
 
 export function getSourceId(db: Database.Database, name: SessionSource): number {
@@ -1196,6 +1225,7 @@ export function getStatus(db: Database.Database): StatusInfo {
   const codexRow = counts.find(r => r.name === 'codex')
   const geminiRow = counts.find(r => r.name === 'gemini')
   const opencodeRow = counts.find(r => r.name === 'opencode')
+  const piRow = counts.find(r => r.name === 'pi')
 
   return {
     dbPath: DB_PATH,
@@ -1204,6 +1234,7 @@ export function getStatus(db: Database.Database): StatusInfo {
     codexSessions: codexRow?.cnt ?? 0,
     geminiSessions: geminiRow?.cnt ?? 0,
     opencodeSessions: opencodeRow?.cnt ?? 0,
+    piSessions: piRow?.cnt ?? 0,
     lastSyncedAt: lastSync?.last ?? null,
     dbSizeBytes: getDBSize(),
   }

@@ -42,12 +42,15 @@ export {
 } from './lib/types'
 
 export { FIXTURE_PASTED } from './lib/fixtures'
+export { firstLinePreview } from './lib/first-line-preview'
+export { parseSpoolDocument } from './lib/spool-document'
 
 // ─── Template renderers ─────────────────────────────────────────
 export { TemplateRender } from './templates'
 export { Forum } from './templates/forum'
 export { Letter } from './templates/letter'
-export { Timeline } from './templates/timeline'
+export { Timeline, TimelineBody } from './templates/timeline'
+export type { TimelineBodyProps } from './templates/timeline'
 export { Chat } from './templates/chat'
 
 // ─── Snapshot reader (used by spool.pro web) ──────────────────
@@ -65,6 +68,8 @@ export {
 // ─── Template primitives (for hosts assembling custom layouts) ──
 export { Body } from './templates/body'
 export { GapMarker } from './templates/gap-marker'
+export { selectSegments } from './templates/selection'
+export type { KeptTurn, SelectedSegments } from './templates/selection'
 
 // ─── Visual components ──────────────────────────────────────────
 export { Wordmark } from './components/wordmark'
@@ -92,6 +97,7 @@ export {
   ensureTurnIds,
   redactConversation,
 } from './lib/storage/spool-file'
+export { snapshotFromSpoolDocument } from './lib/spool-to-snapshot'
 
 // Markdown export ─────────────────────────────────────────────────
 export {

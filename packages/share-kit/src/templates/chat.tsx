@@ -4,8 +4,8 @@
 // evoke the native chat UI of ChatGPT/Claude/Gemini while still
 // reading as a considered artifact.
 
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'

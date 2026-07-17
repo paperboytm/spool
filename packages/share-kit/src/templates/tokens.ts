@@ -1,8 +1,8 @@
 // Thin re-export so templates don't need to know about the canonical
 // paper registry in types.ts. Keeps imports short at call sites.
 
-export type { PaperTokens as TemplateTokens } from '@/lib/types'
-export { paperTokens as templateTokens } from '@/lib/types'
+export type { PaperTokens as TemplateTokens } from '../lib/types'
+export { paperTokens as templateTokens } from '../lib/types'
 
 /** Alpha-blended background tint for redact chips and other accent
  *  surfaces inside the rendered artifact. Derived from the colorway

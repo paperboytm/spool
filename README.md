@@ -6,7 +6,7 @@ Your local AI session library.
   <img src="docs/spool-v1.png" alt="Spool" width="720">
 </p>
 
-Spool collects every Claude Code, Codex CLI, Gemini CLI, and OpenCode session you've ever had into a sidebar of projects you can browse, pin, and revisit. Press ⌘K to search across the whole archive.
+Spool collects every Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi session you've ever had into a sidebar of projects you can browse, pin, and revisit. Press ⌘K to search across the whole archive.
 
 > **Early stage.** Spool is under active development — expect rough edges. Feedback, bug reports, and ideas are very welcome via [Issues](https://github.com/paperboytm/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
@@ -21,7 +21,7 @@ Or grab the prebuilt DMG (macOS arm64) / AppImage (Linux x86_64) directly from t
 ```bash
 pnpm install
 pnpm build
-# DMG is in packages/app/dist/
+# DMG is in apps/app/dist/
 ```
 
 ## What it does
@@ -29,7 +29,7 @@ pnpm build
 Spool turns the pile of AI sessions sitting on your disk into a browsable library.
 
 - **Library shell** — sidebar of projects (derived from working-dir paths across agents) and a main pane that shows recent + pinned sessions for whatever you've selected
-- **Session indexing** — watches Claude/Codex/Gemini session dirs and OpenCode's SQLite database in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, Gemini's project temp dirs under `~/.gemini/tmp/*/chats`, and `~/.local/share/opencode/opencode.db`
+- **Session indexing** — watches Claude/Codex/Gemini/Pi session dirs and OpenCode's SQLite database in real time, including profile-based paths like `~/.claude-profiles/*/projects`, `~/.codex-profiles/*/sessions`, Gemini's project temp dirs under `~/.gemini/tmp/*/chats`, Pi's `~/.pi/agent/sessions`, and `~/.local/share/opencode/opencode.db`
 - **Pin** — keep important sessions on top of their project and on the global Library Home
 - **⌘K search** — fast full-text search scoped to All or the current project; AI mode synthesizes answers across fragments
 - **Agent search** — a `/spool` skill inside Claude Code (and any ACP agent) feeds matching fragments back into your conversation
@@ -42,12 +42,17 @@ Everything stays on your machine. Nothing leaves.
 ## Architecture
 
 ```
+apps/
+  app/            Electron app (React + Vite + Tailwind) — macOS + Linux
+  cli/            CLI interface (`spool search ...`)
+  web/            spool.pro website (TanStack Start: landing + docs + share reader)
+  share-backend/  spool.pro API (Cloudflare Pages Functions, D1/KV/R2)
 packages/
-  app/      Electron app (React + Vite + Tailwind) — macOS + Linux
-  core/     Indexing engine (SQLite + FTS5)
-  cli/      CLI interface (`spool search ...`)
-  redact/   Secret-detection regex library (published as @spool-lab/redact)
-  landing/  spool.pro website
+  core/           Indexing engine (SQLite + FTS5)
+  redact/         Secret-detection regex library (published as @spool-lab/redact)
+  session-kit/    Session data model shared by app/web
+  session-view/   Conversation renderer shared by app/web
+  share-kit/      Share snapshot reader/templates
 ```
 
 ## Development
@@ -55,7 +60,7 @@ packages/
 ```bash
 pnpm install
 pnpm exec electron-rebuild -f -w better-sqlite3   # rebuild native modules for Electron
-pnpm dev          # starts app + landing in dev mode
+pnpm dev          # starts app + web in dev mode
 pnpm test         # runs all tests
 ```
 

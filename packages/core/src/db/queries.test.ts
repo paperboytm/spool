@@ -37,6 +37,42 @@ describe('getOrCreateProject (with identity)', () => {
     })
     expect(id1).toBe(id2)
   })
+
+  it('upgrades an existing path fallback when the worktree becomes resolvable', () => {
+    const id = getOrCreateProject(db, 1, 'paperboy-wt', '/dead/paperboy-wt', 'paperboy-wt', {
+      identityKind: 'path', identityKey: '/dead/paperboy-wt',
+    })
+
+    expect(getOrCreateProject(db, 1, 'paperboy-wt', '/live/paperboy-wt', 'paperboy', {
+      identityKind: 'git_remote', identityKey: 'github.com/paperboytm/paperboy',
+    })).toBe(id)
+
+    const row = db.prepare(`
+      SELECT display_path, display_name, identity_kind, identity_key
+      FROM projects WHERE id = ?
+    `).get(id) as Record<string, unknown>
+    expect(row).toMatchObject({
+      display_path: '/live/paperboy-wt',
+      display_name: 'paperboy',
+      identity_kind: 'git_remote',
+      identity_key: 'github.com/paperboytm/paperboy',
+    })
+  })
+
+  it('does not downgrade a stable git identity when a checkout is temporarily missing', () => {
+    const id = getOrCreateProject(db, 1, 'paperboy-wt', '/live/paperboy-wt', 'paperboy', {
+      identityKind: 'git_remote', identityKey: 'github.com/paperboytm/paperboy',
+    })
+    getOrCreateProject(db, 1, 'paperboy-wt', '/dead/paperboy-wt', 'paperboy-wt', {
+      identityKind: 'path', identityKey: '/dead/paperboy-wt',
+    })
+
+    const row = db.prepare(`SELECT identity_kind, identity_key FROM projects WHERE id = ?`).get(id)
+    expect(row).toEqual({
+      identity_kind: 'git_remote',
+      identity_key: 'github.com/paperboytm/paperboy',
+    })
+  })
 })
 
 describe('upsertSession (title_source authority)', () => {
@@ -239,5 +275,6 @@ describe('getStatus', () => {
     expect(status.codexSessions).toBe(1)
     expect(status.geminiSessions).toBe(0)
     expect(status.opencodeSessions).toBe(0)
+    expect(status.piSessions).toBe(0)
   })
 })

@@ -1,0 +1,83 @@
+name = "spool-share-backend"
+pages_build_output_dir = "public"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# This file contains NO production resource IDs by design.
+#
+# For a Cloudflare Pages project, the runtime D1 / KV / R2 bindings
+# are configured per-project in the Cloudflare dashboard:
+#   Cloudflare → Workers & Pages → spool-share-backend → Settings →
+#   Functions → Bindings → add D1 / KV / R2 binding by name.
+#
+# Source of truth for production bindings is the dashboard, not this
+# file. Keep prod resource IDs out of the public repo — see
+# docs/runbooks/spool-share-launch.md §1 for the one-time setup.
+#
+# What this file controls:
+#   - Binding names that `functions/` reads via `ctx.env.*`
+#   - Migrations directory for `wrangler d1 migrations apply`
+#   - Bucket names (R2 — resource labels, not secrets)
+#
+# Local dev: `wrangler pages dev` ignores any id field below — it
+# emulates each binding with a throwaway file under `.wrangler/state/`.
+# No CF account required.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spool-share-db"
+migrations_dir = "migrations"
+# database_id deliberately omitted; configured in Pages dashboard.
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+# id deliberately omitted; configured in Pages dashboard.
+
+[[kv_namespaces]]
+binding = "META"
+
+[[kv_namespaces]]
+binding = "RATE"
+
+[[kv_namespaces]]
+binding = "NONCE"
+
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "spool-snapshots"
+
+[[r2_buckets]]
+binding = "OG"
+bucket_name = "spool-og"
+
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "spool-avatars"
+
+[[r2_buckets]]
+binding = "HUB"
+bucket_name = "spool-hub"
+
+[vars]
+ENV = "development"
+
+# Cron trigger for the deletion sweep. Pages Functions ignore this in
+# the Pages runtime — the deletion worker is intended to run as a
+# companion Worker (functions/_scheduled/deletion-worker.ts) sharing the
+# same D1/KV/R2 bindings. Kept here for documentation.
+[triggers]
+crons = ["0 */6 * * *"]
+
+# Secrets (set ONCE per environment via wrangler — never commit):
+#   wrangler pages secret put WORKOS_CLIENT_ID         --project-name spool-share-backend
+#       (WorkOS AuthKit environment client id — web sign-in via /api/auth/workos/*;
+#        register https://spool.pro/api/auth/workos/callback as a redirect URI
+#        in the WorkOS dashboard)
+#   wrangler pages secret put WORKOS_API_KEY           --project-name spool-share-backend
+#       (doubles as the OAuth client_secret and the identities-API Bearer key)
+#   wrangler pages secret put ADMIN_USER_IDS           --project-name spool-share-backend
+#       (comma-separated user ids allowed to hit /api/admin/*)
+#
+# CF stores secret values encrypted at rest. Never echoed back through
+# wrangler, never available to local dev (use .dev.vars for that —
+# also gitignored).

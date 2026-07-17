@@ -1,0 +1,136 @@
+import type { D1Database } from '@cloudflare/workers-types'
+
+import type { IdentityClaim } from '../auth/providers/types'
+import { ApiError } from '../errors'
+
+// 16 hex chars = 64 bits of randomness — collision probability is
+// negligible at our user-table scale and the short id reads cleanly.
+const USER_ID_HEX_CHARS = 16
+
+export type UserRow = {
+  id: string
+  email: string
+  name: string | null
+  avatar_url: string | null
+  created_at: number
+  last_signin_at: number
+  deletion_pending_until: number | null
+  deleted_at: number | null
+  // v0.6+ profile customization (migration 0002). Nullable on rows
+  // from before the migration ran; defaults to NULL/1 on new inserts.
+  display_name: string | null
+  custom_avatar_id: string | null
+  // SQLite stores booleans as 0/1 integers. `avatar_visible` is NOT
+  // NULL DEFAULT 1 — 0 means "render initials, even if the user has
+  // a Google avatar". Persisted as integer so D1 round-trips cleanly.
+  avatar_visible: number
+}
+
+export type UpsertIdentityOpts = {
+  /** Migration hook, consulted only when (provider, sub) has no
+   *  user_identities row yet. Returns refs under OTHER providers that
+   *  denote the same human; the first ref matching an existing user
+   *  gets the new identity linked onto it instead of a fresh account.
+   *  Errors propagate — failing open would fork a legacy account. */
+  resolveAliases?: () => Promise<Array<{ provider: string; sub: string }>>
+}
+
+async function findUserByIdentity(
+  db: D1Database,
+  provider: string,
+  sub: string,
+): Promise<UserRow | null> {
+  return db
+    .prepare(
+      'SELECT u.* FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = ? AND i.provider_sub = ?',
+    )
+    .bind(provider, sub)
+    .first<UserRow>()
+}
+
+/** Look up a user by their (provider, provider_sub) identity, updating
+ *  their profile fields when one exists. Creates a fresh users row +
+ *  user_identities link when none does. When `resolveAliases` is given,
+ *  a miss first tries to link onto a user known under an alias identity
+ *  (see UpsertIdentityOpts). */
+export async function upsertUserByIdentity(
+  db: D1Database,
+  claim: IdentityClaim,
+  opts: UpsertIdentityOpts = {},
+): Promise<UserRow> {
+  const existing = await findUserByIdentity(db, claim.provider, claim.sub)
+  const now = Date.now()
+  if (existing) {
+    if (existing.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
+    await db
+      .prepare('UPDATE users SET email=?, name=?, avatar_url=?, last_signin_at=? WHERE id=?')
+      .bind(claim.email, claim.name, claim.avatar_url, now, existing.id)
+      .run()
+    return {
+      ...existing,
+      email: claim.email,
+      name: claim.name,
+      avatar_url: claim.avatar_url,
+      last_signin_at: now,
+    }
+  }
+  if (opts.resolveAliases) {
+    for (const alias of await opts.resolveAliases()) {
+      const legacy = await findUserByIdentity(db, alias.provider, alias.sub)
+      if (!legacy) continue
+      if (legacy.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
+      await db
+        .prepare(
+          'INSERT INTO user_identities (provider, provider_sub, user_id, email, linked_at) VALUES (?,?,?,?,?)',
+        )
+        .bind(claim.provider, claim.sub, legacy.id, claim.email, now)
+        .run()
+      await db
+        .prepare('UPDATE users SET email=?, name=?, avatar_url=?, last_signin_at=? WHERE id=?')
+        .bind(claim.email, claim.name, claim.avatar_url, now, legacy.id)
+        .run()
+      return {
+        ...legacy,
+        email: claim.email,
+        name: claim.name,
+        avatar_url: claim.avatar_url,
+        last_signin_at: now,
+      }
+    }
+  }
+  const id = crypto.randomUUID().replace(/-/g, '').slice(0, USER_ID_HEX_CHARS)
+  await db
+    .prepare(
+      'INSERT INTO users (id, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?)',
+    )
+    .bind(id, claim.email, claim.name, claim.avatar_url, now, now)
+    .run()
+  await db
+    .prepare(
+      'INSERT INTO user_identities (provider, provider_sub, user_id, email, linked_at) VALUES (?,?,?,?,?)',
+    )
+    .bind(claim.provider, claim.sub, id, claim.email, now)
+    .run()
+  return {
+    id,
+    email: claim.email,
+    name: claim.name,
+    avatar_url: claim.avatar_url,
+    created_at: now,
+    last_signin_at: now,
+    deletion_pending_until: null,
+    deleted_at: null,
+    display_name: null,
+    custom_avatar_id: null,
+    // Matches the migration 0002 column default. New users see their
+    // provider avatar by default; the visibility toggle is opt-out.
+    avatar_visible: 1,
+  }
+}
+
+export async function getUserById(db: D1Database, id: string): Promise<UserRow | null> {
+  return db
+    .prepare('SELECT * FROM users WHERE id=? AND deleted_at IS NULL')
+    .bind(id)
+    .first<UserRow>()
+}

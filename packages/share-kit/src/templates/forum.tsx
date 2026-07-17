@@ -5,8 +5,8 @@
 // post numbers on the right margin. Reads like a forum thread or a
 // session-detail panel rather than chat bubbles or editorial prose.
 
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
@@ -251,7 +251,7 @@ function initialsFor(name: string): string {
 }
 
 // Cross-day timestamp label. Mirrors the app's formatRelativeDate logic
-// from packages/app/src/shared/formatDate.ts: same day → HH:MM; yesterday
+// from apps/app/src/shared/formatDate.ts: same day → HH:MM; yesterday
 // → "yesterday, HH:MM"; same year → "Mon DD"; otherwise → "Mon DD, YYYY".
 function formatRelativeTimestamp(iso: string): string {
   try {

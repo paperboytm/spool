@@ -41,6 +41,27 @@ describe('parseCodexSession', () => {
     expect(parsed?.messages).toHaveLength(2)
   })
 
+  it('preserves the session-recorded Git remote for deleted-worktree identity', () => {
+    const fp = writeTmpSession([
+      {
+        timestamp: '2026-04-05T12:00:00Z',
+        type: 'session_meta',
+        payload: {
+          id: 'session-with-remote',
+          cwd: '/Users/me/.codex/worktrees/6ae2/im',
+          git: { repository_url: 'git@github.com:paperboytm/im.git' },
+        },
+      },
+      {
+        timestamp: '2026-04-05T12:00:01Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'Continue the old worktree.' },
+      },
+    ])
+
+    expect(parseCodexSession(fp)?.gitRemote).toBe('git@github.com:paperboytm/im.git')
+  })
+
   it('filters guardian approval transcript sessions from indexing', () => {
     const fp = writeTmpSession([
       {

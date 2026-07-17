@@ -1,0 +1,249 @@
+/* Spool landing — global tokens + base reset. Per DESIGN.md. */
+
+.page-shell,
+.page-shell *,
+.page-shell *::before,
+.page-shell *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #FAFAF8;
+  --surface: #F4F4F0;
+  --surface2: #EEEEE9;
+  --border: #E8E8E2;
+  --border2: #D8D8D0;
+  --text: #1C1C18;
+  --muted: #6B6B60;
+  --faint: #ADADAA;
+  --accent: #C85A00;
+  --accent-bg: #FFF3E8;
+  --accent-weak: rgba(200, 90, 0, 0.08);
+  --src-claude: #C26A4E;
+  --src-twitter: #3A3A3A;
+  --src-github: #555555;
+  --src-youtube: #B22222;
+  --src-chatgpt: #10A37F;
+  --src-gemini: #5887D0;
+  --src-codex: #4A9670;
+  --src-reddit: #FF4500;
+  --src-hn: #FF6600;
+  --src-xhs: #FF2442;
+  --paper: 39 39 3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141410;
+    --surface: #1C1C18;
+    --surface2: #242420;
+    --border: #2E2E28;
+    --border2: #3A3A34;
+    --text: #F2F2EC;
+    --muted: #8A8A80;
+    --faint: #505048;
+    --accent: #F07020;
+    --accent-bg: #2A1800;
+    --accent-weak: rgba(240, 112, 32, 0.1);
+    --src-claude: #E89A7C;
+    --src-twitter: #888880;
+    --src-github: #999990;
+    --src-youtube: #D44444;
+    --src-chatgpt: #20C38F;
+    --src-gemini: #8AB0E5;
+    --src-codex: #7CC9A2;
+    --src-reddit: #FF6B3D;
+    --src-hn: #FF8C3D;
+    --src-xhs: #FF4F6A;
+    --paper: 242 242 236;
+  }
+}
+
+[data-theme="dark"] {
+  --bg: #141410;
+  --surface: #1C1C18;
+  --surface2: #242420;
+  --border: #2E2E28;
+  --border2: #3A3A34;
+  --text: #F2F2EC;
+  --muted: #8A8A80;
+  --faint: #505048;
+  --accent: #F07020;
+  --accent-bg: #2A1800;
+  --accent-weak: rgba(240, 112, 32, 0.1);
+  --src-claude: #E89A7C;
+  --src-twitter: #888880;
+  --src-github: #999990;
+  --src-youtube: #D44444;
+  --src-chatgpt: #20C38F;
+  --src-gemini: #8AB0E5;
+  --src-codex: #7CC9A2;
+  --src-reddit: #FF6B3D;
+  --src-hn: #FF8C3D;
+  --src-xhs: #FF4F6A;
+  --paper: 242 242 236;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  scroll-behavior: smooth;
+}
+
+.page-shell {
+  font-family: 'Geist Variable', 'Geist', -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Sticky footer: shell is a vertical flex container; the page-content
+   wrapper grows to fill remaining height, pushing footer to viewport
+   bottom on short pages (docs/blog). */
+.page-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.page-shell > .page-content {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+/* Flex item with auto cross-axis margins (from .wrap's `margin: 0 auto`)
+   shrink-to-fits in cross axis. Force width: 100% so footer stretches to
+   container, then max-width + auto margins center within. */
+.page-shell > footer { align-self: stretch; width: 100%; }
+
+a { color: inherit; text-decoration: none; }
+
+code, .mono {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: var(--accent-weak); color: var(--accent); }
+
+/* ── shared container ── */
+.wrap {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+@media (max-width: 700px) { .wrap { padding: 0 20px; } }
+
+/* ── top bar ── */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.top-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-size: 16px;
+}
+.brand .brand-mark {
+  width: 22px; height: 22px;
+  color: var(--accent);
+  display: inline-block;
+}
+.brand .dot { color: var(--accent); margin-left: -2px; }
+
+.top nav.links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 13px;
+}
+.top nav.links a {
+  color: var(--muted);
+  transition: color 80ms;
+}
+.top nav.links a:hover { color: var(--text); }
+
+.top nav.links .sep {
+  width: 1px; height: 14px; background: var(--border);
+}
+.iconbtn {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--muted);
+  background: transparent; border: 1px solid transparent;
+  cursor: pointer; transition: background 80ms, border-color 80ms, color 80ms;
+}
+.iconbtn:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .top nav.links a.nav-hideable { display: none; }
+}
+
+/* ── footer ── */
+footer {
+  padding: 40px 0 56px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+footer .legal {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+}
+footer a { color: var(--muted); }
+footer a:hover { color: var(--text); }
+footer .foot-left {
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: 72ch;
+}
+footer .foot-prods {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 2px;
+}
+footer .foot-prod {
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+footer .foot-prod strong { font-weight: 600; }
+footer .foot-prod:hover { color: var(--accent); }
+footer .foot-right {
+  text-align: right;
+  display: flex; flex-direction: column; gap: 8px;
+}

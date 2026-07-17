@@ -13,7 +13,8 @@
 import type { Conversation, EditorOpts, SpoolDocument, Turn } from '../types'
 import { saveBlob } from '../export'
 import { sanitizeFilename } from '../filename'
-import { collectRedactList } from '@/templates/redact'
+import { collectRedactList } from '../../templates/redact'
+import { parseSpoolDocument } from '../spool-document'
 
 const MIME = 'application/spool+json'
 
@@ -168,28 +169,19 @@ export async function readSpoolFile(file: File): Promise<SpoolDocument> {
   } catch {
     throw new Error('Not a valid .spool file (malformed JSON).')
   }
-  if (!isSpoolDocument(parsed)) {
+  const document = parseSpoolDocument(parsed)
+  if (document === null) {
     throw new Error('Not a valid .spool file (unrecognized shape).')
   }
   // Backfill stable turn ids for v1 files (and any v2 that somehow
   // landed without ids). `ensureTurnIds` is idempotent.
   return {
-    ...parsed,
+    ...document,
     conversation: {
-      ...parsed.conversation,
-      turns: ensureTurnIds(parsed.conversation.turns),
+      ...document.conversation,
+      turns: ensureTurnIds(document.conversation.turns),
     },
   }
-}
-
-function isSpoolDocument(v: unknown): v is SpoolDocument {
-  if (!v || typeof v !== 'object') return false
-  const o = v as Record<string, unknown>
-  return (
-    (o.version === 1 || o.version === 2) &&
-    typeof o.conversation === 'object' &&
-    typeof o.opts === 'object'
-  )
 }
 
 function filenameFor(c: Conversation): string {

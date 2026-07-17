@@ -279,7 +279,7 @@ export interface SpoolDocument {
 }
 
 /** Wire-format snapshot served by the share-backend reader endpoint.
- *  Mirrors `packages/app/src/shared/share-publish.ts` — kept here so the
+ *  Mirrors `apps/app/src/shared/share-publish.ts` — kept here so the
  *  `spool.pro` web reader can depend on share-kit alone. The desktop
  *  publish IPC owns the editor-side authoritative copy; if the two ever
  *  drift, the backend's zod validator in

@@ -74,6 +74,18 @@ describe('getSessionRoots', () => {
     ])
   })
 
+  test('should normalize pi home overrides to the agent sessions directory', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-pi-source-paths-'))
+    tempDirs.push(baseDir)
+
+    mkdirSync(join(baseDir, 'agent', 'sessions', '--Users-me-work--'), { recursive: true })
+    vi.stubEnv('SPOOL_PI_DIR', baseDir)
+
+    expect(getSessionRoots('pi')).toEqual([
+      join(baseDir, 'agent', 'sessions'),
+    ])
+  })
+
   test('should normalize OpenCode data directories and database paths', () => {
     const baseDir = mkdtempSync(join(tmpdir(), 'spool-opencode-source-paths-'))
     const opencodeDir = join(baseDir, '.local', 'share', 'opencode')
@@ -225,6 +237,44 @@ describe('detectSessionSource', () => {
     writeFileSync(`${jsonOnly}l`, '')
     expect(detectSessionSource(jsonOnly, sourceRoots)).toBeUndefined()
     expect(detectSessionSource(`${jsonOnly}l`, sourceRoots)).toBe('gemini')
+  })
+})
+
+describe('detectSessionSource — pi', () => {
+  test('classifies pi session files and rejects nested scratch files', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-pi-detect-'))
+    tempDirs.push(baseDir)
+
+    const piRoot = join(baseDir, '.pi', 'agent', 'sessions')
+    mkdirSync(join(piRoot, '--Users-me-work-paperboy--'), { recursive: true })
+
+    const sourceRoots = {
+      claude: [join(baseDir, 'claude-empty')],
+      codex: [join(baseDir, 'codex-empty')],
+      gemini: [join(baseDir, 'gemini-empty')],
+      opencode: [join(baseDir, 'opencode-empty')],
+      pi: [piRoot],
+    } as const
+
+    expect(
+      detectSessionSource(
+        join(piRoot, '--Users-me-work-paperboy--', '2026-04-02T09-05-13-662Z_f41a7803-b075-4b88-8d74-f46a3a06f67d.jsonl'),
+        sourceRoots,
+      ),
+    ).toBe('pi')
+
+    // Files nested below the cwd-slug directory are not sessions.
+    expect(
+      detectSessionSource(
+        join(piRoot, '--Users-me-work-paperboy--', 'scratch', 'notes.jsonl'),
+        sourceRoots,
+      ),
+    ).toBeUndefined()
+
+    // Non-jsonl files in the slug directory are ignored.
+    expect(
+      detectSessionSource(join(piRoot, '--Users-me-work-paperboy--', 'settings.json'), sourceRoots),
+    ).toBeUndefined()
   })
 })
 

@@ -3,12 +3,13 @@ import {
   detectPII,
   applyRedactPolicy,
   collectRedactList,
+  redactPlainText,
   SYNTHETIC_KIND_AUTHOR,
   SYNTHETIC_KIND_MANUAL,
   type RedactReplacement,
 } from './redact'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
-import type { Turn } from '@/lib/types'
+import type { Turn } from '../lib/types'
 
 function turn(role: 'user' | 'assistant', body: string, opts: Partial<Turn> = {}): Turn {
   return { role, body, ...opts } as Turn
@@ -128,6 +129,16 @@ describe('collectRedactList wires policy through', () => {
   it('with opts.redactExclude.values whitelists a specific literal', () => {
     expect(values(collectRedactList(turns, { redactExclude: { values: ['Maya'] } })))
       .not.toContain('Maya')
+  })
+})
+
+describe('redactPlainText', () => {
+  it('applies a resolved list without adding Markdown decoration', () => {
+    const list = collectRedactList(turns)
+    const projected = redactPlainText(`reply to ${EMAIL_FIXTURE}`, list)
+
+    expect(projected).toBe('reply to m***@hogwarts.edu')
+    expect(projected).not.toContain('`')
   })
 })
 

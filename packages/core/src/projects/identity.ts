@@ -42,7 +42,20 @@ export function computeIdentity(
   fs: IdentityFs,
   resolvers: readonly WorktreeUpstreamResolver[] = DEFAULT_RESOLVERS,
   synthesizers: readonly IdentitySynthesizer[] = DEFAULT_SYNTHESIZERS,
+  gitRemoteHint: string | null = null,
 ): ProjectIdentity {
+  // Provider-recorded metadata is the strongest signal: it was captured while
+  // the checkout still existed, so it remains valid after a worktree is
+  // deleted or its parent directory is moved.
+  const hintedRemote = normalizeGitRemote(gitRemoteHint ?? '')
+  if (hintedRemote) {
+    return {
+      kind: 'git_remote',
+      key: hintedRemote,
+      displayName: deriveDisplayName({ kind: 'git_remote', key: hintedRemote, fs }),
+    }
+  }
+
   if (!cwd) return loose()
 
   const home = homedir()

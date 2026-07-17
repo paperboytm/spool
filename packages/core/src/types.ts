@@ -1,4 +1,4 @@
-export type SessionSource = 'claude' | 'codex' | 'gemini' | 'opencode'
+export type SessionSource = 'claude' | 'codex' | 'gemini' | 'opencode' | 'pi'
 export type Source = SessionSource
 export type SearchMatchType = 'fts' | 'phrase' | 'all_terms'
 
@@ -19,6 +19,8 @@ export interface ParsedSession {
   filePath: string
   title: string
   cwd: string
+  /** Provider-recorded Git remote, when available. */
+  gitRemote?: string
   model: string
   startedAt: string
   endedAt: string
@@ -136,6 +138,7 @@ export interface StatusInfo {
   codexSessions: number
   geminiSessions: number
   opencodeSessions: number
+  piSessions: number
   lastSyncedAt: string | null
   dbSizeBytes: number
 }

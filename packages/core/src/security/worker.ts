@@ -3,7 +3,7 @@
 //
 // Implementation: Effect Scope A. Inside this module is Effect-shaped
 // (Queue, Stream, PubSub, Ref, Scope). The boundary — IPC handlers
-// in `packages/app/src/main/ipc/security.ts` — wraps `runFiber` /
+// in `apps/app/src/main/ipc/security.ts` — wraps `runFiber` /
 // `runPromise` so renderers see plain Promise-shaped channels.
 //
 // Single-fiber by design (`concurrency: 1` on the queue stream).

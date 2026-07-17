@@ -9,7 +9,7 @@
 // No Cloudflare Worker, no proxy — Jina Reader serves CORS-open
 // responses that we can fetch straight from the browser.
 
-import type { Conversation, Platform } from '@/lib/types'
+import type { Conversation, Platform } from '../types'
 import { FetchError, fetchContent } from './fetcher'
 import { findSource } from './registry'
 import { ParseError, type ParseErrorReason } from './source'

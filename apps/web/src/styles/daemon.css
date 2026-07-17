@@ -1,0 +1,507 @@
+/* Daemon page — Hero (DaemonTray) + 01 CONNECTORS + 02 LIFECYCLE + 03 PLUGINS. */
+
+/* ─── DaemonTray (right-side specimen, mirrors SpoolSpecimen position) ─── */
+.tray {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 20px 48px -28px rgba(40,20,0,0.25);
+}
+[data-theme="dark"] .tray {
+  box-shadow: 0 1px 0 rgba(255,255,255,0.02), 0 24px 60px -28px rgba(0,0,0,0.6);
+}
+.tray .t-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 4px 14px;
+  border-bottom: 1px dashed var(--border);
+  margin-bottom: 12px;
+}
+.tray .t-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600;
+  color: var(--text);
+}
+.tray .t-title .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.tray .t-status {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+.tray .t-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.tray .t-cell {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.tray .t-cell .n {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+}
+.tray .t-cell .n .sw { width: 7px; height: 7px; border-radius: 50%; }
+.tray .t-cell .m {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+.tray .t-foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+.tray .t-foot .sync { color: var(--accent); }
+
+/* ─── 02 · LIFECYCLE ─── */
+.lifecycle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.lc-card {
+  padding: 36px 32px 32px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.lc-card:last-child { border-right: none; }
+.lc-glyph {
+  color: var(--accent);
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.lc-n {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lc-title {
+  font-family: 'Geist Variable', 'Geist', sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.lc-body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.lc-body code {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+@media (max-width: 900px) {
+  .lifecycle { grid-template-columns: 1fr; }
+  .lc-card { border-right: none; border-bottom: 1px solid var(--border); }
+  .lc-card:last-child { border-bottom: none; }
+}
+
+/* ─── 03 · PLUGINS — 2x2 grid with shared rows so both code blocks
+   start at the same Y; CTA sits under the right code block. ─── */
+.plugin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "prose1 prose2"
+    "code1  code2"
+    "code1  cta";
+  column-gap: 36px;
+  row-gap: 18px;
+  align-items: start;
+}
+.plugin-prose-1 { grid-area: prose1; }
+.plugin-prose-2 { grid-area: prose2; }
+.plugin-code-1  { grid-area: code1; min-width: 0; align-self: start; }
+.plugin-code-2  { grid-area: code2; min-width: 0; }
+.plugin-grid > .ps-cta { grid-area: cta; margin-top: 12px; align-self: start; }
+.plugin-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.plugin-prose .ps-kicker {
+  font-family: 'Geist Mono', monospace;
+  font-size: 11.5px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.plugin-prose p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--muted);
+  text-wrap: pretty;
+  margin: 0;
+}
+.plugin-prose p code {
+  font-family: 'Geist Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.ps-cta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+@media (max-width: 900px) {
+  .plugin-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "prose1"
+      "code1"
+      "prose2"
+      "code2"
+      "cta";
+  }
+}
+.btn.ghost {
+  background: transparent;
+  border: 1px dashed var(--border2);
+  color: var(--muted);
+}
+.btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Code window — mac-style chrome */
+.plugin-code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 18px 40px -24px rgba(28,28,24,0.18);
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.code-head .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+.code-head .dot.red    { background: #ED6A5E; }
+.code-head .dot.yellow { background: #F5BF4F; }
+.code-head .dot.green  { background: #62C454; }
+.code-head .filename {
+  margin-left: 10px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.code-block {
+  margin: 0;
+  padding: 18px 0 20px;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--surface);
+  overflow-x: auto;
+}
+.code-line {
+  display: flex;
+  gap: 16px;
+  padding: 0 20px;
+  white-space: pre;
+}
+.code-line:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.code-line .ln {
+  color: var(--faint);
+  user-select: none;
+  width: 22px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.tok-kw { color: var(--accent); font-weight: 500; }
+.tok-str { color: #2E7A4F; }
+[data-theme="dark"] .tok-str { color: #60C480; }
+.tok-cm { color: var(--faint); font-style: italic; }
+.tok-ty { color: var(--text); }
+
+
+/* ─── Daemon hero cta-row: keep install + Star on same row ─── */
+.cta-row.tight {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.cta-row.tight .install {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.cta-row.tight .install code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cta-row.tight .btn {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .cta-row.tight { flex-wrap: wrap; }
+}
+
+/* ─── 01 · CONNECTORS — rich card grid (registry-driven) ─── */
+.connector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .connector-grid { grid-template-columns: 1fr; }
+}
+
+.c-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.c-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.c-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.c-headtext { min-width: 0; }
+
+.c-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-author {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+.c-desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(12.5px * 1.45 * 2);
+}
+
+.c-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.c-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+}
+.c-meta .category { text-transform: capitalize; }
+.c-meta .sep { color: var(--faint); margin: 0 6px; }
+
+.c-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.c-install-btn {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.c-install-btn:hover { opacity: 0.88; }
+
+.c-copy-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.c-copy-btn:hover {
+  border-color: var(--border2);
+  color: var(--text);
+  background: var(--bg);
+}
+.c-copy-btn svg { width: 12px; height: 12px; display: block; }
+.c-copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+
+/* ─── Hero override: equal columns, tray gets more vertical breathing ─── */
+.hero.hero-daemon {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+@media (max-width: 960px) {
+  .hero.hero-daemon { grid-template-columns: 1fr; }
+}
+
+/* Tray — bigger cells + recent activity log adds vertical weight */
+.tray .t-grid { gap: 8px; }
+.tray .t-cell { padding: 12px 14px; }
+
+.t-activity {
+  margin-top: 14px;
+  padding: 12px 4px 4px;
+  border-top: 1px dashed var(--border);
+}
+.t-act-head {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+  margin-bottom: 8px;
+}
+.t-act {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+.t-act + .t-act {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.t-act-kind {
+  color: var(--accent);
+  font-size: 12px;
+  text-align: center;
+}
+.t-act-kind.ok { color: var(--src-codex); }
+.t-act-name {
+  color: var(--text);
+  font-family: 'Geist Variable', 'Geist', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+.t-act-meta { color: var(--faint); }
+
+/* ─── Ghost connector card — symmetric 8th cell pointing to PLUGINS section ─── */
+.c-card.c-ghost {
+  background: transparent;
+  border: 1px dashed var(--border2);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.c-card.c-ghost:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 3%, transparent);
+}
+.c-icon-ghost {
+  background: transparent !important;
+  border: 1px dashed var(--border2);
+  color: var(--accent);
+  box-shadow: none !important;
+}
+.c-ghost-cta {
+  color: var(--accent);
+  font-family: 'Geist Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* ─── Code block scrollbar — thin custom (overrides default chunky bar) ─── */
+.code-block {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+.code-block::-webkit-scrollbar { height: 6px; }
+.code-block::-webkit-scrollbar-track { background: transparent; }
+.code-block::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 3px;
+}
+.code-block::-webkit-scrollbar-thumb:hover { background: var(--faint); }

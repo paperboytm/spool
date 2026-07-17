@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
-import type { EditorOpts, Turn } from '@/lib/types'
+import type { EditorOpts, Turn } from '../lib/types'
 
 // Built at runtime so the source literal doesn't trip secret scanners.
 const STRIPE_FIXTURE = 'sk_' + 'live_' + 'aH1xK9pQrSt7VwYzA3bC5dF8gJ'

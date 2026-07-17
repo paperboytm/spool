@@ -5,7 +5,7 @@
 // SAFETY: never uses dangerouslySetInnerHTML on user content. All turn
 // bodies flow through React's standard text-escaping path inside the
 // existing template components (Forum / Letter / Timeline / Chat). The
-// guard test in `packages/share-web/tests/safety.test.ts` enforces this
+// guard test in `apps/web/tests/safety.test.ts` enforces this
 // across both share-web and the reader path.
 
 import { useMemo } from 'react'

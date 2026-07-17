@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "packages/landing/**"
+      - "apps/web/**"
       - "videos/**"
       - "**/*.md"
       - "docs/**"
   pull_request:
     paths-ignore:
-      - "packages/landing/**"
+      - "apps/web/**"
       - "videos/**"
       - "**/*.md"
       - "docs/**"
@@ -46,7 +46,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
 
@@ -73,5 +73,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-test-results-${{ matrix.os }}
-          path: packages/app/test-results/
+          path: apps/app/test-results/
           retention-days: 7

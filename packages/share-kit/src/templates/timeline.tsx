@@ -11,11 +11,13 @@
 // Legacy drafts saved before `Turn.timestamp` existed gracefully
 // degrade: the gutter shows a dash and no gaps are drawn.
 
-import type { Conversation, EditorOpts } from '@/lib/types'
-import { typefaceFamily } from '@/lib/types'
+import { useMemo } from 'react'
+import type { Conversation, EditorOpts } from '../lib/types'
+import { typefaceFamily } from '../lib/types'
+import { useProgressiveTurns } from '../reader/use-progressive-turns'
 import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
-import { selectSegments } from './selection'
+import { selectSegments, type SelectedSegments } from './selection'
 import { Body } from './body'
 
 interface Props {
@@ -25,6 +27,23 @@ interface Props {
   redactList?: RedactReplacement[] | undefined
 }
 
+export interface TimelineBodyProps {
+  convo: Conversation
+  opts: EditorOpts
+  /** Host-provided stable redact list — see TemplateRender's prop doc. */
+  redactList?: RedactReplacement[] | undefined
+  /** Progressively mount long standalone timelines. The full Timeline
+   *  document remains synchronous for export/print compatibility. */
+  progressive?: boolean | undefined
+}
+
+interface TimelineBodyContentProps {
+  convo: Conversation
+  opts: EditorOpts
+  redactList: RedactReplacement[]
+  segments: SelectedSegments
+}
+
 export function Timeline({ convo, opts, redactList: injectedRedactList }: Props) {
   const t = templateTokens(opts.paper)
   const accent = opts.accentHex
@@ -32,7 +51,6 @@ export function Timeline({ convo, opts, redactList: injectedRedactList }: Props)
   const tf = typefaceFamily(opts.typeface)
   const redactList = useResolvedRedactList(convo.turns, opts, injectedRedactList)
   const segments = selectSegments(convo, opts)
-  const turnGap = opts.density === 'compact' ? 18 : 28
 
   return (
     <div
@@ -101,157 +119,12 @@ export function Timeline({ convo, opts, redactList: injectedRedactList }: Props)
           : `${segments.total} turns`} · ~{convo.readMin} min
       </div>
 
-      {/* Body: rail + dotted turns.
-          Each turn div carries the gutter padding itself — putting it on
-          the outer wrapper would offset turn-relative absolute children
-          (timestamp, dot) by the padding, pushing them next to the role
-          label instead of into the gutter. */}
-      <div style={{ position: 'relative', marginTop: 36 }}>
-        {/* The rail itself — a hairline rule from the top of the first
-            dot to the bottom of the last dot. Uses t.muted (not t.border)
-            so it reads as an intentional axis rather than a hidden
-            divider — t.border on light papers (snow / bone) fades into
-            the paper tone. */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: 62,
-            top: 4,
-            bottom: 4,
-            width: 1,
-            background: t.muted,
-            opacity: 0.35,
-          }}
-        />
-
-        {segments.turns.map((turn, i) => {
-          const isUser = turn.role === 'user'
-          const prev = i > 0 ? (segments.turns[i - 1] ?? null) : null
-          const showSkippedGap = opts.showGaps && segments.gapBefore[i]! > 0
-          const dayChangeLabel = computeDayChangeLabel(prev, turn)
-          const stamp = formatStamp(turn.timestamp)
-          const hasMarker = showSkippedGap || dayChangeLabel != null
-          const roleColor = isUser ? t.muted : accent
-
-          return (
-            <div key={turn.origIndex}>
-              {/* Marker — standalone band on the timeline, BEFORE the
-                  turn. No dot, no timestamp; the rail crosses through
-                  it. Vertical breathing room on both sides so it reads
-                  as an independent annotation rather than the turn's
-                  first row. */}
-              {hasMarker && (
-                <div
-                  aria-hidden
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    paddingLeft: 78,
-                    margin: `${Math.round(turnGap * 0.5)}px 0`,
-                    fontFamily: 'Geist Mono, monospace',
-                    fontSize: 9,
-                    color: t.muted,
-                    letterSpacing: '0.1em',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {dayChangeLabel && (
-                    <span style={{ letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                      <span style={{ color: accent, marginRight: 4 }}>—</span>
-                      {dayChangeLabel}
-                      <span style={{ color: accent, marginLeft: 4 }}>—</span>
-                    </span>
-                  )}
-                  {showSkippedGap && (
-                    <span style={{ textTransform: 'uppercase' }}>
-                      <span style={{ color: accent, marginRight: 4 }}>⋯</span>
-                      {segments.gapBefore[i]} turn{segments.gapBefore[i] === 1 ? '' : 's'} skipped
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div
-                data-turn-index={turn.origIndex}
-                style={{
-                  marginBottom: turnGap,
-                  scrollMarginTop: 40,
-                }}
-              >
-                <div data-turn-body>
-                  {/* Header row: timestamp + dot + role label. Flex with
-                      alignItems: center guarantees all three sit on the
-                      same optical line — manual top values across
-                      different intrinsic heights drifted by a sub-pixel
-                      and looked off. Column widths sum so the dot lands
-                      at x=62.5 (rail center): 54 + 4 + 9/2 = 62.5. */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span
-                      style={{
-                        width: 54,
-                        flex: 'none',
-                        textAlign: 'right',
-                        fontFamily: 'Geist Mono, monospace',
-                        fontSize: 10,
-                        color: t.muted,
-                        letterSpacing: '0.04em',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {stamp ?? ''}
-                    </span>
-                    <span
-                      aria-hidden
-                      style={{
-                        position: 'relative',
-                        width: 9,
-                        height: 9,
-                        marginLeft: 4,
-                        flex: 'none',
-                        borderRadius: '50%',
-                        background: t.paper,
-                        // Dot stays uniform across both roles — the
-                        // colorway differentiation lives on the role
-                        // label, not the rail marker. Keeps the rail
-                        // reading as one continuous thread instead of
-                        // alternating colored beads.
-                        boxShadow: `inset 0 0 0 1px ${t.muted}`,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <span
-                      style={{
-                        marginLeft: 11,
-                        fontFamily: 'Geist Mono, monospace',
-                        fontSize: 10,
-                        fontWeight: 600,
-                        letterSpacing: '0.14em',
-                        textTransform: 'uppercase',
-                        color: roleColor,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {isUser ? (turn.author ?? 'you').replace(/[\[\]]/g, '') : convo.sourceLabel}
-                    </span>
-                  </div>
-                  {/* Body content sits below the header, indented to
-                      align with the role label's left edge (78 =
-                      54+4+9+11). */}
-                  <div style={{ paddingLeft: 78, marginTop: 8 }}>
-                    <Body
-                      text={turn.body}
-                      redact={opts.redact ? redactList : undefined}
-                      {...BODY_VAR_PROPS}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <TimelineBodyContent
+        convo={convo}
+        opts={opts}
+        redactList={redactList}
+        segments={segments}
+      />
 
       {opts.showColophon && (
         <div
@@ -272,6 +145,217 @@ export function Timeline({ convo, opts, redactList: injectedRedactList }: Props)
           <span style={{ color: accent }}>— {convo.createdAt} —</span>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Embeddable conversation portion of the Timeline template. Hosts that
+ * already provide their own title, byline, or surrounding page chrome can
+ * mount this primitive without duplicating Timeline's masthead, title/meta,
+ * or colophon. The complete Timeline renderer above uses the same primitive,
+ * so the rail geometry, selection rules, gaps, and Markdown body stay shared.
+ */
+export function TimelineBody({
+  convo,
+  opts,
+  redactList: injectedRedactList,
+  progressive = false,
+}: TimelineBodyProps) {
+  const redactList = useResolvedRedactList(convo.turns, opts, injectedRedactList)
+  const segments = useMemo(
+    () => selectSegments(convo, opts),
+    [convo, opts.selected, opts.hideEmptyTurns],
+  )
+  const mounted = useProgressiveTurns(progressive ? segments.kept : 0)
+  const renderedSegments = useMemo<SelectedSegments>(() => {
+    if (!progressive || mounted >= segments.kept) return segments
+    return {
+      ...segments,
+      turns: segments.turns.slice(0, mounted),
+      gapBefore: segments.gapBefore.slice(0, mounted),
+    }
+  }, [mounted, progressive, segments])
+
+  return (
+    <TimelineBodyContent
+      convo={convo}
+      opts={opts}
+      redactList={redactList}
+      segments={renderedSegments}
+    />
+  )
+}
+
+function TimelineBodyContent({ convo, opts, redactList, segments }: TimelineBodyContentProps) {
+  const t = templateTokens(opts.paper)
+  const accent = opts.accentHex
+  const accentBg = accentBgFor(accent)
+  const tf = typefaceFamily(opts.typeface)
+  const turnGap = opts.density === 'compact' ? 18 : 28
+
+  return (
+    /* Body: rail + dotted turns.
+       Each turn div carries the gutter padding itself — putting it on
+       the outer wrapper would offset turn-relative absolute children
+       (timestamp, dot) by the padding, pushing them next to the role
+       label instead of into the gutter. The style vars make this body
+       self-contained when mounted outside the full Timeline document. */
+    <div
+      data-spool-timeline-body
+      style={{
+        ...bodyStyleVars({ accent, accentBg, bodyFont: tf, blockBorder: t.border }),
+        position: 'relative',
+        marginTop: 36,
+        fontFamily: tf,
+        background: t.paper,
+        color: t.text,
+      }}
+    >
+      {/* The rail itself — a hairline rule from the top of the first
+          dot to the bottom of the last dot. Uses t.muted (not t.border)
+          so it reads as an intentional axis rather than a hidden
+          divider — t.border on light papers (snow / bone) fades into
+          the paper tone. */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: 62,
+          top: 4,
+          bottom: 4,
+          width: 1,
+          background: t.muted,
+          opacity: 0.35,
+        }}
+      />
+
+      {segments.turns.map((turn, i) => {
+        const isUser = turn.role === 'user'
+        const prev = i > 0 ? (segments.turns[i - 1] ?? null) : null
+        const showSkippedGap = opts.showGaps && segments.gapBefore[i]! > 0
+        const dayChangeLabel = computeDayChangeLabel(prev, turn)
+        const stamp = formatStamp(turn.timestamp)
+        const hasMarker = showSkippedGap || dayChangeLabel != null
+        const roleColor = isUser ? t.muted : accent
+
+        return (
+          <div key={turn.origIndex}>
+            {/* Marker — standalone band on the timeline, BEFORE the
+                turn. No dot, no timestamp; the rail crosses through
+                it. Vertical breathing room on both sides so it reads
+                as an independent annotation rather than the turn's
+                first row. */}
+            {hasMarker && (
+              <div
+                aria-hidden
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  paddingLeft: 78,
+                  margin: `${Math.round(turnGap * 0.5)}px 0`,
+                  fontFamily: 'Geist Mono, monospace',
+                  fontSize: 9,
+                  color: t.muted,
+                  letterSpacing: '0.1em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {dayChangeLabel && (
+                  <span style={{ letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    <span style={{ color: accent, marginRight: 4 }}>—</span>
+                    {dayChangeLabel}
+                    <span style={{ color: accent, marginLeft: 4 }}>—</span>
+                  </span>
+                )}
+                {showSkippedGap && (
+                  <span style={{ textTransform: 'uppercase' }}>
+                    <span style={{ color: accent, marginRight: 4 }}>⋯</span>
+                    {segments.gapBefore[i]} turn{segments.gapBefore[i] === 1 ? '' : 's'} skipped
+                  </span>
+                )}
+              </div>
+            )}
+
+            <div
+              data-turn-index={turn.origIndex}
+              style={{
+                marginBottom: turnGap,
+                scrollMarginTop: 40,
+              }}
+            >
+              <div data-turn-body>
+                {/* Header row: timestamp + dot + role label. Flex with
+                    alignItems: center guarantees all three sit on the
+                    same optical line — manual top values across
+                    different intrinsic heights drifted by a sub-pixel
+                    and looked off. Column widths sum so the dot lands
+                    at x=62.5 (rail center): 54 + 4 + 9/2 = 62.5. */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      width: 54,
+                      flex: 'none',
+                      textAlign: 'right',
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 10,
+                      color: t.muted,
+                      letterSpacing: '0.04em',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {stamp ?? ''}
+                  </span>
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'relative',
+                      width: 9,
+                      height: 9,
+                      marginLeft: 4,
+                      flex: 'none',
+                      borderRadius: '50%',
+                      background: t.paper,
+                      // Dot stays uniform across both roles — the
+                      // colorway differentiation lives on the role
+                      // label, not the rail marker. Keeps the rail
+                      // reading as one continuous thread instead of
+                      // alternating colored beads.
+                      boxShadow: `inset 0 0 0 1px ${t.muted}`,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <span
+                    style={{
+                      marginLeft: 11,
+                      fontFamily: 'Geist Mono, monospace',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: roleColor,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {isUser ? (turn.author ?? 'you').replace(/[\[\]]/g, '') : convo.sourceLabel}
+                  </span>
+                </div>
+                {/* Body content sits below the header, indented to
+                    align with the role label's left edge (78 =
+                    54+4+9+11). */}
+                <div style={{ paddingLeft: 78, marginTop: 8 }}>
+                  <Body
+                    text={turn.body}
+                    redact={opts.redact ? redactList : undefined}
+                    {...BODY_VAR_PROPS}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

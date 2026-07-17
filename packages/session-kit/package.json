@@ -1,0 +1,32 @@
+{
+  "name": "@spool-lab/session-kit",
+  "version": "0.0.1",
+  "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and session diffs for Spool v2.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "pnpm run clean && tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepack": "pnpm run build"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}
