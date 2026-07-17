@@ -2,11 +2,11 @@
 // available on /api/auth/<id>/{start,callback} + the desktop loopback
 // endpoint with no other code change.
 
-import { googleProvider } from './google'
+import { workosProvider } from './workos'
 import type { OAuthProvider, ProviderId } from './types'
 
 const PROVIDERS: Record<ProviderId, OAuthProvider> = {
-  google: googleProvider,
+  workos: workosProvider,
 }
 
 export function getProvider(id: string): OAuthProvider | null {

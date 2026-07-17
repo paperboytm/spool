@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 
 import { routeFor } from './lib/route'
+import { CliAuth } from './pages/cli-auth'
 import { Me } from './pages/Me'
 import { Privacy } from './pages/Privacy'
 import { Profile } from './pages/Profile'
@@ -29,6 +30,7 @@ export function App() {
   if (route.kind === 'profile') return <Profile handle={route.handle} />
   if (route.kind === 'me') return <Me />
   if (route.kind === 'sign-in') return <SignIn next={route.next} />
+  if (route.kind === 'cli-auth') return <CliAuth code={route.code} />
   if (route.kind === 'terms') return <Terms />
   if (route.kind === 'privacy') return <Privacy />
   return <Tombstone reason="not-found" />

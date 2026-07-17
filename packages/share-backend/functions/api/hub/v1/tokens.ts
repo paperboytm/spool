@@ -2,8 +2,8 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../src/audit'
 import { requireUser } from '../../../../src/auth/require'
-import { sha256Hex } from '../../../../src/hub/auth'
 import type { HubEnv } from '../../../../src/hub/head'
+import { TOKEN_MINT_RATE, mintApiToken } from '../../../../src/hub/tokens'
 import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
 import { checkRate } from '../../../../src/rate-limit'
 
@@ -14,12 +14,7 @@ import { checkRate } from '../../../../src/rate-limit'
 export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
-    const rate = await checkRate(ctx.env.RATE, {
-      bucket: 'hub-token-d',
-      key: user.id,
-      windowSec: 86400,
-      max: 10,
-    })
+    const rate = await checkRate(ctx.env.RATE, { ...TOKEN_MINT_RATE, key: user.id })
     if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
     let label: string | null = null
@@ -30,16 +25,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       // Empty body is fine.
     }
 
-    const bytes = new Uint8Array(32)
-    crypto.getRandomValues(bytes)
-    const token = 'sph_' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-    const id = crypto.randomUUID()
-
-    await ctx.env.DB.prepare(
-      'INSERT INTO api_tokens (id, user_id, token_hash, label, created_at) VALUES (?,?,?,?,?)',
-    )
-      .bind(id, user.id, await sha256Hex(token), label, Date.now())
-      .run()
+    const { id, token } = await mintApiToken(ctx.env.DB, user.id, label)
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,

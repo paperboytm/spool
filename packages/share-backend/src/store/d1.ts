@@ -26,19 +26,39 @@ export type UserRow = {
   avatar_visible: number
 }
 
-/** Look up a user by their (provider, provider_sub) identity, updating
- *  their profile fields when one exists. Creates a fresh users row +
- *  user_identities link when none does. */
-export async function upsertUserByIdentity(
+export type UpsertIdentityOpts = {
+  /** Migration hook, consulted only when (provider, sub) has no
+   *  user_identities row yet. Returns refs under OTHER providers that
+   *  denote the same human; the first ref matching an existing user
+   *  gets the new identity linked onto it instead of a fresh account.
+   *  Errors propagate — failing open would fork a legacy account. */
+  resolveAliases?: () => Promise<Array<{ provider: string; sub: string }>>
+}
+
+async function findUserByIdentity(
   db: D1Database,
-  claim: IdentityClaim,
-): Promise<UserRow> {
-  const existing = await db
+  provider: string,
+  sub: string,
+): Promise<UserRow | null> {
+  return db
     .prepare(
       'SELECT u.* FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = ? AND i.provider_sub = ?',
     )
-    .bind(claim.provider, claim.sub)
+    .bind(provider, sub)
     .first<UserRow>()
+}
+
+/** Look up a user by their (provider, provider_sub) identity, updating
+ *  their profile fields when one exists. Creates a fresh users row +
+ *  user_identities link when none does. When `resolveAliases` is given,
+ *  a miss first tries to link onto a user known under an alias identity
+ *  (see UpsertIdentityOpts). */
+export async function upsertUserByIdentity(
+  db: D1Database,
+  claim: IdentityClaim,
+  opts: UpsertIdentityOpts = {},
+): Promise<UserRow> {
+  const existing = await findUserByIdentity(db, claim.provider, claim.sub)
   const now = Date.now()
   if (existing) {
     if (existing.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
@@ -52,6 +72,30 @@ export async function upsertUserByIdentity(
       name: claim.name,
       avatar_url: claim.avatar_url,
       last_signin_at: now,
+    }
+  }
+  if (opts.resolveAliases) {
+    for (const alias of await opts.resolveAliases()) {
+      const legacy = await findUserByIdentity(db, alias.provider, alias.sub)
+      if (!legacy) continue
+      if (legacy.deleted_at !== null) throw new ApiError('FORBIDDEN', 'account deleted')
+      await db
+        .prepare(
+          'INSERT INTO user_identities (provider, provider_sub, user_id, email, linked_at) VALUES (?,?,?,?,?)',
+        )
+        .bind(claim.provider, claim.sub, legacy.id, claim.email, now)
+        .run()
+      await db
+        .prepare('UPDATE users SET email=?, name=?, avatar_url=?, last_signin_at=? WHERE id=?')
+        .bind(claim.email, claim.name, claim.avatar_url, now, legacy.id)
+        .run()
+      return {
+        ...legacy,
+        email: claim.email,
+        name: claim.name,
+        avatar_url: claim.avatar_url,
+        last_signin_at: now,
+      }
     }
   }
   const id = crypto.randomUUID().replace(/-/g, '').slice(0, USER_ID_HEX_CHARS)

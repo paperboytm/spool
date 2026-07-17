@@ -16,7 +16,7 @@ import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
 import { publicBaseUrl } from '../../../../src/public-url'
 
 type Env = {
-  GOOGLE_CLIENT_ID_WEB: string
+  WORKOS_CLIENT_ID?: string
   // Public origin the provider must redirect back to — must exactly
   // match the value registered with the provider. Defaults to
   // spool.pro; dev sets it to the share-web origin (e.g. http://localhost:3002).

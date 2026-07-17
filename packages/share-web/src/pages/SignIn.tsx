@@ -18,7 +18,7 @@ interface Props {
   next: string
 }
 
-type ProviderId = 'google'
+type ProviderId = 'workos'
 
 interface ProviderEntry {
   id: ProviderId
@@ -26,10 +26,11 @@ interface ProviderEntry {
   icon: ReactNode
 }
 
-// Registered providers, rendered in order. v0.5 ships Google-only;
-// adding GitHub is one extra entry + a matching backend provider.
+// Registered providers, rendered in order. Everything routes through
+// WorkOS AuthKit — Google, email, and future sign-in methods live on
+// the hosted AuthKit page, so new methods need no change here.
 const PROVIDERS: readonly ProviderEntry[] = [
-  { id: 'google', label: 'Continue with Google', icon: <Icon name="google" size={18} /> },
+  { id: 'workos', label: 'Continue to sign in', icon: <Icon name="arrow-right" size={16} /> },
 ]
 
 function authStartHref(provider: ProviderId, dest: string): string {
@@ -112,7 +113,7 @@ export function SignIn({ next }: Props) {
           <h1 className="sw-signin-title">Sign in</h1>
           <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>
           {PROVIDERS.map((p) => (
-            <a key={p.id} className="sw-google-btn" href={authStartHref(p.id, dest)}>
+            <a key={p.id} className="sw-provider-btn" href={authStartHref(p.id, dest)}>
               {p.icon}
               {p.label}
             </a>

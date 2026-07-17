@@ -21,6 +21,8 @@ export function routeFor(pathname: string): 'backend' | 'web' | 'landing' {
     pathname.startsWith('/@') ||
     pathname === '/me' ||
     pathname === '/sign-in' ||
+    pathname === '/cli-auth' || // CLI login approval page
+
     pathname === '/terms' || // legal pages (#389)
     pathname === '/privacy'
   ) {

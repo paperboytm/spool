@@ -73,6 +73,20 @@ describe('routeFor', () => {
   it('sanitizes evil next on /sign-in', () => {
     expect(routeFor('/sign-in', '?next=//evil.com')).toEqual({ kind: 'sign-in', next: '/' })
   })
+
+  it('matches /cli-auth with and without a code', () => {
+    expect(routeFor('/cli-auth', '?code=XKCD-2941')).toEqual({
+      kind: 'cli-auth',
+      code: 'XKCD-2941',
+    })
+    expect(routeFor('/cli-auth')).toEqual({ kind: 'cli-auth', code: null })
+    // Subpaths are not the approval page.
+    expect(routeFor('/cli-auth/extra').kind).toBe('tombstone')
+  })
+
+  it('keeps a cli-auth next path intact for the sign-in round-trip', () => {
+    expect(nextSafe('/cli-auth?code=XKCD-2941')).toBe('/cli-auth?code=XKCD-2941')
+  })
 })
 
 describe('nextSafe', () => {

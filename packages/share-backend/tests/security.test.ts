@@ -1,20 +1,9 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { safeNext } from '../src/auth/next'
-import {
-  _resetJwksCacheForTests,
-  setJwksFetcherForTests,
-} from '../src/auth/jwks'
 import { API_CSP } from '../src/security/csp'
 
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
-import {
-  type Keypair,
-  future,
-  generateKeypair,
-  mintTestJwt,
-  past,
-} from './_helpers/jwt'
 import type { SessionRecord } from '../src/auth/session'
 import type { KVNamespace } from '@cloudflare/workers-types'
 import { nanoidSlug } from '../src/publish/slug'
@@ -28,25 +17,7 @@ vi.mock('workers-og', () => ({
   })),
 }))
 
-const DESKTOP_AUD = 'desktop.apps.googleusercontent.com'
-const WEB_AUD = 'web.apps.googleusercontent.com'
-const ISS = 'https://accounts.google.com'
 const TOKEN = 't'.repeat(40)
-
-let kp: Keypair
-
-beforeAll(async () => {
-  kp = await generateKeypair('kid-security')
-  setJwksFetcherForTests(async () => [kp.publicJwk])
-})
-
-afterAll(() => {
-  setJwksFetcherForTests(null)
-})
-
-beforeEach(() => {
-  _resetJwksCacheForTests()
-})
 
 function envFor(state?: FakeDbState) {
   const { db, state: s } = makeDb(state ?? emptyState())
@@ -60,9 +31,8 @@ function envFor(state?: FakeDbState) {
     NONCE: makeKv(),
     SNAPSHOTS: snapshots.bucket,
     OG: og.bucket,
-    GOOGLE_CLIENT_ID_DESKTOP: DESKTOP_AUD,
-    GOOGLE_CLIENT_ID_WEB: WEB_AUD,
-    GOOGLE_CLIENT_SECRET_WEB: 'secret',
+    WORKOS_CLIENT_ID: 'client_test',
+    WORKOS_API_KEY: 'sk_test',
     state: s,
     _snapshots: snapshots.store,
     _og: og.store,
@@ -385,45 +355,15 @@ describe('safeNext', () => {
     const { onRequestGet } = await import('../functions/api/auth/[provider]/start')
     const env = envFor()
     const req = new Request(
-      'https://spool.share/api/auth/google/start?next=https://evil.com',
+      'https://spool.share/api/auth/workos/start?next=https://evil.com',
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestGet as any)(ctxFor(req, env, { provider: 'google' }))
+    const res = await (onRequestGet as any)(ctxFor(req, env, { provider: 'workos' }))
     expect(res.status).toBe(302)
     const setCookies: string[] =
       res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? '']
     const stateCookie = setCookies.find((c) => c.includes('__spool_oauth_state=')) ?? ''
     expect(stateCookie).toMatch(/__spool_oauth_state=[^|]+\|\/;/)
-  })
-})
-
-// ────────────────────────────────────────────────────────────────────
-// id_token: bad aud → not 200, no leak
-// ────────────────────────────────────────────────────────────────────
-
-describe('id_token validation', () => {
-  it('bad aud is rejected (non-200, no user created)', async () => {
-    const { onRequestPost } = await import(
-      '../functions/api/auth/sign-in-with-id-token'
-    )
-    const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS, aud: 'wrong-aud', sub: 'sub-bad',
-      email: 'a@example.com', email_verified: true,
-      exp: future(), iat: past(0), nonce: 'n',
-    })
-    const req = new Request('https://x/api/auth/sign-in-with-id-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider: 'google', id_token, nonce: 'n' }),
-    })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (onRequestPost as any)(ctxFor(req, env))
-    expect(res.status).not.toBe(200)
-    expect(env.state.users).toHaveLength(0)
-    const body = (await res.json()) as { error?: string; detail?: string }
-    // Make sure the raw id_token is not echoed back.
-    expect(JSON.stringify(body)).not.toContain(id_token)
   })
 })
 

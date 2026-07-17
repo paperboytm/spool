@@ -20,4 +20,9 @@ describe('spool-pro-router routeFor', () => {
     expect(routeFor('/')).toBe('landing')
     expect(routeFor('/blog/post')).toBe('landing')
   })
+
+  it('routes the CLI approval page to share-web and its API to the backend', () => {
+    expect(routeFor('/cli-auth')).toBe('web')
+    expect(routeFor('/api/cli-auth/start')).toBe('backend')
+  })
 })

@@ -27,8 +27,8 @@ type Env = {
   DB: D1Database
   SESSIONS: KVNamespace
   RATE: KVNamespace
-  GOOGLE_CLIENT_ID_WEB: string
-  GOOGLE_CLIENT_SECRET_WEB: string
+  WORKOS_CLIENT_ID?: string
+  WORKOS_API_KEY?: string
   // Must mirror the same value /api/auth/[provider]/start used so the
   // token exchange's redirect_uri is bit-identical to the authorize one.
   PUBLIC_BASE_URL?: string
@@ -71,7 +71,14 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
       { code, codeVerifier: verifier, redirectUri },
       ctx.env,
     )
-    const user = await upsertUserByIdentity(ctx.env.DB, claim)
+    const resolveAliasIdentities = provider.resolveAliasIdentities?.bind(provider)
+    const user = await upsertUserByIdentity(
+      ctx.env.DB,
+      claim,
+      resolveAliasIdentities
+        ? { resolveAliases: () => resolveAliasIdentities(claim.sub, ctx.env) }
+        : {},
+    )
     const sess = await createSession(ctx.env.SESSIONS, user.id)
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,

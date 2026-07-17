@@ -12,6 +12,7 @@ export type Route =
   | { kind: 'profile'; handle: string }
   | { kind: 'me' }
   | { kind: 'sign-in'; next: string }
+  | { kind: 'cli-auth'; code: string | null }
   | { kind: 'terms' }
   | { kind: 'privacy' }
   | { kind: 'tombstone'; reason: 'not-found' }
@@ -65,6 +66,14 @@ export function routeFor(pathname: string, search: string = ''): Route {
   if (path === '/sign-in') {
     const params = new URLSearchParams(search)
     return { kind: 'sign-in', next: nextSafe(params.get('next')) }
+  }
+
+  // CLI login approval: /cli-auth?code=XXXX-XXXX. The code is display
+  // material only (the page re-validates against the backend); pass it
+  // through raw and let the page normalize.
+  if (path === '/cli-auth') {
+    const params = new URLSearchParams(search)
+    return { kind: 'cli-auth', code: params.get('code') }
   }
 
   return { kind: 'tombstone', reason: 'not-found' }

@@ -3,12 +3,12 @@
 #
 # How to obtain each:
 #
-# GOOGLE_CLIENT_ID_DESKTOP / GOOGLE_CLIENT_ID_WEB / GOOGLE_CLIENT_SECRET_WEB
-#   Create a "Spool Dev" project in https://console.cloud.google.com/apis/credentials
-#   • Desktop client — accepts loopback URIs without registration (RFC 8252)
-#   • Web client — register http://localhost:3002/api/auth/google/callback
-#     as an authorised redirect URI
-#   Use a SEPARATE dev OAuth client from prod — never share client ids.
+# WORKOS_CLIENT_ID / WORKOS_API_KEY
+#   All sign-in runs through WorkOS AuthKit (/api/auth/workos/*).
+#   Create a dev environment at https://dashboard.workos.com → grab the
+#   client id ("client_...") and an API key ("sk_..."), and register
+#   http://localhost:3002/api/auth/workos/callback as a redirect URI.
+#   Use a SEPARATE dev environment from prod — never share credentials.
 #
 # SESSION_SIGNING_KEY
 #   Any 32-byte random string. Reserved for future HMAC of state cookies.
@@ -27,15 +27,19 @@
 
 # PUBLIC_BASE_URL
 #   The origin OAuth start/callback bake into the redirect_uri sent to
-#   Google. In dev this MUST be the share-web vite server (the /api/*
+#   WorkOS. In dev this MUST be the share-web vite server (the /api/*
 #   proxy origin), not wrangler's own :8788 — and it must match the
-#   redirect URI registered on the web OAuth client, or every web
-#   sign-in 400s with redirect_uri_mismatch. Unset in prod (defaults
+#   redirect URI registered in the WorkOS dashboard, or every web
+#   sign-in fails with a redirect_uri mismatch. Unset in prod (defaults
 #   to https://spool.pro).
 
-GOOGLE_CLIENT_ID_DESKTOP=
-GOOGLE_CLIENT_ID_WEB=
-GOOGLE_CLIENT_SECRET_WEB=
+# DEV_WORKOS_API_URL (optional — normally injected by share-dev.sh)
+#   workerd ignores proxy envs (workers-sdk#4515); on proxy-only dev
+#   networks point server-side WorkOS calls at the share-web vite relay:
+#   http://localhost:3002/__dev/workos. Leave unset otherwise.
+
+WORKOS_CLIENT_ID=
+WORKOS_API_KEY=
 SESSION_SIGNING_KEY=
 ABUSE_NOTIFY_EMAIL=dev@localhost
 ADMIN_USER_IDS=

@@ -1,46 +1,16 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+// Auth endpoint edges: start / callback plumbing (state CSRF, rate
+// limits, next sanitization) against the sole registered provider
+// (workos), plus sign-out. The workos happy paths + identity linking
+// live in workos.test.ts.
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { onRequestGet as callbackGet } from '../functions/api/auth/[provider]/callback'
 import { onRequestGet as startGet } from '../functions/api/auth/[provider]/start'
-import {
-  SIGNIN_RATE_MAX,
-  SIGNIN_RATE_WINDOW_SEC,
-  onRequestPost as signInPost,
-} from '../functions/api/auth/sign-in-with-id-token'
 import { onRequestPost as signOutPost } from '../functions/api/auth/sign-out'
-import {
-  _resetJwksCacheForTests,
-  setJwksFetcherForTests,
-} from '../src/auth/jwks'
 
 import { getSetCookies, invoke } from './_helpers/ctx'
 import { makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
-import {
-  type Keypair,
-  future,
-  generateKeypair,
-  mintTestJwt,
-  past,
-} from './_helpers/jwt'
-
-const DESKTOP_AUD = 'desktop.apps.googleusercontent.com'
-const WEB_AUD = 'web.apps.googleusercontent.com'
-const ISS = 'https://accounts.google.com'
-
-let kp: Keypair
-
-beforeAll(async () => {
-  kp = await generateKeypair('kid-endpoints')
-  setJwksFetcherForTests(async () => [kp.publicJwk])
-})
-
-afterAll(() => {
-  setJwksFetcherForTests(null)
-})
-
-beforeEach(() => {
-  _resetJwksCacheForTests()
-})
 
 function envFor(dbState?: FakeDbState) {
   const { db, state } = makeDb(dbState)
@@ -48,172 +18,62 @@ function envFor(dbState?: FakeDbState) {
     DB: db,
     SESSIONS: makeKv(),
     RATE: makeKv(),
-    NONCE: makeKv(),
-    GOOGLE_CLIENT_ID_DESKTOP: DESKTOP_AUD,
-    GOOGLE_CLIENT_ID_WEB: WEB_AUD,
-    GOOGLE_CLIENT_SECRET_WEB: 'secret',
+    WORKOS_CLIENT_ID: 'client_test',
+    WORKOS_API_KEY: 'sk_test',
     state,
   }
 }
 
-describe('POST /api/auth/sign-in-with-id-token', () => {
-  it('200 + new user upserted + session token returned', async () => {
-    const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: DESKTOP_AUD,
-      sub: 'sub-1',
-      email: 'a@example.com',
-      email_verified: true,
-      name: 'Alice',
-      picture: 'https://x/a.png',
-      exp: future(),
-      iat: past(0),
-      nonce: 'n1',
-    })
-    const req = new Request('https://spool.pro/api/auth/sign-in-with-id-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-      body: JSON.stringify({ provider: 'google', id_token, nonce: 'n1' }),
-    })
-    const res = await invoke(signInPost, req, env)
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as {
-      session_token: string
-      user: { email: string; name: string }
-    }
-    expect(typeof body.session_token).toBe('string')
-    expect(body.session_token.length).toBeGreaterThanOrEqual(32)
-    expect(body.user.email).toBe('a@example.com')
-    expect(body.user.name).toBe('Alice')
-    expect(env.state.users).toHaveLength(1)
-    expect(env.state.user_identities).toEqual([
-      expect.objectContaining({ provider: 'google', provider_sub: 'sub-1' }),
-    ])
-    // Audit row written for signin.desktop
-    expect(env.state.audit.some((r) => r.action === 'signin.desktop')).toBe(true)
-    // Session row in KV
-    const sess = await env.SESSIONS.get(`session/${body.session_token}`)
-    expect(sess).not.toBeNull()
-  })
-
-  it('400 when id_token or nonce missing', async () => {
-    const env = envFor()
-    const req = new Request('https://x/api/auth/sign-in-with-id-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    const res = await invoke(signInPost, req, env)
-    expect(res.status).toBe(400)
-  })
-
-  it('403 on nonce replay (same nonce twice)', async () => {
-    const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: DESKTOP_AUD,
-      sub: 'sub-2',
-      email: 'b@example.com',
-      email_verified: true,
-      exp: future(),
-      iat: past(0),
-      nonce: 'replay',
-    })
-    const makeReq = () =>
-      new Request('https://x/api/auth/sign-in-with-id-token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ provider: 'google', id_token, nonce: 'replay' }),
-      })
-    const r1 = await invoke(signInPost, makeReq(), env)
-    expect(r1.status).toBe(200)
-    const r2 = await invoke(signInPost, makeReq(), env)
-    expect(r2.status).toBe(403)
-  })
-
-  it('429 when rate limit exceeded', async () => {
-    const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: DESKTOP_AUD,
-      sub: 'sub-3',
-      email: 'c@example.com',
-      email_verified: true,
-      exp: future(),
-      iat: past(0),
-      nonce: 'rl',
-    })
-    // Pre-fill the counter at the current window slot so the next request
-    // tips it over. checkRate writes with TTL = windowSec * 2; mirror that
-    // so the seeded row outlives the request under test.
-    const slot = Math.floor(Date.now() / 1000 / SIGNIN_RATE_WINDOW_SEC)
-    await env.RATE.put(`rate/signin/9.9.9.9/${slot}`, String(SIGNIN_RATE_MAX), {
-      expirationTtl: SIGNIN_RATE_WINDOW_SEC * 2,
-    })
-    const req = new Request('https://x/api/auth/sign-in-with-id-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '9.9.9.9' },
-      body: JSON.stringify({ provider: 'google', id_token, nonce: 'rl' }),
-    })
-    const res = await invoke(signInPost, req, env)
-    expect(res.status).toBe(429)
-  })
-
-  it('rejects token with wrong audience (proxied as 500 via INTERNAL)', async () => {
-    // verifyIdToken throws a non-ApiError when aud mismatches, so jsonError
-    // wraps it as INTERNAL (500). That is fine — we just verify it does NOT
-    // 200, and no user/session is created.
-    const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: 'wrong-aud',
-      sub: 'sub-bad',
-      email: 'd@example.com',
-      email_verified: true,
-      exp: future(),
-      iat: past(0),
-      nonce: 'wa',
-    })
-    const req = new Request('https://x/api/auth/sign-in-with-id-token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider: 'google', id_token, nonce: 'wa' }),
-    })
-    const res = await invoke(signInPost, req, env)
-    expect(res.status).not.toBe(200)
-    expect(env.state.users).toHaveLength(0)
-  })
-})
-
-describe('GET /api/auth/google/callback', () => {
-  function tokenExchangeOk(id_token: string) {
-    return new Response(JSON.stringify({ id_token }), {
+function workosOk(url: string): Response | null {
+  if (url.endsWith('/user_management/authenticate')) {
+    return new Response(
+      JSON.stringify({
+        user: { id: 'user_w1', email: 'w@example.com', first_name: 'W', last_name: null },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )
+  }
+  if (url.includes('/user_management/users/')) {
+    return new Response('[]', {
       status: 200,
       headers: { 'content-type': 'application/json' },
     })
   }
+  return null
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('GET /api/auth/workos/callback — plumbing edges', () => {
+  it('400 when code or state query params are missing', async () => {
+    const env = envFor()
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc')
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+    expect(res.status).toBe(400)
+  })
 
   it('400 when state cookie is absent', async () => {
     const env = envFor()
     const req = new Request(
-      'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
+      'https://spool.pro/api/auth/workos/callback?code=abc&state=xyz',
     )
-    const res = await invoke(callbackGet, req, env, { provider: 'google' })
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(400)
   })
 
   it('403 when state cookie does not match query state', async () => {
     const env = envFor()
     const req = new Request(
-      'https://spool.pro/api/auth/google/callback?code=abc&state=fromUrl',
+      'https://spool.pro/api/auth/workos/callback?code=abc&state=fromUrl',
       {
         headers: {
           cookie: '__spool_oauth_state=otherState|/; __spool_oauth_verifier=v',
         },
       },
     )
-    const res = await invoke(callbackGet, req, env, { provider: 'google' })
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(403)
   })
 
@@ -229,51 +89,27 @@ describe('GET /api/auth/google/callback', () => {
       expirationTtl: RATE_WINDOW_SEC * 2,
     })
     const req = new Request(
-      'https://spool.pro/api/auth/google/callback?code=abc&state=xyz',
+      'https://spool.pro/api/auth/workos/callback?code=abc&state=xyz',
       { headers: { 'CF-Connecting-IP': '8.8.8.8' } },
     )
-    const res = await invoke(callbackGet, req, env, { provider: 'google' })
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(429)
   })
 
-  it('302 + Set-Cookie session on success', async () => {
+  it('403 when the code exchange fails upstream', async () => {
     const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: WEB_AUD,
-      sub: 'web-sub',
-      email: 'w@example.com',
-      email_verified: true,
-      name: 'W',
-      exp: future(),
-      iat: past(0),
-    })
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(tokenExchangeOk(id_token))
-    try {
-      const req = new Request(
-        'https://spool.pro/api/auth/google/callback?code=goodcode&state=S',
-        {
-          headers: {
-            cookie:
-              '__spool_oauth_state=S|/next; __spool_oauth_verifier=verifier-value',
-          },
-        },
-      )
-      const res = await invoke(callbackGet, req, env, { provider: 'google' })
-      expect(res.status).toBe(302)
-      expect(res.headers.get('location')).toBe('/next')
-      const all = getSetCookies(res).join('\n')
-      expect(all).toMatch(/spool_session=/)
-      expect(all).toMatch(/HttpOnly/)
-      expect(env.state.users).toHaveLength(1)
-      expect(env.state.user_identities).toEqual([
-        expect.objectContaining({ provider: 'google', provider_sub: 'web-sub' }),
-      ])
-    } finally {
-      fetchSpy.mockRestore()
-    }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":"invalid_grant"}', { status: 400 }),
+    )
+    const req = new Request(
+      'https://spool.pro/api/auth/workos/callback?code=bad&state=S',
+      {
+        headers: { cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v' },
+      },
+    )
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+    expect(res.status).toBe(403)
+    expect(env.state.users).toHaveLength(0)
   })
 
   it('ASCII-encodes a non-ASCII next so the Location header is RFC-compliant', async () => {
@@ -283,37 +119,26 @@ describe('GET /api/auth/google/callback', () => {
     // must be ASCII — encodeURI keeps `/?&=` intact and percent-encodes
     // the rest.
     const env = envFor()
-    const id_token = await mintTestJwt(kp, {
-      iss: ISS,
-      aud: WEB_AUD,
-      sub: 'web-sub-utf8',
-      email: 'utf8@example.com',
-      email_verified: true,
-      exp: future(),
-      iat: past(0),
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const res = workosOk(String(input))
+      if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
+      return res
     })
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(tokenExchangeOk(id_token))
-    try {
-      const req = new Request(
-        'https://spool.pro/api/auth/google/callback?code=c&state=S',
-        {
-          headers: {
-            cookie:
-              '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
-          },
+    const req = new Request(
+      'https://spool.pro/api/auth/workos/callback?code=c&state=S',
+      {
+        headers: {
+          cookie:
+            '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
         },
-      )
-      const res = await invoke(callbackGet, req, env, { provider: 'google' })
-      expect(res.status).toBe(302)
-      const loc = res.headers.get('location') ?? ''
-      expect(loc).toBe('/me%E3%80%82%E8%BF%99%E6%AC%A1')
-      // Pure ASCII — no raw UTF-8 bytes left.
-      expect(loc).toMatch(/^[\x00-\x7f]*$/)
-    } finally {
-      fetchSpy.mockRestore()
-    }
+      },
+    )
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+    expect(res.status).toBe(302)
+    const loc = res.headers.get('location') ?? ''
+    expect(loc).toBe('/me%E3%80%82%E8%BF%99%E6%AC%A1')
+    // Pure ASCII — no raw UTF-8 bytes left.
+    expect(loc).toMatch(/^[\x00-\x7f]*$/)
   })
 })
 
@@ -348,15 +173,14 @@ describe('POST /api/auth/sign-out', () => {
 })
 
 describe('start endpoint', () => {
-  it('redirects to Google with PKCE challenge and sets both oauth cookies', async () => {
+  it('redirects to AuthKit and sets both oauth cookies', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/google/start?next=/me')
-    const res = await invoke(startGet, req, env, { provider: 'google' })
+    const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')
+    const res = await invoke(startGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     const loc = res.headers.get('location') ?? ''
-    expect(loc).toMatch(/^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/)
-    expect(loc).toMatch(/code_challenge_method=S256/)
-    expect(loc).toMatch(/scope=openid\+email\+profile/)
+    expect(loc).toMatch(/^https:\/\/api\.workos\.com\/user_management\/authorize\?/)
+    expect(loc).toMatch(/provider=authkit/)
     const joined = getSetCookies(res).join('\n')
     expect(joined).toMatch(/__spool_oauth_state=/)
     expect(joined).toMatch(/__spool_oauth_verifier=/)
@@ -365,9 +189,9 @@ describe('start endpoint', () => {
   it('coerces an unsafe next param back to /', async () => {
     const env = envFor()
     const req = new Request(
-      'https://spool.pro/api/auth/google/start?next=//evil.example.com',
+      'https://spool.pro/api/auth/workos/start?next=//evil.example.com',
     )
-    const res = await invoke(startGet, req, env, { provider: 'google' })
+    const res = await invoke(startGet, req, env, { provider: 'workos' })
     const stateCookie =
       getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
     // The cookie value is `${state}|${next}`. Ensure the next half is `/`.
@@ -376,17 +200,21 @@ describe('start endpoint', () => {
 
   it('404s on an unknown provider (no scanner enumeration)', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/github/start')
-    const res = await invoke(startGet, req, env, { provider: 'github' })
-    expect(res.status).toBe(404)
+    for (const provider of ['github', 'google']) {
+      const req = new Request(`https://spool.pro/api/auth/${provider}/start`)
+      const res = await invoke(startGet, req, env, { provider })
+      expect(res.status).toBe(404)
+    }
   })
 
   it('callback 404s on an unknown provider', async () => {
     const env = envFor()
-    const req = new Request(
-      'https://spool.pro/api/auth/github/callback?code=x&state=y',
-    )
-    const res = await invoke(callbackGet, req, env, { provider: 'github' })
-    expect(res.status).toBe(404)
+    for (const provider of ['github', 'google']) {
+      const req = new Request(
+        `https://spool.pro/api/auth/${provider}/callback?code=x&state=y`,
+      )
+      const res = await invoke(callbackGet, req, env, { provider })
+      expect(res.status).toBe(404)
+    }
   })
 })
