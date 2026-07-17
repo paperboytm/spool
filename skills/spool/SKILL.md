@@ -1,108 +1,90 @@
 ---
 name: spool
-description: Share the current session to the Spool hub ("share to spool", "publish this session") or search your local Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi session history
+description: Share the current session to the Spool hub via the spool CLI ("share to spool", "publish this session", withdraw a share, or a pasted spool session link) — and recall past AI sessions from inside any agent by searching all Claude Code, Codex, Gemini CLI, OpenCode, and Pi history when the user references past work ("we discussed this", "what did codex do", "find that session where…").
 allowed-tools: Bash
 ---
 
-Spool is a local search engine over your AI coding sessions, with an optional hub for sharing them. This skill covers both: **sharing the current session** from inside the conversation, and **searching past sessions**.
+Spool turns an AI coding session into something you can hand to someone else: **share** publishes a session to the hub as a URL teammates read and fork from any machine. Underneath sits a local index of every session on this machine — claude, codex, gemini, opencode, pi — and the CLI is the whole interface, so **any agent with a shell can recall any other agent's sessions**: a Codex session is searchable from Claude Code, and whatever you find carries into the current conversation as ordinary context.
 
 ## Routing
 
 Decide from `$ARGS` and the conversation:
 
-- The user wants to **share/publish** this (or a specific) session → **Share flow**
-- The user wants to **withdraw/unpublish** a shared session → run `spool withdraw <sid-or-url>`
-- Anything else (a topic, a question, keywords) → **Search flow**
+- **share/publish** this (or a specific) session → Share flow
+- **withdraw/unpublish** a shared session → `spool withdraw <sid-or-url>`
+- a **spool session URL or sid** the user wants to continue → `spool resume <sid-or-url>` (materializes it locally and forks the provider's native session)
+- anything else (a topic, a question, "that session where…") → Recall flow
 
-## Preflight (both flows)
+## Preflight
 
 ```bash
 which spool
 ```
 
-If not found, tell the user:
-> `spool` CLI is not installed. Run: `npm install -g @spool-lab/cli` then `spool sync` to index your sessions.
-> Stop here.
+If missing, tell the user: install with `npm install -g @spool-lab/cli`, then `spool sync` to index sessions. Stop here.
 
 ## Share flow
 
-Only **claude** and **codex** sessions can be shared. Sharing publishes the **full transcript** to the hub and prints a URL.
+Only **claude** and **codex** sessions can be shared. Sharing publishes the full transcript to the hub and prints a URL.
 
-1. **Index the latest state** (the session must be in the local index, and this picks up the newest turns):
-
-```bash
-spool sync
-```
-
-2. **Pick the target session.**
-
-- Inside Claude Code, the current session's UUID is in `$CLAUDE_CODE_SESSION_ID` — use it.
-- If it's unset (or the user asked for a different session), omit the argument to share the most recent session in the current directory, or pass a UUID / UUID prefix from `spool list`.
-
-3. **Write the note yourself.** You know what this session was about — compose 1–3 sentences (intent → outcome, notable decisions). Always pass it with `-m`; never let the CLI open `$EDITOR` (there is no interactive editor here).
+1. `spool sync` — the session must be indexed, and this picks up the newest turns.
+2. Pick the target: inside Claude Code use `$CLAUDE_CODE_SESSION_ID`; in other agents (or if unset) omit the argument to share the most recent session in the current directory, or pass a UUID from `spool list`. `<uuid>@<n>` shares only the first *n* records.
+3. Compose the note yourself — 1–3 sentences, intent → outcome — and pass it with `-m` (there is no interactive editor here):
 
 ```bash
-spool share "$CLAUDE_CODE_SESSION_ID" -m "<your 1-3 sentence summary>" < /dev/null
+spool share "$CLAUDE_CODE_SESSION_ID" -m "<summary>" < /dev/null
 ```
 
-The `< /dev/null` matters: if the redact gate finds secrets it prompts for confirmation, and an unanswered prompt must abort rather than hang.
+The `< /dev/null` matters: if the redact gate finds secrets it prompts, and an unanswered prompt must abort rather than hang.
 
-4. **Handle the outcome:**
+4. Outcomes:
+   - **`Shared N record(s): <url>`** — give the user the URL; teammates run `spool resume <sid>` to fork it locally.
+   - **`Not logged in`** — the user runs `spool login` (browser approval), then retry.
+   - **Secret findings, share aborted** — show the user the findings summary and ask; only after an explicit yes, re-run with `--yes`.
+   - **`Sharing <source> sessions is not supported yet`** — tell the user only claude and codex sessions are shareable.
 
-- **Success** — output ends with `Shared N record(s): <url>`. Give the user the URL and mention teammates can run `spool resume <sid>` to continue the session locally.
-- **`Not logged in`** — tell the user to run `spool login` (needs a token from the hub), then retry.
-- **Secret findings, share aborted** — the output lists detected secrets (API keys, tokens…). Show the user that summary and ask whether to share anyway. Only after an explicit yes, re-run the same command with `--yes` appended.
-- **`Sharing <source> sessions is not supported yet`** — only claude and codex sessions can be shared; tell the user.
+## Recall flow
 
-Options worth knowing:
+The goal is **cited recall**: your reply answers the question and names the session each claim came from.
 
-- `spool share <uuid>@<n>` shares only the first *n* records (prefix share) — for "share just the part up to X".
-- `spool withdraw <sid-or-url>` unpublishes; the page then returns "withdrawn".
-
-## Search flow
-
-1. **Run the search**
+### 1. Search
 
 ```bash
-spool search "$ARGS" --json --limit 5
+spool search "<query>" --json -n 5
 ```
 
-where `$ARGS` is everything the user passed to `/spool`.
+- `-s claude|codex|gemini|opencode|pi` filters by agent, `--since 7d` by time.
+- When the user names a project, scope to it instead: `spool projects <name>` lists its sessions (exact name > repo slug > substring).
+- Zero hits → run `spool sync` once (indexing is manual; the newest sessions are often missing) and retry with broader terms.
 
-2. **Present the results**
+Done when you hold at least one relevant UUID — or you have synced, retried, and can report there is no match.
 
-For each result in the JSON array, show:
-- **Session title** and date (`startedAt`)
-- **Source** (claude, codex, gemini, opencode, or pi) and **project** path
-- The **snippet** with highlighted terms (strip `<mark>` / `</mark>` tags for plain display)
-- A note of the session UUID
+### 2. Zoom
 
-Example format:
-```
-1. [claude] /code/myproject — 2026-03-20
-   "…evaluated the database sharding tradeoffs and reached a decision…"
-   UUID: abc123
+Pick the cheapest view that answers the question; the full transcript is the most expensive and rarely the right first move:
 
-2. [pi] /code/api — 2026-03-18
-   "…the race condition was caused by a shared map write without a mutex…"
-   UUID: def456
-```
+| Question about the session | Command |
+|---|---|
+| what happened, step by step | `spool show <uuid> --log` — one line per record |
+| what code it changed | `spool show <uuid> --diff` — net diff across the whole session |
+| one specific record | `spool show <uuid>@r<n>` — raw record JSON |
+| the full conversation | `spool show <uuid>` |
 
-3. **Offer to load a full session**
+### 3. Use it
 
-Ask: "Want to see the full conversation for any of these? I can load it with `spool show <uuid>`."
+Fold what you found into your reply as ordinary context, citing the source per claim — `[codex · 7/15 · parallel-world]`. When the user wants to *continue* that session rather than read it, hand over the native resume command that `spool search` already printed: `claude -r <uuid>`, `codex resume <uuid>`, `pi --session <uuid>`.
 
-If the user says yes (or specifies a number/UUID), run:
+## Command reference
 
-```bash
-spool show <uuid>
-```
-
-Include the output as context in your next reply.
-
-## Tips
-
-- `--source claude|codex|gemini|opencode|pi` filters by agent; `--since 7d` limits by time
-- Use quotes for exact phrases: `/spool "read replicas"`
-- Resume hints: `claude -r <uuid>`, `codex resume <uuid>`, `pi --session <uuid>`
-- Run `spool sync` first if results seem stale; `spool status` shows index health
+| Command | Does |
+|---|---|
+| `spool sync [--watch]` | index new sessions; `--watch` stays running |
+| `spool search <query>` | full-text search; prints native resume commands |
+| `spool list` | recent sessions; `-s`/`-p` filter a recent window, so raise `-n` when filtering |
+| `spool projects [name]` | project groups, or one project's sessions |
+| `spool show <uuid\|sid\|url>` | transcript/summary; `--log` timeline, `--diff` net change, `@r<n>` record |
+| `spool pin/unpin/pinned <uuid>` | bookmark sessions — state shared with the Spool app Library |
+| `spool status` / `spool doctor [--fix]` | index stats / environment diagnostics |
+| `spool login` / `spool logout` | hub auth: browser device flow / revoke + clear |
+| `spool share` / `spool withdraw` | publish to the hub / unpublish |
+| `spool resume <sid\|url>[@<n>]` | materialize a shared session locally, fork it natively; `--no-exec` prints the command only |
