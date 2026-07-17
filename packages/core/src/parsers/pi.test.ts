@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { wrapSpoolSystemPrelude } from './spool-prelude.js'
-import { loadPiSession, parsePiSession } from './pi.js'
+import { decodePiSessionDirSlug, loadPiSession, parsePiSession } from './pi.js'
 
 const tempDirs: string[] = []
 
@@ -160,5 +160,34 @@ describe('parsePiSession', () => {
     const parsed = parsePiSession(filePath)
     expect(parsed?.messages).toHaveLength(1)
     expect(parsed?.messages[0]?.contentText).toBe('plain string prompt')
+  })
+})
+
+describe('decodePiSessionDirSlug', () => {
+  it('trims leading and trailing hyphens and decodes the rest to a path', () => {
+    expect(decodePiSessionDirSlug('--Users-claw-code-spool--')).toBe('/Users/claw/code/spool')
+  })
+
+  it('handles a slug with no surrounding hyphens', () => {
+    expect(decodePiSessionDirSlug('Users-claw-code-spool')).toBe('/Users/claw/code/spool')
+  })
+
+  it('returns the original slug unchanged when it is all hyphens', () => {
+    expect(decodePiSessionDirSlug('----')).toBe('----')
+  })
+
+  it('does not hang when a huge hyphen run is not at the very end (ReDoS probe)', () => {
+    // The old `/-+$/` regex is only fast when the string genuinely ends in
+    // the run it's trimming. When a long hyphen run sits just short of the
+    // end (so the anchored match fails and the engine backtracks across
+    // every starting position), it degrades polynomially — measured
+    // ~3.4s @ 100k hyphens on the pre-fix regex vs. sub-millisecond here.
+    const hostile = `-Users-claw${'-'.repeat(100_000)}x`
+    const start = Date.now()
+    const decoded = decodePiSessionDirSlug(hostile)
+    const elapsedMs = Date.now() - start
+
+    expect(elapsedMs).toBeLessThan(1_000)
+    expect(decoded).toBe(`/Users/claw${'/'.repeat(100_000)}x`)
   })
 })

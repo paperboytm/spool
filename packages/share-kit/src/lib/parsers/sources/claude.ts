@@ -185,8 +185,19 @@ function findAnchor(md: string, needle: string): number {
   return -1
 }
 
+// Strip tag-like spans to a fixed point rather than in a single pass: a
+// single `/<[^>]+>/g` pass is both an incomplete sanitizer (nested markup
+// can survive one pass) and a polynomial-ReDoS risk (`[^>]` matches `<`,
+// so a run of `<<<<...` backtracks quadratically). Excluding `<` from the
+// character class removes the backtracking, and the loop closes the
+// completeness gap.
 function stripTags(s: string): string {
-  return s.replace(/<[^>]+>/g, '')
+  let prev: string
+  do {
+    prev = s
+    s = s.replace(/<[^<>]*>/g, '')
+  } while (s !== prev)
+  return s
 }
 
 function collapseWhitespace(s: string): string {

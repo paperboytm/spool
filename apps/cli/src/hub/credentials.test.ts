@@ -81,6 +81,24 @@ describe('hub credentials', () => {
     })
   })
 
+  it('normalizes a hub URL with a huge run of non-trailing slashes without hanging (ReDoS probe)', () => {
+    // normalizeHubUrl's old `/\/+$/` trim backtracks polynomially once the
+    // slash run isn't at the very end of the string (measured multi-second
+    // hangs at 100k slashes on the pre-fix regex vs. sub-millisecond here).
+    const home = tempHome()
+    const hostileUrl = `https://hub.example${'/'.repeat(100_000)}x`
+
+    const start = Date.now()
+    const savedPath = saveHubCredentials({ hubUrl: hostileUrl, token: 'secret-token' }, { homeDir: home })
+    const elapsedMs = Date.now() - start
+
+    expect(elapsedMs).toBeLessThan(2_000)
+    expect(JSON.parse(readFileSync(savedPath, 'utf8'))).toEqual({
+      hubUrl: hostileUrl,
+      token: 'secret-token',
+    })
+  })
+
   it('uses complete environment overrides without reading corrupt disk credentials', () => {
     const home = tempHome()
     const path = hubCredentialsPath({ homeDir: home })

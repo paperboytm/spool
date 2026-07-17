@@ -158,7 +158,10 @@ function extractToolNames(content: unknown): string[] {
  *  e.g. '--Users-claw-code-spool--' → '/Users/claw/code/spool'
  *  Note: lossy for paths containing hyphens — prefer cwd from the header. */
 export function decodePiSessionDirSlug(slug: string): string {
-  const trimmed = slug.replace(/^-+/, '').replace(/-+$/, '')
+  const withoutPrefix = slug.replace(/^-+/, '')
+  let end = withoutPrefix.length
+  while (end > 0 && withoutPrefix[end - 1] === '-') end--
+  const trimmed = withoutPrefix.slice(0, end)
   if (!trimmed) return slug
   return '/' + trimmed.replace(/-/g, '/')
 }

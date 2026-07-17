@@ -130,7 +130,7 @@ export function parseClaudeSessionText(raw: string, filePath: string): ParseProv
   const firstUserMsg = messages.find(m => m.role === 'user' && m.contentText.length > 0 && !m.isSidechain)
   const title = customTitle
     || (firstUserMsg
-      ? firstUserMsg.contentText.replace(/<[^>]+>/g, '').trim().slice(0, 120)
+      ? stripAngleTags(firstUserMsg.contentText).trim().slice(0, 120)
       : '(no title)')
 
   const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort()
@@ -160,6 +160,34 @@ export function parseClaudeSessionText(raw: string, filePath: string): ParseProv
 // these tags) is preserved.
 const SLASH_COMMAND_RECORD = /<command-name>[\s\S]*?<\/command-name>(?:\s*<command-message>[\s\S]*?<\/command-message>)?(?:\s*<command-args>[\s\S]*?<\/command-args>)?/g
 
+// Strip tag-like spans (`<...>`) to a fixed point. A single-pass `/<[^>]+>/g`
+// is both an incomplete sanitizer (nested/nested-looking markup can survive
+// one pass) and a polynomial-ReDoS risk (`[^>]` matches `<`, so a run of
+// `<<<<...` backtracks quadratically). Excluding `<` from the character
+// class removes the backtracking ambiguity, and looping to a fixed point
+// closes the completeness gap.
+function stripAngleTags(s: string): string {
+  let prev: string
+  do {
+    prev = s
+    s = s.replace(/<[^<>]*>/g, '')
+  } while (s !== prev)
+  return s
+}
+
+// Remove every `open`...`close` block via indexOf, linear and regex-free.
+// An unterminated block (open with no matching close) is left as-is.
+function stripBlocks(s: string, open: string, close: string): string {
+  let start = s.indexOf(open)
+  while (start !== -1) {
+    const end = s.indexOf(close, start + open.length)
+    if (end === -1) break
+    s = s.slice(0, start) + s.slice(end + close.length)
+    start = s.indexOf(open, start)
+  }
+  return s
+}
+
 function extractText(content: unknown): string {
   let raw: string
   if (typeof content === 'string') {
@@ -172,14 +200,12 @@ function extractText(content: unknown): string {
   } else {
     return ''
   }
-  return raw
-    .replace(/<spool-system-prelude>[\s\S]*?<\/spool-system-prelude>/g, '')
-    .replace(SLASH_COMMAND_RECORD, '')
-    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/g, '')
-    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g, '')
-    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
-    .replace(/<[^>]+>/g, '')
-    .trim()
+  let text = stripBlocks(raw, '<spool-system-prelude>', '</spool-system-prelude>')
+  text = text.replace(SLASH_COMMAND_RECORD, '')
+  text = stripBlocks(text, '<local-command-stdout>', '</local-command-stdout>')
+  text = stripBlocks(text, '<local-command-caveat>', '</local-command-caveat>')
+  text = stripBlocks(text, '<system-reminder>', '</system-reminder>')
+  return stripAngleTags(text).trim()
 }
 
 function extractToolNames(content: unknown): string[] {

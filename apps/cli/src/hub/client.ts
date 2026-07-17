@@ -302,8 +302,14 @@ async function readErrorMessage(response: Response): Promise<string> {
   return response.statusText || 'Unknown hub error'
 }
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/') end--
+  return value.slice(0, end)
+}
+
 function normalizeHubUrl(value: string): string {
-  const normalized = value.trim().replace(/\/+$/, '')
+  const normalized = stripTrailingSlashes(value.trim())
   const url = new URL(normalized)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('Hub URL must use http or https')

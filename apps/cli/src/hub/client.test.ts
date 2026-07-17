@@ -128,4 +128,20 @@ describe('HubClient', () => {
       /Cannot reach the hub at http:\/\/127\.0\.0\.1:3002 \(connect ECONNREFUSED.*Is the local hub running/,
     )
   })
+
+  it('constructs without hanging when the hub URL has a huge run of non-trailing slashes (ReDoS probe)', () => {
+    // normalizeHubUrl's old `/\/+$/` trim backtracks polynomially once the
+    // slash run isn't at the very end of the string (measured multi-second
+    // hangs at 100k slashes on the pre-fix regex vs. sub-millisecond here).
+    const hostileUrl = `https://hub.example${'/'.repeat(100_000)}x`
+    const start = Date.now()
+    const client = new HubClient({
+      hubUrl: hostileUrl,
+      fetch: (async () => Response.json({})) as typeof fetch,
+    })
+    const elapsedMs = Date.now() - start
+
+    expect(elapsedMs).toBeLessThan(2_000)
+    expect(client).toBeInstanceOf(HubClient)
+  })
 })
