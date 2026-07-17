@@ -1,33 +1,16 @@
-// /session/<sid> — the v2 hub session reader. First screen (note vs
-// machine evidence) stays hub-specific; the conversation itself renders
-// through @spool-lab/session-view — the same components the desktop app
-// uses to open a session — fed by the same session-kit parsers. Diff pane
-// recomputes per-file changes client-side. #r/<idx> deep links and hunk
-// clicks resolve record indices to conversation messages.
+// /session/<sid> — the v2 hub session reader. The Workbench renders the
+// conversation through @spool-lab/session-view — the same components the
+// desktop app uses — fed by the same session-kit parsers. Its diff pane
+// recomputes per-file changes client-side.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MessageList, type MessageListHandle } from '@spool-lab/session-view'
+import { useEffect, useMemo, useState } from 'react'
 import type { SessionViewV1 } from '@spool-lab/session-kit'
-import { SnapshotReader, snapshotFromSpoolDocument, type SpoolDocument } from '@spool/share-kit'
 
 import { Footer, Header, Page } from '../components/Chrome'
-import { DiffPane } from '../components/session/diff-pane'
-import { FirstScreen } from '../components/session/first-screen'
-// PROTOTYPE (throwaway, dev-only — see components/session/prototype/NOTES.md):
-// three UI variants of this page behind ?variant=, mock data behind ?mock=1.
-import { makeSessionFixture } from '../components/session/prototype/fixture'
-import {
-  PrototypeSwitcher,
-  prototypeMockRequested,
-  usePrototypeVariant,
-} from '../components/session/prototype/switcher'
-import { VariantBench } from '../components/session/prototype/variant-bench'
-import { VariantCover } from '../components/session/prototype/variant-cover'
-import { VariantDoc } from '../components/session/prototype/variant-doc'
+import { SessionWorkbench } from '../components/session/workbench'
 import { humanDateTime } from '../lib/dates'
 import {
   fetchHubMeta,
-  fetchHubSpoolFile,
   fetchHubView,
   fetchRecordsExact,
   makeRangeFetcher,
@@ -70,25 +53,11 @@ function useIsDark(): boolean {
 
 export function SessionReader({ sid }: { sid: string }) {
   const [state, setState] = useState<PageState>({ phase: 'loading', loaded: 0, total: null })
-  const [openFile, setOpenFile] = useState<string | null>(null)
-  const [targetMessageId, setTargetMessageId] = useState<number | null>(null)
-  const [highlightRecord, setHighlightRecord] = useState<number | null>(null)
-  const [viewMode, setViewMode] = useState<'conversation' | 'document'>('conversation')
-  const [spoolDoc, setSpoolDoc] = useState<SpoolDocument | null>(null)
-  const listRef = useRef<MessageListHandle>(null)
   const isDark = useIsDark()
-  const [variant, setVariant] = usePrototypeVariant()
 
   const provider = providerOf(sid)
 
   useEffect(() => {
-    // PROTOTYPE (throwaway): render from the fixture, skip the hub.
-    if (import.meta.env.DEV && prototypeMockRequested()) {
-      const fixture = makeSessionFixture(sid)
-      setState({ phase: 'ready', meta: fixture.meta, view: fixture.view, records: fixture.records })
-      return
-    }
-
     let cancelled = false
     void (async () => {
       const meta = await fetchHubMeta(sid)
@@ -136,50 +105,6 @@ export function SessionReader({ sid }: { sid: string }) {
     return (from, to) => Promise.resolve(records.slice(from, to))
   }, [state])
 
-  const jumpToRecord = (index: number) => {
-    setViewMode('conversation')
-    setHighlightRecord(index)
-    const messageId = conversation?.recordToMessageId.get(index)
-    if (messageId === undefined) return
-    setTargetMessageId(messageId)
-    listRef.current?.scrollToMessageId(messageId)
-  }
-
-  // The attached .spool document loads lazily on the first switch to the
-  // Document view.
-  const openDocument = () => {
-    setViewMode('document')
-    if (spoolDoc === null) {
-      void fetchHubSpoolFile(sid).then((doc) => { if (doc) setSpoolDoc(doc) })
-    }
-  }
-
-  const downloadSpoolDoc = () => {
-    if (spoolDoc === null) return
-    const blob = new Blob([JSON.stringify(spoolDoc, null, 2)], { type: 'application/spool+json' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${(spoolDoc.conversation.title || 'session').replace(/[^\w\d-]+/g, '-').slice(0, 60)}.spool`
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
-
-  // Deep link (#r/<idx>): resolve once the conversation is on screen.
-  useEffect(() => {
-    if (state.phase !== 'ready' || conversation === null) return
-    const index = deepLinkIndex(window.location.hash)
-    if (index === null) return
-    const messageId = conversation.recordToMessageId.get(index)
-    if (messageId === undefined) return
-    setHighlightRecord(index)
-    setTargetMessageId(messageId)
-    // Virtuoso mounts with initialTopMostItemIndex via targetMessageId,
-    // but if the list is already mounted, scroll imperatively too.
-    requestAnimationFrame(() => listRef.current?.scrollToMessageId(messageId))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, conversation])
-
   if (state.phase === 'not-found') return <Tombstone reason="not-found" />
 
   if (state.phase === 'withdrawn') {
@@ -221,26 +146,21 @@ export function SessionReader({ sid }: { sid: string }) {
     )
   }
 
-  // PROTOTYPE (throwaway): ?variant=doc|bench|cover swaps the rendered
-  // subtree; data fetching above is untouched. Default renders the page
-  // exactly as before.
-  if (state.phase === 'ready' && conversation !== null && variant !== 'current') {
-    const variantProps = {
-      meta: state.meta,
-      view: state.view,
-      provider,
-      conversation,
-      isDark,
-      fetchRange: localFetchRange,
-    }
+  if (state.phase === 'ready' && conversation !== null) {
     return (
       <Page>
         <Header />
-        {variant === 'doc' && <VariantDoc {...variantProps} />}
-        {variant === 'bench' && <VariantBench {...variantProps} />}
-        {variant === 'cover' && <VariantCover {...variantProps} />}
+        <SessionWorkbench
+          key={sid}
+          meta={state.meta}
+          view={state.view}
+          provider={provider}
+          conversation={conversation}
+          isDark={isDark}
+          fetchRange={localFetchRange}
+          initialRecordIndex={deepLinkIndex(window.location.hash)}
+        />
         <Footer />
-        <PrototypeSwitcher variant={variant} onChange={setVariant} />
       </Page>
     )
   }
@@ -248,7 +168,7 @@ export function SessionReader({ sid }: { sid: string }) {
   return (
     <Page>
       <Header />
-      <main className="sw-main sw-session-main">
+      <main className="sw-main center">
         {state.phase === 'loading' && (
           <p className="sw-session-loading">
             {state.total === null
@@ -256,80 +176,8 @@ export function SessionReader({ sid }: { sid: string }) {
               : `Loading records ${state.loaded}/${state.total}…`}
           </p>
         )}
-        {state.phase === 'ready' && (
-          <>
-            <FirstScreen
-              meta={state.meta}
-              view={state.view}
-              onOpenFile={setOpenFile}
-              onJumpToRecord={jumpToRecord}
-            />
-            {state.meta.spoolFileOid != null && (
-              <div className="sw-session-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === 'conversation'}
-                  className={viewMode === 'conversation' ? 'active' : ''}
-                  onClick={() => setViewMode('conversation')}
-                >
-                  Conversation
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === 'document'}
-                  className={viewMode === 'document' ? 'active' : ''}
-                  onClick={openDocument}
-                >
-                  Document
-                </button>
-                {viewMode === 'document' && spoolDoc !== null && (
-                  <button type="button" className="download" onClick={downloadSpoolDoc}>
-                    Download .spool
-                  </button>
-                )}
-              </div>
-            )}
-            {viewMode === 'document' && (
-              <section className="sw-session-document">
-                {spoolDoc === null
-                  ? <p className="sw-session-loading">Loading document…</p>
-                  : <SnapshotReader snapshot={snapshotFromSpoolDocument(spoolDoc)} />}
-              </section>
-            )}
-            <div className="sw-session-layers" style={viewMode === 'document' ? { display: 'none' } : undefined}>
-              <section className="sw-session-conversation">
-                {conversation && conversation.messages.length > 0
-                  ? (
-                    <MessageList
-                      key={sid}
-                      ref={listRef}
-                      messages={conversation.messages}
-                      isDark={isDark}
-                      targetMessageId={targetMessageId}
-                      showTargetHighlight={targetMessageId !== null}
-                    />
-                  )
-                  : <p className="sw-session-loading">No renderable messages in this session.</p>}
-              </section>
-              {state.view && (
-                <DiffPane
-                  view={state.view}
-                  provider={provider}
-                  fetchRange={localFetchRange}
-                  openFile={openFile}
-                  highlightRecord={highlightRecord}
-                  onSelectFile={setOpenFile}
-                  onJumpToRecord={jumpToRecord}
-                />
-              )}
-            </div>
-          </>
-        )}
       </main>
       <Footer />
-      <PrototypeSwitcher variant={variant} onChange={setVariant} />
     </Page>
   )
 }

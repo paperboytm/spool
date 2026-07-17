@@ -27,7 +27,15 @@ const markdownComponents: ComponentProps<typeof ReactMarkdown>['components'] = {
     )
   },
   img({ node: _node, alt, ...props }) {
-    return <img {...props} alt={alt ?? ''} loading="lazy" decoding="async" />
+    return (
+      <img
+        {...props}
+        alt={alt ?? ''}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+      />
+    )
   },
 }
 

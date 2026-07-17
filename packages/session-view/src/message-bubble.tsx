@@ -76,7 +76,7 @@ function MessageBubble({
         {showAvatar ? (
           <div className={`flex-none w-5 h-5 rounded-full mt-0.5 flex items-center justify-center text-[9px] font-bold ${
             isUser
-              ? 'bg-blue-500 text-white'
+              ? 'bg-accent text-white dark:bg-accent-dark dark:text-neutral-950'
               : 'bg-neutral-700 text-white dark:bg-neutral-300 dark:text-neutral-900'
           }`}>
             {isUser ? 'U' : 'A'}

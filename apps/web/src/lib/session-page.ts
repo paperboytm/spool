@@ -2,28 +2,6 @@
 // string-in/value-out so the fallback chains and deep links test in node.
 
 import type { HubSessionMeta } from './hub-api'
-import type { SessionViewV1 } from '@spool-lab/session-kit'
-
-/** First-screen self-description, three-level degradation (design §5). */
-export type NoteDisplay =
-  | { kind: 'note'; note: string }
-  | { kind: 'last-reply'; lastReply: string }
-  | { kind: 'prompt-and-reply'; firstPrompt: string; lastReply: string }
-  | { kind: 'none' }
-
-export function noteDisplayFor(
-  noteMd: string | null,
-  view: SessionViewV1 | null,
-): NoteDisplay {
-  const note = noteMd?.trim()
-  if (note) return { kind: 'note', note }
-  const lastReply = view?.lastReply.trim() ?? ''
-  const firstPrompt = view?.firstPrompt.trim() ?? ''
-  if (lastReply && firstPrompt) return { kind: 'prompt-and-reply', firstPrompt, lastReply }
-  if (lastReply) return { kind: 'last-reply', lastReply }
-  if (firstPrompt) return { kind: 'prompt-and-reply', firstPrompt, lastReply: '' }
-  return { kind: 'none' }
-}
 
 export interface WorkspaceCardDisplay {
   remotes: string[]
@@ -44,28 +22,6 @@ export function parseWorkspaceCard(cardJson: string | null): WorkspaceCardDispla
       head: stringOrNull(parsed['head']),
       dirty: stringArray(parsed['dirty']),
       observed: stringOrNull(parsed['observed']),
-    }
-  } catch {
-    return null
-  }
-}
-
-export interface LineageDisplay {
-  sid: string
-  position: number
-  url: string | null
-}
-
-export function parseLineage(lineageJson: string | null): LineageDisplay | null {
-  if (!lineageJson) return null
-  try {
-    const parsed = JSON.parse(lineageJson) as { source?: { sid?: unknown; position?: unknown; url?: unknown } }
-    const source = parsed.source
-    if (!source || typeof source.sid !== 'string' || typeof source.position !== 'number') return null
-    return {
-      sid: source.sid,
-      position: source.position,
-      url: typeof source.url === 'string' ? source.url : null,
     }
   } catch {
     return null

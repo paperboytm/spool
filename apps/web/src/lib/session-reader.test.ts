@@ -13,13 +13,10 @@ import { routeFor } from './route'
 import {
   deepLinkHash,
   deepLinkIndex,
-  noteDisplayFor,
-  parseLineage,
   parseWorkspaceCard,
   providerOf,
   resumeCommandFor,
 } from './session-page'
-import type { SessionViewV1 } from '@spool-lab/session-kit'
 
 describe('route /session/:sid', () => {
   it('matches valid sids and rejects junk', () => {
@@ -73,37 +70,12 @@ describe('record fetching', () => {
   })
 })
 
-describe('first-screen fallback chain', () => {
-  const view = (firstPrompt: string, lastReply: string): SessionViewV1 => ({
-    v: 1,
-    index: [],
-    files: [],
-    outline: [],
-    firstPrompt,
-    lastReply,
-    diffstat: { files: 0, adds: 0, dels: 0 },
-  })
-
-  it('prefers the author note, then last reply + first prompt, then nothing', () => {
-    expect(noteDisplayFor('why I share this', view('p', 'r'))).toEqual({ kind: 'note', note: 'why I share this' })
-    expect(noteDisplayFor('  ', view('p', 'r'))).toEqual({
-      kind: 'prompt-and-reply', firstPrompt: 'p', lastReply: 'r',
-    })
-    expect(noteDisplayFor(null, view('', 'r'))).toEqual({ kind: 'last-reply', lastReply: 'r' })
-    expect(noteDisplayFor(null, view('p', ''))).toEqual({
-      kind: 'prompt-and-reply', firstPrompt: 'p', lastReply: '',
-    })
-    expect(noteDisplayFor(null, null)).toEqual({ kind: 'none' })
-  })
-
-  it('parses workspace cards and lineage defensively', () => {
+describe('workbench metadata', () => {
+  it('parses workspace cards defensively', () => {
     expect(parseWorkspaceCard(null)).toBeNull()
     expect(parseWorkspaceCard('not json')).toBeNull()
     expect(parseWorkspaceCard('{"remotes":["origin: x"],"branch":"main","head":"abc","dirty":[],"observed":"t"}'))
       .toEqual({ remotes: ['origin: x'], branch: 'main', head: 'abc', dirty: [], observed: 't' })
-    expect(parseLineage('{"source":{"sid":"claude_x","position":9,"url":null}}'))
-      .toEqual({ sid: 'claude_x', position: 9, url: null })
-    expect(parseLineage('{"source":{}}')).toBeNull()
   })
 })
 
