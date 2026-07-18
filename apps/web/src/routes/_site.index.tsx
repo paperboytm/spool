@@ -2,21 +2,18 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import HomePage from '../components/site/home'
 
-const TITLE = 'Spool — Your AI session library'
+const TITLE = 'Spool — Publish and discover agent sessions'
 const DESC =
-  "Every Claude, Codex, Gemini, and OpenCode session you've ever had, in one local library. Browse by project, pin what matters, and search across everything with ⌘K. Local-first; nothing leaves your machine."
+  'Spool is where people publish, discover, understand, and continue real agent sessions.'
 
 const JSON_LD = JSON.stringify({
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
+  '@type': 'WebSite',
   name: 'Spool',
   description:
-    "Your local AI session library. Browse, pin, and search every Claude Code, Codex, Gemini, and OpenCode session you've ever had — entirely on your machine. Your AI agents can query it too via the /spool skill.",
+    'The publishing platform for agent sessions. Read real workflows, inspect their evidence, and continue useful work in your own agent.',
   url: 'https://spool.pro',
-  applicationCategory: 'DeveloperApplication',
-  operatingSystem: 'macOS',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  author: { '@type': 'Person', name: 'Yifeng', url: 'https://github.com/doodlewind' },
+  author: { '@type': 'Organization', name: 'Spool', url: 'https://spool.pro' },
 })
 
 export const Route = createFileRoute('/_site/')({

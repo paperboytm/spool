@@ -1,6 +1,6 @@
 # @spool-lab/cli
 
-Command-line interface for [Spool](https://spool.pro) — search your AI sessions from the terminal.
+CLI for publishing, reading, resuming, and managing agent Sessions with [Spool](https://spool.pro).
 
 ## Install
 
@@ -8,109 +8,81 @@ Command-line interface for [Spool](https://spool.pro) — search your AI session
 npm install -g @spool-lab/cli
 ```
 
-This gives you the `spool` command.
-
-## Commands
-
-### Search & browse
+## Share and Continue
 
 ```bash
-spool search <query>           # Full-text search across all AI sessions
-spool search "auth" --json     # Output as JSON
-spool search "bug" -n 5        # Limit results
-spool search "fix" --since 7d  # Only recent sessions
-
-spool list                     # List recent sessions
-spool list -s opencode -n 10   # Filter by source
-spool list --json              # Output as JSON
-
-spool show <uuid>              # Print full session content
-spool show <sid|url>           # Shared session: first-screen summary
-spool show <session> --log     # Record timeline
-spool show <session> --diff    # Composed net diff across the session
-spool show <session>@r3        # Land on record 3
-spool show <uuid> --json       # Output as JSON
-
-spool status                   # Show index stats (session count, DB size)
-
-spool projects                 # List projects, grouped across sources
-spool projects spool           # List sessions in a project (by name, identity, path, or cwd)
-spool projects spool -n 50     # Limit how many sessions are shown
-spool projects spool --json    # Output as JSON
+spool sync
+spool login
+spool share <session-uuid>
+spool resume <session-id-or-url>
+spool withdraw <session-id-or-url>
 ```
 
-A project query matches its name, identity key, project display path, or any
-session cwd — an exact name wins over partial matches, and ambiguous queries
-list the candidates so you can refine.
+`spool share` supports Claude Code and Codex CLI Sessions. It checks records for likely sensitive values, creates a Link-only URL, and can ask a detected local Agent to draft the optional Summary.
 
-### Pin
+Useful publishing options:
 
 ```bash
-spool pin <uuid>               # Pin a session to the top of your library
-spool unpin <uuid>             # Remove a session from the pinned list
-spool pinned                   # List pinned sessions
-spool pinned --json            # Output as JSON
+spool share <uuid>@12             # first 12 records
+spool share --summary "..."       # provide Summary Markdown
+spool share --no-agent-summary    # skip local Agent generation
+spool share --spool-file x.spool  # attach a curated document
+spool share --yes                 # skip sensitive-data confirmation
 ```
 
-Pins are shared with the Spool desktop app — pinning here surfaces the
-session in the app's library on its next refresh, and vice versa.
+Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.
 
-### Share & resume
-
-Share a session to [spool.pro](https://spool.pro) and pick it up on
-another machine — or someone else's.
+## Read Sessions
 
 ```bash
-spool login                    # Sign in via browser approval (works over SSH)
-spool login --token <t>        # Paste a hub API token instead (CI / scripts)
-spool logout                   # Revoke this machine's token + delete local credentials
-
-spool share                    # Upload, then offer a detected local Agent for Summary
-spool share <uuid>             # Share a specific session (uuid prefixes work)
-spool share <uuid>@12          # Share only the first 12 records
-spool share --no-agent-summary # Upload without the post-share Agent offer
-spool share --summary "..."    # Advanced: provide Summary Markdown directly
-spool share --yes              # Skip the secret-findings confirmation
-
-spool resume <sid|url>         # Materialize a shared session and fork it natively
-spool resume <sid>@12          # Fork at record 12 (first 12 records only)
-spool resume --workspace <dir> # Resume in a specific workspace root
-spool resume --no-exec         # Print the native resume command instead of launching
-
-spool withdraw <sid|url>       # Take a shared session down (tombstone)
+spool show <uuid>                 # local conversation
+spool show <session-id-or-url>    # Shared Session overview
+spool show <session> --log        # record timeline
+spool show <session> --diff       # composed net diff
+spool show <session>@r3           # specific record
+spool show <session> --json       # machine-readable output
 ```
 
-`spool share` scans for secrets, uploads the session, then detects Claude
-Code and Codex CLI. In an interactive terminal it asks whether one of those
-local Agents should generate a Summary and automatically uploads the result.
-All prompts and progress use Clack. `spool resume` writes a brand-new
-provider-native session (Claude → `~/.claude/projects`, Codex →
-`~/.codex/sessions`) and launches the provider's fork entry point, so
-continued work branches off cleanly from the share point.
-
-### Sync
+## Prepare and Find Local Sessions
 
 ```bash
-spool sync                     # Index new AI sessions (Claude, Codex, Gemini, OpenCode, Pi)
-spool sync --watch             # Keep watching for new sessions
+spool sync [--watch]
+spool list [-s <source>] [-n <count>] [--json]
+spool projects [name] [-n <count>] [--json]
+spool search <query> [-s <source>] [--since 7d] [-n 10] [--json]
+spool status
 ```
 
-### Doctor
+Local preparation supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Sync and search do not publish anything.
+
+## Private Organization
 
 ```bash
-spool doctor                   # Diagnose your environment, database, and config
-spool doctor db.integrity      # Run a single check by id
-spool doctor --json            # Machine-readable output
-spool doctor --fix             # Apply safe fixes for failing checks
-spool doctor --fix --force     # Also apply destructive fixes
+spool pin <uuid>
+spool unpin <uuid>
+spool pinned [--json]
 ```
 
-## Data location
+Pin state is shared with Desktop and does not affect Public Profile order or Discovery ranking.
 
-All data is stored locally in `~/.spool/`:
+## Diagnostics
 
-- `spool.db` — SQLite database with sessions and messages
-- `hub-credentials.json` — hub URL + API token from `spool login`
+```bash
+spool doctor
+spool doctor <check-id>
+spool doctor --json
+spool doctor --fix
+spool doctor --fix --force
+```
+
+## Local Data
+
+The CLI uses `~/.spool/` by default:
+
+- `spool.db` — local Session metadata, messages, search, and state
+- `hub-credentials.json` — revocable Hub credential from `spool login`
+
+Set `SPOOL_DATA_DIR` to isolate a different data directory.
 
 ## License
 

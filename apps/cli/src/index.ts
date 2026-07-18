@@ -25,7 +25,7 @@ const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8
 
 program
   .name('spool')
-  .description('A local search engine for your thinking — search across all your AI sessions')
+  .description('Publish, read, resume, and manage agent sessions with Spool')
   .version(pkg.version)
 
 program.addCommand(searchCommand)

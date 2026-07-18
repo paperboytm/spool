@@ -4,7 +4,7 @@ description: Share the current session and a share-ready Summary to the Spool hu
 allowed-tools: Bash
 ---
 
-Spool turns an AI coding session into something you can hand to someone else: **share** publishes the selected records to the hub as a URL teammates read and fork from any machine. A share can carry a Markdown Summary; in an interactive terminal the CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Underneath sits a local index of every session on this machine — claude, codex, gemini, opencode, pi — so **any agent with a shell can recall any other agent's sessions**.
+Spool is the publishing platform for agent Sessions. **Share** sends the selected records to the Hub and creates a Link-only URL that other people can read and resume from another machine; Public visibility is always a separate author choice. A Share can carry a Markdown Summary: the interactive CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Local preparation covers Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi, so **any agent with a shell can recall another agent's Sessions**.
 
 ## Routing
 
@@ -40,6 +40,7 @@ Only **claude** and **codex** sessions can be shared. Sharing publishes the sele
    - **Next steps** only when the session supports them.
 
    Distinguish completed work from proposals and unresolved items; never invent outcomes.
+
 4. Pass that Summary directly. Agent tool shells are non-interactive, so do not rely on the CLI's post-upload Agent prompt:
 
 ```bash
@@ -87,7 +88,7 @@ Pick the cheapest view that answers the question; the full transcript is the mos
 | --------------------------- | -------------------------------------------------------------- |
 | what happened, step by step | `spool show <uuid> --log` — one line per record                |
 | what code it changed        | `spool show <uuid> --diff` — net diff across the whole session |
-| one specific record         | `spool show <uuid>@r<n>` — pretty-printed record JSON           |
+| one specific record         | `spool show <uuid>@r<n>` — pretty-printed record JSON          |
 | the full conversation       | `spool show <uuid>`                                            |
 
 For local Gemini, OpenCode, and Pi sessions, use the full transcript: record-level `--log`, `--diff`, and `@r<n>` views currently require Claude or Codex raw records. Local UUID prefixes are accepted when unique.
@@ -98,16 +99,16 @@ Fold what you found into your reply as ordinary context, citing the source per c
 
 ## Command reference
 
-| Command                                                  | Does                                                                                                             |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `spool sync [--watch]`                                   | Index new sessions; `--watch` stays running                                                                      |
-| `spool search <query> [-s <source>] [--since 7d]`        | Full-text search; add `--json` for machine-readable results                                                      |
-| `spool list [-s <source>] [-p <path>] [-n <count>]`      | Recent sessions; filters apply to a recent window, so raise `-n` when filtering                                  |
-| `spool projects [query] [-n <count>]`                    | Project groups, or sessions for a name, identity key, path, or cwd                                               |
-| `spool show <uuid\|sid\|url>`                            | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data |
-| `spool pin <uuid>` / `unpin <uuid>` / `pinned`           | Bookmark and list sessions; state is shared with the Spool app Library                                           |
-| `spool status` / `spool doctor [checkId] [--fix]`        | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                 |
-| `spool login [--token <t>]` / `spool logout`             | Hub browser-device auth (or token for automation) / revoke and clear credentials                                 |
-| `spool share [<uuid>[@<n>]] [--summary <markdown>]`      | Publish selected Claude/Codex records; also supports `--no-agent-summary`, `--yes`, and `--spool-file`            |
-| `spool withdraw <sid\|url>`                              | Tombstone a share so its URL stops resolving                                                                     |
-| `spool resume <sid\|url>[@<n>] [--workspace <dir>]`      | Materialize and natively fork a share; `--no-exec` prints the command without launching                          |
+| Command                                             | Does                                                                                                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `spool sync [--watch]`                              | Index new sessions; `--watch` stays running                                                                        |
+| `spool search <query> [-s <source>] [--since 7d]`   | Full-text search; add `--json` for machine-readable results                                                        |
+| `spool list [-s <source>] [-p <path>] [-n <count>]` | Recent sessions; filters apply to a recent window, so raise `-n` when filtering                                    |
+| `spool projects [query] [-n <count>]`               | Project groups, or sessions for a name, identity key, path, or cwd                                                 |
+| `spool show <uuid\|sid\|url>`                       | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data |
+| `spool pin <uuid>` / `unpin <uuid>` / `pinned`      | Bookmark and list sessions; state is shared with the Spool app Library                                             |
+| `spool status` / `spool doctor [checkId] [--fix]`   | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                   |
+| `spool login [--token <t>]` / `spool logout`        | Hub browser-device auth (or token for automation) / revoke and clear credentials                                   |
+| `spool share [<uuid>[@<n>]] [--summary <markdown>]` | Publish selected Claude/Codex records; also supports `--no-agent-summary`, `--yes`, and `--spool-file`             |
+| `spool withdraw <sid\|url>`                         | Tombstone a share so its URL stops resolving                                                                       |
+| `spool resume <sid\|url>[@<n>] [--workspace <dir>]` | Materialize and natively fork a share; `--no-exec` prints the command without launching                            |

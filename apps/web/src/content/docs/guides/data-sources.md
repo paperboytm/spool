@@ -1,21 +1,38 @@
 ---
-title: Data Sources
-description: AI agent session sources that Spool indexes.
+title: Session Sources
+description: Agent Session sources supported by Spool.
 ---
 
-Spool indexes your AI agent sessions automatically. Each source is watched in real time — new sessions appear in your library and become searchable the moment they're written, no manual export needed.
+Spool prepares Sessions from supported coding agents so an author can choose what to share. Source support differs between local preparation and Hub publishing.
 
-## Agent sessions
+## Support matrix
 
-| Agent                  | Path                                  |
-| ---------------------- | ------------------------------------- |
-| Claude Code            | `~/.claude/projects/`                 |
-| Claude Code (profiles) | `~/.claude-profiles/*/projects/`      |
-| Codex CLI              | `~/.codex/sessions/`                  |
-| Codex CLI (profiles)   | `~/.codex-profiles/*/sessions/`       |
-| Gemini CLI             | `~/.gemini/tmp/*/chats/`              |
-| OpenCode               | `~/.local/share/opencode/opencode.db` |
+| Agent       | Local preparation | Hub Share / Resume | Default source location               |
+| ----------- | ----------------- | ------------------ | ------------------------------------- |
+| Claude Code | Yes               | Yes                | `~/.claude/projects/`                 |
+| Codex CLI   | Yes               | Yes                | `~/.codex/sessions/`                  |
+| Gemini CLI  | Yes               | Not yet            | `~/.gemini/tmp/*/chats/`              |
+| OpenCode    | Yes               | Not yet            | `~/.local/share/opencode/opencode.db` |
+| Pi          | Yes               | Not yet            | `~/.pi/agent/sessions/`               |
 
-## Platform data (Twitter, GitHub, Reddit, etc.)
+Claude Code and Codex profile directories are also detected:
 
-Connector-based platform sync (bookmarks, stars, saves) lives in **[Spool Daemon](/daemon/)**, a sibling app. Daemon's captures show up alongside Spool sessions in the same library and search results when both apps are installed.
+```text
+~/.claude-profiles/*/projects/
+~/.codex-profiles/*/sessions/
+```
+
+## Local preparation
+
+Desktop watches supported source locations while it runs. The CLI can trigger the same ingestion explicitly:
+
+```bash
+spool sync
+spool sync --watch
+```
+
+Ingestion does not publish a Session. It makes the Session available for review, organization, search, and an explicit Share action.
+
+## Adding a source
+
+A source must preserve enough provider structure for faithful rendering and, before Hub support is enabled, safe canonical records and native Resume behavior. Source badges are added to public UI only when that source can actually produce the relevant artifact.

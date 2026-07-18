@@ -13,8 +13,10 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             Spool<span className="dot">.</span>
           </Link>
           <nav className="links">
-            <Link to="/">Spool</Link>
-            <Link to="/daemon">Daemon</Link>
+            <Link to="/">Explore</Link>
+            <Link to="/docs/$" params={{ _splat: 'guides/publishing' }}>
+              Publish
+            </Link>
             <Link to="/docs/$" params={{ _splat: 'installation' }}>
               Docs
             </Link>
@@ -37,13 +39,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
               <strong>Spool</strong>
               <span style={{ color: 'var(--accent)' }}>.</span>
             </Link>
-            <Link to="/daemon" className="foot-prod">
-              <strong>Daemon</strong>
-              <span style={{ color: 'var(--accent)' }}>.</span>
-            </Link>
           </div>
           <div>
-            Local-first tools for how you think and capture. Made by{' '}
+            Publish, discover, and continue agent Sessions. Made by{' '}
             <strong style={{ color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
               spool-lab
             </strong>

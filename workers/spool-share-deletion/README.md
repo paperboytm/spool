@@ -1,13 +1,14 @@
 # spool-share-deletion
 
-Cron companion Worker for the share backend. `POST /api/me/delete` only
-queues; this Worker's 6-hourly sweep does the actual deletion (D1 scrub,
-KV tombstones, R2 cleanup). Pages Functions can't register crons, hence
-the standalone Worker. The sweep logic lives in
-`packages/share-backend/functions/_scheduled/deletion-worker.ts`
-(unit-tested in `packages/share-backend/tests/deletion-worker.test.ts`;
-the deploy shape — re-export path, binding set, cron — is pinned by
-`tests/deletion-worker-deploy.test.ts` in the same suite).
+Cron companion Worker for the Spool backend. `POST /api/me/delete` queues
+an account deletion; this Worker's six-hour sweep performs the D1 scrub,
+KV tombstones, and publication, avatar, and Hub R2 cleanup. Pages Functions
+cannot register cron triggers, so the scheduled handler deploys as a standalone Worker.
+
+The sweep logic lives in
+`apps/backend/functions/_scheduled/deletion-worker.ts`, is covered by
+`apps/backend/tests/deletion-worker.test.ts`, and has its deploy shape
+pinned by `apps/backend/tests/deletion-worker-deploy.test.ts`.
 
 ## Deploy
 
@@ -31,9 +32,13 @@ P=/tmp/deletion-verify
 
 # schema + seed (a due deletion with one published share)
 npx wrangler d1 execute DB --local --config wrangler.local.toml --persist-to $P \
-  --file ../../packages/share-backend/migrations/0001_init.sql
+  --file ../../apps/backend/migrations/0001_init.sql
 npx wrangler d1 execute DB --local --config wrangler.local.toml --persist-to $P \
-  --file ../../packages/share-backend/migrations/0002_profile_customize.sql
+  --file ../../apps/backend/migrations/0002_profile_customize.sql
+npx wrangler d1 execute DB --local --config wrangler.local.toml --persist-to $P \
+  --file ../../apps/backend/migrations/0003_hub.sql
+npx wrangler d1 execute DB --local --config wrangler.local.toml --persist-to $P \
+  --file ../../apps/backend/migrations/0004_hub_spool_file.sql
 npx wrangler d1 execute DB --local --config wrangler.local.toml --persist-to $P --command "
   INSERT INTO users(id,email,name,avatar_url,created_at,last_signin_at) VALUES('u1','u1@example.com','U One','https://x/a.png',1,1);
   INSERT INTO user_identities(provider,provider_sub,user_id,email,linked_at) VALUES('google','g-u1','u1','u1@example.com',1);

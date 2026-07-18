@@ -15,6 +15,7 @@ export type DeletionEnv = {
   SNAPSHOTS: R2Bucket
   OG: R2Bucket
   AVATARS: R2Bucket
+  HUB: R2Bucket
 }
 
 // Runtime mirror of DeletionEnv's keys. The companion Worker's
@@ -27,6 +28,7 @@ export const DELETION_BINDING_NAMES = [
   'SNAPSHOTS',
   'OG',
   'AVATARS',
+  'HUB',
 ] as const satisfies readonly (keyof DeletionEnv)[]
 
 // Bounded window for the R2 orphan sweep — long enough to catch a
@@ -38,6 +40,11 @@ const ORPHAN_SWEEP_WINDOW_MS = 7 * 24 * 3600 * 1000
 // Cap on shares processed per orphan sweep. With a 6h cron this drains
 // up to 2k stale objects/day — far above any realistic v0.5 backlog.
 const ORPHAN_SWEEP_LIMIT = 500
+
+// Bound one invocation's prefix work. Reaching the cap is an error so
+// deletion_queue stays in place; the next cron resumes idempotently from
+// the objects that remain under the prefix.
+const R2_PREFIX_SWEEP_MAX_PAGES = 32
 
 export async function runDeletionSweep(env: DeletionEnv, now: number): Promise<void> {
   await sweepDeletedUsers(env, now)
@@ -65,6 +72,18 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         .first()
       if (!stillDue) continue
 
+      // Fail closed before touching physical Hub data. Every Hub read
+      // passes through requireReadableSession(), where withdrawn_at is
+      // a hard 410 gate. If any later R2/D1 step fails, this tombstone
+      // remains in place while the queue row drives a retry.
+      await env.DB.prepare(
+        'UPDATE hub_sessions SET withdrawn_at=?, updated_at=? WHERE owner_user_id=? AND withdrawn_at IS NULL',
+      )
+        .bind(now, now, row.user_id)
+        .run()
+
+      await deleteHubContent(env, row.user_id)
+
       const shares = await env.DB.prepare('SELECT id FROM published_shares WHERE user_id=?')
         .bind(row.user_id)
         .all<{ id: string }>()
@@ -85,38 +104,80 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         ]),
       )
 
-      await Promise.all([
+      // Avatar R2 cleanup is retriable work too. Complete it before
+      // the D1 scrub so an R2 failure cannot race the queue-row delete.
+      await deleteAvatarPrefix(env, row.user_id)
+
+      // D1 batches are transactional in D1: a failed statement rolls
+      // the whole batch back. Keep deletion_queue out of this batch so
+      // any D1 failure is retried; remove it only after every other
+      // destructive step has completed.
+      await env.DB.batch([
         env.DB.prepare(
           'UPDATE published_shares SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL',
-        )
-          .bind(now, row.user_id)
-          .run(),
-        env.DB.prepare('UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL')
-          .bind(now, row.user_id)
-          .run(),
+        ).bind(now, row.user_id),
+        env.DB.prepare(
+          'UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL',
+        ).bind(now, row.user_id),
         // Drop every (provider, sub) link this user had. A fresh sign-in
         // from the same Google / GitHub / … account then finds no
         // identity row → upsertUserByIdentity creates a brand-new user
         // row, no permanent ban from the soft-deleted tombstone.
-        env.DB.prepare('DELETE FROM user_identities WHERE user_id=?').bind(row.user_id).run(),
+        env.DB.prepare('DELETE FROM user_identities WHERE user_id=?').bind(row.user_id),
+        env.DB.prepare('DELETE FROM api_tokens WHERE user_id=?').bind(row.user_id),
         env.DB.prepare(
           "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, " +
             'display_name=NULL, custom_avatar_id=NULL, deleted_at=? WHERE id=?',
-        )
-          .bind(now, row.user_id)
-          .run(),
-        env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?').bind(row.user_id).run(),
-        // R2 avatars/ prefix sweep. R2 list+delete must be paged for
-        // very large prefixes; per-user the count is at most the upload
-        // history (capped at 10/h via rate-limit), so one or two pages
-        // is the realistic worst case.
-        deleteAvatarPrefix(env, row.user_id),
+        ).bind(now, row.user_id),
       ])
+
+      await env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?').bind(row.user_id).run()
     } catch (e) {
       // One bad user shouldn't block the rest of the sweep.
-      console.error('deletion sweep failed for', row.user_id, e)
+      console.error(
+        JSON.stringify({
+          message: 'account deletion sweep failed',
+          userId: row.user_id,
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      )
     }
   }
+}
+
+async function deleteHubContent(env: DeletionEnv, userId: string): Promise<void> {
+  // hub_objects is deduplicated per owner, and one physical pack can
+  // contain objects used by several Sessions. Enumerate the owner's
+  // DISTINCT physical pack keys instead of deriving a key per Session.
+  const packs = await env.DB.prepare(
+    'SELECT DISTINCT pack_key FROM hub_objects WHERE owner_user_id=?',
+  )
+    .bind(userId)
+    .all<{ pack_key: string }>()
+
+  await deleteR2Keys(
+    env.HUB,
+    packs.results.map((row) => row.pack_key),
+  )
+
+  // A pack upload reaches R2 before its hub_objects rows reach D1. If
+  // that D1 insert fails, DISTINCT pack_key cannot discover the orphan.
+  // The account's Hub write gate is already closed while deletion is
+  // pending, so a complete owner-prefix sweep safely covers referenced
+  // and orphaned packs alike. Any list/delete/page-limit failure throws
+  // before the D1 rows or deletion_queue row are removed.
+  await deleteR2Prefix(env.HUB, `hub/packs/${userId}/`)
+
+  // Manifest keys are global (`hub/manifests/<root>`), not owner-scoped:
+  // another owner committing the same content can share the key. There
+  // is no cross-service transaction that makes a D1 reference check plus
+  // R2 deletion race-free, so retain these small hash manifests rather
+  // than risk breaking another owner's Session. The owner-scoped packs
+  // above contain the actual Session bodies and are always deleted.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM hub_objects WHERE owner_user_id=?').bind(userId),
+    env.DB.prepare('DELETE FROM hub_sessions WHERE owner_user_id=?').bind(userId),
+  ])
 }
 
 async function sweepOrphanShareAssets(env: DeletionEnv, now: number): Promise<void> {
@@ -149,17 +210,32 @@ async function deleteAvatarPrefix(env: DeletionEnv, userId: string): Promise<voi
   // upload rate-limit (10/h) so one page is the realistic case, but
   // we still page until R2 says it's done so a stuck/orphaned tail
   // doesn't survive the user's hard-delete.
-  const prefix = `avatars/${userId}/`
+  await deleteR2Prefix(env.AVATARS, `avatars/${userId}/`)
+}
+
+async function deleteR2Prefix(bucket: R2Bucket, prefix: string): Promise<void> {
   let cursor: string | undefined
-  for (let page = 0; page < 32; page++) {
+  for (let page = 0; page < R2_PREFIX_SWEEP_MAX_PAGES; page++) {
     // Conditional spread instead of `cursor` directly: with
     // exactOptionalPropertyTypes, R2ListOptions doesn't accept an
     // explicit `cursor: undefined`.
-    const listing = await env.AVATARS.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) })
-    await Promise.all(listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)))
+    const listing = await bucket.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) })
+    await deleteR2Keys(
+      bucket,
+      listing.objects.map((object) => object.key),
+    )
     if (!listing.truncated) return
     cursor = listing.cursor
-    if (!cursor) return
+    if (!cursor) throw new Error(`R2 listing for ${prefix} was truncated without a cursor`)
+  }
+  throw new Error(`R2 prefix deletion exceeded its page limit: ${prefix}`)
+}
+
+async function deleteR2Keys(bucket: R2Bucket, keys: readonly string[]): Promise<void> {
+  // Workers R2 accepts at most 1,000 keys per bulk delete. Missing keys
+  // are harmless, which makes a partially completed retry idempotent.
+  for (let start = 0; start < keys.length; start += 1000) {
+    await bucket.delete(keys.slice(start, start + 1000))
   }
 }
 

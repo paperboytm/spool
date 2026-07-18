@@ -1,60 +1,98 @@
 # @spool/backend
 
-Cloudflare Pages Functions backing `spool.pro`: auth, publish/read/revoke, OG image generation, profile, /me, and admin audit access.
+Cloudflare Pages Functions backing spool.pro identity, Hub storage, Session reads, publication documents, Profiles, account management, media, and audit surfaces.
 
-Auth surfaces (WorkOS AuthKit is the only identity provider):
+## Responsibilities
 
-- **Web** — AuthKit authorization-code flow via the provider registry (`/api/auth/workos/{start,callback}`). First WorkOS sign-in links onto a pre-existing Google-era account via the WorkOS identities API (`resolveAliasIdentities`), so legacy users keep their handle and shares.
-- **Desktop** — WorkOS PKCE public client (per the official Electron example): the app runs authorize in the system browser with a `spool://auth/callback` custom-scheme redirect, then posts `{code, code_verifier}` to `/api/auth/sign-in-with-code`, which redeems the code, reuses the web upsert/linking path, and mints a KV session.
-- **CLI** — self-hosted device flow under `/api/cli-auth/{start,approve,poll}`: `spool login` opens `spool.pro/cli-auth?code=XXXX-XXXX`, the signed-in user approves in the browser, the CLI polls and claims a `sph_` API token. Works over SSH (the poll loop receives the token, not the browser). Deliberately not WorkOS's device grant: the broker rides the web session, so the CLI stays provider-agnostic. `spool logout` revokes the token via `DELETE /api/hub/v1/tokens` (self-revoke: the bearer names the token to kill; a web session can't).
+- authenticate Web, Desktop, and CLI clients;
+- store content-addressed Session records, views, and attached `.spool` documents;
+- enforce owner-scoped writes, Link-only reads, withdrawal, quotas, and rate limits;
+- serve public Session metadata and ranged records;
+- manage Profile identity and publication visibility;
+- generate social metadata and images;
+- schedule account deletion and physical object cleanup.
 
-> **Resource IDs are not in this repo.** Production D1 / KV / R2 bindings are configured per-project in the Cloudflare Pages dashboard. `wrangler.toml` carries only the binding names + bucket names + binding shape — `database_id` / KV `id` fields are intentionally omitted. External contributors do not need any Cloudflare account to run the full stack locally; `wrangler pages dev` emulates every binding with throwaway files under `.wrangler/state/`. The Pages dashboard is the source of truth for production. See `docs/runbooks/spool-share-launch.md` §1 for the one-time prod setup; operator may keep a local `wrangler.toml.local` (gitignored) if they want a copy with real ids for occasional remote operations.
+The Hub does not modify provider Session content. Canonical records are verified on write, and content-object deduplication is isolated per owner.
 
-## Local development
+## Authentication
 
-Tests are hermetic and need no setup:
+- **Web** — WorkOS AuthKit authorization-code flow through `/api/auth/workos/{start,callback}`
+- **Desktop** — WorkOS PKCE public client with the `spool://auth/callback` custom scheme; the app exchanges the code through `/api/auth/sign-in-with-code`
+- **CLI** — provider-independent browser approval through `/api/cli-auth/{start,approve,poll}`; the polling terminal receives a revocable `sph_` API token
+
+`spool logout` revokes the active CLI token through `DELETE /api/hub/v1/tokens`.
+
+## Cloudflare Bindings
+
+Production resource identifiers are configured on the Cloudflare project, not committed to the repository. Wrangler files define binding names and shape; external contributors can run the complete stack against local emulation.
+
+Bindings include:
+
+- D1 for users, Hub refs, Profiles, credentials, and audit state;
+- KV for web sessions, metadata, rate limits, and nonces;
+- R2 for Session packs, publication documents, avatars, and generated media.
+
+## Tests
+
+The test suite is hermetic and uses in-memory D1/KV/R2 fakes:
 
 ```bash
 pnpm install
-pnpm --filter @spool/backend test
 pnpm --filter @spool/backend typecheck
+pnpm --filter @spool/backend test
 ```
 
-The suite composes handlers against in-memory KV/D1/R2 fakes in `tests/_helpers/fakes.ts`. No wrangler / Cloudflare login required.
+No Cloudflare account is required.
 
-### Running the backend end-to-end against a local app
+## Local Development
 
-For functional smoke tests (publish → read → revoke loop in a real browser, or against the Spool desktop app), boot wrangler with local D1/KV/R2 emulation:
+Create development WorkOS credentials and copy the local secret template:
 
 ```bash
-# 1. Copy the local secrets template + fill in dev WorkOS credentials.
-#    .dev.vars is gitignored. See the file's header for how to obtain each.
 cp apps/backend/.dev.vars.example apps/backend/.dev.vars
 $EDITOR apps/backend/.dev.vars
+```
 
-# 2. Apply migrations to a local SQLite file (one-time + after schema changes).
+Register these redirect URIs in the WorkOS development environment:
+
+```text
+http://localhost:3002/api/auth/workos/callback
+spool://auth/callback
+```
+
+Apply every migration to local D1:
+
+```bash
 cd apps/backend
 corepack pnpm wrangler d1 migrations apply spool-share-db --local
+```
 
-# 3. Boot. Wrangler serves on http://localhost:8788, persists D1/KV/R2 to
-#    .wrangler/state/ (gitignored). No Cloudflare account needed.
+Start only the backend:
+
+```bash
 corepack pnpm dev
 ```
 
-The full three-process dev environment (share-backend + web app + Spool app) ships as `scripts/share-dev.sh` at the repo root — invoke that to bring the whole loop up under one terminal.
+Wrangler serves on `http://localhost:8788` and persists emulated data under `apps/backend/.wrangler/state/`.
 
-## Pre-deploy pentest
-
-Before promoting a build to production, run:
+For Backend + Web + Desktop together:
 
 ```bash
-TARGET=https://staging.spool.pro ./tests/pentest.sh
+./scripts/share-dev.sh
 ```
 
-This probes security headers, unauthenticated access, slug + handle enumeration, and open-redirect surfaces. It exits non-zero on any failure. The script is NOT wired into CI — it is a manual gate.
+## Pre-deploy Security Check
+
+Run the manual probe against staging before production promotion:
+
+```bash
+TARGET=https://staging.spool.pro ./apps/backend/tests/pentest.sh
+```
+
+It checks security headers, unauthenticated access, identifier enumeration, and redirect handling.
 
 ## Deploy
 
-Bindings (D1, KV, R2) and secrets (WorkOS client id + API key, session key, admin user ids) are configured per-Pages-project in the Cloudflare dashboard. The dashboard — not this repo — is the source of truth for production resource ids. See the launch runbook §1 for the one-time setup; on CI, `wrangler pages deploy --project-name spool-share-backend` works without any id in code because the project carries its bindings.
+Production and staging Wrangler files select the Cloudflare project environment. Resource bindings and secrets must already exist on that project.
 
-The scheduled deletion worker (`functions/_scheduled/deletion-worker.ts`) is structured as a standalone `scheduled` handler; Pages Functions do not currently trigger crons, so it should be deployed as a companion Worker against the same bindings.
+The account-deletion scheduled handler is deployed as the companion Worker under `workers/spool-share-deletion`, using the same storage bindings.

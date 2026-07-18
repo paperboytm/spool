@@ -14,8 +14,10 @@ const DOCS_NAV: NavGroup[] = [
   {
     label: 'Guides',
     items: [
+      { slug: '/docs/guides/publishing', title: 'Publishing Sessions' },
+      { slug: '/docs/guides/reading-resuming', title: 'Reading and Resuming' },
       { slug: '/docs/guides/agent-integration', title: 'Agent Integration' },
-      { slug: '/docs/guides/data-sources', title: 'Data Sources' },
+      { slug: '/docs/guides/data-sources', title: 'Session Sources' },
     ],
   },
   {

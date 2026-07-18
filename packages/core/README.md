@@ -1,37 +1,43 @@
 # @spool-lab/core
 
-The engine behind [Spool](https://spool.pro) — a local search engine for your AI sessions.
+Local Session preparation engine used by the Spool desktop app and CLI.
 
-This package provides the core runtime: session parsing, full-text search, and the SQLite database layer. It powers both the Spool desktop app and the `@spool-lab/cli`.
+This package reads provider Sessions, stores normalized metadata and messages in SQLite, groups Sessions by project, maintains private organization state, and provides local full-text retrieval. Preparation is separate from publishing; Hub transport and public visibility do not live in this package.
 
 ## Usage
 
 ```ts
-import { getDB, searchFragments, listRecentSessions, Syncer } from '@spool-lab/core'
+import { getDB, listRecentSessions, searchFragments, Syncer } from '@spool-lab/core'
 
 const db = getDB()
 
-// Search across all indexed sessions
 const results = searchFragments(db, 'authentication middleware', { limit: 10 })
-
-// List recent sessions
 const sessions = listRecentSessions(db, 20)
 
-// Sync new sessions from Claude, Codex, Gemini, OpenCode
 const syncer = new Syncer(db)
 syncer.syncAll()
 ```
 
-## What's inside
+## Responsibilities
 
-- **Session parsers** — reads Claude Code, Codex, Gemini CLI, and OpenCode sessions
-- **Full-text search** — FTS5 with unicode + trigram indexes for CJK support
-- **Watcher** — incremental indexing as new session files arrive
-- **Stars** — pin sessions for quick recall
+- provider Session loading for Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi
+- project grouping across agent sources
+- incremental file and database ingestion
+- SQLite metadata and message storage
+- FTS5 retrieval, including CJK-friendly indexes
+- private pins and desktop state
+- security-scan storage and maintenance helpers
 
-## Native dependency
+Browser-safe canonical records, views, and composed Session diffs belong to `@spool-lab/session-kit`.
 
-This package depends on [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3), which includes a native C++ addon. On most platforms, prebuilt binaries are downloaded automatically during install. If that fails, you'll need a C++ toolchain (Python 3, node-gyp).
+## Native Dependency
+
+This package depends on [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3). The native binary must match the active Node or Electron runtime:
+
+```bash
+pnpm run rebuild:native:node
+pnpm run rebuild:native:electron
+```
 
 ## License
 

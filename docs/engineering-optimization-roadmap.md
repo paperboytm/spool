@@ -27,7 +27,7 @@
   measured budget breach — revisit only against new measurements.
 - **Packaged assets are removed only with packaged-app proof.** Import
   search misses dynamic loading; #417 shipped with an asar size report and
-  a packaged smoke test (`packages/app/scripts/smoke-packaged.mjs`).
+  a packaged smoke test (`apps/app/scripts/smoke-packaged.mjs`).
 - **One `better-sqlite3` ABI at a time.** The workspace pins one version
   and flips it Node↔Electron via `scripts/with-electron-native.mjs`,
   restoring Node afterwards. See CONTRIBUTING "Native module runtimes".

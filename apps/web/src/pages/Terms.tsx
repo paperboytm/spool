@@ -1,15 +1,12 @@
-// Terms of service — static legal page, deliberately minimal: the
-// service is free, so there are no billing/refund clauses, and we
-// self-identify as the service rather than a named legal entity. The
-// load-bearing parts are content ownership/responsibility and the use
-// restrictions the report flow points at. Structure informed by the
-// Basecamp open-source policies (CC BY 4.0).
+// Terms of service — static legal page. Keep every service and content
+// claim aligned with the publishing, visibility, withdrawal, and account
+// behavior implemented by spool.pro.
 
 import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'July 7, 2026'
+const LAST_UPDATED = 'July 18, 2026'
 
 export function Terms() {
   useEffect(() => {
@@ -26,85 +23,104 @@ export function Terms() {
           <p className="sw-legal-date">Last updated: {LAST_UPDATED}</p>
 
           <p>
-            These terms cover spool.pro, the publishing service for the Spool desktop app. By
-            creating an account or publishing a share you agree to them. The short version: your
-            content is yours, don't use the service to hurt people, and we provide it as-is.
+            These terms cover spool.pro and its Session publishing, reading, Profile, Discovery, and
+            Resume services. By creating an account or sharing a Session, you agree to them. The
+            short version: your content remains yours, you are responsible for what you disclose, do
+            not use the service to harm people, and the service is provided as-is.
           </p>
 
           <h2>The service</h2>
           <p>
-            spool.pro hosts conversation snapshots you explicitly publish from the Spool app and
-            serves them at public links. The service is currently free. We work hard to keep it fast
-            and available, but it is provided <strong>as is</strong>, without warranties of any
-            kind, and we may change or discontinue features — if we ever discontinue the service
-            itself, we'll give you notice and time to take your content elsewhere.
+            Spool hosts agent Sessions that authors explicitly share, serves them at durable URLs,
+            and may list Public Sessions on Profiles and Discovery surfaces. Supported clients can
+            materialize a Shared Session as new agent-native work. The service does not host or
+            restore a complete project repository.
+          </p>
+          <p>
+            The service is currently free and provided <strong>as is</strong>, without warranties of
+            any kind. We may change or discontinue features. If the service itself is discontinued,
+            we will provide reasonable notice and an opportunity to retrieve content when possible.
           </p>
 
           <h2>Your account</h2>
           <p>
-            You sign in with Google and are responsible for activity that happens under your
-            account. You can delete your account at any time from{' '}
-            <a href="/me">your account page</a>; deletion is described in the{' '}
+            You are responsible for activity under your account and for protecting authenticated
+            devices and credentials. You can manage or delete the account from{' '}
+            <a href="/me">your account page</a>. Deletion is described in the{' '}
             <a href="/privacy">privacy policy</a>.
           </p>
 
           <h2>Your content</h2>
           <p>
-            What you publish stays yours. You grant us the non-exclusive license needed to operate
-            the service — to store, copy, display, and distribute your published shares at their
-            links and in previews such as social-media cards. This license ends for a share when you
-            unpublish it, except where the privacy policy describes residual copies.
+            Your Session content remains yours. You grant us a non-exclusive license to store,
+            verify, copy, display, and distribute a Shared Session as needed to operate its URL,
+            reader, Profile listing, Discovery entry, previews, and Resume APIs. This license ends
+            when the content is deleted, subject to security records, legal obligations, and copies
+            made by third parties.
           </p>
           <p>
-            You are responsible for what you publish. Conversations can contain things you didn't
-            write — other people's words, AI output, pasted code, credentials, personal data.
-            Publishing makes all of it public, and by publishing you confirm you have the right to
-            do that.
+            You are responsible for everything you share or publish, including user messages, agent
+            output, tool activity, code, credentials, personal information, and third-party
+            material. You confirm that you have the right to disclose it.
+          </p>
+
+          <h2>Visibility</h2>
+          <p>
+            A <strong>Link-only</strong> Session is available to anyone with its URL but is not
+            listed by Spool on your Profile or in Discovery. A <strong>Public</strong> Session may
+            be listed, searched, previewed, and shared broadly. Public visibility requires a
+            separate author choice.
           </p>
           <p>
-            <strong>Unpublishing is permanent.</strong> The link dies within seconds and can never
-            be revived; republishing the same draft produces a new link. Copies made by third
-            parties while a share was live (search engines, link previews) are outside our control.
+            Neither visibility state is a confidentiality service. Recipients can copy content, and
+            third-party caches or previews may outlive withdrawal.
+          </p>
+
+          <h2>Withdrawal</h2>
+          <p>
+            Withdrawing a Shared Session blocks new access and removes it from Spool's public
+            surfaces. Withdrawal does not revoke copies already made by readers, search engines, or
+            preview services.
           </p>
 
           <h2>Use restrictions</h2>
-          <p>You may not use spool.pro to publish or do any of the following:</p>
+          <p>You may not use spool.pro to share, publish, or distribute:</p>
           <ul>
-            <li>content that is illegal or that you don't have the right to share</li>
-            <li>other people's personal or private information (doxxing)</li>
-            <li>malware, phishing, or content designed to deceive or harm</li>
-            <li>harassment, threats, or incitement</li>
-            <li>spam, or bulk publishing for SEO or promotional schemes</li>
+            <li>illegal content or material you do not have the right to disclose</li>
+            <li>other people’s personal or confidential information without permission</li>
+            <li>malware, phishing, credential theft, or content designed to deceive or harm</li>
+            <li>harassment, credible threats, or incitement</li>
+            <li>spam or bulk content intended primarily to manipulate search or promotion</li>
             <li>
-              anything that disrupts the service — probing or breaking security and rate limits,
-              scraping accounts, automated abuse
+              automated abuse, unauthorized scraping, security probing, or attempts to bypass rate
+              limits and access controls
             </li>
           </ul>
           <p>
-            Every published share carries a report link. You can also reach us at{' '}
+            Use the report control on a Public Session or contact{' '}
             <a href="mailto:abuse@spool.pro">abuse@spool.pro</a>.
           </p>
 
           <h2>Removal and termination</h2>
           <p>
-            We may remove content or suspend accounts that violate these terms — where practical
-            we'll tell you why. Nothing here limits your ability to walk away: your account and
-            everything in it can be deleted by you, at any time, for any reason.
+            We may remove content or suspend accounts that violate these terms or create material
+            risk to users or the service. Where practical, we will explain the action. You may stop
+            using the service and delete your account at any time.
           </p>
 
           <h2>Liability</h2>
           <p>
             To the maximum extent permitted by law, we are not liable for indirect, incidental, or
-            consequential damages arising from your use of the service, and our total liability for
-            any claim is limited to the amount you've paid us to use spool.pro in the past twelve
-            months — which, for a free service, is zero.
+            consequential damages arising from use of the service. Our total liability for a claim
+            is limited to the amount paid to use spool.pro during the previous twelve months—which
+            is zero while the service is free.
           </p>
 
           <h2>Changes</h2>
           <p>
-            We may update these terms as the service evolves. The date at the top reflects the
-            latest revision; material changes will be announced on the site before they take effect.
-            Using the service after a change takes effect means you accept the revised terms.
+            We may update these terms as the service evolves. The date above shows the latest
+            revision. We will announce material changes before they take effect when reasonably
+            possible. Continued use after a change takes effect means you accept the revised terms.
           </p>
 
           <p className="sw-legal-credit">

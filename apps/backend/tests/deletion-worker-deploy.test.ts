@@ -43,5 +43,6 @@ describe('spool-share-deletion deploy shape', () => {
     expect(toml).toContain('bucket_name = "spool-snapshots"')
     expect(toml).toContain('bucket_name = "spool-og"')
     expect(toml).toContain('bucket_name = "spool-avatars"')
+    expect(toml).toContain('bucket_name = "spool-hub"')
   })
 })
