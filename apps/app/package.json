@@ -28,7 +28,7 @@
     "build:share-kit": "vp run --filter @spool/share-kit build",
     "build:session-view": "vp run --filter @spool-lab/session-view build",
     "build:deps": "pnpm run build:redact && pnpm run build:session-kit && pnpm run build:core && pnpm run build:cli && pnpm run build:share-kit && pnpm run build:session-view",
-    "dev": "pnpm run build:deps && node ../../scripts/with-electron-native.mjs node scripts/dev.mjs",
+    "dev": "pnpm run ensure:electron-runtime && pnpm run build:deps && node ../../scripts/with-electron-native.mjs node scripts/dev.mjs",
     "dev:reset-db": "node scripts/dev-reset-db.mjs",
     "dev:seed-from-prod": "node scripts/dev-seed-from-prod.mjs",
     "build": "electron-vite build && pnpm run build:workers",
