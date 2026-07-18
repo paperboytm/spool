@@ -11,6 +11,7 @@ import { HubClient, HubHttpError, type HubFetch, type HubRecord } from '../hub/c
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { materializeSession } from '../hub/materialize.js'
 import { resolveSessionRef } from '../hub/ref.js'
+import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // `spool resume <url|sid>[<@n>]` — materialize, don't graft (design §3):
 // fetch the shared records, verify integrity client-side, write a brand-new
@@ -35,6 +36,7 @@ export interface ResumeCommandDependencies extends HubCredentialOptions {
   error?: (message: string) => void
   cwd?: string
   spawn?: typeof spawnSync
+  ui?: CliUi
 }
 
 export async function handleResumeCommand(
@@ -44,6 +46,8 @@ export async function handleResumeCommand(
 ): Promise<0 | 1> {
   const log = dependencies.log ?? console.log
   const error = dependencies.error ?? console.error
+  const ui = dependencies.ui ?? createTextUi(log, error)
+  ui.intro('Resume a shared session')
 
   try {
     const ref = resolveSessionRef(input)
@@ -55,15 +59,17 @@ export async function handleResumeCommand(
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
 
-    const meta = await client.getSession(ref.sid)
-    const wanted = Math.min(ref.position ?? meta.count, meta.count)
-    if (wanted < 1) {
-      error('Nothing to resume: the shared session is empty.')
-      return 1
+    const downloading = ui.spinner()
+    downloading.start('Downloading shared session records')
+    let downloaded: Awaited<ReturnType<typeof downloadAndVerify>>
+    try {
+      downloaded = await downloadAndVerify(client, ref.sid, ref.position)
+      downloading.stop(`Verified ${downloaded.records.length} records`)
+    } catch (cause) {
+      downloading.error('Could not download and verify the shared session')
+      throw cause
     }
-
-    const records = await fetchRecords(client, ref.sid, wanted)
-    await verifyRecords(records, wanted === meta.count ? meta.root : null)
+    const { meta, records, wanted } = downloaded
 
     const workspaceRoot = resolveWorkspaceRoot(
       options.workspace ?? dependencies.cwd ?? process.cwd(),
@@ -92,18 +98,20 @@ export async function handleResumeCommand(
     if (existsSync(filePath)) throw new Error(`Refusing to overwrite ${filePath}`)
     writeFileSync(filePath, materialized.lines.join('\n') + '\n', 'utf8')
 
-    log(`Materialized ${records.length} record(s) as a new ${ref.provider} session ${sessionId}.`)
+    ui.success(`Materialized a new ${ref.provider} session ${sessionId}`)
     if (meta.cardJson) {
-      log(`Workspace card (author's last observed repo state): ${meta.cardJson}`)
+      ui.note(meta.cardJson, 'Author’s last observed workspace state')
     }
-    log('')
     // Always print the command — it stays in scrollback, and re-running
     // it forks another fresh branch off the materialized anchor.
-    log(`  cd ${workspaceRoot} && ${materialized.resumeArgv.join(' ')}`)
+    ui.note(`cd ${workspaceRoot} && ${materialized.resumeArgv.join(' ')}`, 'Native resume command')
 
-    if (options.exec === false) return 0
+    if (options.exec === false) {
+      ui.outro('Session materialized. Run the command above when ready.')
+      return 0
+    }
 
-    log('')
+    ui.outro(`Launching ${ref.provider === 'claude' ? 'Claude Code' : 'Codex CLI'}…`)
     const spawn = dependencies.spawn ?? spawnSync
     const [command, ...args] = materialized.resumeArgv as [string, ...string[]]
     const result = spawn(command, args, {
@@ -113,7 +121,7 @@ export async function handleResumeCommand(
     if (result.error) {
       const code = (result.error as NodeJS.ErrnoException).code
       if (code === 'ENOENT') {
-        error(
+        ui.error(
           `${command} CLI not found on PATH — the session is materialized; run the command above manually.`,
         )
         return 1
@@ -123,9 +131,9 @@ export async function handleResumeCommand(
     return result.status === 0 ? 0 : 1
   } catch (cause) {
     if (cause instanceof HubHttpError) {
-      error(friendlyHubError(cause, input))
+      ui.error(friendlyHubError(cause, input))
     } else {
-      error(cause instanceof Error ? cause.message : String(cause))
+      ui.error(cause instanceof Error ? cause.message : String(cause))
     }
     return 1
   }
@@ -137,10 +145,14 @@ export const resumeCommand = new Command('resume')
   .option('--workspace <dir>', 'Workspace root to resume in (default: current directory)')
   .option('--no-exec', 'Print the native resume command instead of launching it')
   .action(async (input: string, opts: { workspace?: string; exec: boolean }) => {
-    const exitCode = await handleResumeCommand(input, {
-      ...(opts.workspace === undefined ? {} : { workspace: opts.workspace }),
-      exec: opts.exec,
-    })
+    const exitCode = await handleResumeCommand(
+      input,
+      {
+        ...(opts.workspace === undefined ? {} : { workspace: opts.workspace }),
+        exec: opts.exec,
+      },
+      { ui: createClackUi() },
+    )
     if (exitCode !== 0) process.exitCode = exitCode
   })
 
@@ -158,6 +170,15 @@ function resolveWorkspaceRoot(input: string): string {
   } catch {
     return absolute
   }
+}
+
+async function downloadAndVerify(client: HubClient, sid: string, position?: number) {
+  const meta = await client.getSession(sid)
+  const wanted = Math.min(position ?? meta.count, meta.count)
+  if (wanted < 1) throw new Error('Nothing to resume: the shared session is empty.')
+  const records = await fetchRecords(client, sid, wanted)
+  await verifyRecords(records, wanted === meta.count ? meta.root : null)
+  return { meta, records, wanted }
 }
 
 async function fetchRecords(client: HubClient, sid: string, wanted: number): Promise<HubRecord[]> {

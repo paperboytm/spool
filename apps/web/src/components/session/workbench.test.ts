@@ -215,7 +215,7 @@ const meta: HubSessionMeta = {
   root: 'root-oid',
   count: 4,
   sig: null,
-  noteMd: '# Purpose\n\nKeep the context readable.',
+  summaryMd: '# Purpose\n\nKeep the context readable.',
   cardJson: null,
   lineageJson: null,
   viewOid: 'view-oid',
@@ -245,7 +245,7 @@ function renderWorkbench(
   options: {
     spool?: SpoolDocument | null
     messages?: ParsedConversation
-    noteMd?: string | null
+    summaryMd?: string | null
     cardJson?: string | null
     view?: SessionViewV1 | null
   } = {},
@@ -254,7 +254,7 @@ function renderWorkbench(
     createElement(SessionWorkbench, {
       meta: {
         ...meta,
-        noteMd: options.noteMd === undefined ? meta.noteMd : options.noteMd,
+        summaryMd: options.summaryMd === undefined ? meta.summaryMd : options.summaryMd,
         cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
       },
       view: options.view === undefined ? view : options.view,
@@ -345,10 +345,10 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('class="sw-session-sticky min-w-0 lg:sticky"')
   })
 
-  it('keeps the raw fallback usable without a note, view, or messages', () => {
+  it('keeps the raw fallback usable without a summary, view, or messages', () => {
     const html = renderWorkbench({
       spool: null,
-      noteMd: '  ',
+      summaryMd: '  ',
       view: null,
       messages: { title: '', messages: [], recordToMessageId: new Map() },
     })

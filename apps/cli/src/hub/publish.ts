@@ -1,0 +1,64 @@
+import {
+  type HubClient,
+  type HubHeadResponse,
+  type HubObjectUpload,
+  type HubSessionWriteRequest,
+} from './client.js'
+import { UPLOAD_MAX_LINES, chunkUploads, type PreparedShare } from './share-pipeline.js'
+import type { WorkspaceCard } from './workspace.js'
+
+export interface PublishPreparedShareOptions {
+  card: WorkspaceCard | null
+  /** Markdown shown as the shared session's Summary. */
+  summary: string | null
+  /** Optional curated .spool document attached to the share. */
+  spoolFile?: HubObjectUpload | null
+  onUploadProgress?: (uploaded: number, total: number) => void
+}
+
+/**
+ * Commit a prepared session through the Hub's push → upload → head protocol.
+ *
+ * This is the single upload seam used by both `spool share` and Desktop.
+ * Callers prepare/review locally, then pass the accepted Markdown Summary;
+ * transport ordering, head construction, and object batching stay owned by
+ * the CLI package.
+ */
+export async function publishPreparedShare(
+  client: Pick<HubClient, 'pushSession' | 'uploadObjects' | 'commitSessionHead'>,
+  prepared: PreparedShare,
+  options: PublishPreparedShareOptions,
+): Promise<HubHeadResponse> {
+  const spoolFile = options.spoolFile ?? null
+  const summary = options.summary?.trim() ? options.summary : null
+  const head: HubSessionWriteRequest = {
+    root: prepared.root,
+    count: prepared.count,
+    manifest: prepared.manifest,
+    sig: null,
+    cardJson: options.card === null ? null : JSON.stringify(options.card),
+    summaryMd: summary,
+    lineageJson: prepared.lineageJson,
+    viewOid: prepared.viewOid,
+    spoolFileOid: spoolFile?.oid ?? null,
+  }
+
+  const { missing } = await client.pushSession(prepared.sid, head)
+  const missingSet = new Set(missing)
+  const uploads: HubObjectUpload[] = [
+    ...prepared.records.map((record) => ({ oid: record.oid, data: record.data })),
+    { oid: prepared.viewOid, data: prepared.viewData },
+    ...(spoolFile === null ? [] : [spoolFile]),
+  ].filter((object) => missingSet.has(object.oid))
+
+  let uploaded = 0
+  for (const batch of chunkUploads(uploads)) {
+    await client.uploadObjects(batch)
+    uploaded += batch.length
+    if (uploads.length > UPLOAD_MAX_LINES) {
+      options.onUploadProgress?.(uploaded, uploads.length)
+    }
+  }
+
+  return client.commitSessionHead(prepared.sid, head)
+}

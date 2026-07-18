@@ -15,7 +15,8 @@ import { serverApiOrigin } from '../lib/server-api-origin'
 import { SessionReader } from '../pages/session-reader'
 
 interface HubMetaForOg {
-  noteMd: string | null
+  summaryMd?: string | null
+  noteMd?: string | null
   count: number
   author: { handle: string | null; displayName: string | null }
 }
@@ -42,7 +43,7 @@ async function loadSessionOgMeta(sid: string): Promise<LoaderData> {
       : (meta.author.displayName ?? 'someone')
     return {
       og: {
-        title: sessionOgTitle(meta.noteMd),
+        title: sessionOgTitle(meta.summaryMd ?? meta.noteMd),
         description: `A coding-agent session shared by ${author} — ${meta.count} records.`,
         origin,
       },

@@ -34,7 +34,7 @@ import {
   resumeCommandFor,
 } from '../../lib/session-page'
 import { CliInstallDialog } from './cli-install-dialog'
-import { SessionNote } from './session-note'
+import { SessionSummary } from './session-summary'
 
 interface Props {
   meta: HubSessionMeta
@@ -355,7 +355,7 @@ export function SessionWorkbench({
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,720px)_280px] lg:items-start lg:gap-8">
           <div className="min-w-0">
-            <SessionNote markdown={meta.noteMd} className="mb-6" />
+            <SessionSummary markdown={meta.summaryMd} className="mb-6" />
 
             <section aria-labelledby="session-timeline-title">
               <div className="mb-4 flex items-baseline justify-between gap-4">

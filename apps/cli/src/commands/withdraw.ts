@@ -3,11 +3,13 @@ import { Command } from 'commander'
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { resolveSessionRef } from '../hub/ref.js'
+import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 export interface WithdrawCommandDependencies extends HubCredentialOptions {
   fetch?: HubFetch
   log?: (message: string) => void
   error?: (message: string) => void
+  ui?: CliUi
 }
 
 export async function handleWithdrawCommand(
@@ -16,14 +18,16 @@ export async function handleWithdrawCommand(
 ): Promise<0 | 1> {
   const log = dependencies.log ?? console.log
   const error = dependencies.error ?? console.error
+  const ui = dependencies.ui ?? createTextUi(log, error)
   let resolvedSid: string | undefined
+  ui.intro('Withdraw a shared session')
 
   try {
     const ref = resolveSessionRef(input)
     resolvedSid = ref.sid
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
-      error('Not logged in. Run `spool login` first.')
+      ui.error('Not logged in. Run `spool login` first.')
       return 1
     }
 
@@ -32,14 +36,22 @@ export async function handleWithdrawCommand(
       token: credentials.token,
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
-    await client.withdrawSession(ref.sid)
-    log(`You withdrew session ${ref.sid}.`)
+    const withdrawing = ui.spinner()
+    withdrawing.start(`Withdrawing ${ref.sid}`)
+    try {
+      await client.withdrawSession(ref.sid)
+      withdrawing.stop('Hub tombstone committed')
+    } catch (cause) {
+      withdrawing.error('Could not withdraw the session')
+      throw cause
+    }
+    ui.outro(`Withdrew session ${ref.sid}.`)
     return 0
   } catch (cause) {
     if (cause instanceof HubHttpError) {
-      error(friendlyHubError(cause, resolvedSid ?? input))
+      ui.error(friendlyHubError(cause, resolvedSid ?? input))
     } else {
-      error(errorMessage(cause))
+      ui.error(errorMessage(cause))
     }
     return 1
   }
@@ -49,7 +61,7 @@ export const withdrawCommand = new Command('withdraw')
   .description('Withdraw a shared session from the Spool hub')
   .argument('<sid|url>', 'Shared session ID or URL')
   .action(async (input: string) => {
-    const exitCode = await handleWithdrawCommand(input)
+    const exitCode = await handleWithdrawCommand(input, { ui: createClackUi() })
     if (exitCode !== 0) process.exitCode = exitCode
   })
 

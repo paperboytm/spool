@@ -53,6 +53,7 @@
     "prepack": "vp run build"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@spool-lab/core": "workspace:^",
     "@spool-lab/redact": "workspace:^",
     "@spool-lab/session-kit": "workspace:^",

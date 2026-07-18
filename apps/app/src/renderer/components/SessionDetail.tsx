@@ -420,8 +420,8 @@ export default function SessionDetail({
             <button
               data-testid="detail-share"
               onClick={() => onShare(session, messages)}
-              title={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
-              aria-label={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
+              title={t('sidebar.shareSession')}
+              aria-label={t('sidebar.shareSession')}
               className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
                 hasDraft
                   ? 'text-accent dark:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2'

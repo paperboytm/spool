@@ -1681,7 +1681,7 @@ function SessionCard({
               ...(onShare
                 ? [
                     {
-                      label: t('shareEditor.openNew', { defaultValue: 'Edit share draft' }),
+                      label: t('sidebar.shareSession', { defaultValue: 'Share session' }),
                       icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
                       onSelect: () => onShare(),
                     },

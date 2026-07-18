@@ -17,6 +17,7 @@ export async function openShareEditorFromSessionDetail(
 ): Promise<void> {
   await openSessionDetail(window, sessionUuid)
   await window.locator('[data-testid="detail-share"]').click()
+  await continueWithFullConversation(window)
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
 }
 
@@ -38,7 +39,7 @@ export async function openSessionDetail(window: Page, sessionUuid: string): Prom
 }
 
 /**
- * Open a SessionRow ⋯ menu and pick "Edit share draft".
+ * Open a SessionRow ⋯ menu and pick "Share session".
  */
 export async function shareFromSessionRowMenu(window: Page, sessionUuid: string): Promise<void> {
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
@@ -46,8 +47,19 @@ export async function shareFromSessionRowMenu(window: Page, sessionUuid: string)
   await expect(row).toBeVisible({ timeout: 5000 })
   await row.hover()
   await row.getByLabel('More actions').click()
-  await window.getByRole('menuitem', { name: 'Edit share draft' }).click()
+  await window.getByRole('menu').getByRole('menuitem').first().click()
+  await continueWithFullConversation(window)
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
+}
+
+/** The legacy share-editor suites exercise full-transcript behavior. The
+ * product preflight now defaults to an agent summary, so those suites choose
+ * the explicit full-conversation branch before asserting editor behavior. */
+export async function continueWithFullConversation(window: Page): Promise<void> {
+  const dialog = window.locator('[data-testid="share-session-dialog"]')
+  await expect(dialog).toBeVisible({ timeout: 5000 })
+  await dialog.locator('[data-testid="share-full-option"]').click()
+  await dialog.locator('[data-testid="share-session-continue"]').click()
 }
 
 /** Navigate the sidebar to the Shares page. */

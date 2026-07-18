@@ -13,7 +13,7 @@ CREATE TABLE hub_sessions (
   record_count INTEGER NOT NULL,
   sig TEXT,                                   -- Ed25519 head signature; verification is a follow-up
   card_json TEXT,                             -- workspace card
-  note_md TEXT,                               -- author note (share README)
+  note_md TEXT,                               -- legacy column name: Markdown Summary
   lineage_json TEXT,                          -- fork origin { sid, position }
   view_oid TEXT,                              -- content-addressed view object
   visibility TEXT NOT NULL DEFAULT 'unlisted' CHECK (visibility IN ('unlisted','private')),

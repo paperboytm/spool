@@ -17,6 +17,7 @@ import type {
   TerminalOutputRequest,
   TerminalOutputResponse,
 } from '@agentclientprotocol/sdk'
+import { buildSessionSummaryPrompt } from '@spool-lab/cli/hub'
 import {
   getDB,
   getOrCreateAskProject,
@@ -24,6 +25,8 @@ import {
   insertSpoolAuthoredSession,
   wrapSpoolSystemPrelude,
   type FragmentResult,
+  type Message,
+  type Session,
   type SessionSource,
 } from '@spool-lab/core'
 import WebSocketImpl from 'ws'
@@ -311,30 +314,70 @@ export class AcpManager {
     onToolCall?: (event: ToolCallEvent) => void,
     onSessionStarted?: (info: { sessionUuid: string; source: SessionSource; cwd: string }) => void,
   ): Promise<string> {
-    const agents = await this.detectAgents()
-    const agent = agents.find((a) => a.id === agentId)
-    if (!agent) throw new Error(`Agent "${agentId}" not found. Install ${agentId} CLI first.`)
+    return this.runPrompt({
+      agentId,
+      prompt: this.buildPrompt(userQuery),
+      authoredTitle: userQuery,
+      onChunk,
+      ...(onToolCall ? { onToolCall } : {}),
+      ...(onSessionStarted ? { onSessionStarted } : {}),
+      allowTools: true,
+      acceptPartialOnError: true,
+    })
+  }
 
-    // Cancel any running query
+  /** Summarize one selected session without giving the agent tool access.
+   * The transcript is embedded as quoted data in a bounded prompt, so this
+   * path works with every ACP agent and cannot wander into unrelated files. */
+  async summarizeSession(agentId: string, session: Session, messages: Message[]): Promise<string> {
+    const { prompt, authoredTitle } = buildSessionSummaryPrompt(session, messages)
+    return this.runPrompt({
+      agentId,
+      prompt,
+      authoredTitle,
+      onChunk: () => {},
+      allowTools: false,
+      acceptPartialOnError: false,
+    })
+  }
+
+  private async runPrompt(options: {
+    agentId: string
+    prompt: string
+    authoredTitle: string
+    onChunk: (text: string) => void
+    onToolCall?: (event: ToolCallEvent) => void
+    onSessionStarted?: (info: { sessionUuid: string; source: SessionSource; cwd: string }) => void
+    allowTools: boolean
+    acceptPartialOnError: boolean
+  }): Promise<string> {
+    const agents = await this.detectAgents()
+    const agent = agents.find((candidate) => candidate.id === options.agentId)
+    if (!agent || agent.status !== 'ready') {
+      throw new Error(`Agent "${options.agentId}" is not ready. Install or start it first.`)
+    }
+
+    // ACP agents are single-flight. Starting a new search or summary cancels
+    // the prior operation rather than letting two subprocesses race events.
     this.cancel()
 
     const configs = getEffectiveConfigs()
-    const config = configs[agentId]
-    if (!config) throw new Error(`No config for agent "${agentId}"`)
-
-    const prompt = this.buildPrompt(userQuery)
+    const config = configs[options.agentId]
+    if (!config) throw new Error(`No config for agent "${options.agentId}"`)
 
     if (config.acpMode === 'websocket') {
-      return this.queryViaWebSocket(config, prompt, onChunk, onToolCall)
+      return this.queryViaWebSocket(config, options.prompt, options.onChunk, options.onToolCall)
     }
     return this.queryViaAcp(
-      agentId,
+      options.agentId,
       config,
-      prompt,
-      onChunk,
-      onToolCall,
-      userQuery,
-      onSessionStarted,
+      options.prompt,
+      options.onChunk,
+      options.onToolCall,
+      options.authoredTitle,
+      options.onSessionStarted,
+      options.allowTools,
+      options.acceptPartialOnError,
     )
   }
 
@@ -351,8 +394,10 @@ export class AcpManager {
     prompt: string,
     onChunk: (text: string) => void,
     onToolCall?: (event: ToolCallEvent) => void,
-    userQuery?: string,
+    authoredTitle?: string,
     onSessionStarted?: (info: { sessionUuid: string; source: SessionSource; cwd: string }) => void,
+    allowTools = true,
+    acceptPartialOnError = true,
   ): Promise<string> {
     // Dynamically import the ESM-only ACP SDK
     const acp = await import('@agentclientprotocol/sdk')
@@ -457,8 +502,11 @@ export class AcpManager {
         requestPermission: async (params: {
           options?: Array<{ optionId: string; kind?: string }>
         }) => {
+          if (!allowTools) return { outcome: { outcome: 'cancelled' as const } }
           try {
-            // Auto-approve: pick the first allow/approve option from the agent's list
+            // Auto-approve in Agent Search: searching the local knowledge base
+            // intentionally requires sqlite/file tools. Session summaries take
+            // the deny branch above and never receive this capability.
             const options = params.options ?? []
             const allowOption = options.find((o) => o.kind?.startsWith('allow')) ?? options[0]
             console.log(`[ACP] requestPermission: picking optionId=${allowOption?.optionId}`)
@@ -472,6 +520,7 @@ export class AcpManager {
         },
         extMethod: async () => ({}),
         createTerminal: async (params: CreateTerminalRequest): Promise<CreateTerminalResponse> => {
+          if (!allowTools) throw new Error('Terminal tools are disabled for session summaries.')
           const id = `term-${++terminalCounter}`
           const termProc = spawn(params.command, params.args ?? [], {
             cwd: params.cwd ?? process.cwd(),
@@ -539,6 +588,7 @@ export class AcpManager {
           return {}
         },
         readTextFile: async (params: ReadTextFileRequest): Promise<ReadTextFileResponse> => {
+          if (!allowTools) throw new Error('File tools are disabled for session summaries.')
           try {
             return { content: await readFile(params.path, 'utf8') }
           } catch {
@@ -623,7 +673,7 @@ export class AcpManager {
       // sync to derive a garbage title from the ACP preamble. Best-effort:
       // any DB error is logged but doesn't block the answer.
       const source = agentIdToSource(agentId)
-      if (source && userQuery) {
+      if (source && authoredTitle) {
         try {
           const db = getDB()
           const sourceId = getSourceId(db, source)
@@ -632,7 +682,7 @@ export class AcpManager {
             projectId,
             sourceId,
             sessionUuid: sessionId,
-            title: userQuery,
+            title: authoredTitle,
             cwd: stableCwd,
           })
           onSessionStarted?.({ sessionUuid: sessionId, source, cwd: stableCwd })
@@ -643,14 +693,17 @@ export class AcpManager {
 
       // Step 3: Prompt (this blocks until the agent finishes)
       // ACP PromptRequest takes `prompt: ContentBlock[]`, not `messages`
-      await conn.prompt({
+      const response = await conn.prompt({
         sessionId,
         prompt: [{ type: 'text', text: prompt }],
       })
+      if (!acceptPartialOnError && response.stopReason !== 'end_turn') {
+        throw new Error(`Agent stopped before completing the summary (${response.stopReason}).`)
+      }
 
       return fullText
     } catch (err) {
-      if (fullText) return fullText
+      if (fullText && acceptPartialOnError) return fullText
       const msg =
         err instanceof Error
           ? err.message

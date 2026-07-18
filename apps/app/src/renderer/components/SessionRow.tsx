@@ -148,7 +148,7 @@ export default function SessionRow({
               ...(onShare
                 ? [
                     {
-                      label: t('shareEditor.openNew'),
+                      label: t('sidebar.shareSession'),
                       icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
                       onSelect: () => onShare(session.sessionUuid),
                     },

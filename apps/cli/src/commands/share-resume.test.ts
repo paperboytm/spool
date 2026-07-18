@@ -13,6 +13,8 @@ import { sequenceRoot } from '@spool-lab/session-kit'
 import { describe, expect, it } from 'vite-plus/test'
 
 import type { HubFetch } from '../hub/client.js'
+import type { LocalSummaryAgent } from '../hub/local-summary-agent.js'
+import type { CliSpinner, CliUi } from '../ui.js'
 import { handleResumeCommand } from './resume.js'
 import { handleShareCommand } from './share.js'
 
@@ -29,7 +31,7 @@ interface StoredHead {
   manifest: string[]
   sig: string | null
   cardJson: string | null
-  noteMd: string | null
+  summaryMd: string | null
   lineageJson: string | null
   viewOid: string
   spoolFileOid?: string | null
@@ -92,7 +94,7 @@ function makeHub() {
           root: session.root,
           count: session.count,
           sig: session.sig,
-          noteMd: session.noteMd,
+          summaryMd: session.summaryMd,
           cardJson: session.cardJson,
           lineageJson: session.lineageJson,
           viewOid: session.viewOid,
@@ -185,6 +187,44 @@ function writeFixtureSession(workspaceRoot: string): string {
   return filePath
 }
 
+function interactiveUi(
+  options: {
+    confirm?: boolean
+    selected?: 'claude' | 'codex'
+    events?: string[]
+  } = {},
+): CliUi {
+  const events = options.events ?? []
+  const spinner = (): CliSpinner => ({
+    start: (message) => events.push(`spinner:start:${message ?? ''}`),
+    message: (message) => events.push(`spinner:message:${message ?? ''}`),
+    stop: (message) => events.push(`spinner:stop:${message ?? ''}`),
+    error: (message) => events.push(`spinner:error:${message ?? ''}`),
+    cancel: (message) => events.push(`spinner:cancel:${message ?? ''}`),
+  })
+  return {
+    interactive: true,
+    intro: (message) => events.push(`intro:${message}`),
+    note: (message, title) => events.push(`note:${title ?? ''}:${message}`),
+    info: (message) => events.push(`info:${message}`),
+    step: (message) => events.push(`step:${message}`),
+    success: (message) => events.push(`success:${message}`),
+    warn: (message) => events.push(`warn:${message}`),
+    error: (message) => events.push(`error:${message}`),
+    outro: (message) => events.push(`outro:${message}`),
+    cancel: (message) => events.push(`cancel:${message}`),
+    confirm: async (message) => {
+      events.push(`confirm:${message}`)
+      return options.confirm ?? true
+    },
+    select: async ({ message }) => {
+      events.push(`select:${message}`)
+      return options.selected ?? 'claude'
+    },
+    spinner,
+  }
+}
+
 function shareDeps(
   hub: ReturnType<typeof makeHub>,
   workspaceRoot: string,
@@ -213,6 +253,135 @@ function shareDeps(
   }
 }
 
+describe('spool share local Agent Summary flow', () => {
+  it('uploads first, detects installed Agents, then generates and uploads the Summary', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-flow-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-flow-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const agents: LocalSummaryAgent[] = [
+      { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+      { id: 'codex', name: 'Codex CLI', path: '/bin/codex' },
+    ]
+    let generatedAfterUpload = false
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'codex', events }),
+        detectSummaryAgents: async () => {
+          expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+          return agents
+        },
+        generateSummary: async (agent, prompt) => {
+          generatedAfterUpload = hub.sessions.has(`claude_${SESSION_UUID}`)
+          expect(agent.id).toBe('codex')
+          expect(prompt).toContain('rename alpha to beta in the demo file')
+          expect(prompt).not.toContain('Done: renamed alpha to beta.')
+          return '## Outcome\n\nThe rename is ready.'
+        },
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(generatedAfterUpload).toBe(true)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
+      '## Outcome\n\nThe rename is ready.',
+    )
+    expect(events.findIndex((event) => event.startsWith('note:Shared session:'))).toBeLessThan(
+      events.findIndex((event) => event.startsWith('confirm:')),
+    )
+    expect(events).toContain('select:Which local Agent should generate the Summary?')
+  })
+
+  it('does not prompt or invoke an Agent when stdout is non-interactive', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    let detected = false
+
+    const exit = await handleShareCommand(
+      undefined,
+      {},
+      {
+        ...share.deps,
+        detectSummaryAgents: async () => {
+          detected = true
+          return []
+        },
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(detected).toBe(false)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+  })
+
+  it('preserves an existing Summary when the user declines regeneration', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-preserve-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-preserve-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    expect(
+      await handleShareCommand(
+        undefined,
+        { summary: '## Existing\n\nKeep this Summary.' },
+        share.deps,
+      ),
+    ).toBe(0)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ confirm: false }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
+      '## Existing\n\nKeep this Summary.',
+    )
+  })
+
+  it('leaves the uploaded session live when the user declines generation', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-decline-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-decline-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ confirm: false }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () => {
+          throw new Error('must not run')
+        },
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+  })
+})
+
 describe('spool share → spool resume round trip', () => {
   it('shares through the 3-step handshake and resumes into a fresh local session', async () => {
     const hub = makeHub()
@@ -221,7 +390,8 @@ describe('spool share → spool resume round trip', () => {
     const filePath = writeFixtureSession(authorWs)
     const share = shareDeps(hub, authorWs, filePath, authorHome)
 
-    const shareExit = await handleShareCommand(undefined, { noEdit: true }, share.deps)
+    const summary = '## Outcome\n\nReady for review.'
+    const shareExit = await handleShareCommand(undefined, { summary }, share.deps)
     expect(share.errors).toEqual([])
     expect(shareExit).toBe(0)
 
@@ -230,6 +400,7 @@ describe('spool share → spool resume round trip', () => {
     expect(head).toBeDefined()
     expect(head?.count).toBe(4)
     expect(head?.root).toBe(await sequenceRoot(head?.manifest ?? []))
+    expect(head?.summaryMd).toBe(summary)
     expect(hub.objects.has(head?.viewOid ?? '')).toBe(true)
     for (const oid of head?.manifest ?? []) {
       expect(hub.objects.get(oid)).not.toContain(authorWs)
@@ -336,7 +507,7 @@ describe('spool share → spool resume round trip', () => {
 
     const shareExit = await handleShareCommand(
       undefined,
-      { noEdit: true },
+      { agentSummary: false },
       {
         ...share.deps,
         resolveTarget: () => ({
@@ -432,7 +603,7 @@ describe('spool share → spool resume round trip', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      { noEdit: true, spoolFile: docPath },
+      { agentSummary: false, spoolFile: docPath },
       share.deps,
     )
     expect(share.errors).toEqual([])
@@ -454,7 +625,7 @@ describe('spool share → spool resume round trip', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      { noEdit: true, spoolFile: docPath },
+      { agentSummary: false, spoolFile: docPath },
       share.deps,
     )
     expect(exit).toBe(1)
@@ -479,14 +650,14 @@ describe('spool share → spool resume round trip', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      { noEdit: true },
+      { agentSummary: false },
       {
         ...share.deps,
         confirm: async () => false,
       },
     )
     expect(exit).toBe(1)
-    expect(share.errors.join('\n')).toContain('Share aborted')
+    expect(share.errors.join('\n')).toContain('Share cancelled')
     expect(hub.sessions.size).toBe(0)
     expect(share.logs.join('\n')).toContain('high-severity')
   })
@@ -497,7 +668,7 @@ describe('spool share → spool resume round trip', () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-tamper-home-'))
     const filePath = writeFixtureSession(ws)
     const share = shareDeps(hub, ws, filePath, home)
-    expect(await handleShareCommand(undefined, { noEdit: true }, share.deps)).toBe(0)
+    expect(await handleShareCommand(undefined, { agentSummary: false }, share.deps)).toBe(0)
 
     const sid = `claude_${SESSION_UUID}`
     const head = hub.sessions.get(sid) as StoredHead
@@ -525,7 +696,7 @@ describe('spool share → spool resume round trip', () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-gone-home-'))
     const filePath = writeFixtureSession(ws)
     const share = shareDeps(hub, ws, filePath, home)
-    expect(await handleShareCommand(undefined, { noEdit: true }, share.deps)).toBe(0)
+    expect(await handleShareCommand(undefined, { agentSummary: false }, share.deps)).toBe(0)
 
     const sid = `claude_${SESSION_UUID}`
     ;(hub.sessions.get(sid) as StoredHead).withdrawn = true

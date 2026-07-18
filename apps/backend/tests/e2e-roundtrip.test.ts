@@ -153,7 +153,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     const shareErrors: string[] = []
     const shareExit = await handleShareCommand(
       undefined,
-      { noEdit: true, yes: true },
+      { agentSummary: false, yes: true },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,
@@ -180,7 +180,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
       root: string
       count: number
       viewOid: string
-      noteMd: string | null
+      summaryMd: string | null
     }
     expect(meta.count).toBe(4)
 
@@ -289,7 +289,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     const codexSid = `codex_${SESSION_UUID}`
     const exit = await handleShareCommand(
       undefined,
-      { noEdit: true, yes: true },
+      { agentSummary: false, yes: true },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,
@@ -362,7 +362,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
 
     const exit = await handleShareCommand(
       `${SESSION_UUID}@2`,
-      { noEdit: true, yes: true },
+      { agentSummary: false, yes: true },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,

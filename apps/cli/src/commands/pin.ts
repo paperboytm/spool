@@ -9,38 +9,44 @@ import {
 import { Command } from 'commander'
 
 import { printSession } from '../format.js'
+import { createClackUi } from '../ui.js'
 
 export const pinCommand = new Command('pin')
   .description('Pin a session so it stays at the top of your library')
   .argument('<uuid>', 'Session UUID')
   .action((uuid: string) => {
+    const ui = createClackUi()
+    ui.intro('Pin a session')
     const db = getDB(true)
     const result = getSessionWithMessages(db, uuid)
     if (!result) {
-      console.error(`Session not found: ${uuid}`)
-      process.exit(1)
+      ui.error(`Session not found: ${uuid}`)
+      process.exitCode = 1
+      return
     }
 
     const label = result.session.title ?? uuid
     if (isPinned(db, uuid)) {
-      console.log(`Already pinned: ${label}`)
+      ui.outro(`Already pinned: ${label}`)
       return
     }
     pinSession(db, uuid)
-    console.log(`Pinned: ${label}`)
+    ui.outro(`Pinned: ${label}`)
   })
 
 export const unpinCommand = new Command('unpin')
   .description('Remove a session from your pinned list')
   .argument('<uuid>', 'Session UUID')
   .action((uuid: string) => {
+    const ui = createClackUi()
+    ui.intro('Unpin a session')
     const db = getDB(true)
     if (!isPinned(db, uuid)) {
-      console.log(`Not pinned: ${uuid}`)
+      ui.outro(`Not pinned: ${uuid}`)
       return
     }
     unpinSession(db, uuid)
-    console.log(`Unpinned: ${uuid}`)
+    ui.outro(`Unpinned: ${uuid}`)
   })
 
 export const pinnedCommand = new Command('pinned')

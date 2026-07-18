@@ -95,16 +95,17 @@ spool logout
 
 ## `spool share`
 
-Share a session to [spool.pro](https://spool.pro) and get a URL. Scans
-for secrets before anything leaves the machine, then opens your editor
-to write a note.
+Share a session to [spool.pro](https://spool.pro) and get a URL. It scans
+for secrets and uploads first. In an interactive terminal, Spool then detects
+Claude Code and Codex CLI, asks whether to generate a Summary locally, and
+automatically uploads the result.
 
 ```bash
-spool share                    # latest session in the current directory
+spool share                    # upload, then offer a detected local Agent
 spool share <uuid>             # a specific session (uuid prefixes work)
 spool share <uuid>@12          # only the first 12 records
-spool share -m "note"          # set the note without the editor
-spool share --no-edit          # publish the prefilled draft as-is
+spool share --no-agent-summary # skip the post-share Agent offer
+spool share --summary "..."    # advanced: provide Summary Markdown directly
 spool share --yes              # skip the secret-findings confirmation
 ```
 

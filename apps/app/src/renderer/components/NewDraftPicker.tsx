@@ -22,7 +22,7 @@ export default function NewDraftPicker({ onSelect, onClose }: Props) {
       optionsDefaultOpen
       groupRecentsByDate
       labels={{
-        enterHint: t('newDraft.open'),
+        enterHint: t('common.select'),
         noMatches: (query) => t('newDraft.empty', { query }),
         emptyNoSessions: t('newDraft.emptyNoSessions'),
         emptyInProject: (project) => t('newDraft.emptyInProject', { project }),

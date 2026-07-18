@@ -11,7 +11,7 @@ export const OID_RE = /^[0-9a-f]{64}$/
 export const SID_RE = /^(claude|codex)_[0-9A-Za-z-]{8,64}$/
 
 export const MAX_MANIFEST = 100_000
-export const MAX_NOTE_BYTES = 64 * 1024
+export const MAX_SUMMARY_BYTES = 64 * 1024
 export const MAX_CARD_BYTES = 64 * 1024
 export const MAX_LINEAGE_BYTES = 4 * 1024
 export const MAX_BATCH_BYTES = 32 * 1024 * 1024
@@ -25,19 +25,37 @@ const boundedText = (maxBytes: number) =>
     message: `must be at most ${maxBytes} bytes`,
   })
 
-export const HeadBody = z.object({
-  root: z.string().regex(OID_RE),
-  count: z.number().int().min(1).max(MAX_MANIFEST),
-  manifest: z.array(z.string().regex(OID_RE)).min(1).max(MAX_MANIFEST),
-  sig: z.string().max(512).nullable(),
-  cardJson: boundedText(MAX_CARD_BYTES).nullable(),
-  noteMd: boundedText(MAX_NOTE_BYTES).nullable(),
-  lineageJson: boundedText(MAX_LINEAGE_BYTES).nullable(),
-  viewOid: z.string().regex(OID_RE),
-  // Optional curated .spool document (content-addressed, rides through
-  // objects/batch like the view). Default keeps older clients valid.
-  spoolFileOid: z.string().regex(OID_RE).nullable().default(null),
-})
+const summaryMarkdown = boundedText(MAX_SUMMARY_BYTES).nullable()
+
+export const HeadBody = z
+  .object({
+    root: z.string().regex(OID_RE),
+    count: z.number().int().min(1).max(MAX_MANIFEST),
+    manifest: z.array(z.string().regex(OID_RE)).min(1).max(MAX_MANIFEST),
+    sig: z.string().max(512).nullable(),
+    cardJson: boundedText(MAX_CARD_BYTES).nullable(),
+    summaryMd: summaryMarkdown.optional(),
+    // Rolling-upgrade alias for clients released before Summary replaced Note.
+    noteMd: summaryMarkdown.optional(),
+    lineageJson: boundedText(MAX_LINEAGE_BYTES).nullable(),
+    viewOid: z.string().regex(OID_RE),
+    // Optional curated .spool document (content-addressed, rides through
+    // objects/batch like the view). Default keeps older clients valid.
+    spoolFileOid: z.string().regex(OID_RE).nullable().default(null),
+  })
+  .superRefine((body, context) => {
+    if (body.summaryMd === undefined && body.noteMd === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['summaryMd'],
+        message: 'required',
+      })
+    }
+  })
+  .transform(({ noteMd, summaryMd, ...body }) => ({
+    ...body,
+    summaryMd: summaryMd === undefined ? (noteMd ?? null) : summaryMd,
+  }))
 export type HeadBodyT = z.infer<typeof HeadBody>
 
 export function requireSid(params: unknown): string {

@@ -234,6 +234,12 @@ const api = {
   ): Promise<{ ok: boolean; fullText?: string; error?: string }> =>
     ipcRenderer.invoke('spool:ai-search', { query, agentId, context }),
 
+  summarizeSession: (
+    sessionUuid: string,
+    agentId: string,
+  ): Promise<{ ok: true; summary: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('spool:ai-summarize-session', { sessionUuid, agentId }),
+
   aiCancel: (agentId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:ai-cancel', { agentId }),
 
@@ -483,8 +489,8 @@ const spoolShare = {
   // v2 hub share (records, not styled snapshots) — one-click publish.
   hubSharePrepare: (sessionUuid: string): Promise<HubSharePrepareResult> =>
     ipcRenderer.invoke('hub-share:prepare', { sessionUuid }),
-  hubSharePublish: (sessionUuid: string, note: string): Promise<HubSharePublishResult> =>
-    ipcRenderer.invoke('hub-share:publish', { sessionUuid, note }),
+  hubSharePublish: (sessionUuid: string, summary: string): Promise<HubSharePublishResult> =>
+    ipcRenderer.invoke('hub-share:publish', { sessionUuid, summary }),
 }
 
 export type SpoolShareAPI = typeof spoolShare

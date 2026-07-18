@@ -14,6 +14,7 @@ import {
   saveHubCredentials,
   type HubCredentialOptions,
 } from '../hub/credentials.js'
+import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // `spool login` = self-hosted device flow: ask the hub for a
 // device_code/user_code pair, send the user to the approval page in a
@@ -33,6 +34,7 @@ export interface LoginCommandDependencies extends HubCredentialOptions {
   sleep?: (ms: number) => Promise<void>
   /** Shown on the approval page; defaults to the machine hostname. */
   label?: string
+  ui?: CliUi
 }
 
 export async function handleLoginCommand(
@@ -41,7 +43,9 @@ export async function handleLoginCommand(
 ): Promise<0 | 1> {
   const log = dependencies.log ?? console.log
   const error = dependencies.error ?? console.error
+  const ui = dependencies.ui ?? createTextUi(log, error)
   const credentialOptions = pickCredentialOptions(dependencies)
+  ui.intro('Sign in to Spool')
 
   try {
     const { hubUrl } = loadHubCredentials(credentialOptions)
@@ -50,18 +54,18 @@ export async function handleLoginCommand(
     if (options.token !== undefined) {
       token = options.token.trim()
       if (token === '') {
-        error('Hub token cannot be empty.')
+        ui.error('Hub token cannot be empty.')
         return 1
       }
     } else {
-      token = await browserLogin(hubUrl, dependencies, log)
+      token = await browserLogin(hubUrl, dependencies, ui)
     }
 
     const path = saveHubCredentials({ hubUrl, token }, credentialOptions)
-    log(`You saved hub credentials to ${path}.`)
+    ui.outro(`Signed in. Credentials saved to ${path}.`)
     return 0
   } catch (cause) {
-    error(`Login failed: ${errorMessage(cause)}`)
+    ui.error(`Login failed: ${errorMessage(cause)}`)
     return 1
   }
 }
@@ -69,7 +73,7 @@ export async function handleLoginCommand(
 async function browserLogin(
   hubUrl: string,
   dependencies: LoginCommandDependencies,
-  log: (message: string) => void,
+  ui: CliUi,
 ): Promise<string> {
   const client = new HubClient({
     hubUrl,
@@ -80,14 +84,11 @@ async function browserLogin(
   const label = dependencies.label ?? hostname()
 
   const start = await client.startCliAuth(label)
-  log(`Confirm this code in your browser: ${start.user_code}`)
+  ui.note(`${start.user_code}\n${start.verification_uri}`, 'Confirm this device in your browser')
   const opened = await openBrowser(start.verification_uri)
-  log(
-    opened
-      ? `Opening ${start.verification_uri}`
-      : `Open this URL in a browser to approve: ${start.verification_uri}`,
-  )
-  log('Waiting for approval…')
+  if (!opened) ui.info('The browser could not be opened automatically; use the URL above.')
+  const waiting = ui.spinner()
+  waiting.start('Waiting for browser approval')
 
   const deadline = Date.now() + start.expires_in * 1000
   let intervalMs = Math.max(1, start.interval) * 1000
@@ -98,17 +99,23 @@ async function browserLogin(
       poll = await client.pollCliAuth(start.device_code)
     } catch (cause) {
       if (cause instanceof HubHttpError && cause.status === 404) {
+        waiting.error('Browser approval expired or was denied')
         throw new Error('the sign-in request expired or was denied in the browser.')
       }
       if (cause instanceof HubHttpError && cause.status === 429) {
         // RFC 8628 slow_down semantics: back off and keep going.
         intervalMs *= 2
+        waiting.message('The Hub asked us to slow down; still waiting for approval')
       }
       // Transient network/server hiccups keep polling until the deadline.
       continue
     }
-    if (poll.status === 'approved' && poll.token !== undefined) return poll.token
+    if (poll.status === 'approved' && poll.token !== undefined) {
+      waiting.stop('Browser approval received')
+      return poll.token
+    }
   }
+  waiting.error('Timed out waiting for browser approval')
   throw new Error('timed out waiting for browser approval. Run `spool login` again.')
 }
 
@@ -116,7 +123,7 @@ export const loginCommand = new Command('login')
   .description('Sign in to the Spool hub via your browser (or --token to paste one)')
   .option('--token <t>', 'Hub API token (skips the browser flow)')
   .action(async (options: LoginCommandOptions) => {
-    const exitCode = await handleLoginCommand(options)
+    const exitCode = await handleLoginCommand(options, { ui: createClackUi() })
     if (exitCode !== 0) process.exitCode = exitCode
   })
 

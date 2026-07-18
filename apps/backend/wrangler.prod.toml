@@ -1,0 +1,57 @@
+# Production Pages deployment config with concrete resource identifiers.
+# Resource ids are not credentials; Wrangler authentication remains external.
+# Wrangler ≥4.9x refuses config-based Pages deploys without ids.
+# Deploy by temporarily swapping this in as wrangler.toml (Pages rejects
+# --config custom paths):
+#   mv wrangler.toml wrangler.toml.checked-in
+#   cp wrangler.prod.toml wrangler.toml
+#   wrangler pages deploy public
+#   mv -f wrangler.toml.checked-in wrangler.toml
+# PUBLIC_BASE_URL is deliberately unset in prod (code defaults to
+# https://spool.pro).
+name = "spool-share-backend"
+pages_build_output_dir = "public"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spool-share-db"
+database_id = "fa7aa980-e646-4ebe-8c2f-bf5d5d30ab9d"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "25bb827645584937b84b21e3f4ca959e"
+
+[[kv_namespaces]]
+binding = "META"
+id = "b5f5a1ad9f3e456cbdbdc7c7125c4dec"
+
+[[kv_namespaces]]
+binding = "RATE"
+id = "3c8f77d8465f431280d939c2467a5706"
+
+[[kv_namespaces]]
+binding = "NONCE"
+id = "ceb41586e4e64f61a461da99c1f31583"
+
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "spool-snapshots"
+
+[[r2_buckets]]
+binding = "OG"
+bucket_name = "spool-og"
+
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "spool-avatars"
+
+[[r2_buckets]]
+binding = "HUB"
+bucket_name = "spool-hub"
+
+[vars]
+ENV = "production"
+ABUSE_NOTIFY_EMAIL = "abuse@spool.pro"

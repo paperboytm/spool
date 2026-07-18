@@ -369,7 +369,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             recordCount,
             sig,
             cardJson,
-            noteMd,
+            summaryMd,
             lineageJson,
             viewOid,
             spoolFileOid,
@@ -395,7 +395,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             existing.record_count = recordCount
             existing.sig = sig
             existing.card_json = cardJson
-            existing.note_md = noteMd
+            existing.note_md = summaryMd
             existing.lineage_json = lineageJson
             existing.view_oid = viewOid
             existing.spool_file_oid = spoolFileOid
@@ -409,7 +409,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               record_count: recordCount,
               sig,
               card_json: cardJson,
-              note_md: noteMd,
+              note_md: summaryMd,
               lineage_json: lineageJson,
               view_oid: viewOid,
               spool_file_oid: spoolFileOid,

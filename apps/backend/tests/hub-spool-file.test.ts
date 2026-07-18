@@ -67,7 +67,7 @@ async function shareWithSpoolFile(env: Env) {
     manifest: [record.oid],
     sig: null,
     cardJson: null,
-    noteMd: null,
+    summaryMd: null,
     lineageJson: null,
     viewOid: view.oid,
     spoolFileOid: spoolFile.oid,
@@ -161,7 +161,7 @@ describe('hub spool-file attachment', () => {
       manifest: [record.oid],
       sig: null,
       cardJson: null,
-      noteMd: null,
+      summaryMd: null,
       lineageJson: null,
       viewOid: view.oid,
       // No spoolFileOid at all — older clients omit the field entirely.

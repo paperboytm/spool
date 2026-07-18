@@ -83,7 +83,7 @@ describe('sessionOgHead', () => {
 })
 
 describe('sessionOgTitle', () => {
-  it('takes the first line of the note', () => {
+  it('takes the first line of the Summary', () => {
     expect(sessionOgTitle('Fix the auth flow\n\nLonger body')).toBe('Fix the auth flow')
   })
 
@@ -91,7 +91,7 @@ describe('sessionOgTitle', () => {
     expect(sessionOgTitle('  padded  \nrest')).toBe('padded')
   })
 
-  it('falls back when the note is empty or missing', () => {
+  it('falls back when the Summary is empty or missing', () => {
     expect(sessionOgTitle('')).toBe('Shared session')
     expect(sessionOgTitle(null)).toBe('Shared session')
     expect(sessionOgTitle(undefined)).toBe('Shared session')

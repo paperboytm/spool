@@ -7,6 +7,7 @@ import {
   loadStoredHubCredentials,
   type HubCredentialOptions,
 } from '../hub/credentials.js'
+import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // `spool logout` = the inverse of login: revoke this machine's token on
 // the hub (best-effort — an unreachable hub must not wedge local
@@ -18,6 +19,7 @@ export interface LogoutCommandDependencies extends HubCredentialOptions {
   log?: (message: string) => void
   error?: (message: string) => void
   fetch?: HubFetch
+  ui?: CliUi
 }
 
 export async function handleLogoutCommand(
@@ -25,12 +27,14 @@ export async function handleLogoutCommand(
 ): Promise<0 | 1> {
   const log = dependencies.log ?? console.log
   const error = dependencies.error ?? console.error
+  const ui = dependencies.ui ?? createTextUi(log, error)
   const credentialOptions = pickCredentialOptions(dependencies)
+  ui.intro('Sign out of Spool')
 
   try {
     const stored = loadStoredHubCredentials(credentialOptions)
     if (stored === undefined) {
-      error(`Not logged in (no credentials at ${hubCredentialsPath(credentialOptions)}).`)
+      ui.error(`Not logged in (no credentials at ${hubCredentialsPath(credentialOptions)}).`)
       return 1
     }
 
@@ -39,33 +43,34 @@ export async function handleLogoutCommand(
       token: stored.token,
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
+    const revoking = ui.spinner()
+    revoking.start('Revoking this machine’s Hub token')
     try {
       await client.revokeToken()
-      log(`You revoked this machine's token on ${stored.hubUrl}.`)
+      revoking.stop(`Revoked the token on ${stored.hubUrl}`)
     } catch (cause) {
       if (cause instanceof HubHttpError && cause.status === 401) {
         // Already dead on the hub — logout still succeeds locally.
-        log('The hub had already invalidated this token.')
+        revoking.stop('The Hub had already invalidated this token')
       } else {
-        error(
-          `Warning: could not revoke the token on ${stored.hubUrl} (${errorMessage(cause)}). ` +
-            'Removing local credentials anyway — revoke it from your account page if needed.',
+        revoking.error('Could not revoke the remote token')
+        ui.warn(
+          `Removing local credentials anyway. Revoke the token from your account page if needed: ${errorMessage(cause)}`,
         )
       }
     }
 
     const removed = clearHubCredentials(credentialOptions)
-    if (removed !== undefined) log(`You signed out; removed ${removed}.`)
+    if (removed !== undefined) ui.success(`Removed local credentials at ${removed}`)
 
     const env = credentialOptions.env ?? process.env
     if (env['SPOOL_HUB_TOKEN']?.trim()) {
-      log(
-        'Note: SPOOL_HUB_TOKEN is set in your environment and still wins — unset it to fully sign out.',
-      )
+      ui.warn('SPOOL_HUB_TOKEN is still set; unset it to fully sign out.')
     }
+    ui.outro('Signed out.')
     return 0
   } catch (cause) {
-    error(`Logout failed: ${errorMessage(cause)}`)
+    ui.error(`Logout failed: ${errorMessage(cause)}`)
     return 1
   }
 }
@@ -75,7 +80,7 @@ export const logoutCommand = new Command('logout')
     "Sign out of the Spool hub: revoke this machine's token and delete local credentials",
   )
   .action(async () => {
-    const exitCode = await handleLogoutCommand()
+    const exitCode = await handleLogoutCommand({ ui: createClackUi() })
     if (exitCode !== 0) process.exitCode = exitCode
   })
 

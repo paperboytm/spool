@@ -38,15 +38,15 @@ const markdownComponents: ComponentProps<typeof ReactMarkdown>['components'] = {
   },
 }
 
-export function SessionNote({
+export function SessionSummary({
   markdown,
   className,
 }: {
   markdown: string | null
   className?: string
 }) {
-  const note = markdown?.trim()
-  if (!note) return null
+  const summary = markdown?.trim()
+  if (!summary) return null
 
   return (
     <section className={className} aria-labelledby="session-summary-title">
@@ -55,7 +55,7 @@ export function SessionNote({
       </h2>
       <div className="mt-4 w-full text-sm leading-[1.65] [overflow-wrap:anywhere] text-[var(--text)] [&_.contains-task-list]:list-none [&_.contains-task-list]:pl-0 [&_.task-list-item]:list-none [&_.task-list-item_input]:mr-2 [&_.task-list-item_input]:h-3 [&_.task-list-item_input]:w-3 [&_.task-list-item_input]:accent-[var(--accent)] [&_blockquote]:m-0 [&_blockquote]:mb-3 [&_blockquote]:border-l-[3px] [&_blockquote]:border-[var(--border-strong)] [&_blockquote]:py-1 [&_blockquote]:pl-3 [&_blockquote]:text-[var(--muted)] [&_blockquote>p:last-child]:mb-0 [&_code]:rounded [&_code]:border [&_code]:border-[var(--border)] [&_code]:bg-[var(--bg-sink)] [&_code]:px-1 [&_code]:py-[2px] [&_code]:font-mono [&_code]:text-[0.9em] [&_h1]:mt-6 [&_h1]:mb-3 [&_h1]:border-b [&_h1]:border-[var(--border)] [&_h1]:pb-2 [&_h1]:text-lg [&_h1]:leading-6 [&_h1]:font-semibold [&_h1]:tracking-[-0.01em] [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:border-b [&_h2]:border-[var(--border)] [&_h2]:pb-2 [&_h2]:text-base [&_h2]:leading-6 [&_h2]:font-semibold [&_h2]:tracking-[-0.01em] [&_h3]:mt-4 [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:leading-5 [&_h3]:font-semibold [&_h4]:mt-3 [&_h4]:mb-2 [&_h4]:text-[13px] [&_h4]:leading-5 [&_h4]:font-semibold [&_h5]:mt-3 [&_h5]:mb-2 [&_h5]:text-[13px] [&_h5]:leading-5 [&_h5]:font-semibold [&_h6]:mt-3 [&_h6]:mb-2 [&_h6]:text-[13px] [&_h6]:leading-5 [&_h6]:font-semibold [&_hr]:my-5 [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-[var(--border)] [&_li+li]:mt-1 [&_li>p]:mb-2 [&_ol]:mt-0 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mt-0 [&_p]:mb-3 [&_pre]:m-0 [&_pre]:mb-4 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-[var(--border)] [&_pre]:bg-[var(--card-2)] [&_pre]:px-4 [&_pre]:py-3 [&_pre]:font-mono [&_pre]:text-xs [&_pre]:leading-5 [&_pre]:[tab-size:2] [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[inherit] [&_table]:w-max [&_table]:min-w-full [&_table]:border-collapse [&_table]:text-xs [&_table]:leading-5 [&_tbody_tr:last-child_td]:border-b-0 [&_td]:border-b [&_td]:border-[var(--border)] [&_td]:px-3 [&_td]:py-2 [&_td]:text-left [&_td]:align-top [&_th]:border-b [&_th]:border-[var(--border)] [&_th]:bg-[var(--bg-sink)] [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:align-top [&_th]:font-semibold [&_ul]:mt-0 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {note}
+          {summary}
         </ReactMarkdown>
       </div>
     </section>
