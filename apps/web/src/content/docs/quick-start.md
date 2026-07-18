@@ -1,45 +1,71 @@
 ---
 title: Quick Start
-description: Get up and running with Spool in under 5 minutes.
+description: Share an agent Session and let someone else continue it.
 ---
 
-After [installing Spool](/docs/installation), you're a few clicks away from a browsable library of every AI session on your machine.
+After [installing Spool](/docs/installation), you can turn a Claude Code or Codex CLI Session into a durable URL in a few minutes.
 
-## 1. Launch Spool
+## 1. Prepare your Sessions
 
-Open Spool from your Applications folder. It starts indexing your Claude Code, Codex CLI, Gemini CLI, and OpenCode sessions automatically — new sessions become visible the moment they're written.
-
-## 2. Browse your library
-
-The left sidebar lists **projects** — derived from the working directories your agents ran in, so a project called `api-core` collects every Claude / Codex / Gemini session you ever opened from that repo. Click a project to see its sessions in the main pane.
-
-The Library Home (the default main-pane view) shows your most recent sessions across **all** projects, bucketed by date.
-
-## 3. Pin what matters
-
-Hover any session row and click the pin icon. Pinned sessions surface at the top of:
-
-- their owning project's view, and
-- the global **Pinned** section on Library Home.
-
-Pin replaces the older Star concept — same gesture, library-shaped semantics.
-
-## 4. Search with ⌘K
-
-Press **⌘K** anywhere in the app to open the search overlay. Search is scoped to the current project by default, or **All** to span the whole archive. Toggle to **AI** mode in the same overlay for synthesized answers backed by source fragments.
-
-## 5. Search from your terminal
-
-The bundled CLI runs the same search engine:
+Launch the desktop app, or index from the terminal:
 
 ```bash
-spool search "auth middleware"
-spool list -n 10
-spool show <uuid>
+spool sync
 ```
 
-See the [CLI reference](/docs/reference/cli) for the full command set.
+Spool reads supported agent Session files on your machine and groups them by project. This preparation step is local; it does not publish anything.
 
-## What about platform data (Twitter, GitHub, Reddit, …)?
+## 2. Sign in
 
-Bookmarks, stars, and saves live in **[Spool Daemon](/daemon/)** — a sibling app focused on capture sync. Once you install Daemon, its captures appear alongside Spool sessions in the same search box.
+Sign in from Desktop, or run:
+
+```bash
+spool login
+```
+
+The CLI opens a browser-approval flow and stores a revocable Hub credential on this machine.
+
+## 3. Choose a Session
+
+In Desktop, open a Session and choose **Share session**.
+
+From the CLI, find a Session and share it:
+
+```bash
+spool list -n 10
+spool share <session-uuid>
+```
+
+Only Claude Code and Codex CLI Sessions can currently be shared and resumed.
+
+## 4. Review before sharing
+
+Spool shows what will be shared, scans the records for likely sensitive values, and prepares an optional Summary. The Summary helps a reader understand the intent and outcome, but the original Session remains authoritative.
+
+For a CLI share, Spool can ask a detected local Agent to draft the Summary with your own provider and authentication settings.
+
+## 5. Send the URL
+
+A successful share returns a URL such as:
+
+```text
+https://spool.pro/session/claude_…
+```
+
+Anyone with the URL can read the Shared Session without installing Spool. New Hub shares are Link-only while Public Profile and Discovery controls are being completed.
+
+## 6. Continue the work
+
+A reader who has the CLI can create a new native Session from the shared point:
+
+```bash
+spool resume <session-url>
+```
+
+Resume never modifies the source. It creates new work and preserves the relationship back to the Shared Session.
+
+## Next steps
+
+- [Publishing Sessions](/docs/guides/publishing)
+- [Reading and Resuming](/docs/guides/reading-resuming)
+- [CLI reference](/docs/reference/cli)

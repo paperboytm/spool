@@ -1,39 +1,55 @@
 ---
 title: Agent Integration
-description: Use Spool as a search backend for your AI coding agents.
+description: Let a coding agent share, resume, and recall Sessions through Spool.
 ---
 
-Spool ships a `/spool` skill that any ACP-compatible agent can call mid-conversation. The agent searches your local session library and pulls matching fragments back into its context — no copy-paste, no cloud round-trip.
+Spool ships a skill for shell-capable coding agents. It lets an agent share the current Session, continue from a Spool URL, or retrieve relevant context from Sessions already indexed on the machine.
 
-## The `/spool` skill
+## Install the skill
 
-The skill lives in [`skills/spool/SKILL.md`](https://github.com/spool-lab/spool/blob/main/skills/spool/SKILL.md) in the repo. To use it from Claude Code, copy that file into your project's `.claude/skills/spool/SKILL.md` (or your global `~/.claude/skills/spool/SKILL.md`).
+The source lives at [`skills/spool/SKILL.md`](https://github.com/spool-lab/spool/blob/main/skills/spool/SKILL.md).
 
-The skill requires the `spool` CLI to be on `PATH`. Install it once:
+Place it in the skill directory used by your agent, and make sure the CLI is available:
 
 ```bash
 npm install -g @spool-lab/cli
+spool doctor
 ```
 
-## Example
+## Share from an agent
 
-Inside a Claude Code conversation:
+Ask the agent to “share this session to Spool.” The skill:
 
+1. syncs the latest records;
+2. selects the current Session;
+3. prepares a concise Summary;
+4. runs `spool share` without bypassing sensitive-data findings;
+5. returns the durable URL.
+
+Only Claude Code and Codex CLI Sessions can currently be published through the Hub.
+
+## Continue a Spool Session
+
+Give the agent a spool.pro Session URL and ask it to continue the work. The skill routes the URL to:
+
+```bash
+spool resume <session-url>
 ```
-> /spool auth middleware refresh token rotation
+
+Resume creates a new native Session and keeps the source relationship intact.
+
+## Recall prior work
+
+The same skill can search local Sessions when you ask about earlier decisions:
+
+```bash
+spool search "refresh token rotation" --json -n 5
+spool show <uuid> --diff
+spool show <uuid> --log
 ```
 
-Claude invokes the skill, runs `spool search` against your local index, and presents the top matches with source attribution (Claude / Codex / Gemini / OpenCode) and session UUIDs. You can ask Claude to load any of them with `spool show <uuid>` for full context.
+Search results include source, project, time, snippet, and Session identifier. The agent can load only the depth needed for the current question instead of injecting every prior conversation.
 
-## How it works
+## Trust boundary
 
-1. The agent invokes `/spool <query>`.
-2. The skill shells out to `spool search "<query>" --json --limit 5`.
-3. Matching fragments come back with `source`, `project`, `startedAt`, `snippet`, and `uuid`.
-4. The agent presents the results and offers to load any session in full.
-
-Inference and search both happen on your machine. Spool's status bar always shows `via ACP · local` while AI mode runs — the same trust signal applies when an agent calls the skill.
-
-## Beyond Claude Code
-
-Any agent that can call a CLI tool can use Spool the same way. The CLI's `--json` flag gives you a stable shape to parse; see [CLI reference](/docs/reference/cli) for the full surface.
+Local recall stays on the machine. Sharing is a separate explicit action. When a local Agent generates a Summary or synthesized answer, the interface must identify the Agent and show `via ACP · local` where ACP is used.

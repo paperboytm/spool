@@ -39,27 +39,26 @@ Requires Apple Silicon. The script quits any running Spool instance before repla
 
 ```
 apps/
-  app/            Electron macOS app (React + Vite + Tailwind)
-  cli/            CLI interface
-  web/            spool.pro website (TanStack Start: landing, docs, blog,
-                  share reader, profile + account pages)
-  share-backend/  spool.pro publish API (Cloudflare Pages Functions: D1/KV/R2)
+  app/          Electron desktop app for preparing and sharing Sessions
+  cli/          CLI for Session preparation, sharing, reading, and Resume
+  web/          spool.pro website, docs, Profiles, account pages, and Session reader
+  backend/      Hub, identity, publication, and media API on Cloudflare
 packages/
-  core/           Indexing engine (SQLite + FTS5)
-  redact/         Sensitive-data detection shared by app + share surfaces
-  session-kit/    Session data model shared by app + web
-  session-view/   Conversation renderer shared by app + web
-  share-kit/      Share templates + snapshot rendering (app + web)
+  core/         Local Session ingestion, organization, SQLite, and search
+  redact/       Sensitive-data detection shared by publishing surfaces
+  session-kit/  Browser-safe canonical records, views, and Session diffs
+  session-view/ Conversation renderer shared by Desktop and Web
+  share-kit/    Curated `.spool` documents, templates, and export primitives
 ```
 
-## Share publish: local dev stack
+## Publishing: local development stack
 
-Most contributions never need this — `pnpm dev` runs the app fine without
-it. Set it up only when working on the publish flow (share-backend, the
-web app's share pages, or the app's publish surfaces).
+Most contributions never need this—`pnpm dev` runs the desktop app without
+it. Set it up when working on the Hub, public Session pages, account/Profile
+surfaces, or Desktop publishing flow.
 
-The stack is three processes: share-backend (wrangler, :8788), the web
-app (vite, :3002), and the Electron app pointed at the local backend.
+The stack is three processes: backend (Wrangler, :8788), web
+(Vite, :3002), and the Electron app pointed at the local backend.
 `./scripts/share-dev.sh` boots all three. One-time setup first:
 
 1. **WorkOS dev environment** — create one at

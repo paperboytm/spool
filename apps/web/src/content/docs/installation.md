@@ -1,33 +1,55 @@
 ---
 title: Installation
-description: Install Spool on your machine.
+description: Install the Spool desktop app or CLI.
 ---
 
-Spool runs locally on macOS (Apple Silicon).
+Spool currently publishes and resumes Claude Code and Codex CLI Sessions. The desktop app runs on macOS with Apple Silicon; the CLI runs anywhere its Node.js dependencies are supported.
 
-## Quick install
+## Desktop app
 
 ```bash
 curl -fsSL https://spool.pro/install.sh | bash
 ```
 
-This downloads the latest `.dmg` from GitHub Releases, mounts it, and copies `Spool.app` to `/Applications`.
+The installer downloads the latest signed release and copies `Spool.app` to `/Applications`.
 
-## Requirements
+You can also download the release artifact directly from [GitHub Releases](https://github.com/spool-lab/spool/releases/latest).
 
-- macOS on Apple Silicon (M1+)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or any ACP-compatible agent
+### Requirements
 
-## Verify installation
+- macOS on Apple Silicon (M1 or newer)
+- at least one supported coding agent
+- a spool.pro account to share Sessions
 
-After installation, launch Spool from `/Applications` or Spotlight. The app will start indexing your Claude Code, Codex, Gemini CLI, and OpenCode sessions automatically.
+## CLI
 
-## Optional: install the CLI
-
-The `spool` command-line interface is published separately on npm. Install it globally to search your library from any terminal:
+Install the CLI globally:
 
 ```bash
 npm install -g @spool-lab/cli
 ```
 
-See the [CLI reference](/docs/reference/cli) for available commands.
+Verify it is available:
+
+```bash
+spool --version
+spool doctor
+```
+
+The desktop app and CLI use the same local Session index.
+
+## Sign in for sharing
+
+Desktop sign-in opens the system browser. The CLI uses a browser-approval flow that also works over SSH:
+
+```bash
+spool login
+```
+
+The terminal prints a short approval URL and waits for the browser confirmation.
+
+## Local data and publishing
+
+Session preparation happens locally. Nothing is published automatically. A share is created only after you choose a Session and confirm the publishing flow.
+
+See [Quick Start](/docs/quick-start) to publish your first Session.

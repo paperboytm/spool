@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { ApiError } from '../errors'
 
-// Wire spec for /api/hub/v1 — see plans/spool-v2-pr1-scope.md. The sid is
+// Wire spec for the Hub API — see docs/product-architecture.zh-CN.md. The sid is
 // '<provider>_<provider-session-uuid>'; oids are lowercase hex sha256 of
 // canonical record bytes. Limits guard D1/R2 from hostile payloads, not
 // legitimate sessions.

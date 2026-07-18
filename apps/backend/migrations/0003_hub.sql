@@ -1,5 +1,5 @@
 -- 0003_hub.sql
--- Spool v2 hub: content-addressed session sync (see plans/spool-v2-pr1-scope.md).
+-- Spool Hub: content-addressed Session sync (see docs/product-architecture.zh-CN.md).
 --
 -- hub_sessions is the head ref: one row per shared session, single-writer
 -- (owner). hub_objects locates every uploaded object (records + view

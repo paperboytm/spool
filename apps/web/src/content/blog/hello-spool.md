@@ -1,37 +1,66 @@
 ---
-title: 'Introducing Spool: The Missing Search Engine for Your Own Data'
-description: 'Why we built a local search engine for developers who think with AI — and how it works.'
+title: 'Agent Sessions Should Be Publishable'
+description: 'Why agent work needs a readable, discoverable, and resumable public format.'
 date: 2026-04-02
 author: Yifeng
 tags: [announcement, product]
 ---
 
-If you use Claude Code, Codex, Gemini CLI, or any AI coding agent daily, you've accumulated hundreds of sessions. Each one contains decisions, debugging breakthroughs, architectural discussions — your best thinking, scattered across session files on your machine.
+People increasingly build software with coding agents, but the work itself is hard to share.
 
-Spool makes all of that searchable.
+A pull request shows the resulting code. A screenshot shows a moment. A recap tells the version someone remembered to write down. None of them preserve the complete path: the prompt that set the direction, the decisions made along the way, the commands and tools the agent used, the failed attempts, and the context someone else would need to continue.
 
-## The problem
+Spool makes the agent Session a first-class publishing format.
 
-Your past agent sessions are gold. You've solved hard problems, explored trade-offs, and built up context that's invaluable for future work. But there's no good way to find any of it.
+## A Session is a work artifact
 
-You can't grep through JSONL files and get useful results. You can't ask your agent "what did we discuss about caching last month?" because it has no memory across sessions.
+An agent Session contains more than conversation. It records intent, reasoning, tool activity, implementation details, and often the most useful explanation of why the final code looks the way it does.
 
-## How Spool works
+Publishing that Session should not mean dumping an unreadable log. A Spool page lets a reader begin with a Summary, inspect the conversation and tools, review files and net changes, and deep-link to the exact moment that matters.
 
-Spool watches your session directories in real time. Every conversation becomes searchable the moment it's written — no manual export, no copy-paste. All local, all on your machine.
+The original Session remains authoritative. The Summary helps orientation; the evidence remains available underneath it.
 
-For platform data — GitHub stars, Twitter bookmarks, Reddit saves — see [Spool Daemon](/daemon/), our sibling app focused on capture sync.
+## Reading should lead to continuation
 
-## What's next: agent-native search
+The most useful technical material often makes you want to try it yourself.
 
-The key insight: your coding agent is already the best search engine you have. It just needs access to your personal data.
+A Spool URL is both a page and a continuation point. With the CLI, a reader can resume the shared records as a new native Session in a supported coding agent. The source stays unchanged, and the relationship between source and continuation remains visible.
 
-We're building a `/spool` skill for Claude Code and a standalone CLI so your agent can search your past sessions and pull matching context directly into the current conversation. Ask it to "build on last month's auth discussion" and it will actually be able to.
+```bash
+spool resume <session-url>
+```
 
-## Try it
+## Public work needs identity and discovery
+
+Useful Sessions should not disappear after a link is sent once. Public Sessions belong on author Profiles and in Discovery surfaces organized around topics, projects, agents, and the work itself.
+
+That community starts with a high-quality public corpus—not vanity metrics. Authorship, evidence, search, and continuation lineage matter before likes or follower counts.
+
+## Publishing must be explicit
+
+Agent Sessions can contain credentials, personal data, local paths, and code that was never meant to leave a machine.
+
+Spool keeps the boundary clear:
+
+- local preparation does not publish anything;
+- Share creates a Link-only URL;
+- Publish is a separate choice that makes the Session discoverable;
+- sensitive-data findings appear before disclosure;
+- an author can withdraw a Shared Session.
+
+## Try the current sharing flow
 
 ```bash
 curl -fsSL https://spool.pro/install.sh | bash
 ```
 
-Spool is open source and runs entirely on your machine. [Star us on GitHub](https://github.com/spool-lab/spool) if this resonates.
+Or install the CLI:
+
+```bash
+npm install -g @spool-lab/cli
+spool sync
+spool login
+spool share <session-uuid>
+```
+
+Spool is open source and being built in public. [Follow the repository on GitHub](https://github.com/spool-lab/spool) if agent work deserves a better public format.

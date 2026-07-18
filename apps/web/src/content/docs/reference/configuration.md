@@ -1,40 +1,48 @@
 ---
 title: Configuration
-description: Spool's data paths and agent configuration.
+description: Local data, credentials, and source paths used by Spool.
 ---
 
-Spool stores its data in `~/.spool/`.
+Spool stores local application data under `~/.spool/` by default.
 
 ## Data directory
 
-| Path                   | Purpose                      |
-| ---------------------- | ---------------------------- |
-| `~/.spool/spool.db`    | Local search index (SQLite)  |
-| `~/.spool/agents.json` | Agent and SDK configuration  |
-| `~/.spool/ui.json`     | UI preferences (theme, etc.) |
+| Path                            | Purpose                                             |
+| ------------------------------- | --------------------------------------------------- |
+| `~/.spool/spool.db`             | Local Session metadata, messages, search, and state |
+| `~/.spool/agents.json`          | Local Agent and ACP configuration                   |
+| `~/.spool/ui.json`              | UI preferences                                      |
+| `~/.spool/security.json`        | Security-scan preferences                           |
+| `~/.spool/hub-credentials.json` | Revocable CLI Hub credential                        |
 
-## Watched directories
+Override the directory for development or isolated automation:
 
-Spool watches the following directories for real-time session indexing. These paths are built-in and do not require configuration.
-
-| Agent                  | Path                                  |
-| ---------------------- | ------------------------------------- |
-| Claude Code            | `~/.claude/projects/`                 |
-| Claude Code (profiles) | `~/.claude-profiles/*/projects/`      |
-| Codex CLI              | `~/.codex/sessions/`                  |
-| Codex CLI (profiles)   | `~/.codex-profiles/*/sessions/`       |
-| Gemini CLI             | `~/.gemini/tmp/*/chats/`              |
-| OpenCode               | `~/.local/share/opencode/opencode.db` |
-
-New sessions become searchable the moment they're written.
-
-## Agent configuration
-
-The `~/.spool/agents.json` file configures which agent Spool uses for AI-powered features:
-
-```json
-{
-  "defaultAgent": "claude",
-  "defaultSearchSort": "relevance"
-}
+```bash
+SPOOL_DATA_DIR=/some/path spool sync
 ```
+
+Desktop development uses `~/.spool-dev/` automatically.
+
+## Source locations
+
+| Agent                | Path                                  |
+| -------------------- | ------------------------------------- |
+| Claude Code          | `~/.claude/projects/`                 |
+| Claude Code profiles | `~/.claude-profiles/*/projects/`      |
+| Codex CLI            | `~/.codex/sessions/`                  |
+| Codex CLI profiles   | `~/.codex-profiles/*/sessions/`       |
+| Gemini CLI           | `~/.gemini/tmp/*/chats/`              |
+| OpenCode             | `~/.local/share/opencode/opencode.db` |
+| Pi                   | `~/.pi/agent/sessions/`               |
+
+These source locations are built in.
+
+## Hub credentials
+
+`spool login` writes a revocable token to `hub-credentials.json`. `spool logout` asks the Hub to revoke that token and removes the local file. If a machine is lost, revoke its credential from the account surface.
+
+Never commit the Spool data directory or Hub credential file to a repository.
+
+## Publishing boundary
+
+Configuration does not make Sessions public. A Session leaves the machine only through an explicit Share flow. Public visibility is a separate explicit Publish choice.
