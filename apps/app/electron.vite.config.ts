@@ -183,6 +183,16 @@ export default defineConfig(({ mode }) => ({
     ],
     build: {
       rollupOptions: {
+        output: {
+          format: 'es',
+          // electron-vite's generated ESM shim can land inside a retained
+          // third-party JSDoc block after Rolldown combines the main graph.
+          // Define the Node path globals up front so bundled app modules do
+          // not depend on the placement of that generated shim.
+          banner:
+            'globalThis.__filename ??= import.meta.filename;\n' +
+            'globalThis.__dirname ??= import.meta.dirname;',
+        },
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
         },

@@ -74,6 +74,8 @@ describe('main-process ESM workspace bundles', () => {
     }
 
     const bundle = readFileSync(mainEntry, 'utf8')
+    expect(bundle).toContain('globalThis.__filename ??= import.meta.filename')
+    expect(bundle).toContain('globalThis.__dirname ??= import.meta.dirname')
     expect(bundle).toContain('../preload/index.js')
     expect(bundle).not.toContain('../preload/index.mjs')
     for (const workerEntry of WORKER_ENTRIES) {
