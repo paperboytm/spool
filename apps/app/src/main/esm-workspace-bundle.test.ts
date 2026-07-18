@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -13,6 +13,7 @@ const ELECTRON_VITE = resolve(
   '.bin',
   process.platform === 'win32' ? 'electron-vite.CMD' : 'electron-vite',
 )
+const WORKER_CONFIG = resolve(APP_ROOT, 'electron.workers.vite.config.ts')
 const execFileAsync = promisify(execFile)
 
 const IMPORT_ONLY_WORKSPACE_PACKAGES = ['@spool-lab/cli/hub', '@spool-lab/session-kit']
@@ -26,10 +27,37 @@ describe('main-process ESM workspace bundles', () => {
   it('does not leave import-only packages behind as CommonJS requires', async () => {
     rmSync(OUT_DIR, { recursive: true, force: true })
 
+    const buildEnv = {
+      ...process.env,
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
+      // Reproduce the graph that previously pulled an Electron-only auth
+      // chunk into the scan worker through generated interop helpers.
+      SPOOL_E2E_TEST: '1',
+    }
+
     await execFileAsync(ELECTRON_VITE, ['build', '--outDir', OUT_DIR], {
       cwd: APP_ROOT,
-      env: { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' },
+      env: buildEnv,
     })
+    await execFileAsync(ELECTRON_VITE, ['build', '--config', WORKER_CONFIG, '--outDir', OUT_DIR], {
+      cwd: APP_ROOT,
+      env: buildEnv,
+    })
+
+    const workerChunksDir = join(OUT_DIR, 'main', 'worker-chunks')
+    const workerBundlePaths = [
+      ...WORKER_ENTRIES.map((entry) => join(OUT_DIR, 'main', entry)),
+      ...readdirSync(workerChunksDir).map((entry) => join(workerChunksDir, entry)),
+    ]
+    for (const workerBundlePath of workerBundlePaths) {
+      const workerBundle = readFileSync(workerBundlePath, 'utf8')
+      expect(workerBundle, 'worker bundle must not import Electron runtime APIs').not.toMatch(
+        /from\s+['"]electron['"]/,
+      )
+      expect(workerBundle, 'worker bundle must not contain Electron npm code').not.toContain(
+        'node_modules/.pnpm/electron@',
+      )
+    }
 
     const mainEntry = join(OUT_DIR, 'main', 'index.mjs')
     const preloadEntry = join(OUT_DIR, 'preload', 'index.js')

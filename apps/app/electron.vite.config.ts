@@ -185,9 +185,6 @@ export default defineConfig(({ mode }) => ({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          'sync-worker': resolve(__dirname, 'src/main/sync-worker.ts'),
-          'scan-worker-thread': resolve(__dirname, 'src/main/scan-worker-thread.ts'),
-          'mutation-worker-thread': resolve(__dirname, 'src/main/mutation-worker-thread.ts'),
         },
       },
     },

@@ -31,8 +31,9 @@
     "dev": "pnpm run build:deps && node ../../scripts/with-electron-native.mjs node scripts/dev.mjs",
     "dev:reset-db": "node scripts/dev-reset-db.mjs",
     "dev:seed-from-prod": "node scripts/dev-seed-from-prod.mjs",
-    "build": "electron-vite build",
-    "build:electron": "pnpm run build:deps && electron-vite build",
+    "build": "electron-vite build && pnpm run build:workers",
+    "build:workers": "electron-vite build --config electron.workers.vite.config.ts",
+    "build:electron": "pnpm run build:deps && pnpm run build",
     "package": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --publish never",
     "package:mac": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --mac --arm64 --publish never",
     "package:linux": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --linux --publish never",
@@ -47,7 +48,7 @@
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
     "pretest:e2e": "pnpm run ensure:electron-runtime",
     "test:e2e": "node ../../scripts/with-electron-native.mjs pnpm run test:e2e:raw",
-    "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 electron-vite build && playwright test --config e2e/playwright.config.ts"
+    "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 pnpm run build && playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",
