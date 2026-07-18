@@ -516,6 +516,25 @@
       "action_unpublishing": "取消发布中"
     }
   },
+  "shareSummary": {
+    "title": "分享前先总结？",
+    "subtitle": "用你的 Agent 创建精简摘要，或保留完整对话。",
+    "option_summary": "使用 {{agent}} 总结",
+    "option_summary_body": "Spool 会通过此设备上的 ACP 将该会话交给你的 Agent。仍会使用该 Agent 自己配置的模型和服务提供方。",
+    "option_summary_unavailable_title": "使用你的 Agent 总结",
+    "option_summary_unavailable_body": "没有可用的 Agent。请在“设置 → Agent”中添加。",
+    "agent_label": "Agent",
+    "agent_trust": "经 ACP · 本机 · {{agent}}",
+    "option_full": "使用完整对话",
+    "option_full_body": "在分享编辑器中打开全部消息，不会运行 Agent。",
+    "continue_summary": "创建总结",
+    "continue_full": "打开完整对话",
+    "creating_title": "正在创建总结",
+    "creating_body": "{{agent}} 正在将该会话整理成精简的 Markdown 摘要，供你确认。",
+    "cancel_generation": "取消总结",
+    "error_title": "无法创建总结",
+    "error_generic": "你的 Agent 没有返回总结。"
+  },
   "shareEditor": {
     "openExisting": "编辑分享草稿",
     "openNew": "编辑分享草稿",
@@ -712,7 +731,7 @@
   "newDraft": {
     "title": "从会话开始分享",
     "subtitle": "选择要分享的会话",
-    "searchPlaceholder": "从会话开始分享",
+    "searchPlaceholder": "选择要总结或分享的会话",
     "empty": "没有匹配「{{query}}」的会话。",
     "emptyNoSessions": "暂无会话——先索引一些会话，它们会显示在这里。",
     "emptyInProject": "{{project}} 中暂无会话。",
@@ -856,7 +875,7 @@
     "title": "发布这个会话?",
     "lead": "将完整转录({{records}} 条记录)发布到你的 spool.pro 账号。拿到链接的人可以阅读并从中恢复会话。",
     "secretsWarning": "检测到 {{total}} 处疑似敏感信息(其中 {{high}} 处高危)。分享会公开这些内容——不确定时请先用安全扫描检查。",
-    "noteLabel": "给读者的说明",
+    "summaryLabel": "摘要（Markdown）",
     "publish": "发布",
     "publishing": "发布中…",
     "doneTitle": "已分享",

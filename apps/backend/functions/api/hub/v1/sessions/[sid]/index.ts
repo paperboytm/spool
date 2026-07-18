@@ -14,12 +14,15 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     const sid = requireSid(ctx.params['sid'])
     const session = await requireReadableSession(ctx.env.DB, sid)
     const author = await getHubAuthor(ctx.env.DB, session.owner_user_id)
+    const summaryMd = session.note_md
     return jsonOk({
       sid: session.sid,
       root: session.root,
       count: session.record_count,
       sig: session.sig,
-      noteMd: session.note_md,
+      summaryMd,
+      // Rolling-upgrade alias for older CLI/Desktop/Web clients.
+      noteMd: summaryMd,
       cardJson: session.card_json,
       lineageJson: session.lineage_json,
       viewOid: session.view_oid,

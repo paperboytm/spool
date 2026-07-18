@@ -516,6 +516,25 @@
       "action_unpublishing": "取消發布中"
     }
   },
+  "shareSummary": {
+    "title": "分享前先摘要？",
+    "subtitle": "用你的 Agent 建立精簡摘要，或保留完整對話。",
+    "option_summary": "使用 {{agent}} 摘要",
+    "option_summary_body": "Spool 會透過此裝置上的 ACP 將此會話交給你的 Agent。仍會使用該 Agent 自己設定的模型與服務供應商。",
+    "option_summary_unavailable_title": "使用你的 Agent 摘要",
+    "option_summary_unavailable_body": "找不到可用的 Agent。請在「設定 → Agent」中新增。",
+    "agent_label": "Agent",
+    "agent_trust": "經 ACP · 本機 · {{agent}}",
+    "option_full": "使用完整對話",
+    "option_full_body": "在分享編輯器中開啟全部訊息，不會執行 Agent。",
+    "continue_summary": "建立摘要",
+    "continue_full": "開啟完整對話",
+    "creating_title": "正在建立摘要",
+    "creating_body": "{{agent}} 正在將此會話整理成精簡的 Markdown 摘要，供你確認。",
+    "cancel_generation": "取消摘要",
+    "error_title": "無法建立摘要",
+    "error_generic": "你的 Agent 沒有傳回摘要。"
+  },
   "shareEditor": {
     "openExisting": "編輯分享草稿",
     "openNew": "編輯分享草稿",
@@ -712,7 +731,7 @@
   "newDraft": {
     "title": "從會話建立分享",
     "subtitle": "選擇要分享的會話",
-    "searchPlaceholder": "從會話建立分享",
+    "searchPlaceholder": "選擇要摘要或分享的會話",
     "empty": "沒有符合「{{query}}」的會話。",
     "emptyNoSessions": "尚無會話——先建立索引，它們會出現在這裡。",
     "emptyInProject": "{{project}} 中尚無會話。",
@@ -856,7 +875,7 @@
     "title": "發佈這個會話?",
     "lead": "將完整轉錄({{records}} 條記錄)發佈到你的 spool.pro 帳號。取得連結的人可以閱讀並從中恢復會話。",
     "secretsWarning": "偵測到 {{total}} 處疑似敏感資訊(其中 {{high}} 處高風險)。分享會公開這些內容——不確定時請先用安全掃描檢查。",
-    "noteLabel": "給讀者的說明",
+    "summaryLabel": "摘要（Markdown）",
     "publish": "發佈",
     "publishing": "發佈中…",
     "doneTitle": "已分享",

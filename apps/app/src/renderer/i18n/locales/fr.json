@@ -545,6 +545,25 @@
       "action_unpublishing": "Dépublication"
     }
   },
+  "shareSummary": {
+    "title": "Résumer avant de partager ?",
+    "subtitle": "Créez un résumé concis avec votre agent, ou conservez toute la conversation.",
+    "option_summary": "Résumer avec {{agent}}",
+    "option_summary_body": "Spool envoie cette session à votre agent via ACP sur cet appareil. Les réglages de modèle et de fournisseur de votre agent continuent de s'appliquer.",
+    "option_summary_unavailable_title": "Résumer avec votre agent",
+    "option_summary_unavailable_body": "Aucun agent prêt. Ajoutez-en un dans Réglages → Agent.",
+    "agent_label": "Agent",
+    "agent_trust": "via ACP · local · {{agent}}",
+    "option_full": "Utiliser toute la conversation",
+    "option_full_body": "Ouvre tous les messages dans l'éditeur de partage. Aucun agent n'est lancé.",
+    "continue_summary": "Créer le résumé",
+    "continue_full": "Ouvrir toute la conversation",
+    "creating_title": "Création du résumé",
+    "creating_body": "{{agent}} transforme cette session en un résumé Markdown concis à vérifier.",
+    "cancel_generation": "Annuler le résumé",
+    "error_title": "Impossible de créer le résumé",
+    "error_generic": "Votre agent n'a renvoyé aucun résumé."
+  },
   "shareEditor": {
     "openExisting": "Modifier le brouillon de partage",
     "openNew": "Modifier le brouillon de partage",
@@ -749,7 +768,7 @@
   "newDraft": {
     "title": "Créer un brouillon depuis une session",
     "subtitle": "Choisissez une session à partager",
-    "searchPlaceholder": "Créer un brouillon depuis une session",
+    "searchPlaceholder": "Choisir une session à résumer ou partager",
     "empty": "Aucune session ne correspond à « {{query}} ».",
     "emptyNoSessions": "Aucune session pour l'instant — indexez-en quelques-unes et elles apparaîtront ici.",
     "emptyInProject": "Aucune session dans {{project}} pour l'instant.",
@@ -898,7 +917,7 @@
     "title": "Publier cette session ?",
     "lead": "Publie la transcription complète ({{records}} enregistrements) sur votre compte spool.pro. Toute personne disposant du lien peut la lire et la reprendre.",
     "secretsWarning": "{{total}} secrets potentiels détectés (dont {{high}} à haut risque). Le partage publie ces valeurs.",
-    "noteLabel": "Note pour les lecteurs",
+    "summaryLabel": "Résumé (Markdown)",
     "publish": "Publier",
     "publishing": "Publication…",
     "doneTitle": "Partagé",

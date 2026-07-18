@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { runChecks, type CheckResult, type FixResult } from '@spool-lab/core'
 import { Command } from 'commander'
 
+import { createClackUi } from '../ui.js'
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 interface DoctorFlags {
@@ -23,27 +25,47 @@ export const doctorCommand = new Command('doctor')
   .option('--force', 'With --fix, also apply destructive fixes')
   .action(async (checkId: string | undefined, flags: DoctorFlags) => {
     const filter = checkId ? [checkId] : undefined
-    const rawResults = await runChecks(filter)
-    const results = refineForAppVersion(rawResults, readCliVersion(), readAppVersion())
-
     if (flags.json) {
+      const rawResults = await runChecks(filter)
+      const results = refineForAppVersion(rawResults, readCliVersion(), readAppVersion())
       printJson(results)
       setExit(results)
+      return
+    }
+
+    const ui = createClackUi()
+    ui.intro('Spool Doctor')
+    const app = readAppVersion()
+    ui.info(`CLI ${readCliVersion()}${app ? ` · Desktop ${app.version}` : ''}`)
+    const checking = ui.spinner()
+    checking.start(checkId ? `Running ${checkId}` : 'Checking the local Spool environment')
+    let results: CheckResult[]
+    try {
+      const rawResults = await runChecks(filter)
+      results = refineForAppVersion(rawResults, readCliVersion(), readAppVersion())
+      checking.stop(`Completed ${results.length} checks`)
+    } catch (cause) {
+      checking.error('Checks failed')
+      ui.error(cause instanceof Error ? cause.message : String(cause))
+      process.exitCode = 1
       return
     }
 
     printHuman(results, flags.verbose === true)
 
     if (flags.fix) {
+      const fixing = ui.spinner()
+      fixing.start('Applying available fixes')
       const applied = await applyFixes(results, flags.force === true)
+      fixing.stop(`Applied ${applied.applied.length} fixes`)
       printFixSummary(applied)
-      if (applied.applied.length > 0) {
-        console.log('\nRe-run `spool doctor` to verify.')
-      }
+      if (applied.applied.length > 0) ui.info('Re-run `spool doctor` to verify.')
     } else {
       printFixHint(results)
     }
 
+    const summary = summarize(results)
+    ui.outro(`${summary.ok} ok · ${summary.warn} warnings · ${summary.error} errors`)
     setExit(results)
   })
 
@@ -96,14 +118,6 @@ const CATEGORY_LABEL: Record<CheckResult['category'], string> = {
 }
 
 function printHuman(results: CheckResult[], verbose: boolean): void {
-  const cliVersion = readCliVersion()
-  const app = readAppVersion()
-  console.log(
-    c('bold', `Spool Doctor`) +
-      c('dim', `  cli ${cliVersion}` + (app ? `  ·  app ${app.version}` : '')),
-  )
-  console.log()
-
   for (const category of CATEGORY_ORDER) {
     const rows = results.filter((r) => r.category === category)
     if (rows.length === 0) continue

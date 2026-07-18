@@ -545,6 +545,25 @@
       "action_unpublishing": "Ziehe zurück"
     }
   },
+  "shareSummary": {
+    "title": "Vor dem Teilen zusammenfassen?",
+    "subtitle": "Erstelle mit deinem Agenten eine kompakte Zusammenfassung oder behalte die vollständige Unterhaltung.",
+    "option_summary": "Mit {{agent}} zusammenfassen",
+    "option_summary_body": "Spool sendet diese Sitzung über ACP auf diesem Gerät an deinen Agenten. Dessen Modell- und Anbieter-Einstellungen gelten weiterhin.",
+    "option_summary_unavailable_title": "Mit deinem Agenten zusammenfassen",
+    "option_summary_unavailable_body": "Kein bereiter Agent gefunden. Füge einen unter Einstellungen → Agent hinzu.",
+    "agent_label": "Agent",
+    "agent_trust": "via ACP · lokal · {{agent}}",
+    "option_full": "Vollständige Unterhaltung verwenden",
+    "option_full_body": "Öffnet alle Nachrichten im Teilen-Editor. Es wird kein Agent ausgeführt.",
+    "continue_summary": "Zusammenfassung erstellen",
+    "continue_full": "Vollständige Unterhaltung öffnen",
+    "creating_title": "Zusammenfassung wird erstellt",
+    "creating_body": "{{agent}} erstellt eine kompakte Markdown-Zusammenfassung zur Überprüfung.",
+    "cancel_generation": "Zusammenfassung abbrechen",
+    "error_title": "Zusammenfassung konnte nicht erstellt werden",
+    "error_generic": "Dein Agent hat keine Zusammenfassung zurückgegeben."
+  },
   "shareEditor": {
     "openExisting": "Freigabe-Entwurf bearbeiten",
     "openNew": "Freigabe-Entwurf bearbeiten",
@@ -749,7 +768,7 @@
   "newDraft": {
     "title": "Entwurf aus einer Sitzung erstellen",
     "subtitle": "Sitzung zum Teilen auswählen",
-    "searchPlaceholder": "Entwurf aus einer Sitzung erstellen",
+    "searchPlaceholder": "Sitzung zum Zusammenfassen oder Teilen auswählen",
     "empty": "Keine Sitzungen passen zu „{{query}}\".",
     "emptyNoSessions": "Noch keine Sitzungen – indexieren Sie zunächst einige, dann erscheinen sie hier.",
     "emptyInProject": "Noch keine Sitzungen in {{project}}.",
@@ -898,7 +917,7 @@
     "title": "Diese Session veröffentlichen?",
     "lead": "Veröffentlicht das vollständige Transkript ({{records}} Einträge) in deinem spool.pro-Konto. Jeder mit dem Link kann es lesen und fortsetzen.",
     "secretsWarning": "{{total}} mögliche Geheimnisse erkannt ({{high}} mit hohem Risiko). Beim Teilen werden diese Werte veröffentlicht.",
-    "noteLabel": "Notiz für Leser",
+    "summaryLabel": "Zusammenfassung (Markdown)",
     "publish": "Veröffentlichen",
     "publishing": "Wird veröffentlicht…",
     "doneTitle": "Geteilt",

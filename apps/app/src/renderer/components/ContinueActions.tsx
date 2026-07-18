@@ -57,7 +57,7 @@ export default function ContinueActions({
     ...(onShare
       ? [
           {
-            label: t('shareEditor.openNew'),
+            label: t('sidebar.shareSession'),
             icon: <SquarePen size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />,
             onSelect: onShare,
           },

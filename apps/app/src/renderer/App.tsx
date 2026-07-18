@@ -34,6 +34,7 @@ import AiAnswerCard from './components/AiAnswerCard.js'
 import AppToaster from './components/AppToaster.js'
 import AppTopBar from './components/AppTopBar.js'
 import FragmentResults from './components/FragmentResults.js'
+import HubShareDialog from './components/hub-share-dialog.js'
 import LibraryLanding from './components/LibraryLanding.js'
 import ProjectView from './components/ProjectView.js'
 import type { ScopeValue } from './components/ScopeSelector.js'
@@ -43,6 +44,7 @@ import SecurityPage from './components/SecurityPage.js'
 import SessionDetail from './components/SessionDetail.js'
 import SettingsPanel from './components/SettingsPanel.js'
 import ShareEditorPage from './components/ShareEditorPage.js'
+import ShareSessionDialog from './components/ShareSessionDialog.js'
 import SharesPage from './components/SharesPage.js'
 import Sidebar from './components/Sidebar.js'
 import SidebarRail from './components/SidebarRail.js'
@@ -156,6 +158,20 @@ export default function App() {
     opts: EditorOpts
   }
   const [shareEditor, setShareEditor] = useState<ShareEditorBundle | null>(null)
+  type ShareRequest = {
+    session: Session
+    messages: Message[]
+    returnView: View
+  }
+  const [shareRequest, setShareRequest] = useState<ShareRequest | null>(null)
+  const [hubSummaryShare, setHubSummaryShare] = useState<{
+    sessionUuid: string
+    summary: string
+  } | null>(null)
+  // Invalidates an in-flight summary when the user cancels the preflight.
+  // The ACP process is also killed, but the token closes the smaller race
+  // where a completed IPC response lands just before cancellation.
+  const summaryRequestSeq = useRef(0)
   // The view the user came from when opening the editor — Back returns
   // here. Captured up front because guessing from current state
   // (selectedSession etc.) misroutes when the user opens a draft from
@@ -191,8 +207,8 @@ export default function App() {
     [enterShareEditor, sidebarCollapsed],
   )
 
-  const handleStartShareFromSession = useCallback(
-    async (session: Session, messages: Message[], returnView: View = 'session') => {
+  const openFullShareFromSession = useCallback(
+    async (session: Session, messages: Message[], returnView: View) => {
       const draftId = sessionDraftId(session.sessionUuid)
       // If the user has shared this session before, reopen their saved
       // draft (their edits to template / paper / typeface / etc. are in
@@ -266,6 +282,16 @@ export default function App() {
     [openShareEditor],
   )
 
+  // Every new session → Share entry point lands on the same preflight. When
+  // a ready agent exists, Summary is selected by default; the dialog makes
+  // the agent/provider boundary explicit before generation begins.
+  const handleStartShareFromSession = useCallback(
+    (session: Session, messages: Message[], returnView: View = 'session') => {
+      setShareRequest({ session, messages, returnView })
+    },
+    [],
+  )
+
   const handleStartShareFromUuid = useCallback(
     async (sessionUuid: string) => {
       try {
@@ -274,13 +300,57 @@ export default function App() {
           console.error('Cannot share — session not found:', sessionUuid)
           return
         }
-        await handleStartShareFromSession(result.session, result.messages, view)
+        handleStartShareFromSession(result.session, result.messages, view)
       } catch (err) {
         console.error('Failed to load session for share:', err)
       }
     },
     [handleStartShareFromSession, view],
   )
+
+  const handleOpenFullShare = useCallback(async () => {
+    const request = shareRequest
+    if (!request) return
+    summaryRequestSeq.current += 1
+    setShareRequest(null)
+    await openFullShareFromSession(request.session, request.messages, request.returnView)
+  }, [openFullShareFromSession, shareRequest])
+
+  const handleCreateSummaryShare = useCallback(
+    async (agent: AgentInfo) => {
+      const request = shareRequest
+      if (!request) return
+      if (!window.spool?.summarizeSession) {
+        throw new Error('Session summaries are unavailable in this build.')
+      }
+
+      const requestId = ++summaryRequestSeq.current
+      const result = await window.spool.summarizeSession(request.session.sessionUuid, agent.id)
+      if (requestId !== summaryRequestSeq.current) return
+      if (!result.ok) throw new Error(result.error)
+
+      // Generation stays local through ACP. The accepted Markdown now moves
+      // into the Hub review dialog; publishing is delegated to the shared CLI
+      // pipeline rather than becoming a styled Desktop draft.
+      setShareRequest(null)
+      setHubSummaryShare({
+        sessionUuid: request.session.sessionUuid,
+        summary: result.summary,
+      })
+    },
+    [shareRequest],
+  )
+
+  const handleCloseShareRequest = useCallback(() => {
+    summaryRequestSeq.current += 1
+    setShareRequest(null)
+  }, [])
+
+  const handleCancelSummary = useCallback(() => {
+    summaryRequestSeq.current += 1
+    setShareRequest(null)
+    void window.spool?.aiCancel(aiAgent)
+  }, [aiAgent])
 
   const handleImportSpoolFile = useCallback(
     async (file: File) => {
@@ -899,6 +969,9 @@ export default function App() {
   const activeAgentInfo = availableAgents.find((a) => a.id === aiAgent) ?? availableAgents[0]
   const activeAgentName = activeAgentInfo?.name ?? aiAgent
   const hasAgents = availableAgents.length > 0
+  // The summary disclosure promises an ACP connection on this device.
+  // Exclude legacy websocket integrations so that trust label stays literal.
+  const summaryAgents = availableAgents.filter((agent) => agent.acpMode !== 'websocket')
   const fragmentSources = deferredResults.filter(
     (result): result is FragmentSearchResult => result.kind === 'fragment',
   )
@@ -974,6 +1047,27 @@ export default function App() {
     />
   )
 
+  const shareSessionDialogElement = shareRequest ? (
+    <ShareSessionDialog
+      sessionUuid={shareRequest.session.sessionUuid}
+      sessionTitle={shareRequest.session.title?.trim() || t('common.noTitle')}
+      agents={summaryAgents}
+      activeAgentId={aiAgent}
+      onClose={handleCloseShareRequest}
+      onCancelGeneration={handleCancelSummary}
+      onOpenFull={handleOpenFullShare}
+      onCreateSummary={handleCreateSummaryShare}
+    />
+  ) : null
+  const hubSummaryShareDialogElement = hubSummaryShare ? (
+    <HubShareDialog
+      open
+      sessionUuid={hubSummaryShare.sessionUuid}
+      initialSummary={hubSummaryShare.summary}
+      onClose={() => setHubSummaryShare(null)}
+    />
+  ) : null
+
   // Share editor owns its own PageLayout (with a right panel) — short-
   // circuit App's regular two-column layout for that view.
   if (isShareEditorView && shareEditor) {
@@ -1040,6 +1134,8 @@ export default function App() {
           onCommit={handleSearchCommit}
           onOpenResult={handleOpenResultFromOverlay}
         />
+        {shareSessionDialogElement}
+        {hubSummaryShareDialogElement}
       </>
     )
   }
@@ -1292,6 +1388,8 @@ export default function App() {
         onCommit={handleSearchCommit}
         onOpenResult={handleOpenResultFromOverlay}
       />
+      {shareSessionDialogElement}
+      {hubSummaryShareDialogElement}
     </div>
   )
 }

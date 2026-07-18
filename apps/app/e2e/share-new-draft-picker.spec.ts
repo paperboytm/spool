@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
-import { navigateToShares } from './helpers/share'
+import { continueWithFullConversation, navigateToShares } from './helpers/share'
 
 let ctx: AppContext
 
@@ -49,6 +49,7 @@ test('FTS search narrows results; keyboard nav + Enter opens editor', async () =
   await window.keyboard.press('ArrowDown')
   await window.keyboard.press('ArrowUp')
   await window.keyboard.press('Enter')
+  await continueWithFullConversation(window)
 
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
 })

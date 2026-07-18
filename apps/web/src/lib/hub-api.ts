@@ -18,7 +18,7 @@ export interface HubSessionMeta {
   root: string
   count: number
   sig: string | null
-  noteMd: string | null
+  summaryMd: string | null
   cardJson: string | null
   lineageJson: string | null
   viewOid: string | null
@@ -26,6 +26,12 @@ export interface HubSessionMeta {
   createdAt: number
   updatedAt: number
   author: HubAuthor
+}
+
+type HubSessionMetaWire = Omit<HubSessionMeta, 'summaryMd'> & {
+  summaryMd?: string | null
+  /** Compatibility with Hub responses from before the Summary rename. */
+  noteMd?: string | null
 }
 
 export type HubMetaResult =
@@ -46,7 +52,11 @@ export async function fetchHubMeta(sid: string): Promise<HubMetaResult> {
       headers: { accept: 'application/json' },
     })
     if (r.status === 200) {
-      return { kind: 'ok', meta: (await r.json()) as HubSessionMeta }
+      const { noteMd, ...meta } = (await r.json()) as HubSessionMetaWire
+      return {
+        kind: 'ok',
+        meta: { ...meta, summaryMd: meta.summaryMd ?? noteMd ?? null },
+      }
     }
     if (r.status === 410) {
       const body = (await r.json().catch(() => ({}))) as { withdrawnAt?: number }

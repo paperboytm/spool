@@ -32,7 +32,7 @@ interface StoredHead {
   manifest: string[]
   viewOid: string
   spoolFileOid: string | null
-  noteMd: string | null
+  summaryMd: string | null
 }
 
 function makeHub() {
@@ -125,7 +125,7 @@ describe('hub-share IPC', () => {
     loadToken.mockReturnValue('session-token')
   })
 
-  it('prepare computes counts, diffstat, redact findings, and a note prefill locally', async () => {
+  it('prepare computes counts, diffstat, redact findings, and a summary prefill locally', async () => {
     setup()
     const result = await invoke<HubSharePrepareResult>('hub-share:prepare', {
       sessionUuid: SESSION_UUID,
@@ -134,7 +134,7 @@ describe('hub-share IPC', () => {
     expect(result.prepared.sid).toBe(`claude_${SESSION_UUID}`)
     expect(result.prepared.count).toBe(2)
     expect(result.prepared.secrets.total).toBeGreaterThan(0)
-    expect(result.prepared.notePrefill).toContain('Records shared: 2')
+    expect(result.prepared.summaryPrefill).toContain('Records shared: 2')
   })
 
   it('publish runs the 3-step handshake with the app session bearer', async () => {
@@ -142,13 +142,13 @@ describe('hub-share IPC', () => {
     await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
     const result = await invoke<HubSharePublishResult>('hub-share:publish', {
       sessionUuid: SESSION_UUID,
-      note: 'take a look',
+      summary: '## Outcome\n\nTake a look.',
     })
     if (!result.ok) throw new Error(result.error)
     expect(result.url).toBe(`https://hub.test/session/claude_${SESSION_UUID}`)
 
     const head = hub.sessions.get(`claude_${SESSION_UUID}`)
-    expect(head?.noteMd).toBe('take a look')
+    expect(head?.summaryMd).toBe('## Outcome\n\nTake a look.')
     expect(head?.root).toBe(await sequenceRoot(head?.manifest ?? []))
     expect(hub.objects.has(head?.viewOid ?? '')).toBe(true)
 
@@ -166,7 +166,7 @@ describe('hub-share IPC', () => {
     loadToken.mockReturnValue(null)
     const result = await invoke<HubSharePublishResult>('hub-share:publish', {
       sessionUuid: SESSION_UUID,
-      note: '',
+      summary: '',
     })
     expect(result).toEqual({ ok: false, error: 'UNAUTHENTICATED' })
   })

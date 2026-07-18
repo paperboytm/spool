@@ -623,8 +623,8 @@ describe('sync', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spool-cli-sync-'))
     try {
       const out = run(['sync'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Syncing sessions')
-      expect(out).toContain('Done')
+      expect(out).toContain('Sync sessions')
+      expect(out).toContain('Local index is up to date')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

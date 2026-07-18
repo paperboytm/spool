@@ -65,11 +65,11 @@ spool login                    # Sign in via browser approval (works over SSH)
 spool login --token <t>        # Paste a hub API token instead (CI / scripts)
 spool logout                   # Revoke this machine's token + delete local credentials
 
-spool share                    # Share the latest session in the current directory
+spool share                    # Upload, then offer a detected local Agent for Summary
 spool share <uuid>             # Share a specific session (uuid prefixes work)
 spool share <uuid>@12          # Share only the first 12 records
-spool share -m "note"          # Set the note without opening the editor
-spool share --no-edit          # Publish the prefilled draft as-is
+spool share --no-agent-summary # Upload without the post-share Agent offer
+spool share --summary "..."    # Advanced: provide Summary Markdown directly
 spool share --yes              # Skip the secret-findings confirmation
 
 spool resume <sid|url>         # Materialize a shared session and fork it natively
@@ -80,8 +80,10 @@ spool resume --no-exec         # Print the native resume command instead of laun
 spool withdraw <sid|url>       # Take a shared session down (tombstone)
 ```
 
-`spool share` scans for secrets before anything leaves the machine and
-opens your editor to write a note. `spool resume` writes a brand-new
+`spool share` scans for secrets, uploads the session, then detects Claude
+Code and Codex CLI. In an interactive terminal it asks whether one of those
+local Agents should generate a Summary and automatically uploads the result.
+All prompts and progress use Clack. `spool resume` writes a brand-new
 provider-native session (Claude → `~/.claude/projects`, Codex →
 `~/.codex/sessions`) and launches the provider's fork entry point, so
 continued work branches off cleanly from the share point.

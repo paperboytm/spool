@@ -1179,6 +1179,31 @@ ipcMain.handle(
   },
 )
 
+ipcMain.handle(
+  'spool:ai-summarize-session',
+  async (_e, { sessionUuid, agentId }: { sessionUuid: string; agentId: string }) => {
+    try {
+      const selected = getSessionWithMessages(db, sessionUuid)
+      if (!selected) return { ok: false, error: 'Session not found.' }
+
+      const summary = (
+        await acpManager.summarizeSession(agentId, selected.session, selected.messages)
+      ).trim()
+      if (!summary) return { ok: false, error: 'Your agent returned an empty summary.' }
+      return { ok: true, summary }
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err)
+      console.error('[spool:ai-summarize-session] Agent summary failed:', error)
+      return { ok: false, error }
+    }
+  },
+)
+
 ipcMain.handle('spool:ai-cancel', () => {
   acpManager.cancel()
   return { ok: true }

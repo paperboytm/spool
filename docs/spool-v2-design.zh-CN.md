@@ -33,7 +33,7 @@
 record          一条 provider 记录，canonical bytes，内容寻址
 sequence        record 的 Merkle 列表（前缀共享，容忍 provider 截断/重写）
 session head    可变 ref：spool-session-id → 最新 sequence root
-                单写者（只有作者机器能推进），携带四样元数据：作者签名、lineage、workspace card（§3.1）、note（§3.2）
+                单写者（只有作者机器能推进），携带四样元数据：作者签名、lineage、workspace card（§3.1）、Summary（§3.2）
 lineage         fork 关系：新 session → (源 session-id @ record 位置)
 ```
 
@@ -41,7 +41,7 @@ lineage         fork 关系：新 session → (源 session-id @ record 位置)
 
 规则只有两条：head 只能由作者推进；别人想继续，就 fork 出新 session，lineage 记下来源。session 之间永不 merge。
 
-正文的权威数据只有 records 一种；head 携带的少量元数据（签名、lineage、workspace card、note）与 ref 本身同级，是被同步的指针，不是正文。
+正文的权威数据只有 records 一种；head 携带的少量元数据（签名、lineage、workspace card、Summary）与 ref 本身同级，是被同步的指针，不是正文。
 
 ## 3. Share 与 Resume
 
@@ -84,23 +84,23 @@ card 是便利指针，不是保证：缺失或过期时 resume 退化为纯对�
 - 没有 remote 的本地仓库：card 记 no remote，退化为纯对话 resume。
 - agent 自己复原要花几个回合——把成本从 Spool 的工程复杂度移到 resume 后的几轮对话，MVP 值得这个交换。
 
-### 3.2 Note：session 的 README
+### 3.2 Summary：session 的 README
 
-session 是原始流，share 是发布动作；README 属于发布物，不属于原始流——类比 PR description 属于 PR，不属于 commits。这份 README 叫 note，是 share 的 message。
+session 是原始流，share 是发布动作；README 属于发布物，不属于原始流——类比 PR description 属于 PR，不属于 commits。这份 README 叫 Summary，是 share 的 Markdown 概览。
 
-`spool share` 像 git commit 一样打开 $EDITOR：草稿从 records 确定性预填——意图取首条 prompt，结局取末条回复，附文件清单、测试证据、workspace card；预填部分像 git commit 的注释行一样标出，不算作者写的内容。作者要补的只有他自己知道的三样东西：为什么分享（给谁、要什么）、接手须知（环境、坑、下一步）、想被 review 的点。
+Desktop 默认让用户选择本地 Agent，通过 ACP 生成 Summary；生成前明确披露 Agent，生成后先供用户检查，再交给 CLI package 的统一上传模块。`spool share` 的顺序不同：先把 session 发布并拿到 URL，再检测本机安装的 Claude Code / Codex CLI；交互式终端通过 Clack 询问用户是否生成，多个 Agent 时让用户选择，生成完成后自动推进同一个 head 上传 Summary。Agent 保留用户自己的模型、Provider 与认证设置；运行是临时的，并限制工具/写权限。
 
 ```bash
-spool share                 # 打开 $EDITOR，预填草稿，作者补写后保存退出
-spool share -m "..."        # note 内联提供，不打开编辑器
-spool share --no-edit       # 直接用预填草稿，不改一个字
+spool share                       # 先上传，再询问是否用检测到的本地 Agent 生成 Summary
+spool share --no-agent-summary    # 只上传 session，不询问 Agent
+spool share --summary "..."       # 高级旁路：直接传入 Markdown Summary（不推荐作为默认体验）
 ```
 
-note 可选：`-m`、`--no-edit`，或编辑器里什么都不写直接保存退出，都能发布——摩擦不能挡住 share。
+Summary 可选：用户拒绝、取消、没有安装受支持的 Agent，或非交互环境下，session 都保持已发布状态；生成失败也不能回滚已经成功的 share。`--summary` 保留给自动化或已有 Summary 的调用方，但产品默认引导本地 Agent 流程。
 
-存储：note 挂在 session head 的元数据上，随 head 同步，单写者，签名覆盖，作者可改。fork 不继承 note——新 session 的 share 自己写一份；来源已经由 lineage 记下。
+存储：Summary 挂在 session head 的元数据上，随 head 同步，单写者，签名覆盖，作者可改。fork 不继承 Summary——新 session 的 share 自己写一份；来源已经由 lineage 记下。
 
-诚实原则：note 是作者的主观自述，页面与 CLI 把它和机器证据（测试结果、diff 统计、workspace card）分区渲染。note 不覆盖证据：作者写"测试都过了"不算数，证据行说了才算。
+诚实原则：Summary 是作者或其本地 Agent 的主观概览，页面与 CLI 把它和机器证据（测试结果、diff 统计、workspace card）分区渲染。Summary 不覆盖证据：Summary 写"测试都过了"不算数，证据行说了才算。
 
 ## 4. Trace：行级归因
 
@@ -162,12 +162,12 @@ spool why <file>:<line>        # 跳进 session，定位到写下这行的那条
 
 ## 5. Share 页面：别人看什么
 
-首屏回答的不是"改了什么"，是"这是什么、值不值得继续看"——GitHub 首屏给 README + 目录树而不是 commit 列表，同一个逻辑。首屏的自述有三级来源，逐级退化：作者 share 时写的 note（§3.2）；作者让 agent 收尾总结的末条回复；什么都没有时，首条 prompt 说意图、末条回复说结局。触碰过的文件清单是空间地图，user prompts 章节大纲是时间地图。
+首屏回答的不是"改了什么"，是"这是什么、值不值得继续看"——GitHub 首屏给 README + 目录树而不是 commit 列表，同一个逻辑。首屏的自述有三级来源，逐级退化：share 时附带的 Markdown Summary（§3.2）；作者让 agent 收尾总结的末条回复；什么都没有时，首条 prompt 说意图、末条回复说结局。触碰过的文件清单是空间地图，user prompts 章节大纲是时间地图。
 
 页面分三层：
 
 ```text
-首屏（定位）    note（若有）＋ 首条 prompt ＋ 末条回复 ＋ 文件清单/章节大纲
+首屏（定位）    Markdown Summary（若有）＋ 首条 prompt ＋ 末条回复 ＋ 文件清单/章节大纲
                ＋ 状态 ＋ resume 命令
     ↓ 点进去
 第二层（消费）  timeline ↔ session diff 双栏联动
@@ -187,7 +187,7 @@ spool why <file>:<line>        # 跳进 session，定位到写下这行的那条
 - 前缀分享点之后的内容；
 - 分享时重写掉的绝对路径与环境信息。
 
-模型生成的 note 草稿列为 later；确定性预填草稿属于 MVP。
+Desktop ACP 与 CLI 本地 Agent 生成的 Summary 最终都写入同一个 Hub `summaryMd` 字段；CLI 的生成发生在 session 首次上传成功之后。
 
 ## 6. 一个 CLI：唯一入口
 
@@ -196,7 +196,7 @@ spool why <file>:<line>        # 跳进 session，定位到写下这行的那条
 ```text
 spool                        # 定位：当前 workspace 的 sessions，活跃在前
 spool show <id|url>[@r<n>]   # 看：默认首屏摘要；--log 看 timeline；--diff 看 session diff；@r<n> 落到确切 record
-spool share [<id>][@<n>]     # 分享：打开编辑器写 note（-m 内联 / --no-edit），推 hub 返回 URL；@<n> 前缀分享
+spool share [<id>][@<n>]     # 分享：先推 hub，再用 Clack 询问本地 Agent 生成并自动上传 Summary；--summary 为高级旁路
 spool resume <id|url>[@<n>]  # 接手：拉取、物化、写出生记录、原生 resume
 spool blame <path>[:<line>]  # 归因：行/文件 → session 链；--porcelain 供工具消费
 spool why <path>:<line>      # blame 单行 + 自动 show 跳到出生 record
@@ -243,7 +243,7 @@ $ spool
 ## 9. MVP 切片
 
 1. **摄入**：Claude/Codex adapter → record/sequence/head，容忍截断重写。
-2. **Share + Resume**：hub 对象同步、前缀分享、跨机器物化 + 原生 resume 真实 round-trip、note 编辑器流程（确定性预填草稿）。
+2. **Share + Resume**：hub 对象同步、前缀分享、跨机器物化 + 原生 resume 真实 round-trip、Summary 编辑器流程（本地 Agent 生成或确定性预填）。
 3. **Trace**：事件抽取、内容链接版本链、磁盘补洞、`spool blame`/`spool why` CLI。
 4. **界面**：投影——hub session 页（§5 三层结构的 web 渲染，服务没装 CLI 的来访者）；编辑器 gutter 注记（消费 `blame --porcelain`）。
 

@@ -2,20 +2,20 @@ import type { SessionViewV1 } from '@spool-lab/session-kit'
 
 import type { WorkspaceCard } from './workspace.js'
 
-// Deterministic note prefill (design §3.2): intent from the first prompt,
-// outcome from the last reply, plus the machine evidence summary. Shown as
-// comment lines in $EDITOR; published verbatim under --no-edit.
+// Deterministic Summary guidance for surfaces that offer manual entry:
+// intent from the first prompt, outcome from the last reply, plus machine
+// evidence. CLI share now recommends post-upload local Agent generation.
 
 const LINE_WIDTH = 120
 
-export function buildNotePrefill(opts: {
+export function buildSummaryPrefill(opts: {
   view: SessionViewV1
   card: WorkspaceCard | null
   count: number
 }): string {
   const { view, card, count } = opts
   const lines: string[] = [
-    'Spool share draft — write for the person receiving this session:',
+    'Spool Summary — write for the person receiving this session:',
     'why you are sharing it, what they need to know to take over, and',
     'where you want review. Lines below are prefilled from the records.',
     '',

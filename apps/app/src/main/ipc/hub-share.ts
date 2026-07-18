@@ -4,11 +4,11 @@ import { homedir } from 'node:os'
 import {
   HubClient,
   HubHttpError,
-  buildNotePrefill,
+  buildSummaryPrefill,
   buildWorkspaceCard,
-  chunkUploads,
   detectWorkspaceRoot,
   prepareShare,
+  publishPreparedShare,
   scanRecordsForSecrets,
   type PreparedShare,
   type WorkspaceCard,
@@ -209,7 +209,11 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
             adds: prepared.view.diffstat.adds,
             dels: prepared.view.diffstat.dels,
             secrets: { total: secrets.total, high: secrets.high, byKind: secrets.byKind },
-            notePrefill: buildNotePrefill({ view: prepared.view, card, count: prepared.count }),
+            summaryPrefill: buildSummaryPrefill({
+              view: prepared.view,
+              card,
+              count: prepared.count,
+            }),
           },
         }
       } catch (cause) {
@@ -220,7 +224,7 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
 
   ipcMain.handle(
     'hub-share:publish',
-    async (_e, args: { sessionUuid: string; note: string }): Promise<HubSharePublishResult> => {
+    async (_e, args: { sessionUuid: string; summary: string }): Promise<HubSharePublishResult> => {
       try {
         const token = (deps.loadTokenFn ?? loadToken)()
         if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
@@ -235,31 +239,11 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
           fetch: deps.fetchFn ?? defaultFetch,
         })
 
-        const head = {
-          root: prepared.root,
-          count: prepared.count,
-          manifest: prepared.manifest,
-          sig: null,
-          cardJson: card === null ? null : JSON.stringify(card),
-          noteMd: args.note.trim() === '' ? null : args.note,
-          lineageJson: prepared.lineageJson,
-          viewOid: prepared.viewOid,
-          spoolFileOid: spoolFile === null ? null : spoolFile.oid,
-        }
-
-        const { missing } = await client.pushSession(prepared.sid, head)
-        const missingSet = new Set(missing)
-        const uploads = [
-          ...prepared.records.map((record) => ({ oid: record.oid, data: record.data })),
-          { oid: prepared.viewOid, data: prepared.viewData },
-          ...(spoolFile === null ? [] : [spoolFile]),
-        ].filter((object) => missingSet.has(object.oid))
-
-        for (const batch of chunkUploads(uploads)) {
-          await client.uploadObjects(batch)
-        }
-
-        const { url } = await client.commitSessionHead(prepared.sid, head)
+        const { url } = await publishPreparedShare(client, prepared, {
+          card,
+          summary: args.summary,
+          spoolFile,
+        })
         preparedCache.delete(args.sessionUuid)
         return { ok: true, url }
       } catch (cause) {

@@ -12,7 +12,7 @@ export interface HubSessionWriteRequest {
   manifest: string[]
   sig: null
   cardJson: string | null
-  noteMd: string | null
+  summaryMd: string | null
   lineageJson: string | null
   viewOid: string
   /** Optional curated .spool document attached to the share. */
@@ -49,7 +49,7 @@ export interface HubSessionMeta {
   count: number
   sig: string | null
   cardJson: string | null
-  noteMd: string | null
+  summaryMd: string | null
   lineageJson: string | null
   viewOid: string
   spoolFileOid?: string | null
@@ -111,7 +111,10 @@ export class HubClient {
   }
 
   pushSession(sid: string, body: HubSessionWriteRequest): Promise<HubPushResponse> {
-    return this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/push`, body)
+    return this.postJson(
+      `/api/hub/v1/sessions/${encodeURIComponent(sid)}/push`,
+      withLegacySummaryAlias(body),
+    )
   }
 
   uploadObjects(objects: Iterable<HubObjectUpload>): Promise<HubObjectBatchResponse> {
@@ -120,7 +123,10 @@ export class HubClient {
   }
 
   commitSessionHead(sid: string, body: HubSessionWriteRequest): Promise<HubHeadResponse> {
-    return this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/head`, body)
+    return this.postJson(
+      `/api/hub/v1/sessions/${encodeURIComponent(sid)}/head`,
+      withLegacySummaryAlias(body),
+    )
   }
 
   async withdrawSession(sid: string): Promise<void> {
@@ -146,8 +152,14 @@ export class HubClient {
     return this.postJson('/api/cli-auth/poll', { device_code: deviceCode })
   }
 
-  getSession(sid: string): Promise<HubSessionMeta> {
-    return this.getJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}`)
+  async getSession(sid: string): Promise<HubSessionMeta> {
+    const { noteMd, ...meta } = await this.getJson<
+      HubSessionMeta & { summaryMd?: string | null; noteMd?: string | null }
+    >(`/api/hub/v1/sessions/${encodeURIComponent(sid)}`)
+    return {
+      ...meta,
+      summaryMd: meta.summaryMd ?? noteMd ?? null,
+    }
   }
 
   getSessionView<TView = unknown>(sid: string): Promise<TView> {
@@ -259,6 +271,14 @@ export async function* readNdjsonLines<T>(
   } finally {
     reader.releaseLock()
   }
+}
+
+/** Keep new clients compatible with Hub deployments from before the
+ *  Summary rename. The canonical client surface remains `summaryMd`. */
+function withLegacySummaryAlias(
+  body: HubSessionWriteRequest,
+): HubSessionWriteRequest & { noteMd: string | null } {
+  return { ...body, noteMd: body.summaryMd }
 }
 
 function parseNdjsonLine<T>(line: string, lineNumber: number): T | undefined {

@@ -12,7 +12,7 @@ const meta: HubSessionMeta = {
   root: 'root',
   count: 2,
   sig: null,
-  noteMd: null,
+  summaryMd: null,
   cardJson: null,
   lineageJson: null,
   viewOid: null,

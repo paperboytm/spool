@@ -545,6 +545,25 @@
       "action_unpublishing": "Unpublishing"
     }
   },
+  "shareSummary": {
+    "title": "Summarize before sharing?",
+    "subtitle": "Create a focused summary with your agent, or keep the full conversation.",
+    "option_summary": "Summarize with {{agent}}",
+    "option_summary_body": "Spool sends this session to your agent through ACP on this device. Your agent's model and provider settings still apply.",
+    "option_summary_unavailable_title": "Summarize with your agent",
+    "option_summary_unavailable_body": "No ready agent found. Add one in Settings → Agent.",
+    "agent_label": "Agent",
+    "agent_trust": "via ACP · local · {{agent}}",
+    "option_full": "Use the full conversation",
+    "option_full_body": "Open every message in the share editor. No agent runs.",
+    "continue_summary": "Create summary",
+    "continue_full": "Open full conversation",
+    "creating_title": "Creating a summary",
+    "creating_body": "{{agent}} is turning this session into a concise Markdown summary for you to review.",
+    "cancel_generation": "Cancel summary",
+    "error_title": "Couldn't create summary",
+    "error_generic": "Your agent didn't return a summary."
+  },
   "shareEditor": {
     "openExisting": "Edit share draft",
     "openNew": "Edit share draft",
@@ -749,7 +768,7 @@
   "newDraft": {
     "title": "Start a draft from a session",
     "subtitle": "Pick a session to share",
-    "searchPlaceholder": "Start a draft from a session",
+    "searchPlaceholder": "Choose a session to summarize or share",
     "empty": "No sessions match \"{{query}}\".",
     "emptyNoSessions": "No sessions yet — index some first and they'll show up here.",
     "emptyInProject": "No sessions in {{project}} yet.",
@@ -898,7 +917,7 @@
     "title": "Publish this session?",
     "lead": "Shares the full transcript ({{records}} records) to your spool.pro account. Anyone with the link can read it and resume from it.",
     "secretsWarning": "{{total}} potential secrets detected ({{high}} high severity). Sharing publishes these values — review with Security Scan first if unsure.",
-    "noteLabel": "Note for readers",
+    "summaryLabel": "Summary (Markdown)",
     "publish": "Publish",
     "publishing": "Publishing…",
     "doneTitle": "Shared",

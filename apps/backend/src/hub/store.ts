@@ -13,6 +13,7 @@ export type HubSessionRow = {
   record_count: number
   sig: string | null
   card_json: string | null
+  // Legacy persistence name; the Hub contract calls this Summary.
   note_md: string | null
   lineage_json: string | null
   view_oid: string | null
@@ -43,7 +44,7 @@ export async function upsertHubSession(
     recordCount: number
     sig: string | null
     cardJson: string | null
-    noteMd: string | null
+    summaryMd: string | null
     lineageJson: string | null
     viewOid: string
     spoolFileOid: string | null
@@ -66,7 +67,7 @@ export async function upsertHubSession(
       row.recordCount,
       row.sig,
       row.cardJson,
-      row.noteMd,
+      row.summaryMd,
       row.lineageJson,
       row.viewOid,
       row.spoolFileOid,

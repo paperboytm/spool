@@ -47,7 +47,7 @@ describe('login command handler', () => {
       hubUrl: 'http://127.0.0.1:8788',
       token: 'pasted-token',
     })
-    expect(output).toEqual([`You saved hub credentials to ${path}.`])
+    expect(output).toEqual([`Signed in. Credentials saved to ${path}.`])
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -223,10 +223,9 @@ describe('logout command handler', () => {
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer sph_machine')
     const path = join(home, '.spool', 'hub-credentials.json')
     expect(existsSync(path)).toBe(false)
-    expect(output).toEqual([
-      "You revoked this machine's token on https://stored.example.",
-      `You signed out; removed ${path}.`,
-    ])
+    expect(output.join('\n')).toContain('Revoked the token on https://stored.example')
+    expect(output.join('\n')).toContain(`Removed local credentials at ${path}`)
+    expect(output.at(-1)).toBe('Signed out.')
     expect(errors).toEqual([])
   })
 
@@ -253,8 +252,8 @@ describe('logout command handler', () => {
     ).resolves.toBe(0)
 
     expect(existsSync(join(home, '.spool', 'hub-credentials.json'))).toBe(false)
-    expect(errors.join('\n')).toMatch(/could not revoke the token/)
-    expect(output.join('\n')).toMatch(/You signed out; removed /)
+    expect(errors.join('\n')).toMatch(/Could not revoke the remote token/)
+    expect(output.join('\n')).toMatch(/Removed local credentials at /)
   })
 
   it('treats an already-invalid token as signed out', async () => {
@@ -322,7 +321,7 @@ describe('logout command handler', () => {
     // The stored token is the one revoked — never the env override.
     const [, init] = fetchMock.mock.calls[0]! as [string | URL | Request, RequestInit]
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer sph_machine')
-    expect(output.join('\n')).toMatch(/SPOOL_HUB_TOKEN is set/)
+    expect(output.join('\n')).toMatch(/SPOOL_HUB_TOKEN is still set/)
   })
 })
 
@@ -351,7 +350,7 @@ describe('withdraw command handler', () => {
     expect(String(input)).toBe(`https://shared.example/api/hub/v1/sessions/${SID}/withdraw`)
     expect(init?.method).toBe('POST')
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer owner-token')
-    expect(output).toEqual([`You withdrew session ${SID}.`])
+    expect(output.join('\n')).toContain(`Withdrew session ${SID}.`)
     expect(errors).toEqual([])
   })
 
@@ -375,6 +374,6 @@ describe('withdraw command handler', () => {
       }),
     ).resolves.toBe(1)
 
-    expect(errors).toEqual([expected])
+    expect(errors.at(-1)).toBe(expected)
   })
 })

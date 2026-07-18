@@ -14,21 +14,23 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 interface Props {
   open: boolean
   sessionUuid: string
+  /** Agent-generated or author-provided Markdown to review before publishing. */
+  initialSummary?: string
   onClose: () => void
 }
 
 type DialogState =
   | { phase: 'preparing' }
-  | { phase: 'ready'; prepared: HubSharePrepared; note: string }
-  | { phase: 'publishing'; prepared: HubSharePrepared; note: string }
+  | { phase: 'ready'; prepared: HubSharePrepared; summary: string }
+  | { phase: 'publishing'; prepared: HubSharePrepared; summary: string }
   | { phase: 'done'; url: string }
   | { phase: 'error'; message: string; unauthenticated: boolean }
 
-export default function HubShareDialog({ open, sessionUuid, onClose }: Props) {
+export default function HubShareDialog({ open, sessionUuid, initialSummary = '', onClose }: Props) {
   const { t } = useTranslation()
   const [state, setState] = useState<DialogState>({ phase: 'preparing' })
   const [copied, setCopied] = useState(false)
-  const noteRef = useRef<HTMLTextAreaElement>(null)
+  const summaryRef = useRef<HTMLTextAreaElement>(null)
 
   const busy = state.phase === 'preparing' || state.phase === 'publishing'
   useHotkeys({ Escape: onClose }, { active: open && !busy, modal: true })
@@ -41,7 +43,7 @@ export default function HubShareDialog({ open, sessionUuid, onClose }: Props) {
     void window.spoolShare.hubSharePrepare(sessionUuid).then((result) => {
       if (cancelled) return
       if (result.ok) {
-        setState({ phase: 'ready', prepared: result.prepared, note: '' })
+        setState({ phase: 'ready', prepared: result.prepared, summary: initialSummary })
       } else {
         setState({ phase: 'error', message: result.error, unauthenticated: false })
       }
@@ -49,12 +51,12 @@ export default function HubShareDialog({ open, sessionUuid, onClose }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open, sessionUuid])
+  }, [initialSummary, open, sessionUuid])
 
   const publish = useCallback(async () => {
     if (state.phase !== 'ready') return
-    setState({ phase: 'publishing', prepared: state.prepared, note: state.note })
-    const result = await window.spoolShare.hubSharePublish(sessionUuid, state.note)
+    setState({ phase: 'publishing', prepared: state.prepared, summary: state.summary })
+    const result = await window.spoolShare.hubSharePublish(sessionUuid, state.summary)
     if (result.ok) {
       setState({ phase: 'done', url: result.url })
     } else {
@@ -126,16 +128,16 @@ export default function HubShareDialog({ open, sessionUuid, onClose }: Props) {
               )}
 
               <label className="text-warm-muted dark:text-dark-muted mt-4 block text-[10px] font-semibold tracking-[0.08em] uppercase">
-                {t('hubShare.noteLabel')}
+                {t('hubShare.summaryLabel')}
               </label>
               <textarea
-                ref={noteRef}
-                data-testid="hub-share-note"
-                value={state.note}
-                placeholder={state.prepared.notePrefill}
+                ref={summaryRef}
+                data-testid="hub-share-summary"
+                value={state.summary}
+                placeholder={state.prepared.summaryPrefill}
                 disabled={state.phase === 'publishing'}
                 onChange={(e) => {
-                  if (state.phase === 'ready') setState({ ...state, note: e.target.value })
+                  if (state.phase === 'ready') setState({ ...state, summary: e.target.value })
                 }}
                 rows={4}
                 className="border-warm-border2 dark:border-dark-border2 bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-faint focus:border-accent dark:focus:border-accent-dark mt-1 w-full resize-y rounded-lg border px-3 py-2 text-[13px] focus:outline-none"

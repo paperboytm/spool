@@ -82,7 +82,7 @@ async function makeHubFixture() {
     root: await sequenceRoot(manifest),
     count: canonical.length,
     sig: null,
-    noteMd: 'why I shared this',
+    summaryMd: '## Why I shared this\n\nThe auth decision is ready for review.',
     cardJson: '{"branch":"main","head":"abc123def"}',
     lineageJson: null,
     viewOid: 'v'.repeat(64),
@@ -144,7 +144,7 @@ describe('spool show against the hub', () => {
     expect(await handleShowCommand(SID, {}, d.deps)).toBe(0)
     const out = d.logs.join('\n')
     expect(out).toContain('@xy · 4 records')
-    expect(out).toContain('why I shared this')
+    expect(out).toContain('Why I shared this')
     expect(out).toContain('src/a.ts')
     expect(out).toContain(`spool resume ${SID}`)
   })

@@ -149,7 +149,7 @@ async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) 
     manifest,
     sig: null,
     cardJson: JSON.stringify({ workspace: '$SPOOL_WS', branch: 'main' }),
-    noteMd: 'A synthetic shared session.',
+    summaryMd: '## Outcome\n\nA synthetic shared session.',
     lineageJson: null,
     viewOid: view.oid,
   }
@@ -381,6 +381,33 @@ describe('hub push', () => {
     })
   })
 
+  it('accepts the legacy noteMd alias while returning the canonical Summary field', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const { summaryMd, ...head } = fixture.head
+    const legacyHead = { ...head, noteMd: summaryMd }
+
+    const pushed = await invoke(
+      pushPost,
+      jsonPost(`${sessionUrl(SID)}/push`, legacyHead, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(pushed.status).toBe(200)
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    const committed = await invoke(
+      headPost,
+      jsonPost(`${sessionUrl(SID)}/head`, legacyHead, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(committed.status).toBe(200)
+
+    const metadata = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    await expect(metadata.json()).resolves.toMatchObject({ summaryMd })
+  })
+
   it('enforces single-writer ownership of a session head', async () => {
     const env = envFor()
     await seedUsers(env)
@@ -559,6 +586,7 @@ describe('hub public reads', () => {
       sid: SID,
       root: fixture.head.root,
       count: fixture.head.count,
+      summaryMd: fixture.head.summaryMd,
       author: {
         handle: 'alice',
         displayName: 'Alice Example',

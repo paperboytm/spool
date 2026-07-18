@@ -49,7 +49,7 @@ packages/
 
 - sequence 用哈希链(`node_i = H(node_{i-1} ‖ record_oid_i)`),git-commit 式前缀共享;位置即下标,支持 `@120` 前缀分享。MVP 不需要 Merkle 树的 O(log n) 证明。
 - provider 截断/重写:复用 Syncer 的 append/rewrite 分类;发现分叉点后从分叉处重算链,旧 records 仍在对象库中(内容寻址,无损失)。
-- head:`heads(session_id, root, count, card_json, note, lineage_json, sig, updated_at)`。签名用 Ed25519(`@noble/ed25519`),首次使用生成机器密钥于 `~/.spool/key`,`spool login` 时把公钥注册到 hub 账号。
+- head:`heads(session_id, root, count, card_json, summary_md, lineage_json, sig, updated_at)`。签名用 Ed25519(`@noble/ed25519`),首次使用生成机器密钥于 `~/.spool/key`,`spool login` 时把公钥注册到 hub 账号。
 - spool-session-id = `<provider>:<provider-uuid>`,展示用短哈希(`#a3f2`)。
 - 存储形态:独立 `~/.spool/store.db`(sqlite,WAL,zstd 压缩 blob 列)。不用文件系统扇出目录——records 小而多,单文件库更快也好清理。
 
@@ -66,7 +66,7 @@ Syncer 每次扫描,除喂 v1 索引外,同时把原始行切分 → canonical �
 ### 3.1 端点
 
 ```text
-POST /api/hub/v1/sessions/:sid/head      推进 ref:{root,count,card,note,lineage,sig,prefix_limit}
+POST /api/hub/v1/sessions/:sid/head      推进 ref:{root,count,card,summaryMd,lineage,sig,prefix_limit}
                                           → 校验 owner+签名+单调推进,返回缺失 record OID 列表
 POST /api/hub/v1/objects/batch           批量上传 records(服务端逐个验哈希,写 R2)
 GET  /api/hub/v1/sessions/:sid           head 元数据(尊重墓碑与 prefix_limit)
@@ -96,7 +96,7 @@ R2 新 bucket(或前缀)`hub-objects/<oid>`。ACL 沿用 owner + `visibility ∈
 
 ## 4. Share / Resume(CLI 侧)
 
-- `spool share [<id>][@<n>]`:打开 `$EDITOR` 写 note(确定性预填:首条 prompt / 末条回复 / 文件清单 / card;`-m` / `--no-edit` 旁路)→ 推 head + 补传对象 → 返回 URL。
+- `spool share [<id>][@<n>]`:先跑 redact 闸并推 head + 补传对象，URL 成功后再检测 Claude Code/Codex CLI；通过 Clack 询问/选择本地 Agent，临时调用生成 Markdown Summary，完成后自动二次推进 head。`--summary` 是高级旁路，`--no-agent-summary` 跳过询问。
 - **share 前跑 redact 扫描**(复用 `@spool-lab/redact`,core 已有 scan 管线):发现高危 finding 时警示、要求确认。设计稿说「分享即分享全文」,这一道闸是必要的产品诚实,与 app 端 Security Scan 对齐。
 - `spool resume <url|id>[@<n>]`:拉取 → 物化为**全新** provider 原生 session 文件(新 UUID,`$WS` 反向映射到本地 workspace 根;无 checkout 时用 cwd)→ 追加唯一一条 Spool 出生记录(resume note:来源 URL/作者/@位置 + workspace card 全文 + 给 agent 的复原提示)→ 登记 lineage → exec `claude --resume` / `codex resume`。物化机制沿 `spool-prelude.ts` 的先例扩展。
 - **最大风险在这里**:物化文件必须被 provider CLI 原生接受,且 provider 格式随版本漂移。对策:Phase 0 先做 spike 验证可行性;之后用版本钉住的 golden round-trip 测试守护(fixtures 摄入 → 物化 → `claude --resume <id> -p "ok"` 单轮验收)。
@@ -116,7 +116,7 @@ CLI:`spool blame <path>[:<line>]`(`--porcelain`/`--json`)、`spool why <path>:<l
 
 share-web 新增 v2 路由(建议 `/session/:sid`,`/s/` 留给 v1 快照;见 D4),严格按设计稿 §5 三层:
 
-1. **首屏(定位)**:note(三级退化:note → 末条回复 → 首条 prompt+末条回复)+ 文件清单 + 章节大纲 + 状态 + resume 命令(一键复制)。note 与机器证据(diff 统计、card)分区渲染。
+1. **首屏(定位)**:Markdown Summary（三级退化:Summary → 末条回复 → 首条 prompt+末条回复）+ 文件清单 + 章节大纲 + 状态 + resume 命令(一键复制)。Summary 与机器证据(diff 统计、card)分区渲染。
 2. **第二层(消费)**:timeline ↔ session diff 双栏联动(点 hunk ↔ 点 tool call 互跳)。session diff = diff(首次触碰前, 最后离开后),由 session-kit 在**客户端**计算——hub 保持哑服务,不代算。
 3. **第三层(考古)**:`#r/<idx>` 深链,带上下文展开。
 
@@ -139,7 +139,7 @@ Phase 1 ── Store(core + session-kit)          ←基础,串行
 
 Phase 2 ── Hub + Share/Resume                  ┐
   P2.1  backend:迁移 + objects/head/withdraw 端点 + token(hermetic 测试 + pentest 项)
-  P2.2  CLI:login(loopback PKCE)、share(note 编辑器 + redact 闸)  │ 与 Phase 3
+  P2.2  CLI:login(loopback PKCE)、share(Summary 编辑器 + redact 闸)  │ 与 Phase 3
   P2.3  CLI:resume 物化 + lineage;双 HOME 跨机器 round-trip e2e     │ 并行
   P2.4  withdraw + 前缀分享                                        │
                                                                   │

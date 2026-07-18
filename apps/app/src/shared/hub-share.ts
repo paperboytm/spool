@@ -14,7 +14,7 @@ export interface HubSharePrepared {
   adds: number
   dels: number
   secrets: HubShareSecretsSummary
-  notePrefill: string
+  summaryPrefill: string
 }
 
 export type HubSharePrepareResult =

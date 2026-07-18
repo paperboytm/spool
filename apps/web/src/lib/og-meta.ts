@@ -54,7 +54,7 @@ export function snapshotOgHead(og: OgMeta): HeadFragment {
 }
 
 export interface SessionOgMeta {
-  /** First line of the note, or a first-prompt excerpt. */
+  /** First line of the Summary, or a first-prompt excerpt. */
   title: string
   /** Author + record-count line. */
   description: string
@@ -83,9 +83,9 @@ export function sessionOgHead(og: SessionOgMeta): HeadFragment {
   }
 }
 
-/** First line of the session note, or the generic fallback. Shared by
+/** First line of the session Summary, or the generic fallback. Shared by
  *  the /session/<sid> loader and its tests. */
-export function sessionOgTitle(noteMd: string | null | undefined): string {
-  const firstLine = noteMd?.split('\n', 1)[0]?.trim()
+export function sessionOgTitle(summaryMd: string | null | undefined): string {
+  const firstLine = summaryMd?.split('\n', 1)[0]?.trim()
   return firstLine || 'Shared session'
 }

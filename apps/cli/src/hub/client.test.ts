@@ -18,19 +18,46 @@ describe('HubClient', () => {
       manifest: ['oid-a', 'oid-b'],
       sig: null,
       cardJson: '{"branch":"main"}',
-      noteMd: 'Ready for review',
+      summaryMd: '## Outcome\n\nReady for review.',
       lineageJson: null,
       viewOid: 'view-oid',
+      spoolFileOid: null,
     }
 
     await expect(client.pushSession(SID, body)).resolves.toEqual({ missing: ['oid-b'] })
     const [input, init] = fetchMock.mock.calls[0]!
     expect(String(input)).toBe(`https://hub.example/api/hub/v1/sessions/${SID}/push`)
-    expect(init).toMatchObject({ method: 'POST', body: JSON.stringify(body) })
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ ...body, noteMd: body.summaryMd }),
+    })
     const headers = new Headers(init?.headers)
     expect(headers.get('authorization')).toBe('Bearer hub-token')
     expect(headers.get('content-type')).toBe('application/json')
     expect(headers.get('accept')).toBe('application/json')
+  })
+
+  it('normalizes a legacy noteMd response to the Summary field', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        sid: SID,
+        root: 'root-1',
+        count: 1,
+        sig: null,
+        cardJson: null,
+        noteMd: '# Legacy summary',
+        lineageJson: null,
+        viewOid: 'view-oid',
+        createdAt: 1,
+        updatedAt: 1,
+        author: { handle: null, displayName: null, avatarUrl: null },
+      }),
+    )
+    const client = new HubClient({ hubUrl: 'https://hub.example', fetch: fetchMock })
+
+    await expect(client.getSession(SID)).resolves.toMatchObject({
+      summaryMd: '# Legacy summary',
+    })
   })
 
   it('uploads object batches as NDJSON', async () => {

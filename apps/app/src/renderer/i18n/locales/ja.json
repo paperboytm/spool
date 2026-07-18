@@ -516,6 +516,25 @@
       "action_unpublishing": "取り消し中"
     }
   },
+  "shareSummary": {
+    "title": "共有する前に要約しますか？",
+    "subtitle": "あなたのエージェントで簡潔な要約を作るか、会話全体を残します。",
+    "option_summary": "{{agent}} で要約",
+    "option_summary_body": "Spool はこのデバイス上の ACP 経由で、このセッションをあなたのエージェントに送ります。エージェント側のモデルとプロバイダー設定が適用されます。",
+    "option_summary_unavailable_title": "エージェントで要約",
+    "option_summary_unavailable_body": "利用可能なエージェントがありません。設定 → エージェントで追加してください。",
+    "agent_label": "エージェント",
+    "agent_trust": "ACP 経由 · ローカル · {{agent}}",
+    "option_full": "会話全体を使用",
+    "option_full_body": "すべてのメッセージを共有エディターで開きます。エージェントは実行されません。",
+    "continue_summary": "要約を作成",
+    "continue_full": "会話全体を開く",
+    "creating_title": "要約を作成中",
+    "creating_body": "{{agent}} が確認用の簡潔な Markdown 要約を作成しています。",
+    "cancel_generation": "要約をキャンセル",
+    "error_title": "要約を作成できませんでした",
+    "error_generic": "エージェントから要約が返されませんでした。"
+  },
   "shareEditor": {
     "openExisting": "共有下書きを編集",
     "openNew": "共有下書きを編集",
@@ -712,7 +731,7 @@
   "newDraft": {
     "title": "セッションから下書きを作成",
     "subtitle": "共有するセッションを選択",
-    "searchPlaceholder": "セッションから下書きを作成",
+    "searchPlaceholder": "要約または共有するセッションを選択",
     "empty": "「{{query}}」に一致するセッションがありません。",
     "emptyNoSessions": "セッションがまだありません — 先にいくつかインデックスするとここに表示されます。",
     "emptyInProject": "{{project}} にセッションはまだありません。",
@@ -856,7 +875,7 @@
     "title": "このセッションを公開しますか?",
     "lead": "完全なトランスクリプト({{records}} 件のレコード)を spool.pro アカウントに公開します。リンクを知っている人は誰でも閲覧・再開できます。",
     "secretsWarning": "{{total}} 件の機密情報の可能性が検出されました(うち {{high}} 件が高リスク)。共有するとこれらの値が公開されます。",
-    "noteLabel": "読者へのメモ",
+    "summaryLabel": "要約（Markdown）",
     "publish": "公開",
     "publishing": "公開中…",
     "doneTitle": "共有しました",

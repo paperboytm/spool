@@ -139,9 +139,9 @@ async function showHub(
     : (meta.author.displayName ?? 'unknown')
   log(`Session: ${meta.sid}`)
   log(`Author:  ${author} · ${meta.count} records`)
-  if (meta.noteMd) {
+  if (meta.summaryMd) {
     log('')
-    log(meta.noteMd.trim())
+    log(meta.summaryMd.trim())
   } else if (view.firstPrompt || view.lastReply) {
     log('')
     if (view.firstPrompt) log(`Intent:  ${firstLine(view.firstPrompt)}`)

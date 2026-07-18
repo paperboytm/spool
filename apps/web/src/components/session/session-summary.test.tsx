@@ -1,14 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { SessionNote } from './session-note'
+import { SessionSummary } from './session-summary'
 
 function render(markdown: string | null): string {
-  return renderToStaticMarkup(<SessionNote markdown={markdown} />)
+  return renderToStaticMarkup(<SessionSummary markdown={markdown} />)
 }
 
-describe('SessionNote', () => {
-  it('renders no markup when the note is missing or blank', () => {
+describe('SessionSummary', () => {
+  it('renders no markup when the summary is missing or blank', () => {
     expect(render(null)).toBe('')
     expect(render(' \n\t ')).toBe('')
   })

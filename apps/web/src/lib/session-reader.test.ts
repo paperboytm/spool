@@ -243,7 +243,7 @@ describe('hub records → desktop-identical conversation', () => {
 })
 
 describe('session OG tags', () => {
-  it('titles the card from the note and emits a summary card without og:image', () => {
+  it('titles the card from the Summary and emits a summary card without og:image', () => {
     // Escaping moved from the old string-injection path into React's
     // attribute rendering — the fragment carries raw values now.
     const fragment = sessionOgHead({

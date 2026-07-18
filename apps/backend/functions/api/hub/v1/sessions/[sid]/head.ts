@@ -36,7 +36,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       recordCount: body.count,
       sig: body.sig,
       cardJson: body.cardJson,
-      noteMd: body.noteMd,
+      summaryMd: body.summaryMd,
       lineageJson: body.lineageJson,
       viewOid: body.viewOid,
       spoolFileOid: body.spoolFileOid,
