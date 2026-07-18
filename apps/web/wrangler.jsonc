@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "spool-web",
+  // Keep the existing production service name so the first direct deploy can
+  // replace its script without trying to steal the already-bound route.
+  "name": "spool-pro-router",
   "main": "src/server.ts",
   "compatibility_date": "2026-07-17",
   "compatibility_flags": ["nodejs_compat"],
@@ -21,7 +23,7 @@
   },
   "env": {
     "staging": {
-      "name": "spool-web-staging",
+      "name": "spool-pro-router-staging",
       "routes": [
         {
           "pattern": "staging.spool.pro/*",
