@@ -43,7 +43,7 @@
     "clean": "rm -rf out dist-electron",
     "typecheck": "tsc --noEmit",
     "pretest": "pnpm run ensure:electron-runtime",
-    "test": "vp test run",
+    "test": "vp test run --no-file-parallelism",
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
     "test:e2e": "node ../../scripts/with-electron-native.mjs pnpm run test:e2e:raw",
     "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 electron-vite build && playwright test --config e2e/playwright.config.ts"
@@ -65,7 +65,7 @@
     "@tanstack/react-virtual": "^3.14.6",
     "acp-extension-claude": "^0.54.3",
     "acp-extension-codex": "^1.1.2",
-    "better-sqlite3": "11.10.0",
+    "better-sqlite3": "12.11.1",
     "bindings": "^1.5.0",
     "effect": "^3.22.0",
     "electron-store": "^11.0.2",

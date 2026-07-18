@@ -168,6 +168,21 @@ export function getOpenCodeSessionIndexedMtime(filePath: string): string {
   }
 }
 
+function stripHtmlTags(value: string): string {
+  let result = ''
+  let insideTag = false
+  for (const char of value) {
+    if (char === '<') {
+      insideTag = true
+    } else if (char === '>') {
+      insideTag = false
+    } else if (!insideTag) {
+      result += char
+    }
+  }
+  return result
+}
+
 export function loadOpenCodeSession(filePath: string): ParseSessionResult {
   const parsedPath = parseOpenCodeSessionFilePath(filePath)
   if (!parsedPath) return { kind: 'skipped' }
@@ -230,13 +245,10 @@ export function loadOpenCodeSession(filePath: string): ParseSessionResult {
       (message) =>
         !message.isSidechain && message.role === 'user' && message.contentText.trim().length > 0,
     )
-    const title =
-      session.title?.trim() ||
-      firstUserMessage?.contentText
-        .replace(/<[^>]+>/g, '')
-        .trim()
-        .slice(0, 120) ||
-      '(no title)'
+    const derivedTitle = firstUserMessage
+      ? stripHtmlTags(firstUserMessage.contentText).trim().slice(0, 120)
+      : ''
+    const title = session.title?.trim() || derivedTitle || '(no title)'
 
     return {
       kind: 'parsed',

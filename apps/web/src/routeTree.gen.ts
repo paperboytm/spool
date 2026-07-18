@@ -8,23 +8,23 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
 import { Route as SiteRouteImport } from './routes/_site'
-import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
-import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
-import { Route as SiteConnectorsRouteImport } from './routes/_site.connectors'
-import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
-import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
-import { Route as SiteIndexRouteImport } from './routes/_site.index'
-import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as CliAuthRouteImport } from './routes/cli-auth'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as SSlugRouteImport } from './routes/s.$slug'
-import { Route as SessionSidRouteImport } from './routes/session.$sid'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SiteIndexRouteImport } from './routes/_site.index'
+import { Route as SiteConnectorsRouteImport } from './routes/_site.connectors'
+import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
+import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
+import { Route as SSlugRouteImport } from './routes/s.$slug'
+import { Route as SessionSidRouteImport } from './routes/session.$sid'
+import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
+import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
+import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
 
 const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
   id: '/@{$handle}',

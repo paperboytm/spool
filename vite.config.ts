@@ -33,6 +33,7 @@ export default defineConfig({
     '*': 'vp check --fix',
   },
   fmt: {
+    ignorePatterns: ['apps/web/src/routeTree.gen.ts'],
     singleQuote: true,
     semi: false,
     sortImports: {},
@@ -53,6 +54,7 @@ export default defineConfig({
       '**/out/**',
       '**/test-results/**',
       '**/.turbo/**',
+      'apps/web/src/routeTree.gen.ts',
       'apps/app/release/**',
       'packages/connectors/**/dist/**',
     ],

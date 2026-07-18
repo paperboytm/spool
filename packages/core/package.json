@@ -50,7 +50,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@spool-lab/redact": "workspace:*",
     "@spool-lab/session-kit": "workspace:^",
-    "better-sqlite3": "11.10.0",
+    "better-sqlite3": "12.11.1",
     "effect": "^3.22.0"
   },
   "devDependencies": {

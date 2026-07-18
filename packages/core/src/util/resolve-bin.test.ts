@@ -4,7 +4,13 @@ import { join } from 'node:path'
 
 import { describe, it, expect, afterEach, beforeEach } from 'vite-plus/test'
 
-import { wellKnownBinPaths, nvmVersionBins, miseVersionBins } from './resolve-bin.js'
+import {
+  wellKnownBinPaths,
+  nvmVersionBins,
+  miseVersionBins,
+  resolveSystemBinary,
+  resolveSystemBinaryAsync,
+} from './resolve-bin.js'
 
 let tmpHome: string
 
@@ -41,6 +47,20 @@ describe('wellKnownBinPaths', () => {
   it('appends mise shim path', () => {
     const paths = wellKnownBinPaths('codex', tmpHome)
     expect(paths).toContain(`${tmpHome}/.local/share/mise/shims/codex`)
+  })
+
+  it.each(['codex; touch /tmp/pwned', '../codex', 'codex $(whoami)', ''])(
+    'rejects unsafe binary name %j before filesystem or shell lookup',
+    async (name) => {
+      expect(wellKnownBinPaths(name, tmpHome)).toEqual([])
+      expect(resolveSystemBinary(name)).toBeNull()
+      await expect(resolveSystemBinaryAsync(name)).resolves.toBeNull()
+    },
+  )
+
+  it('still resolves a safe binary name', async () => {
+    expect(resolveSystemBinary('node')).toMatch(/node$/)
+    await expect(resolveSystemBinaryAsync('node')).resolves.toMatch(/node$/)
   })
 })
 

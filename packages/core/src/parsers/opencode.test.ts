@@ -64,6 +64,25 @@ describe('OpenCode parser', () => {
     ])
   })
 
+  it('removes complete and incomplete HTML tags from a derived title', () => {
+    const { db, dbPath } = createOpenCodeDb()
+    try {
+      seedOpenCodeSession(db)
+      db.prepare("UPDATE session SET title = '' WHERE id = 'ses_abc123'").run()
+      db.prepare("UPDATE part SET data = ? WHERE id = 'part_user_text'").run(
+        JSON.stringify({ type: 'text', text: '<<script>alert(1)</script>' }),
+      )
+    } finally {
+      db.close()
+    }
+
+    const result = loadOpenCodeSession(makeOpenCodeSessionFilePath(dbPath, 'ses_abc123'))
+    expect(result.kind).toBe('parsed')
+    if (result.kind !== 'parsed') return
+    expect(result.session.title).toBe('alert(1)')
+    expect(result.session.title).not.toContain('<')
+  })
+
   it('lists active sessions as synthetic per-session file paths', () => {
     const { db, dbPath } = createOpenCodeDb()
     try {
