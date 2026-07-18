@@ -25,9 +25,11 @@
     "preview": "vp preview --port 3002",
     "test": "vp test run",
     "test:watch": "vp test",
-    "deploy": "void deploy",
+    "deploy": "pnpm run build && wrangler deploy",
+    "deploy:dry": "pnpm run build && wrangler deploy --dry-run",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime false",
     "sync:registry": "node scripts/sync-registry.mjs",
-    "clean": "rm -rf dist .void node_modules/.vite"
+    "clean": "rm -rf dist .wrangler node_modules/.vite"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
@@ -44,6 +46,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.45.1",
     "@cloudflare/workers-types": "^5.20260718.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.1.1",
@@ -55,6 +58,6 @@
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "void": "^0.10.10"
+    "wrangler": "^4.112.0"
   }
 }

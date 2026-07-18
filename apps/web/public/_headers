@@ -1,0 +1,4 @@
+# Static assets are served before the Worker entrypoint, so preserve the
+# route diagnostic header here. Dynamic web and API responses set it in code.
+/*
+  x-spool-route: web

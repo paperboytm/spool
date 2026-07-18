@@ -21,6 +21,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 
 import { snapshotOgHead } from '../lib/og-meta'
 import { SLUG_RE } from '../lib/route'
+import { serverApiOrigin } from '../lib/server-api-origin'
 import { Reader } from '../pages/Reader'
 
 interface MetaForOg {
@@ -40,10 +41,12 @@ async function loadOgMeta(slug: string): Promise<LoaderData> {
   if (!import.meta.env.SSR) return { og: null }
 
   const server = await import('@tanstack/react-start/server')
-  const origin = new URL(server.getRequest().url).origin
+  const requestUrl = server.getRequest().url
+  const origin = new URL(requestUrl).origin
 
   try {
-    const res = await fetch(`${origin}/api/meta/${encodeURIComponent(slug)}`)
+    const apiOrigin = serverApiOrigin()
+    const res = await fetch(`${apiOrigin}/api/meta/${encodeURIComponent(slug)}`)
     if (res.status !== 200) return { og: null }
     const meta = (await res.json()) as MetaForOg
     return { og: { title: meta.title ?? '', origin } }
