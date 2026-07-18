@@ -45,6 +45,7 @@
     "pretest": "pnpm run ensure:electron-runtime",
     "test": "vp test run --no-file-parallelism",
     "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
+    "pretest:e2e": "pnpm run ensure:electron-runtime",
     "test:e2e": "node ../../scripts/with-electron-native.mjs pnpm run test:e2e:raw",
     "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 electron-vite build && playwright test --config e2e/playwright.config.ts"
   },
