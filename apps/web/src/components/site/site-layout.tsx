@@ -14,9 +14,6 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           </Link>
           <nav className="links">
             <Link to="/">Explore</Link>
-            <Link to="/docs/$" params={{ _splat: 'guides/publishing' }}>
-              Publish
-            </Link>
             <Link to="/docs/$" params={{ _splat: 'installation' }}>
               Docs
             </Link>
@@ -41,7 +38,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             </Link>
           </div>
           <div>
-            Publish, discover, and continue agent Sessions. Made by{' '}
+            Share, understand, and continue agent Sessions. Made by{' '}
             <strong style={{ color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
               spool-lab
             </strong>

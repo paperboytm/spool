@@ -52,25 +52,25 @@ function Hero() {
     <section className="home-hero">
       <div className="hh-meta">
         <span className="pulse" />
-        <span className="ver">v0.4.1</span>
+        <span className="ver">Early access</span>
         <span className="dot" />
-        <span>local-first</span>
+        <span>Link-only by default</span>
         <span className="dot" />
-        <span>macOS · Apple Silicon</span>
+        <span>Claude Code · Codex CLI</span>
         <span className="dot" />
         <span>MIT</span>
       </div>
 
       <h1 className="hh-h1">
-        Your AI session
+        Share agent work.
         <br />
-        <em>library</em>
+        <em>Continue it</em>
         <span className="accent">.</span>
       </h1>
 
       <p className="hh-lede">
-        Every Claude, Codex, Gemini, and OpenCode session in one place. Browsable, pinnable,
-        searchable — <strong>and never leaves your machine</strong>.
+        Turn a real coding-agent Session into a durable link. Readers get the Summary, conversation,
+        tool activity, files, and diff — then resume it as new work.
       </p>
 
       <div className="hh-cta">
@@ -114,15 +114,12 @@ interface HeroProject {
 }
 
 const HERO_PROJECTS: readonly HeroProject[] = [
-  { name: 'harbor', count: 142, dots: ['claude', 'codex'], active: true },
-  { name: 'tide', count: 87, dots: ['claude', 'gemini'] },
-  { name: 'prism', count: 53, dots: ['claude'] },
-  { name: 'forge', count: 41, dots: ['codex', 'claude'] },
-  { name: 'ledger', count: 38, dots: ['gemini', 'codex'] },
-  { name: 'atlas', count: 27, dots: ['claude'] },
-  { name: 'terra', count: 22, dots: ['gemini'] },
-  { name: 'relay', count: 19, dots: ['claude', 'codex'] },
-  { name: 'vault', count: 14, dots: ['codex'] },
+  { name: 'Summary', count: 1, dots: ['claude'], active: true },
+  { name: 'Conversation', count: 42, dots: ['claude'] },
+  { name: 'Tool activity', count: 18, dots: ['claude'] },
+  { name: 'Touched files', count: 7, dots: ['claude'] },
+  { name: 'Diff', count: 214, dots: ['claude'] },
+  { name: 'Source records', count: 96, dots: ['claude'] },
 ]
 
 function HeroSidebar() {
@@ -134,13 +131,13 @@ function HeroSidebar() {
 
       <div className="hh-search">
         <SearchIcon size={12} />
-        <span className="ph">Search…</span>
-        <span className="kbd">⌘K</span>
+        <span className="ph">Find in Session…</span>
+        <span className="kbd">⌘F</span>
       </div>
 
       <div className="hh-lbl">
-        <span>Projects</span>
-        <span className="sort">recent ▾</span>
+        <span>Session</span>
+        <span className="sort">Link-only</span>
       </div>
 
       {HERO_PROJECTS.map((p) => (
@@ -159,15 +156,15 @@ function HeroSidebar() {
       <div className="hh-divider" />
       <div className="hh-pj is-loose">
         <FolderIcon dashed />
-        <span className="nm">Loose</span>
+        <span className="nm">Record deep links</span>
         <span />
-        <span className="cnt">8</span>
+        <span className="cnt">96</span>
       </div>
 
       <div className="hh-foot">
         <span className="live" />
         <span>
-          <strong>462</strong> sessions · live
+          Source Session <strong>unchanged</strong>
         </span>
       </div>
     </aside>
@@ -177,60 +174,57 @@ function HeroSidebar() {
 function HeroMain() {
   return (
     <div className="hh-main">
-      <h2 className="hh-app-h">AI Session Library</h2>
-      <div className="hh-app-sub">All your AI conversations, organized by your code projects.</div>
+      <h2 className="hh-app-h">JWT rotation without double refresh</h2>
+      <div className="hh-app-sub">Shared 2h ago · Claude Code · Link-only</div>
 
       <div className="hh-feed">
         <div className="hh-seg">
-          <span className="nm">Pinned</span>
-          <span className="ct">3 sessions</span>
+          <span className="nm">Summary</span>
+          <span className="ct">Interpretation</span>
           <span className="ln" />
         </div>
 
         <SessionRow
           src="claude"
-          title="auth middleware: JWT rotation with refresh tokens"
-          meta="harbor · today · 42 messages · claude-sonnet-4-6"
-          pinned
+          label="claude"
+          title="Rotate refresh tokens without duplicating requests across browser tabs"
+          meta="Authentication · session renewal · concurrency"
         />
         <SessionRow
           src="claude"
-          title="webhook idempotency keys: design + migration plan"
-          meta="ledger · 2d ago · 38 messages · claude-sonnet-4-6"
-          pinned
+          label="claude"
+          title="Added a single-flight refresh path and replay protection"
+          meta="Implementation complete · tests passing"
         />
         <SessionRow
-          src="gemini"
-          title="RAG pipeline: llamaindex vs custom orchestration"
-          meta="atlas · 4d ago · 27 messages · gemini-2.5-pro"
-          pinned
-        />
-        <SessionRow
-          src="codex"
-          title="shared VPC peering: terraform module spec"
-          meta="terra · 5d ago · 19 messages · gpt-5-codex"
-          pinned
+          src="claude"
+          label="claude"
+          title="Keep access tokens short-lived; rotate refresh tokens on every use"
+          meta="Chosen after comparing three alternatives"
         />
 
         <div className="hh-seg hh-seg-2">
-          <span className="nm">Today</span>
+          <span className="nm">Machine-derived evidence</span>
           <span className="ln" />
         </div>
 
         <SessionRow
           src="claude"
-          title="rate limit middleware: token bucket impl"
-          meta="harbor · 1h ago · 24 messages · claude-sonnet-4-6"
+          label="claude"
+          title="18 tool calls across implementation and validation"
+          meta="pnpm test · pnpm typecheck · git diff"
         />
         <SessionRow
           src="claude"
-          title="gesture-handler v3 upgrade: breaking changes"
-          meta="tide · today · 16 messages · claude-sonnet-4-6"
+          label="claude"
+          title="7 files touched · +214 / −63"
+          meta="middleware.ts · token-store.ts · auth.test.ts"
         />
         <SessionRow
-          src="codex"
-          title="checkout funnel A/B: pricing page variant"
-          meta="tide · today · 16 messages · gpt-5-codex"
+          src="claude"
+          label="claude"
+          title="Continue this work in a new native Session"
+          meta="Source remains unchanged · lineage preserved"
         />
       </div>
     </div>
@@ -239,14 +233,14 @@ function HeroMain() {
 
 function SessionRow({
   src,
+  label,
   title,
   meta,
-  pinned,
 }: {
   src: 'claude' | 'codex' | 'gemini'
+  label: string
   title: string
   meta: string
-  pinned?: boolean
 }) {
   const dimSeparators = (text: string) =>
     text.split(' · ').map((part, i, arr) => (
@@ -257,12 +251,12 @@ function SessionRow({
     ))
   return (
     <div className="hh-row">
-      <span className={`hh-bd hh-bd-${src}`}>{src}</span>
+      <span className={`hh-bd hh-bd-${src}`}>{label}</span>
       <div className="bod">
         <div className="ttl">{title}</div>
         <div className="mt">{dimSeparators(meta)}</div>
       </div>
-      {pinned ? <PinIcon /> : <span />}
+      <span />
     </div>
   )
 }
@@ -345,14 +339,14 @@ function BrowseSection() {
   return (
     <section className="pillar reveal">
       <PillarHead
-        kicker="Browse"
+        kicker="Share"
         title={
           <>
-            One project, <em>every agent</em>, one view
+            One Session, <em>one durable link</em>
             <span className="accent">.</span>
           </>
         }
-        sub="Spool watches Claude, Codex, Gemini, and OpenCode sessions today. Sessions are grouped by working directory, so opening a project shows everything you discussed there, regardless of which agent you used."
+        sub="Choose a Claude Code or Codex CLI Session, review the exact record range and sensitive-data findings, add an optional Summary, and share. New Hub shares are Link-only."
       />
 
       <div className="pillar-spec">
@@ -369,44 +363,43 @@ function BrowseDiagram() {
         <div className="bd-src">
           <div className="bd-src-head">
             <span className={`hh-bd hh-bd-claude`}>claude</span>
-            <span className="bd-src-path">~/.claude/projects/-Users-you-harbor</span>
+            <span className="bd-src-path">claude_7a55b1ee-…</span>
           </div>
           <div className="bd-src-files">
-            <span>0e1f88a2-09b3-4cae-…jsonl</span>
-            <span>4c3d12f0-91e8-44b1-…jsonl</span>
-            <span>7a55b1ee-2c0f-49b7-…jsonl</span>
-            <span className="bd-src-more">+ 39 sessions</span>
+            <span>96 source records</span>
+            <span>7 touched files · +214 / −63</span>
+            <span className="bd-src-more">Source: Claude Code</span>
           </div>
         </div>
 
         <div className="bd-src">
           <div className="bd-src-head">
-            <span className={`hh-bd hh-bd-codex`}>codex</span>
-            <span className="bd-src-path">~/.codex/sessions/2026/05/06/harbor</span>
+            <span className={`hh-bd hh-bd-claude`}>claude</span>
+            <span className="bd-src-path">Sensitive-data gate</span>
           </div>
           <div className="bd-src-files">
-            <span>rollout-2026-05-06T11-4-…jsonl</span>
-            <span>rollout-2026-05-04T09-1-…jsonl</span>
-            <span className="bd-src-more">+ 16 sessions</span>
+            <span>Record range confirmed</span>
+            <span>Potential secrets reviewed</span>
+            <span className="bd-src-more">Nothing else on the machine is included</span>
           </div>
         </div>
 
         <div className="bd-src">
           <div className="bd-src-head">
-            <span className={`hh-bd hh-bd-gemini`}>gemini</span>
-            <span className="bd-src-path">~/.gemini/tmp/harbor-PROJECT/chats</span>
+            <span className={`hh-bd hh-bd-claude`}>claude</span>
+            <span className="bd-src-path">Optional Summary</span>
           </div>
           <div className="bd-src-files">
-            <span>chat-2026-05-05.json</span>
-            <span>chat-2026-04-22.json</span>
-            <span className="bd-src-more">+ 11 sessions</span>
+            <span>Intent and outcome</span>
+            <span>Key decisions</span>
+            <span className="bd-src-more">Kept separate from machine evidence</span>
           </div>
         </div>
 
         <div className="bd-src bd-src-soon">
           <div className="bd-src-head">
-            <span className="bd-soon-badge">soon</span>
-            <span className="bd-src-path">cursor · windsurf · aider · zed · …</span>
+            <span className="bd-soon-badge">share</span>
+            <span className="bd-src-path">spool share claude_7a55b1ee-…</span>
           </div>
         </div>
       </div>
@@ -424,34 +417,34 @@ function BrowseDiagram() {
         >
           <path d="M5 12h14M13 5l7 7-7 7" />
         </svg>
-        <span className="bd-arrow-lbl">grouped by working dir</span>
+        <span className="bd-arrow-lbl">explicit share</span>
       </div>
 
       <div className="bd-out">
         <div className="bd-out-head">
           <FolderIcon />
-          <span className="bd-out-name">harbor</span>
-          <span className="bd-out-meta">142 sessions · 3 agents</span>
+          <span className="bd-out-name">Shared Session</span>
+          <span className="bd-out-meta">Link-only · source unchanged</span>
         </div>
         <div className="bd-out-stats">
           <div className="bd-out-stat">
             <span className="bd-stat-dot" style={{ background: 'var(--src-claude)' }} />
-            <span className="bd-stat-num">87</span>
-            <span className="bd-stat-lbl">claude</span>
+            <span className="bd-stat-num">1</span>
+            <span className="bd-stat-lbl">Summary</span>
           </div>
           <div className="bd-out-stat">
-            <span className="bd-stat-dot" style={{ background: 'var(--src-codex)' }} />
-            <span className="bd-stat-num">42</span>
-            <span className="bd-stat-lbl">codex</span>
+            <span className="bd-stat-dot" style={{ background: 'var(--src-claude)' }} />
+            <span className="bd-stat-num">96</span>
+            <span className="bd-stat-lbl">records</span>
           </div>
           <div className="bd-out-stat">
-            <span className="bd-stat-dot" style={{ background: 'var(--src-gemini)' }} />
-            <span className="bd-stat-num">13</span>
-            <span className="bd-stat-lbl">gemini</span>
+            <span className="bd-stat-dot" style={{ background: 'var(--src-claude)' }} />
+            <span className="bd-stat-num">7</span>
+            <span className="bd-stat-lbl">files</span>
           </div>
         </div>
         <div className="bd-out-foot">
-          All under <code>/Users/you/code/harbor</code>
+          <code>spool.pro/session/claude_7a55b1ee-…</code>
         </div>
       </div>
     </div>
@@ -462,14 +455,14 @@ function PinSection() {
   return (
     <section className="pillar reveal">
       <PillarHead
-        kicker="Pin"
+        kicker="Read"
         title={
           <>
-            The ten that <em>matter</em>, on top
+            Start with the outcome. <em>Go as deep as you need</em>
             <span className="accent">.</span>
           </>
         }
-        sub="One click pins a session in its project — and onto the global Library Home. The ones you keep coming back to stay where you'll find them. No folders, no tags, no ceremony."
+        sub="A Shared Session is more than a transcript. Summary explains the work; conversation and tool activity preserve the process; files and diff provide machine-derived evidence."
       />
 
       <div className="pillar-spec">
@@ -484,34 +477,34 @@ function PinBoard() {
     {
       rotate: -2.4,
       src: 'claude' as const,
-      project: 'harbor',
-      title: 'auth middleware: JWT rotation with refresh tokens',
-      note: 'the canonical rotation discussion — link this anywhere auth comes up',
-      date: 'Mar 15',
+      project: 'summary',
+      title: 'Intent, outcome, and the decisions that shaped the work',
+      note: 'Interpretation for orientation — useful, but never presented as proof.',
+      date: 'Start here',
     },
     {
       rotate: 1.6,
-      src: 'gemini' as const,
-      project: 'atlas',
-      title: 'RAG pipeline: llamaindex vs custom orchestration',
-      note: 'decision tree we worked out before the spike',
-      date: 'Apr 02',
+      src: 'claude' as const,
+      project: 'conversation',
+      title: 'Prompts, responses, pivots, and failed attempts in sequence',
+      note: 'The original exchange stays available when the short version is not enough.',
+      date: 'Process',
     },
     {
       rotate: -0.8,
-      src: 'codex' as const,
-      project: 'ledger',
-      title: 'webhook idempotency keys: design + migration plan',
-      note: 'every part of the design that survived review is here',
-      date: 'Apr 18',
+      src: 'claude' as const,
+      project: 'tools',
+      title: 'Commands and tool activity connected to the relevant turns',
+      note: 'Inspect what the agent actually ran instead of relying on a recap.',
+      date: 'Evidence',
     },
     {
       rotate: 2.8,
       src: 'claude' as const,
-      project: 'tide',
-      title: 'B+ tree write path spike — leaf split edge case',
-      note: "you'll forget the off-by-one. don't reinvent it.",
-      date: 'Jan 30',
+      project: 'files + diff',
+      title: 'Touched files and composed net changes',
+      note: 'Git remains authoritative; Spool shows the evidence recorded in the Session.',
+      date: 'Verify',
     },
   ]
 
@@ -538,18 +531,18 @@ function SearchSection() {
   return (
     <section className="pillar reveal">
       <PillarHead
-        kicker="Search"
+        kicker="Resume"
         title={
           <>
-            <span className="kbd-h">⌘K</span> from anywhere — Fast or <em>AI</em>
+            Continue the work without <em>changing the source</em>
             <span className="accent">.</span>
           </>
         }
         sub={
           <>
-            <strong>Fast</strong> runs FTS5 across every indexed session, instantly.{' '}
-            <strong>AI</strong> hands the query to an agent on your machine, which synthesizes an
-            answer with sources. The <code>local</code> label never goes away.
+            <code>spool resume</code> verifies the shared records, creates a new provider-native
+            Session, and preserves where it came from. Choose a workspace and keep working in the
+            agent you already use.
           </>
         }
       />
@@ -594,82 +587,66 @@ function CmdKOverlay() {
       <div className="cmdk-pop">
         <div className="cmdk-bar">
           <SearchIcon size={16} />
-          <span className="cmdk-q">refresh token rotation</span>
+          <span className="cmdk-q">spool resume https://spool.pro/session/claude_…</span>
           <span className="cmdk-modes">
-            <span className="cmdk-mode on" title="Fast">
+            <span className="cmdk-mode on" title="Verify">
               <BoltIcon />
             </span>
-            <span className="cmdk-mode" title="AI">
+            <span className="cmdk-mode" title="Resume">
               <SparkleIcon />
             </span>
           </span>
         </div>
 
         <div className="cmdk-scope">
-          <span className="cmdk-scope-lbl">SEARCHING:</span>
-          <span className="cmdk-chip">in: project</span>
-          <span className="cmdk-chip on">All projects</span>
+          <span className="cmdk-scope-lbl">CREATING:</span>
+          <span className="cmdk-chip">new Session</span>
+          <span className="cmdk-chip on">Source unchanged</span>
         </div>
 
         <div className="cmdk-results">
           <CmdKRow
             src="claude"
-            project="harbor"
-            title={
-              <>
-                auth middleware: JWT <mark>rotation</mark> with <mark>refresh tokens</mark>
-              </>
-            }
-            date="today"
+            label="claude"
+            project="Records"
+            title="96 objects verified against the source manifest"
+            date="done"
           />
           <CmdKRow
             src="claude"
-            project="tide"
-            title={
-              <>
-                <mark>refresh token rotation</mark> edge cases — concurrent requests
-              </>
-            }
-            date="2d ago"
-          />
-          <CmdKRow
-            src="codex"
-            project="harbor"
-            title={
-              <>
-                jwt vs opaque <mark>tokens</mark>: short-lived access + rotating{' '}
-                <mark>refresh</mark>
-              </>
-            }
-            date="5d ago"
-          />
-          <CmdKRow
-            src="gemini"
-            project="ledger"
-            title={
-              <>
-                session <mark>refresh</mark> with redis TTL spike
-              </>
-            }
-            date="Jan 22"
+            label="claude"
+            project="Project"
+            title="~/code/harbor selected as the working directory"
+            date="done"
           />
           <CmdKRow
             src="claude"
-            project="atlas"
-            title={
-              <>
-                webhook idempotency keys: <mark>token</mark> expiry handling
-              </>
-            }
-            date="Jan 14"
+            label="claude"
+            project="Source"
+            title="Summary and continuation prelude attached"
+            date="done"
+          />
+          <CmdKRow
+            src="claude"
+            label="claude"
+            project="Claude"
+            title="New provider-native Session prepared"
+            date="ready"
+          />
+          <CmdKRow
+            src="claude"
+            label="claude"
+            project="Spool"
+            title="Source relationship preserved for the continuation"
+            date="kept"
           />
         </div>
 
         <div className="cmdk-foot">
-          <span className="cmdk-foot-l">View all results ›</span>
+          <span className="cmdk-foot-l">Launch Claude Code ›</span>
           <span className="cmdk-foot-r">
             <span className="cmdk-kbd">↩</span>
-            30 results
+            source unchanged
           </span>
         </div>
       </div>
@@ -679,18 +656,20 @@ function CmdKOverlay() {
 
 function CmdKRow({
   src,
+  label,
   project,
   title,
   date,
 }: {
   src: 'claude' | 'codex' | 'gemini'
+  label: string
   project: string
   title: React.ReactNode
   date: string
 }) {
   return (
     <div className="cmdk-row">
-      <span className={`hh-bd hh-bd-${src}`}>{src}</span>
+      <span className={`hh-bd hh-bd-${src}`}>{label}</span>
       <span className="cmdk-pj">{project}</span>
       <span className="cmdk-ttl">{title}</span>
       <span className="cmdk-date">{date}</span>
@@ -720,19 +699,18 @@ function AgentSection() {
   return (
     <section className="agent-sec reveal">
       <PillarHead
-        kicker="Agents"
+        kicker="Lineage"
         title={
           <>
-            Your agent reads your <em>library</em> too
+            New work, with its <em>source still visible</em>
             <span className="accent">.</span>
           </>
         }
         sub={
           <>
-            Drop the <code>/spool</code> skill into Claude Code and ask things like "build on the
-            auth-middleware discussion from last week." It shells out to <code>spool search</code>,
-            returns matching fragments, and lets the agent load any session in full. Any tool-using
-            agent can do the same via the CLI.
+            Resume materializes a fresh native Session instead of reopening or modifying the shared
+            one. The continuation keeps a reference to its source and the exact point where the new
+            work began.
           </>
         }
       />
@@ -740,44 +718,44 @@ function AgentSection() {
       <div className="agent">
         <div className="notes">
           <div>
-            <h3>01 — Ask what it ought to know.</h3>
+            <h3>01 — Resume creates, never mutates.</h3>
             <p>
-              "Build on the auth-middleware discussion from last week." Claude invokes{' '}
-              <code>/spool</code>, the skill runs <code>spool search</code> against your local
-              index, and matching fragments flow back into the conversation.
+              The Shared Session remains unchanged. The reader gets a new provider identifier and a
+              clean place to continue the work.
             </p>
           </div>
           <div>
-            <h3>02 — Sources don't decide retrievability.</h3>
+            <h3>02 — The authority stays clear.</h3>
             <p>
-              A Claude session, an old Codex run, a Gemini brainstorm — all indexed under the same
-              project, all returned by the same search. Whichever agent later asks gets all of it.
+              The source Session is authoritative for agent work. The workspace and Git remain
+              authoritative for code; Spool does not pretend to restore an entire repository.
             </p>
           </div>
           <div>
-            <h3>03 — The CLI is the public surface.</h3>
+            <h3>03 — Continuation keeps its provenance.</h3>
             <p>
-              The skill is a thin wrapper around <code>spool search --json</code>. Any tool-using
-              agent — or any script — can talk to your library the same way. Local in, local out.
+              The new Session records where it came from and which source records were resumed, so
+              future readers can follow the relationship in either direction.
             </p>
           </div>
         </div>
 
         <div className="term">
           <div className="line">
-            <span className="p">$</span> <span className="you">claude</span>
+            <span className="p">$</span> <span className="you">spool resume</span>
           </div>
           <div className="line" style={{ marginTop: 10 }}>
-            <span className="sys">&gt;</span> <span>build on the auth middleware</span>
+            <span className="sys">&gt;</span>{' '}
+            <span>https://spool.pro/session/claude_7a55b1ee-…</span>
           </div>
           <div className="line">
-            <span className="sys">&gt;</span> <span>discussion from last week</span>
+            <span className="sys">&gt;</span> <span>--workspace ~/code/harbor</span>
           </div>
 
           <div className="out">
             <div className="line">
               <span className="sys">◉</span>{' '}
-              <span className="sys">/spool — searching your library…</span>
+              <span className="sys">Verifying and materializing the continuation…</span>
             </div>
             <div className="frag">
               <span
@@ -789,38 +767,38 @@ function AgentSection() {
               >
                 claude
               </span>
-              <span className="path">auth-middleware-rewrite</span>
-              <span className="when">Mar 15</span>
+              <span className="path">96 records</span>
+              <span className="when">verified</span>
             </div>
             <div className="frag">
               <span
                 className="tag"
                 style={{
-                  background: 'color-mix(in srgb, var(--src-codex) 20%, transparent)',
-                  color: 'var(--src-codex)',
+                  background: 'color-mix(in srgb, var(--src-claude) 20%, transparent)',
+                  color: 'var(--src-claude)',
                 }}
               >
-                codex
+                claude
               </span>
-              <span className="path">jwt rotation spike</span>
-              <span className="when">Feb 08</span>
+              <span className="path">~/code/harbor</span>
+              <span className="when">selected</span>
             </div>
             <div className="frag">
               <span
                 className="tag"
                 style={{
-                  background: 'color-mix(in srgb, var(--src-gemini) 20%, transparent)',
-                  color: 'var(--src-gemini)',
+                  background: 'color-mix(in srgb, var(--src-claude) 20%, transparent)',
+                  color: 'var(--src-claude)',
                 }}
               >
-                gemini
+                claude
               </span>
-              <span className="path">redis session ttl</span>
-              <span className="when">Jan 22</span>
+              <span className="path">Claude Code continuation</span>
+              <span className="when">created</span>
             </div>
           </div>
 
-          <div className="inject">→ 3 fragments loaded into context · local</div>
+          <div className="inject">→ New Session ready · source unchanged · lineage preserved</div>
         </div>
       </div>
     </section>
@@ -833,36 +811,36 @@ function PrinciplesSection() {
   const principles = [
     {
       n: 'i.',
-      title: 'Library, not search box.',
-      body: 'The shell is the home — sidebar of projects, main pane of sessions. ⌘K is one entry point among several, not the whole product.',
+      title: 'Real Session, not a recap.',
+      body: 'The original agent record stays authoritative. Presentation helps people read it without rewriting what happened.',
     },
     {
       n: 'ii.',
-      title: 'Local, always.',
-      body: 'On-device index, on-device queries, on-device inference. Your machine is the only place your sessions ever live.',
+      title: 'Link-only by default.',
+      body: 'Sharing creates a durable URL for the chosen Session and record range. Nothing else on the machine is exposed.',
     },
     {
       n: 'iii.',
-      title: 'First-person metadata.',
-      body: '"You discussed this · Mar 15" beats "Claude Code · Mar 15." The library is yours; the language should say so.',
+      title: 'Interpretation is not evidence.',
+      body: 'Summary explains intent and outcome. Conversation, tools, files, and diff remain separate so readers can verify it.',
     },
     {
       n: 'iv.',
-      title: 'Agents read it too.',
-      body: 'Anything humans can browse, an agent can query. The /spool skill ships with the repo; the same JSON CLI is your public surface.',
+      title: 'Resume creates lineage.',
+      body: 'Every continuation becomes new work with a visible source relationship. The Shared Session is never modified.',
     },
   ]
   return (
     <section className="reveal">
       <PillarHead
-        kicker="House rules"
+        kicker="Boundaries"
         title={
           <>
-            Four things we won't <em>compromise</em>
+            Clear by default, <em>all the way through</em>
             <span className="accent">.</span>
           </>
         }
-        sub="Spool's defaults aren't accidents. These are the four lines we won't cross."
+        sub="Spool keeps the sharing boundary, evidence, and continuation semantics explicit."
       />
 
       <div className="principles">
@@ -884,9 +862,9 @@ function FinalCTA() {
   return (
     <section className="final reveal">
       <div className="big">
-        Your sessions,
+        Share the context.
         <br />
-        <em>finally findable</em>
+        <em>Continue the work</em>
         <span className="accent">.</span>
       </div>
       <div className="row">
@@ -899,7 +877,7 @@ function FinalCTA() {
           Read the docs →
         </a>
       </div>
-      <div className="plat">macOS · Apple Silicon · MIT · Built in the open</div>
+      <div className="plat">Link-only by default · Claude Code · Codex CLI · MIT</div>
     </section>
   )
 }
