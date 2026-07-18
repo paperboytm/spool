@@ -261,7 +261,7 @@ async function bootScanWorker(): Promise<void> {
     // through pfRuntime.analyze → hidden inference window. When
     // pfRuntime isn't active, analyze() returns [] so the worker
     // gets an empty result quickly instead of blocking.
-    scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.js'), {
+    scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.mjs'), {
       analyze: (text) =>
         pfRuntime.analyze(text) as Promise<
           Array<{
@@ -286,7 +286,7 @@ async function bootScanWorker(): Promise<void> {
  *  in-process on the main DB handle, which is the legacy behaviour. */
 async function bootMutationWorker(): Promise<void> {
   try {
-    mutationWorker = await spawnMutationWorker(join(__dirname, 'mutation-worker-thread.js'))
+    mutationWorker = await spawnMutationWorker(join(__dirname, 'mutation-worker-thread.mjs'))
   } catch (err) {
     console.error('[security] mutation worker failed to boot:', err)
     mutationWorker = null
@@ -627,7 +627,7 @@ function runSyncWorker(): Promise<{ added: number; updated: number; errors: numb
 
   activeSyncPromise = new Promise<{ added: number; updated: number; errors: number }>(
     (resolve, reject) => {
-      const workerPath = join(__dirname, 'sync-worker.js')
+      const workerPath = join(__dirname, 'sync-worker.mjs')
       const worker = new Worker(workerPath)
       worker.on('message', (msg: SyncWorkerMessage) => {
         if (msg.type === 'progress') {
@@ -1173,6 +1173,31 @@ ipcMain.handle(
       console.error('[spool:ai-search] Agent query failed:', error)
       if (err instanceof Error && err.stack) console.error(err.stack)
       mainWindow?.webContents.send('spool:ai-done', { fullText: '', error })
+      return { ok: false, error }
+    }
+  },
+)
+
+ipcMain.handle(
+  'spool:ai-summarize-session',
+  async (_e, { sessionUuid, agentId }: { sessionUuid: string; agentId: string }) => {
+    try {
+      const selected = getSessionWithMessages(db, sessionUuid)
+      if (!selected) return { ok: false, error: 'Session not found.' }
+
+      const summary = (
+        await acpManager.summarizeSession(agentId, selected.session, selected.messages)
+      ).trim()
+      if (!summary) return { ok: false, error: 'Your agent returned an empty summary.' }
+      return { ok: true, summary }
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err)
+      console.error('[spool:ai-summarize-session] Agent summary failed:', error)
       return { ok: false, error }
     }
   },

@@ -16,6 +16,7 @@ const ELECTRON_VITE = resolve(
 const execFileAsync = promisify(execFile)
 
 const IMPORT_ONLY_WORKSPACE_PACKAGES = ['@spool-lab/cli/hub', '@spool-lab/session-kit']
+const WORKER_ENTRIES = ['sync-worker.mjs', 'scan-worker-thread.mjs', 'mutation-worker-thread.mjs']
 
 afterEach(() => {
   rmSync(OUT_DIR, { recursive: true, force: true })
@@ -39,9 +40,19 @@ describe('main-process ESM workspace bundles', () => {
       existsSync(inferencePreloadEntry),
       `expected ${inferencePreloadEntry} to exist after build`,
     ).toBe(true)
+    for (const workerEntry of WORKER_ENTRIES) {
+      const workerPath = join(OUT_DIR, 'main', workerEntry)
+      expect(existsSync(workerPath), `expected ${workerPath} to exist after build`).toBe(true)
+    }
 
     const bundle = readFileSync(mainEntry, 'utf8')
     expect(bundle).toContain('../preload/index.mjs')
+    for (const workerEntry of WORKER_ENTRIES) {
+      expect(bundle, `main bundle should launch ${workerEntry}`).toContain(workerEntry)
+      expect(bundle, `main bundle should not launch a .js build of ${workerEntry}`).not.toContain(
+        workerEntry.replace(/\.mjs$/, '.js'),
+      )
+    }
     for (const packageName of IMPORT_ONLY_WORKSPACE_PACKAGES) {
       const hasRuntimeRequire =
         bundle.includes(`require("${packageName}")`) || bundle.includes(`require('${packageName}')`)
