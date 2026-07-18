@@ -79,10 +79,7 @@ export interface OAuthProvider {
    *  by a public client — code_verifier instead of client_secret. The
    *  desktop app posts {code, verifier} to /api/auth/sign-in-with-code;
    *  providers without a public-client flow simply omit this. */
-  exchangeNativeCode?(
-    params: ExchangeNativeCodeParams,
-    env: ProviderEnv,
-  ): Promise<IdentityClaim>
+  exchangeNativeCode?(params: ExchangeNativeCodeParams, env: ProviderEnv): Promise<IdentityClaim>
   /** Optional migration hook. Called by the sign-in flows only when
    *  (provider, sub) has no user_identities row yet: returns identity
    *  refs under OTHER providers that denote the same human (e.g. the

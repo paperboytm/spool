@@ -10,8 +10,7 @@ type Env = { META: KVNamespace; OG: R2Bucket }
 // reader does after a revoke. Without alignment, the PNG could linger
 // at the edge for 5× longer than the underlying snapshot.
 const OG_CACHE_MAX_AGE_SEC = 30
-const OG_CACHE_HEADER =
-  `public, max-age=${OG_CACHE_MAX_AGE_SEC}, s-maxage=${OG_CACHE_MAX_AGE_SEC}, must-revalidate`
+const OG_CACHE_HEADER = `public, max-age=${OG_CACHE_MAX_AGE_SEC}, s-maxage=${OG_CACHE_MAX_AGE_SEC}, must-revalidate`
 
 type Meta = {
   owner: string

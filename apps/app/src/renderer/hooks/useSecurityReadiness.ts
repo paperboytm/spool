@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+
 import { securityApi, type SecurityReadiness } from '../api/security.js'
 
 /** Tracks the main-process scan-worker boot state.
@@ -17,17 +18,23 @@ export function useSecurityReadiness(): SecurityReadiness {
   const [readiness, setReadiness] = useState<SecurityReadiness>({ ready: false, reason: 'booting' })
   useEffect(() => {
     let cancelled = false
-    void securityApi.getReadiness().then((r) => {
-      if (!cancelled) setReadiness(r)
-    }).catch(() => {
-      // Eager registration means this rejection only happens if the
-      // feature flag is off — leave the initial 'booting' state in
-      // place; the parent feature-flag gate keeps the surface hidden.
-    })
+    void securityApi
+      .getReadiness()
+      .then((r) => {
+        if (!cancelled) setReadiness(r)
+      })
+      .catch(() => {
+        // Eager registration means this rejection only happens if the
+        // feature flag is off — leave the initial 'booting' state in
+        // place; the parent feature-flag gate keeps the surface hidden.
+      })
     const off = securityApi.onReadinessChanged((next) => {
       setReadiness(next)
     })
-    return () => { cancelled = true; off() }
+    return () => {
+      cancelled = true
+      off()
+    }
   }, [])
   return readiness
 }

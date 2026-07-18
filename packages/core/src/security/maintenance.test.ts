@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   existsSync,
   mkdirSync,
@@ -8,9 +7,12 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach, afterEach } from 'vite-plus/test'
+
 import { listBackups, deleteBackups } from './maintenance.js'
 
 const tempDirs: string[] = []
@@ -28,7 +30,12 @@ function makeTempDir(prefix: string): string {
   return dir
 }
 
-function touchBackup(dir: string, name: string, mtimeS: number, payload = `payload-for-${name}`): string {
+function touchBackup(
+  dir: string,
+  name: string,
+  mtimeS: number,
+  payload = `payload-for-${name}`,
+): string {
   const full = join(dir, name)
   writeFileSync(full, payload)
   utimesSync(full, mtimeS, mtimeS)
@@ -56,7 +63,7 @@ describe('listBackups', () => {
     const list = listBackups(db)
 
     expect(list).toHaveLength(4)
-    const byName = Object.fromEntries(list.map(b => [b.name, b]))
+    const byName = Object.fromEntries(list.map((b) => [b.name, b]))
     expect(byName['spool-pre-v5-2026-01-01T00-00-00.db']!.kind).toBe('auto')
     expect(byName['spool-pre-v9-2026-01-02T00-00-00.db']!.kind).toBe('auto')
     expect(byName['spool-pre-pr5-revert-2026-01-03T00-00-00.db']!.kind).toBe('manual')
@@ -72,12 +79,8 @@ describe('listBackups', () => {
     touchBackup(backupDir, 'spool-pre-v5-mid.db', 1_700_000_100)
     touchBackup(backupDir, 'spool-pre-v5-new.db', 1_700_000_200)
 
-    const names = listBackups(db).map(b => b.name)
-    expect(names).toEqual([
-      'spool-pre-v5-new.db',
-      'spool-pre-v5-mid.db',
-      'spool-pre-v5-old.db',
-    ])
+    const names = listBackups(db).map((b) => b.name)
+    expect(names).toEqual(['spool-pre-v5-new.db', 'spool-pre-v5-mid.db', 'spool-pre-v5-old.db'])
   })
 
   it('ignores files not matching spool-pre-*.db', () => {
@@ -87,7 +90,7 @@ describe('listBackups', () => {
     touchBackup(backupDir, 'spool-pre-v5-keep.db', 1_700_000_000)
 
     const list = listBackups(db)
-    expect(list.map(b => b.name)).toEqual(['spool-pre-v5-keep.db'])
+    expect(list.map((b) => b.name)).toEqual(['spool-pre-v5-keep.db'])
   })
 
   it('returns [] when the backups directory does not exist', () => {
@@ -161,4 +164,3 @@ describe('deleteBackups', () => {
     expect(res.deleted).toBe(1)
   })
 })
-

@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
-import { DEFAULT_OPTS } from './types'
 import { parseSpoolDocument } from './spool-document'
+import { DEFAULT_OPTS } from './types'
 
 describe('parseSpoolDocument', () => {
   it('normalizes a complete document without retaining unknown fields', () => {

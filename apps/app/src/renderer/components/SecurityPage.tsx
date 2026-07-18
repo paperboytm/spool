@@ -13,11 +13,6 @@
 //   5. Info drawer — informational signals (paths, IPs, internal-host)
 //      collapsed by default with the false-positive audit fact visible.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, ChevronDown, ChevronRight, CircleSlash, Copy, Eye, EyeOff, Info, Layers, Loader2, MoreHorizontal, RotateCw, SquarePen, SquareTerminal, Eraser, ShieldAlert, X, Settings as SettingsIcon } from 'lucide-react'
-import { toast } from 'sonner'
-import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import type {
   FindingRow,
   RiskByCategoryRow,
@@ -33,23 +28,49 @@ import {
   SENSITIVE_KIND_LABEL,
   type SensitiveKind,
 } from '@spool-lab/redact'
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleSlash,
+  Copy,
+  Eye,
+  EyeOff,
+  Info,
+  Layers,
+  Loader2,
+  MoreHorizontal,
+  RotateCw,
+  SquarePen,
+  SquareTerminal,
+  Eraser,
+  ShieldAlert,
+  X,
+  Settings as SettingsIcon,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+
+import { formatRelativeDate } from '../../shared/formatDate.js'
+import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { securityApi } from '../api/security.js'
 import { useSecurityReadiness } from '../hooks/useSecurityReadiness.js'
-import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
+import { SourceBadge } from './Badges.js'
+import Menu from './Menu.js'
 import AllowlistManageModal from './security/AllowlistManageModal.js'
 import BlastRadius from './security/BlastRadius.js'
 import DetectorsChip from './security/DetectorsChip.js'
-import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
-import { truncateValue } from './security/truncate-value.js'
+import { compactModel } from './security/format.js'
 import {
   AMBIENT_BANNER_THRESHOLD,
   scanInFlightCount,
   shouldShowScanBanner,
 } from './security/page-helpers.js'
-import { compactModel } from './security/format.js'
-import { SourceBadge } from './Badges.js'
-import Menu from './Menu.js'
-import { formatRelativeDate } from '../../shared/formatDate.js'
+import { parseQualifier, toggleKindQualifier } from './security/parse-qualifier.js'
+import PurgeConfirmDialog from './security/PurgeConfirmDialog.js'
+import { truncateValue } from './security/truncate-value.js'
 
 interface Props {
   onOpenSession: (sessionUuid: string) => void
@@ -83,12 +104,12 @@ function SecurityPageNotice({
     return (
       <div
         data-testid="security-readiness-booting"
-        className="p-6 space-y-3 animate-pulse"
+        className="animate-pulse space-y-3 p-6"
         aria-busy="true"
       >
-        <div className="h-3 w-40 rounded bg-warm-border/60 dark:bg-dark-border/60" />
-        <div className="h-20 rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface" />
-        <div className="h-3 w-32 rounded bg-warm-border/60 dark:bg-dark-border/60" />
+        <div className="bg-warm-border/60 dark:bg-dark-border/60 h-3 w-40 rounded" />
+        <div className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface h-20 rounded-[8px] border" />
+        <div className="bg-warm-border/60 dark:bg-dark-border/60 h-3 w-32 rounded" />
       </div>
     )
   }
@@ -97,14 +118,15 @@ function SecurityPageNotice({
       <div
         data-testid="security-unavailable"
         role="alert"
-        className="rounded-[8px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-4 py-3.5 max-w-2xl"
+        className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface max-w-2xl rounded-[8px] border px-4 py-3.5"
       >
-        <p className="text-sm font-medium text-warm-text dark:text-dark-text mb-1">
+        <p className="text-warm-text dark:text-dark-text mb-1 text-sm font-medium">
           {t('security.unavailable_title', { defaultValue: 'Scanner unavailable' })}
         </p>
-        <p className="text-[12px] leading-[18px] text-warm-faint dark:text-dark-muted">
+        <p className="text-warm-faint dark:text-dark-muted text-[12px] leading-[18px]">
           {t('security.unavailable_body', {
-            defaultValue: 'Spool could not start the security scan worker. Findings cannot be loaded until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.',
+            defaultValue:
+              'Spool could not start the security scan worker. Findings cannot be loaded until it recovers. Restarting the app usually resolves this; if it persists, check the developer console for the boot error.',
           })}
         </p>
       </div>
@@ -131,7 +153,9 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   const [showLow, setShowLow] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
   const [bulkPurgeKind, setBulkPurgeKind] = useState<string | null>(null)
-  const [bulkPurgeSamples, setBulkPurgeSamples] = useState<Array<{ value: string; sessionTitle: string }>>([])
+  const [bulkPurgeSamples, setBulkPurgeSamples] = useState<
+    Array<{ value: string; sessionTitle: string }>
+  >([])
   // "Ignored items" — a shallow entry into the same modal Settings →
   // Security exposes. Count is fetched on mount + folded into the
   // findings-changed refresh path (ignoring a finding writes an
@@ -149,13 +173,21 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   const [valuesHidden, setValuesHidden] = useState(false)
   useEffect(() => {
     let cancelled = false
-    void securityApi.getPrefs().then(p => {
-      if (!cancelled) setValuesHidden(p.securityPageValuesBlurred === true)
-    }).catch(() => { /* fall back to default-reveal */ })
-    const off = securityApi.onPrefsChanged(p => {
+    void securityApi
+      .getPrefs()
+      .then((p) => {
+        if (!cancelled) setValuesHidden(p.securityPageValuesBlurred === true)
+      })
+      .catch(() => {
+        /* fall back to default-reveal */
+      })
+    const off = securityApi.onPrefsChanged((p) => {
       setValuesHidden(p.securityPageValuesBlurred === true)
     })
-    return () => { cancelled = true; off() }
+    return () => {
+      cancelled = true
+      off()
+    }
   }, [])
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null)
   // True between the click on Rescan and the moment the worker reports
@@ -167,7 +199,11 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   // Snapshot captured the moment the worker transitions from busy to
   // idle. Keeps the "scan complete" banner pinned so the user gets a
   // confirmation moment instead of a flash; cleared only via the X.
-  const [scanResult, setScanResult] = useState<{ scanned: number; high: number; low: number } | null>(null)
+  const [scanResult, setScanResult] = useState<{
+    scanned: number
+    high: number
+    low: number
+  } | null>(null)
   const wasScanningRef = useRef(false)
   // The latest moment `scan_completed_at` was set on ANY session — used
   // as the "scanned X ago" line in the meta row.
@@ -237,7 +273,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = securityApi.onChange(() => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => { timer = null; void refresh() }, 300)
+      timer = setTimeout(() => {
+        timer = null
+        void refresh()
+      }, 300)
     })
     return () => {
       if (timer) clearTimeout(timer)
@@ -299,12 +338,15 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   useEffect(() => {
     let active = true
     let idleTimer: ReturnType<typeof setTimeout> | null = null
-    void securityApi.getScanStatus().then((s) => {
-      if (!active) return
-      setScanStatus(s)
-      const seedBusy = s.queued > 0 || s.scanning !== null || s.backfillRemaining > 0
-      if (seedBusy) setDisplayBusy(true)
-    }).catch(() => {})
+    void securityApi
+      .getScanStatus()
+      .then((s) => {
+        if (!active) return
+        setScanStatus(s)
+        const seedBusy = s.queued > 0 || s.scanning !== null || s.backfillRemaining > 0
+        if (seedBusy) setDisplayBusy(true)
+      })
+      .catch(() => {})
     const off = securityApi.onScanStatus((next) => {
       setScanStatus(next)
       // Track the worker-reported high-water mark so the result
@@ -321,7 +363,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
       }
       const nowBusy = next.queued > 0 || next.scanning !== null || next.backfillRemaining > 0
       if (nowBusy) {
-        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
+        if (idleTimer) {
+          clearTimeout(idleTimer)
+          idleTimer = null
+        }
         setDisplayBusy(true)
         if (!wasScanningRef.current) {
           // Idle → busy edge. Snapshot the pre-scan high-risk total
@@ -330,7 +375,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
           // cleanly. Reset the manual-burst latch to the worker's
           // truth for THIS burst.
           highCountAtScanStartRef.current = riskRef.current
-            .filter(r => r.severity === 'high')
+            .filter((r) => r.severity === 'high')
             .reduce((a, c) => a + c.count, 0)
           lastBackfillTotalRef.current = next.backfillTotal
           sawManualDuringBurstRef.current = next.manualBurstInFlight
@@ -356,7 +401,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
           // banner the user expected to see after their click would
           // silently never render. Firing immediately + bypassing
           // the gate guarantees the ACK lands.
-          if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
+          if (idleTimer) {
+            clearTimeout(idleTimer)
+            idleTimer = null
+          }
           setRescanInFlight(false)
           // Await the refetch + read counts from its return value, not
           // from riskRef.current — the ref isn't updated until the
@@ -389,11 +437,20 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             try {
               const fresh = await refreshRef.current()
               if (fresh) rows = fresh
-            } catch { /* keep the snapshot fallback */ }
-            const currentHigh = rows.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
-            const currentLow = rows.filter(r => r.severity === 'low').reduce((a, c) => a + c.count, 0)
+            } catch {
+              /* keep the snapshot fallback */
+            }
+            const currentHigh = rows
+              .filter((r) => r.severity === 'high')
+              .reduce((a, c) => a + c.count, 0)
+            const currentLow = rows
+              .filter((r) => r.severity === 'low')
+              .reduce((a, c) => a + c.count, 0)
             setScanResult({
-              scanned: lastBackfillTotalRef.current > 0 ? lastBackfillTotalRef.current : sessionsLenRef.current,
+              scanned:
+                lastBackfillTotalRef.current > 0
+                  ? lastBackfillTotalRef.current
+                  : sessionsLenRef.current,
               high: currentHigh,
               low: currentLow,
             })
@@ -418,7 +475,9 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
           void (async () => {
             const fresh = await refreshRef.current()
             const rows = fresh ?? riskRef.current
-            const currentHigh = rows.filter(r => r.severity === 'high').reduce((a, c) => a + c.count, 0)
+            const currentHigh = rows
+              .filter((r) => r.severity === 'high')
+              .reduce((a, c) => a + c.count, 0)
             const delta = currentHigh - highCountAtScanStartRef.current
             if (delta > 0) {
               // Background discovery — non-blocking toast.
@@ -478,7 +537,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   // refetch every session card.
   const kindsKey = (parsed.filter.kinds ?? []).join('|')
   const activeKinds = useMemo<readonly string[]>(
-    () => kindsKey ? kindsKey.split('|') : [],
+    () => (kindsKey ? kindsKey.split('|') : []),
     [kindsKey],
   )
   const activeKindSet = useMemo(() => new Set(activeKinds), [activeKinds])
@@ -493,11 +552,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
       state: 'active',
     })
     const sample = rows.slice(0, 4)
-    const values = await securityApi.getFindingValues(sample.map(r => r.id)).catch(() => ({} as Record<number, string | null>))
-    const samples = sample.flatMap(r => {
+    const values = await securityApi
+      .getFindingValues(sample.map((r) => r.id))
+      .catch(() => ({}) as Record<number, string | null>)
+    const samples = sample.flatMap((r) => {
       const v = values[r.id]
       if (!v) return []
-      const session = sessions.find(s => s.id === r.sessionId)
+      const session = sessions.find((s) => s.id === r.sessionId)
       return [{ value: truncateValue(v), sessionTitle: session?.title?.trim() || '(no title)' }]
     })
     setBulkPurgeSamples(samples)
@@ -518,16 +579,16 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
     void refresh()
   }
 
-  const highCats = risk.filter(r => r.severity === 'high')
-  const lowCats = risk.filter(r => r.severity === 'low')
-  const infoCats = risk.filter(r => r.severity === 'info')
+  const highCats = risk.filter((r) => r.severity === 'high')
+  const lowCats = risk.filter((r) => r.severity === 'low')
+  const infoCats = risk.filter((r) => r.severity === 'info')
   const highCount = highCats.reduce((a, c) => a + c.count, 0)
   const lowCount = lowCats.reduce((a, c) => a + c.count, 0)
   const infoCount = infoCats.reduce((a, c) => a + c.count, 0)
   const visibleActive = highCount + lowCount
 
   return (
-    <div data-testid="security-page" className="flex flex-col flex-1 min-h-0">
+    <div data-testid="security-page" className="flex min-h-0 flex-1 flex-col">
       {/* Meta row — matches SharesPage's pattern (px-6 pt-1.5 pb-3) so
        *  the distance from the sidebar reads identical across pages. */}
       <div className="flex-none px-6 pt-1.5 pb-3">
@@ -535,110 +596,112 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
          *  scroll area's stable 8px gutter below) so the right-aligned
          *  Ignored entry lines up with the cards' right-edge controls
          *  instead of overhanging them. */}
-        <div className="pr-3 flex items-center gap-3">
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-warm-faint dark:text-dark-muted tabular-nums">
-          {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
-          {infoCount > 0 && (
-            <span className="opacity-70">
-              {' · '}
-              {t('security.summary_info', { count: infoCount, defaultValue: '{{count}} info' })}
-            </span>
-          )}
-          {/* Detectors chip qualifies the counts above (which engine
-           *  produced them), so it sits next to them — and, being the
-           *  most static element, anchors the left of the row while the
-           *  width-volatile "scanned X ago" trails at the end. */}
-          {scanStatus?.currentProfile && (
-            <>
-              {' · '}
-              <DetectorsChip profile={scanStatus.currentProfile} />
-            </>
-          )}
-          {activeKinds.length > 0 && (
-            <>
-              {' · '}
-              {t('security.filter_active', {
-                count: activeKinds.length,
-                defaultValue: 'filtered by {{count}} kind(s)',
-              })}
-              {' '}
+        <div className="flex items-center gap-3 pr-3">
+          <span className="text-warm-faint dark:text-dark-muted min-w-0 flex-1 truncate font-mono text-[11px] leading-5 tabular-nums">
+            {t('security.summary', { findings: visibleActive, defaultValue: '{{findings}} risk' })}
+            {infoCount > 0 && (
+              <span className="opacity-70">
+                {' · '}
+                {t('security.summary_info', { count: infoCount, defaultValue: '{{count}} info' })}
+              </span>
+            )}
+            {/* Detectors chip qualifies the counts above (which engine
+             *  produced them), so it sits next to them — and, being the
+             *  most static element, anchors the left of the row while the
+             *  width-volatile "scanned X ago" trails at the end. */}
+            {scanStatus?.currentProfile && (
+              <>
+                {' · '}
+                <DetectorsChip profile={scanStatus.currentProfile} />
+              </>
+            )}
+            {activeKinds.length > 0 && (
+              <>
+                {' · '}
+                {t('security.filter_active', {
+                  count: activeKinds.length,
+                  defaultValue: 'filtered by {{count}} kind(s)',
+                })}{' '}
+                <button
+                  type="button"
+                  data-testid="security-filter-clear"
+                  onClick={clearKindFilter}
+                  className="text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark underline-offset-2 transition-colors hover:underline"
+                >
+                  {t('security.filter_clear', { defaultValue: 'clear' })}
+                </button>
+              </>
+            )}
+            {/* "scanned X ago" is the row's only width-volatile text, so
+             *  it trails last: its width changes can't shove the static
+             *  counts/chip to its left. Pairing it with the ↻ button
+             *  also reads as "last scanned · refresh", giving the bare
+             *  icon a label by adjacency.
+             *  Plain inline text (no flex wrapper, no inline indicator)
+             *  so it shares the surrounding mono baseline exactly and
+             *  never reflows the ↻ button. It's a stable "last
+             *  completed" fact, NOT a scan-in-flight signal, so it stays
+             *  put even under a full ScanBanner — removing it mid-scan
+             *  collapsed the row width and shoved the controls sideways,
+             *  then back. In-progress scanning is signalled by the
+             *  ScanBanner below (≥5 sessions) and by this stamp ticking
+             *  to "just now" when a scan settles. */}
+            {lastScanCompletedAt && (
+              <>
+                {' · '}
+                <span data-testid="security-scan-state">
+                  {t('security.scanned_ago', {
+                    ago: formatScanAgo(
+                      lastScanCompletedAt,
+                      t as unknown as (k: string, o?: Record<string, unknown>) => string,
+                    ),
+                    defaultValue: 'scanned {{ago}}',
+                  })}
+                </span>
+              </>
+            )}
+          </span>
+          {/* Both actions sit together at the row's right edge, icon-only
+           *  with tooltips for a uniform look — the stats span's flex-1
+           *  pushes the group over. */}
+          <div className="flex flex-none items-center gap-1">
+            <button
+              type="button"
+              data-testid="security-rescan-all"
+              onClick={handleRescanAll}
+              disabled={rescanInFlight}
+              title={t('security.rescanAll', { defaultValue: 'Rescan all' })}
+              aria-label={t('security.rescanAll', { defaultValue: 'Rescan all' })}
+              className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded transition-colors duration-75 ${
+                rescanInFlight
+                  ? 'text-accent dark:text-accent-dark cursor-wait'
+                  : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
+              }`}
+            >
+              <RotateCw
+                size={13}
+                strokeWidth={1.75}
+                className={rescanInFlight ? 'animate-spin' : ''}
+                aria-hidden
+              />
+            </button>
+            {ignoredCount > 0 && (
               <button
                 type="button"
-                data-testid="security-filter-clear"
-                onClick={clearKindFilter}
-                className="text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark underline-offset-2 hover:underline transition-colors"
+                data-testid="security-ignored-open"
+                onClick={() => setIgnoredOpen(true)}
+                title={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
+                aria-label={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
+                className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 flex-none items-center justify-center rounded transition-colors duration-75"
               >
-                {t('security.filter_clear', { defaultValue: 'clear' })}
+                <CircleSlash size={13} strokeWidth={1.75} aria-hidden />
               </button>
-            </>
-          )}
-          {/* "scanned X ago" is the row's only width-volatile text, so
-           *  it trails last: its width changes can't shove the static
-           *  counts/chip to its left. Pairing it with the ↻ button
-           *  also reads as "last scanned · refresh", giving the bare
-           *  icon a label by adjacency.
-           *  Plain inline text (no flex wrapper, no inline indicator)
-           *  so it shares the surrounding mono baseline exactly and
-           *  never reflows the ↻ button. It's a stable "last
-           *  completed" fact, NOT a scan-in-flight signal, so it stays
-           *  put even under a full ScanBanner — removing it mid-scan
-           *  collapsed the row width and shoved the controls sideways,
-           *  then back. In-progress scanning is signalled by the
-           *  ScanBanner below (≥5 sessions) and by this stamp ticking
-           *  to "just now" when a scan settles. */}
-          {lastScanCompletedAt && (
-            <>
-              {' · '}
-              <span data-testid="security-scan-state">
-                {t('security.scanned_ago', {
-                  ago: formatScanAgo(lastScanCompletedAt, t as unknown as (k: string, o?: Record<string, unknown>) => string),
-                  defaultValue: 'scanned {{ago}}',
-                })}
-              </span>
-            </>
-          )}
-        </span>
-        {/* Both actions sit together at the row's right edge, icon-only
-         *  with tooltips for a uniform look — the stats span's flex-1
-         *  pushes the group over. */}
-        <div className="flex-none flex items-center gap-1">
-        <button
-          type="button"
-          data-testid="security-rescan-all"
-          onClick={handleRescanAll}
-          disabled={rescanInFlight}
-          title={t('security.rescanAll', { defaultValue: 'Rescan all' })}
-          aria-label={t('security.rescanAll', { defaultValue: 'Rescan all' })}
-          className={`flex-none inline-flex items-center justify-center w-5 h-5 rounded transition-colors duration-75 ${
-            rescanInFlight
-              ? 'text-accent dark:text-accent-dark cursor-wait'
-              : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
-          }`}
-        >
-          <RotateCw
-            size={13}
-            strokeWidth={1.75}
-            className={rescanInFlight ? 'animate-spin' : ''}
-            aria-hidden
-          />
-        </button>
-        {ignoredCount > 0 && (
-          <button
-            type="button"
-            data-testid="security-ignored-open"
-            onClick={() => setIgnoredOpen(true)}
-            title={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
-            aria-label={t('security.ignored_manage', { defaultValue: 'Ignored items' })}
-            className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
-          >
-            <CircleSlash size={13} strokeWidth={1.75} aria-hidden />
-          </button>
-        )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 [scrollbar-gutter:stable]">
+      <div className="min-h-0 flex-1 [scrollbar-gutter:stable] overflow-y-auto px-6 pb-6">
         <div>
           {/* Single ScanStatusBanner slot — outside the empty /
            *  findings / loading branch so a manual rescan that
@@ -684,7 +747,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             return null
           })()}
           {loading ? null : error ? (
-            <p className="text-sm text-warm-muted dark:text-dark-muted py-4">
+            <p className="text-warm-muted dark:text-dark-muted py-4 text-sm">
               {t('common.error')}: {error}
             </p>
           ) : risk.length === 0 && !isScanning ? (
@@ -700,11 +763,18 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                 <section className="mb-3" data-testid="security-high-section">
                   <CollapsibleHeader
                     expanded={showHigh}
-                    onToggle={() => setShowHigh(v => !v)}
+                    onToggle={() => setShowHigh((v) => !v)}
                     testid="security-toggle-high"
                     label={t('security.severity_high', { defaultValue: 'High · credentials' })}
                     count={highCount}
-                    leading={<AlertTriangle size={11} strokeWidth={1.75} className="text-accent dark:text-accent-dark" aria-hidden />}
+                    leading={
+                      <AlertTriangle
+                        size={11}
+                        strokeWidth={1.75}
+                        className="text-accent dark:text-accent-dark"
+                        aria-hidden
+                      />
+                    }
                     preview={{ rows: highCats }}
                   />
                   {showHigh && (
@@ -723,11 +793,18 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                 <section className="mb-3" data-testid="security-low-section">
                   <CollapsibleHeader
                     expanded={showLow}
-                    onToggle={() => setShowLow(v => !v)}
+                    onToggle={() => setShowLow((v) => !v)}
                     testid="security-toggle-low"
                     label={t('security.severity_low', { defaultValue: 'Low · identity' })}
                     count={lowCount}
-                    leading={<AlertTriangle size={11} strokeWidth={1.75} className="text-warm-faint dark:text-dark-muted" aria-hidden />}
+                    leading={
+                      <AlertTriangle
+                        size={11}
+                        strokeWidth={1.75}
+                        className="text-warm-faint dark:text-dark-muted"
+                        aria-hidden
+                      />
+                    }
                     preview={{ rows: lowCats }}
                   />
                   {showLow && (
@@ -746,11 +823,18 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                 <section className="mb-4" data-testid="security-info-section">
                   <CollapsibleHeader
                     expanded={showInfo}
-                    onToggle={() => setShowInfo(v => !v)}
+                    onToggle={() => setShowInfo((v) => !v)}
                     testid="security-toggle-info"
                     label={t('security.severity_info', { defaultValue: 'Info · environment' })}
                     count={infoCount}
-                    leading={<Info size={11} strokeWidth={1.75} className="text-warm-faint dark:text-dark-muted" aria-hidden />}
+                    leading={
+                      <Info
+                        size={11}
+                        strokeWidth={1.75}
+                        className="text-warm-faint dark:text-dark-muted"
+                        aria-hidden
+                      />
+                    }
                     preview={{ rows: infoCats }}
                   />
                   {showInfo && (
@@ -762,9 +846,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                         onToggle={toggleKindFilter}
                         onBulkPurge={(k) => void openBulkPurge(k)}
                       />
-                      <p className="mt-2 text-[11px] text-warm-faint dark:text-dark-muted" data-testid="security-info-footnote">
+                      <p
+                        className="text-warm-faint dark:text-dark-muted mt-2 text-[11px]"
+                        data-testid="security-info-footnote"
+                      >
                         {t('security.info_footnote', {
-                          defaultValue: 'Kept as audit records, not surfaced as standalone findings.',
+                          defaultValue:
+                            'Kept as audit records, not surfaced as standalone findings.',
                         })}
                       </p>
                     </>
@@ -778,11 +866,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                   lit tile again to drop it from the filter. */}
 
               <section className="mb-5">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[13px] font-medium leading-[18px] text-warm-text dark:text-dark-text">
-                    {t('security.sessions_with_findings', { defaultValue: 'Sessions with active findings' })}
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-warm-text dark:text-dark-text text-[13px] leading-[18px] font-medium">
+                    {t('security.sessions_with_findings', {
+                      defaultValue: 'Sessions with active findings',
+                    })}
                   </span>
-                  <span className="font-mono text-[12px] text-warm-faint dark:text-dark-muted tabular-nums ml-1">
+                  <span className="text-warm-faint dark:text-dark-muted ml-1 font-mono text-[12px] tabular-nums">
                     {sessionsTotal ?? sessions.length}
                   </span>
                   {/* Icon-only toggle, tooltip via title.
@@ -794,35 +884,47 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                       data-testid="security-toggle-values"
                       onClick={() => {
                         const next = !valuesHidden
-                        setValuesHidden(next)  // optimistic — pref subscription will mirror
+                        setValuesHidden(next) // optimistic — pref subscription will mirror
                         void securityApi.setPrefs({ securityPageValuesBlurred: next })
                       }}
                       aria-pressed={valuesHidden}
-                      aria-label={valuesHidden
-                        ? t('security.show_values_full', { defaultValue: 'Show values' })
-                        : t('security.hide_values_full', { defaultValue: 'Hide values for screen-share' })}
-                      title={valuesHidden
-                        ? t('security.show_values_full', { defaultValue: 'Show values' })
-                        : t('security.hide_values_full', { defaultValue: 'Hide values for screen-share' })}
-                      className={`ml-auto inline-flex items-center justify-center w-5 h-5 rounded transition-colors duration-75 ${
+                      aria-label={
+                        valuesHidden
+                          ? t('security.show_values_full', { defaultValue: 'Show values' })
+                          : t('security.hide_values_full', {
+                              defaultValue: 'Hide values for screen-share',
+                            })
+                      }
+                      title={
+                        valuesHidden
+                          ? t('security.show_values_full', { defaultValue: 'Show values' })
+                          : t('security.hide_values_full', {
+                              defaultValue: 'Hide values for screen-share',
+                            })
+                      }
+                      className={`ml-auto inline-flex h-5 w-5 items-center justify-center rounded transition-colors duration-75 ${
                         valuesHidden
                           ? 'bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark'
                           : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
                       }`}
                     >
-                      {valuesHidden
-                        ? <EyeOff size={13} strokeWidth={1.75} aria-hidden />
-                        : <Eye size={13} strokeWidth={1.75} aria-hidden />}
+                      {valuesHidden ? (
+                        <EyeOff size={13} strokeWidth={1.75} aria-hidden />
+                      ) : (
+                        <Eye size={13} strokeWidth={1.75} aria-hidden />
+                      )}
                     </button>
                   )}
                 </div>
                 {sessions.length === 0 ? (
-                  <p className="font-mono text-[11px] text-warm-faint dark:text-dark-muted py-2">
-                    {t('security.empty_sessions', { defaultValue: 'No sessions match this filter.' })}
+                  <p className="text-warm-faint dark:text-dark-muted py-2 font-mono text-[11px]">
+                    {t('security.empty_sessions', {
+                      defaultValue: 'No sessions match this filter.',
+                    })}
                   </p>
                 ) : (
                   <div className="flex flex-col">
-                    {sessions.map(s => (
+                    {sessions.map((s) => (
                       <SessionCard
                         key={s.id}
                         session={s}
@@ -838,7 +940,7 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                         type="button"
                         data-testid="security-sessions-load-more"
                         onClick={() => setSessionsPageCount((n) => n + 1)}
-                        className="self-start mt-2 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                        className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text mt-2 h-7 self-start rounded-md px-2.5 text-[12px] font-medium transition-colors"
                       >
                         {t('security.load_more', { defaultValue: 'Load more' })}
                       </button>
@@ -846,7 +948,6 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
                   </div>
                 )}
               </section>
-
             </>
           )}
         </div>
@@ -858,8 +959,13 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
         kind={bulkPurgeKind ?? ''}
         bulk
         bulkSamples={bulkPurgeSamples}
-        onConfirm={() => { void confirmBulkPurgeKind() }}
-        onCancel={() => { setBulkPurgeKind(null); setBulkPurgeSamples([]) }}
+        onConfirm={() => {
+          void confirmBulkPurgeKind()
+        }}
+        onCancel={() => {
+          setBulkPurgeKind(null)
+          setBulkPurgeSamples([])
+        }}
       />
 
       {ignoredOpen && (
@@ -868,7 +974,10 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
             setIgnoredOpen(false)
             // Un-ignoring inside the modal removes allowlist rows; pull
             // a fresh count so the header badge reflects it immediately.
-            void securityApi.countAllowlistEntries().then(setIgnoredCount).catch(() => {})
+            void securityApi
+              .countAllowlistEntries()
+              .then(setIgnoredCount)
+              .catch(() => {})
           }}
         />
       )}
@@ -928,7 +1037,7 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
       // two-component shape produced. Aligned with the progress
       // strip's 300ms fade-out below so both finish on the same
       // frame.
-      className={`relative grid items-center gap-3 mb-5 px-4 py-2.5 rounded-lg overflow-hidden border animate-in fade-in transition-colors duration-300 ${
+      className={`animate-in fade-in relative mb-5 grid items-center gap-3 overflow-hidden rounded-lg border px-4 py-2.5 transition-colors duration-300 ${
         isScanning
           ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent-bg-strong dark:border-accent-bg-strong-dark'
           : 'bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border'
@@ -939,15 +1048,15 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
        *  complete. The wrapper is `w-4 h-4` in both modes so the
        *  column width is identical and the middle text doesn't
        *  jitter when the inner glyph swaps. */}
-      <span className="relative inline-flex items-center justify-center w-4 h-4">
+      <span className="relative inline-flex h-4 w-4 items-center justify-center">
         {isScanning ? (
           <>
-            <span className="absolute inset-1 rounded-full bg-accent dark:bg-accent-dark" />
-            <span className="absolute inset-0 rounded-full bg-accent dark:bg-accent-dark opacity-30 animate-ping" />
+            <span className="bg-accent dark:bg-accent-dark absolute inset-1 rounded-full" />
+            <span className="bg-accent dark:bg-accent-dark absolute inset-0 animate-ping rounded-full opacity-30" />
           </>
         ) : (
           <span
-            className="inline-flex items-center justify-center w-4 h-4 rounded-full"
+            className="inline-flex h-4 w-4 items-center justify-center rounded-full"
             style={{ background: 'var(--color-status-success)' }}
           >
             <Check size={11} strokeWidth={2.2} className="text-white" aria-hidden />
@@ -956,10 +1065,10 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
       </span>
 
       {/* Middle text — same grid cell, content swaps per state. */}
-      <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-2">
         {scanning ? (
           <>
-            <span className="text-[13px] font-medium text-accent dark:text-accent-dark">
+            <span className="text-accent dark:text-accent-dark text-[13px] font-medium">
               {t('security.scanning', { defaultValue: 'Scanning' })}
             </span>
             {/* Burst-scoped progress count: "23 of 145 rescans" makes
@@ -974,7 +1083,7 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
             {total > 0 && (
               <span
                 data-testid="security-scan-banner-progress"
-                className="font-mono text-[11px] text-warm-muted dark:text-dark-muted tabular-nums whitespace-nowrap"
+                className="text-warm-muted dark:text-dark-muted font-mono text-[11px] whitespace-nowrap tabular-nums"
               >
                 {t('security.scanning_progress', {
                   done,
@@ -986,21 +1095,27 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
           </>
         ) : complete ? (
           <>
-            <span className="text-[13px] text-warm-text dark:text-dark-text font-medium">
+            <span className="text-warm-text dark:text-dark-text text-[13px] font-medium">
               {t('security.scan_done', { defaultValue: 'Scan complete' })}
             </span>
-            <span className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted">
+            <span className="text-warm-muted dark:text-dark-muted font-mono text-[11px] tabular-nums">
               {noFindings ? (
                 t('security.scan_done_clean', { defaultValue: 'nothing high-risk found' })
               ) : (
                 <>
                   <span className="text-accent dark:text-accent-dark">
-                    {t('security.scan_done_high', { count: complete.result.high, defaultValue: '{{count}} high' })}
+                    {t('security.scan_done_high', {
+                      count: complete.result.high,
+                      defaultValue: '{{count}} high',
+                    })}
                   </span>
                   {complete.result.low > 0 && (
                     <>
                       {' · '}
-                      {t('security.scan_done_low', { count: complete.result.low, defaultValue: '{{count}} low' })}
+                      {t('security.scan_done_low', {
+                        count: complete.result.low,
+                        defaultValue: '{{count}} low',
+                      })}
                     </>
                   )}
                 </>
@@ -1015,7 +1130,7 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
        *  grid `auto 1fr auto` middle column stays put across the
        *  swap. */}
       {scanning ? (
-        <span aria-hidden className="inline-block w-5 h-5" />
+        <span aria-hidden className="inline-block h-5 w-5" />
       ) : complete ? (
         <button
           type="button"
@@ -1023,7 +1138,7 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
           onClick={complete.onDismiss}
           title={t('common.close', { defaultValue: 'Close' })}
           aria-label={t('common.close', { defaultValue: 'Close' })}
-          className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
         >
           <X size={13} strokeWidth={1.6} aria-hidden />
         </button>
@@ -1048,7 +1163,7 @@ function ScanStatusBanner({ state }: { state: ScanStatusBannerState }) {
        *  we render only the bar, not "X / N" text. */}
       <div
         key={scanning ? scanning.burstKey : 'complete'}
-        className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent dark:bg-accent-dark transition-[width,opacity] duration-300"
+        className="bg-accent dark:bg-accent-dark absolute right-0 bottom-0 left-0 h-[2px] transition-[width,opacity] duration-300"
         style={{
           width: scanning ? `${pct}%` : '100%',
           opacity: scanning ? 1 : 0,
@@ -1090,22 +1205,22 @@ function CollapsibleHeader({
       data-testid={testid}
       onClick={onToggle}
       aria-expanded={expanded}
-      className="w-full flex items-center gap-2 mb-1.5 rounded -ml-1 pl-1 py-0.5 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className="hover:bg-warm-surface dark:hover:bg-dark-surface mb-1.5 -ml-1 flex w-full items-center gap-2 rounded py-0.5 pl-1 transition-colors"
     >
       {/* Left group: shrinks so the preview truncates instead of
        *  pushing the chevron off-screen when counts are large. */}
-      <span className="flex-1 min-w-0 inline-flex items-baseline gap-2 overflow-hidden">
+      <span className="inline-flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden">
         {leading && <span className="flex-none self-center">{leading}</span>}
-        <span className="flex-none text-[13px] font-medium leading-[18px] text-warm-text dark:text-dark-text">
+        <span className="text-warm-text dark:text-dark-text flex-none text-[13px] leading-[18px] font-medium">
           {label}
         </span>
-        <span className="flex-none font-mono text-[12px] text-warm-faint dark:text-dark-muted tabular-nums">
+        <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[12px] tabular-nums">
           {count}
         </span>
         {!expanded && previewRows.length > 0 && (
           <span
             data-testid={`${testid}-preview`}
-            className="hidden sm:inline-block truncate font-mono text-[11px] text-warm-faint dark:text-dark-muted"
+            className="text-warm-faint dark:text-dark-muted hidden truncate font-mono text-[11px] sm:inline-block"
           >
             {previewRows.map((r, i) => (
               <span key={r.kind}>
@@ -1114,17 +1229,17 @@ function CollapsibleHeader({
                 <span className="tabular-nums">{r.count}</span>
               </span>
             ))}
-            {previewMore > 0 && (
-              <span className="opacity-60"> · +{previewMore}</span>
-            )}
+            {previewMore > 0 && <span className="opacity-60"> · +{previewMore}</span>}
           </span>
         )}
       </span>
-      <span className="flex-none inline-flex items-center gap-1.5 text-warm-faint dark:text-dark-muted">
+      <span className="text-warm-faint dark:text-dark-muted inline-flex flex-none items-center gap-1.5">
         {trailing}
-        {expanded
-          ? <ChevronDown size={12} strokeWidth={1.7} aria-hidden />
-          : <ChevronRight size={12} strokeWidth={1.7} aria-hidden />}
+        {expanded ? (
+          <ChevronDown size={12} strokeWidth={1.7} aria-hidden />
+        ) : (
+          <ChevronRight size={12} strokeWidth={1.7} aria-hidden />
+        )}
       </span>
     </button>
   )
@@ -1148,7 +1263,7 @@ function KindGrid({
       className="grid gap-1.5"
       style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
     >
-      {rows.map(r => (
+      {rows.map((r) => (
         <KindTile
           key={r.kind}
           kind={r.kind}
@@ -1189,30 +1304,45 @@ function KindTile({
         ? 'bg-transparent border-warm-border2 dark:border-dark-border2 border-dashed opacity-90'
         : 'bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2 hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
 
-  const activeClasses = active ? 'border-accent ring-1 ring-accent dark:border-accent-dark dark:ring-accent-dark' : ''
-  const countColor = tone === 'high' ? 'text-accent dark:text-accent-dark' : 'text-warm-text dark:text-dark-text'
+  const activeClasses = active
+    ? 'border-accent ring-1 ring-accent dark:border-accent-dark dark:ring-accent-dark'
+    : ''
+  const countColor =
+    tone === 'high' ? 'text-accent dark:text-accent-dark' : 'text-warm-text dark:text-dark-text'
 
   return (
     <div
       data-testid="risk-category-chip"
       data-kind={kind}
       data-severity={tone}
-      className={`group relative flex flex-col justify-between min-w-[132px] h-14 px-3 py-2 rounded-lg border ${toneClasses} ${activeClasses} transition-colors cursor-pointer`}
+      className={`group relative flex h-14 min-w-[132px] flex-col justify-between rounded-lg border px-3 py-2 ${toneClasses} ${activeClasses} cursor-pointer transition-colors`}
       onClick={onSelect}
       role="button"
       tabIndex={0}
       aria-pressed={active}
-      aria-label={t('security.chip_aria', { kind, count, sessions, defaultValue: '{{kind}} · {{count}} findings in {{sessions}} sessions' })}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+      aria-label={t('security.chip_aria', {
+        kind,
+        count,
+        sessions,
+        defaultValue: '{{kind}} · {{count}} findings in {{sessions}} sessions',
+      })}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
     >
-      <span className="font-mono text-[12px] text-warm-text dark:text-dark-text truncate">
+      <span className="text-warm-text dark:text-dark-text truncate font-mono text-[12px]">
         {kind}
       </span>
-      <span className="flex items-baseline justify-between gap-2 min-w-0">
-        <span className={`font-mono tabular-nums text-[15px] leading-none font-medium tracking-[-0.01em] flex-none ${countColor}`}>
+      <span className="flex min-w-0 items-baseline justify-between gap-2">
+        <span
+          className={`flex-none font-mono text-[15px] leading-none font-medium tracking-[-0.01em] tabular-nums ${countColor}`}
+        >
           {count}
         </span>
-        <span className="font-mono text-[10px] text-warm-muted dark:text-dark-muted tabular-nums truncate">
+        <span className="text-warm-muted dark:text-dark-muted truncate font-mono text-[10px] tabular-nums">
           {t('sidebar.sessionCount', { count: sessions, defaultValue: '{{count}} sessions' })}
         </span>
       </span>
@@ -1221,8 +1351,11 @@ function KindTile({
         data-testid="risk-bulk-purge"
         title={t('security.purge_all_kind', { kind, defaultValue: 'Purge all {{kind}}' })}
         aria-label={t('security.purge_all_kind', { kind, defaultValue: 'Purge all {{kind}}' })}
-        onClick={(e) => { e.stopPropagation(); onBulkPurge() }}
-        className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded inline-flex items-center justify-center text-warm-faint dark:text-dark-muted opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 hover:text-accent dark:hover:text-accent-dark transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation()
+          onBulkPurge()
+        }}
+        className="text-warm-faint dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark absolute top-1.5 right-1.5 inline-flex h-[18px] w-[18px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5"
       >
         <Eraser size={12} strokeWidth={1.5} aria-hidden />
       </button>
@@ -1277,7 +1410,7 @@ function SessionCard({
       // listFindings already ignores excludeInfo if `kinds` contains an
       // info kind, but flip the flag here too so the contract is
       // obvious at the call site.
-      const someInfo = activeKinds.some(k => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
+      const someInfo = activeKinds.some((k) => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
       if (someInfo) f.excludeInfo = false
     }
     try {
@@ -1288,7 +1421,7 @@ function SessionCard({
       // one IPC trip instead of one-per-row. Caller passes the value
       // down as a prop; FindingItem no longer needs its own fetch.
       if (page.rows.length > 0) {
-        const map = await securityApi.getFindingValues(page.rows.map(r => r.id))
+        const map = await securityApi.getFindingValues(page.rows.map((r) => r.id))
         setValues(map)
       } else {
         setValues({})
@@ -1300,7 +1433,9 @@ function SessionCard({
     }
   }, [session.id, activeKinds, findingsPageCount])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   // Refetch findings when this session is rescanned (manual click,
   // post-sync auto-rescan, REDACT_DETECTOR_VERSION bump, …). Without
@@ -1323,7 +1458,10 @@ function SessionCard({
     const off = securityApi.onChange((c) => {
       if (c.sessionId !== session.id) return
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => { timer = null; void loadRef.current() }, 300)
+      timer = setTimeout(() => {
+        timer = null
+        void loadRef.current()
+      }, 300)
     })
     return () => {
       if (timer) clearTimeout(timer)
@@ -1339,7 +1477,11 @@ function SessionCard({
   }, [activeKindsKey])
 
   async function handleCopyId() {
-    try { await navigator.clipboard.writeText(session.sessionUuid) } catch { /* clipboard blocked */ }
+    try {
+      await navigator.clipboard.writeText(session.sessionUuid)
+    } catch {
+      /* clipboard blocked */
+    }
   }
   async function handleRescan() {
     await securityApi.rescanSession(session.id)
@@ -1347,15 +1489,27 @@ function SessionCard({
   async function handleResume() {
     setResuming(true)
     try {
-      await window.spool.resumeCLI(session.sessionUuid, session.source as never, session.cwd ?? undefined)
+      await window.spool.resumeCLI(
+        session.sessionUuid,
+        session.source as never,
+        session.cwd ?? undefined,
+      )
     } finally {
       setTimeout(() => setResuming(false), 1000)
     }
   }
-  const resumeCommand = getSessionResumeCommand(session.source as never, session.sessionUuid, session.cwd)
+  const resumeCommand = getSessionResumeCommand(
+    session.source as never,
+    session.sessionUuid,
+    session.cwd,
+  )
   async function handleCopyCommand() {
     if (!resumeCommand) return
-    try { await navigator.clipboard.writeText(resumeCommand) } catch { /* clipboard blocked */ }
+    try {
+      await navigator.clipboard.writeText(resumeCommand)
+    } catch {
+      /* clipboard blocked */
+    }
   }
 
   // Session-scoped bulk — the same unit the FindingsStrip acts on, so
@@ -1364,27 +1518,33 @@ function SessionCard({
   // card showing only the first page still purges/dismisses everything.
   async function sessionReportableIds(): Promise<number[]> {
     const rows = await securityApi.listFindings({ sessionId: session.id, state: 'active' })
-    return rows.filter(r => !INFO_SEVERITY_KINDS.has(r.kind as SensitiveKind)).map(r => r.id)
+    return rows.filter((r) => !INFO_SEVERITY_KINDS.has(r.kind as SensitiveKind)).map((r) => r.id)
   }
   async function handleDismissAll() {
     const ids = await sessionReportableIds()
     if (ids.length === 0) return
-    try { await securityApi.dismissFindings(ids, 'session') }
-    catch { /* surfaces via reload */ }
-    await load(); onRefresh()
+    try {
+      await securityApi.dismissFindings(ids, 'session')
+    } catch {
+      /* surfaces via reload */
+    }
+    await load()
+    onRefresh()
   }
   async function handlePurgeAll() {
     const ids = await sessionReportableIds()
     if (ids.length === 0) return
-    try { await securityApi.purgeFindings(ids) }
-    catch { /* surfaces via reload */ }
-    await load(); onRefresh()
+    try {
+      await securityApi.purgeFindings(ids)
+    } catch {
+      /* surfaces via reload */
+    }
+    await load()
+    onRefresh()
   }
 
   if (findings === null) {
-    return (
-      <article className="py-2" />
-    )
+    return <article className="py-2" />
   }
 
   // Hide info-tier kinds (absolute-path / ip / internal-host) from the
@@ -1392,15 +1552,19 @@ function SessionCard({
   // info findings are stored as an audit record but have ~98% false-
   // positive rate, so showing 848 absolute-path rows would drown the
   // real leaks. The Info drawer at the bottom is where they surface.
-  const allowInfo = activeKinds.some(k => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
+  const allowInfo = activeKinds.some((k) => INFO_SEVERITY_KINDS.has(k as SensitiveKind))
   const reportable = allowInfo
     ? findings
-    : findings.filter(f => !INFO_SEVERITY_KINDS.has(f.kind as SensitiveKind))
+    : findings.filter((f) => !INFO_SEVERITY_KINDS.has(f.kind as SensitiveKind))
 
   const visible = showAll ? reportable : reportable.slice(0, LIMIT)
   const hidden = reportable.length - visible.length
-  const high = reportable.filter(f => f.state === 'active' && HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind)).length
-  const low = reportable.filter(f => f.state === 'active' && !HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind)).length
+  const high = reportable.filter(
+    (f) => f.state === 'active' && HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind),
+  ).length
+  const low = reportable.filter(
+    (f) => f.state === 'active' && !HIGH_SEVERITY_KINDS.has(f.kind as SensitiveKind),
+  ).length
   const title = session.title?.trim() || t('common.noTitle')
 
   // Match SessionRow's meta format exactly: relative date · N msgs · model
@@ -1415,19 +1579,21 @@ function SessionCard({
       data-session-uuid={session.sessionUuid}
       className="py-2"
     >
-      <header className="group flex items-center gap-2 -ml-1">
+      <header className="group -ml-1 flex items-center gap-2">
         <button
           type="button"
           data-testid="security-session-toggle"
-          onClick={() => setCollapsed(c => !c)}
+          onClick={() => setCollapsed((c) => !c)}
           aria-expanded={!collapsed}
-          aria-label={collapsed
-            ? t('common.expand', { defaultValue: 'Expand' })
-            : t('common.collapse', { defaultValue: 'Collapse' })}
-          className="flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded text-left cursor-default transition-colors"
+          aria-label={
+            collapsed
+              ? t('common.expand', { defaultValue: 'Expand' })
+              : t('common.collapse', { defaultValue: 'Collapse' })
+          }
+          className="flex min-w-0 flex-1 cursor-default items-center gap-2 rounded py-0.5 pr-1 pl-1 text-left transition-colors"
         >
           <SourceBadge source={session.source} />
-          <span className="flex-1 min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate">
+          <span className="text-warm-text dark:text-dark-text min-w-0 flex-1 truncate text-[13px] font-medium">
             {title}
           </span>
           {/* Chevron sits after the title, hidden until hover so the row
@@ -1435,15 +1601,17 @@ function SessionCard({
            *  shift on hover); only its opacity toggles. Whichever
            *  direction the chevron points is the action it'll perform
            *  on click — collapsed → expand (▶), expanded → collapse (▼). */}
-          <span className="flex-none inline-flex items-center justify-center w-3.5 h-3.5 text-warm-faint dark:text-dark-muted opacity-0 group-hover:opacity-100 transition-opacity">
-            {collapsed
-              ? <ChevronRight size={12} strokeWidth={1.7} aria-hidden />
-              : <ChevronDown size={12} strokeWidth={1.7} aria-hidden />}
+          <span className="text-warm-faint dark:text-dark-muted inline-flex h-3.5 w-3.5 flex-none items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+            {collapsed ? (
+              <ChevronRight size={12} strokeWidth={1.7} aria-hidden />
+            ) : (
+              <ChevronDown size={12} strokeWidth={1.7} aria-hidden />
+            )}
           </span>
         </button>
-        <span className="flex-none flex items-center gap-2">
+        <span className="flex flex-none items-center gap-2">
           {high > 0 && (
-            <span className="inline-flex items-center gap-[3px] font-mono tabular-nums text-[11px] text-accent dark:text-accent-dark">
+            <span className="text-accent dark:text-accent-dark inline-flex items-center gap-[3px] font-mono text-[11px] tabular-nums">
               <AlertTriangle size={12} strokeWidth={1.7} aria-hidden />
               {high}
             </span>
@@ -1454,10 +1622,12 @@ function SessionCard({
            *  borrows the same triangle in the muted low colour, so the
            *  cluster keeps a consistent icon weight either way. */}
           {low > 0 && (
-            <span className="inline-flex items-center gap-[3px] font-mono tabular-nums text-[11px] text-warm-muted dark:text-dark-muted">
-              {high > 0
-                ? <span className="w-1 h-1 rounded-full bg-warm-muted dark:bg-dark-muted" />
-                : <AlertTriangle size={12} strokeWidth={1.7} aria-hidden />}
+            <span className="text-warm-muted dark:text-dark-muted inline-flex items-center gap-[3px] font-mono text-[11px] tabular-nums">
+              {high > 0 ? (
+                <span className="bg-warm-muted dark:bg-dark-muted h-1 w-1 rounded-full" />
+              ) : (
+                <AlertTriangle size={12} strokeWidth={1.7} aria-hidden />
+              )}
               {low}
             </span>
           )}
@@ -1472,72 +1642,99 @@ function SessionCard({
                 aria-label={t('common.moreActions', { defaultValue: 'More actions' })}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
               >
                 <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
               </button>
             )}
             items={[
-              ...(high + low > 0 ? [
-                {
-                  label: t('security.dismiss_all', { defaultValue: 'Dismiss all' }),
-                  icon: <CircleSlash size={14} strokeWidth={1.6} aria-hidden />,
-                  onSelect: () => { void handleDismissAll() },
-                },
-                {
-                  label: t('security.strip_purge_all', { defaultValue: 'Purge all' }),
-                  icon: <Eraser size={14} strokeWidth={1.6} aria-hidden />,
-                  onSelect: () => setPurgeAllPending(true),
-                },
-                { separator: true as const },
-              ] : []),
+              ...(high + low > 0
+                ? [
+                    {
+                      label: t('security.dismiss_all', { defaultValue: 'Dismiss all' }),
+                      icon: <CircleSlash size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => {
+                        void handleDismissAll()
+                      },
+                    },
+                    {
+                      label: t('security.strip_purge_all', { defaultValue: 'Purge all' }),
+                      icon: <Eraser size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => setPurgeAllPending(true),
+                    },
+                    { separator: true as const },
+                  ]
+                : []),
               {
                 label: t('security.view_session_detail', { defaultValue: 'View session detail' }),
                 icon: <Eye size={14} strokeWidth={1.6} aria-hidden />,
                 onSelect: () => onOpen(),
               },
-              ...(onShare ? [{
-                label: t('shareEditor.openNew', { defaultValue: 'Edit share draft' }),
-                icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => onShare(),
-              }] : []),
+              ...(onShare
+                ? [
+                    {
+                      label: t('shareEditor.openNew', { defaultValue: 'Edit share draft' }),
+                      icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => onShare(),
+                    },
+                  ]
+                : []),
               {
                 label: resuming
                   ? t('common.openingTerminal', { defaultValue: 'Opening terminal…' })
                   : t('session.resume_inTerminal', { defaultValue: 'Continue in terminal' }),
-                icon: resuming
-                  ? <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
-                  : <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleResume() },
+                icon: resuming ? (
+                  <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
+                ) : (
+                  <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />
+                ),
+                onSelect: () => {
+                  void handleResume()
+                },
                 disabled: resuming,
               },
-              ...(resumeCommand ? [{
-                label: t('common.copyResumeCommand', { defaultValue: 'Copy terminal command' }),
-                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleCopyCommand() },
-              }] : []),
+              ...(resumeCommand
+                ? [
+                    {
+                      label: t('common.copyResumeCommand', {
+                        defaultValue: 'Copy terminal command',
+                      }),
+                      icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => {
+                        void handleCopyCommand()
+                      },
+                    },
+                  ]
+                : []),
               {
                 label: t('sidebar.copySessionId', { defaultValue: 'Copy session ID' }),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleCopyId() },
+                onSelect: () => {
+                  void handleCopyId()
+                },
               },
               {
                 label: t('security.rescan_session', { defaultValue: 'Rescan this session' }),
                 icon: <RotateCw size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleRescan() },
+                onSelect: () => {
+                  void handleRescan()
+                },
               },
             ]}
           />
         </span>
       </header>
-      <p className="mt-0.5 pl-1.5 font-mono text-[11px] tabular-nums text-warm-faint dark:text-dark-muted truncate">
+      <p className="text-warm-faint dark:text-dark-muted mt-0.5 truncate pl-1.5 font-mono text-[11px] tabular-nums">
         {session.projectDisplayName && (
           <>
-            <span className="text-warm-muted dark:text-dark-muted">{session.projectDisplayName}</span>
+            <span className="text-warm-muted dark:text-dark-muted">
+              {session.projectDisplayName}
+            </span>
             {' · '}
           </>
         )}
-        {dateStr} · {msgsStr}{modelStr ? ` · ${modelStr}` : ''}
+        {dateStr} · {msgsStr}
+        {modelStr ? ` · ${modelStr}` : ''}
       </p>
       {!collapsed && visible.length > 0 && (
         <div className="mt-1 flex flex-col gap-px">
@@ -1547,19 +1744,22 @@ function SessionCard({
               finding={f}
               value={values[f.id] ?? null}
               valuesHidden={valuesHidden}
-              onChange={() => { void load(); onRefresh() }}
+              onChange={() => {
+                void load()
+                onRefresh()
+              }}
             />
           ))}
           {hidden > 0 && !showAll && (
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="self-start mt-0.5 h-[22px] pl-6 pr-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text inline-flex items-center gap-3 transition-colors"
+              className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text mt-0.5 inline-flex h-[22px] items-center gap-3 self-start rounded bg-transparent pr-2 pl-6 font-mono text-[11px] transition-colors"
             >
               {/* Chevron sits in the same 14px centred slot the finding
                *  bullets use, so it lines up under the dots and the
                *  label aligns with the kind column. */}
-              <span className="inline-flex items-center justify-center w-3.5">
+              <span className="inline-flex w-3.5 items-center justify-center">
                 <ChevronDown size={11} strokeWidth={1.7} aria-hidden />
               </span>
               {t('security.show_more', { count: hidden, defaultValue: 'show {{count}} more' })}
@@ -1570,7 +1770,7 @@ function SessionCard({
               type="button"
               data-testid="security-findings-load-more"
               onClick={() => setFindingsPageCount((n) => n + 1)}
-              className="self-start ml-6 mt-0.5 h-[22px] px-2 rounded bg-transparent font-mono text-[11px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text mt-0.5 ml-6 h-[22px] self-start rounded bg-transparent px-2 font-mono text-[11px] transition-colors"
             >
               {t('security.load_more', { defaultValue: 'Load more' })}
             </button>
@@ -1583,7 +1783,10 @@ function SessionCard({
         kind={reportable[0]?.kind ?? 'mixed'}
         bulk
         hasCredential={high > 0}
-        onConfirm={() => { setPurgeAllPending(false); void handlePurgeAll() }}
+        onConfirm={() => {
+          setPurgeAllPending(false)
+          void handlePurgeAll()
+        }}
         onCancel={() => setPurgeAllPending(false)}
       />
     </article>
@@ -1629,8 +1832,14 @@ function FindingItem({
     const kindLabel = SENSITIVE_KIND_LABEL[finding.kind as SensitiveKind] ?? finding.kind
     toast(
       scope === 'global'
-        ? t('security.dismissed_global_toast', { kind: kindLabel, defaultValue: 'Ignored {{kind}} everywhere' })
-        : t('security.dismissed_session_toast', { kind: kindLabel, defaultValue: 'Ignored {{kind}}' }),
+        ? t('security.dismissed_global_toast', {
+            kind: kindLabel,
+            defaultValue: 'Ignored {{kind}} everywhere',
+          })
+        : t('security.dismissed_session_toast', {
+            kind: kindLabel,
+            defaultValue: 'Ignored {{kind}}',
+          }),
       {
         // Show the value so the confirmation is recognisable, not just
         // "Ignored Env-var secret". Truncated; reconstructed plaintext,
@@ -1639,9 +1848,12 @@ function FindingItem({
         action: {
           label: t('common.undo', { defaultValue: 'Undo' }),
           onClick: () => {
-            void securityApi.undismissFinding(finding.id)
+            void securityApi
+              .undismissFinding(finding.id)
               .then(() => onChange())
-              .catch(() => { toast.error(t('security.undo_failed', { defaultValue: 'Could not undo' })) })
+              .catch(() => {
+                toast.error(t('security.undo_failed', { defaultValue: 'Could not undo' }))
+              })
           },
         },
       },
@@ -1673,153 +1885,170 @@ function FindingItem({
       : 'text-warm-text dark:text-dark-text blur-[3.5px] cursor-pointer select-none'
 
   const displayValue = isPurged
-    ? `[redacted: ${(SENSITIVE_KIND_LABEL[finding.kind as SensitiveKind] ?? finding.kind)}]`
+    ? `[redacted: ${SENSITIVE_KIND_LABEL[finding.kind as SensitiveKind] ?? finding.kind}]`
     : value === null
       ? t('security.value_unavailable', { defaultValue: '(value unavailable)' })
       : value
 
   return (
     <div data-testid="finding-row-wrap" data-finding-id={finding.id}>
-    <div
-      data-testid="finding-row"
-      data-finding-id={finding.id}
-      data-kind={finding.kind}
-      data-state={finding.state}
-      data-blurred={!isPurged && !revealed ? '1' : '0'}
-      className="group relative grid items-center gap-3 pl-6 pr-2 py-0.5 rounded font-mono text-[11px] hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
-      style={{ gridTemplateColumns: '14px 110px 1fr', opacity: finding.state === 'dismissed' ? 0.5 : 1 }}
-    >
-      <span className={`justify-self-center w-1 h-1 rounded-full ${bulletClass}`} />
-      <span className="text-warm-muted dark:text-dark-muted truncate">{finding.kind}</span>
-      <div data-testid="finding-value-cell" className="flex items-center gap-2 min-w-0">
-        <span
-          data-testid="finding-value"
-          className={`min-w-0 truncate transition-[filter] duration-100 ${!isActive ? 'pr-20' : ''} ${valueClass}`}
-          title={revealed && value ? value : undefined}
-          onMouseEnter={() => valuesHidden && !isPurged && setLocalReveal(true)}
-          onClick={() => valuesHidden && !isPurged && setLocalReveal(true)}
-        >
-          {displayValue}
-        </span>
-        {/* Cross-session count — a quiet ⧉N badge right after the value
-         *  (label lives in the tooltip). Clicking expands the per-session
-         *  list below. Sits next to the value, clear of the hover-action
-         *  cluster that floats at the row's right edge. */}
-        {isActive && high && blastCount > 0 && (
-          <button
-            type="button"
-            data-testid="blast-badge"
-            data-sessions={blastCount}
-            onClick={() => setBlastExpanded(v => !v)}
-            aria-expanded={blastExpanded}
-            title={t('security.blast_radius_sessions', {
-              count: blastCount,
-              defaultValue_one: 'Also in 1 other session',
-              defaultValue_other: 'Also in {{count}} other sessions',
-            })}
-            className="flex-none inline-flex items-center gap-0.5 h-4 px-1 rounded font-mono text-[10px] leading-none tabular-nums text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors"
+      <div
+        data-testid="finding-row"
+        data-finding-id={finding.id}
+        data-kind={finding.kind}
+        data-state={finding.state}
+        data-blurred={!isPurged && !revealed ? '1' : '0'}
+        className="group hover:bg-warm-surface dark:hover:bg-dark-surface relative grid items-center gap-3 rounded py-0.5 pr-2 pl-6 font-mono text-[11px] transition-colors"
+        style={{
+          gridTemplateColumns: '14px 110px 1fr',
+          opacity: finding.state === 'dismissed' ? 0.5 : 1,
+        }}
+      >
+        <span className={`h-1 w-1 justify-self-center rounded-full ${bulletClass}`} />
+        <span className="text-warm-muted dark:text-dark-muted truncate">{finding.kind}</span>
+        <div data-testid="finding-value-cell" className="flex min-w-0 items-center gap-2">
+          <span
+            data-testid="finding-value"
+            className={`min-w-0 truncate transition-[filter] duration-100 ${!isActive ? 'pr-20' : ''} ${valueClass}`}
+            title={revealed && value ? value : undefined}
+            onMouseEnter={() => valuesHidden && !isPurged && setLocalReveal(true)}
+            onClick={() => valuesHidden && !isPurged && setLocalReveal(true)}
           >
-            <Layers size={11} strokeWidth={1.6} aria-hidden />
-            <span className="leading-none">{blastCount}</span>
-          </button>
-        )}
-      </div>
-      {/* Actions (active) / state label (otherwise) float over the
-       *  value's right edge instead of holding a grid column. An
-       *  always-present `auto` column reserved the full button-cluster
-       *  width even while the buttons were invisible, so the value
-       *  truncated ~200px short of the real right edge. Now the value
-       *  spans the row and a gradient mask matching the hover surface
-       *  fades it out beneath the buttons so the two never collide. */}
-      {isActive ? (
-        <span className="absolute inset-y-0 right-0 z-10 flex items-stretch opacity-0 group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100 transition-opacity">
-          {/* A short fade blends the value's tail into the surface
-           *  right before an opaque block that carries the controls.
-           *  The block colour matches the hovered row, so it's
-           *  invisible against it — its only job is to mask the value
-           *  beneath. `has-[aria-expanded]` keeps the whole group (and
-           *  thus the menu's anchor) visible while the scope menu is
-           *  open even after the pointer leaves the row. */}
-          <span aria-hidden className="w-10 bg-gradient-to-r from-transparent to-warm-surface dark:to-dark-surface" />
-          <span className="flex items-center gap-2 pr-2 bg-warm-surface dark:bg-dark-surface">
-            {/* Dismiss is a single trigger that opens the scope menu —
-             *  no implicit default action, since "session" vs "everywhere"
-             *  is a real choice the user should make deliberately. Label +
-             *  caret live in one button so they stay baseline-aligned. */}
-            <Menu
-              align="right"
-              testId="ignore-scope-menu"
-              trigger={({ open, toggle }) => (
-                <button
-                  type="button"
-                  data-testid="ignore-button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={toggle}
-                  aria-haspopup="menu"
-                  aria-expanded={open}
-                  className="inline-flex items-center justify-center h-[18px] w-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
-                  title={t('security.dismiss', { defaultValue: 'Dismiss' })}
-                  aria-label={t('security.dismiss', { defaultValue: 'Dismiss' })}
-                >
-                  <CircleSlash size={12} strokeWidth={1.7} aria-hidden />
-                </button>
-              )}
-              items={[
-                {
-                  label: t('security.dismiss_session', { defaultValue: 'Dismiss in this session' }),
-                  onSelect: () => { void dismiss('session') },
-                },
-                {
-                  label: t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' }),
-                  onSelect: () => { void dismiss('global') },
-                },
-              ]}
-            />
-            {/* Purge = scrub the value from the local archive, so an
-             *  eraser (not a trash can) + its confirm dialog. */}
+            {displayValue}
+          </span>
+          {/* Cross-session count — a quiet ⧉N badge right after the value
+           *  (label lives in the tooltip). Clicking expands the per-session
+           *  list below. Sits next to the value, clear of the hover-action
+           *  cluster that floats at the row's right edge. */}
+          {isActive && high && blastCount > 0 && (
             <button
               type="button"
-              data-testid="purge-button"
-              onClick={() => setPurgePending(true)}
-              className="inline-flex items-center justify-center h-[18px] w-4 text-warm-faint dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors"
-              title={t('security.purge', { defaultValue: 'Purge from local archive' })}
+              data-testid="blast-badge"
+              data-sessions={blastCount}
+              onClick={() => setBlastExpanded((v) => !v)}
+              aria-expanded={blastExpanded}
+              title={t('security.blast_radius_sessions', {
+                count: blastCount,
+                defaultValue_one: 'Also in 1 other session',
+                defaultValue_other: 'Also in {{count}} other sessions',
+              })}
+              className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 inline-flex h-4 flex-none items-center gap-0.5 rounded px-1 font-mono text-[10px] leading-none tabular-nums transition-colors"
             >
-              <Eraser size={12} strokeWidth={1.7} aria-hidden />
+              <Layers size={11} strokeWidth={1.6} aria-hidden />
+              <span className="leading-none">{blastCount}</span>
             </button>
-          </span>
-        </span>
-      ) : (
-        <span className="absolute inset-y-0 right-2 flex items-center font-sans text-[10px] uppercase tracking-[0.08em] font-semibold text-warm-faint dark:text-dark-muted">
-          {finding.state}
-        </span>
-      )}
-      <PurgeConfirmDialog
-        open={purgePending}
-        count={1}
-        kind={finding.kind}
-        {...(value !== null ? { before: value } : {})}
-        onConfirm={() => { void purge() }}
-        onCancel={() => setPurgePending(false)}
-      />
-    </div>
-    {/* Cross-session blast radius — credentials only, active rows only.
-     *  Identity/PII kinds can't be "rotated" and a contact recurring
-     *  across sessions is expected, so the radius is reserved for the
-     *  high-severity (credential) tier where multi-session exposure is
-     *  the actionable signal. */}
-    {isActive && high && (
-      <div className="grid items-center gap-3 pl-6 pr-2" style={{ gridTemplateColumns: '14px 110px 1fr' }}>
-        <div className="col-start-3 min-w-0">
-          <BlastRadius
-            kind={finding.kind as SensitiveKind}
-            valueHash={finding.valueHash}
-            currentSessionId={finding.sessionId}
-            expanded={blastExpanded}
-            onCount={setBlastCount}
-          />
+          )}
         </div>
+        {/* Actions (active) / state label (otherwise) float over the
+         *  value's right edge instead of holding a grid column. An
+         *  always-present `auto` column reserved the full button-cluster
+         *  width even while the buttons were invisible, so the value
+         *  truncated ~200px short of the real right edge. Now the value
+         *  spans the row and a gradient mask matching the hover surface
+         *  fades it out beneath the buttons so the two never collide. */}
+        {isActive ? (
+          <span className="absolute inset-y-0 right-0 z-10 flex items-stretch opacity-0 transition-opacity group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+            {/* A short fade blends the value's tail into the surface
+             *  right before an opaque block that carries the controls.
+             *  The block colour matches the hovered row, so it's
+             *  invisible against it — its only job is to mask the value
+             *  beneath. `has-[aria-expanded]` keeps the whole group (and
+             *  thus the menu's anchor) visible while the scope menu is
+             *  open even after the pointer leaves the row. */}
+            <span
+              aria-hidden
+              className="to-warm-surface dark:to-dark-surface w-10 bg-gradient-to-r from-transparent"
+            />
+            <span className="bg-warm-surface dark:bg-dark-surface flex items-center gap-2 pr-2">
+              {/* Dismiss is a single trigger that opens the scope menu —
+               *  no implicit default action, since "session" vs "everywhere"
+               *  is a real choice the user should make deliberately. Label +
+               *  caret live in one button so they stay baseline-aligned. */}
+              <Menu
+                align="right"
+                testId="ignore-scope-menu"
+                trigger={({ open, toggle }) => (
+                  <button
+                    type="button"
+                    data-testid="ignore-button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={toggle}
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-[18px] w-4 items-center justify-center transition-colors"
+                    title={t('security.dismiss', { defaultValue: 'Dismiss' })}
+                    aria-label={t('security.dismiss', { defaultValue: 'Dismiss' })}
+                  >
+                    <CircleSlash size={12} strokeWidth={1.7} aria-hidden />
+                  </button>
+                )}
+                items={[
+                  {
+                    label: t('security.dismiss_session', {
+                      defaultValue: 'Dismiss in this session',
+                    }),
+                    onSelect: () => {
+                      void dismiss('session')
+                    },
+                  },
+                  {
+                    label: t('security.dismiss_global', { defaultValue: 'Dismiss everywhere' }),
+                    onSelect: () => {
+                      void dismiss('global')
+                    },
+                  },
+                ]}
+              />
+              {/* Purge = scrub the value from the local archive, so an
+               *  eraser (not a trash can) + its confirm dialog. */}
+              <button
+                type="button"
+                data-testid="purge-button"
+                onClick={() => setPurgePending(true)}
+                className="text-warm-faint dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark inline-flex h-[18px] w-4 items-center justify-center transition-colors"
+                title={t('security.purge', { defaultValue: 'Purge from local archive' })}
+              >
+                <Eraser size={12} strokeWidth={1.7} aria-hidden />
+              </button>
+            </span>
+          </span>
+        ) : (
+          <span className="text-warm-faint dark:text-dark-muted absolute inset-y-0 right-2 flex items-center font-sans text-[10px] font-semibold tracking-[0.08em] uppercase">
+            {finding.state}
+          </span>
+        )}
+        <PurgeConfirmDialog
+          open={purgePending}
+          count={1}
+          kind={finding.kind}
+          {...(value !== null ? { before: value } : {})}
+          onConfirm={() => {
+            void purge()
+          }}
+          onCancel={() => setPurgePending(false)}
+        />
       </div>
-    )}
+      {/* Cross-session blast radius — credentials only, active rows only.
+       *  Identity/PII kinds can't be "rotated" and a contact recurring
+       *  across sessions is expected, so the radius is reserved for the
+       *  high-severity (credential) tier where multi-session exposure is
+       *  the actionable signal. */}
+      {isActive && high && (
+        <div
+          className="grid items-center gap-3 pr-2 pl-6"
+          style={{ gridTemplateColumns: '14px 110px 1fr' }}
+        >
+          <div className="col-start-3 min-w-0">
+            <BlastRadius
+              kind={finding.kind as SensitiveKind}
+              valueHash={finding.valueHash}
+              currentSessionId={finding.sessionId}
+              expanded={blastExpanded}
+              onCount={setBlastCount}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1837,34 +2066,35 @@ function EmptyState({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="flex items-start gap-4 max-w-[560px] pt-4">
-      <span className="flex-none w-9 h-9 rounded-lg bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border inline-flex items-center justify-center text-warm-muted dark:text-dark-muted mt-0.5">
+    <div className="flex max-w-[560px] items-start gap-4 pt-4">
+      <span className="bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted mt-0.5 inline-flex h-9 w-9 flex-none items-center justify-center rounded-lg border">
         <ShieldAlert size={18} strokeWidth={1.5} aria-hidden />
       </span>
-      <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <h2
           data-testid="security-empty-title"
           data-scan-state={lastScan === null ? 'never' : 'clean'}
-          className="text-[15px] font-semibold text-warm-text dark:text-dark-text leading-5 tracking-[-0.005em]"
+          className="text-warm-text dark:text-dark-text text-[15px] leading-5 font-semibold tracking-[-0.005em]"
         >
           {lastScan === null
             ? t('security.empty_title_never', { defaultValue: "Scan hasn't run yet." })
             : t('security.empty_title', { defaultValue: 'Nothing to review.' })}
         </h2>
-        <p className="text-[13px] text-warm-muted dark:text-dark-muted leading-[18px] max-w-[480px]">
+        <p className="text-warm-muted dark:text-dark-muted max-w-[480px] text-[13px] leading-[18px]">
           {lastScan === null
             ? t('security.empty_body_never', {
                 defaultValue: 'Click Rescan all to begin.',
               })
             : t('security.empty_body', {
-                defaultValue: "We scanned your sessions and found nothing high-risk. Spool re-scans whenever new sessions sync.",
+                defaultValue:
+                  'We scanned your sessions and found nothing high-risk. Spool re-scans whenever new sessions sync.',
               })}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="mt-0.5 flex items-center gap-1.5">
           <button
             type="button"
             onClick={onRescan}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border text-[12px] font-medium text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:border-warm-border2 dark:hover:border-dark-border2 transition-colors"
+            className="bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:border-warm-border2 dark:hover:border-dark-border2 inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors"
           >
             <RotateCw size={12} strokeWidth={1.6} aria-hidden />
             {t('security.rescanAll', { defaultValue: 'Rescan all' })}
@@ -1874,7 +2104,7 @@ function EmptyState({
               type="button"
               data-testid="security-empty-detector-settings"
               onClick={onOpenSettings}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors"
             >
               <SettingsIcon size={12} strokeWidth={1.6} aria-hidden />
               {t('security.detector_settings', { defaultValue: 'Detector settings' })}
@@ -1883,19 +2113,23 @@ function EmptyState({
         </div>
 
         {(lastScan || currentProfile) && (
-          <div className="mt-1.5 rounded-lg border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3.5 py-3">
-            <div className="text-[11px] font-semibold leading-[14px] text-warm-muted dark:text-dark-muted mb-1.5">
+          <div className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface mt-1.5 rounded-lg border px-3.5 py-3">
+            <div className="text-warm-muted dark:text-dark-muted mb-1.5 text-[11px] leading-[14px] font-semibold">
               {t('security.last_scan', { defaultValue: 'Last scan' })}
             </div>
-            <div className="font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted leading-[18px]">
+            <div className="text-warm-muted dark:text-dark-muted font-mono text-[11px] leading-[18px] tabular-nums">
               {lastScan && (
                 <div>
-                  {t('security.last_scan_when', { ago: formatScanAgo(lastScan, t as unknown as (k: string, o?: Record<string, unknown>) => string), defaultValue: 'scanned {{ago}}' })}
+                  {t('security.last_scan_when', {
+                    ago: formatScanAgo(
+                      lastScan,
+                      t as unknown as (k: string, o?: Record<string, unknown>) => string,
+                    ),
+                    defaultValue: 'scanned {{ago}}',
+                  })}
                 </div>
               )}
-              {currentProfile && (
-                <div>{currentProfile}</div>
-              )}
+              {currentProfile && <div>{currentProfile}</div>}
             </div>
           </div>
         )}
@@ -1908,7 +2142,8 @@ function formatScanAgo(iso: string, t: (k: string, o?: Record<string, unknown>) 
   try {
     const ts = new Date(iso).getTime()
     const ms = Date.now() - ts
-    if (!Number.isFinite(ms) || ms < 0) return t('security.ago_just_now', { defaultValue: 'just now' })
+    if (!Number.isFinite(ms) || ms < 0)
+      return t('security.ago_just_now', { defaultValue: 'just now' })
     const s = Math.floor(ms / 1000)
     if (s < 45) return t('security.ago_just_now', { defaultValue: 'just now' })
     const m = Math.floor(s / 60)
@@ -1921,4 +2156,3 @@ function formatScanAgo(iso: string, t: (k: string, o?: Record<string, unknown>) 
     return ''
   }
 }
-

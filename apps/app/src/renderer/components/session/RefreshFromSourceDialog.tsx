@@ -12,6 +12,7 @@
 import { RotateCcw, ShieldAlert } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 
 interface Props {
@@ -37,56 +38,58 @@ export default function RefreshFromSourceDialog({ open, busy, onConfirm, onCance
       data-testid="refresh-from-source-confirm"
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-warm-text/30 dark:bg-black/40"
-      onClick={(e) => { if (!busy && e.target === e.currentTarget) onCancel() }}
+      className="bg-warm-text/30 fixed inset-0 z-50 flex items-center justify-center dark:bg-black/40"
+      onClick={(e) => {
+        if (!busy && e.target === e.currentTarget) onCancel()
+      }}
     >
       <div
-        className="font-sans bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[460px] max-w-[90vw] overflow-hidden border border-warm-border dark:border-dark-border"
+        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border w-[460px] max-w-[90vw] overflow-hidden rounded-[10px] border font-sans"
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
         <div className="px-6 pt-5 pb-4">
-          <div className="flex items-center gap-1.5 text-[12px] font-medium text-accent dark:text-accent-dark">
+          <div className="text-accent dark:text-accent-dark flex items-center gap-1.5 text-[12px] font-medium">
             <RotateCcw size={13} strokeWidth={1.7} aria-hidden />
             <span>{t('session.refreshPretitle')}</span>
           </div>
-          <h2 className="mt-2 text-[16px] leading-[22px] font-semibold tracking-[-0.005em] text-warm-text dark:text-dark-text">
+          <h2 className="text-warm-text dark:text-dark-text mt-2 text-[16px] leading-[22px] font-semibold tracking-[-0.005em]">
             {t('session.refreshConfirmTitle')}
           </h2>
 
-          <p className="mt-3 text-[13px] leading-[19px] text-warm-muted dark:text-dark-muted">
+          <p className="text-warm-muted dark:text-dark-muted mt-3 text-[13px] leading-[19px]">
             {t('session.refreshConfirmLead')}
           </p>
 
           <div
-            className="mt-4 flex items-start gap-2 rounded-lg border border-accent/30 dark:border-accent-dark/35 bg-accent/[0.06] dark:bg-accent-dark/[0.10] p-3"
+            className="border-accent/30 dark:border-accent-dark/35 bg-accent/[0.06] dark:bg-accent-dark/[0.10] mt-4 flex items-start gap-2 rounded-lg border p-3"
             role="note"
           >
             <ShieldAlert
               size={15}
               strokeWidth={1.7}
               aria-hidden
-              className="flex-none mt-0.5 text-accent dark:text-accent-dark"
+              className="text-accent dark:text-accent-dark mt-0.5 flex-none"
             />
-            <div className="flex-1 min-w-0 text-[12.5px] leading-[18px] text-warm-text dark:text-dark-text">
+            <div className="text-warm-text dark:text-dark-text min-w-0 flex-1 text-[12.5px] leading-[18px]">
               <div className="font-medium">{t('session.refreshConfirmWarnTitle')}</div>
-              <div className="mt-1 text-warm-muted dark:text-dark-muted">
+              <div className="text-warm-muted dark:text-dark-muted mt-1">
                 {t('session.refreshConfirmWarnBody')}
               </div>
             </div>
           </div>
 
-          <p className="mt-3 text-[12px] leading-[18px] text-warm-faint dark:text-dark-muted">
+          <p className="text-warm-faint dark:text-dark-muted mt-3 text-[12px] leading-[18px]">
             {t('session.refreshConfirmDismissNote')}
           </p>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 pb-5 pt-3">
+        <div className="flex justify-end gap-2 px-6 pt-3 pb-5">
           <button
             ref={cancelRef}
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="inline-flex items-center h-7 px-2.5 rounded-md bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border text-[12px] font-medium text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:border-warm-border2 dark:hover:border-dark-border2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:border-warm-border2 dark:hover:border-dark-border2 inline-flex h-7 items-center rounded-md border px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t('common.cancel')}
           </button>
@@ -95,7 +98,7 @@ export default function RefreshFromSourceDialog({ open, busy, onConfirm, onCance
             disabled={busy}
             data-testid="refresh-from-source-commit"
             onClick={onConfirm}
-            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-accent dark:bg-accent-dark border border-accent dark:border-accent-dark text-[12px] font-medium text-white hover:bg-accent/90 dark:hover:bg-accent-dark/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark hover:bg-accent/90 dark:hover:bg-accent-dark/90 inline-flex h-7 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RotateCcw size={12} strokeWidth={1.7} aria-hidden />
             {t('session.refreshConfirmAction')}

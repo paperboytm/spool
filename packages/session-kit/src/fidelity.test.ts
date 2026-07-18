@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { composeSessionDiff } from './diff.js'
 import { extractEditEvents } from './edits.js'
@@ -95,9 +95,7 @@ describe('apply_patch bodies without @@ markers', () => {
       codexOutput('c2', { output: 'Success.', metadata: { exit_code: 0 } }),
     ])
     expect(events).toHaveLength(1)
-    expect(events[0]?.replacements).toEqual([
-      { oldText: 'old line\n', newText: 'new line\n' },
-    ])
+    expect(events[0]?.replacements).toEqual([{ oldText: 'old line\n', newText: 'new line\n' }])
   })
 })
 
@@ -114,10 +112,16 @@ describe('sparse indexed records', () => {
   })
 
   it('attributes events to the sequence index, not the array position', () => {
-    const events = extractEditEvents([{ i: 7, data: call }, { i: 8, data: result }], {
-      provider: 'claude',
-      workspaceRoot: '/ws',
-    })
+    const events = extractEditEvents(
+      [
+        { i: 7, data: call },
+        { i: 8, data: result },
+      ],
+      {
+        provider: 'claude',
+        workspaceRoot: '/ws',
+      },
+    )
     expect(events).toHaveLength(1)
     expect(events[0]?.recordIndex).toBe(7)
     expect(events[0]?.resultRecordIndex).toBe(8)
@@ -125,10 +129,16 @@ describe('sparse indexed records', () => {
   })
 
   it('flows sequence indices into the per-file fetch list', () => {
-    const events = extractEditEvents([{ i: 7, data: call }, { i: 8, data: result }], {
-      provider: 'claude',
-      workspaceRoot: '/ws',
-    })
+    const events = extractEditEvents(
+      [
+        { i: 7, data: call },
+        { i: 8, data: result },
+      ],
+      {
+        provider: 'claude',
+        workspaceRoot: '/ws',
+      },
+    )
     const diff = composeSessionDiff(events)
     expect(diff.files[0]?.events).toEqual([7, 8])
     expect(diff.files[0]?.newText).toBe('beta\ngamma\n')

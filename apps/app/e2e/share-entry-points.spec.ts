@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import {
   navigateToShares,
@@ -54,7 +55,9 @@ test('entry point: NewDraftPicker opens (via empty-state CTA or + button)', asyn
     await expect(plus).toBeVisible({ timeout: 5000 })
     await plus.click()
   }
-  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({ timeout: 5000 })
+  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({
+    timeout: 5000,
+  })
   await ctx.window.keyboard.press('Escape')
   await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeHidden({ timeout: 5000 })
 })
@@ -69,6 +72,8 @@ test('entry point: LibraryLanding ⋯ menu Share opens editor', async () => {
   await row.hover()
   await row.getByLabel('More actions').click()
   await ctx.window.getByRole('menuitem', { name: 'Edit share draft' }).click()
-  await expect(ctx.window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
+  await expect(ctx.window.locator('[data-testid="share-editor-page"]')).toBeVisible({
+    timeout: 5000,
+  })
   await closeEditorIfOpen()
 })

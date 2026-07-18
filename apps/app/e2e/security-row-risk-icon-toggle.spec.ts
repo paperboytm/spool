@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression for the "Risk icon on session rows" toggle added in
 // Settings → Security (PR introducing `sessionRowRiskIconVisible`).
@@ -30,39 +32,59 @@ test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
       const file = join(claudeDir, 'test-project', 'row-risk-icon-fixture.jsonl')
-      writeFileSync(file, [
-        JSON.stringify({
-          type: 'user',
-          sessionId: 'row-risk-icon-session',
-          cwd: '/tmp/test-project',
-          uuid: 'rri-msg-1',
-          timestamp: '2026-05-28T10:00:00Z',
-          message: { role: 'user', content: `please rotate ${FAKE_AKIA}` },
-        }),
-        JSON.stringify({
-          type: 'assistant',
-          uuid: 'rri-msg-2',
-          timestamp: '2026-05-28T10:00:05Z',
-          message: {
-            role: 'assistant',
-            model: 'claude-sonnet-4',
-            content: 'rotated',
-          },
-        }),
-      ].join('\n'))
+      writeFileSync(
+        file,
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: 'row-risk-icon-session',
+            cwd: '/tmp/test-project',
+            uuid: 'rri-msg-1',
+            timestamp: '2026-05-28T10:00:00Z',
+            message: { role: 'user', content: `please rotate ${FAKE_AKIA}` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'rri-msg-2',
+            timestamp: '2026-05-28T10:00:05Z',
+            message: {
+              role: 'assistant',
+              model: 'claude-sonnet-4',
+              content: 'rotated',
+            },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Settings toggle hides the row-level risk badge on Project view, Security page is unaffected', async () => {
@@ -118,5 +140,7 @@ test('Settings toggle hides the row-level risk badge on Project view, Security p
   await window.keyboard.press('Escape')
 
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
-  await expect(row.locator('[data-testid="security-badge"][data-severity="high"]')).toBeVisible({ timeout: 5_000 })
+  await expect(row.locator('[data-testid="security-badge"][data-severity="high"]')).toBeVisible({
+    timeout: 5_000,
+  })
 })

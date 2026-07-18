@@ -15,14 +15,14 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
     const until = Date.now() + GRACE_PERIOD_MS
-    await ctx.env.DB
-      .prepare('UPDATE users SET deletion_pending_until=? WHERE id=? AND deleted_at IS NULL')
+    await ctx.env.DB.prepare(
+      'UPDATE users SET deletion_pending_until=? WHERE id=? AND deleted_at IS NULL',
+    )
       .bind(until, user.id)
       .run()
-    await ctx.env.DB
-      .prepare(
-        'INSERT OR REPLACE INTO deletion_queue (user_id, scheduled_at, cancelled) VALUES (?, ?, 0)',
-      )
+    await ctx.env.DB.prepare(
+      'INSERT OR REPLACE INTO deletion_queue (user_id, scheduled_at, cancelled) VALUES (?, ?, 0)',
+    )
       .bind(user.id, until)
       .run()
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
@@ -38,12 +38,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env, { allowPendingDeletion: true })
-    await ctx.env.DB
-      .prepare('UPDATE users SET deletion_pending_until=NULL WHERE id=?')
+    await ctx.env.DB.prepare('UPDATE users SET deletion_pending_until=NULL WHERE id=?')
       .bind(user.id)
       .run()
-    await ctx.env.DB
-      .prepare('UPDATE deletion_queue SET cancelled=1 WHERE user_id=?')
+    await ctx.env.DB.prepare('UPDATE deletion_queue SET cancelled=1 WHERE user_id=?')
       .bind(user.id)
       .run()
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {

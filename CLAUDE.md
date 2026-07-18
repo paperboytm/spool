@@ -5,6 +5,7 @@ All font choices, colors, spacing, layout, and aesthetic direction are defined t
 Do not deviate without explicit user approval.
 
 Key rules at a glance:
+
 - Search bar is centered on home screen (Google homepage feel), moves to top on results
 - Warm amber accent `#C85A00` (light) / `#F07020` (dark) — never blue or purple
 - Warm near-black `#141410` for dark mode — never pure `#000` or cold `#0A0A0A`
@@ -38,4 +39,3 @@ poster trick.
 - The composition skeleton lives at `videos/launch-template/`.
 - Per-release assets (raw `.mov`, audio, renders) are gitignored —
   source of truth is the composition `index.html` plus the helpers.
-

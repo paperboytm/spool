@@ -1,5 +1,6 @@
-import { Command } from 'commander'
 import { getDB, listRecentSessionsPage } from '@spool-lab/core'
+import { Command } from 'commander'
+
 import { printSession } from '../format.js'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode', 'pi'])
@@ -15,11 +16,11 @@ export const listCommand = new Command('list')
     let sessions = listRecentSessionsPage(db, { limit: parseInt(opts.limit, 10) * 2 }).sessions
 
     if (opts.source && SESSION_SOURCES.has(opts.source)) {
-      sessions = sessions.filter(s => s.source === opts.source)
+      sessions = sessions.filter((s) => s.source === opts.source)
     }
     if (opts.project) {
       const needle = opts.project.toLowerCase()
-      sessions = sessions.filter(s => s.projectDisplayPath.toLowerCase().includes(needle))
+      sessions = sessions.filter((s) => s.projectDisplayPath.toLowerCase().includes(needle))
     }
 
     sessions = sessions.slice(0, parseInt(opts.limit, 10))

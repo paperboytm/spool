@@ -10,6 +10,7 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
+
 import type { Snapshot } from '../../../shared/share-publish.js'
 
 /** Normalise a possibly-human-formatted date string to ISO 8601.
@@ -41,19 +42,15 @@ export function buildSnapshotFromEditor(args: {
     ...rawConv,
     turns: ensureTurnIds(rawConv.turns),
   }
-  const { conversation: redactedConv, perTurnRedacted } = redactConversation(
-    convWithIds,
-    opts,
-  )
+  const { conversation: redactedConv, perTurnRedacted } = redactConversation(convWithIds, opts)
 
   const selected = opts.selected
-  const hiddenTurnIds =
-    !selected
-      ? []
-      : redactedConv.turns
-          .map((t, idx) => ({ id: t.id!, idx }))
-          .filter(({ idx }) => !selected.includes(idx))
-          .map((t) => t.id)
+  const hiddenTurnIds = !selected
+    ? []
+    : redactedConv.turns
+        .map((t, idx) => ({ id: t.id!, idx }))
+        .filter(({ idx }) => !selected.includes(idx))
+        .map((t) => t.id)
   // Hidden turns survive in the `turns` array (the backend validates
   // `turn_order.length === turns.length`), but their bodies are
   // BLANKED before upload so the snapshot stored in R2 carries no
@@ -72,16 +69,14 @@ export function buildSnapshotFromEditor(args: {
   // OPAQUE POSITIONAL token (`t0`, `t1`, … by array index) before
   // emitting. The reader only uses ids for ordering and hidden lookup,
   // never for content, so positional ids are fully compatible.
-  const opaqueIdFor = new Map(
-    redactedConv.turns.map((t, idx) => [t.id!, `t${idx}`]),
-  )
+  const opaqueIdFor = new Map(redactedConv.turns.map((t, idx) => [t.id!, `t${idx}`]))
 
   const snapshotTurns = redactedConv.turns.map((t, idx) => {
     const originalId = t.id!
     const id = `t${idx}`
-    const role = (t.role === 'user' || t.role === 'assistant'
-      ? t.role
-      : 'assistant') as 'user' | 'assistant'
+    const role = (t.role === 'user' || t.role === 'assistant' ? t.role : 'assistant') as
+      | 'user'
+      | 'assistant'
     if (hiddenIdSet.has(originalId)) {
       return { id, role, content: '' }
     }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { sessionOgHead, sessionOgTitle, snapshotOgHead } from './og-meta'
 
@@ -78,9 +78,7 @@ describe('sessionOgHead', () => {
   it('falls back to generic title and description', () => {
     const out = sessionOgHead({ title: '', description: '', canonicalUrl: 'x' })
     expect(out.meta[0]).toEqual({ title: 'Shared session · spool.pro' })
-    expect(metaValue(out, 'name', 'description')).toBe(
-      'A shared coding-agent session on Spool.',
-    )
+    expect(metaValue(out, 'name', 'description')).toBe('A shared coding-agent session on Spool.')
   })
 })
 

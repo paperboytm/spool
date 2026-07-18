@@ -7,11 +7,11 @@ A synthetic DOM cursor that tracks Playwright's mouse position and pulses on cli
 Two facts about the capture pipeline:
 
 1. **Playwright's `page.mouse.move()` / `mouse.click()` don't move the OS cursor.** They dispatch DOM events directly into the renderer. The real OS cursor stays where it was when you ran the spec.
-2. **`screencapture -V` films native pixels.** Whatever the OS shows is what ends up in the `.mov`. Even with `-C`, only the *real* OS cursor would be captured, and it's not moving.
+2. **`screencapture -V` films native pixels.** Whatever the OS shows is what ends up in the `.mov`. Even with `-C`, only the _real_ OS cursor would be captured, and it's not moving.
 
 So a scene like "click the + button, watch the picker open" reads as "the picker just appeared on its own" — no agency, no cause. The viewer doesn't see the click happen.
 
-An earlier approach deleted the cursor entirely and used amber annotations to call out the *result* of the action. That works for changes that are visible at scale, but it falls apart when:
+An earlier approach deleted the cursor entirely and used amber annotations to call out the _result_ of the action. That works for changes that are visible at scale, but it falls apart when:
 
 - The same UI region keeps appearing with different contents (a list cycling through options)
 - The click is on a tiny target (a + button, a tab, a row affordance that fades in on hover)
@@ -26,9 +26,9 @@ The cursor-overlay technique fixes this. The trick is that the cursor must track
 ```ts
 import {
   installCursorOverlay, // call once after the page is ready
-  cursorClick,          // move + pause + click + pulse ring
-  cursorTo,             // move only (no click)
-  cursorPark,           // move to absolute (x, y) coords — for idle parking
+  cursorClick, // move + pause + click + pulse ring
+  cursorTo, // move only (no click)
+  cursorPark, // move to absolute (x, y) coords — for idle parking
 } from './helpers/cursor-overlay'
 ```
 
@@ -86,7 +86,7 @@ Moves to absolute viewport coordinates (CSS pixels). Use to:
 
 **Important parking rules:**
 
-- Don't park on the *next* clip's click target. A cursor that sits on `+` for 2s and then "clicks" reads as a delayed action — viewers parse it as a missed click. Park elsewhere (on an interior card, in empty chrome).
+- Don't park on the _next_ clip's click target. A cursor that sits on `+` for 2s and then "clicks" reads as a delayed action — viewers parse it as a missed click. Park elsewhere (on an interior card, in empty chrome).
 - Park on real content, not gutters. If your park position lands between cards or in empty grey space, the cursor looks abandoned. Aim for the centre of a visible element.
 
 ## Timing rules of thumb

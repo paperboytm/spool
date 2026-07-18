@@ -52,10 +52,7 @@ export function shareBackendOrigin(
   return sharePublicOrigin(env)
 }
 
-export function resolveAvatarUrl(
-  raw: string,
-  env?: Record<string, string | undefined>,
-): string {
+export function resolveAvatarUrl(raw: string, env?: Record<string, string | undefined>): string {
   if (/^https?:\/\//i.test(raw)) return raw
   if (!raw.startsWith('/')) return raw
   return `${shareBackendOrigin(env)}${raw}`

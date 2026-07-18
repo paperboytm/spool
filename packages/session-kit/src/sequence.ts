@@ -22,7 +22,9 @@ export async function sequenceRoot(
   count: number = oids.length,
 ): Promise<string> {
   if (!Number.isSafeInteger(count) || count < 0 || count > oids.length) {
-    throw new RangeError('Sequence prefix count must be an integer between 0 and the manifest length')
+    throw new RangeError(
+      'Sequence prefix count must be an integer between 0 and the manifest length',
+    )
   }
   if (count === 0) return '0'.repeat(DIGEST_BYTES * 2)
 

@@ -1,21 +1,9 @@
 import { existsSync, statSync, readdirSync, readFileSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
+import { basename, dirname, join } from 'node:path'
+
 import type Database from 'better-sqlite3'
-import { loadClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
-import { loadCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
-import { loadGeminiSession } from '../parsers/gemini.js'
-import { decodePiSessionDirSlug, loadPiSession, PI_INDEX_VERSION } from '../parsers/pi.js'
-import {
-  getOpenCodeSessionIndexedMtime,
-  isOpenCodeDatabaseFile,
-  listOpenCodeSessionFilePaths,
-  loadOpenCodeSession,
-  OPENCODE_INDEX_VERSION,
-  parseOpenCodeSessionFilePath,
-} from '../parsers/opencode.js'
-import type { SessionSource } from '../types.js'
-import { getSessionRoots, isSessionFileForSource } from './source-paths.js'
+
 import {
   deleteSessionByFilePath,
   getSourceId,
@@ -29,9 +17,23 @@ import {
   recomputeMessageCount,
   type UpsertSessionMode,
 } from '../db/queries.js'
-import type { ParsedMessage, SyncResult } from '../types.js'
-import { computeIdentity } from '../projects/identity.js'
+import { loadClaudeSession, decodeProjectSlug } from '../parsers/claude.js'
+import { loadCodexSession, CODEX_INDEX_VERSION } from '../parsers/codex.js'
+import { loadGeminiSession } from '../parsers/gemini.js'
+import {
+  getOpenCodeSessionIndexedMtime,
+  isOpenCodeDatabaseFile,
+  listOpenCodeSessionFilePaths,
+  loadOpenCodeSession,
+  OPENCODE_INDEX_VERSION,
+  parseOpenCodeSessionFilePath,
+} from '../parsers/opencode.js'
+import { decodePiSessionDirSlug, loadPiSession, PI_INDEX_VERSION } from '../parsers/pi.js'
 import { realFs } from '../projects/fs.js'
+import { computeIdentity } from '../projects/identity.js'
+import type { SessionSource } from '../types.js'
+import type { ParsedMessage, SyncResult } from '../types.js'
+import { getSessionRoots, isSessionFileForSource } from './source-paths.js'
 
 export interface SyncProgressEvent {
   phase: 'scanning' | 'syncing' | 'indexing' | 'done'
@@ -83,7 +85,11 @@ export class Syncer {
 
     for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
       for (const dir of getSessionRoots(source)) {
-        try { addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source)) } catch { /* dir may not exist */ }
+        try {
+          addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source))
+        } catch {
+          /* dir may not exist */
+        }
       }
     }
 
@@ -92,7 +98,7 @@ export class Syncer {
     const knownMtimes = getAllSessionMtimes(this.db)
     this.codexTitleIndex = loadCodexSessionIndex()
 
-    const pendingFiles = files.flatMap(f => {
+    const pendingFiles = files.flatMap((f) => {
       const existing = knownMtimes.get(f.path)
       try {
         const indexedMtime = getIndexedMtime(f.path, f.source)
@@ -133,7 +139,11 @@ export class Syncer {
           else if (result === 'updated') updated++
           else if (result === 'error') errors++
         }
-        this.onProgress?.({ phase: 'syncing', count: Math.min(i + BATCH, pendingFiles.length), total: pendingFiles.length })
+        this.onProgress?.({
+          phase: 'syncing',
+          count: Math.min(i + BATCH, pendingFiles.length),
+          total: pendingFiles.length,
+        })
       }
 
       this.applyCodexTitles()
@@ -236,9 +246,9 @@ export class Syncer {
    *  custom-title record landing while everything else stays the
    *  same). */
   private titleDiffersFromStored(sessionId: number, nextTitle: string): boolean {
-    const row = this.db
-      .prepare('SELECT title FROM sessions WHERE id = ?')
-      .get(sessionId) as { title: string | null } | undefined
+    const row = this.db.prepare('SELECT title FROM sessions WHERE id = ?').get(sessionId) as
+      | { title: string | null }
+      | undefined
     return (row?.title ?? '') !== nextTitle
   }
 
@@ -285,19 +295,21 @@ export class Syncer {
       // exists to re-derive content, but append-mode INSERT … DO NOTHING never
       // updates uuid-matched rows — a version-only mismatch must rewrite, or
       // the bump re-visits every file and changes nothing.
-      const versionChanged = existingMtime !== null
-        && existingMtime.includes('::')
-        && !existingMtime.endsWith(`::${getIndexVersion(source)}`)
+      const versionChanged =
+        existingMtime !== null &&
+        existingMtime.includes('::') &&
+        !existingMtime.endsWith(`::${getIndexVersion(source)}`)
 
-      const parseResult = source === 'claude'
-        ? loadClaudeSession(filePath)
-        : source === 'codex'
-          ? loadCodexSession(filePath)
-          : source === 'gemini'
-            ? loadGeminiSession(filePath)
-            : source === 'pi'
-              ? loadPiSession(filePath)
-              : loadOpenCodeSession(filePath)
+      const parseResult =
+        source === 'claude'
+          ? loadClaudeSession(filePath)
+          : source === 'codex'
+            ? loadCodexSession(filePath)
+            : source === 'gemini'
+              ? loadGeminiSession(filePath)
+              : source === 'pi'
+                ? loadPiSession(filePath)
+                : loadOpenCodeSession(filePath)
 
       if (parseResult.kind !== 'parsed') {
         // The "filtered" path normally removes a session whose source
@@ -309,10 +321,12 @@ export class Syncer {
         // certainly something the user wants to know about rather
         // than have happen silently.
         if (parseResult.kind === 'filtered' && existingMtime !== null && !force) {
-          this.db.prepare(`
+          this.db
+            .prepare(`
             INSERT INTO sync_log (source_id, file_path, status, message)
             VALUES (?, ?, 'ok', ?)
-          `).run(getSourceId(this.db, source), filePath, 'filtered from index')
+          `)
+            .run(getSourceId(this.db, source), filePath, 'filtered from index')
           deleteSessionByFilePath(this.db, filePath)
           return 'updated'
         }
@@ -326,7 +340,11 @@ export class Syncer {
       }
 
       const sourceId = getSourceId(this.db, source)
-      const { slug: rawSlug, displayPath, displayName } = resolveProject(filePath, source, parsed.cwd)
+      const {
+        slug: rawSlug,
+        displayPath,
+        displayName,
+      } = resolveProject(filePath, source, parsed.cwd)
       const identity = computeIdentity(
         parsed.cwd || null,
         realFs,
@@ -339,14 +357,16 @@ export class Syncer {
       // of accumulating one row per scratch dir.
       const slug = identity.kind === 'synthetic' ? identity.key : rawSlug
       const projectId = getOrCreateProject(
-        this.db, sourceId, slug,
+        this.db,
+        sourceId,
+        slug,
         identity.displayPath ?? displayPath,
         identity.displayName || displayName,
         { identityKind: identity.kind, identityKey: identity.key },
       )
 
       const isNew = existingMtime === null
-      const hasToolUse = parsed.messages.some(m => m.toolNames.length > 0)
+      const hasToolUse = parsed.messages.some((m) => m.toolNames.length > 0)
 
       // Classify the sync before we touch anything. The result decides
       // whether existing message rows survive (`append`) or get
@@ -356,26 +376,33 @@ export class Syncer {
       // Explicit force overrides classification — the user has
       // accepted that any per-message user-side state (Security Scan
       // purge, dismiss) on this session will be rebuilt from source.
-      const mode: UpsertSessionMode = force
-        ?? (versionChanged ? 'rewrite' : this.classifySync(parsed.sessionUuid, parsed.messages, source))
+      const mode: UpsertSessionMode =
+        force ??
+        (versionChanged
+          ? 'rewrite'
+          : this.classifySync(parsed.sessionUuid, parsed.messages, source))
 
       let committedSessionId: number | null = null
       let insertedCount = 0
       this.db.transaction(() => {
-        const sessionId = upsertSession(this.db, {
-          projectId,
-          sourceId,
-          sessionUuid: parsed.sessionUuid,
-          filePath,
-          title: parsed.title,
-          startedAt: parsed.startedAt,
-          endedAt: parsed.endedAt,
-          messageCount: parsed.messages.filter(m => !m.isSidechain).length,
-          hasToolUse,
-          cwd: parsed.cwd,
-          model: parsed.model,
-          rawFileMtime: mtime,
-        }, mode)
+        const sessionId = upsertSession(
+          this.db,
+          {
+            projectId,
+            sourceId,
+            sessionUuid: parsed.sessionUuid,
+            filePath,
+            title: parsed.title,
+            startedAt: parsed.startedAt,
+            endedAt: parsed.endedAt,
+            messageCount: parsed.messages.filter((m) => !m.isSidechain).length,
+            hasToolUse,
+            cwd: parsed.cwd,
+            model: parsed.model,
+            rawFileMtime: mtime,
+          },
+          mode,
+        )
 
         insertedCount = insertMessages(this.db, sessionId, sourceId, parsed.messages)
 
@@ -408,40 +435,56 @@ export class Syncer {
         // load-bearing UX win that lets purge / dismiss / star
         // survive across re-sync of an unchanged source file.
         if (contentChanged) {
-          this.db.prepare(
-            `UPDATE sessions SET scan_profile = NULL, scan_completed_at = NULL WHERE id = ?`,
-          ).run(sessionId)
+          this.db
+            .prepare(
+              `UPDATE sessions SET scan_profile = NULL, scan_completed_at = NULL WHERE id = ?`,
+            )
+            .run(sessionId)
         }
 
-        this.db.prepare(`
+        this.db
+          .prepare(`
           INSERT INTO sync_log (source_id, file_path, status)
           VALUES (?, ?, 'ok')
-        `).run(sourceId, filePath)
+        `)
+          .run(sourceId, filePath)
         committedSessionId = sessionId
       })()
 
       const contentChanged = mode === 'rewrite' || insertedCount > 0
       if (committedSessionId !== null && this.onSessionChanged && contentChanged) {
-        try { this.onSessionChanged(committedSessionId) } catch { /* swallow callback errors */ }
+        try {
+          this.onSessionChanged(committedSessionId)
+        } catch {
+          /* swallow callback errors */
+        }
       }
       return isNew ? 'added' : 'updated'
     } catch (err) {
       try {
-        const sourceRow = this.db
-          .prepare('SELECT id FROM sources WHERE name = ?')
-          .get(source) as { id: number } | undefined
+        const sourceRow = this.db.prepare('SELECT id FROM sources WHERE name = ?').get(source) as
+          | { id: number }
+          | undefined
         if (sourceRow) {
-          this.db.prepare(`
+          this.db
+            .prepare(`
             INSERT INTO sync_log (source_id, file_path, status, message)
             VALUES (?, ?, 'error', ?)
-          `).run(sourceRow.id, filePath, String(err))
+          `)
+            .run(sourceRow.id, filePath, String(err))
         }
-      } catch { /* ignore log errors */ }
+      } catch {
+        /* ignore log errors */
+      }
       return 'error'
     }
   }
 
-  private syncOpenCodeDatabase(dbPath: string, knownMtimes?: Map<string, string>, options?: SyncFileOptions): 'added' | 'updated' | 'skipped' | 'error' {
+  private syncOpenCodeDatabase(
+    dbPath: string,
+    knownMtimes?: Map<string, string>,
+    options?: SyncFileOptions,
+  ): 'added' | 'updated' | 'skipped' | 'error' {
     let changed = false
     let hadError = false
 
@@ -454,12 +497,16 @@ export class Syncer {
           .prepare('SELECT id FROM sources WHERE name = ?')
           .get('opencode') as { id: number } | undefined
         if (sourceRow) {
-          this.db.prepare(`
+          this.db
+            .prepare(`
             INSERT INTO sync_log (source_id, file_path, status, message)
             VALUES (?, ?, 'error', ?)
-          `).run(sourceRow.id, dbPath, String(err))
+          `)
+            .run(sourceRow.id, dbPath, String(err))
         }
-      } catch { /* ignore log errors */ }
+      } catch {
+        /* ignore log errors */
+      }
       return 'error'
     }
 
@@ -471,8 +518,8 @@ export class Syncer {
 
     const activePaths = new Set(sessionPaths)
     const stalePaths = listIndexedOpenCodeSessionPaths(this.db)
-      .filter(path => parseOpenCodeSessionFilePath(path)?.dbPath === dbPath)
-      .filter(path => !activePaths.has(path))
+      .filter((path) => parseOpenCodeSessionFilePath(path)?.dbPath === dbPath)
+      .filter((path) => !activePaths.has(path))
     for (const stalePath of stalePaths) {
       if (deleteSessionByFilePath(this.db, stalePath)) changed = true
     }
@@ -508,13 +555,15 @@ function cleanupStaleOpenCodeSessions(
 }
 
 function listIndexedOpenCodeSessionPaths(db: Database.Database): string[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     SELECT s.file_path AS filePath
     FROM sessions s
     JOIN sources src ON src.id = s.source_id
     WHERE src.name = 'opencode'
-  `).all() as Array<{ filePath: string }>
-  return rows.map(row => row.filePath)
+  `)
+    .all() as Array<{ filePath: string }>
+  return rows.map((row) => row.filePath)
 }
 
 function addUniqueFiles(
@@ -555,7 +604,7 @@ function collectSessionFiles(
   if (source === 'opencode') {
     const dbPath = join(dir, 'opencode.db')
     if (!existsSync(dbPath)) return []
-    return listOpenCodeSessionFilePaths(dbPath).map(path => ({ path, source }))
+    return listOpenCodeSessionFilePaths(dbPath).map((path) => ({ path, source }))
   }
 
   const results: Array<{ path: string; source: SessionSource }> = []
@@ -606,9 +655,13 @@ function loadCodexSessionIndex(): Map<string, string> {
       try {
         const rec = JSON.parse(line) as { id?: string; thread_name?: string }
         if (rec.id && rec.thread_name) titles.set(rec.id, rec.thread_name)
-      } catch { /* skip malformed lines */ }
+      } catch {
+        /* skip malformed lines */
+      }
     }
-  } catch { /* file may not exist */ }
+  } catch {
+    /* file may not exist */
+  }
   return titles
 }
 
@@ -654,8 +707,6 @@ function resolveProject(
   const displayPath = cwd || projectIdentifier
   const parts = displayPath.split('/').filter(Boolean)
   const displayName = parts[parts.length - 1] ?? projectIdentifier
-  const slug = cwd
-    ? displayPath.replace(/^\//, '').replace(/\//g, '-')
-    : projectIdentifier
+  const slug = cwd ? displayPath.replace(/^\//, '').replace(/\//g, '-') : projectIdentifier
   return { slug: slug || projectIdentifier, displayPath, displayName }
 }

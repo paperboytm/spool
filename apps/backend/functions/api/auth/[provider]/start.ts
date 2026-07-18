@@ -5,7 +5,6 @@
 
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { getProvider } from '../../../../src/auth/providers/registry'
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -13,6 +12,7 @@ import {
 } from '../../../../src/auth/cookie'
 import { safeNext } from '../../../../src/auth/next'
 import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
+import { getProvider } from '../../../../src/auth/providers/registry'
 import { publicBaseUrl } from '../../../../src/public-url'
 
 type Env = {

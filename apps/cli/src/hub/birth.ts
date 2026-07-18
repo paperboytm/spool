@@ -18,10 +18,7 @@ export interface BirthPayload {
   }
 }
 
-export function buildBirthText(
-  payload: BirthPayload,
-  cardJson: string | null,
-): string {
+export function buildBirthText(payload: BirthPayload, cardJson: string | null): string {
   const lines = [
     BIRTH_OPEN,
     'This session was resumed via Spool from a shared session. This note was',
@@ -29,7 +26,7 @@ export function buildBirthText(
     '',
     `Source: ${payload.source.url ?? payload.source.sid} (@${payload.source.position})`,
     '',
-    'Workspace card — the repo state last observed on the author\'s machine:',
+    "Workspace card — the repo state last observed on the author's machine:",
     cardJson ?? '(no workspace card: restore degrades to conversation-only)',
     '',
     'Hint for the agent: if the codebase above is not present in the current',

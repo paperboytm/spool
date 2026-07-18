@@ -1,11 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../../../src/audit'
+import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import type { HubEnv } from '../../../../../../src/hub/head'
 import { getHubSession, withdrawHubSession } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
-import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 
 // Tombstone, not deletion: the meta endpoint answers 410 immediately, the
 // body endpoints refuse, R2 objects stay put (account deletion is the

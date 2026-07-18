@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -14,7 +15,9 @@ test.afterAll(async () => {
 async function openPicker(): Promise<void> {
   await ctx.window.locator('[data-testid="sidebar-shares"]').click()
   await expect(
-    ctx.window.locator('[data-testid="shares-empty-start"], [data-testid="shares-draft-row"]').first(),
+    ctx.window
+      .locator('[data-testid="shares-empty-start"], [data-testid="shares-draft-row"]')
+      .first(),
   ).toBeVisible({ timeout: 5000 })
   const empty = ctx.window.locator('[data-testid="shares-empty-start"]')
   const plus = ctx.window.locator('[data-testid="shares-new-draft"]')
@@ -23,7 +26,9 @@ async function openPicker(): Promise<void> {
   } else {
     await plus.click()
   }
-  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({ timeout: 5000 })
+  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({
+    timeout: 5000,
+  })
 }
 
 async function closePicker(): Promise<void> {
@@ -94,7 +99,9 @@ test('outside click closes popover but not the modal', async () => {
   // Click somewhere inside the picker but outside the popover (the search
   // input strip is a safe target — clicking it doesn't fire a session pick).
   await ctx.window.locator('[data-testid="new-draft-picker"] input[type="text"]').first().click()
-  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-popover"]')).toBeHidden({ timeout: 2000 })
+  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-popover"]')).toBeHidden({
+    timeout: 2000,
+  })
   await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible()
   await closePicker()
 })
@@ -105,14 +112,20 @@ test('selecting a project scopes the picker and hides row breadcrumbs', async ()
   const popover = ctx.window.locator('[data-testid="new-draft-picker-scope-popover"]')
   await expect(popover).toBeVisible()
   // First non-"Any project" option corresponds to a real project group.
-  const projectOption = popover.locator('[data-testid="new-draft-picker-scope-option"][data-identity-key]:not([data-identity-key=""])').first()
+  const projectOption = popover
+    .locator(
+      '[data-testid="new-draft-picker-scope-option"][data-identity-key]:not([data-identity-key=""])',
+    )
+    .first()
   await expect(projectOption).toBeVisible()
   const projectName = (await projectOption.locator('span').first().textContent())?.trim() ?? ''
   await projectOption.click()
   await expect(popover).toBeHidden({ timeout: 2000 })
 
   // Chip now reflects the scoped project and a clear button appears.
-  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')).toContainText(projectName)
+  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')).toContainText(
+    projectName,
+  )
   await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-clear"]')).toBeVisible()
 
   // Row breadcrumb suffix is suppressed under scope (project name would be
@@ -123,7 +136,9 @@ test('selecting a project scopes the picker and hides row breadcrumbs', async ()
 
   // Clear scope; chip returns to default.
   await ctx.window.locator('[data-testid="new-draft-picker-scope-clear"]').click()
-  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')).toContainText(/Any project/i)
+  await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-trigger"]')).toContainText(
+    /Any project/i,
+  )
   await expect(ctx.window.locator('[data-testid="new-draft-picker-scope-clear"]')).toHaveCount(0)
   await closePicker()
 })

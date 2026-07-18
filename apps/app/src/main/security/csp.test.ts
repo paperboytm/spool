@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { __cspFixtures, buildCsp, buildPfInferenceCsp, isPfInferenceDocument } from './csp.js'
 
@@ -161,7 +161,8 @@ describe('Renderer CSP policy', () => {
     it('prod keeps the canonical spool.pro family alongside the override', () => {
       // Published-share URLs and avatar links keep pointing at
       // spool.pro even when the API origin is overridden.
-      const connect = directives(buildCsp({ dev: false, backendOrigin: origin })).get('connect-src') ?? []
+      const connect =
+        directives(buildCsp({ dev: false, backendOrigin: origin })).get('connect-src') ?? []
       expect(connect).toContain('https://spool.pro')
       expect(connect).toContain('https://*.spool.pro')
     })
@@ -191,9 +192,17 @@ describe('Renderer CSP policy', () => {
 
   describe('Privacy Filter inference document', () => {
     it('selects only the dedicated inference HTML entry', () => {
-      expect(isPfInferenceDocument('file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/pf-inference.html')).toBe(true)
+      expect(
+        isPfInferenceDocument(
+          'file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/pf-inference.html',
+        ),
+      ).toBe(true)
       expect(isPfInferenceDocument('http://localhost:5173/pf-inference.html')).toBe(true)
-      expect(isPfInferenceDocument('file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/index.html')).toBe(false)
+      expect(
+        isPfInferenceDocument(
+          'file:///Applications/Spool.app/Contents/Resources/app.asar/out/renderer/index.html',
+        ),
+      ).toBe(false)
     })
 
     it('allows the local model protocol and WASM execution', () => {
@@ -208,7 +217,9 @@ describe('Renderer CSP policy', () => {
     it('keeps production inference offline except for local schemes', () => {
       const connect = directives(buildPfInferenceCsp({ dev: false })).get('connect-src') ?? []
       expect(connect).toEqual(["'self'", 'pf-model:', 'blob:'])
-      expect(connect.every(source => !source.startsWith('http') && !source.startsWith('ws'))).toBe(true)
+      expect(
+        connect.every((source) => !source.startsWith('http') && !source.startsWith('ws')),
+      ).toBe(true)
     })
   })
 })

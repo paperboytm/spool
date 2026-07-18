@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import {
-  Avatar,
-  Footer,
-  Header,
-  Page,
-} from '../components/Chrome'
+import { Avatar, Footer, Header, Page } from '../components/Chrome'
 import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
 import { humanDate } from '../lib/dates'
 import { normalizeTabTitle } from '../lib/page-title'
@@ -106,9 +101,7 @@ export function Profile({ handle }: { handle: string }) {
           <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
           <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
             Published
-            {profile.shares.length > 0 && (
-              <span className="count">{profile.shares.length}</span>
-            )}
+            {profile.shares.length > 0 && <span className="count">{profile.shares.length}</span>}
           </h2>
           {profile.shares.length === 0 ? (
             <p className="sw-empty">Nothing published yet.</p>
@@ -116,10 +109,7 @@ export function Profile({ handle }: { handle: string }) {
             <ul className="sw-list">
               {profile.shares.map((s) => (
                 <li key={s.id} className="sw-share">
-                  <a
-                    className="sw-share-link"
-                    href={`/s/${encodeURIComponent(s.id)}`}
-                  >
+                  <a className="sw-share-link" href={`/s/${encodeURIComponent(s.id)}`}>
                     <span className="sw-share-title" title={s.title}>
                       {s.title}
                     </span>

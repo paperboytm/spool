@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, type AppContext } from './helpers/launch'
 
 // Security IPC handlers are registered inside `bootScanWorker().then(...)`
@@ -7,16 +8,21 @@ import { launchApp, type AppContext } from './helpers/launch'
 // registerSecurityIpc has finished — any handler being available
 // implies all of them are.
 async function waitForSecurityIpc(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<unknown> } } }).spool?.security
-    if (!api) return false
-    try {
-      await api.getScanStatus()
-      return true
-    } catch {
-      return false
-    }
-  }, { timeout: 30_000, polling: 100 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as { spool?: { security?: { getScanStatus: () => Promise<unknown> } } }
+      ).spool?.security
+      if (!api) return false
+      try {
+        await api.getScanStatus()
+        return true
+      } catch {
+        return false
+      }
+    },
+    { timeout: 30_000, polling: 100 },
+  )
 }
 
 // PF download card surface coverage (PR 5e):
@@ -40,7 +46,9 @@ test.beforeAll(async () => {
   ctx = await launchApp({})
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function openSecurityTab(window: AppContext['window']) {
   await window.locator('[data-testid="settings-button"]').click()
@@ -49,7 +57,9 @@ async function openSecurityTab(window: AppContext['window']) {
     .locator('[data-testid="settings-panel"] [aria-pressed]')
     .filter({ hasText: /Security|安全|セキュリティ|보안|Sécurité|Sicherheit/ })
     .click()
-  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({
+    timeout: 10_000,
+  })
 }
 
 // Surface-shape + state-machine wiring in one launch.

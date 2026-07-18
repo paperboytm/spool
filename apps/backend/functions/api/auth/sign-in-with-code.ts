@@ -10,9 +10,9 @@
 
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
-import { createSession } from '../../../src/auth/session'
-import { getProvider } from '../../../src/auth/providers/registry'
 import { audit } from '../../../src/audit'
+import { getProvider } from '../../../src/auth/providers/registry'
+import { createSession } from '../../../src/auth/session'
 import { ApiError, jsonError } from '../../../src/errors'
 import { checkRate } from '../../../src/rate-limit'
 import { clientIp } from '../../../src/request'

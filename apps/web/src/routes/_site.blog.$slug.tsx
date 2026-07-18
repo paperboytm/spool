@@ -16,9 +16,7 @@ export const Route = createFileRoute('/_site/blog/$slug')({
     return {
       meta: [
         { title: `${title} | Spool` },
-        ...(typeof description === 'string'
-          ? [{ name: 'description', content: description }]
-          : []),
+        ...(typeof description === 'string' ? [{ name: 'description', content: description }] : []),
         { property: 'og:type', content: 'article' },
         { property: 'og:title', content: title },
         ...(typeof description === 'string'

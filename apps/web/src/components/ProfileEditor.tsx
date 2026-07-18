@@ -4,12 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import {
-  deleteAvatar,
-  type MeResponse,
-  updateDisplayName,
-  uploadAvatar,
-} from '../lib/api'
+import { deleteAvatar, type MeResponse, updateDisplayName, uploadAvatar } from '../lib/api'
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 const ACCEPT_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])

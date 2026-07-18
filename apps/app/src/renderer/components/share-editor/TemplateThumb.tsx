@@ -42,7 +42,9 @@ export function TemplateThumb({ id, accent, paper, border, text, muted, surface 
         />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {bar('70%', 0.8)}
-          {Array.from({ length: lines }).map((_, idx) => bar(idx === lines - 1 ? '60%' : '95%', 0.5))}
+          {Array.from({ length: lines }).map((_, idx) =>
+            bar(idx === lines - 1 ? '60%' : '95%', 0.5),
+          )}
         </div>
       </div>
     )

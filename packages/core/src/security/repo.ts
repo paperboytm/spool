@@ -10,13 +10,10 @@
 // share-kit-aligned `hashValueForRedactExclude` so identity matches
 // across surfaces (share editor's exclude list, security allowlists).
 
-import type Database from 'better-sqlite3'
 import type { SensitiveKind } from '@spool-lab/redact'
-import {
-  HIGH_SEVERITY_KINDS,
-  INFO_SEVERITY_KINDS,
-  severityOf,
-} from '@spool-lab/redact'
+import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, severityOf } from '@spool-lab/redact'
+import type Database from 'better-sqlite3'
+
 import type {
   FindingRow,
   FindingState,
@@ -189,22 +186,25 @@ export const deleteActiveFindings = deleteRefreshableFindings
  *  because their pattern-only signal has too high a false-positive
  *  rate to be meaningful at first glance. */
 export function updateSessionCounts(db: Database.Database, sessionId: number): void {
-  const active = db.prepare(
-    `SELECT
+  const active = db
+    .prepare(
+      `SELECT
         SUM(CASE WHEN kind NOT IN (${infoKindsPlaceholders()}) THEN 1 ELSE 0 END) AS total,
         SUM(CASE WHEN kind IN (${highKindsPlaceholders()}) THEN 1 ELSE 0 END) AS high
      FROM findings
      WHERE session_id = ? AND state = 'active'`,
-  ).get(
-    ...INFO_SEVERITY_KINDS_ARRAY,
-    ...HIGH_SEVERITY_KINDS_ARRAY,
-    sessionId,
-  ) as { total: number | null; high: number | null }
-  const purged = db.prepare(
-    `SELECT COUNT(*) AS c
+    )
+    .get(...INFO_SEVERITY_KINDS_ARRAY, ...HIGH_SEVERITY_KINDS_ARRAY, sessionId) as {
+    total: number | null
+    high: number | null
+  }
+  const purged = db
+    .prepare(
+      `SELECT COUNT(*) AS c
        FROM findings
       WHERE session_id = ? AND state = 'purged'`,
-  ).get(sessionId) as { c: number }
+    )
+    .get(sessionId) as { c: number }
   db.prepare(
     `UPDATE sessions
         SET scan_finding_count = ?,
@@ -256,15 +256,14 @@ export function invalidateSessionScanProfile(db: Database.Database, sessionId: n
 
 /** Sessions whose stored profile doesn't structurally match
  *  `currentProfile`. Used at boot for backfill enqueue. */
-export function listSessionsNeedingScan(
-  db: Database.Database,
-  currentProfile: string,
-): number[] {
-  const rows = db.prepare(
-    `SELECT id, scan_profile
+export function listSessionsNeedingScan(db: Database.Database, currentProfile: string): number[] {
+  const rows = db
+    .prepare(
+      `SELECT id, scan_profile
        FROM sessions
       ORDER BY started_at DESC`,
-  ).all() as Array<{ id: number; scan_profile: string | null }>
+    )
+    .all() as Array<{ id: number; scan_profile: string | null }>
   const out: number[] = []
   for (const r of rows) {
     if (r.scan_profile === null || r.scan_profile !== currentProfile) {
@@ -308,8 +307,11 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
   // Skip info-tier kinds unless the caller is explicitly asking for
   // one. Saves the renderer from paging through 800+ absolute-path
   // findings before reaching the api-key that actually matters.
-  const explicitKindsInclude = (kinds: readonly SensitiveKind[] | undefined, kind: SensitiveKind | undefined): boolean => {
-    if (kinds && kinds.length > 0) return kinds.some(k => INFO_SEVERITY_KINDS.has(k))
+  const explicitKindsInclude = (
+    kinds: readonly SensitiveKind[] | undefined,
+    kind: SensitiveKind | undefined,
+  ): boolean => {
+    if (kinds && kinds.length > 0) return kinds.some((k) => INFO_SEVERITY_KINDS.has(k))
     if (kind !== undefined) return INFO_SEVERITY_KINDS.has(kind)
     return false
   }
@@ -330,21 +332,15 @@ export function listFindings(db: Database.Database, filter: FindingFilter): Find
 }
 
 /** limit+1 peek to set `hasMore` without an extra COUNT round-trip. */
-function paginate<F extends { limit?: number }, R>(
-  filter: F,
-  fetch: (f: F) => R[],
-): Page<R> {
+function paginate<F extends { limit?: number }, R>(filter: F, fetch: (f: F) => R[]): Page<R> {
   if (filter.limit === undefined) return { rows: fetch(filter), hasMore: false }
   const peeked = fetch({ ...filter, limit: filter.limit + 1 })
   const hasMore = peeked.length > filter.limit
   return { rows: hasMore ? peeked.slice(0, filter.limit) : peeked, hasMore }
 }
 
-export function listFindingsPage(
-  db: Database.Database,
-  filter: FindingFilter,
-): Page<FindingRow> {
-  return paginate(filter, f => listFindings(db, f))
+export function listFindingsPage(db: Database.Database, filter: FindingFilter): Page<FindingRow> {
+  return paginate(filter, (f) => listFindings(db, f))
 }
 
 /** Shared WHERE-clause builder for the session-findings join. Used by
@@ -355,16 +351,17 @@ function buildSessionFindingWhereSql(filter: SessionFindingFilter): {
   params: unknown[]
 } {
   const params: unknown[] = []
-  const stateCondition = filter.state && filter.state !== 'any'
-    ? 'f.state = ?'
-    : "f.state = 'active'"
+  const stateCondition =
+    filter.state && filter.state !== 'any' ? 'f.state = ?' : "f.state = 'active'"
   if (filter.state && filter.state !== 'any') params.push(filter.state)
 
   let kindCondition = ''
   const explicitKinds: readonly string[] | undefined =
     filter.kinds && filter.kinds.length > 0
       ? filter.kinds
-      : filter.kind !== undefined ? [filter.kind] : undefined
+      : filter.kind !== undefined
+        ? [filter.kind]
+        : undefined
   if (explicitKinds) {
     const placeholders = explicitKinds.map(() => '?').join(',')
     kindCondition = `AND f.kind IN (${placeholders})`
@@ -457,7 +454,7 @@ export function listSessionsWithFindings(
     finding_count: number
     high_count: number | null
   }>
-  return rows.map(r => ({
+  return rows.map((r) => ({
     id: r.id,
     sessionUuid: r.session_uuid,
     title: r.title,
@@ -478,7 +475,7 @@ export function listSessionsWithFindingsPage(
   db: Database.Database,
   filter: SessionFindingFilter,
 ): Page<SessionWithFindingCounts> {
-  return paginate(filter, f => listSessionsWithFindings(db, f))
+  return paginate(filter, (f) => listSessionsWithFindings(db, f))
 }
 
 /** Total distinct sessions matching the same filter as
@@ -505,16 +502,18 @@ export function countSessionsWithFindings(
 /** Risk by category — one row per kind that has ≥ 1 active finding.
  *  Drives the Watchtower-style panel on the Security page. */
 export function riskByCategory(db: Database.Database): RiskByCategoryRow[] {
-  const rows = db.prepare(
-    `SELECT kind,
+  const rows = db
+    .prepare(
+      `SELECT kind,
             COUNT(*) AS count,
             COUNT(DISTINCT session_id) AS sessions
        FROM findings
       WHERE state = 'active'
       GROUP BY kind
       ORDER BY count DESC`,
-  ).all() as Array<{ kind: string; count: number; sessions: number }>
-  return rows.map(r => ({
+    )
+    .all() as Array<{ kind: string; count: number; sessions: number }>
+  return rows.map((r) => ({
     kind: r.kind as SensitiveKind,
     severity: severityOf(r.kind as SensitiveKind),
     count: r.count,
@@ -537,8 +536,9 @@ export function occurrencesByValueHash(
   kind: SensitiveKind,
   valueHash: string,
 ): OccurrenceBySession[] {
-  const rows = db.prepare(
-    `SELECT
+  const rows = db
+    .prepare(
+      `SELECT
         s.id            AS session_id,
         s.session_uuid  AS session_uuid,
         s.title         AS session_title,
@@ -553,7 +553,8 @@ export function occurrencesByValueHash(
       WHERE f.kind = ? AND f.value_hash = ? AND f.state = 'active'
       GROUP BY s.id
       ORDER BY last_seen DESC, s.id DESC`,
-  ).all(kind, valueHash) as Array<{
+    )
+    .all(kind, valueHash) as Array<{
     session_id: number
     session_uuid: string
     session_title: string | null
@@ -562,7 +563,7 @@ export function occurrencesByValueHash(
     count: number
     last_seen: string
   }>
-  return rows.map(r => ({
+  return rows.map((r) => ({
     sessionId: r.session_id,
     sessionUuid: r.session_uuid,
     sessionTitle: r.session_title,
@@ -581,11 +582,13 @@ export function occurrencesByValueHash(
  *  the label could read older than the true last scan. Returns null
  *  when nothing has been scanned yet. */
 export function lastScanCompletedAt(db: Database.Database): string | null {
-  const row = db.prepare(
-    `SELECT MAX(scan_completed_at) AS last
+  const row = db
+    .prepare(
+      `SELECT MAX(scan_completed_at) AS last
        FROM sessions
       WHERE scan_completed_at IS NOT NULL`,
-  ).get() as { last: string | null }
+    )
+    .get() as { last: string | null }
   return row.last
 }
 
@@ -594,12 +597,14 @@ export function lastScanCompletedAt(db: Database.Database): string | null {
  *  no longer points at a valid message (race against session
  *  deletion) or has been purged (offsets now point at the mask). */
 export function getFindingValue(db: Database.Database, findingId: number): string | null {
-  const row = db.prepare(
-    `SELECT f.start_offset, f.end_offset, f.state, m.content_text
+  const row = db
+    .prepare(
+      `SELECT f.start_offset, f.end_offset, f.state, m.content_text
        FROM findings f
        LEFT JOIN messages m ON m.id = f.message_id
       WHERE f.id = ?`,
-  ).get(findingId) as
+    )
+    .get(findingId) as
     | { start_offset: number; end_offset: number; state: FindingState; content_text: string | null }
     | undefined
   if (!row || row.content_text === null) return null
@@ -617,12 +622,14 @@ export function getFindingValues(
   const out: Record<number, string | null> = {}
   if (findingIds.length === 0) return out
   const placeholders = findingIds.map(() => '?').join(',')
-  const rows = db.prepare(
-    `SELECT f.id, f.start_offset, f.end_offset, f.state, m.content_text
+  const rows = db
+    .prepare(
+      `SELECT f.id, f.start_offset, f.end_offset, f.state, m.content_text
        FROM findings f
        LEFT JOIN messages m ON m.id = f.message_id
       WHERE f.id IN (${placeholders})`,
-  ).all(...findingIds) as Array<{
+    )
+    .all(...findingIds) as Array<{
     id: number
     start_offset: number
     end_offset: number
@@ -655,15 +662,16 @@ export interface AllowlistSnapshot {
 const allowKey = (kind: string, hash: string) => `${kind}|${hash}`
 
 export function getAllowlists(db: Database.Database, sessionId: number): AllowlistSnapshot {
-  const sessionRows = db.prepare(
-    'SELECT kind, value_hash FROM allowlist_session WHERE session_id = ?',
-  ).all(sessionId) as Array<{ kind: string; value_hash: string }>
-  const globalRows = db.prepare(
-    'SELECT kind, value_hash FROM allowlist_global',
-  ).all() as Array<{ kind: string; value_hash: string }>
+  const sessionRows = db
+    .prepare('SELECT kind, value_hash FROM allowlist_session WHERE session_id = ?')
+    .all(sessionId) as Array<{ kind: string; value_hash: string }>
+  const globalRows = db.prepare('SELECT kind, value_hash FROM allowlist_global').all() as Array<{
+    kind: string
+    value_hash: string
+  }>
   return {
-    session: new Set(sessionRows.map(r => allowKey(r.kind, r.value_hash))),
-    global: new Set(globalRows.map(r => allowKey(r.kind, r.value_hash))),
+    session: new Set(sessionRows.map((r) => allowKey(r.kind, r.value_hash))),
+    global: new Set(globalRows.map((r) => allowKey(r.kind, r.value_hash))),
   }
 }
 
@@ -716,9 +724,7 @@ export function removeAllowlistGlobal(
   kind: SensitiveKind,
   valueHash: string,
 ): void {
-  db.prepare(
-    `DELETE FROM allowlist_global WHERE kind = ? AND value_hash = ?`,
-  ).run(kind, valueHash)
+  db.prepare(`DELETE FROM allowlist_global WHERE kind = ? AND value_hash = ?`).run(kind, valueHash)
 }
 
 export interface AllowlistEntryRow {
@@ -745,8 +751,9 @@ export interface AllowlistEntryRow {
  *  finding's message text — the same plaintext the findings view
  *  shows (blurred). Nothing is persisted on the allowlist row. */
 export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[] {
-  const sessionRows = db.prepare(
-    `SELECT a.session_id     AS session_id,
+  const sessionRows = db
+    .prepare(
+      `SELECT a.session_id     AS session_id,
             a.kind          AS kind,
             a.value_hash    AS value_hash,
             a.created_at    AS created_at,
@@ -755,7 +762,8 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
        FROM allowlist_session a
        JOIN sessions s ON s.id = a.session_id
       ORDER BY a.created_at DESC`,
-  ).all() as Array<{
+    )
+    .all() as Array<{
     session_id: number
     kind: string
     value_hash: string
@@ -763,11 +771,13 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
     session_uuid: string
     session_title: string | null
   }>
-  const globalRows = db.prepare(
-    `SELECT kind, value_hash, created_at
+  const globalRows = db
+    .prepare(
+      `SELECT kind, value_hash, created_at
        FROM allowlist_global
       ORDER BY created_at DESC`,
-  ).all() as Array<{
+    )
+    .all() as Array<{
     kind: string
     value_hash: string
     created_at: string
@@ -794,24 +804,35 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
   )
 
   return [
-    ...globalRows.map((r): AllowlistEntryRow => ({
-      scope: 'global',
-      kind: r.kind as SensitiveKind,
-      valueHash: r.value_hash,
-      createdAt: r.created_at,
-      sessionUuid: null,
-      sessionTitle: null,
-      value: (globalValueStmt.get(r.kind, r.value_hash) as { value: string | null } | undefined)?.value ?? null,
-    })),
-    ...sessionRows.map((r): AllowlistEntryRow => ({
-      scope: 'session',
-      kind: r.kind as SensitiveKind,
-      valueHash: r.value_hash,
-      createdAt: r.created_at,
-      sessionUuid: r.session_uuid,
-      sessionTitle: r.session_title,
-      value: (sessionValueStmt.get(r.session_id, r.kind, r.value_hash) as { value: string | null } | undefined)?.value ?? null,
-    })),
+    ...globalRows.map(
+      (r): AllowlistEntryRow => ({
+        scope: 'global',
+        kind: r.kind as SensitiveKind,
+        valueHash: r.value_hash,
+        createdAt: r.created_at,
+        sessionUuid: null,
+        sessionTitle: null,
+        value:
+          (globalValueStmt.get(r.kind, r.value_hash) as { value: string | null } | undefined)
+            ?.value ?? null,
+      }),
+    ),
+    ...sessionRows.map(
+      (r): AllowlistEntryRow => ({
+        scope: 'session',
+        kind: r.kind as SensitiveKind,
+        valueHash: r.value_hash,
+        createdAt: r.created_at,
+        sessionUuid: r.session_uuid,
+        sessionTitle: r.session_title,
+        value:
+          (
+            sessionValueStmt.get(r.session_id, r.kind, r.value_hash) as
+              | { value: string | null }
+              | undefined
+          )?.value ?? null,
+      }),
+    ),
   ]
 }
 
@@ -819,12 +840,8 @@ export function listAllowlistEntries(db: Database.Database): AllowlistEntryRow[]
  *  two `SELECT COUNT(*)` summed, no per-row value reconstruction.
  *  Use this instead of `listAllowlistEntries().length` for counts. */
 export function countAllowlistEntries(db: Database.Database): number {
-  const session = db.prepare(
-    'SELECT COUNT(*) AS c FROM allowlist_session',
-  ).get() as { c: number }
-  const global = db.prepare(
-    'SELECT COUNT(*) AS c FROM allowlist_global',
-  ).get() as { c: number }
+  const session = db.prepare('SELECT COUNT(*) AS c FROM allowlist_session').get() as { c: number }
+  const global = db.prepare('SELECT COUNT(*) AS c FROM allowlist_global').get() as { c: number }
   return session.c + global.c
 }
 
@@ -839,11 +856,9 @@ export function dismissFinding(
   scope: 'session' | 'global',
   recomputeCounts = true,
 ): number | null {
-  const f = db.prepare(
-    `SELECT session_id, kind, value_hash FROM findings WHERE id = ?`,
-  ).get(findingId) as
-    | { session_id: number; kind: string; value_hash: string }
-    | undefined
+  const f = db
+    .prepare(`SELECT session_id, kind, value_hash FROM findings WHERE id = ?`)
+    .get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
   if (!f) return null
   db.prepare(
     `UPDATE findings
@@ -894,9 +909,9 @@ export function dismissFindings(
 /** Re-activate a dismissed finding and remove the allowlist entry
  *  that pinned it (both scopes, since UI doesn't always know which). */
 export function undismissFinding(db: Database.Database, findingId: number): number | null {
-  const f = db.prepare(
-    'SELECT session_id, kind, value_hash FROM findings WHERE id = ?',
-  ).get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
+  const f = db
+    .prepare('SELECT session_id, kind, value_hash FROM findings WHERE id = ?')
+    .get(findingId) as { session_id: number; kind: string; value_hash: string } | undefined
   if (!f) return null
   db.prepare(
     `UPDATE findings

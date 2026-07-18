@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest'
 import { homedir } from 'node:os'
+
+import { describe, it, expect } from 'vite-plus/test'
+
+import type { IdentitySynthesizer } from './identity-synthesizers.js'
 import { computeIdentity, normalizeGitRemote } from './identity.js'
 import type { WorktreeUpstreamResolver } from './worktree-resolvers.js'
-import type { IdentitySynthesizer } from './identity-synthesizers.js'
 
 const noFs = {
   exists: () => false,
@@ -17,12 +19,11 @@ const noSynthesizers: IdentitySynthesizer[] = []
 
 describe('normalizeGitRemote', () => {
   it('strips .git and lowercases host', () => {
-    expect(normalizeGitRemote('git@github.com:Foo/Bar.git'))
-      .toBe('github.com/foo/bar')
-    expect(normalizeGitRemote('https://GitHub.com/foo/bar'))
-      .toBe('github.com/foo/bar')
-    expect(normalizeGitRemote('https://user:pass@github.com/foo/bar.git'))
-      .toBe('github.com/foo/bar')
+    expect(normalizeGitRemote('git@github.com:Foo/Bar.git')).toBe('github.com/foo/bar')
+    expect(normalizeGitRemote('https://GitHub.com/foo/bar')).toBe('github.com/foo/bar')
+    expect(normalizeGitRemote('https://user:pass@github.com/foo/bar.git')).toBe(
+      'github.com/foo/bar',
+    )
   })
   it('returns null for unparseable input', () => {
     expect(normalizeGitRemote('')).toBeNull()
@@ -56,7 +57,9 @@ describe('computeIdentity', () => {
     const home = homedir()
     expect(computeIdentity(home, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
     expect(computeIdentity(`${home}/Desktop`, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
-    expect(computeIdentity(`${home}/Downloads`, noFs, noResolvers, noSynthesizers).kind).toBe('loose')
+    expect(computeIdentity(`${home}/Downloads`, noFs, noResolvers, noSynthesizers).kind).toBe(
+      'loose',
+    )
     expect(computeIdentity('/tmp', noFs, noResolvers, noSynthesizers).kind).toBe('loose')
   })
 
@@ -82,8 +85,7 @@ describe('computeIdentity', () => {
       exists: (p: string) => p.endsWith('/.git'),
       readText: () => null,
       spawn: (cmd: string, args: string[]) => {
-        if (args.includes('remote.origin.url'))
-          return { stdout: '', exitCode: 1 }
+        if (args.includes('remote.origin.url')) return { stdout: '', exitCode: 1 }
         if (args.includes('--git-common-dir'))
           return { stdout: '/Users/chen/local-only/.git\n', exitCode: 0 }
         return { stdout: '', exitCode: 1 }
@@ -97,8 +99,7 @@ describe('computeIdentity', () => {
   it('falls back to manifest dir when no git', () => {
     const fs = {
       exists: (p: string) => p === '/Users/chen/proj/package.json',
-      readText: (p: string) =>
-        p.endsWith('package.json') ? '{"name":"my-proj"}' : null,
+      readText: (p: string) => (p.endsWith('package.json') ? '{"name":"my-proj"}' : null),
       spawn: () => ({ stdout: '', exitCode: 1 }),
     }
     const id = computeIdentity('/Users/chen/proj/src', fs, noResolvers, noSynthesizers)
@@ -136,7 +137,7 @@ describe('computeIdentity', () => {
     }
     const resolver: WorktreeUpstreamResolver = {
       name: 'fake',
-      resolve: (cwd) => cwd === '/wt/proj/branch' ? '/repos/proj' : null,
+      resolve: (cwd) => (cwd === '/wt/proj/branch' ? '/repos/proj' : null),
     }
     const id = computeIdentity('/wt/proj/branch', fs, [resolver], noSynthesizers)
     expect(id.kind).toBe('git_remote')
@@ -174,7 +175,10 @@ describe('computeIdentity', () => {
     let resolverCalled = false
     const resolver: WorktreeUpstreamResolver = {
       name: 'fake',
-      resolve: () => { resolverCalled = true; return '/elsewhere' },
+      resolve: () => {
+        resolverCalled = true
+        return '/elsewhere'
+      },
     }
     const id = computeIdentity('/Users/me/repo', fs, [resolver], noSynthesizers)
     expect(id.kind).toBe('git_remote')
@@ -186,24 +190,21 @@ describe('computeIdentity', () => {
       exists: (p: string) => p.endsWith('/.git'),
       readText: () => null,
       spawn: (cmd: string, args: string[]) => {
-        if (args.includes('remote.origin.url'))
-          return { stdout: '', exitCode: 1 }
-        if (args.includes('--git-common-dir'))
-          return { stdout: '../shared.git\n', exitCode: 0 }   // relative
+        if (args.includes('remote.origin.url')) return { stdout: '', exitCode: 1 }
+        if (args.includes('--git-common-dir')) return { stdout: '../shared.git\n', exitCode: 0 } // relative
         return { stdout: '', exitCode: 1 }
       },
     }
     const id = computeIdentity('/Users/chen/Code/spool-wt', fs, noResolvers, noSynthesizers)
     expect(id.kind).toBe('git_common_dir')
-    expect(id.key).toBe('/Users/chen/Code/shared.git')   // resolved up one level
+    expect(id.key).toBe('/Users/chen/Code/shared.git') // resolved up one level
   })
 
   it('runs synthesizers after worktree resolvers, before path fallback', () => {
     const synth: IdentitySynthesizer = {
       name: 'fake',
-      synthesize: (cwd) => cwd === '/scratch/x'
-        ? { kind: 'synthetic', key: 'fake:x', displayName: 'Fake' }
-        : null,
+      synthesize: (cwd) =>
+        cwd === '/scratch/x' ? { kind: 'synthetic', key: 'fake:x', displayName: 'Fake' } : null,
     }
     const id = computeIdentity('/scratch/x', noFs, noResolvers, [synth])
     expect(id.kind).toBe('synthetic')

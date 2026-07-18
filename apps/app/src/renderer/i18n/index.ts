@@ -1,12 +1,13 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
+
+import de from './locales/de.json'
 import en from './locales/en.json'
-import zhCN from './locales/zh-CN.json'
-import zhTW from './locales/zh-TW.json'
+import fr from './locales/fr.json'
 import ja from './locales/ja.json'
 import ko from './locales/ko.json'
-import de from './locales/de.json'
-import fr from './locales/fr.json'
+import zhCN from './locales/zh-CN.json'
+import zhTW from './locales/zh-TW.json'
 
 export type SupportedLocale = 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'
 export type LanguagePreference = 'system' | SupportedLocale
@@ -23,15 +24,28 @@ const STORAGE_KEY = 'spool:lang-cache'
 function readCachedLocale(): SupportedLocale | null {
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    if (v === 'en' || v === 'zh-CN' || v === 'zh-TW' || v === 'ja' || v === 'ko' || v === 'de' || v === 'fr') return v
-  } catch { /* localStorage disabled — ignore */ }
+    if (
+      v === 'en' ||
+      v === 'zh-CN' ||
+      v === 'zh-TW' ||
+      v === 'ja' ||
+      v === 'ko' ||
+      v === 'de' ||
+      v === 'fr'
+    )
+      return v
+  } catch {
+    /* localStorage disabled — ignore */
+  }
   return null
 }
 
 function writeCachedLocale(locale: SupportedLocale): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, locale)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 // Initial language: cached value if available, else en. The renderer will

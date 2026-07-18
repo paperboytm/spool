@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
-import type { Session, SessionSource } from '../types.js'
+
 import { SESSION_SELECT, rowToSession } from '../db/queries.js'
+import type { Session, SessionSource } from '../types.js'
 
 export type ProjectSessionSortOrder = 'recent' | 'oldest' | 'most_messages' | 'title'
 
@@ -112,20 +113,26 @@ export function listProjectDirectoryCounts(
     GROUP BY cwd
     ORDER BY MAX(s.started_at) DESC
   `
-  const rows = db.prepare(sql).all(...params) as Array<{ cwd: string; cnt: number; last_at: string }>
-  return rows.map(r => ({ cwd: r.cwd, sessionCount: r.cnt, lastSessionAt: r.last_at }))
+  const rows = db.prepare(sql).all(...params) as Array<{
+    cwd: string
+    cnt: number
+    last_at: string
+  }>
+  return rows.map((r) => ({ cwd: r.cwd, sessionCount: r.cnt, lastSessionAt: r.last_at }))
 }
 
 export function listPinnedSessionsByIdentity(
   db: Database.Database,
   identityKey: string,
 ): Session[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     ${SESSION_SELECT}
     JOIN pins ON pins.session_uuid = s.session_uuid
     WHERE p.identity_key = ? AND s.message_count > 0
     ORDER BY pins.pinned_at DESC
-  `).all(identityKey) as Array<Record<string, unknown>>
+  `)
+    .all(identityKey) as Array<Record<string, unknown>>
   return rows.map(rowToSession)
 }
 
@@ -148,14 +155,15 @@ function executePage(
   const pageRows = hasMore ? rows.slice(0, limit) : rows
   const sessions = pageRows.map(rowToSession)
   const last = sessions.at(-1)
-  const nextCursor = hasMore && last
-    ? {
-        startedAt: last.startedAt,
-        sessionUuid: last.sessionUuid,
-        messageCount: last.messageCount,
-        title: last.title ?? '',
-      }
-    : null
+  const nextCursor =
+    hasMore && last
+      ? {
+          startedAt: last.startedAt,
+          sessionUuid: last.sessionUuid,
+          messageCount: last.messageCount,
+          title: last.title ?? '',
+        }
+      : null
   return { sessions, nextCursor }
 }
 
@@ -195,8 +203,11 @@ function cursorWhere(
         )`,
         params: [
           c.messageCount,
-          c.messageCount, c.startedAt,
-          c.messageCount, c.startedAt, c.sessionUuid,
+          c.messageCount,
+          c.startedAt,
+          c.messageCount,
+          c.startedAt,
+          c.sessionUuid,
         ],
       }
     case 'title':
@@ -206,11 +217,7 @@ function cursorWhere(
           OR (${titleExpr} = ? AND s.started_at < ?)
           OR (${titleExpr} = ? AND s.started_at = ? AND s.session_uuid > ?)
         )`,
-        params: [
-          c.title,
-          c.title, c.startedAt,
-          c.title, c.startedAt, c.sessionUuid,
-        ],
+        params: [c.title, c.title, c.startedAt, c.title, c.startedAt, c.sessionUuid],
       }
     case 'recent':
     default:

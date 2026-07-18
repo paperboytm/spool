@@ -45,7 +45,7 @@ export function insertSessionSorted(
   if (last && compareSessions(candidate, last, order) > 0 && !exhausted) {
     return sessions
   }
-  const idx = sessions.findIndex(s => compareSessions(candidate, s, order) <= 0)
+  const idx = sessions.findIndex((s) => compareSessions(candidate, s, order) <= 0)
   if (idx === -1) return [...sessions, candidate]
   return [...sessions.slice(0, idx), candidate, ...sessions.slice(idx)]
 }

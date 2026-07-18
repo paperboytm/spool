@@ -1,5 +1,5 @@
-import { Command } from 'commander'
 import { getDB, Syncer, SpoolWatcher } from '@spool-lab/core'
+import { Command } from 'commander'
 
 export const syncCommand = new Command('sync')
   .description('Sync AI sessions to the local index')
@@ -27,7 +27,11 @@ export const syncCommand = new Command('sync')
         console.log(`[${new Date().toLocaleTimeString()}] +${data.count} new session(s) indexed`)
       })
       watcher.on('error', (_event, data) => {
-        console.error(`[${new Date().toLocaleTimeString()}] watcher error:`, data.error, data.root ? `(root=${data.root})` : '')
+        console.error(
+          `[${new Date().toLocaleTimeString()}] watcher error:`,
+          data.error,
+          data.root ? `(root=${data.root})` : '',
+        )
       })
       watcher.start()
 

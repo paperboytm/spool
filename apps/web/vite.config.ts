@@ -1,9 +1,9 @@
-import type { Plugin } from "vite";
-import { defineConfig } from "vite";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import tailwindcss from "@tailwindcss/vite";
-import viteReact from "@vitejs/plugin-react";
-import { voidPlugin } from "void";
+import tailwindcss from '@tailwindcss/vite'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
+import type { Plugin } from 'vite-plus'
+import { defineConfig, lazyPlugins } from 'vite-plus'
+import { voidPlugin } from 'void'
 
 // Dev-only relay for the backend's server-side WorkOS calls (code
 // exchange + identities). workerd (wrangler pages dev) makes its
@@ -16,42 +16,46 @@ import { voidPlugin } from "void";
 // vite dev middleware only exists under `vite serve`.
 function devWorkosRelay(): Plugin {
   return {
-    name: "dev-workos-relay",
-    apply: "serve",
+    name: 'dev-workos-relay',
+    apply: 'serve',
     configureServer(server) {
       // Mounted middleware sees req.url with the mount prefix stripped,
       // so '/__dev/workos/user_management/authenticate' arrives as
       // '/user_management/authenticate' — exactly the api.workos.com path.
-      server.middlewares.use("/__dev/workos", (req, res) => {
-        const chunks: Buffer[] = [];
-        req.on("data", (c: Buffer) => chunks.push(c));
-        req.on("end", () => {
+      server.middlewares.use('/__dev/workos', (req, res) => {
+        const chunks: Buffer[] = []
+        req.on('data', (c: Buffer) => chunks.push(c))
+        req.on('end', () => {
           void (async () => {
             try {
-              const { EnvHttpProxyAgent } = await import("undici");
-              const headers: Record<string, string> = {};
-              if (req.headers["content-type"]) headers["content-type"] = req.headers["content-type"];
-              if (req.headers["authorization"]) headers["authorization"] = req.headers["authorization"];
-              const body = Buffer.concat(chunks);
-              const upstream = await fetch(`https://api.workos.com${req.url ?? "/"}`, {
-                method: req.method ?? "GET",
+              const { EnvHttpProxyAgent } = await import('undici')
+              const headers: Record<string, string> = {}
+              if (req.headers['content-type']) headers['content-type'] = req.headers['content-type']
+              if (req.headers['authorization'])
+                headers['authorization'] = req.headers['authorization']
+              const body = Buffer.concat(chunks)
+              const upstream = await fetch(`https://api.workos.com${req.url ?? '/'}`, {
+                method: req.method ?? 'GET',
                 headers,
                 ...(body.length > 0 ? { body } : {}),
                 // Non-standard undici option: route via http(s)_proxy env.
                 dispatcher: new EnvHttpProxyAgent(),
-              } as RequestInit);
-              res.statusCode = upstream.status;
-              res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
-              res.end(Buffer.from(await upstream.arrayBuffer()));
+              } as RequestInit)
+              res.statusCode = upstream.status
+              res.setHeader(
+                'content-type',
+                upstream.headers.get('content-type') ?? 'application/json',
+              )
+              res.end(Buffer.from(await upstream.arrayBuffer()))
             } catch (e) {
-              res.statusCode = 502;
-              res.end(JSON.stringify({ error: "dev workos relay failed", detail: String(e) }));
+              res.statusCode = 502
+              res.end(JSON.stringify({ error: 'dev workos relay failed', detail: String(e) }))
             }
-          })();
-        });
-      });
+          })()
+        })
+      })
     },
-  };
+  }
 }
 
 // Marketing/docs/blog surfaces are prerendered to static HTML at build
@@ -63,26 +67,32 @@ function devWorkosRelay(): Plugin {
 // App surfaces (/s/*, /session/*, /@*, /me, /sign-in, /cli-auth) are
 // NOT prerendered — they SSR per request so loaders can inject OG meta
 // and per-route security headers (see src/start.ts).
-const PRERENDER_ROOTS = ["/", "/daemon", "/connectors", "/blog", "/terms", "/privacy"];
+const PRERENDER_ROOTS = ['/', '/daemon', '/connectors', '/blog', '/terms', '/privacy']
 
-export default defineConfig({
-  plugins: [
-    voidPlugin(), // must come before the framework plugin
-    tailwindcss(),
-    tanstackStart({
-      prerender: {
-        enabled: true,
-        crawlLinks: true,
-        filter: (page) =>
-          PRERENDER_ROOTS.includes(page.path) ||
-          page.path.startsWith("/docs") ||
-          page.path.startsWith("/blog"),
-      },
-      pages: PRERENDER_ROOTS.map((path) => ({ path })),
-    }),
-    viteReact(),
-    devWorkosRelay(),
-  ],
+export default defineConfig(({ mode }) => ({
+  // Vitest used to have a standalone config with no application plugins.
+  // Keep that isolation because Void's Cloudflare runner is only needed for
+  // application build and development.
+  plugins:
+    mode === 'test'
+      ? []
+      : (lazyPlugins(() => [
+          voidPlugin(), // must come before the framework plugin
+          tailwindcss(),
+          tanstackStart({
+            prerender: {
+              enabled: true,
+              crawlLinks: true,
+              filter: (page) =>
+                PRERENDER_ROOTS.includes(page.path) ||
+                page.path.startsWith('/docs') ||
+                page.path.startsWith('/blog'),
+            },
+            pages: PRERENDER_ROOTS.map((path) => ({ path })),
+          }),
+          viteReact(),
+          devWorkosRelay(),
+        ]) ?? []),
   build: {
     // No sourcemaps in production. The reader is the most public
     // surface in the product — emitting .js.map exposes the entire
@@ -96,10 +106,14 @@ export default defineConfig({
     // against http://localhost:3002 (see CONTRIBUTING.md).
     port: 3002,
     proxy: {
-      "/api": {
-        target: process.env["SPOOL_SHARE_BACKEND"] ?? "http://localhost:8788",
+      '/api': {
+        target: process.env['SPOOL_SHARE_BACKEND'] ?? 'http://localhost:8788',
         changeOrigin: true,
       },
     },
   },
-});
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
+  },
+}))

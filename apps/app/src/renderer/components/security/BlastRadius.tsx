@@ -9,12 +9,13 @@
 // Boundary honesty: this is about Spool's own surfaces (search / AI /
 // browse). The original ~/.claude session files are never touched.
 
+import { HIGH_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+import { Eraser } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eraser } from 'lucide-react'
-import { securityApi, type OccurrenceBySession } from '../../api/security.js'
+
 import { getSessionSourceColor } from '../../../shared/sessionSources.js'
-import { HIGH_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
+import { securityApi, type OccurrenceBySession } from '../../api/security.js'
 import PurgeConfirmDialog from './PurgeConfirmDialog.js'
 
 interface Props {
@@ -33,7 +34,13 @@ interface Props {
   onCount: (otherCount: number) => void
 }
 
-export default function BlastRadius({ kind, valueHash, currentSessionId, expanded, onCount }: Props) {
+export default function BlastRadius({
+  kind,
+  valueHash,
+  currentSessionId,
+  expanded,
+  onCount,
+}: Props) {
   const { t } = useTranslation()
   const [rows, setRows] = useState<OccurrenceBySession[] | null>(null)
   const [purgePending, setPurgePending] = useState(false)
@@ -46,7 +53,9 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
     }
   }, [kind, valueHash])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+  }, [load])
 
   // Refetch when findings change anywhere (a purge / dismiss elsewhere
   // shrinks the radius). Debounced — burst purges collapse to one read.
@@ -54,21 +63,30 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = securityApi.onChange(() => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => { timer = null; void load() }, 300)
+      timer = setTimeout(() => {
+        timer = null
+        void load()
+      }, 300)
     })
-    return () => { if (timer) clearTimeout(timer); off() }
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
   }, [load])
 
-  const others = rows === null
-    ? []
-    : currentSessionId === undefined
-      ? rows
-      : rows.filter(r => r.sessionId !== currentSessionId)
+  const others =
+    rows === null
+      ? []
+      : currentSessionId === undefined
+        ? rows
+        : rows.filter((r) => r.sessionId !== currentSessionId)
   const otherCount = others.length
 
   // Drive the parent's value-row badge. onCount is a stable setter, so
   // depending on it is safe; runs only when the count actually moves.
-  useEffect(() => { onCount(otherCount) }, [otherCount, onCount])
+  useEffect(() => {
+    onCount(otherCount)
+  }, [otherCount, onCount])
 
   // Nothing to expand (value confined to the current session / nowhere),
   // or the parent hasn't toggled it open. The badge — when otherCount > 0
@@ -81,8 +99,11 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
   const isCredential = HIGH_SEVERITY_KINDS.has(kind)
 
   async function purgeEverywhere() {
-    try { await securityApi.purgeEverywhere(kind, valueHash) }
-    catch { /* surfaces via onChange → refetch shrinks the radius */ }
+    try {
+      await securityApi.purgeEverywhere(kind, valueHash)
+    } catch {
+      /* surfaces via onChange → refetch shrinks the radius */
+    }
     await load()
   }
 
@@ -90,9 +111,9 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
     <div data-testid="blast-radius" data-sessions={otherCount}>
       <ul
         data-testid="blast-radius-list"
-        className="mt-1 ml-1.5 flex flex-col gap-1 border-l border-warm-border dark:border-dark-border pl-2.5"
+        className="border-warm-border dark:border-dark-border mt-1 ml-1.5 flex flex-col gap-1 border-l pl-2.5"
       >
-        {others.map(r => (
+        {others.map((r) => (
           <li
             key={r.sessionId}
             data-testid="blast-radius-row"
@@ -104,19 +125,24 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
               aria-hidden
               data-testid="source-dot"
               data-source={r.source}
-              className="block w-1.5 h-1.5 rounded-full flex-none"
+              className="block h-1.5 w-1.5 flex-none rounded-full"
               style={{ background: getSessionSourceColor(r.source) }}
             />
             <span className="min-w-0 truncate">
-              <span className="font-sans text-warm-text dark:text-dark-text">
+              <span className="text-warm-text dark:text-dark-text font-sans">
                 {r.sessionTitle || t('common.untitled', { defaultValue: 'Untitled' })}
               </span>
               {r.project && (
-                <span className="font-mono text-warm-faint dark:text-dark-muted"> · {r.project}</span>
+                <span className="text-warm-faint dark:text-dark-muted font-mono">
+                  {' '}
+                  · {r.project}
+                </span>
               )}
             </span>
             {r.count > 1 && (
-              <span className="font-mono tabular-nums text-[10px] text-warm-faint dark:text-dark-muted">×{r.count}</span>
+              <span className="text-warm-faint dark:text-dark-muted font-mono text-[10px] tabular-nums">
+                ×{r.count}
+              </span>
             )}
           </li>
         ))}
@@ -131,7 +157,7 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
               type="button"
               data-testid="purge-everywhere"
               onClick={() => setPurgePending(true)}
-              className="inline-flex items-center gap-1.5 h-5 -ml-0.5 rounded font-sans text-[11px] text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark transition-colors"
+              className="text-warm-muted dark:text-dark-muted hover:text-accent dark:hover:text-accent-dark -ml-0.5 inline-flex h-5 items-center gap-1.5 rounded font-sans text-[11px] transition-colors"
             >
               <Eraser size={12} strokeWidth={1.7} aria-hidden />
               {t('security.purge_everywhere_cta', {
@@ -149,7 +175,10 @@ export default function BlastRadius({ kind, valueHash, currentSessionId, expande
         kind={kind}
         bulk
         hasCredential={isCredential}
-        onConfirm={() => { setPurgePending(false); void purgeEverywhere() }}
+        onConfirm={() => {
+          setPurgePending(false)
+          void purgeEverywhere()
+        }}
         onCancel={() => setPurgePending(false)}
       />
     </div>

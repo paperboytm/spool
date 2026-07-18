@@ -37,12 +37,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     if (!v.ok) throw new ApiError('UNPROCESSABLE', v.reason)
 
     const [existing, prior] = await Promise.all([
-      ctx.env.DB
-        .prepare('SELECT user_id FROM handles WHERE handle=? AND released_at IS NULL')
+      ctx.env.DB.prepare('SELECT user_id FROM handles WHERE handle=? AND released_at IS NULL')
         .bind(v.handle)
         .first<{ user_id: string }>(),
-      ctx.env.DB
-        .prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
+      ctx.env.DB.prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
         .bind(user.id)
         .first<{ handle: string }>(),
     ])
@@ -58,8 +56,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       // above and INSERTed first. Map the PK violation to 409 instead
       // of letting jsonError surface it as 500 INTERNAL.
       try {
-        await ctx.env.DB
-          .prepare('INSERT INTO handles (handle, user_id, claimed_at) VALUES (?, ?, ?)')
+        await ctx.env.DB.prepare(
+          'INSERT INTO handles (handle, user_id, claimed_at) VALUES (?, ?, ?)',
+        )
           .bind(v.handle, user.id, Date.now())
           .run()
       } catch (e) {

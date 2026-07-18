@@ -1,12 +1,14 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import {
   installSaveFilePickerMock,
   openShareEditorFromSessionDetail,
   waitForSavedFile,
 } from './helpers/share'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 
 // End-to-end regression for the PDF export pipeline: the renderer
 // serializes the preview DOM, main renders it in a hidden SANDBOXED

@@ -1,12 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../../../src/audit'
+import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
 import { upsertHubSession } from '../../../../../../src/hub/store'
 import { parseHeadBody, requireSid } from '../../../../../../src/hub/wire'
-import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { publicBaseUrl } from '../../../../../../src/public-url'
 
 // Step 3 of the share handshake: commit the head. Re-runs the same

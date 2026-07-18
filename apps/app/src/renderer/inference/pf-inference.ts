@@ -9,7 +9,11 @@
 
 import { detectRuntime } from './runtime-detect.js'
 import type {
-  PfAnalyzeRequest, PfAnalyzeResult, PfReadyMessage, PfFailedMessage, PfMatch,
+  PfAnalyzeRequest,
+  PfAnalyzeResult,
+  PfReadyMessage,
+  PfFailedMessage,
+  PfMatch,
 } from './types.js'
 
 declare global {
@@ -36,7 +40,10 @@ interface PipelineOutput {
   end: number
 }
 
-type Pipeline = (text: string, opts?: { aggregation_strategy?: string }) => Promise<PipelineOutput[]>
+type Pipeline = (
+  text: string,
+  opts?: { aggregation_strategy?: string },
+) => Promise<PipelineOutput[]>
 
 async function main(): Promise<void> {
   const bridge = window.pfBridge
@@ -53,7 +60,9 @@ async function main(): Promise<void> {
     runtime = detect.runtime
     adapterLabel = detect.adapterLabel
   } catch (err) {
-    bridge.failed({ message: `runtime detection failed: ${err instanceof Error ? err.message : String(err)}` })
+    bridge.failed({
+      message: `runtime detection failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
     return
   }
 
@@ -81,7 +90,9 @@ async function main(): Promise<void> {
     })
     pipe = built as unknown as Pipeline
   } catch (err) {
-    bridge.failed({ message: `model load failed: ${err instanceof Error ? err.message : String(err)}` })
+    bridge.failed({
+      message: `model load failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
     return
   }
 
@@ -126,7 +137,7 @@ async function analyzeOne(
         // occurrence. transformers.js returns matches in document
         // order, so the cursor advances monotonically.
         const idx = req.text.indexOf(m.word, searchCursor)
-        if (idx < 0) return []  // word doesn't actually appear — drop
+        if (idx < 0) return [] // word doesn't actually appear — drop
         start = idx
         end = idx + m.word.length
         searchCursor = end
@@ -135,7 +146,9 @@ async function analyzeOne(
         // fallback doesn't go backwards in the text.
         searchCursor = Math.max(searchCursor, end as number)
       }
-      return [{ class: cls, value: m.word, start: start as number, end: end as number, score: m.score }]
+      return [
+        { class: cls, value: m.word, start: start as number, end: end as number, score: m.score },
+      ]
     })
     bridge.sendAnalyzeResult({ reqId: req.reqId, ok: true, matches })
   } catch (err) {

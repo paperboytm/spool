@@ -19,8 +19,9 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     // set. This query matches the design intent (released handles are
     // re-claimable) — when the release flow ships, the claim path must
     // switch to INSERT … ON CONFLICT(handle) DO UPDATE SET released_at=NULL.
-    const row = await ctx.env.DB
-      .prepare('SELECT 1 FROM handles WHERE handle=? AND released_at IS NULL')
+    const row = await ctx.env.DB.prepare(
+      'SELECT 1 FROM handles WHERE handle=? AND released_at IS NULL',
+    )
       .bind(v.handle)
       .first()
     return jsonOk({ available: !row }, { headers })

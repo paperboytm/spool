@@ -1,8 +1,10 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { describe, it, expect, afterEach, beforeEach } from 'vite-plus/test'
+
 import {
   orcaResolver,
   supersetResolver,
@@ -22,11 +24,17 @@ beforeEach(() => {
 afterEach(() => {
   if (originalHome) process.env['HOME'] = originalHome
   else delete process.env['HOME']
-  try { rmSync(tmpHome, { recursive: true, force: true }) } catch { /* ignore */ }
+  try {
+    rmSync(tmpHome, { recursive: true, force: true })
+  } catch {
+    /* ignore */
+  }
   _resetWorktreeResolverCachesForTests()
 })
 
-function supersetDbPath() { return join(tmpHome, '.superset', 'local.db') }
+function supersetDbPath() {
+  return join(tmpHome, '.superset', 'local.db')
+}
 
 function createSupersetSchema(): Database.Database {
   const db = new Database(supersetDbPath())
@@ -68,8 +76,9 @@ describe('supersetResolver', () => {
     ).run('proj1', '/repos/customproj', 'customproj', '/custom/wt-base')
     db.close()
 
-    expect(supersetResolver.resolve('/custom/wt-base/customproj/branch-x'))
-      .toBe('/repos/customproj')
+    expect(supersetResolver.resolve('/custom/wt-base/customproj/branch-x')).toBe(
+      '/repos/customproj',
+    )
   })
 
   it('falls back to global settings worktree_base_dir', () => {
@@ -77,9 +86,7 @@ describe('supersetResolver', () => {
     db.prepare(
       `INSERT INTO projects (id, main_repo_path, name, worktree_base_dir) VALUES (?, ?, ?, ?)`,
     ).run('proj1', '/repos/p', 'p', null)
-    db.prepare(
-      `INSERT INTO settings (id, worktree_base_dir) VALUES (1, ?)`,
-    ).run('/global/wts')
+    db.prepare(`INSERT INTO settings (id, worktree_base_dir) VALUES (1, ?)`).run('/global/wts')
     db.close()
 
     expect(supersetResolver.resolve('/global/wts/p/branch')).toBe('/repos/p')
@@ -111,7 +118,7 @@ describe('supersetResolver', () => {
 
   it('returns null gracefully on malformed schema', () => {
     const db = new Database(supersetDbPath())
-    db.exec(`CREATE TABLE projects (id TEXT)`)  // missing required columns
+    db.exec(`CREATE TABLE projects (id TEXT)`) // missing required columns
     db.close()
 
     expect(supersetResolver.resolve('/anything')).toBeNull()
@@ -146,29 +153,36 @@ describe('orcaResolver', () => {
       },
     })
 
-    expect(orcaResolver.resolve('/custom/worktrees/paperboy/feature/apps/mobile'))
-      .toBe('/Users/me/work/paperboy')
+    expect(orcaResolver.resolve('/custom/worktrees/paperboy/feature/apps/mobile')).toBe(
+      '/Users/me/work/paperboy',
+    )
   })
 
   it('recovers pruned Orca worktree metadata from a unique repo name', () => {
     writeOrcaData({ repos: [paperboyRepo], worktreeMeta: {} })
 
-    expect(orcaResolver.resolve('/Users/me/orca/workspaces/paperboy/main-2'))
-      .toBe('/Users/me/work/paperboy')
+    expect(orcaResolver.resolve('/Users/me/orca/workspaces/paperboy/main-2')).toBe(
+      '/Users/me/work/paperboy',
+    )
   })
 
   it('recovers a deleted Codex worktree and its nested cwd', () => {
     writeOrcaData({ repos: [paperboyRepo], worktreeMeta: {} })
 
-    expect(orcaResolver.resolve('/Users/me/.codex/worktrees/1da1/paperboy/apps/mobile'))
-      .toBe('/Users/me/work/paperboy')
+    expect(orcaResolver.resolve('/Users/me/.codex/worktrees/1da1/paperboy/apps/mobile')).toBe(
+      '/Users/me/work/paperboy',
+    )
   })
 
   it('does not guess when two registered repos have the same name', () => {
     writeOrcaData({
       repos: [
         paperboyRepo,
-        { id: 'repo-paperboy-fork', path: '/Users/me/work/forks/paperboy', displayName: 'paperboy' },
+        {
+          id: 'repo-paperboy-fork',
+          path: '/Users/me/work/forks/paperboy',
+          displayName: 'paperboy',
+        },
       ],
       worktreeMeta: {},
     })

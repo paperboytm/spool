@@ -13,11 +13,11 @@
 
 import type { Conversation, EditorOpts } from '../lib/types'
 import { typefaceFamily } from '../lib/types'
-import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
+import { Body } from './body'
+import { GapMarker } from './gap-marker'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
-import { GapMarker } from './gap-marker'
-import { Body } from './body'
+import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 
 interface Props {
   convo: Conversation
@@ -107,9 +107,11 @@ export function Letter({ convo, opts, redactList: injectedRedactList }: Props) {
           letterSpacing: '0.04em',
         }}
       >
-        with {convo.sourceLabel} · {segments.isExcerpt
+        with {convo.sourceLabel} ·{' '}
+        {segments.isExcerpt
           ? `${segments.kept} of ${segments.total} turns`
-          : `${segments.total} turns`} · ~{convo.readMin} min · Stitched {convo.createdAt}
+          : `${segments.total} turns`}{' '}
+        · ~{convo.readMin} min · Stitched {convo.createdAt}
       </div>
 
       {/* Body */}
@@ -122,7 +124,11 @@ export function Letter({ convo, opts, redactList: injectedRedactList }: Props) {
         }}
       >
         {segments.turns.map((turn, i) => (
-          <div key={turn.origIndex} data-turn-index={turn.origIndex} style={{ scrollMarginTop: 40 }}>
+          <div
+            key={turn.origIndex}
+            data-turn-index={turn.origIndex}
+            style={{ scrollMarginTop: 40 }}
+          >
             {opts.showGaps && segments.gapBefore[i]! > 0 && (
               <div style={{ marginBottom: turnGap }}>
                 <GapMarker count={segments.gapBefore[i]!} tokens={t} accent={accent} />
@@ -152,7 +158,9 @@ export function Letter({ convo, opts, redactList: injectedRedactList }: Props) {
                     flexShrink: 0,
                   }}
                 />
-                {turn.role === 'user' ? (turn.author ?? 'User').replace(/[\[\]]/g, '') : convo.sourceLabel}
+                {turn.role === 'user'
+                  ? (turn.author ?? 'User').replace(/[\[\]]/g, '')
+                  : convo.sourceLabel}
               </div>
               <Body
                 text={turn.body}

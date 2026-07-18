@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import PinIcon from './PinIcon.js'
 
 type Props = {
@@ -22,7 +23,9 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
     try {
       if (next) await window.spool.pinSession(sessionUuid)
       else await window.spool.unpinSession(sessionUuid)
-      window.dispatchEvent(new CustomEvent('spool:pin-change', { detail: { sessionUuid, pinned: next } }))
+      window.dispatchEvent(
+        new CustomEvent('spool:pin-change', { detail: { sessionUuid, pinned: next } }),
+      )
     } catch {
       onChange?.(pinned)
     } finally {
@@ -38,7 +41,9 @@ export default function PinButton({ sessionUuid, pinned, onChange, size = 'sm' }
       type="button"
       data-testid="pin-button"
       data-pinned={pinned ? '1' : '0'}
-      onClick={(event) => { void toggle(event) }}
+      onClick={(event) => {
+        void toggle(event)
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') void toggle(event)
       }}

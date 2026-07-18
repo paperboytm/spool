@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
 import { canonicalizeRecord, sequenceRoot } from '@spool-lab/session-kit'
+import { describe, expect, it } from 'vite-plus/test'
 
 import type { HubFetch } from '../hub/client.js'
 import { handleShowCommand, parseShowRef } from './show.js'
@@ -13,7 +14,11 @@ const HUB_URL = 'https://hub.test'
 describe('parseShowRef', () => {
   it('classifies uuids, sids, urls, and @r anchors', () => {
     expect(parseShowRef('abc-123').kind).toBe('local')
-    expect(parseShowRef('abc-123@r7')).toMatchObject({ kind: 'local', uuid: 'abc-123', recordIndex: 7 })
+    expect(parseShowRef('abc-123@r7')).toMatchObject({
+      kind: 'local',
+      uuid: 'abc-123',
+      recordIndex: 7,
+    })
     expect(parseShowRef(SID)).toMatchObject({ kind: 'hub' })
     expect(parseShowRef(`${SID}@r3`)).toMatchObject({ kind: 'hub', recordIndex: 3 })
     expect(parseShowRef(`${HUB_URL}/session/${SID}@r2`)).toMatchObject({
@@ -24,16 +29,52 @@ describe('parseShowRef', () => {
 })
 
 const RECORDS = [
-  { type: 'user', uuid: 'u-1', sessionId: 's', timestamp: '2026-07-16T10:00:00.000Z', message: { role: 'user', content: 'rename alpha to beta' } },
-  { type: 'assistant', uuid: 'u-2', parentUuid: 'u-1', sessionId: 's', message: { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: { file_path: '/ws/src/a.ts', old_string: 'alpha', new_string: 'beta' } }] } },
-  { type: 'user', uuid: 'u-3', parentUuid: 'u-2', sessionId: 's', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] }, toolUseResult: { originalFile: 'alpha\nkeep\n', oldString: 'alpha', newString: 'beta' } },
-  { type: 'assistant', uuid: 'u-4', parentUuid: 'u-3', sessionId: 's', message: { role: 'assistant', content: [{ type: 'text', text: 'Renamed alpha to beta.' }] } },
+  {
+    type: 'user',
+    uuid: 'u-1',
+    sessionId: 's',
+    timestamp: '2026-07-16T10:00:00.000Z',
+    message: { role: 'user', content: 'rename alpha to beta' },
+  },
+  {
+    type: 'assistant',
+    uuid: 'u-2',
+    parentUuid: 'u-1',
+    sessionId: 's',
+    message: {
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool_use',
+          id: 't1',
+          name: 'Edit',
+          input: { file_path: '/ws/src/a.ts', old_string: 'alpha', new_string: 'beta' },
+        },
+      ],
+    },
+  },
+  {
+    type: 'user',
+    uuid: 'u-3',
+    parentUuid: 'u-2',
+    sessionId: 's',
+    message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] },
+    toolUseResult: { originalFile: 'alpha\nkeep\n', oldString: 'alpha', newString: 'beta' },
+  },
+  {
+    type: 'assistant',
+    uuid: 'u-4',
+    parentUuid: 'u-3',
+    sessionId: 's',
+    message: { role: 'assistant', content: [{ type: 'text', text: 'Renamed alpha to beta.' }] },
+  },
 ]
 
 async function makeHubFixture() {
   const { deriveView } = await import('@spool-lab/session-kit')
-  const canonical = await Promise.all(RECORDS.map((record) =>
-    canonicalizeRecord(JSON.stringify(record), { workspaceRoot: '/ws' })))
+  const canonical = await Promise.all(
+    RECORDS.map((record) => canonicalizeRecord(JSON.stringify(record), { workspaceRoot: '/ws' })),
+  )
   const manifest = canonical.map((record) => record.oid)
   const view = deriveView(canonical, { provider: 'claude' })
   const meta = {
@@ -53,14 +94,23 @@ async function makeHubFixture() {
   const fetchImpl: HubFetch = async (input) => {
     const url = new URL(String(input))
     const json = (body: unknown, status = 200) =>
-      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
     if (url.pathname === `/api/hub/v1/sessions/${SID}`) return json(meta)
     if (url.pathname === `/api/hub/v1/sessions/${SID}/view`) return json(view)
     if (url.pathname === `/api/hub/v1/sessions/${SID}/records`) {
       const from = Number(url.searchParams.get('from') ?? '0')
-      const to = Math.min(Number(url.searchParams.get('to') ?? String(canonical.length)), canonical.length)
-      const lines = canonical.slice(from, to).map((record, index) =>
-        JSON.stringify({ i: from + index, oid: record.oid, data: record.data }))
+      const to = Math.min(
+        Number(url.searchParams.get('to') ?? String(canonical.length)),
+        canonical.length,
+      )
+      const lines = canonical
+        .slice(from, to)
+        .map((record, index) =>
+          JSON.stringify({ i: from + index, oid: record.oid, data: record.data }),
+        )
       return new Response(lines.join('\n') + '\n', {
         status: 200,
         headers: { 'content-type': 'application/x-ndjson' },
@@ -136,16 +186,24 @@ describe('spool show for local sessions', () => {
   function localTarget() {
     const dir = mkdtempSync(join(tmpdir(), 'spool-show-local-'))
     const filePath = join(dir, 'session.jsonl')
-    writeFileSync(filePath, RECORDS.map((record) => JSON.stringify(record)).join('\n') + '\n', 'utf8')
+    writeFileSync(
+      filePath,
+      RECORDS.map((record) => JSON.stringify(record)).join('\n') + '\n',
+      'utf8',
+    )
     return { provider: 'claude' as const, filePath, workspaceRoot: '/ws', print: () => {} }
   }
 
   it('--diff composes the net change from the provider file', async () => {
     const d = deps(async () => new Response('{}', { status: 500 }))
-    const exit = await handleShowCommand('some-local-uuid', { diff: true }, {
-      ...d.deps,
-      resolveLocal: () => localTarget(),
-    })
+    const exit = await handleShowCommand(
+      'some-local-uuid',
+      { diff: true },
+      {
+        ...d.deps,
+        resolveLocal: () => localTarget(),
+      },
+    )
     expect(exit).toBe(0)
     const out = d.logs.join('\n')
     expect(out).toContain('── src/a.ts  +1 -1')
@@ -153,20 +211,28 @@ describe('spool show for local sessions', () => {
 
   it('@r<n> prints the raw record', async () => {
     const d = deps(async () => new Response('{}', { status: 500 }))
-    const exit = await handleShowCommand('some-local-uuid@r3', {}, {
-      ...d.deps,
-      resolveLocal: () => localTarget(),
-    })
+    const exit = await handleShowCommand(
+      'some-local-uuid@r3',
+      {},
+      {
+        ...d.deps,
+        resolveLocal: () => localTarget(),
+      },
+    )
     expect(exit).toBe(0)
     expect(d.logs.join('\n')).toContain('Renamed alpha to beta.')
   })
 
   it('keeps the legacy not-found error', async () => {
     const d = deps(async () => new Response('{}', { status: 500 }))
-    const exit = await handleShowCommand('missing-uuid', {}, {
-      ...d.deps,
-      resolveLocal: () => null,
-    })
+    const exit = await handleShowCommand(
+      'missing-uuid',
+      {},
+      {
+        ...d.deps,
+        resolveLocal: () => null,
+      },
+    )
     expect(exit).toBe(1)
     expect(d.errors.join('\n')).toContain('Session not found: missing-uuid')
   })

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import { Effect } from 'effect'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { PrettyConsoleSpanExporter } from './exporter-pretty.js'
 import { observabilityLayer } from './layer.js'
 
@@ -17,11 +18,15 @@ describe('PrettyConsoleSpanExporter', () => {
         yield* Effect.succeed(undefined).pipe(
           Effect.withSpan('test.work', { attributes: { sessionId: 42, kind: 'api-key' } }),
         )
-      }).pipe(Effect.provide(observabilityLayer({
-        serviceName: 'test',
-        env: 'test',
-        testExporter: exporter,
-      }))),
+      }).pipe(
+        Effect.provide(
+          observabilityLayer({
+            serviceName: 'test',
+            env: 'test',
+            testExporter: exporter,
+          }),
+        ),
+      ),
     )
     expect(out).toHaveLength(1)
     expect(out[0]).toContain('[test.work]')
@@ -39,11 +44,15 @@ describe('PrettyConsoleSpanExporter', () => {
         yield* Effect.succeed(undefined).pipe(
           Effect.withSpan('test.work', { attributes: { blob: longValue } }),
         )
-      }).pipe(Effect.provide(observabilityLayer({
-        serviceName: 'test',
-        env: 'test',
-        testExporter: exporter,
-      }))),
+      }).pipe(
+        Effect.provide(
+          observabilityLayer({
+            serviceName: 'test',
+            env: 'test',
+            testExporter: exporter,
+          }),
+        ),
+      ),
     )
     expect(out[0]).toContain('…')
     expect(out[0]?.length).toBeLessThan(longValue.length + 80)
@@ -55,11 +64,13 @@ describe('PrettyConsoleSpanExporter', () => {
     await Effect.runPromise(
       Effect.succeed(undefined).pipe(
         Effect.withSpan('test.work', { attributes: { k: 1 } }),
-        Effect.provide(observabilityLayer({
-          serviceName: 'test',
-          env: 'test',
-          testExporter: exporter,
-        })),
+        Effect.provide(
+          observabilityLayer({
+            serviceName: 'test',
+            env: 'test',
+            testExporter: exporter,
+          }),
+        ),
       ),
     )
     // eslint-disable-next-line no-control-regex

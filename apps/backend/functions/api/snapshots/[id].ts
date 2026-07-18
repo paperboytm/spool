@@ -17,8 +17,7 @@ const TOMBSTONE_HEADERS = {
 // must-revalidate disposition forces shared caches to re-check on next
 // hit instead of refreshing lazily.
 const SNAPSHOT_CACHE_MAX_AGE_SEC = 30
-const SNAPSHOT_CACHE_HEADER =
-  `public, max-age=${SNAPSHOT_CACHE_MAX_AGE_SEC}, s-maxage=${SNAPSHOT_CACHE_MAX_AGE_SEC}, must-revalidate`
+const SNAPSHOT_CACHE_HEADER = `public, max-age=${SNAPSHOT_CACHE_MAX_AGE_SEC}, s-maxage=${SNAPSHOT_CACHE_MAX_AGE_SEC}, must-revalidate`
 
 type Meta = {
   owner: string
@@ -37,10 +36,10 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     const meta = JSON.parse(metaRaw) as Meta
 
     if (meta.revoked_at) {
-      return new Response(
-        JSON.stringify({ revoked: true, at: meta.revoked_at }),
-        { status: 410, headers: TOMBSTONE_HEADERS },
-      )
+      return new Response(JSON.stringify({ revoked: true, at: meta.revoked_at }), {
+        status: 410,
+        headers: TOMBSTONE_HEADERS,
+      })
     }
     const obj = await ctx.env.SNAPSHOTS.get(`${id}.json`)
     if (!obj) throw new ApiError('NOT_FOUND')

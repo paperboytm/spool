@@ -16,18 +16,18 @@ v1 stays untouched: existing CLI commands, `/api/publish` snapshot share, `/s/:i
 
 ## In scope / out of scope
 
-| In (PR 1) | Out (follow-ups) |
-| --- | --- |
-| New pkg `packages/session-kit` (browser-safe core logic) | Persistent local store (`store.db`) — records are computed at share time |
-| Hub endpoints under `/api/hub/v1/*` in share-backend | Ed25519 signature **verification** (wire carries `sig: null`) |
-| CLI: `login`, `share` (incl. `@<n>` prefix), `resume` (claude), `withdraw` | `resume` for codex; gemini/opencode everywhere |
-| Web reader `/session/:sid` (3 layers) + router route | OG **image** (meta tags only), editor gutter, Trace/blame/why |
-| Hermetic round-trip integration test | Playwright e2e for the reader (document the gap in PR body) |
+| In (PR 1)                                                                  | Out (follow-ups)                                                         |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| New pkg `packages/session-kit` (browser-safe core logic)                   | Persistent local store (`store.db`) — records are computed at share time |
+| Hub endpoints under `/api/hub/v1/*` in share-backend                       | Ed25519 signature **verification** (wire carries `sig: null`)            |
+| CLI: `login`, `share` (incl. `@<n>` prefix), `resume` (claude), `withdraw` | `resume` for codex; gemini/opencode everywhere                           |
+| Web reader `/session/:sid` (3 layers) + router route                       | OG **image** (meta tags only), editor gutter, Trace/blame/why            |
+| Hermetic round-trip integration test                                       | Playwright e2e for the reader (document the gap in PR body)              |
 
 ## Identifiers & crypto (binding wire spec)
 
 - `oid` = lowercase hex SHA-256 of the canonical record bytes (UTF-8). Use WebCrypto (`crypto.subtle`) — must run in browser, Workers, Node ≥ 20.
-- Canonicalization: parse the raw JSONL line, re-serialize JCS-style (recursively sorted object keys, no insignificant whitespace, UTF-8), then rewrite paths: every occurrence of the workspace root string → `$SPOOL_WS`, of the user home dir → `$SPOOL_HOME`. Hash *after* rewriting, so OIDs are machine-independent.
+- Canonicalization: parse the raw JSONL line, re-serialize JCS-style (recursively sorted object keys, no insignificant whitespace, UTF-8), then rewrite paths: every occurrence of the workspace root string → `$SPOOL_WS`, of the user home dir → `$SPOOL_HOME`. Hash _after_ rewriting, so OIDs are machine-independent.
 - Sequence chain: `node_i = sha256(raw(node_{i-1}) || raw(oid_i))` over raw 32-byte digests, `node_{-1}` = 32 zero bytes. `root(n) = hex(node_{n-1})`. Prefix share `@n` = push head at position `n`.
 - `sid` = `<provider>_<provider-session-uuid>`, provider ∈ `claude | codex` (e.g. `claude_6f9a…`). Share URL: `https://spool.pro/session/<sid>`.
 

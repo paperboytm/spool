@@ -56,7 +56,7 @@ export function deriveView(
     const details = classifyRecord(provider, record, recordEvents)
     const timestamp = stringAt(record, 'timestamp')
     const excerpt = details.text ? truncateUtf8(details.text.trim(), EXCERPT_BYTES) : ''
-    const files = [...new Set(recordEvents.map(event => event.path))]
+    const files = [...new Set(recordEvents.map((event) => event.path))]
     const entry: ViewIndexEntry = {
       i: recordIndex,
       kind: details.kind,
@@ -79,7 +79,7 @@ export function deriveView(
   const view: SessionViewV1 = {
     v: 1,
     index,
-    files: diff.files.map(file => ({
+    files: diff.files.map((file) => ({
       path: file.path,
       events: file.events,
       adds: file.adds,
@@ -153,8 +153,8 @@ function classifyClaude(record: UnknownRecord): RecordDetails {
   const text = claudeText(content)
   if (Array.isArray(content)) {
     const items = content.filter(isObject)
-    if (items.some(item => item['type'] === 'tool_result')) return { kind: 'tool' }
-    const toolUse = items.find(item => item['type'] === 'tool_use')
+    if (items.some((item) => item['type'] === 'tool_result')) return { kind: 'tool' }
+    const toolUse = items.find((item) => item['type'] === 'tool_use')
     if (toolUse) {
       const tool = stringAt(toolUse, 'name')
       return {
@@ -193,9 +193,12 @@ function classifyCodex(record: UnknownRecord): RecordDetails {
     const tool = stringAt(payload, 'name')
     return { kind: 'tool', ...(tool === undefined ? {} : { tool }) }
   }
-  if (payloadType === 'custom_tool_call_output'
-    || payloadType === 'function_call_output'
-    || payloadType === 'patch_apply_end') return { kind: 'tool' }
+  if (
+    payloadType === 'custom_tool_call_output' ||
+    payloadType === 'function_call_output' ||
+    payloadType === 'patch_apply_end'
+  )
+    return { kind: 'tool' }
 
   const role = stringAt(payload, 'role')
   const text = codexResponseText(payload['content'])
@@ -211,8 +214,8 @@ function claudeText(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return content
     .filter(isObject)
-    .filter(item => item['type'] === 'text')
-    .map(item => stringAt(item, 'text') ?? '')
+    .filter((item) => item['type'] === 'text')
+    .map((item) => stringAt(item, 'text') ?? '')
     .filter(Boolean)
     .join('\n')
 }
@@ -221,8 +224,11 @@ function codexResponseText(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return content
     .filter(isObject)
-    .filter(item => item['type'] === 'output_text' || item['type'] === 'text' || item['type'] === 'input_text')
-    .map(item => stringAt(item, 'text') ?? '')
+    .filter(
+      (item) =>
+        item['type'] === 'output_text' || item['type'] === 'text' || item['type'] === 'input_text',
+    )
+    .map((item) => stringAt(item, 'text') ?? '')
     .filter(Boolean)
     .join('\n')
 }

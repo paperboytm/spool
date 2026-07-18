@@ -57,13 +57,13 @@ export function containsCjk(value: string): boolean {
 export function shouldUseSessionFallback(query: string): boolean {
   const terms = getNaturalSearchTerms(query)
   if (terms.length < 2) return false
-  return terms.some(term => containsShortCjkTerm(term))
+  return terms.some((term) => containsShortCjkTerm(term))
 }
 
 export function canUseSessionSearchFts(query: string): boolean {
   const terms = getNaturalSearchTerms(query)
   if (terms.length === 0) return false
-  return terms.every(term => !containsShortCjkTerm(term))
+  return terms.every((term) => !containsShortCjkTerm(term))
 }
 
 export function buildPreviewFtsPlan(query: string): PreviewFtsPlan | null {
@@ -75,14 +75,16 @@ export function buildPreviewFtsPlan(query: string): PreviewFtsPlan | null {
   // preview. Trigram phrases never match below 3 codepoints (`错误码 42`),
   // and unicode61 tokenizes punctuation-only terms to an empty phrase
   // (`foo =>`). Either shape falls back to the LIKE scan.
-  const unmatchable = tableKind === 'trigram'
-    ? (term: string) => Array.from(term).length < 3
-    : (term: string) => !/[\p{L}\p{N}]/u.test(term)
+  const unmatchable =
+    tableKind === 'trigram'
+      ? (term: string) => Array.from(term).length < 3
+      : (term: string) => !/[\p{L}\p{N}]/u.test(term)
   if (terms.some(unmatchable)) return null
 
-  const ftsTerms = tableKind === 'unicode'
-    ? terms.map(term => `${quoteFtsTerm(term)}*`)
-    : terms.map(quoteFtsTerm)
+  const ftsTerms =
+    tableKind === 'unicode'
+      ? terms.map((term) => `${quoteFtsTerm(term)}*`)
+      : terms.map(quoteFtsTerm)
 
   return {
     tableKind,
@@ -96,11 +98,13 @@ function normalizeWhitespace(value: string): string {
 }
 
 function looksLikeExplicitFtsQuery(query: string): boolean {
-  return query.includes('"')
-    || query.includes('*')
-    || query.includes('(')
-    || query.includes(')')
-    || EXPLICIT_FTS_OPERATOR.test(query)
+  return (
+    query.includes('"') ||
+    query.includes('*') ||
+    query.includes('(') ||
+    query.includes(')') ||
+    EXPLICIT_FTS_OPERATOR.test(query)
+  )
 }
 
 function quoteFtsTerm(value: string): string {

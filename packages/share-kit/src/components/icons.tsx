@@ -4,7 +4,14 @@
 
 import { Link, ArrowRight, Sparkles, Shield, AlertCircle, Copy } from 'lucide-react'
 
-export { Link as IconLink, ArrowRight as IconArrow, Sparkles as IconSparkle, Shield as IconShield, AlertCircle as IconAlert, Copy as IconCopy }
+export {
+  Link as IconLink,
+  ArrowRight as IconArrow,
+  Sparkles as IconSparkle,
+  Shield as IconShield,
+  AlertCircle as IconAlert,
+  Copy as IconCopy,
+}
 
 interface BobbinProps {
   size?: number

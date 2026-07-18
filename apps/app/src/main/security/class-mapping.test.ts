@@ -1,14 +1,15 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
 import type { SensitiveMatch } from '@spool-lab/redact'
-import {
-  mapPfMatch,
-  mapPfMatches,
-  setUnknownLabelSink,
-  type PfRawMatch,
-} from './class-mapping.js'
+import { describe, it, expect, afterEach, vi } from 'vite-plus/test'
+
+import { mapPfMatch, mapPfMatches, setUnknownLabelSink, type PfRawMatch } from './class-mapping.js'
 
 const regex = (kind: SensitiveMatch['kind'], start: number, end: number): SensitiveMatch => ({
-  kind, value: '', start, end, confidence: 0.95, provider: 'regex',
+  kind,
+  value: '',
+  start,
+  end,
+  confidence: 0.95,
+  provider: 'regex',
 })
 
 describe('class mapping — kept classes (high-precision on PII-only setting)', () => {
@@ -60,7 +61,7 @@ describe('class mapping — suppression rules', () => {
     // Real-shape standalone secret — high score, ≥16 chars, high entropy.
     // Should land as generic-secret since regex doesn't know this prefix.
     it('high-confidence high-entropy ≥16 chars passes', () => {
-      const value = 'j82H1xK9pQrSt7VwYzA3bC5dF8gJ'  // 28 random mixed chars
+      const value = 'j82H1xK9pQrSt7VwYzA3bC5dF8gJ' // 28 random mixed chars
       const pf: PfRawMatch = { class: 'secret', value, start: 0, end: value.length, score: 0.97 }
       expect(mapPfMatch(pf, { regexMatches: [], fullText: value })?.kind).toBe('generic-secret')
     })
@@ -70,11 +71,17 @@ describe('class mapping — suppression rules', () => {
       expect(mapPfMatch(pf, { regexMatches: [], fullText: value })).toBeNull()
     })
     it('drops below 16 chars even at high confidence', () => {
-      const pf: PfRawMatch = { class: 'secret', value: 'shortpw1234', start: 0, end: 11, score: 0.99 }
+      const pf: PfRawMatch = {
+        class: 'secret',
+        value: 'shortpw1234',
+        start: 0,
+        end: 11,
+        score: 0.99,
+      }
       expect(mapPfMatch(pf, { regexMatches: [], fullText: 'shortpw1234' })).toBeNull()
     })
     it('drops low-entropy strings (placeholder passwords)', () => {
-      const value = 'changemechangeme'  // 16 chars but repetitive — low entropy
+      const value = 'changemechangeme' // 16 chars but repetitive — low entropy
       const pf: PfRawMatch = { class: 'secret', value, start: 0, end: value.length, score: 0.99 }
       expect(mapPfMatch(pf, { regexMatches: [], fullText: value })).toBeNull()
     })
@@ -82,7 +89,9 @@ describe('class mapping — suppression rules', () => {
 
   it('date alone is suppressed', () => {
     const pf: PfRawMatch = { class: 'date', value: '1990-05-15', start: 0, end: 10, score: 0.85 }
-    expect(mapPfMatch(pf, { regexMatches: [], fullText: 'random text 1990-05-15 nothing here' })).toBeNull()
+    expect(
+      mapPfMatch(pf, { regexMatches: [], fullText: 'random text 1990-05-15 nothing here' }),
+    ).toBeNull()
   })
 
   it('date with DOB context → date-of-birth', () => {
@@ -120,7 +129,13 @@ describe('class mapping — unknown-label observability', () => {
   it('invokes the sink with the unknown label (still drops the match)', () => {
     const sink = vi.fn()
     setUnknownLabelSink(sink)
-    const pf: PfRawMatch = { class: 'new_model_class', value: 'secret-ish', start: 0, end: 10, score: 0.99 }
+    const pf: PfRawMatch = {
+      class: 'new_model_class',
+      value: 'secret-ish',
+      start: 0,
+      end: 10,
+      score: 0.99,
+    }
     expect(mapPfMatch(pf, { regexMatches: [], fullText: 'secret-ish' })).toBeNull()
     expect(sink).toHaveBeenCalledTimes(1)
     expect(sink).toHaveBeenCalledWith('new_model_class')
@@ -129,7 +144,13 @@ describe('class mapping — unknown-label observability', () => {
   it('passes only the label, never the matched value', () => {
     const sink = vi.fn()
     setUnknownLabelSink(sink)
-    const pf: PfRawMatch = { class: 'mystery', value: 'sensitive-user-content', start: 0, end: 22, score: 0.9 }
+    const pf: PfRawMatch = {
+      class: 'mystery',
+      value: 'sensitive-user-content',
+      start: 0,
+      end: 22,
+      score: 0.9,
+    }
     mapPfMatch(pf, { regexMatches: [], fullText: 'sensitive-user-content' })
     expect(sink).toHaveBeenCalledWith('mystery')
     expect(sink.mock.calls[0]).not.toContain('sensitive-user-content')
@@ -139,9 +160,15 @@ describe('class mapping — unknown-label observability', () => {
     const sink = vi.fn()
     setUnknownLabelSink(sink)
     // known class
-    mapPfMatch({ class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.99 }, { regexMatches: [], fullText: 'a@b.c' })
+    mapPfMatch(
+      { class: 'email', value: 'a@b.c', start: 0, end: 5, score: 0.99 },
+      { regexMatches: [], fullText: 'a@b.c' },
+    )
     // unknown but below the 0.85 floor — dropped before mapClass()
-    mapPfMatch({ class: 'mystery', value: 'x', start: 0, end: 1, score: 0.5 }, { regexMatches: [], fullText: 'x' })
+    mapPfMatch(
+      { class: 'mystery', value: 'x', start: 0, end: 1, score: 0.5 },
+      { regexMatches: [], fullText: 'x' },
+    )
     expect(sink).not.toHaveBeenCalled()
   })
 
@@ -171,11 +198,11 @@ describe('class mapping — unknown-label observability', () => {
 describe('mapPfMatches', () => {
   it('drops suppressed entries while keeping the rest', () => {
     const pf: PfRawMatch[] = [
-      { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 },           // disabled class
+      { class: 'person', value: 'Maya', start: 0, end: 4, score: 0.9 }, // disabled class
       { class: 'account_number', value: '0123456', start: 10, end: 17, score: 0.95 }, // disabled class
-      { class: 'email', value: 'a@b.c', start: 20, end: 25, score: 0.9 },         // kept
+      { class: 'email', value: 'a@b.c', start: 20, end: 25, score: 0.9 }, // kept
     ]
     const out = mapPfMatches(pf, { regexMatches: [], fullText: 'Maya       0123456    a@b.c' })
-    expect(out.map(m => m.kind)).toEqual(['email'])
+    expect(out.map((m) => m.kind)).toEqual(['email'])
   })
 })

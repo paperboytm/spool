@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { maskValueByKind } from './mask.js'
 
 describe('maskValueByKind', () => {
@@ -13,9 +14,13 @@ describe('maskValueByKind', () => {
     expect(maskValueByKind('123-45-6789', 'ssn')).toBe('***-**-6789')
   })
   it('api-key identifies the vendor when the prefix is recognised', () => {
-    expect(maskValueByKind('sk_' + 'live_' + 'x'.repeat(24), 'api-key')).toBe('[redacted: Stripe key]')
+    expect(maskValueByKind('sk_' + 'live_' + 'x'.repeat(24), 'api-key')).toBe(
+      '[redacted: Stripe key]',
+    )
     expect(maskValueByKind('AKIAIOSFODNN7EXAMPLE', 'api-key')).toBe('[redacted: AWS key]')
-    expect(maskValueByKind('ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789', 'api-key')).toBe('[redacted: GitHub key]')
+    expect(maskValueByKind('ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789', 'api-key')).toBe(
+      '[redacted: GitHub key]',
+    )
     expect(maskValueByKind('sk-ant-api03-xyz', 'api-key')).toBe('[redacted: Anthropic key]')
     expect(maskValueByKind('hf_abc', 'api-key')).toBe('[redacted: Hugging Face key]')
   })
@@ -23,17 +28,22 @@ describe('maskValueByKind', () => {
     expect(maskValueByKind('zzz-unknown-prefix-abc123', 'api-key')).toBe('[redacted API key]')
   })
   it('connection-string preserves the scheme', () => {
-    expect(maskValueByKind('postgresql://user:pass@host/db', 'connection-string'))
-      .toBe('postgresql://[redacted]')
-    expect(maskValueByKind('mongodb+srv://u:p@cluster.mongodb.net/test', 'connection-string'))
-      .toBe('mongodb+srv://[redacted]')
+    expect(maskValueByKind('postgresql://user:pass@host/db', 'connection-string')).toBe(
+      'postgresql://[redacted]',
+    )
+    expect(maskValueByKind('mongodb+srv://u:p@cluster.mongodb.net/test', 'connection-string')).toBe(
+      'mongodb+srv://[redacted]',
+    )
   })
   it('url-creds preserves scheme + host but masks userinfo', () => {
-    expect(maskValueByKind('https://admin:hunter2@db.example.com:5432/main', 'url-creds'))
-      .toBe('https://[redacted:redacted]@db.example.com:5432/main')
+    expect(maskValueByKind('https://admin:hunter2@db.example.com:5432/main', 'url-creds')).toBe(
+      'https://[redacted:redacted]@db.example.com:5432/main',
+    )
   })
   it('env-var preserves the NAME but masks the VALUE', () => {
-    expect(maskValueByKind('STRIPE_SECRET_KEY=' + 'sk_' + 'live_' + 'xxxx', 'env-var')).toBe('STRIPE_SECRET_KEY=[redacted]')
+    expect(maskValueByKind('STRIPE_SECRET_KEY=' + 'sk_' + 'live_' + 'xxxx', 'env-var')).toBe(
+      'STRIPE_SECRET_KEY=[redacted]',
+    )
   })
   it('private-key includes the original byte size as a hint', () => {
     const key = '-'.repeat(1500)
@@ -45,14 +55,20 @@ describe('maskValueByKind', () => {
     expect(maskValueByKind('Basic abc', 'basic-auth')).toBe('Basic [redacted]')
   })
   it('cloud-cred-ini detects AWS vs Google by content', () => {
-    expect(maskValueByKind('aws_access_key_id = AKIAIOSFODNN7EXAMPLE', 'cloud-cred-ini'))
-      .toBe('[redacted AWS credentials]')
-    expect(maskValueByKind('"refresh_token": "1//abc"', 'cloud-cred-ini'))
-      .toBe('[redacted Google credentials]')
+    expect(maskValueByKind('aws_access_key_id = AKIAIOSFODNN7EXAMPLE', 'cloud-cred-ini')).toBe(
+      '[redacted AWS credentials]',
+    )
+    expect(maskValueByKind('"refresh_token": "1//abc"', 'cloud-cred-ini')).toBe(
+      '[redacted Google credentials]',
+    )
   })
   it('absolute-path preserves the root segment', () => {
-    expect(maskValueByKind('/Users/chen/secrets/keys.txt', 'absolute-path')).toBe('/Users/[redacted]')
-    expect(maskValueByKind('C:\\Users\\chen\\Documents\\x', 'absolute-path')).toBe('C:\\Users\\[redacted]')
+    expect(maskValueByKind('/Users/chen/secrets/keys.txt', 'absolute-path')).toBe(
+      '/Users/[redacted]',
+    )
+    expect(maskValueByKind('C:\\Users\\chen\\Documents\\x', 'absolute-path')).toBe(
+      'C:\\Users\\[redacted]',
+    )
   })
   it('ip preserves the IPv4-vs-IPv6 distinction', () => {
     expect(maskValueByKind('192.168.1.42', 'ip')).toBe('[redacted IPv4]')

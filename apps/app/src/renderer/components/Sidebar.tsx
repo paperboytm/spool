@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
-import { Layers3 as LibraryIcon, Search as SearchIcon, Settings as SettingsIcon, Newspaper as SharesIcon, ShieldAlert as SecurityIcon, SquareTerminal, MoreHorizontal, Copy, Loader2, SquarePen, PanelLeft } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import PinIcon from './PinIcon.js'
-import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
-import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import {
-  DEFAULT_SIDEBAR_SORT_ORDER,
-  SIDEBAR_SORT_OPTIONS,
-  type SidebarSortOrder,
-} from '../../shared/sidebarSort.js'
+  Layers3 as LibraryIcon,
+  Search as SearchIcon,
+  Settings as SettingsIcon,
+  Newspaper as SharesIcon,
+  ShieldAlert as SecurityIcon,
+  SquareTerminal,
+  MoreHorizontal,
+  Copy,
+  Loader2,
+  SquarePen,
+  PanelLeft,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import {
   DEFAULT_PINNED_SORT_ORDER,
   PINNED_SORT_OPTIONS,
   type PinnedSortOrder,
 } from '../../shared/pinnedSort.js'
+import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
+import { getSessionSourceColor, getSessionSourceLabel } from '../../shared/sessionSources.js'
+import {
+  DEFAULT_SIDEBAR_SORT_ORDER,
+  SIDEBAR_SORT_OPTIONS,
+  type SidebarSortOrder,
+} from '../../shared/sidebarSort.js'
 import Menu from './Menu.js'
+import PinIcon from './PinIcon.js'
 
 type Props = {
   activeIdentityKey: string | null
@@ -47,20 +60,51 @@ type Props = {
   chromeOnly?: boolean
 }
 
-export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, onSelectProject, onSelectSession, onSelectHome, isLibraryActive = false, onSelectShares, isSharesActive = false, onSelectSecurity, isSecurityActive = false, onOpenSearch, syncStatus, status, onSettingsClick, showSourceDots = true, showSessionCount = true, sortOrder = DEFAULT_SIDEBAR_SORT_ORDER, onSortOrderChange, pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER, onPinnedSortOrderChange, onCopySessionId, onShareSession, sidebarToggle, chromeOnly = false }: Props) {
+export default function Sidebar({
+  activeIdentityKey,
+  activeSessionUuid = null,
+  onSelectProject,
+  onSelectSession,
+  onSelectHome,
+  isLibraryActive = false,
+  onSelectShares,
+  isSharesActive = false,
+  onSelectSecurity,
+  isSecurityActive = false,
+  onOpenSearch,
+  syncStatus,
+  status,
+  onSettingsClick,
+  showSourceDots = true,
+  showSessionCount = true,
+  sortOrder = DEFAULT_SIDEBAR_SORT_ORDER,
+  onSortOrderChange,
+  pinnedSortOrder = DEFAULT_PINNED_SORT_ORDER,
+  onPinnedSortOrderChange,
+  onCopySessionId,
+  onShareSession,
+  sidebarToggle,
+  chromeOnly = false,
+}: Props) {
   const { t } = useTranslation()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
     switch (value) {
-      case 'recent': return t('sidebar.sort_recent')
-      case 'name': return t('sidebar.sort_name')
-      case 'most_sessions': return t('sidebar.sort_most_sessions')
+      case 'recent':
+        return t('sidebar.sort_recent')
+      case 'name':
+        return t('sidebar.sort_name')
+      case 'most_sessions':
+        return t('sidebar.sort_most_sessions')
     }
   }
   const pinnedSortLabel = (value: PinnedSortOrder): string => {
     switch (value) {
-      case 'recent_pinned': return t('sidebar.sort_recent_pinned')
-      case 'recent': return t('sidebar.sort_recent_used')
-      case 'name': return t('sidebar.sort_name')
+      case 'recent_pinned':
+        return t('sidebar.sort_recent_pinned')
+      case 'recent':
+        return t('sidebar.sort_recent_used')
+      case 'name':
+        return t('sidebar.sort_name')
     }
   }
   const [groups, setGroups] = useState<ProjectGroup[] | null>(null)
@@ -70,18 +114,30 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
 
   useEffect(() => {
     let cancelled = false
-    window.spool.listProjectGroups()
-      .then(result => { if (!cancelled) setGroups(result) })
-      .catch(() => { if (!cancelled) setGroups([]) })
-    return () => { cancelled = true }
+    window.spool
+      .listProjectGroups()
+      .then((result) => {
+        if (!cancelled) setGroups(result)
+      })
+      .catch(() => {
+        if (!cancelled) setGroups([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [status?.totalSessions])
 
   useEffect(() => {
     let cancelled = false
     function refresh() {
-      window.spool.listPinnedSessions()
-        .then(result => { if (!cancelled) setPinned(result) })
-        .catch(() => { if (!cancelled) setPinned([]) })
+      window.spool
+        .listPinnedSessions()
+        .then((result) => {
+          if (!cancelled) setPinned(result)
+        })
+        .catch(() => {
+          if (!cancelled) setPinned([])
+        })
     }
     refresh()
     window.addEventListener('spool:pin-change', refresh)
@@ -95,25 +151,27 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
     () => (pinned ? sortPinnedSessions(pinned, pinnedSortOrder) : null),
     [pinned, pinnedSortOrder],
   )
-  const visibleGroups = (groups ?? []).filter(g => g.sessionCount > 0)
+  const visibleGroups = (groups ?? []).filter((g) => g.sessionCount > 0)
   const projectGroups = useMemo(
-    () => sortProjectGroups(visibleGroups.filter(g => g.identityKind !== 'loose'), sortOrder),
+    () =>
+      sortProjectGroups(
+        visibleGroups.filter((g) => g.identityKind !== 'loose'),
+        sortOrder,
+      ),
     [visibleGroups, sortOrder],
   )
-  const looseGroup = visibleGroups.find(g => g.identityKind === 'loose')
+  const looseGroup = visibleGroups.find((g) => g.identityKind === 'loose')
 
   return (
     <aside
       data-testid="sidebar"
       className={[
         'w-60 flex-none flex flex-col h-full overflow-hidden transition-colors duration-[280ms] ease-out',
-        chromeOnly
-          ? 'bg-warm-bg dark:bg-dark-bg'
-          : 'bg-warm-surface dark:bg-dark-surface',
+        chromeOnly ? 'bg-warm-bg dark:bg-dark-bg' : 'bg-warm-surface dark:bg-dark-surface',
       ].join(' ')}
     >
       {sidebarToggle && (
-        <div className="px-2 pt-1 flex-none flex flex-col gap-0.5">
+        <div className="flex flex-none flex-col gap-0.5 px-2 pt-1">
           {chromeOnly ? (
             <SidebarCollapsedToggle
               collapsed={sidebarToggle.collapsed}
@@ -135,177 +193,194 @@ export default function Sidebar({ activeIdentityKey, activeSessionUuid = null, o
       )}
       {!chromeOnly && (
         <>
-      <nav className={`px-2 ${sidebarToggle ? 'pt-0 mt-0.5' : 'pt-1'} pb-2 flex-none flex flex-col gap-0.5`} aria-label={t('sidebar.library')}>
-        {onSelectHome && (
-          <NavRow
-            testId="sidebar-library"
-            icon={<LibraryIcon size={14} strokeWidth={1.75} />}
-            label={t('sidebar.library')}
-            active={isLibraryActive}
-            onClick={onSelectHome}
-          />
-        )}
-        <NavRow
-          testId="sidebar-security"
-          icon={<SecurityIcon size={14} strokeWidth={1.75} />}
-          label={t('sidebar.security')}
-          active={isSecurityActive}
-          onClick={onSelectSecurity}
-        />
-        <NavRow
-          testId="sidebar-shares"
-          icon={<SharesIcon size={14} strokeWidth={1.75} />}
-          label={t('sidebar.shares')}
-          active={isSharesActive}
-          onClick={onSelectShares}
-        />
-        {onOpenSearch && (
-          <NavRow
-            testId="sidebar-search"
-            icon={<SearchIcon size={14} strokeWidth={1.75} />}
-            label={t('sidebar.search')}
-            trailing={<KbdHint>{formatModShortcut('K')}</KbdHint>}
-            onClick={onOpenSearch}
-          />
-        )}
-      </nav>
-
-      {sortedPinned && sortedPinned.length > 0 && onSelectSession && (
-        <div className="flex-none">
-          <SectionHeader
-            label={t('sidebar.pinned')}
-            open={pinnedOpen}
-            onToggle={() => setPinnedOpen(open => !open)}
-            testId="sidebar-pinned-toggle"
-            trailing={onPinnedSortOrderChange ? (
-              <Menu
-                align="right"
-                testId="sidebar-pinned-sort-menu"
-                trigger={({ open, toggle }) => (
-                  <button
-                    type="button"
-                    data-testid="sidebar-pinned-sort-trigger"
-                    onClick={toggle}
-                    title={t('sidebar.sortBy')}
-                    aria-label={t('sidebar.sortBy')}
-                    aria-haspopup="menu"
-                    aria-expanded={open}
-                    className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
-                      open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
-                    }`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                      <path d="M1 3.5h12M2.5 7h9M5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                )}
-                items={PINNED_SORT_OPTIONS.map(option => ({
-                  label: pinnedSortLabel(option.value),
-                  active: pinnedSortOrder === option.value,
-                  onSelect: () => onPinnedSortOrderChange(option.value),
-                }))}
+          <nav
+            className={`px-2 ${sidebarToggle ? 'mt-0.5 pt-0' : 'pt-1'} flex flex-none flex-col gap-0.5 pb-2`}
+            aria-label={t('sidebar.library')}
+          >
+            {onSelectHome && (
+              <NavRow
+                testId="sidebar-library"
+                icon={<LibraryIcon size={14} strokeWidth={1.75} />}
+                label={t('sidebar.library')}
+                active={isLibraryActive}
+                onClick={onSelectHome}
               />
-            ) : null}
-          />
-          {pinnedOpen && (
-            <div className="px-2 max-h-40 overflow-y-auto scrollbar-none">
-              {sortedPinned.map(session => (
-                <PinnedRow
-                  key={session.sessionUuid}
-                  session={session}
-                  active={session.sessionUuid === activeSessionUuid}
-                  onClick={() => onSelectSession(session.sessionUuid)}
-                  {...(onCopySessionId ? { onCopySessionId } : {})}
-                  onShare={onShareSession}
-                />
-              ))}
+            )}
+            <NavRow
+              testId="sidebar-security"
+              icon={<SecurityIcon size={14} strokeWidth={1.75} />}
+              label={t('sidebar.security')}
+              active={isSecurityActive}
+              onClick={onSelectSecurity}
+            />
+            <NavRow
+              testId="sidebar-shares"
+              icon={<SharesIcon size={14} strokeWidth={1.75} />}
+              label={t('sidebar.shares')}
+              active={isSharesActive}
+              onClick={onSelectShares}
+            />
+            {onOpenSearch && (
+              <NavRow
+                testId="sidebar-search"
+                icon={<SearchIcon size={14} strokeWidth={1.75} />}
+                label={t('sidebar.search')}
+                trailing={<KbdHint>{formatModShortcut('K')}</KbdHint>}
+                onClick={onOpenSearch}
+              />
+            )}
+          </nav>
+
+          {sortedPinned && sortedPinned.length > 0 && onSelectSession && (
+            <div className="flex-none">
+              <SectionHeader
+                label={t('sidebar.pinned')}
+                open={pinnedOpen}
+                onToggle={() => setPinnedOpen((open) => !open)}
+                testId="sidebar-pinned-toggle"
+                trailing={
+                  onPinnedSortOrderChange ? (
+                    <Menu
+                      align="right"
+                      testId="sidebar-pinned-sort-menu"
+                      trigger={({ open, toggle }) => (
+                        <button
+                          type="button"
+                          data-testid="sidebar-pinned-sort-trigger"
+                          onClick={toggle}
+                          title={t('sidebar.sortBy')}
+                          aria-label={t('sidebar.sortBy')}
+                          aria-haspopup="menu"
+                          aria-expanded={open}
+                          className={`text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-end transition-opacity ${
+                            open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
+                          }`}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                            <path
+                              d="M1 3.5h12M2.5 7h9M5 10.5h4"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                      items={PINNED_SORT_OPTIONS.map((option) => ({
+                        label: pinnedSortLabel(option.value),
+                        active: pinnedSortOrder === option.value,
+                        onSelect: () => onPinnedSortOrderChange(option.value),
+                      }))}
+                    />
+                  ) : null
+                }
+              />
+              {pinnedOpen && (
+                <div className="max-h-40 scrollbar-none overflow-y-auto px-2">
+                  {sortedPinned.map((session) => (
+                    <PinnedRow
+                      key={session.sessionUuid}
+                      session={session}
+                      active={session.sessionUuid === activeSessionUuid}
+                      onClick={() => onSelectSession(session.sessionUuid)}
+                      {...(onCopySessionId ? { onCopySessionId } : {})}
+                      onShare={onShareSession}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <SectionHeader
-          label={t('sidebar.projects')}
-          open={projectsOpen}
-          onToggle={() => setProjectsOpen(open => !open)}
-          testId="sidebar-projects-toggle"
-          trailing={onSortOrderChange ? (
-            <Menu
-              align="right"
-              testId="sidebar-sort-menu"
-              trigger={({ open, toggle }) => (
-                <button
-                  type="button"
-                  data-testid="sidebar-sort-trigger"
-                  onClick={toggle}
-                  title={t('sidebar.sortBy')}
-                  aria-label={t('sidebar.sortBy')}
-                  aria-haspopup="menu"
-                  aria-expanded={open}
-                  className={`flex-none inline-flex items-center justify-end h-4 transition-opacity text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text ${
-                    open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
-                  }`}
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                    <path d="M1 3.5h12M2.5 7h9M5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </button>
-              )}
-              items={SIDEBAR_SORT_OPTIONS.map(option => ({
-                label: sidebarSortLabel(option.value),
-                active: sortOrder === option.value,
-                onSelect: () => onSortOrderChange(option.value),
-              }))}
-            />
-          ) : null}
-        />
-
-        {projectsOpen && (
-          <div className="flex-1 min-h-0 overflow-y-auto pb-3 px-2 scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)]">
-            {groups === null ? (
-              <SidebarSkeleton />
-            ) : projectGroups.length === 0 && !looseGroup ? (
-              <p className="px-2 py-3 text-xs text-warm-faint dark:text-dark-muted">
-                {t('sidebar.noProjects')}
-              </p>
-            ) : (
-              <>
-                {projectGroups.map(group => (
-                  <ProjectRow
-                    key={group.identityKey}
-                    group={group}
-                    active={group.identityKey === activeIdentityKey}
-                    showSourceDots={showSourceDots}
-                    showSessionCount={showSessionCount}
-                    onClick={() => onSelectProject(group.identityKey)}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <SectionHeader
+              label={t('sidebar.projects')}
+              open={projectsOpen}
+              onToggle={() => setProjectsOpen((open) => !open)}
+              testId="sidebar-projects-toggle"
+              trailing={
+                onSortOrderChange ? (
+                  <Menu
+                    align="right"
+                    testId="sidebar-sort-menu"
+                    trigger={({ open, toggle }) => (
+                      <button
+                        type="button"
+                        data-testid="sidebar-sort-trigger"
+                        onClick={toggle}
+                        title={t('sidebar.sortBy')}
+                        aria-label={t('sidebar.sortBy')}
+                        aria-haspopup="menu"
+                        aria-expanded={open}
+                        className={`text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-end transition-opacity ${
+                          open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
+                        }`}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                          <path
+                            d="M1 3.5h12M2.5 7h9M5 10.5h4"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                    items={SIDEBAR_SORT_OPTIONS.map((option) => ({
+                      label: sidebarSortLabel(option.value),
+                      active: sortOrder === option.value,
+                      onSelect: () => onSortOrderChange(option.value),
+                    }))}
                   />
-                ))}
+                ) : null
+              }
+            />
 
-                {looseGroup && (
+            {projectsOpen && (
+              <div className="min-h-0 flex-1 scrollbar-none overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%_-_20px),transparent)] px-2 pb-3">
+                {groups === null ? (
+                  <SidebarSkeleton />
+                ) : projectGroups.length === 0 && !looseGroup ? (
+                  <p className="text-warm-faint dark:text-dark-muted px-2 py-3 text-xs">
+                    {t('sidebar.noProjects')}
+                  </p>
+                ) : (
                   <>
-                    <div className="my-2 mx-2 border-t border-warm-border dark:border-dark-border" />
-                    <ProjectRow
-                      group={looseGroup}
-                      active={looseGroup.identityKey === activeIdentityKey}
-                      showSourceDots={showSourceDots}
-                      showSessionCount={showSessionCount}
-                      onClick={() => onSelectProject(looseGroup.identityKey)}
-                    />
+                    {projectGroups.map((group) => (
+                      <ProjectRow
+                        key={group.identityKey}
+                        group={group}
+                        active={group.identityKey === activeIdentityKey}
+                        showSourceDots={showSourceDots}
+                        showSessionCount={showSessionCount}
+                        onClick={() => onSelectProject(group.identityKey)}
+                      />
+                    ))}
+
+                    {looseGroup && (
+                      <>
+                        <div className="border-warm-border dark:border-dark-border mx-2 my-2 border-t" />
+                        <ProjectRow
+                          group={looseGroup}
+                          active={looseGroup.identityKey === activeIdentityKey}
+                          showSourceDots={showSourceDots}
+                          showSessionCount={showSessionCount}
+                          onClick={() => onSelectProject(looseGroup.identityKey)}
+                        />
+                      </>
+                    )}
                   </>
                 )}
-              </>
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      <UpdateBanner />
-      <SidebarStatus
-        syncStatus={syncStatus ?? null}
-        status={status ?? null}
-        {...(onSettingsClick ? { onSettingsClick } : {})}
-      />
+          <UpdateBanner />
+          <SidebarStatus
+            syncStatus={syncStatus ?? null}
+            status={status ?? null}
+            {...(onSettingsClick ? { onSettingsClick } : {})}
+          />
         </>
       )}
     </aside>
@@ -347,14 +422,22 @@ function NavRow({
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
       ].join(' ')}
     >
-      <span className="flex-none w-4 h-4 inline-flex items-center justify-center">{icon}</span>
-      <span className="flex-1 text-left truncate">{label}</span>
+      <span className="inline-flex h-4 w-4 flex-none items-center justify-center">{icon}</span>
+      <span className="flex-1 truncate text-left">{label}</span>
       {trailing}
     </button>
   )
 }
 
-function SidebarCollapsedToggle({ collapsed, onToggle, title }: { collapsed: boolean; onToggle: () => void; title: string }) {
+function SidebarCollapsedToggle({
+  collapsed,
+  onToggle,
+  title,
+}: {
+  collapsed: boolean
+  onToggle: () => void
+  title: string
+}) {
   const { t } = useTranslation()
   return (
     <button
@@ -364,7 +447,7 @@ function SidebarCollapsedToggle({ collapsed, onToggle, title }: { collapsed: boo
       title={title}
       aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
       aria-pressed={collapsed}
-      className="ml-1 flex-none inline-flex items-center justify-center w-6 h-6 rounded-md text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75"
+      className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text ml-1 inline-flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors duration-75"
       style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
       <PanelLeft size={14} strokeWidth={1.75} />
@@ -379,7 +462,7 @@ function formatModShortcut(key: string) {
 
 function KbdHint({ children }: { children: ReactNode }) {
   return (
-    <kbd className="flex-none font-mono text-[10px] tabular-nums text-warm-faint/80 dark:text-dark-muted/80">
+    <kbd className="text-warm-faint/80 dark:text-dark-muted/80 flex-none font-mono text-[10px] tabular-nums">
       {children}
     </kbd>
   )
@@ -399,10 +482,16 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex-none h-[30px] pl-4 pr-4 flex items-center gap-2">
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full flex-none ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`} />
-        <span data-testid="status-text" className="text-[11px] font-mono text-warm-faint dark:text-dark-muted truncate" title={text}>
+    <div className="flex h-[30px] flex-none items-center gap-2 pr-4 pl-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span
+          className={`h-1.5 w-1.5 flex-none rounded-full ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`}
+        />
+        <span
+          data-testid="status-text"
+          className="text-warm-faint dark:text-dark-muted truncate font-mono text-[11px]"
+          title={text}
+        >
           {text}
         </span>
       </div>
@@ -413,7 +502,7 @@ function SidebarStatus({
           onClick={onSettingsClick}
           title={t('sidebar.settings')}
           aria-label={t('sidebar.settings')}
-          className="flex-none inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+          className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-center transition-colors"
         >
           <SettingsIcon size={13} strokeWidth={1.75} />
         </button>
@@ -460,16 +549,20 @@ function UpdateBanner() {
       setPending(null)
       setUpdate(data)
     })
-    return () => { off() }
+    return () => {
+      off()
+    }
   }, [])
 
   if (!update && !pending) return null
   if (update?.status === 'error' && errorDismissed && !pending) return null
 
   const effectiveStatus =
-    pending === 'preparing' ? 'downloading' :
-    pending === 'restarting' ? 'restarting' :
-    update?.status ?? null
+    pending === 'preparing'
+      ? 'downloading'
+      : pending === 'restarting'
+        ? 'restarting'
+        : (update?.status ?? null)
 
   const isPassive = effectiveStatus === 'downloading' || effectiveStatus === 'restarting'
   const isError = effectiveStatus === 'error'
@@ -487,72 +580,143 @@ function UpdateBanner() {
   }
 
   const label =
-    pending === 'preparing' ? t('update.downloading', { percent: 0 }) :
-    pending === 'restarting' ? t('update.restart') :
-    update?.status === 'available' ? `${t('update.available')}${update.version ? ` · v${update.version}` : ''}` :
-    update?.status === 'ready' ? t('update.ready') :
-    update?.status === 'error' ? t('common.retry') :
-    update?.percent != null ? t('update.downloading', { percent: update.percent }) : t('update.downloading', { percent: 0 })
+    pending === 'preparing'
+      ? t('update.downloading', { percent: 0 })
+      : pending === 'restarting'
+        ? t('update.restart')
+        : update?.status === 'available'
+          ? `${t('update.available')}${update.version ? ` · v${update.version}` : ''}`
+          : update?.status === 'ready'
+            ? t('update.ready')
+            : update?.status === 'error'
+              ? t('common.retry')
+              : update?.percent != null
+                ? t('update.downloading', { percent: update.percent })
+                : t('update.downloading', { percent: 0 })
 
-  const baseRow = 'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text transition-all duration-150'
+  const baseRow =
+    'flex-none mx-2 mb-2 h-9 px-3 rounded-md flex items-center gap-2 text-[12px] bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text transition-all duration-150'
 
   const icon =
     effectiveStatus === 'available' ? (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="flex-none"
+      >
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
     ) : effectiveStatus === 'ready' ? (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="flex-none"
+      >
         <polyline points="23 4 23 10 17 10" />
         <polyline points="1 20 1 14 7 14" />
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
       </svg>
     ) : isError ? (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="flex-none"
+      >
         <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     ) : (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none animate-spin">
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="flex-none animate-spin"
+      >
         <path d="M21 12a9 9 0 1 1-6.219-8.56" />
       </svg>
     )
 
   if (isPassive) {
     return (
-      <div data-testid={`update-banner-${effectiveStatus}`} className={`${baseRow} text-warm-muted dark:text-dark-muted`}>
+      <div
+        data-testid={`update-banner-${effectiveStatus}`}
+        className={`${baseRow} text-warm-muted dark:text-dark-muted`}
+      >
         {icon}
-        <span className="flex-1 min-w-0 truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
       </div>
     )
   }
 
   if (isError) {
     return (
-      <div data-testid="update-banner-error" className={`${baseRow} pr-1 text-warm-muted dark:text-dark-muted`}>
+      <div
+        data-testid="update-banner-error"
+        className={`${baseRow} text-warm-muted dark:text-dark-muted pr-1`}
+      >
         <button
           type="button"
           data-testid="update-banner-error-retry"
           onClick={onClick}
           title={t('common.retry')}
           aria-label={t('common.retry')}
-          className="flex-1 min-w-0 flex items-center gap-2 -mx-1 px-1 rounded cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.04] active:bg-black/[0.08] dark:active:bg-white/[0.08] active:scale-[0.99] transition-all duration-150"
+          className="-mx-1 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 transition-all duration-150 hover:bg-black/[0.04] active:scale-[0.99] active:bg-black/[0.08] dark:hover:bg-white/[0.04] dark:active:bg-white/[0.08]"
         >
           {icon}
-          <span className="flex-1 min-w-0 truncate text-left">{label}</span>
+          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
         </button>
         <button
           type="button"
           data-testid="update-banner-error-dismiss"
-          onClick={(e) => { e.stopPropagation(); setErrorDismissed(true) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setErrorDismissed(true)
+          }}
           title={t('common.close')}
           aria-label={t('common.close')}
-          className="flex-none inline-flex items-center justify-center w-6 h-6 rounded cursor-pointer text-warm-faint dark:text-dark-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06] hover:text-warm-text dark:hover:text-dark-text active:bg-black/[0.1] dark:active:bg-white/[0.1] active:scale-[0.95] transition-all duration-150"
+          className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-6 w-6 flex-none cursor-pointer items-center justify-center rounded transition-all duration-150 hover:bg-black/[0.06] active:scale-[0.95] active:bg-black/[0.1] dark:hover:bg-white/[0.06] dark:active:bg-white/[0.1]"
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -567,10 +731,10 @@ function UpdateBanner() {
       data-testid={`update-banner-${effectiveStatus}`}
       onClick={onClick}
       title={label}
-      className={`${baseRow} text-left w-auto cursor-pointer hover:brightness-95 dark:hover:brightness-110 active:brightness-90 dark:active:brightness-115 active:scale-[0.99]`}
+      className={`${baseRow} w-auto cursor-pointer text-left hover:brightness-95 active:scale-[0.99] active:brightness-90 dark:hover:brightness-110 dark:active:brightness-115`}
     >
       {icon}
-      <span className="flex-1 min-w-0 truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
   )
 }
@@ -584,14 +748,17 @@ function getSyncStatusText(
 ): string {
   if (syncStatus) {
     if (syncStatus.phase === 'scanning') return t('status.scanning')
-    if (syncStatus.phase === 'syncing') return t('status.indexing', { count: syncStatus.count, total: syncStatus.total })
+    if (syncStatus.phase === 'syncing')
+      return t('status.indexing', { count: syncStatus.count, total: syncStatus.total })
     if (syncStatus.phase === 'indexing') return t('status.building')
     if (syncStatus.phase === 'done' && status) {
       return t('status.sessionsNow_other', { count: status.totalSessions })
     }
   }
   if (!status) return t('status.loading')
-  const lastSync = status.lastSyncedAt ? formatShortTimeAgo(status.lastSyncedAt, t) : t('status.never')
+  const lastSync = status.lastSyncedAt
+    ? formatShortTimeAgo(status.lastSyncedAt, t)
+    : t('status.never')
   return t('status.sessionsAgo_other', { count: status.totalSessions, ago: lastSync })
 }
 
@@ -624,13 +791,13 @@ function SectionHeader({
   trailing?: ReactNode
 }) {
   return (
-    <div className="group mx-2 mt-1 px-2 py-1 flex items-center gap-1">
+    <div className="group mx-2 mt-1 flex items-center gap-1 px-2 py-1">
       <button
         type="button"
         data-testid={testId}
         aria-expanded={open}
         onClick={onToggle}
-        className="flex-1 flex items-center gap-1.5 text-left text-[11px] font-medium text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text rounded-md select-none"
+        className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex flex-1 items-center gap-1.5 rounded-md text-left text-[11px] font-medium select-none"
       >
         <span>{label}</span>
         <svg
@@ -639,9 +806,15 @@ function SectionHeader({
           viewBox="0 0 12 12"
           fill="none"
           aria-hidden="true"
-          className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+          className={`flex-none opacity-30 transition-all group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
         >
-          <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M4 2L8 6L4 10"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
       {trailing}
@@ -690,7 +863,11 @@ function PinnedRow({
     setUnpinning(true)
     try {
       await window.spool.unpinSession(session.sessionUuid)
-      window.dispatchEvent(new CustomEvent('spool:pin-change', { detail: { sessionUuid: session.sessionUuid, pinned: false } }))
+      window.dispatchEvent(
+        new CustomEvent('spool:pin-change', {
+          detail: { sessionUuid: session.sessionUuid, pinned: false },
+        }),
+      )
     } finally {
       setUnpinning(false)
     }
@@ -710,25 +887,29 @@ function PinnedRow({
         }
       }}
       aria-label={projectName ? `${title}, ${projectName}` : title}
-      className={`group w-full text-left flex items-center gap-1 px-2 py-1 rounded-md transition-colors duration-75 focus:outline-none ${
+      className={`group flex w-full items-center gap-1 rounded-md px-2 py-1 text-left transition-colors duration-75 focus:outline-none ${
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
-      <span className="flex-1 truncate text-[13px]" title={title}>{title}</span>
+      <span className="flex-1 truncate text-[13px]" title={title}>
+        {title}
+      </span>
       <span
-        className="flex-none flex items-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 group-has-[[aria-expanded=true]]:opacity-100 transition-opacity"
+        className="flex flex-none items-center gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 group-has-[[aria-expanded=true]]:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           data-testid="sidebar-pinned-unpin"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => { void handleUnpin() }}
+          onClick={() => {
+            void handleUnpin()
+          }}
           aria-label={t('sidebar.unpin')}
           disabled={unpinning}
-          className="inline-flex items-center justify-center h-4 text-accent/80 dark:text-accent-dark/80 hover:text-accent dark:hover:text-accent-dark transition-colors disabled:opacity-50"
+          className="text-accent/80 dark:text-accent-dark/80 hover:text-accent dark:hover:text-accent-dark inline-flex h-4 items-center justify-center transition-colors disabled:opacity-50"
         >
           <PinIcon size={13} filled />
         </button>
@@ -743,34 +924,50 @@ function PinnedRow({
               aria-label={t('common.more')}
               aria-haspopup="menu"
               aria-expanded={open}
-              className="inline-flex items-center justify-center h-4 text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 items-center justify-center transition-colors"
             >
               <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
             </button>
           )}
           items={[
-            ...(onShare ? [{
-              label: t('shareEditor.openNew'),
-              icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
-              onSelect: () => onShare(session.sessionUuid),
-            }] : []),
+            ...(onShare
+              ? [
+                  {
+                    label: t('shareEditor.openNew'),
+                    icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
+                    onSelect: () => onShare(session.sessionUuid),
+                  },
+                ]
+              : []),
             {
               label: resuming ? t('common.loading') : t('session.resume_inTerminal'),
-              icon: resuming
-                ? <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
-                : <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />,
-              onSelect: () => { void handleResume() },
+              icon: resuming ? (
+                <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
+              ) : (
+                <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />
+              ),
+              onSelect: () => {
+                void handleResume()
+              },
               disabled: resuming,
             },
-            ...(resumeCommand ? [{
-              label: t('common.copyResumeCommand'),
-              icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-              onSelect: () => { void handleCopyCommand() },
-            }] : []),
+            ...(resumeCommand
+              ? [
+                  {
+                    label: t('common.copyResumeCommand'),
+                    icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
+                    onSelect: () => {
+                      void handleCopyCommand()
+                    },
+                  },
+                ]
+              : []),
             {
               label: t('sidebar.copySessionId'),
               icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-              onSelect: () => { void handleCopyId() },
+              onSelect: () => {
+                void handleCopyId()
+              },
             },
           ]}
         />
@@ -804,19 +1001,17 @@ function ProjectRow({
       data-identity-key={group.identityKey}
       aria-label={ariaLabel}
       onClick={onClick}
-      className={`w-full text-left flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 ${
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-75 ${
         active
           ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
           : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
       }`}
     >
       <FolderIcon active={active} />
-      <span className="flex-1 truncate text-[13px]">
-        {group.displayName}
-      </span>
+      <span className="flex-1 truncate text-[13px]">{group.displayName}</span>
       {showSourceDots && <SourceDots sources={group.sources} />}
       {showSessionCount && (
-        <span className="flex-none font-mono text-[11px] tabular-nums text-warm-faint/70 dark:text-dark-muted/70">
+        <span className="text-warm-faint/70 dark:text-dark-muted/70 flex-none font-mono text-[11px] tabular-nums">
           {group.sessionCount}
         </span>
       )}
@@ -848,11 +1043,11 @@ function SourceDots({ sources }: { sources: SessionSource[] }) {
   if (sources.length === 0) return null
   const tooltip = sources.map(getSessionSourceLabel).join(' · ')
   return (
-    <span aria-hidden="true" title={tooltip} className="flex-none flex items-center gap-1">
-      {sources.map(source => (
+    <span aria-hidden="true" title={tooltip} className="flex flex-none items-center gap-1">
+      {sources.map((source) => (
         <span
           key={source}
-          className="block w-1.5 h-1.5 rounded-full"
+          className="block h-1.5 w-1.5 rounded-full"
           style={{ background: getSessionSourceColor(source) }}
         />
       ))}
@@ -862,11 +1057,11 @@ function SourceDots({ sources }: { sources: SessionSource[] }) {
 
 function SidebarSkeleton() {
   return (
-    <div className="px-2 py-1 space-y-1.5" aria-hidden>
+    <div className="space-y-1.5 px-2 py-1" aria-hidden>
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          className="h-6 rounded-md bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse"
+          className="bg-warm-surface2 dark:bg-dark-surface2 h-6 animate-pulse rounded-md opacity-60"
         />
       ))}
     </div>
@@ -877,7 +1072,9 @@ function sortProjectGroups(groups: ProjectGroup[], order: SidebarSortOrder): Pro
   const sorted = [...groups]
   switch (order) {
     case 'name':
-      sorted.sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }))
+      sorted.sort((a, b) =>
+        a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }),
+      )
       return sorted
     case 'most_sessions':
       sorted.sort((a, b) => {

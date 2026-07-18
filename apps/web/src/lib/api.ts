@@ -18,10 +18,7 @@ interface TombstoneBody {
   at?: number
 }
 
-export function decideSnapshotState(
-  status: number,
-  body: unknown,
-): SnapshotFetchResult {
+export function decideSnapshotState(status: number, body: unknown): SnapshotFetchResult {
   if (status === 200) {
     return { kind: 'ok', snapshot: body as Snapshot }
   }
@@ -120,7 +117,7 @@ export async function updateDisplayName(value: string | null): Promise<void> {
     body: JSON.stringify({ display_name: value }),
   })
   if (!r.ok) {
-    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    const detail = (await r.json().catch(() => ({}))) as { detail?: string }
     throw new Error(detail.detail ?? `HTTP_${r.status}`)
   }
 }
@@ -133,7 +130,7 @@ export async function setAvatarVisible(visible: boolean): Promise<void> {
     body: JSON.stringify({ avatar_visible: visible }),
   })
   if (!r.ok) {
-    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    const detail = (await r.json().catch(() => ({}))) as { detail?: string }
     throw new Error(detail.detail ?? `HTTP_${r.status}`)
   }
 }
@@ -149,7 +146,7 @@ export async function uploadAvatar(file: File): Promise<{ avatar_id: string; url
     body: form,
   })
   if (!r.ok) {
-    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    const detail = (await r.json().catch(() => ({}))) as { detail?: string }
     throw new Error(detail.detail ?? `HTTP_${r.status}`)
   }
   return (await r.json()) as { avatar_id: string; url: string }
@@ -161,7 +158,7 @@ export async function deleteAvatar(): Promise<void> {
     credentials: 'include',
   })
   if (!r.ok) {
-    const detail = await r.json().catch(() => ({})) as { detail?: string }
+    const detail = (await r.json().catch(() => ({}))) as { detail?: string }
     throw new Error(detail.detail ?? `HTTP_${r.status}`)
   }
 }
@@ -323,7 +320,9 @@ export async function checkHandle(handle: string): Promise<CheckHandleResult> {
   }
 }
 
-export async function claimHandle(handle: string): Promise<
+export async function claimHandle(
+  handle: string,
+): Promise<
   | { kind: 'ok'; handle: string }
   | { kind: 'invalid'; reason: string }
   | { kind: 'taken' }
@@ -370,9 +369,7 @@ export async function signOut(): Promise<boolean> {
   }
 }
 
-export type DeleteAccountResult =
-  | { kind: 'ok'; scheduled_at: number }
-  | { kind: 'error' }
+export type DeleteAccountResult = { kind: 'ok'; scheduled_at: number } | { kind: 'error' }
 
 export async function scheduleAccountDeletion(): Promise<DeleteAccountResult> {
   try {

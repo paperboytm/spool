@@ -5,8 +5,9 @@ import {
   type SpanProcessor,
 } from '@opentelemetry/sdk-trace-base'
 import { Effect, Layer, ManagedRuntime } from 'effect'
-import { PrettyConsoleSpanExporter } from './exporter-pretty.js'
+
 import { RotatingFileSpanExporter } from './exporter-file.js'
+import { PrettyConsoleSpanExporter } from './exporter-pretty.js'
 
 export type ObservabilityEnv = 'dev' | 'prod' | 'test'
 
@@ -62,7 +63,6 @@ export function makeObservabilityRuntime(config: ObservabilityConfig): {
   const runtime = ManagedRuntime.make(observabilityLayer(config))
   return {
     runtime,
-    run: <A, E>(eff: Effect.Effect<A, E>) =>
-      runtime.runPromise(eff as Effect.Effect<A, never>),
+    run: <A, E>(eff: Effect.Effect<A, E>) => runtime.runPromise(eff as Effect.Effect<A, never>),
   }
 }

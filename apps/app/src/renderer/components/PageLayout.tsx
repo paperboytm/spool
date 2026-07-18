@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+
 import AppTopBar from './AppTopBar.js'
 import SidebarRail, { FOLD_EASE } from './SidebarRail.js'
 
@@ -47,7 +48,7 @@ export default function PageLayout({
   children,
 }: Props) {
   return (
-    <div className="relative flex flex-col h-screen bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text">
+    <div className="bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text relative flex h-screen flex-col">
       <AppTopBar
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
@@ -55,16 +56,14 @@ export default function PageLayout({
       >
         {topBar}
       </AppTopBar>
-      <div className="flex flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1">
         <SidebarRail
           collapsed={sidebarCollapsed}
           collapsedWidth={!trafficLightInset ? 'chrome' : 'none'}
         >
           {sidebar}
         </SidebarRail>
-        <div className="relative flex flex-col flex-1 min-w-0">
-          {children}
-        </div>
+        <div className="relative flex min-w-0 flex-1 flex-col">{children}</div>
         {/* Outer animates width 0 ↔ 280; inner is hardcoded to
          *  RIGHT_PANEL_WIDTH so ControlPanel's ~1000-node subtree doesn't
          *  re-lay out each frame — outer just clips. (Sidebar's content
@@ -81,9 +80,7 @@ export default function PageLayout({
           }}
           aria-hidden={!rightPanelOpen}
         >
-          <div style={{ width: RIGHT_PANEL_WIDTH, height: '100%' }}>
-            {rightPanel}
-          </div>
+          <div style={{ width: RIGHT_PANEL_WIDTH, height: '100%' }}>{rightPanel}</div>
         </div>
       </div>
     </div>

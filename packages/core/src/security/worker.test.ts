@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { Effect, Scope, Exit, Stream, Chunk, Fiber } from 'effect'
-import Database from 'better-sqlite3'
 import { regexProvider } from '@spool-lab/redact'
+import Database from 'better-sqlite3'
+import { Effect, Scope, Exit, Stream, Chunk, Fiber } from 'effect'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
-import { makeScanWorker, waitForIdle, type ScanWorker } from './worker.js'
 import { listFindings } from './repo.js'
+import { makeScanWorker, waitForIdle, type ScanWorker } from './worker.js'
 
 // Fake AWS access key — split at concat time so neither GitHub
 // push-protection nor our `*EXAMPLE` validator filters it.
@@ -61,7 +62,9 @@ async function withWorker<A>(
 
 describe('ScanWorker', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb(1) })
+  beforeEach(() => {
+    db = setupDb(1)
+  })
 
   it('processes an enqueued session and writes findings + sets scan_profile', async () => {
     await withWorker(db, async (worker) => {
@@ -69,7 +72,8 @@ describe('ScanWorker', () => {
       await Effect.runPromise(waitForIdle(worker))
       const rows = listFindings(db, { sessionId: 1 })
       expect(rows.length).toBeGreaterThan(0)
-      const sess = db.prepare('SELECT scan_profile, scan_finding_count FROM sessions WHERE id = 1')
+      const sess = db
+        .prepare('SELECT scan_profile, scan_finding_count FROM sessions WHERE id = 1')
         .get() as { scan_profile: string; scan_finding_count: number }
       expect(sess.scan_profile).toBe('regex@3')
       expect(sess.scan_finding_count).toBeGreaterThan(0)
@@ -86,9 +90,9 @@ describe('ScanWorker', () => {
       const enqueued = await Effect.runPromise(worker.backfill())
       expect(enqueued).toBe(3)
       await Effect.runPromise(waitForIdle(worker))
-      const rows = db.prepare(
-        'SELECT scan_profile, scan_finding_count FROM sessions ORDER BY id',
-      ).all() as Array<{ scan_profile: string; scan_finding_count: number }>
+      const rows = db
+        .prepare('SELECT scan_profile, scan_finding_count FROM sessions ORDER BY id')
+        .all() as Array<{ scan_profile: string; scan_finding_count: number }>
       expect(rows.every((r) => r.scan_profile === 'regex@3')).toBe(true)
       expect(rows.every((r) => r.scan_finding_count > 0)).toBe(true)
     })
@@ -110,7 +114,9 @@ describe('ScanWorker', () => {
       const enqueued = await Effect.runPromise(worker.rescanAll())
       expect(enqueued).toBe(2)
       await Effect.runPromise(waitForIdle(worker))
-      const rows = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{ scan_profile: string }>
+      const rows = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{
+        scan_profile: string
+      }>
       expect(rows.every((r) => r.scan_profile === 'regex@3')).toBe(true)
     })
   })
@@ -155,8 +161,9 @@ describe('ScanWorker', () => {
       const enqueued = await Effect.runPromise(worker.backfill())
       expect(enqueued).toBe(1)
       await Effect.runPromise(waitForIdle(worker))
-      const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = 1')
-        .get() as { scan_profile: string }
+      const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = 1').get() as {
+        scan_profile: string
+      }
       expect(sess.scan_profile).toBe('regex@3,allow@deadbeef')
     } finally {
       await Effect.runPromise(Scope.close(scope, Exit.void))
@@ -172,16 +179,18 @@ describe('ScanWorker', () => {
     db.prepare("UPDATE sessions SET scan_profile = 'regex@3'").run()
     await withWorker(db, async (worker) => {
       // Sanity: pre-rescan both rows are stamped.
-      const before = db.prepare('SELECT scan_profile FROM sessions ORDER BY id')
-        .all() as Array<{ scan_profile: string | null }>
-      expect(before.every(r => r.scan_profile === 'regex@3')).toBe(true)
+      const before = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{
+        scan_profile: string | null
+      }>
+      expect(before.every((r) => r.scan_profile === 'regex@3')).toBe(true)
       const count = await Effect.runPromise(worker.rescanAll())
       expect(count).toBe(2)
       // After enqueue + idle, both should be re-stamped.
       await Effect.runPromise(waitForIdle(worker))
-      const after = db.prepare('SELECT scan_profile FROM sessions ORDER BY id')
-        .all() as Array<{ scan_profile: string | null }>
-      expect(after.every(r => r.scan_profile === 'regex@3')).toBe(true)
+      const after = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{
+        scan_profile: string | null
+      }>
+      expect(after.every((r) => r.scan_profile === 'regex@3')).toBe(true)
     })
   })
 
@@ -203,15 +212,13 @@ describe('ScanWorker', () => {
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.enqueue(1))
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
       // queued++ event present
-      expect(collected.some(s => s.queued === 1)).toBe(true)
+      expect(collected.some((s) => s.queued === 1)).toBe(true)
       // scanning=1 event present
-      expect(collected.some(s => s.scanning === 1)).toBe(true)
+      expect(collected.some((s) => s.scanning === 1)).toBe(true)
       // drained back to idle
-      expect(collected.some(s => s.scanning === null && s.queued === 0)).toBe(true)
+      expect(collected.some((s) => s.scanning === null && s.queued === 0)).toBe(true)
     })
   })
 
@@ -225,19 +232,18 @@ describe('ScanWorker', () => {
       // generous number, stop collecting on the first fully-idle
       // snapshot via takeUntil to avoid hanging.
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       const enqueued = await Effect.runPromise(worker.rescanAll())
       expect(enqueued).toBe(5)
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
       // High-water mark reaches the burst size.
-      expect(Math.max(...collected.map(s => s.backfillTotal))).toBe(5)
+      expect(Math.max(...collected.map((s) => s.backfillTotal))).toBe(5)
       // Drains back to 0 once fully idle.
       const last = collected[collected.length - 1]!
       expect(last.backfillRemaining).toBe(0)
@@ -256,8 +262,9 @@ describe('ScanWorker', () => {
     const multiDb = setupDb(3)
     await withWorker(multiDb, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
@@ -266,14 +273,15 @@ describe('ScanWorker', () => {
       expect(initial.manualBurstInFlight).toBe(false)
       await Effect.runPromise(worker.rescanAll())
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
       // At least one in-flight snapshot has the flag set.
-      expect(collected.some(s =>
-        s.manualBurstInFlight === true &&
-        (s.backfillRemaining > 0 || s.scanning !== null || s.queued > 0),
-      )).toBe(true)
+      expect(
+        collected.some(
+          (s) =>
+            s.manualBurstInFlight === true &&
+            (s.backfillRemaining > 0 || s.scanning !== null || s.queued > 0),
+        ),
+      ).toBe(true)
       // Once fully idle the flag is cleared.
       const last = collected[collected.length - 1]!
       expect(last.manualBurstInFlight).toBe(false)
@@ -286,17 +294,16 @@ describe('ScanWorker', () => {
   it('enqueue() never raises manualBurstInFlight', async () => {
     await withWorker(db, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.enqueue(1))
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
-      expect(collected.every(s => s.manualBurstInFlight === false)).toBe(true)
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
+      expect(collected.every((s) => s.manualBurstInFlight === false)).toBe(true)
     })
   })
 
@@ -308,20 +315,22 @@ describe('ScanWorker', () => {
     const multiDb = setupDb(3)
     await withWorker(multiDb, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.backfill({ userInitiated: true }))
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
-      expect(collected.some(s =>
-        s.manualBurstInFlight === true &&
-        (s.backfillRemaining > 0 || s.scanning !== null || s.queued > 0),
-      )).toBe(true)
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
+      expect(
+        collected.some(
+          (s) =>
+            s.manualBurstInFlight === true &&
+            (s.backfillRemaining > 0 || s.scanning !== null || s.queued > 0),
+        ),
+      ).toBe(true)
       expect(collected[collected.length - 1]!.manualBurstInFlight).toBe(false)
     })
   })
@@ -340,16 +349,15 @@ describe('ScanWorker', () => {
     const multiDb = setupDb(N)
     await withWorker(multiDb, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.rescanAll())
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
 
       // Per-burst event budget:
       //   - 1 up-front updateStatus (sets backfillRemaining +
@@ -374,7 +382,7 @@ describe('ScanWorker', () => {
 
       // Burst correctness still holds — the per-item loop's effect on
       // backfillTotal must be the high-water mark.
-      expect(Math.max(...collected.map(s => s.backfillTotal))).toBe(N)
+      expect(Math.max(...collected.map((s) => s.backfillTotal))).toBe(N)
       // …and the burst drains all the way back to idle.
       const last = collected[collected.length - 1]!
       expect(last.backfillRemaining).toBe(0)
@@ -387,17 +395,16 @@ describe('ScanWorker', () => {
     const multiDb = setupDb(3)
     await withWorker(multiDb, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.backfill())
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
-      expect(collected.every(s => s.manualBurstInFlight === false)).toBe(true)
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
+      expect(collected.every((s) => s.manualBurstInFlight === false)).toBe(true)
     })
   })
 
@@ -451,9 +458,9 @@ describe('ScanWorker', () => {
       // sleep between scanOne calls (in worker.ts drain) gives us
       // discrete status events to watch.
       await Effect.runPromise(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.backfillRemaining <= 2,
-        ).pipe(Stream.runDrain),
+        Stream.takeUntil(worker.statusChanges, (s) => s.backfillRemaining <= 2).pipe(
+          Stream.runDrain,
+        ),
       )
       const midSnap = await Effect.runPromise(worker.getStatus)
       // Confirm we're observing the sticky-max in action: total still
@@ -488,23 +495,30 @@ describe('ScanWorker', () => {
     const multiDb = setupDb(3)
     await withWorker(multiDb, async (worker) => {
       const collectFiber = Effect.runFork(
-        Stream.takeUntil(worker.statusChanges, (s) =>
-          s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
+        Stream.takeUntil(
+          worker.statusChanges,
+          (s) => s.queued === 0 && s.scanning === null && s.backfillRemaining === 0,
         ).pipe(Stream.runCollect),
       )
       await new Promise<void>((r) => setTimeout(r, 20))
       await Effect.runPromise(worker.rescanAll())
       await Effect.runPromise(waitForIdle(worker))
-      const collected = Chunk.toReadonlyArray(
-        await Effect.runPromise(Fiber.join(collectFiber)),
-      )
+      const collected = Chunk.toReadonlyArray(await Effect.runPromise(Fiber.join(collectFiber)))
       // Walk every adjacent pair while the burst is in flight and
       // assert the total never shrinks.
       for (let i = 1; i < collected.length; i++) {
         const prev = collected[i - 1]!
         const next = collected[i]!
-        const prevBusy = !(prev.queued === 0 && prev.scanning === null && prev.backfillRemaining === 0)
-        const nextBusy = !(next.queued === 0 && next.scanning === null && next.backfillRemaining === 0)
+        const prevBusy = !(
+          prev.queued === 0 &&
+          prev.scanning === null &&
+          prev.backfillRemaining === 0
+        )
+        const nextBusy = !(
+          next.queued === 0 &&
+          next.scanning === null &&
+          next.backfillRemaining === 0
+        )
         if (prevBusy && nextBusy) {
           expect(next.backfillTotal).toBeGreaterThanOrEqual(prev.backfillTotal)
         }

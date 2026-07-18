@@ -19,11 +19,7 @@ export function makeKv(): KVNamespace {
       }
       return v.value
     },
-    async put(
-      key: string,
-      value: string,
-      opts?: { expirationTtl?: number },
-    ): Promise<void> {
+    async put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void> {
       const expiresAt = opts?.expirationTtl ? now() + opts.expirationTtl * 1000 : null
       store.set(key, { value, expiresAt })
     },
@@ -177,7 +173,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const [sid] = params as [string]
           return (state.hub_sessions.find((row) => row.sid === sid) as T) ?? null
         }
-        if (/^SELECT COALESCE\(SUM\(size\),0\) AS total FROM hub_objects WHERE owner_user_id=\?$/i.test(sql)) {
+        if (
+          /^SELECT COALESCE\(SUM\(size\),0\) AS total FROM hub_objects WHERE owner_user_id=\?$/i.test(
+            sql,
+          )
+        ) {
           const [ownerUserId] = params as [string]
           const total = state.hub_objects
             .filter((row) => row.owner_user_id === ownerUserId)
@@ -187,26 +187,34 @@ export function makeDb(state: FakeDbState = emptyState()): {
         if (/^SELECT user_id FROM api_tokens WHERE token_hash=\?$/i.test(sql)) {
           const [tokenHash] = params as [string]
           const row = state.api_tokens.find((token) => token.token_hash === tokenHash)
-          return (row ? ({ user_id: row.user_id } as T) : null)
+          return row ? ({ user_id: row.user_id } as T) : null
         }
         if (/^SELECT id, user_id FROM api_tokens WHERE token_hash=\?$/i.test(sql)) {
           const [tokenHash] = params as [string]
           const row = state.api_tokens.find((token) => token.token_hash === tokenHash)
-          return (row ? ({ id: row.id, user_id: row.user_id } as T) : null)
+          return row ? ({ id: row.id, user_id: row.user_id } as T) : null
         }
-        if (/^SELECT name, avatar_url, display_name, custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL$/i.test(sql)) {
+        if (
+          /^SELECT name, avatar_url, display_name, custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
           const [id] = params as [string]
           const user = state.users.find((row) => row.id === id && row.deleted_at === null)
           if (!user) return null
-          return ({
+          return {
             name: user.name,
             avatar_url: user.avatar_url,
             display_name: user.display_name ?? null,
             custom_avatar_id: user.custom_avatar_id ?? null,
             avatar_visible: user.avatar_visible ?? 1,
-          } as T)
+          } as T
         }
-        if (/^SELECT u\.\* FROM users u JOIN user_identities i ON i\.user_id = u\.id WHERE i\.provider = \? AND i\.provider_sub = \?/i.test(sql)) {
+        if (
+          /^SELECT u\.\* FROM users u JOIN user_identities i ON i\.user_id = u\.id WHERE i\.provider = \? AND i\.provider_sub = \?/i.test(
+            sql,
+          )
+        ) {
           const [provider, sub] = params as [string, string]
           const link = state.user_identities.find(
             (i) => i.provider === provider && i.provider_sub === sub,
@@ -220,91 +228,119 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const u = state.users.find((u) => u.id === id && u.deleted_at === null)
           return (u as T) ?? null
         }
-        if (/^SELECT custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL/i.test(sql)) {
+        if (
+          /^SELECT custom_avatar_id, avatar_visible FROM users WHERE id=\? AND deleted_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [id] = params
           const u = state.users.find((u) => u.id === id && u.deleted_at === null)
           if (!u) return null
-          return ({
+          return {
             custom_avatar_id: u.custom_avatar_id ?? null,
             avatar_visible: u.avatar_visible ?? 1,
-          } as T)
+          } as T
         }
         if (/^SELECT custom_avatar_id FROM users WHERE id=\?/i.test(sql)) {
           const [id] = params
           const u = state.users.find((u) => u.id === id)
           if (!u) return null
-          return ({ custom_avatar_id: u.custom_avatar_id ?? null } as T)
+          return { custom_avatar_id: u.custom_avatar_id ?? null } as T
         }
         if (/^SELECT 1 FROM handles WHERE handle=\? AND released_at IS NULL/i.test(sql)) {
           const [h] = params
           const row = state.handles.find((x) => x.handle === h && x.released_at === null)
-          return (row ? ({ '1': 1 } as T) : null)
+          return row ? ({ '1': 1 } as T) : null
         }
         if (/^SELECT user_id FROM handles WHERE handle=\? AND released_at IS NULL/i.test(sql)) {
           const [h] = params
           const row = state.handles.find((x) => x.handle === h && x.released_at === null)
-          return (row ? ({ user_id: row.user_id } as T) : null)
+          return row ? ({ user_id: row.user_id } as T) : null
         }
         if (/^SELECT handle FROM handles WHERE user_id=\? AND released_at IS NULL/i.test(sql)) {
           const [uid] = params
           const row = state.handles.find((x) => x.user_id === uid && x.released_at === null)
-          return (row ? ({ handle: row.handle } as T) : null)
+          return row ? ({ handle: row.handle } as T) : null
         }
-        if (/^SELECT version FROM published_shares WHERE id=\? AND user_id=\? AND revoked_at IS NULL/i.test(sql)) {
+        if (
+          /^SELECT version FROM published_shares WHERE id=\? AND user_id=\? AND revoked_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [id, uid] = params
           const row = state.published_shares.find(
             (s) => s.id === id && s.user_id === uid && s.revoked_at === null,
           )
-          return (row ? ({ version: row.version } as T) : null)
+          return row ? ({ version: row.version } as T) : null
         }
-        if (/^SELECT version, draft_id FROM published_shares WHERE id=\? AND user_id=\? AND revoked_at IS NULL/i.test(sql)) {
+        if (
+          /^SELECT version, draft_id FROM published_shares WHERE id=\? AND user_id=\? AND revoked_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [id, uid] = params
           const row = state.published_shares.find(
             (s) => s.id === id && s.user_id === uid && s.revoked_at === null,
           )
-          return (row ? ({ version: row.version, draft_id: row.draft_id ?? null } as T) : null)
+          return row ? ({ version: row.version, draft_id: row.draft_id ?? null } as T) : null
         }
-        if (/^SELECT id, version FROM published_shares WHERE user_id=\? AND client_request_id=\? AND revoked_at IS NULL/i.test(sql)) {
+        if (
+          /^SELECT id, version FROM published_shares WHERE user_id=\? AND client_request_id=\? AND revoked_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [uid, key] = params
           const row = state.published_shares.find(
             (s) => s.user_id === uid && s.client_request_id === key && s.revoked_at === null,
           )
-          return (row ? ({ id: row.id, version: row.version } as T) : null)
+          return row ? ({ id: row.id, version: row.version } as T) : null
         }
         if (/^SELECT revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
           const [id, uid] = params
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
-          return (row ? ({ revoked_at: row.revoked_at } as T) : null)
+          return row ? ({ revoked_at: row.revoked_at } as T) : null
         }
-        if (/^SELECT visibility, revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
+        if (
+          /^SELECT visibility, revoked_at FROM published_shares WHERE id=\? AND user_id=\?/i.test(
+            sql,
+          )
+        ) {
           const [id, uid] = params
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
-          return (row ? ({ visibility: row.visibility, revoked_at: row.revoked_at } as T) : null)
+          return row ? ({ visibility: row.visibility, revoked_at: row.revoked_at } as T) : null
         }
         if (/^SELECT 1 FROM published_shares WHERE id=\? AND user_id=\?/i.test(sql)) {
           const [id, uid] = params
           const row = state.published_shares.find((s) => s.id === id && s.user_id === uid)
-          return (row ? ({ '1': 1 } as T) : null)
+          return row ? ({ '1': 1 } as T) : null
         }
         if (/^SELECT 1 FROM published_shares WHERE id=\?/i.test(sql)) {
           const [id] = params
           const row = state.published_shares.find((s) => s.id === id)
-          return (row ? ({ '1': 1 } as T) : null)
+          return row ? ({ '1': 1 } as T) : null
         }
-        if (/^SELECT 1 FROM deletion_queue WHERE user_id=\? AND cancelled=0 AND scheduled_at <= \?/i.test(sql)) {
+        if (
+          /^SELECT 1 FROM deletion_queue WHERE user_id=\? AND cancelled=0 AND scheduled_at <= \?/i.test(
+            sql,
+          )
+        ) {
           const [user_id, cutoff] = params as [string, number]
           const r = state.deletion_queue.find(
             (x) => x.user_id === user_id && x.cancelled === 0 && x.scheduled_at <= cutoff,
           )
-          return (r ? ({ '1': 1 } as T) : null)
+          return r ? ({ '1': 1 } as T) : null
         }
-        if (/^SELECT u\.id AS user_id, u\.email AS email, u\.name AS name, u\.avatar_url AS avatar_url, u\.display_name AS display_name, u\.custom_avatar_id AS custom_avatar_id, u\.avatar_visible AS avatar_visible FROM handles h JOIN users u ON u\.id = h\.user_id WHERE h\.handle = \? AND h\.released_at IS NULL AND u\.deleted_at IS NULL/i.test(sql)) {
+        if (
+          /^SELECT u\.id AS user_id, u\.email AS email, u\.name AS name, u\.avatar_url AS avatar_url, u\.display_name AS display_name, u\.custom_avatar_id AS custom_avatar_id, u\.avatar_visible AS avatar_visible FROM handles h JOIN users u ON u\.id = h\.user_id WHERE h\.handle = \? AND h\.released_at IS NULL AND u\.deleted_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [handle] = params as [string]
           const h = state.handles.find((x) => x.handle === handle && x.released_at === null)
           if (!h) return null
           const u = state.users.find((x) => x.id === h.user_id && x.deleted_at === null)
           if (!u) return null
-          return ({
+          return {
             user_id: u.id,
             email: u.email,
             name: u.name,
@@ -312,7 +348,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             display_name: u.display_name ?? null,
             custom_avatar_id: u.custom_avatar_id ?? null,
             avatar_visible: u.avatar_visible ?? 1,
-          } as T)
+          } as T
         }
         throw new Error(`unmocked first() SQL: ${sql}`)
       },
@@ -321,8 +357,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
       // matched nothing so optimistic-concurrency callers can detect
       // races (mirrored real D1 surfaces the same value).
       async run(): Promise<{ success: boolean; meta: { changes: number } }> {
-
-        if (/^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(sql)) {
+        if (
+          /^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(
+            sql,
+          )
+        ) {
           const [
             sid,
             ownerUserId,
@@ -382,7 +421,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE hub_sessions SET withdrawn_at=\?, updated_at=\? WHERE sid=\? AND owner_user_id=\?$/i.test(sql)) {
+        if (
+          /^UPDATE hub_sessions SET withdrawn_at=\?, updated_at=\? WHERE sid=\? AND owner_user_id=\?$/i.test(
+            sql,
+          )
+        ) {
           const [withdrawnAt, updatedAt, sid, ownerUserId] = params as [
             number,
             number,
@@ -397,7 +440,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           row.updated_at = updatedAt
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^INSERT OR IGNORE INTO hub_objects \(owner_user_id, oid, size, pack_key, offset, length, created_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?\)$/i.test(sql)) {
+        if (
+          /^INSERT OR IGNORE INTO hub_objects \(owner_user_id, oid, size, pack_key, offset, length, created_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?\)$/i.test(
+            sql,
+          )
+        ) {
           const [ownerUserId, oid, size, packKey, offset, length, createdAt] = params as [
             string,
             string,
@@ -435,7 +482,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           state.api_tokens = state.api_tokens.filter((row) => row.token_hash !== tokenHash)
           return { success: true, meta: { changes: before - state.api_tokens.length } }
         }
-        if (/^INSERT INTO api_tokens \(id, user_id, token_hash, label, created_at\) VALUES \(\?,\?,\?,\?,\?\)$/i.test(sql)) {
+        if (
+          /^INSERT INTO api_tokens \(id, user_id, token_hash, label, created_at\) VALUES \(\?,\?,\?,\?,\?\)$/i.test(
+            sql,
+          )
+        ) {
           const [id, userId, tokenHash, label, createdAt] = params as [
             string,
             string,
@@ -475,7 +526,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           })
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE users SET email=\?, name=\?, avatar_url=\?, last_signin_at=\? WHERE id=\?/i.test(sql)) {
+        if (
+          /^UPDATE users SET email=\?, name=\?, avatar_url=\?, last_signin_at=\? WHERE id=\?/i.test(
+            sql,
+          )
+        ) {
           const [email, name, avatar, last, id] = params as [
             string,
             string | null,
@@ -492,7 +547,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^INSERT INTO user_identities \(provider, provider_sub, user_id, email, linked_at\) VALUES/i.test(sql)) {
+        if (
+          /^INSERT INTO user_identities \(provider, provider_sub, user_id, email, linked_at\) VALUES/i.test(
+            sql,
+          )
+        ) {
           const [provider, provider_sub, user_id, email, linked_at] = params as [
             string,
             string,
@@ -509,7 +568,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
           state.user_identities = state.user_identities.filter((i) => i.user_id !== user_id)
           return { success: true, meta: { changes: before - state.user_identities.length } }
         }
-        if (/^UPDATE users SET deletion_pending_until=\? WHERE id=\? AND deleted_at IS NULL/i.test(sql)) {
+        if (
+          /^UPDATE users SET deletion_pending_until=\? WHERE id=\? AND deleted_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [until, id] = params as [number, string]
           const u = state.users.find((u) => u.id === id && u.deleted_at === null)
           if (u) u.deletion_pending_until = until
@@ -557,9 +620,29 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (r) r.cancelled = 1
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^INSERT INTO published_shares \(id, user_id, title, visibility, version, published_at, draft_id, client_request_id\)/i.test(sql)) {
-          const [id, user_id, title, visibility, version, published_at, draft_id, client_request_id] = params as [
-            string, string, string, string, number, number, string | null, string | null,
+        if (
+          /^INSERT INTO published_shares \(id, user_id, title, visibility, version, published_at, draft_id, client_request_id\)/i.test(
+            sql,
+          )
+        ) {
+          const [
+            id,
+            user_id,
+            title,
+            visibility,
+            version,
+            published_at,
+            draft_id,
+            client_request_id,
+          ] = params as [
+            string,
+            string,
+            string,
+            string,
+            number,
+            number,
+            string | null,
+            string | null,
           ]
           // Mirror the UNIQUE(user_id, client_request_id) partial index
           // so the publish handler's catch-and-resolve path is exercised
@@ -576,7 +659,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 s.revoked_at === null,
             )
           ) {
-            throw new Error('UNIQUE constraint failed: published_shares.user_id, published_shares.client_request_id')
+            throw new Error(
+              'UNIQUE constraint failed: published_shares.user_id, published_shares.client_request_id',
+            )
           }
           state.published_shares.push({
             id,
@@ -593,9 +678,31 @@ export function makeDb(state: FakeDbState = emptyState()): {
           })
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE published_shares SET title=\?, visibility=\?, version=\?, republished_at=\?, draft_id=\?, client_request_id=\? WHERE id=\? AND user_id=\? AND version=\?/i.test(sql)) {
-          const [title, visibility, version, republished_at, draft_id, client_request_id, id, user_id, expectedVersion] = params as [
-            string, string, number, number, string | null, string | null, string, string, number,
+        if (
+          /^UPDATE published_shares SET title=\?, visibility=\?, version=\?, republished_at=\?, draft_id=\?, client_request_id=\? WHERE id=\? AND user_id=\? AND version=\?/i.test(
+            sql,
+          )
+        ) {
+          const [
+            title,
+            visibility,
+            version,
+            republished_at,
+            draft_id,
+            client_request_id,
+            id,
+            user_id,
+            expectedVersion,
+          ] = params as [
+            string,
+            string,
+            number,
+            number,
+            string | null,
+            string | null,
+            string,
+            string,
+            number,
           ]
           // Honour the optimistic-concurrency clause: only the row whose
           // current version still matches the SELECTed-then-bound value
@@ -621,7 +728,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 x.id !== id,
             )
           ) {
-            throw new Error('UNIQUE constraint failed: published_shares.user_id, published_shares.client_request_id')
+            throw new Error(
+              'UNIQUE constraint failed: published_shares.user_id, published_shares.client_request_id',
+            )
           }
           s.title = title
           s.visibility = visibility
@@ -649,21 +758,31 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (s) s.visibility = visibility
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE published_shares SET revoked_at=\? WHERE user_id=\? AND revoked_at IS NULL/i.test(sql)) {
+        if (
+          /^UPDATE published_shares SET revoked_at=\? WHERE user_id=\? AND revoked_at IS NULL/i.test(
+            sql,
+          )
+        ) {
           const [revoked_at, user_id] = params as [number, string]
           for (const s of state.published_shares) {
             if (s.user_id === user_id && s.revoked_at === null) s.revoked_at = revoked_at
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE handles SET released_at=\? WHERE user_id=\? AND released_at IS NULL/i.test(sql)) {
+        if (
+          /^UPDATE handles SET released_at=\? WHERE user_id=\? AND released_at IS NULL/i.test(sql)
+        ) {
           const [released_at, user_id] = params as [number, string]
           for (const h of state.handles) {
             if (h.user_id === user_id && h.released_at === null) h.released_at = released_at
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^UPDATE users SET email='\[deleted\]', name=NULL, avatar_url=NULL, display_name=NULL, custom_avatar_id=NULL, deleted_at=\? WHERE id=\?/i.test(sql)) {
+        if (
+          /^UPDATE users SET email='\[deleted\]', name=NULL, avatar_url=NULL, display_name=NULL, custom_avatar_id=NULL, deleted_at=\? WHERE id=\?/i.test(
+            sql,
+          )
+        ) {
           const [deleted_at, id] = params as [number, string]
           const u = state.users.find((u) => u.id === id)
           if (u) {
@@ -683,7 +802,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
       async all<T = unknown>(): Promise<{ results: T[] }> {
-        if (/^SELECT oid FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(sql)) {
+        if (
+          /^SELECT oid FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(
+            sql,
+          )
+        ) {
           const [ownerUserId, ...oids] = params as [string, ...string[]]
           const wanted = new Set(oids)
           const items = state.hub_objects
@@ -691,7 +814,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .map((row) => ({ oid: row.oid }))
           return { results: items as T[] }
         }
-        if (/^SELECT oid, pack_key, offset, length FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(sql)) {
+        if (
+          /^SELECT oid, pack_key, offset, length FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(
+            sql,
+          )
+        ) {
           const [ownerUserId, ...oids] = params as [string, ...string[]]
           const wanted = new Set(oids)
           const items = state.hub_objects
@@ -704,7 +831,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }))
           return { results: items as T[] }
         }
-        if (/^SELECT user_id FROM deletion_queue WHERE scheduled_at <= \? AND cancelled = 0/i.test(sql)) {
+        if (
+          /^SELECT user_id FROM deletion_queue WHERE scheduled_at <= \? AND cancelled = 0/i.test(
+            sql,
+          )
+        ) {
           const [cutoff] = params as [number]
           const items = state.deletion_queue
             .filter((r) => r.scheduled_at <= cutoff && r.cancelled === 0)
@@ -718,7 +849,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .map((s) => ({ id: s.id }))
           return { results: items as T[] }
         }
-        if (/^SELECT id FROM published_shares\s+WHERE revoked_at IS NOT NULL AND revoked_at > \?\s+LIMIT \?/i.test(sql)) {
+        if (
+          /^SELECT id FROM published_shares\s+WHERE revoked_at IS NOT NULL AND revoked_at > \?\s+LIMIT \?/i.test(
+            sql,
+          )
+        ) {
           const [revokedCutoff, limit] = params as [number, number]
           const items = state.published_shares
             .filter((s) => s.revoked_at !== null && s.revoked_at > revokedCutoff)
@@ -726,15 +861,14 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .map((s) => ({ id: s.id }))
           return { results: items as T[] }
         }
-        if (/^SELECT id, title, published_at, version FROM published_shares WHERE user_id = \? AND visibility = \? AND revoked_at IS NULL ORDER BY published_at DESC LIMIT \?/i.test(sql)) {
+        if (
+          /^SELECT id, title, published_at, version FROM published_shares WHERE user_id = \? AND visibility = \? AND revoked_at IS NULL ORDER BY published_at DESC LIMIT \?/i.test(
+            sql,
+          )
+        ) {
           const [uid, vis, limit] = params as [string, string, number]
           const items = state.published_shares
-            .filter(
-              (s) =>
-                s.user_id === uid &&
-                s.visibility === vis &&
-                s.revoked_at === null,
-            )
+            .filter((s) => s.user_id === uid && s.visibility === vis && s.revoked_at === null)
             .slice()
             .sort((a, b) => b.published_at - a.published_at)
             .slice(0, limit)
@@ -746,7 +880,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }))
           return { results: items as T[] }
         }
-        if (/^SELECT user_id, ip_hash, ua_hash, action, target_id, details_json, ts FROM audit_log ORDER BY ts DESC LIMIT \?/i.test(sql)) {
+        if (
+          /^SELECT user_id, ip_hash, ua_hash, action, target_id, details_json, ts FROM audit_log ORDER BY ts DESC LIMIT \?/i.test(
+            sql,
+          )
+        ) {
           const [limit] = params as [number]
           const items = state.audit
             .slice()
@@ -763,7 +901,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }))
           return { results: items as T[] }
         }
-        if (/^SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id FROM published_shares WHERE user_id=\? ORDER BY published_at DESC/i.test(sql)) {
+        if (
+          /^SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id FROM published_shares WHERE user_id=\? ORDER BY published_at DESC/i.test(
+            sql,
+          )
+        ) {
           const [uid] = params as [string]
           const items = state.published_shares
             .filter((s) => s.user_id === uid)
@@ -805,7 +947,10 @@ type R2Object = {
   httpMetadata?: { contentType?: string }
 }
 
-export function makeR2(): { bucket: R2Bucket; store: Map<string, { bytes: Uint8Array; contentType?: string }> } {
+export function makeR2(): {
+  bucket: R2Bucket
+  store: Map<string, { bytes: Uint8Array; contentType?: string }>
+} {
   const store = new Map<string, { bytes: Uint8Array; contentType?: string }>()
   const enc = new TextEncoder()
 

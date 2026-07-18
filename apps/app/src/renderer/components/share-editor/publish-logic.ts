@@ -95,8 +95,7 @@ export function computeUnredactedMatches(
   // are moot. Skip them here too, otherwise the gate fires on data
   // that will never reach R2 and the warning copy lies to the user.
   const selected = opts.selected
-  const isHidden = (idx: number): boolean =>
-    selected !== undefined && !selected.includes(idx)
+  const isHidden = (idx: number): boolean => selected !== undefined && !selected.includes(idx)
   const high: UnredactedMatch[] = []
   const medium: UnredactedMatch[] = []
   conversation.turns.forEach((turn, idx) => {

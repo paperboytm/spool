@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import type { Conversation, EditorOpts } from '@spool/share-kit'
 import {
   AlertTriangle,
   Check,
@@ -14,13 +13,15 @@ import {
   RefreshCw,
   Send,
 } from 'lucide-react'
-import type { Conversation, EditorOpts } from '@spool/share-kit'
-import { computeUnredactedMatches, publishErrorKey } from '../publish-logic.js'
-import { buildSnapshotFromEditor } from '../snapshot-adapter.js'
-import { ConnectCard } from '../ConnectCard.js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import type { PublishedRow, PublishSuccess, Visibility } from '../../../../shared/share-publish.js'
 import { useShareAuth } from '../../../hooks/useShareAuth.js'
 import { computePublishIdempotencyKey } from '../../../lib/publishIdempotency.js'
-import type { PublishedRow, PublishSuccess, Visibility } from '../../../../shared/share-publish.js'
+import { ConnectCard } from '../ConnectCard.js'
+import { computeUnredactedMatches, publishErrorKey } from '../publish-logic.js'
+import { buildSnapshotFromEditor } from '../snapshot-adapter.js'
 
 type Props = {
   /** Draft id this publish flow is bound to. Threaded into the publish
@@ -195,39 +196,41 @@ export function PublishTab({
     //    changes — surfacing the disabled state up front is more
     //    honest than letting the click look successful.
     const republishDisabled = publishing || !pending || !hasUnpublishedEdits
-    return <PublishedManageView
-      t={t}
-      published={published}
-      hasUnpublishedEdits={hasUnpublishedEdits}
-      copied={copied}
-      onCopy={async () => {
-        try {
-          await navigator.clipboard.writeText(published.url)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1500)
-        } catch {
-          /* ignore */
-        }
-      }}
-      onView={() => window.open(published.url, '_blank', 'noopener,noreferrer')}
-      onRepublish={() => {
-        // Same submit path as the publish form, but `published?.id`
-        // makes handlePublish stamp `override_slug` so the backend
-        // updates this row instead of minting a new slug.
-        void handlePublish()
-      }}
-      onUnpublish={onRequestUnpublish}
-      republishing={publishing}
-      republishDisabled={republishDisabled}
-      error={error}
-    />
+    return (
+      <PublishedManageView
+        t={t}
+        published={published}
+        hasUnpublishedEdits={hasUnpublishedEdits}
+        copied={copied}
+        onCopy={async () => {
+          try {
+            await navigator.clipboard.writeText(published.url)
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 1500)
+          } catch {
+            /* ignore */
+          }
+        }}
+        onView={() => window.open(published.url, '_blank', 'noopener,noreferrer')}
+        onRepublish={() => {
+          // Same submit path as the publish form, but `published?.id`
+          // makes handlePublish stamp `override_slug` so the backend
+          // updates this row instead of minting a new slug.
+          void handlePublish()
+        }}
+        onUnpublish={onRequestUnpublish}
+        republishing={publishing}
+        republishDisabled={republishDisabled}
+        error={error}
+      />
+    )
   }
 
   // ── State 4: signed in + draft — publish form ────────────────────
   // How many turns actually publish: an active TurnSelector selection
   // wins over the raw conversation length.
   const publishTurnCount = pending
-    ? pending.opts.selected?.length ?? pending.conversation.turns.length
+    ? (pending.opts.selected?.length ?? pending.conversation.turns.length)
     : null
 
   return (
@@ -261,23 +264,23 @@ export function PublishTab({
       <div className="px-4 pb-3">
         <div
           data-testid="share-menu-snapshot-card"
-          className="flex items-center gap-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3 py-2"
+          className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface flex items-center gap-2 rounded-md border px-3 py-2"
         >
-          <span className="inline-flex w-7 h-7 flex-none items-center justify-center rounded-md bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted">
+          <span className="bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted inline-flex h-7 w-7 flex-none items-center justify-center rounded-md">
             <FileText size={15} strokeWidth={1.75} aria-hidden />
           </span>
           <div className="min-w-0">
-            <div className="text-[12px] font-medium text-warm-text dark:text-dark-text truncate">
+            <div className="text-warm-text dark:text-dark-text truncate text-[12px] font-medium">
               {pending ? pending.conversation.title || t('common.untitled') : '—'}
             </div>
-            <div className="text-[11px] font-mono text-warm-muted dark:text-dark-muted">
+            <div className="text-warm-muted dark:text-dark-muted font-mono text-[11px]">
               {publishTurnCount !== null
                 ? t('shareEditor.publishTab.snapshot_turns', { count: publishTurnCount })
                 : '—'}
             </div>
           </div>
         </div>
-        <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-warm-muted dark:text-dark-muted">
+        <p className="text-warm-muted dark:text-dark-muted mt-2 flex items-start gap-1.5 text-[11px] leading-snug">
           <LinkIcon size={12} strokeWidth={1.75} className="mt-0.5 flex-none" aria-hidden />
           <span>
             <span className="font-medium">{t('shareEditor.publishTab.visibility_link_title')}</span>
@@ -287,32 +290,36 @@ export function PublishTab({
         </p>
       </div>
 
-      {SHOW_VISIBILITY_PICKER && <fieldset disabled={publishing} className="px-4 pb-3">
-        <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
-          {t('shareEditor.publishTab.visibility_legend')}
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <VisibilityCard
-            icon={<LinkIcon size={15} strokeWidth={1.75} aria-hidden />}
-            title={t('shareEditor.publishTab.visibility_link_title')}
-            testId="share-menu-visibility-link-only"
-            description={t('shareEditor.publishTab.visibility_link_description')}
-            checked={visibility === 'unlisted'}
-            onSelect={() => setVisibility('unlisted')}
-          />
-          <VisibilityCard
-            icon={<FileText size={15} strokeWidth={1.75} aria-hidden />}
-            title={t('shareEditor.publishTab.visibility_profile_title')}
-            testId="share-menu-visibility-on-profile"
-            description={hasHandle
-              ? t('shareEditor.publishTab.visibility_profile_description_listed')
-              : t('shareEditor.publishTab.visibility_profile_description_needsHandle')}
-            checked={visibility === 'profile-listed'}
-            disabled={!hasHandle}
-            onSelect={() => setVisibility('profile-listed')}
-          />
-        </div>
-      </fieldset>}
+      {SHOW_VISIBILITY_PICKER && (
+        <fieldset disabled={publishing} className="px-4 pb-3">
+          <legend className="text-warm-muted dark:text-dark-muted text-[11.5px] font-medium">
+            {t('shareEditor.publishTab.visibility_legend')}
+          </legend>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <VisibilityCard
+              icon={<LinkIcon size={15} strokeWidth={1.75} aria-hidden />}
+              title={t('shareEditor.publishTab.visibility_link_title')}
+              testId="share-menu-visibility-link-only"
+              description={t('shareEditor.publishTab.visibility_link_description')}
+              checked={visibility === 'unlisted'}
+              onSelect={() => setVisibility('unlisted')}
+            />
+            <VisibilityCard
+              icon={<FileText size={15} strokeWidth={1.75} aria-hidden />}
+              title={t('shareEditor.publishTab.visibility_profile_title')}
+              testId="share-menu-visibility-on-profile"
+              description={
+                hasHandle
+                  ? t('shareEditor.publishTab.visibility_profile_description_listed')
+                  : t('shareEditor.publishTab.visibility_profile_description_needsHandle')
+              }
+              checked={visibility === 'profile-listed'}
+              disabled={!hasHandle}
+              onSelect={() => setVisibility('profile-listed')}
+            />
+          </div>
+        </fieldset>
+      )}
 
       {error && (
         <p
@@ -334,7 +341,7 @@ export function PublishTab({
               data-testid="share-menu-confirm-anyway"
               onClick={() => setHighOverride(true)}
               disabled={publishing}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[color:var(--color-status-error)] px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t('shareEditor.publishTab.publishAnyway')}
             </button>
@@ -342,28 +349,39 @@ export function PublishTab({
             <button
               type="button"
               data-testid={high.length > 0 ? 'share-menu-submit-unredacted' : 'share-menu-submit'}
-              onClick={() => { void handlePublish() }}
+              onClick={() => {
+                void handlePublish()
+              }}
               disabled={publishing || !pending}
-              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed ${
+              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 ${
                 high.length > 0
                   ? 'bg-[color:var(--color-status-error)] hover:opacity-90'
                   : 'bg-accent dark:bg-accent-dark hover:opacity-90'
               }`}
             >
-              {publishing
-                ? <><Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />{t('shareEditor.publishTab.publishing')}</>
-                : error
-                  ? t('shareEditor.publishTab.tryAgain')
-                  // After the high-risk override, the submit button must NOT
-                  // re-use the "Publish anyway" label — that's the same text
-                  // and same spot as the override button, so a second click
-                  // on the same pixel would publish unredacted credentials.
-                  // Switch to an explicit "Publish unredacted" confirm so the
-                  // live-publish click is visibly distinct from the override.
-                  : high.length > 0
-                    ? <><AlertTriangle size={12} strokeWidth={1.8} aria-hidden />{t('shareEditor.publishTab.publishUnredacted')}</>
-                    : <><Send size={12} strokeWidth={1.8} aria-hidden />{t('shareEditor.publishTab.publish')}</>
-              }
+              {publishing ? (
+                <>
+                  <Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />
+                  {t('shareEditor.publishTab.publishing')}
+                </>
+              ) : error ? (
+                t('shareEditor.publishTab.tryAgain') // After the high-risk override, the submit button must NOT
+              ) : // re-use the "Publish anyway" label — that's the same text
+              // and same spot as the override button, so a second click
+              // on the same pixel would publish unredacted credentials.
+              // Switch to an explicit "Publish unredacted" confirm so the
+              // live-publish click is visibly distinct from the override.
+              high.length > 0 ? (
+                <>
+                  <AlertTriangle size={12} strokeWidth={1.8} aria-hidden />
+                  {t('shareEditor.publishTab.publishUnredacted')}
+                </>
+              ) : (
+                <>
+                  <Send size={12} strokeWidth={1.8} aria-hidden />
+                  {t('shareEditor.publishTab.publish')}
+                </>
+              )}
             </button>
           )
         }
@@ -386,12 +404,12 @@ export function PublishTabSkeleton() {
   return (
     <div className="flex flex-col" aria-hidden>
       <div className="px-4 pb-3">
-        <div className="h-[46px] rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
-        <div className="mt-2 h-4 w-2/3 rounded bg-warm-surface dark:bg-dark-surface animate-pulse" />
+        <div className="bg-warm-surface dark:bg-dark-surface h-[46px] animate-pulse rounded-md" />
+        <div className="bg-warm-surface dark:bg-dark-surface mt-2 h-4 w-2/3 animate-pulse rounded" />
       </div>
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40">
-        <div className="h-4 w-1/2 rounded bg-warm-surface dark:bg-dark-surface animate-pulse" />
-        <div className="h-8 w-24 rounded-md bg-warm-surface dark:bg-dark-surface animate-pulse" />
+      <div className="border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40 flex items-center justify-between gap-3 border-t px-4 py-3">
+        <div className="bg-warm-surface dark:bg-dark-surface h-4 w-1/2 animate-pulse rounded" />
+        <div className="bg-warm-surface dark:bg-dark-surface h-8 w-24 animate-pulse rounded-md" />
       </div>
     </div>
   )
@@ -422,7 +440,7 @@ function VisibilityCard({
       data-testid={testId}
       onClick={onSelect}
       disabled={disabled}
-      className={`relative flex flex-col text-left rounded-md p-2.5 border transition-colors disabled:cursor-not-allowed ${
+      className={`relative flex flex-col rounded-md border p-2.5 text-left transition-colors disabled:cursor-not-allowed ${
         checked
           ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
           : disabled
@@ -431,26 +449,30 @@ function VisibilityCard({
       }`}
     >
       <div className="flex w-full items-start justify-between gap-2">
-        <span className={`inline-flex w-7 h-7 items-center justify-center rounded-md ${
-          checked
-            ? 'bg-accent text-white dark:bg-accent-dark'
-            : 'bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted'
-        }`}>
+        <span
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
+            checked
+              ? 'bg-accent dark:bg-accent-dark text-white'
+              : 'bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted'
+          }`}
+        >
           {icon}
         </span>
-        <span className={`inline-flex w-4 h-4 items-center justify-center rounded-full border ${
-          checked
-            ? 'bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark'
-            : 'border-warm-border2 dark:border-dark-border2 bg-transparent'
-        }`}>
+        <span
+          className={`inline-flex h-4 w-4 items-center justify-center rounded-full border ${
+            checked
+              ? 'bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark'
+              : 'border-warm-border2 dark:border-dark-border2 bg-transparent'
+          }`}
+        >
           {checked && <Check size={10} strokeWidth={2.5} className="text-white" aria-hidden />}
         </span>
       </div>
-      <div className="mt-2 text-[12.5px] font-semibold text-warm-text dark:text-dark-text">
+      <div className="text-warm-text dark:text-dark-text mt-2 text-[12.5px] font-semibold">
         {title}
       </div>
       <div
-        className="mt-0.5 text-[11px] leading-snug text-warm-muted dark:text-dark-muted"
+        className="text-warm-muted dark:text-dark-muted mt-0.5 text-[11px] leading-snug"
         // text-wrap: balance evens out the line breaks for short
         // 2-line descriptions so "Listed on your /\n@handle" doesn't
         // dangle an orphan. Supported in all modern browsers Electron
@@ -490,24 +512,24 @@ function PiiHighWarning({
           aria-hidden
           className="mt-0.5 flex-none text-[color:var(--color-status-error)]"
         />
-        <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-medium text-warm-text dark:text-dark-text">
+        <div className="min-w-0 flex-1">
+          <p className="text-warm-text dark:text-dark-text text-[12px] font-medium">
             {t('shareEditor.publishTab.pii_high_warning', { count })}
           </p>
           <ul className="mt-1.5 space-y-1">
             {rows.map((m, i) => (
               <li
                 key={`${m.turn_index}-${m.start}-${i}`}
-                className="text-[11px] text-warm-muted dark:text-dark-muted flex items-center gap-2"
+                className="text-warm-muted dark:text-dark-muted flex items-center gap-2 text-[11px]"
               >
                 <span className="font-medium">{m.label}</span>
-                <code className="font-mono text-[10.5px] px-1 rounded bg-warm-surface dark:bg-dark-surface">
+                <code className="bg-warm-surface dark:bg-dark-surface rounded px-1 font-mono text-[10.5px]">
                   {m.preview}
                 </code>
               </li>
             ))}
             {extra > 0 && (
-              <li className="text-[10.5px] italic text-warm-faint dark:text-dark-muted">
+              <li className="text-warm-faint dark:text-dark-muted text-[10.5px] italic">
                 {t('shareEditor.publishTab.pii_more', { count: extra })}
               </li>
             )}
@@ -518,15 +540,19 @@ function PiiHighWarning({
                 type="button"
                 onClick={onRedactAll}
                 data-testid="share-menu-redact-all"
-                className="text-[11px] font-medium underline text-warm-text dark:text-dark-text hover:opacity-80"
+                className="text-warm-text dark:text-dark-text text-[11px] font-medium underline hover:opacity-80"
               >
                 {t('shareEditor.publishTab.pii_redactAll')}
               </button>
             )}
           </div>
           {blocked && (
-            <p className="mt-2 text-[11px] text-warm-muted dark:text-dark-muted">
-              {t('shareEditor.publishTab.pii_blocked_hint_prefix')} <span className="font-medium">{t('shareEditor.publishTab.pii_blocked_hint_emphasis')}</span> {t('shareEditor.publishTab.pii_blocked_hint_suffix')}
+            <p className="text-warm-muted dark:text-dark-muted mt-2 text-[11px]">
+              {t('shareEditor.publishTab.pii_blocked_hint_prefix')}{' '}
+              <span className="font-medium">
+                {t('shareEditor.publishTab.pii_blocked_hint_emphasis')}
+              </span>{' '}
+              {t('shareEditor.publishTab.pii_blocked_hint_suffix')}
             </p>
           )}
         </div>
@@ -553,36 +579,36 @@ function PiiMediumWarning({
   return (
     <section
       data-testid="share-menu-pii-medium"
-      className="mx-4 mb-3 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface px-3 py-2"
+      className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface mx-4 mb-3 rounded-md border px-3 py-2"
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full flex items-center gap-1.5 text-[11.5px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text"
+        className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex w-full items-center gap-1.5 text-[11.5px]"
       >
-        {open
-          ? <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
-          : <ChevronRight size={12} strokeWidth={1.8} aria-hidden />}
-        <span>
-          {t('shareEditor.publishTab.pii_medium_signals', { count })}
-        </span>
+        {open ? (
+          <ChevronDown size={12} strokeWidth={1.8} aria-hidden />
+        ) : (
+          <ChevronRight size={12} strokeWidth={1.8} aria-hidden />
+        )}
+        <span>{t('shareEditor.publishTab.pii_medium_signals', { count })}</span>
       </button>
       {open && (
         <ul className="mt-1.5 space-y-1 pl-4">
           {rows.map((m, i) => (
             <li
               key={`${m.turn_index}-${m.start}-${i}`}
-              className="text-[11px] text-warm-muted dark:text-dark-muted flex items-center gap-2"
+              className="text-warm-muted dark:text-dark-muted flex items-center gap-2 text-[11px]"
             >
               <span className="font-medium">{m.label}</span>
-              <code className="font-mono text-[10.5px] px-1 rounded bg-warm-bg dark:bg-dark-bg">
+              <code className="bg-warm-bg dark:bg-dark-bg rounded px-1 font-mono text-[10.5px]">
                 {m.preview}
               </code>
             </li>
           ))}
           {extra > 0 && (
-            <li className="text-[10.5px] italic text-warm-faint dark:text-dark-muted">
+            <li className="text-warm-faint dark:text-dark-muted text-[10.5px] italic">
               {t('shareEditor.publishTab.pii_more', { count: extra })}
             </li>
           )}
@@ -627,8 +653,10 @@ function PublishedManageView({
       <div className="px-4 pb-3">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-[11.5px] text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
-            <span>{t('shareEditor.publishTab.published_status', { version: published.version })}</span>
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
+            <span>
+              {t('shareEditor.publishTab.published_status', { version: published.version })}
+            </span>
           </div>
           {hasUnpublishedEdits && (
             // Drift indicator — the live draft hashes differently from
@@ -638,27 +666,38 @@ function PublishedManageView({
             // moment they reopen the popover.
             <span
               data-testid="share-menu-unpublished-edits"
-              className="inline-flex items-center gap-1 px-1.5 h-4 rounded-[3px] text-[10px] font-medium bg-accent-bg dark:bg-[#2A1800] text-accent dark:text-accent-dark"
+              className="bg-accent-bg text-accent dark:text-accent-dark inline-flex h-4 items-center gap-1 rounded-[3px] px-1.5 text-[10px] font-medium dark:bg-[#2A1800]"
               title={t('shareEditor.publishTab.unpublishedEdits_title')}
             >
-              <span className="inline-block w-1 h-1 rounded-full bg-current" />
+              <span className="inline-block h-1 w-1 rounded-full bg-current" />
               {t('shareEditor.publishTab.unpublishedEdits')}
             </span>
           )}
         </div>
         <div className="mt-2 flex items-stretch gap-1.5">
-          <div className="flex-1 min-w-0 inline-flex items-center px-2.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-[12px] font-mono text-warm-text dark:text-dark-text overflow-hidden">
-            <span className="truncate" title={published.url}>{displayUrl}</span>
+          <div className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text inline-flex min-w-0 flex-1 items-center overflow-hidden rounded-md border px-2.5 font-mono text-[12px]">
+            <span className="truncate" title={published.url}>
+              {displayUrl}
+            </span>
           </div>
           <button
             type="button"
             data-testid="share-menu-copy"
-            onClick={() => { void onCopy() }}
-            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-[11.5px] font-medium text-warm-text dark:text-dark-text border border-warm-border2 dark:border-dark-border2 hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+            onClick={() => {
+              void onCopy()
+            }}
+            className="text-warm-text dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:bg-warm-surface dark:hover:bg-dark-surface inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-[11.5px] font-medium transition-colors"
           >
-            {copied
-              ? <><Check size={12} strokeWidth={1.8} aria-hidden /> {t('shareEditor.publishTab.copied')}</>
-              : <><Copy size={12} strokeWidth={1.8} aria-hidden /> {t('shareEditor.publishTab.copy')}</>}
+            {copied ? (
+              <>
+                <Check size={12} strokeWidth={1.8} aria-hidden />{' '}
+                {t('shareEditor.publishTab.copied')}
+              </>
+            ) : (
+              <>
+                <Copy size={12} strokeWidth={1.8} aria-hidden /> {t('shareEditor.publishTab.copy')}
+              </>
+            )}
           </button>
         </div>
 
@@ -669,12 +708,21 @@ function PublishedManageView({
          *  a small icon button just clutters the row. */}
         <div className="mt-2 grid grid-cols-2 gap-1.5">
           <ActionButton
-            icon={<RefreshCw size={12} strokeWidth={1.8} className={republishing ? 'animate-spin' : ''} aria-hidden />}
-            label={republishing
-              ? t('shareEditor.publishTab.republishing')
-              : hasUnpublishedEdits
-                ? t('shareEditor.publishTab.republish')
-                : t('shareEditor.publishTab.upToDate')}
+            icon={
+              <RefreshCw
+                size={12}
+                strokeWidth={1.8}
+                className={republishing ? 'animate-spin' : ''}
+                aria-hidden
+              />
+            }
+            label={
+              republishing
+                ? t('shareEditor.publishTab.republishing')
+                : hasUnpublishedEdits
+                  ? t('shareEditor.publishTab.republish')
+                  : t('shareEditor.publishTab.upToDate')
+            }
             onClick={onRepublish}
             disabled={republishDisabled}
             testid="share-menu-republish"
@@ -707,7 +755,7 @@ function PublishedManageView({
             type="button"
             data-testid="share-menu-open-share"
             onClick={onView}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+            className="bg-accent dark:bg-accent-dark inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
           >
             <ExternalLink size={12} strokeWidth={1.8} aria-hidden />
             {t('shareEditor.publishTab.openShare')}
@@ -739,9 +787,9 @@ function ActionButton({
       data-testid={testid}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1 h-7 rounded text-[11.5px] font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`inline-flex h-7 items-center justify-center gap-1 rounded border text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         danger
-          ? 'text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)] border-[color:var(--color-status-error)]/30 hover:bg-[color:var(--color-status-error)]/8'
+          ? 'border-[color:var(--color-status-error)]/30 text-[color:var(--color-status-error)] hover:bg-[color:var(--color-status-error)]/8 dark:text-[color:var(--color-status-error-dark)]'
           : 'text-warm-text dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:bg-warm-surface dark:hover:bg-dark-surface'
       }`}
     >
@@ -753,8 +801,8 @@ function ActionButton({
 
 function Footer({ hint, action }: { hint: string; action: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40">
-      <p className="flex-1 min-w-0 text-[11px] text-warm-muted dark:text-dark-muted leading-snug">
+    <div className="border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40 flex items-center justify-between gap-3 border-t px-4 py-3">
+      <p className="text-warm-muted dark:text-dark-muted min-w-0 flex-1 text-[11px] leading-snug">
         {hint}
       </p>
       {action}

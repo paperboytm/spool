@@ -1,9 +1,4 @@
-import type {
-  D1Database,
-  KVNamespace,
-  PagesFunction,
-  R2Bucket,
-} from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace, PagesFunction, R2Bucket } from '@cloudflare/workers-types'
 
 import { audit } from '../../../src/audit'
 import { requireUser } from '../../../src/auth/require'
@@ -73,9 +68,7 @@ export const onRequestPost: PagesFunction<Env, 'id'> = async (ctx) => {
     // — burying the tombstone without clearing it. D1 first means a
     // partial failure leaves the row revoked from the owner's view
     // and a retry can complete the tombstone work.
-    await ctx.env.DB.prepare(
-      'UPDATE published_shares SET revoked_at=? WHERE id=?',
-    )
+    await ctx.env.DB.prepare('UPDATE published_shares SET revoked_at=? WHERE id=?')
       .bind(now, id)
       .run()
 
@@ -88,10 +81,9 @@ export const onRequestPost: PagesFunction<Env, 'id'> = async (ctx) => {
 
     // KV tombstone already enforces 410 on reads; R2 cleanup is fire-and-forget.
     ctx.waitUntil(
-      Promise.all([
-        ctx.env.SNAPSHOTS.delete(`${id}.json`),
-        ctx.env.OG.delete(`${id}.png`),
-      ]).then(() => undefined),
+      Promise.all([ctx.env.SNAPSHOTS.delete(`${id}.json`), ctx.env.OG.delete(`${id}.png`)]).then(
+        () => undefined,
+      ),
     )
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {

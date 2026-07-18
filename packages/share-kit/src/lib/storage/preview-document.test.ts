@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { buildPreviewDocument, PREVIEW_TURN_COUNT } from './preview-document'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { DEFAULT_OPTS } from '../types'
 import type { SpoolDocument, Turn } from '../types'
+import { buildPreviewDocument, PREVIEW_TURN_COUNT } from './preview-document'
 
 function makeTurn(i: number, body = `turn ${i}`): Turn {
   return {
@@ -36,7 +37,12 @@ describe('buildPreviewDocument', () => {
     const preview = buildPreviewDocument(doc)
     expect(preview.conversation.turns).toHaveLength(PREVIEW_TURN_COUNT)
     expect(preview.conversation.turns.map((t) => t.body)).toEqual([
-      'turn 0', 'turn 1', 'turn 2', 'turn 3', 'turn 4', 'turn 5',
+      'turn 0',
+      'turn 1',
+      'turn 2',
+      'turn 3',
+      'turn 4',
+      'turn 5',
     ])
   })
 
@@ -49,14 +55,19 @@ describe('buildPreviewDocument', () => {
     const preview = buildPreviewDocument(doc)
     expect(preview.conversation.turns).toHaveLength(PREVIEW_TURN_COUNT)
     expect(preview.conversation.turns.map((t) => t.body)).toEqual([
-      'turn 10', 'turn 20', 'turn 30', 'turn 40', 'turn 50', 'turn 60',
+      'turn 10',
+      'turn 20',
+      'turn 30',
+      'turn 40',
+      'turn 50',
+      'turn 60',
     ])
   })
 
   it('respects hideEmptyTurns — fills from later turns when earlier ones are empty', () => {
     const turns: Turn[] = [
       makeTurn(0, 'a'),
-      makeTurn(1, ''),    // tool-only assistant turn
+      makeTurn(1, ''), // tool-only assistant turn
       makeTurn(2, '   '), // whitespace-only
       makeTurn(3, 'b'),
       makeTurn(4, 'c'),
@@ -68,9 +79,7 @@ describe('buildPreviewDocument', () => {
     ]
     const doc = makeDoc(turns, { selected: undefined, hideEmptyTurns: true })
     const preview = buildPreviewDocument(doc)
-    expect(preview.conversation.turns.map((t) => t.body)).toEqual(
-      ['a', 'b', 'c', 'd', 'e', 'f'],
-    )
+    expect(preview.conversation.turns.map((t) => t.body)).toEqual(['a', 'b', 'c', 'd', 'e', 'f'])
   })
 
   it('clears opts.selected and opts.hideEmptyTurns on the preview document', () => {
@@ -87,10 +96,13 @@ describe('buildPreviewDocument', () => {
   })
 
   it('preserves non-selection opts (template, paper, typeface, colorway, accentHex)', () => {
-    const doc = makeDoc(
-      [makeTurn(0)],
-      { template: 'timeline', paper: 'graphite', typeface: 'fraunces', colorway: 'walnut', accentHex: '#9F7A4C' },
-    )
+    const doc = makeDoc([makeTurn(0)], {
+      template: 'timeline',
+      paper: 'graphite',
+      typeface: 'fraunces',
+      colorway: 'walnut',
+      accentHex: '#9F7A4C',
+    })
     const preview = buildPreviewDocument(doc)
     expect(preview.opts.template).toBe('timeline')
     expect(preview.opts.paper).toBe('graphite')

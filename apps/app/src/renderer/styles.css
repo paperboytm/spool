@@ -9,36 +9,48 @@
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url('@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  src: url('@fontsource-variable/geist/files/geist-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Inter Variable';
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Hanken Grotesk Variable';
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url('@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  src: url('@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Fraunces Variable';
   font-style: normal;
   font-display: swap;
   font-weight: 100 900;
-  src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
-@import "@fontsource/geist-mono/latin-400.css";
-@import "@fontsource/geist-mono/latin-500.css";
-@import "tailwindcss";
+@import '@fontsource/geist-mono/latin-400.css';
+@import '@fontsource/geist-mono/latin-500.css';
+@import 'tailwindcss';
 
 /* The shared conversation components live outside this package; point
  * Tailwind's source scanner at them so their utilities compile here with
@@ -47,45 +59,45 @@
 
 @theme {
   /* Warm palette — light */
-  --color-warm-bg: #FAFAF8;
-  --color-warm-surface: #F4F4F0;
-  --color-warm-surface2: #EEEEE9;
-  --color-warm-border: #E8E8E2;
-  --color-warm-border2: #D8D8D0;
-  --color-warm-text: #1C1C18;
-  --color-warm-muted: #6B6B60;
-  --color-warm-faint: #ADADAA;
-  --color-accent: #C85A00;
-  --color-accent-bg: #FFF3E8;
-  --color-accent-bg-strong: #FFE5CC;
+  --color-warm-bg: #fafaf8;
+  --color-warm-surface: #f4f4f0;
+  --color-warm-surface2: #eeeee9;
+  --color-warm-border: #e8e8e2;
+  --color-warm-border2: #d8d8d0;
+  --color-warm-text: #1c1c18;
+  --color-warm-muted: #6b6b60;
+  --color-warm-faint: #adadaa;
+  --color-accent: #c85a00;
+  --color-accent-bg: #fff3e8;
+  --color-accent-bg-strong: #ffe5cc;
 
   /* Warm palette — dark */
   --color-dark-bg: #141410;
-  --color-dark-surface: #1C1C18;
+  --color-dark-surface: #1c1c18;
   --color-dark-surface2: #242420;
-  --color-dark-border: #2E2E28;
-  --color-dark-border2: #3A3A34;
-  --color-dark-text: #F2F2EC;
-  --color-dark-muted: #9A9A8E;
+  --color-dark-border: #2e2e28;
+  --color-dark-border2: #3a3a34;
+  --color-dark-text: #f2f2ec;
+  --color-dark-muted: #9a9a8e;
   --color-dark-faint: #505048;
-  --color-accent-dark: #F07020;
+  --color-accent-dark: #f07020;
   /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
   --color-accent-bg-dark: #2a1800;
   --color-accent-bg-strong-dark: #3d2400;
 
   /* Status — warm-tuned, never Tailwind defaults (see DESIGN.md) */
-  --color-status-success: #6BAF6B;
-  --color-status-warning: #E4A640;
-  --color-status-error:   #C95A4F;
-  --color-status-success-dark: #7DC07D;
-  --color-status-warning-dark: #F0B854;
-  --color-status-error-dark:   #D67259;
+  --color-status-success: #6baf6b;
+  --color-status-warning: #e4a640;
+  --color-status-error: #c95a4f;
+  --color-status-success-dark: #7dc07d;
+  --color-status-warning-dark: #f0b854;
+  --color-status-error-dark: #d67259;
 
   /* Source badges */
-  --color-src-claude: #C26A4E;
-  --color-src-codex: #4A9670;
-  --color-src-gemini: #5887D0;
-  --color-src-opencode: #8A6F3D;
+  --color-src-claude: #c26a4e;
+  --color-src-codex: #4a9670;
+  --color-src-gemini: #5887d0;
+  --color-src-opencode: #8a6f3d;
 
   /* Typography */
   --font-sans: 'Inter Variable', system-ui, sans-serif;
@@ -118,14 +130,17 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-in.fade-in {
   animation: fadeIn var(--tw-duration, 150ms) ease-out;
 }
-
 
 .duration-150 {
   --tw-duration: 150ms;
@@ -214,9 +229,15 @@ body {
  * background-color directly was clobbering the user bubble's surface
  * fill at the end of the keyframe). */
 @keyframes spool-share-jump-flash {
-  0%   { opacity: 0.22; }
-  60%  { opacity: 0.16; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0.22;
+  }
+  60% {
+    opacity: 0.16;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 [data-spool-share-flash] [data-turn-body] {
   position: relative;
@@ -225,7 +246,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background-color: #F07020;
+  background-color: #f07020;
   pointer-events: none;
   border-radius: inherit;
   animation: spool-share-jump-flash 1600ms ease-out forwards;

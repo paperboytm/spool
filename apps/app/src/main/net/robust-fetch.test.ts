@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 const directSessionFetch = vi.fn()
 
@@ -26,9 +26,10 @@ function transport(label: string, impl: () => Promise<Response>): Transport {
   return { label, fetch: vi.fn(impl) as unknown as Transport['fetch'] }
 }
 
-const netErr = () => Object.assign(new Error('fetch failed'), {
-  cause: new Error('connect ETIMEDOUT 142.250.0.1:443'),
-})
+const netErr = () =>
+  Object.assign(new Error('fetch failed'), {
+    cause: new Error('connect ETIMEDOUT 142.250.0.1:443'),
+  })
 
 describe('robustFetch', () => {
   it('returns the first transport result without touching the rest', async () => {
@@ -42,7 +43,9 @@ describe('robustFetch', () => {
 
   it('falls through to the next transport on a network-level failure', async () => {
     const ok = new Response('hi', { status: 200 })
-    const first = transport('a', async () => { throw netErr() })
+    const first = transport('a', async () => {
+      throw netErr()
+    })
     const second = transport('b', async () => ok)
     const res = await robustFetch('https://x.test/', {}, [first, second])
     expect(res).toBe(ok)
@@ -61,38 +64,50 @@ describe('robustFetch', () => {
   })
 
   it('rethrows non-network errors immediately', async () => {
-    const first = transport('a', async () => { throw new TypeError('body used already') })
+    const first = transport('a', async () => {
+      throw new TypeError('body used already')
+    })
     const second = transport('b', async () => new Response('never'))
-    await expect(robustFetch('https://x.test/', {}, [first, second]))
-      .rejects.toThrow('body used already')
+    await expect(robustFetch('https://x.test/', {}, [first, second])).rejects.toThrow(
+      'body used already',
+    )
     expect(second.fetch).not.toHaveBeenCalled()
   })
 
   it('throws the last network error when every transport fails', async () => {
-    const first = transport('a', async () => { throw netErr() })
-    const last = Object.assign(new Error('fetch failed'), { cause: new Error('net::ERR_CONNECTION_REFUSED') })
-    const second = transport('b', async () => { throw last })
-    await expect(robustFetch('https://x.test/', {}, [first, second]))
-      .rejects.toBe(last)
+    const first = transport('a', async () => {
+      throw netErr()
+    })
+    const last = Object.assign(new Error('fetch failed'), {
+      cause: new Error('net::ERR_CONNECTION_REFUSED'),
+    })
+    const second = transport('b', async () => {
+      throw last
+    })
+    await expect(robustFetch('https://x.test/', {}, [first, second])).rejects.toBe(last)
   })
 })
 
 describe('fetchOnce', () => {
   it('probes with a GET, then sends the real request exactly once on the winner', async () => {
     const calls: { url: string; method?: string }[] = []
-    const dead = transport('dead', async () => { throw netErr() })
+    const dead = transport('dead', async () => {
+      throw netErr()
+    })
     const alive: Transport = {
       label: 'alive',
       fetch: vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-        calls.push({ url: String(url), ...(init?.method !== undefined && { method: init.method }) })
+        calls.push({
+          url: String(url),
+          ...(init?.method !== undefined && { method: init.method }),
+        })
         return new Response('ok', { status: init?.method === 'POST' ? 200 : 404 })
       }) as unknown as Transport['fetch'],
     }
-    const res = await fetchOnce(
-      'https://api.test/token',
-      { method: 'POST', body: 'code=once' },
-      [dead, alive],
-    )
+    const res = await fetchOnce('https://api.test/token', { method: 'POST', body: 'code=once' }, [
+      dead,
+      alive,
+    ])
     expect(res.status).toBe(200)
     // dead transport saw only the probe; the POST went out once, on alive.
     expect(dead.fetch).toHaveBeenCalledTimes(1)
@@ -113,19 +128,27 @@ describe('fetchOnce', () => {
     const flaky: Transport = {
       label: 'flaky',
       fetch: vi.fn(async () => {
-        if (!probed) { probed = true; return new Response('probe ok') }
+        if (!probed) {
+          probed = true
+          return new Response('probe ok')
+        }
         throw netErr() // the committed POST dies mid-flight
       }) as unknown as Transport['fetch'],
     }
     const second = transport('never', async () => new Response('never'))
-    await expect(fetchOnce('https://api.test/token', { method: 'POST' }, [flaky, second]))
-      .rejects.toThrow('fetch failed')
+    await expect(
+      fetchOnce('https://api.test/token', { method: 'POST' }, [flaky, second]),
+    ).rejects.toThrow('fetch failed')
     expect(second.fetch).not.toHaveBeenCalled()
   })
 
   it('throws when every probe fails', async () => {
-    const a = transport('a', async () => { throw netErr() })
-    const b = transport('b', async () => { throw netErr() })
+    const a = transport('a', async () => {
+      throw netErr()
+    })
+    const b = transport('b', async () => {
+      throw netErr()
+    })
     await expect(fetchOnce('https://api.test/x', {}, [a, b])).rejects.toThrow('fetch failed')
   })
 })
@@ -155,14 +178,18 @@ describe('proxyRulesFromEnv', () => {
   })
 
   it('maps a socks proxy to socks5 rules', () => {
-    expect(proxyRulesFromEnv({ all_proxy: 'socks5://127.0.0.1:7897' })).toBe('socks5://127.0.0.1:7897')
+    expect(proxyRulesFromEnv({ all_proxy: 'socks5://127.0.0.1:7897' })).toBe(
+      'socks5://127.0.0.1:7897',
+    )
   })
 
   it('prefers https_proxy over all_proxy and uppercase variants', () => {
-    expect(proxyRulesFromEnv({
-      ALL_PROXY: 'socks5://1.1.1.1:1080',
-      https_proxy: 'http://2.2.2.2:8080',
-    })).toBe('2.2.2.2:8080')
+    expect(
+      proxyRulesFromEnv({
+        ALL_PROXY: 'socks5://1.1.1.1:1080',
+        https_proxy: 'http://2.2.2.2:8080',
+      }),
+    ).toBe('2.2.2.2:8080')
   })
 
   it('returns null when unset or unparseable', () => {
@@ -176,7 +203,12 @@ describe('isNetworkError', () => {
   it.each([
     ['undici fetch failed with cause', netErr()],
     ['chromium net error', new Error('net::ERR_PROXY_CONNECTION_FAILED')],
-    ['timeout abort', Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })],
+    [
+      'timeout abort',
+      Object.assign(new Error('The operation was aborted due to timeout'), {
+        name: 'TimeoutError',
+      }),
+    ],
   ])('%s → true', (_name, err) => {
     expect(isNetworkError(err)).toBe(true)
   })

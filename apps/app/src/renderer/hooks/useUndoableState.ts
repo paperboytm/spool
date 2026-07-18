@@ -54,9 +54,10 @@ export function applySet<T>(
     return { snap: { ...snap, present: next }, lastSetAt: now }
   }
   const newPast = [...snap.past, snap.present]
-  const trimmed = newPast.length > options.maxHistory
-    ? newPast.slice(newPast.length - options.maxHistory)
-    : newPast
+  const trimmed =
+    newPast.length > options.maxHistory
+      ? newPast.slice(newPast.length - options.maxHistory)
+      : newPast
   return { snap: { past: trimmed, present: next, future: [] }, lastSetAt: now }
 }
 
@@ -80,10 +81,7 @@ export function applyRedo<T>(snap: UndoSnapshot<T>): UndoSnapshot<T> {
   }
 }
 
-export function useUndoableState<T>(
-  initial: T,
-  options: UndoableOptions = {},
-): UndoableState<T> {
+export function useUndoableState<T>(initial: T, options: UndoableOptions = {}): UndoableState<T> {
   const normalised: NormalisedOptions = {
     coalesceMs: options.coalesceMs ?? DEFAULTS.coalesceMs,
     maxHistory: options.maxHistory ?? DEFAULTS.maxHistory,
@@ -98,24 +96,25 @@ export function useUndoableState<T>(
   // coalesce a user edit with a system-driven state replacement.
   const lastSetAtRef = useRef<number>(0)
 
-  const set = useCallback((next: SetArg<T>) => {
-    // Capture wall-clock + the watermark BEFORE entering the updater so
-    // the ref mutation stays out of the setState reducer (StrictMode
-    // double-invokes those, ref mutation there is an anti-pattern).
-    const now = Date.now()
-    const prevLastSetAt = lastSetAtRef.current
-    lastSetAtRef.current = now
-    setSnapshot(prev => {
-      const resolved = typeof next === 'function'
-        ? (next as UpdaterFn<T>)(prev.present)
-        : next
-      return applySet(prev, resolved, prevLastSetAt, now, normalised).snap
-    })
-    // `normalised` is rebuilt each render but its primitives are stable;
-    // depending on the inner numbers (rather than the wrapper object)
-    // keeps `set`'s identity stable for downstream consumers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalised.coalesceMs, normalised.maxHistory])
+  const set = useCallback(
+    (next: SetArg<T>) => {
+      // Capture wall-clock + the watermark BEFORE entering the updater so
+      // the ref mutation stays out of the setState reducer (StrictMode
+      // double-invokes those, ref mutation there is an anti-pattern).
+      const now = Date.now()
+      const prevLastSetAt = lastSetAtRef.current
+      lastSetAtRef.current = now
+      setSnapshot((prev) => {
+        const resolved = typeof next === 'function' ? (next as UpdaterFn<T>)(prev.present) : next
+        return applySet(prev, resolved, prevLastSetAt, now, normalised).snap
+      })
+      // `normalised` is rebuilt each render but its primitives are stable;
+      // depending on the inner numbers (rather than the wrapper object)
+      // keeps `set`'s identity stable for downstream consumers.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [normalised.coalesceMs, normalised.maxHistory],
+  )
 
   const undo = useCallback(() => {
     setSnapshot(applyUndo)

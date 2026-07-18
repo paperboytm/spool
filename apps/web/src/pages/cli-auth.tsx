@@ -11,11 +11,7 @@
 import { useEffect, useState } from 'react'
 
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
-import {
-  type CliAuthInfo,
-  decideCliAuth,
-  fetchCliAuthInfo,
-} from '../lib/cli-auth'
+import { type CliAuthInfo, decideCliAuth, fetchCliAuthInfo } from '../lib/cli-auth'
 
 interface Props {
   code: string | null
@@ -207,13 +203,7 @@ export function CliAuth({ code }: Props) {
   )
 }
 
-function Shell({
-  children,
-  busyLabel,
-}: {
-  children: React.ReactNode
-  busyLabel?: string
-}) {
+function Shell({ children, busyLabel }: { children: React.ReactNode; busyLabel?: string }) {
   return (
     <Page>
       <Header />

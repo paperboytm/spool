@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { navigateToShares, openShareEditorFromSessionDetail, seedShareDraft } from './helpers/share'
 
@@ -59,6 +60,8 @@ test('editor topbar delete modal closes the editor and removes the draft', async
   // The session-derived draft should not appear on Shares.
   await navigateToShares(window)
   await expect(
-    window.locator(`[data-testid="shares-draft-row"]`).filter({ hasText: /XYLOPHONE|test-session-001/ }),
+    window
+      .locator(`[data-testid="shares-draft-row"]`)
+      .filter({ hasText: /XYLOPHONE|test-session-001/ }),
   ).toHaveCount(0)
 })

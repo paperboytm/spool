@@ -2,6 +2,23 @@
   "name": "@spool-lab/session-kit",
   "version": "0.6.0",
   "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and session diffs for Spool v2.",
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,22 +28,19 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": [
-    "dist"
-  ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepack": "pnpm run build"
+    "prepack": "vp run build"
   },
   "devDependencies": {
-    "vitest": "^3.2.4"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

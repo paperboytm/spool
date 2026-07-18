@@ -30,8 +30,7 @@ const TOMBSTONE_HEADERS = {
 // Same 30s window as /api/snapshots/:id so a revoke takes the social-card
 // preview off-air on the same timeline as the reader page itself.
 const META_CACHE_MAX_AGE_SEC = 30
-const META_CACHE_HEADER =
-  `public, max-age=${META_CACHE_MAX_AGE_SEC}, s-maxage=${META_CACHE_MAX_AGE_SEC}, must-revalidate`
+const META_CACHE_HEADER = `public, max-age=${META_CACHE_MAX_AGE_SEC}, s-maxage=${META_CACHE_MAX_AGE_SEC}, must-revalidate`
 
 type KvMeta = {
   owner: string
@@ -53,10 +52,10 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     const meta = JSON.parse(raw) as KvMeta
 
     if (meta.revoked_at) {
-      return new Response(
-        JSON.stringify({ revoked: true, at: meta.revoked_at }),
-        { status: 410, headers: TOMBSTONE_HEADERS },
-      )
+      return new Response(JSON.stringify({ revoked: true, at: meta.revoked_at }), {
+        status: 410,
+        headers: TOMBSTONE_HEADERS,
+      })
     }
     // Owner intentionally omitted — same reasoning as /api/snapshots/:id:
     // exposing the internal user id to anyone with a slug would hand

@@ -21,9 +21,7 @@ export const Route = createFileRoute('/_site/docs/$')({
     return {
       meta: [
         { title: `${title} | Spool` },
-        ...(typeof description === 'string'
-          ? [{ name: 'description', content: description }]
-          : []),
+        ...(typeof description === 'string' ? [{ name: 'description', content: description }] : []),
       ],
     }
   },

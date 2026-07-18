@@ -1,7 +1,18 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, nativeImage, net, shell } from 'electron'
-import type { MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
+
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  nativeImage,
+  net,
+  shell,
+} from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 
 // Install global error handlers as the very first thing in the file. Node 22
 // defaults to --unhandled-rejections=strict, which means a single unhandled
@@ -25,54 +36,87 @@ process.on('uncaughtException', (err) => {
       `${err instanceof Error ? err.message : String(err)}\n\n` +
         `Spool will keep running, but if you see this repeatedly please restart the app.`,
     )
-  } catch { /* dialog unavailable — log already happened */ }
+  } catch {
+    /* dialog unavailable — log already happened */
+  }
 })
 
 import {
-  getDB, Syncer, SpoolWatcher,
-  searchFragments, searchSessionPreview, listRecentSessionsPage, getSessionWithMessages, getStatus,
-  pinSession, unpinSession, getPinnedUuids, listPinnedSessions,
-  listProjectGroups, listSessionsByIdentity, listPinnedSessionsByIdentity, listProjectDirectoryCounts,
-  listShareDrafts, getShareDraft, upsertShareDraft, deleteShareDraft, countDraftsBySession,
+  getDB,
+  Syncer,
+  SpoolWatcher,
+  searchFragments,
+  searchSessionPreview,
+  listRecentSessionsPage,
+  getSessionWithMessages,
+  getStatus,
+  pinSession,
+  unpinSession,
+  getPinnedUuids,
+  listPinnedSessions,
+  listProjectGroups,
+  listSessionsByIdentity,
+  listPinnedSessionsByIdentity,
+  listProjectDirectoryCounts,
+  listShareDrafts,
+  getShareDraft,
+  upsertShareDraft,
+  deleteShareDraft,
+  countDraftsBySession,
   invalidateSessionScanProfile,
   makeObservabilityRuntime,
   SPOOL_DIR,
 } from '@spool-lab/core'
-import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
-import { spawnMutationWorker, type MutationWorkerProxy } from './mutation-worker-proxy.js'
-import { Effect } from 'effect'
-import { registerSecurityIpc, registerSecurityReadinessIpc, SECURITY_IPC_CHANNELS, type SecurityReadiness } from './ipc/security.js'
-import { loadSecurityPreferences, saveSecurityPreferences } from './securityPreferences.js'
-import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
-import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
-import { makePfCoordinator } from './security/pf-coordinator.js'
-import { shouldAutoActivatePf } from './security/pf-activation.js'
-import { pfModelDir } from './security/model-paths.js'
 import type {
-  FragmentResult, SessionSource, ListSessionsByIdentityOptions, SessionsCursor,
-  ShareDraftRow, UpsertShareDraftInput,
+  FragmentResult,
+  SessionSource,
+  ListSessionsByIdentityOptions,
+  SessionsCursor,
+  ShareDraftRow,
+  UpsertShareDraftInput,
 } from '@spool-lab/core'
-import { setupTray } from './tray.js'
-import { AcpManager } from './acp.js'
-import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
-import { openTerminal } from './terminal.js'
+import type Database from 'better-sqlite3'
+import { Effect } from 'effect'
+
 import { getSessionResumeCommand } from '../shared/resumeCommand.js'
-import { resolveResumeWorkingDirectory } from './sessionResume.js'
-import { loadUIPreferences, saveThemeEditor, saveThemeSource, saveSidebarCollapsed } from './uiPreferences.js'
-import { hydrateBinaryCache } from './binaryCache.js'
-import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
-import { registerShareAuthIpc } from './ipc/share-auth.js'
+import { AcpManager } from './acp.js'
 import {
   dispatchDeepLink,
   dispatchDeepLinkFromArgv,
   registerDeepLinkScheme,
 } from './auth/deep-link.js'
-import { registerShareProfileIpc } from './ipc/share-profile.js'
-import { installRendererCsp } from './security/csp.js'
-import { registerSharePublishIpc } from './ipc/share-publish.js'
+import { hydrateBinaryCache } from './binaryCache.js'
+import { snapshotEventLoopLag, startEventLoopMonitor } from './eventLoopMonitor.js'
 import { registerHubShareIpc } from './ipc/hub-share.js'
-import type Database from 'better-sqlite3'
+import {
+  registerSecurityIpc,
+  registerSecurityReadinessIpc,
+  SECURITY_IPC_CHANNELS,
+  type SecurityReadiness,
+} from './ipc/security.js'
+import { registerShareAuthIpc } from './ipc/share-auth.js'
+import { registerShareProfileIpc } from './ipc/share-profile.js'
+import { registerSharePublishIpc } from './ipc/share-publish.js'
+import { spawnMutationWorker, type MutationWorkerProxy } from './mutation-worker-proxy.js'
+import { spawnScanWorker, type ScanWorkerProxy } from './scan-worker-proxy.js'
+import { installRendererCsp } from './security/csp.js'
+import { pfModelDir } from './security/model-paths.js'
+import { shouldAutoActivatePf } from './security/pf-activation.js'
+import { makePfCoordinator } from './security/pf-coordinator.js'
+import { registerPfModelProtocol, registerPfModelScheme } from './security/pf-model-protocol.js'
+import { makePfRuntime, pfModelInstalled } from './security/pf-runtime.js'
+import { loadSecurityPreferences, saveSecurityPreferences } from './securityPreferences.js'
+import { resolveResumeWorkingDirectory } from './sessionResume.js'
 import type { SyncWorkerMessage } from './sync-worker.js'
+import { openTerminal } from './terminal.js'
+import { setupTray } from './tray.js'
+import {
+  loadUIPreferences,
+  saveThemeEditor,
+  saveThemeSource,
+  saveSidebarCollapsed,
+} from './uiPreferences.js'
+import { setupAutoUpdater, downloadUpdate, quitAndInstall } from './updater.js'
 
 // Privilege the `pf-model://` scheme before app.ready so the hidden
 // inference renderer can fetch model files through it. Has to happen
@@ -86,7 +130,8 @@ registerPfModelScheme()
 // reach with `electronApp.evaluate(...)` — no production IPC surface.
 startEventLoopMonitor()
 if (process.env['SPOOL_E2E_TEST'] === '1') {
-  ;(globalThis as { __spoolEventLoopLag?: typeof snapshotEventLoopLag }).__spoolEventLoopLag = snapshotEventLoopLag
+  ;(globalThis as { __spoolEventLoopLag?: typeof snapshotEventLoopLag }).__spoolEventLoopLag =
+    snapshotEventLoopLag
 }
 
 const isDevMode = Boolean(process.env['ELECTRON_RENDERER_URL'])
@@ -99,7 +144,12 @@ if (customUserDataDir) {
 const { run: runWithObservability } = makeObservabilityRuntime(
   isDevMode
     ? { serviceName: 'spool-app-main', serviceVersion: app.getVersion(), env: 'dev' }
-    : { serviceName: 'spool-app-main', serviceVersion: app.getVersion(), env: 'prod', logsDir: join(SPOOL_DIR, 'logs') },
+    : {
+        serviceName: 'spool-app-main',
+        serviceVersion: app.getVersion(),
+        env: 'prod',
+        logsDir: join(SPOOL_DIR, 'logs'),
+      },
 )
 // macOS menu bar shows the first menu's label as the app name
 app.setName(isDevMode ? 'Spool DEV' : 'Spool')
@@ -212,9 +262,16 @@ async function bootScanWorker(): Promise<void> {
     // pfRuntime isn't active, analyze() returns [] so the worker
     // gets an empty result quickly instead of blocking.
     scanWorker = await spawnScanWorker(join(__dirname, 'scan-worker-thread.js'), {
-      analyze: (text) => pfRuntime.analyze(text) as Promise<Array<{
-        class: string; value: string; start: number; end: number; score: number
-      }>>,
+      analyze: (text) =>
+        pfRuntime.analyze(text) as Promise<
+          Array<{
+            class: string
+            value: string
+            start: number
+            end: number
+            score: number
+          }>
+        >,
     })
   } catch (err) {
     console.error('[security] scan worker failed to boot:', err)
@@ -238,27 +295,43 @@ async function bootMutationWorker(): Promise<void> {
 
 async function shutdownScanWorker(): Promise<void> {
   if (disposeSecurityIpc) {
-    try { disposeSecurityIpc() } catch { /* best effort */ }
+    try {
+      disposeSecurityIpc()
+    } catch {
+      /* best effort */
+    }
     disposeSecurityIpc = null
   }
   if (disposeSecurityReadinessIpc) {
-    try { disposeSecurityReadinessIpc() } catch { /* best effort */ }
+    try {
+      disposeSecurityReadinessIpc()
+    } catch {
+      /* best effort */
+    }
     disposeSecurityReadinessIpc = null
     setSecurityReadiness = null
   }
   if (scanWorker) {
     try {
       await scanWorker.shutdown()
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
     scanWorker = null
   }
   if (mutationWorker) {
     try {
       await mutationWorker.shutdown()
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
     mutationWorker = null
   }
-  try { await pfRuntime.stop() } catch { /* best effort */ }
+  try {
+    await pfRuntime.stop()
+  } catch {
+    /* best effort */
+  }
 }
 
 /** Idempotent boot of the Security feature: scan worker + its IPC, plus
@@ -286,9 +359,11 @@ async function ensureSecurityBooted(): Promise<void> {
     // globalThis.fetch (undici) bypasses both (see bug_electron_proxy).
     // E2E exception: SPOOL_E2E_TEST swaps in an immediate-503 fake so the
     // download state machine is deterministic without a real network hop.
-    const pfFetchImpl: typeof globalThis.fetch = process.env['SPOOL_E2E_TEST'] === '1'
-      ? (async () => new Response(null, { status: 503, statusText: 'e2e-fake' })) as typeof globalThis.fetch
-      : ((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch
+    const pfFetchImpl: typeof globalThis.fetch =
+      process.env['SPOOL_E2E_TEST'] === '1'
+        ? ((async () =>
+            new Response(null, { status: 503, statusText: 'e2e-fake' })) as typeof globalThis.fetch)
+        : (((url, init) => net.fetch(url as string, init)) as typeof globalThis.fetch)
     pfCoordinator = makePfCoordinator({
       modelDir: pfModelDir(),
       fetch: pfFetchImpl,
@@ -303,12 +378,15 @@ async function ensureSecurityBooted(): Promise<void> {
       // shouldAutoActivatePf gates on securityBooted so a download
       // that completes in the brief pre-boot window can't spawn a
       // hidden inference window before the feature is up.
-      if (!shouldAutoActivatePf({
-        phase: s.phase,
-        securityBooted,
-        pfActivationPending: prefs.pfActivationPending,
-        pfEnabled: prefs.pfEnabled,
-      })) return
+      if (
+        !shouldAutoActivatePf({
+          phase: s.phase,
+          securityBooted,
+          pfActivationPending: prefs.pfActivationPending,
+          pfEnabled: prefs.pfEnabled,
+        })
+      )
+        return
       void (async () => {
         const next = saveSecurityPreferences({ pfEnabled: true })
         mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
@@ -429,13 +507,15 @@ async function syncPfRuntime(pfEnabled: boolean): Promise<void> {
       // pfActivationPending clears on the way out (success OR fail) so
       // the callout's "Activating…" state stops hanging on a permanent
       // failure. ScanBanner takes over visually once backfill enqueues.
-      Effect.ensuring(Effect.sync(() => {
-        const cur = loadSecurityPreferences()
-        if (cur.pfActivationPending) {
-          const next = saveSecurityPreferences({ pfActivationPending: false })
-          mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
-        }
-      })),
+      Effect.ensuring(
+        Effect.sync(() => {
+          const cur = loadSecurityPreferences()
+          if (cur.pfActivationPending) {
+            const next = saveSecurityPreferences({ pfActivationPending: false })
+            mainWindow?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, next)
+          }
+        }),
+      ),
       Effect.withSpan('pf.sync_runtime'),
     ),
   )
@@ -488,7 +568,8 @@ function createWindow(): BrowserWindow {
     const isInternal =
       url === current ||
       url.startsWith('file://') ||
-      (!!process.env['ELECTRON_RENDERER_URL'] && url.startsWith(process.env['ELECTRON_RENDERER_URL']))
+      (!!process.env['ELECTRON_RENDERER_URL'] &&
+        url.startsWith(process.env['ELECTRON_RENDERER_URL']))
     if (isInternal) return
     if (/^https?:/i.test(url) || /^mailto:/i.test(url)) {
       event.preventDefault()
@@ -544,179 +625,187 @@ let activeSyncPromise: Promise<{ added: number; updated: number; errors: number 
 function runSyncWorker(): Promise<{ added: number; updated: number; errors: number }> {
   if (activeSyncPromise) return activeSyncPromise
 
-  activeSyncPromise = new Promise<{ added: number; updated: number; errors: number }>((resolve, reject) => {
-    const workerPath = join(__dirname, 'sync-worker.js')
-    const worker = new Worker(workerPath)
-    worker.on('message', (msg: SyncWorkerMessage) => {
-      if (msg.type === 'progress') {
-        isSyncActive = msg.data.phase !== 'done'
-        searchCache.clear()
-        mainWindow?.webContents.send('spool:sync-progress', msg.data)
-      } else if (msg.type === 'done') {
-        isSyncActive = false
-        searchCache.clear()
-        resolve(msg.result)
-      } else if (msg.type === 'error') {
-        isSyncActive = false
-        reject(new Error(msg.error))
-      }
-    })
-    worker.on('error', reject)
-    worker.on('exit', (code) => {
-      if (code !== 0) reject(new Error(`Sync worker exited with code ${code}`))
-    })
-  }).finally(() => {
+  activeSyncPromise = new Promise<{ added: number; updated: number; errors: number }>(
+    (resolve, reject) => {
+      const workerPath = join(__dirname, 'sync-worker.js')
+      const worker = new Worker(workerPath)
+      worker.on('message', (msg: SyncWorkerMessage) => {
+        if (msg.type === 'progress') {
+          isSyncActive = msg.data.phase !== 'done'
+          searchCache.clear()
+          mainWindow?.webContents.send('spool:sync-progress', msg.data)
+        } else if (msg.type === 'done') {
+          isSyncActive = false
+          searchCache.clear()
+          resolve(msg.result)
+        } else if (msg.type === 'error') {
+          isSyncActive = false
+          reject(new Error(msg.error))
+        }
+      })
+      worker.on('error', reject)
+      worker.on('exit', (code) => {
+        if (code !== 0) reject(new Error(`Sync worker exited with code ${code}`))
+      })
+    },
+  ).finally(() => {
     activeSyncPromise = null
   })
 
   return activeSyncPromise
 }
 
-app.whenReady().then(async () => {
-  // Renderer CSP — has to land BEFORE any BrowserWindow loads its URL,
-  // otherwise the first response slips through with whatever Vite (or
-  // the bundled file:// loader) emits and Electron's "Insecure CSP"
-  // warning fires once before our header takes over.
-  installRendererCsp({ dev: isDevMode })
+app
+  .whenReady()
+  .then(async () => {
+    // Renderer CSP — has to land BEFORE any BrowserWindow loads its URL,
+    // otherwise the first response slips through with whatever Vite (or
+    // the bundled file:// loader) emits and Electron's "Insecure CSP"
+    // warning fires once before our header takes over.
+    installRendererCsp({ dev: isDevMode })
 
-  // Hydrate the agent-binary path cache from disk before anything has a
-  // chance to call `cachedResolveAsync`. Without this every cold launch
-  // re-runs `<user-shell> -ilc 'command -v ...'` once per agent — three
-  // serialised execSync-style spawns on a slow .zshrc are the dominant
-  // contributor to the launch beachball.
-  hydrateBinaryCache()
+    // Hydrate the agent-binary path cache from disk before anything has a
+    // chance to call `cachedResolveAsync`. Without this every cold launch
+    // re-runs `<user-shell> -ilc 'command -v ...'` once per agent — three
+    // serialised execSync-style spawns on a slow .zshrc are the dominant
+    // contributor to the launch beachball.
+    hydrateBinaryCache()
 
-  // Set dock icon (dev mode doesn't pick up build config)
-  const dockIconPath = join(__dirname, '../../resources/icon.icns')
-  try { app.dock?.setIcon(nativeImage.createFromPath(dockIconPath)) } catch {}
+    // Set dock icon (dev mode doesn't pick up build config)
+    const dockIconPath = join(__dirname, '../../resources/icon.icns')
+    try {
+      app.dock?.setIcon(nativeImage.createFromPath(dockIconPath))
+    } catch {}
 
-  Menu.setApplicationMenu(buildApplicationMenu())
+    Menu.setApplicationMenu(buildApplicationMenu())
 
-  db = getDB()
-  acpManager = new AcpManager()
+    db = getDB()
+    acpManager = new AcpManager()
 
-  syncer = new Syncer(db, undefined, (sessionId) => {
-    // Sync mutated this session's messages; existing findings now have
-    // stale offsets. The Syncer already nulled scan_profile inside the
-    // commit txn; here we just re-enqueue so the worker picks it up —
-    // unless the user opted out of auto-rescan in Settings → Security,
-    // in which case we leave scan_profile dirty for the next manual
-    // Rescan all click.
-    // `invalidateSessionScanProfile` updates the v12 `scan_profile`
-    // column regardless of the feature flag — the column lives in
-    // every user's schema. Re-enqueuing only runs when the worker
-    // is booted (i.e. the flag is on); the column resets either
-    // way, which keeps state consistent if the flag flips on later.
-    invalidateSessionScanProfile(db, sessionId)
-    if (scanWorker && loadSecurityPreferences().rescanAfterSync === 'auto') {
-      // Promise-shaped so a worker-thread rejection (e.g. the child
-      // died) surfaces in the log instead of vanishing silently
-      // through Effect.runFork. The Effect itself is failure-free
-      // shape (Effect<void, never>) — `.catch` here is the safety
-      // net for runtime promise rejections from the underlying
-      // postMessage round-trip.
-      runWithObservability(scanWorker.enqueue(sessionId)).catch((err) => {
-        console.error('[security] scan-worker enqueue failed:', err)
-      })
-    }
-  })
-  watcher = new SpoolWatcher(syncer)
-  watcher.on('new-sessions', (_event, data) => {
-    searchCache.clear()
-    mainWindow?.webContents.send('spool:new-sessions', data)
-  })
-  watcher.on('error', (_event, data) => {
-    console.error('[watcher]', data.error, data.root ? `(root=${data.root})` : '')
-  })
-
-  // Initial sync in worker thread (non-blocking)
-  runSyncWorker().then((result) => {
-    watcher.start()
-    // Sessions were inserted by the worker thread which has its own
-    // DB handle, so the renderer never got an onNewSessions push for
-    // them. Without an explicit signal here, any view that listed
-    // sessions BEFORE sync finished would stay empty until the next
-    // file-watcher event. Emit new-sessions so LibraryLanding /
-    // ProjectView refetch — same code path that already handles
-    // post-startup inserts.
-    if (result.added > 0) {
-      mainWindow?.webContents.send('spool:new-sessions', { count: result.added })
-    }
-    // Sessions were inserted by the worker thread which has its own DB
-    // handle — no onSessionChanged callbacks reached this process. Kick
-    // off a backfill round now that the sessions table is populated.
-    if (scanWorker) {
-      runWithObservability(scanWorker.backfill()).catch((err) => {
-        console.error('[security] post-sync backfill failed:', err)
-      })
-    }
-  }).catch((err) => {
-    console.error('[sync-worker] failed:', err)
-  })
-
-  mainWindow = createWindow()
-
-  // Boot the Security Scan worker AFTER createWindow so the renderer
-  // mount + initial sync don't wait on it. The Syncer's
-  // onSessionChanged callback and the post-sync backfill are both
-  // guarded by `if (scanWorker)`, so any session changes that fire
-  // before the worker is ready are no-ops — backfill catches up once
-  // boot completes.
-  void ensureSecurityBooted()
-
-  // Share-auth IPC (PKCE loopback OAuth + safeStorage session).
-  // The build-time __SPOOL_E2E__ switch is the ONE place the production
-  // binary chooses between real OAuth + safeStorage and the e2e-mode
-  // in-memory store + fake-id-token. Prod builds get
-  // `if (false) { ... }` here, which terser deletes outright; the
-  // dynamic import to ./e2e-mode/share-auth-e2e is never resolved by
-  // rollup, so its source never ships in any production bundle.
-  if (__SPOOL_E2E__) {
-    const { registerShareAuthIpcForE2E } = await import('./e2e-mode/share-auth-e2e.js')
-    registerShareAuthIpcForE2E()
-  } else {
-    registerShareAuthIpc()
-  }
-  // Share-publish IPC (publish / revoke / republish + handles)
-  registerSharePublishIpc()
-  // Share-profile IPC (display name + avatar upload / delete / visibility)
-  registerShareProfileIpc()
-  // v2 hub share IPC (one-click records share to spool.pro)
-  registerHubShareIpc()
-
-  // Auto-updater (only runs in packaged builds)
-  setupAutoUpdater(() => mainWindow)
-
-
-  function showOrCreateWindow() {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show()
-    } else {
-      mainWindow = createWindow()
-    }
-    void app.dock?.show()
-  }
-  focusExistingWindow = showOrCreateWindow
-
-  if (!isDevMode) {
-    setupTray(showOrCreateWindow, () => {
-      void runSyncWorker().catch((error) => {
-        console.error('[sync-worker] tray sync failed:', error)
-      })
+    syncer = new Syncer(db, undefined, (sessionId) => {
+      // Sync mutated this session's messages; existing findings now have
+      // stale offsets. The Syncer already nulled scan_profile inside the
+      // commit txn; here we just re-enqueue so the worker picks it up —
+      // unless the user opted out of auto-rescan in Settings → Security,
+      // in which case we leave scan_profile dirty for the next manual
+      // Rescan all click.
+      // `invalidateSessionScanProfile` updates the v12 `scan_profile`
+      // column regardless of the feature flag — the column lives in
+      // every user's schema. Re-enqueuing only runs when the worker
+      // is booted (i.e. the flag is on); the column resets either
+      // way, which keeps state consistent if the flag flips on later.
+      invalidateSessionScanProfile(db, sessionId)
+      if (scanWorker && loadSecurityPreferences().rescanAfterSync === 'auto') {
+        // Promise-shaped so a worker-thread rejection (e.g. the child
+        // died) surfaces in the log instead of vanishing silently
+        // through Effect.runFork. The Effect itself is failure-free
+        // shape (Effect<void, never>) — `.catch` here is the safety
+        // net for runtime promise rejections from the underlying
+        // postMessage round-trip.
+        runWithObservability(scanWorker.enqueue(sessionId)).catch((err) => {
+          console.error('[security] scan-worker enqueue failed:', err)
+        })
+      }
     })
-  }
+    watcher = new SpoolWatcher(syncer)
+    watcher.on('new-sessions', (_event, data) => {
+      searchCache.clear()
+      mainWindow?.webContents.send('spool:new-sessions', data)
+    })
+    watcher.on('error', (_event, data) => {
+      console.error('[watcher]', data.error, data.root ? `(root=${data.root})` : '')
+    })
 
-  app.on('activate', showOrCreateWindow)
-}).catch((err) => {
-  // Without this catch, any rejection from the startup sequence becomes an
-  // unhandled promise rejection — Node 20+ terminates the process with SIGTRAP,
-  // producing an opaque EXC_BREAKPOINT crash with only `PromiseRejectCallback`
-  // in the stack. Logging the error here gives users something actionable.
-  console.error('[startup] fatal error during app initialization:', err)
-  if (err instanceof Error && err.stack) console.error(err.stack)
-  dialog.showErrorBox('Spool failed to start', err instanceof Error ? err.message : String(err))
-  app.exit(1)
-})
+    // Initial sync in worker thread (non-blocking)
+    runSyncWorker()
+      .then((result) => {
+        watcher.start()
+        // Sessions were inserted by the worker thread which has its own
+        // DB handle, so the renderer never got an onNewSessions push for
+        // them. Without an explicit signal here, any view that listed
+        // sessions BEFORE sync finished would stay empty until the next
+        // file-watcher event. Emit new-sessions so LibraryLanding /
+        // ProjectView refetch — same code path that already handles
+        // post-startup inserts.
+        if (result.added > 0) {
+          mainWindow?.webContents.send('spool:new-sessions', { count: result.added })
+        }
+        // Sessions were inserted by the worker thread which has its own DB
+        // handle — no onSessionChanged callbacks reached this process. Kick
+        // off a backfill round now that the sessions table is populated.
+        if (scanWorker) {
+          runWithObservability(scanWorker.backfill()).catch((err) => {
+            console.error('[security] post-sync backfill failed:', err)
+          })
+        }
+      })
+      .catch((err) => {
+        console.error('[sync-worker] failed:', err)
+      })
+
+    mainWindow = createWindow()
+
+    // Boot the Security Scan worker AFTER createWindow so the renderer
+    // mount + initial sync don't wait on it. The Syncer's
+    // onSessionChanged callback and the post-sync backfill are both
+    // guarded by `if (scanWorker)`, so any session changes that fire
+    // before the worker is ready are no-ops — backfill catches up once
+    // boot completes.
+    void ensureSecurityBooted()
+
+    // Share-auth IPC (PKCE loopback OAuth + safeStorage session).
+    // The build-time __SPOOL_E2E__ switch is the ONE place the production
+    // binary chooses between real OAuth + safeStorage and the e2e-mode
+    // in-memory store + fake-id-token. Prod builds get
+    // `if (false) { ... }` here, which terser deletes outright; the
+    // dynamic import to ./e2e-mode/share-auth-e2e is never resolved by
+    // rollup, so its source never ships in any production bundle.
+    if (__SPOOL_E2E__) {
+      const { registerShareAuthIpcForE2E } = await import('./e2e-mode/share-auth-e2e.js')
+      registerShareAuthIpcForE2E()
+    } else {
+      registerShareAuthIpc()
+    }
+    // Share-publish IPC (publish / revoke / republish + handles)
+    registerSharePublishIpc()
+    // Share-profile IPC (display name + avatar upload / delete / visibility)
+    registerShareProfileIpc()
+    // v2 hub share IPC (one-click records share to spool.pro)
+    registerHubShareIpc()
+
+    // Auto-updater (only runs in packaged builds)
+    setupAutoUpdater(() => mainWindow)
+
+    function showOrCreateWindow() {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show()
+      } else {
+        mainWindow = createWindow()
+      }
+      void app.dock?.show()
+    }
+    focusExistingWindow = showOrCreateWindow
+
+    if (!isDevMode) {
+      setupTray(showOrCreateWindow, () => {
+        void runSyncWorker().catch((error) => {
+          console.error('[sync-worker] tray sync failed:', error)
+        })
+      })
+    }
+
+    app.on('activate', showOrCreateWindow)
+  })
+  .catch((err) => {
+    // Without this catch, any rejection from the startup sequence becomes an
+    // unhandled promise rejection — Node 20+ terminates the process with SIGTRAP,
+    // producing an opaque EXC_BREAKPOINT crash with only `PromiseRejectCallback`
+    // in the stack. Logging the error here gives users something actionable.
+    console.error('[startup] fatal error during app initialization:', err)
+    if (err instanceof Error && err.stack) console.error(err.stack)
+    dialog.showErrorBox('Spool failed to start', err instanceof Error ? err.message : String(err))
+    app.exit(1)
+  })
 
 app.on('window-all-closed', () => {
   if (isDevMode) {
@@ -734,68 +823,107 @@ app.on('before-quit', (event) => {
   if (scanWorker) {
     event.preventDefault()
     shutdownScanWorker()
-      .catch((err) => { console.error('[security] shutdown failed:', err) })
-      .finally(() => { app.exit(0) })
+      .catch((err) => {
+        console.error('[security] shutdown failed:', err)
+      })
+      .finally(() => {
+        app.exit(0)
+      })
   }
 })
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('spool:search', (_e, { query, limit = 10, source, onlyPinned, identityKey }: { query: string; limit?: number; source?: string; onlyPinned?: boolean; identityKey?: string }) => {
-  const cacheKey = `${source ?? 'all'}|${identityKey ?? 'any'}|${limit}|${onlyPinned ? 'pinned' : 'full'}|${query}`
-  if (!isSyncActive) {
+ipcMain.handle(
+  'spool:search',
+  (
+    _e,
+    {
+      query,
+      limit = 10,
+      source,
+      onlyPinned,
+      identityKey,
+    }: {
+      query: string
+      limit?: number
+      source?: string
+      onlyPinned?: boolean
+      identityKey?: string
+    },
+  ) => {
+    const cacheKey = `${source ?? 'all'}|${identityKey ?? 'any'}|${limit}|${onlyPinned ? 'pinned' : 'full'}|${query}`
+    if (!isSyncActive) {
+      const cached = searchCache.get(cacheKey)
+      if (cached) return cached
+    }
+
+    const sessionSource =
+      source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
+        ? source
+        : undefined
+    const results = searchFragments(db, query, {
+      limit,
+      ...(sessionSource ? { source: sessionSource } : {}),
+      ...(onlyPinned ? { onlyPinned: true } : {}),
+      ...(identityKey ? { identityKey } : {}),
+    }).map((f) => ({ ...f, kind: 'fragment' as const }))
+
+    if (!isSyncActive) {
+      searchCache.set(cacheKey, results)
+    }
+
+    return results
+  },
+)
+
+ipcMain.handle(
+  'spool:search-preview',
+  (_e, { query, limit = 5, source }: { query: string; limit?: number; source?: string }) => {
+    const cacheKey = `preview|${source ?? 'all'}|${limit}|${query}`
     const cached = searchCache.get(cacheKey)
     if (cached) return cached
-  }
 
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
-    ? source
-    : undefined
-  const results = searchFragments(db, query, {
-    limit,
-    ...(sessionSource ? { source: sessionSource } : {}),
-    ...(onlyPinned ? { onlyPinned: true } : {}),
-    ...(identityKey ? { identityKey } : {}),
-  }).map(f => ({ ...f, kind: 'fragment' as const }))
+    const sessionSource =
+      source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
+        ? source
+        : undefined
+    const fragments = searchSessionPreview(db, query, {
+      limit,
+      ...(sessionSource ? { source: sessionSource } : {}),
+    }).map((f) => ({ ...f, kind: 'fragment' as const }))
+    searchCache.set(cacheKey, fragments)
+    return fragments
+  },
+)
 
-  if (!isSyncActive) {
-    searchCache.set(cacheKey, results)
-  }
-
-  return results
-})
-
-ipcMain.handle('spool:search-preview', (_e, { query, limit = 5, source }: { query: string; limit?: number; source?: string }) => {
-  const cacheKey = `preview|${source ?? 'all'}|${limit}|${query}`
-  const cached = searchCache.get(cacheKey)
-  if (cached) return cached
-
-  const sessionSource = source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
-    ? source
-    : undefined
-  const fragments = searchSessionPreview(db, query, {
-    limit,
-    ...(sessionSource ? { source: sessionSource } : {}),
-  }).map(f => ({ ...f, kind: 'fragment' as const }))
-  searchCache.set(cacheKey, fragments)
-  return fragments
-})
-
-ipcMain.handle('spool:list-sessions', (_e, args: { limit?: number; cursor?: SessionsCursor } = {}) => {
-  return listRecentSessionsPage(db, args)
-})
+ipcMain.handle(
+  'spool:list-sessions',
+  (_e, args: { limit?: number; cursor?: SessionsCursor } = {}) => {
+    return listRecentSessionsPage(db, args)
+  },
+)
 
 ipcMain.handle('spool:list-project-groups', () => {
   return listProjectGroups(db)
 })
 
-ipcMain.handle('spool:list-sessions-by-identity', (_e, { identityKey, options }: { identityKey: string; options?: ListSessionsByIdentityOptions }) => {
-  return listSessionsByIdentity(db, identityKey, options)
-})
+ipcMain.handle(
+  'spool:list-sessions-by-identity',
+  (
+    _e,
+    { identityKey, options }: { identityKey: string; options?: ListSessionsByIdentityOptions },
+  ) => {
+    return listSessionsByIdentity(db, identityKey, options)
+  },
+)
 
-ipcMain.handle('spool:list-project-directory-counts', (_e, { identityKey, sources }: { identityKey: string; sources?: SessionSource[] }) => {
-  return listProjectDirectoryCounts(db, identityKey, sources ? { sources } : {})
-})
+ipcMain.handle(
+  'spool:list-project-directory-counts',
+  (_e, { identityKey, sources }: { identityKey: string; sources?: SessionSource[] }) => {
+    return listProjectDirectoryCounts(db, identityKey, sources ? { sources } : {})
+  },
+)
 
 ipcMain.handle('spool:get-session', (_e, { sessionUuid }: { sessionUuid: string }) => {
   return getSessionWithMessages(db, sessionUuid)
@@ -825,9 +953,12 @@ ipcMain.handle('spool:list-pinned-sessions', () => {
   return listPinnedSessions(db)
 })
 
-ipcMain.handle('spool:list-pinned-sessions-by-identity', (_e, { identityKey }: { identityKey: string }) => {
-  return listPinnedSessionsByIdentity(db, identityKey)
-})
+ipcMain.handle(
+  'spool:list-pinned-sessions-by-identity',
+  (_e, { identityKey }: { identityKey: string }) => {
+    return listPinnedSessionsByIdentity(db, identityKey)
+  },
+)
 
 ipcMain.handle('spool:list-share-drafts', (_e, { limit }: { limit?: number } = {}) => {
   const opts: { limit?: number } = {}
@@ -910,15 +1041,14 @@ ipcMain.handle('spool:force-resync-session', (_e, { sessionUuid }: { sessionUuid
     .prepare('SELECT file_path, source_id FROM sessions WHERE session_uuid = ?')
     .get(sessionUuid) as { file_path: string; source_id: number } | undefined
   if (!row) return { ok: false as const, error: 'session-not-found' }
-  const sourceRow = db
-    .prepare('SELECT name FROM sources WHERE id = ?')
-    .get(row.source_id) as { name: SessionSource } | undefined
+  const sourceRow = db.prepare('SELECT name FROM sources WHERE id = ?').get(row.source_id) as
+    | { name: SessionSource }
+    | undefined
   if (!sourceRow) return { ok: false as const, error: 'source-not-found' }
   try {
-    const result = syncer.syncFile(
-      row.file_path, sourceRow.name, undefined, undefined,
-      { forceMode: 'rewrite' },
-    )
+    const result = syncer.syncFile(row.file_path, sourceRow.name, undefined, undefined, {
+      forceMode: 'rewrite',
+    })
     if (result === 'error') return { ok: false as const, error: 'sync-error' }
     return { ok: true as const, result }
   } catch (err) {
@@ -927,29 +1057,32 @@ ipcMain.handle('spool:force-resync-session', (_e, { sessionUuid }: { sessionUuid
   }
 })
 
-ipcMain.handle('spool:resume-cli', (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
-  try {
-    const command = getSessionResumeCommand(source, sessionUuid)
-    if (!command) {
-      return { ok: false, error: `Session source "${source}" cannot be resumed from the CLI.` }
+ipcMain.handle(
+  'spool:resume-cli',
+  (_e, { sessionUuid, source, cwd }: { sessionUuid: string; source: string; cwd?: string }) => {
+    try {
+      const command = getSessionResumeCommand(source, sessionUuid)
+      if (!command) {
+        return { ok: false, error: `Session source "${source}" cannot be resumed from the CLI.` }
+      }
+      const session = getSessionWithMessages(db, sessionUuid)?.session
+      const resumeCwd = session
+        ? resolveResumeWorkingDirectory(session)
+        : resolveResumeWorkingDirectory({
+            source: source as SessionSource,
+            cwd: cwd ?? null,
+            projectDisplayPath: '',
+            filePath: '',
+          })
+      const terminal = acpManager.getAgentsConfig().terminal
+      openTerminal(command, terminal, resumeCwd)
+      return { ok: true }
+    } catch (err) {
+      console.error('[spool:resume-cli]', err)
+      return { ok: false, error: String(err) }
     }
-    const session = getSessionWithMessages(db, sessionUuid)?.session
-    const resumeCwd = session
-      ? resolveResumeWorkingDirectory(session)
-      : resolveResumeWorkingDirectory({
-          source: source as SessionSource,
-          cwd: cwd ?? null,
-          projectDisplayPath: '',
-          filePath: '',
-        })
-    const terminal = acpManager.getAgentsConfig().terminal
-    openTerminal(command, terminal, resumeCwd)
-    return { ok: true }
-  } catch (err) {
-    console.error('[spool:resume-cli]', err)
-    return { ok: false, error: String(err) }
-  }
-})
+  },
+)
 
 ipcMain.handle('spool:copy-fragment', (_e, { text }: { text: string }) => {
   const { clipboard } = require('electron')
@@ -972,11 +1105,14 @@ ipcMain.handle('spool:get-theme-editor-state', () => {
   return uiPreferences.themeEditor
 })
 
-ipcMain.handle('spool:set-theme-editor-state', (_e, { state }: { state: import('../renderer/theme/editorTypes.js').ThemeEditorStateV1 }) => {
-  uiPreferences.themeEditor = state
-  saveThemeEditor(state)
-  return { ok: true }
-})
+ipcMain.handle(
+  'spool:set-theme-editor-state',
+  (_e, { state }: { state: import('../renderer/theme/editorTypes.js').ThemeEditorStateV1 }) => {
+    uiPreferences.themeEditor = state
+    saveThemeEditor(state)
+    return { ok: true }
+  },
+)
 
 // ── AI / ACP Handlers ────────────────────────────────────────────────────────
 
@@ -992,30 +1128,55 @@ ipcMain.handle('spool:ai-get-config', () => {
   return acpManager.getAgentsConfig()
 })
 
-ipcMain.handle('spool:ai-set-config', (_e, { config }: { config: import('./acp.js').AgentsConfig }) => {
-  acpManager.saveAgentsConfig(config)
-  return { ok: true }
-})
+ipcMain.handle(
+  'spool:ai-set-config',
+  (_e, { config }: { config: import('./acp.js').AgentsConfig }) => {
+    acpManager.saveAgentsConfig(config)
+    return { ok: true }
+  },
+)
 
-ipcMain.handle('spool:ai-search', async (_e, { query, agentId, context }: { query: string; agentId: string; context: import('@spool-lab/core').FragmentResult[] }) => {
-  try {
-    const fullText = await acpManager.query(agentId, query, context, (text) => {
-      mainWindow?.webContents.send('spool:ai-chunk', { text })
-    }, (toolCall) => {
-      mainWindow?.webContents.send('spool:ai-tool-call', toolCall)
-    }, (info) => {
-      mainWindow?.webContents.send('spool:ai-session-started', info)
-    })
-    mainWindow?.webContents.send('spool:ai-done', { fullText })
-    return { ok: true, fullText }
-  } catch (err) {
-    const error = err instanceof Error ? err.message : (typeof err === 'object' && err !== null && 'message' in err) ? String((err as any).message) : String(err)
-    console.error('[spool:ai-search] Agent query failed:', error)
-    if (err instanceof Error && err.stack) console.error(err.stack)
-    mainWindow?.webContents.send('spool:ai-done', { fullText: '', error })
-    return { ok: false, error }
-  }
-})
+ipcMain.handle(
+  'spool:ai-search',
+  async (
+    _e,
+    {
+      query,
+      agentId,
+      context,
+    }: { query: string; agentId: string; context: import('@spool-lab/core').FragmentResult[] },
+  ) => {
+    try {
+      const fullText = await acpManager.query(
+        agentId,
+        query,
+        context,
+        (text) => {
+          mainWindow?.webContents.send('spool:ai-chunk', { text })
+        },
+        (toolCall) => {
+          mainWindow?.webContents.send('spool:ai-tool-call', toolCall)
+        },
+        (info) => {
+          mainWindow?.webContents.send('spool:ai-session-started', info)
+        },
+      )
+      mainWindow?.webContents.send('spool:ai-done', { fullText })
+      return { ok: true, fullText }
+    } catch (err) {
+      const error =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as any).message)
+            : String(err)
+      console.error('[spool:ai-search] Agent query failed:', error)
+      if (err instanceof Error && err.stack) console.error(err.stack)
+      mainWindow?.webContents.send('spool:ai-done', { fullText: '', error })
+      return { ok: false, error }
+    }
+  },
+)
 
 ipcMain.handle('spool:ai-cancel', () => {
   acpManager.cancel()

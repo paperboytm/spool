@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { parseQualifier, withQualifier, toggleKindQualifier } from './parse-qualifier.js'
 
 describe('parseQualifier', () => {
@@ -29,8 +30,9 @@ describe('parseQualifier', () => {
   })
 
   it('is:dismissed stays accepted as a backward-compat alias for is:ignored', () => {
-    expect(parseQualifier('is:dismissed').filter.state)
-      .toBe(parseQualifier('is:ignored').filter.state)
+    expect(parseQualifier('is:dismissed').filter.state).toBe(
+      parseQualifier('is:ignored').filter.state,
+    )
   })
 
   it('is: with unknown value is treated as free text, not silently dropped', () => {
@@ -100,8 +102,9 @@ describe('withQualifier', () => {
   })
 
   it('preserves other qualifiers and free text', () => {
-    expect(withQualifier('is:active severity:high', 'kind', 'jwt'))
-      .toBe('kind:jwt is:active severity:high')
+    expect(withQualifier('is:active severity:high', 'kind', 'jwt')).toBe(
+      'kind:jwt is:active severity:high',
+    )
   })
 
   it('idempotent: parsing back then rebuilding is structural', () => {

@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression test for the meta-row layout shift (May 2026):
 //
@@ -62,15 +64,35 @@ test.beforeAll(async () => {
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number; manualBurstInFlight: boolean }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && !s.manualBurstInFlight
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+                manualBurstInFlight: boolean
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return (
+        s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && !s.manualBurstInFlight
+      )
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Meta row keeps the timestamp and holds the rescan button still during a scan', async () => {
@@ -93,7 +115,9 @@ test('Meta row keeps the timestamp and holds the rescan button still during a sc
 
   // The scanning banner must come up — this is the state that used to
   // hide the timestamp.
-  await expect(window.locator('[data-testid="security-scan-banner"]')).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="security-scan-banner"]')).toBeVisible({
+    timeout: 10_000,
+  })
 
   // Regression: the timestamp must NOT disappear under the banner...
   await expect(scanState).toBeVisible()

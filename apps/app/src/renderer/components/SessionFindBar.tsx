@@ -1,6 +1,6 @@
+import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
 type Props = {
   visible: boolean
@@ -99,7 +99,7 @@ export default function SessionFindBar({
   return (
     <div
       ref={containerRef}
-      className="absolute top-8 right-4 z-20 flex items-center gap-0.5 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] pl-2 pr-1 py-0.5 w-[320px] animate-in fade-in transition-[border-color,box-shadow] focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 focus-within:shadow-[0_0_0_3px_rgba(200,90,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:focus-within:shadow-[0_0_0_3px_rgba(240,112,32,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
+      className="border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 animate-in fade-in focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 absolute top-8 right-4 z-20 flex w-[320px] items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2 shadow-[0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-[border-color,box-shadow] focus-within:shadow-[0_0_0_3px_rgba(200,90,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] dark:focus-within:shadow-[0_0_0_3px_rgba(240,112,32,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
       role="search"
     >
       <input
@@ -128,24 +128,24 @@ export default function SessionFindBar({
           }
         }}
         placeholder={t('session.find_placeholder')}
-        className="flex-1 min-w-0 bg-transparent text-[13px] text-warm-text dark:text-dark-text outline-none placeholder:text-warm-faint dark:placeholder:text-dark-muted"
+        className="text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted min-w-0 flex-1 bg-transparent text-[13px] outline-none"
         autoComplete="off"
         spellCheck={false}
         data-testid="session-find-input"
       />
       <span
-        className={`flex-none font-mono text-[11px] tabular-nums text-warm-muted dark:text-dark-muted whitespace-nowrap pl-1 transition-opacity ${pending ? 'opacity-60' : ''}`}
+        className={`text-warm-muted dark:text-dark-muted flex-none pl-1 font-mono text-[11px] whitespace-nowrap tabular-nums transition-opacity ${pending ? 'opacity-60' : ''}`}
         data-testid="session-find-status"
         data-pending={pending ? 'true' : undefined}
       >
         {statusLabel}
       </span>
-      <div className="flex-none w-px h-4 bg-warm-border dark:bg-dark-border mx-0.5" />
+      <div className="bg-warm-border dark:bg-dark-border mx-0.5 h-4 w-px flex-none" />
       <button
         type="button"
         onClick={onPrevious}
         disabled={!hasQuery || !hasMatches}
-        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
+        className="text-warm-muted dark:text-dark-muted enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text inline-flex h-6 w-6 flex-none items-center justify-center rounded transition-colors disabled:opacity-40"
         aria-label={`${t('session.find_prev')} (${previousShortcutLabel})`}
         title={`${t('session.find_prev')} (${previousShortcutLabel})`}
         data-testid="session-find-prev"
@@ -156,7 +156,7 @@ export default function SessionFindBar({
         type="button"
         onClick={onNext}
         disabled={!hasQuery || !hasMatches}
-        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text disabled:opacity-40"
+        className="text-warm-muted dark:text-dark-muted enabled:hover:bg-warm-surface enabled:hover:text-warm-text enabled:dark:hover:bg-dark-surface enabled:dark:hover:text-dark-text inline-flex h-6 w-6 flex-none items-center justify-center rounded transition-colors disabled:opacity-40"
         aria-label={`${t('session.find_next')} (${nextShortcutLabel})`}
         title={`${t('session.find_next')} (${nextShortcutLabel})`}
         data-testid="session-find-next"
@@ -166,7 +166,7 @@ export default function SessionFindBar({
       <button
         type="button"
         onClick={onClose}
-        className="flex-none inline-flex items-center justify-center w-6 h-6 rounded text-warm-muted dark:text-dark-muted transition-colors hover:bg-warm-surface hover:text-warm-text dark:hover:bg-dark-surface dark:hover:text-dark-text"
+        className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface hover:text-warm-text dark:hover:bg-dark-surface dark:hover:text-dark-text inline-flex h-6 w-6 flex-none items-center justify-center rounded transition-colors"
         aria-label={t('session.find_close')}
         title={`${t('session.find_close')} (Esc)`}
       >

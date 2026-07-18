@@ -4,10 +4,19 @@
 // is injectable so tests don't touch the network.
 
 import { createHash } from 'node:crypto'
-import { createWriteStream, statSync, renameSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
+import {
+  createWriteStream,
+  statSync,
+  renameSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+
 import type { ManifestFile, ModelManifest } from './model-manifest.js'
 import { manifestFileUrl, manifestTotalBytes } from './model-manifest.js'
 
@@ -113,10 +122,10 @@ export async function downloadModel(opts: DownloadOptions): Promise<void> {
     })
 
     if (!fileMatches(partPath, file)) {
-      throw new DownloadError(
-        `SHA-256 mismatch for ${file.path}`,
-        { file: file.path, stage: 'hash' },
-      )
+      throw new DownloadError(`SHA-256 mismatch for ${file.path}`, {
+        file: file.path,
+        stage: 'hash',
+      })
     }
 
     renameSync(partPath, finalPath)
@@ -152,23 +161,23 @@ async function fetchAndAppend(args: {
     // useful message instead of a bare "fetch failed".
     const host = safeHost(args.url)
     const detail = cause instanceof Error ? cause.message : String(cause)
-    throw new DownloadError(
-      `Couldn't reach ${host} (${detail}). Check network / proxy.`,
-      { file: args.partPath, stage: 'http' },
-    )
+    throw new DownloadError(`Couldn't reach ${host} (${detail}). Check network / proxy.`, {
+      file: args.partPath,
+      stage: 'http',
+    })
   }
 
   if (args.startOffset > 0 && res.status !== 206 && res.status !== 200) {
-    throw new DownloadError(
-      `Unexpected resume status ${res.status} for ${args.url}`,
-      { file: args.partPath, stage: 'http' },
-    )
+    throw new DownloadError(`Unexpected resume status ${res.status} for ${args.url}`, {
+      file: args.partPath,
+      stage: 'http',
+    })
   }
   if (args.startOffset === 0 && !res.ok) {
-    throw new DownloadError(
-      `HTTP ${res.status} for ${args.url}`,
-      { file: args.partPath, stage: 'http' },
-    )
+    throw new DownloadError(`HTTP ${res.status} for ${args.url}`, {
+      file: args.partPath,
+      stage: 'http',
+    })
   }
   if (!res.body) {
     throw new DownloadError('Response missing body', { file: args.partPath, stage: 'http' })
@@ -196,5 +205,9 @@ function fileMatches(path: string, file: ManifestFile): boolean {
 }
 
 function safeHost(url: string): string {
-  try { return new URL(url).host } catch { return url }
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
 }

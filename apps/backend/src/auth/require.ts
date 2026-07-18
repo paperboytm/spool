@@ -2,7 +2,6 @@ import type { D1Database, KVNamespace } from '@cloudflare/workers-types'
 
 import { ApiError } from '../errors'
 import { getUserById, type UserRow } from '../store/d1'
-
 import { COOKIE_NAME, readCookie } from './cookie'
 import { loadSession } from './session'
 

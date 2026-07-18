@@ -2,6 +2,24 @@
   "name": "@spool/share-kit",
   "version": "0.0.1",
   "private": true,
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
+  "files": [
+    "dist",
+    "src/styles"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -30,41 +48,37 @@
     "./styles/tokens.css": "./src/styles/tokens.css",
     "./styles/fonts.css": "./src/styles/fonts.css"
   },
-  "files": [
-    "dist",
-    "src/styles"
-  ],
   "scripts": {
-    "build": "pnpm run clean && vite build",
-    "dev": "vite build --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "dev": "vp build --watch",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@spool-lab/redact": "workspace:*",
     "html-to-image": "^1.11.13",
-    "idb-keyval": "^6.2.1"
-  },
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "lucide-react": "^0.460.0 || ^1.0.0",
-    "react-markdown": "^9.0.0 || ^10.0.0",
-    "remark-gfm": "^4.0.0"
+    "idb-keyval": "^6.3.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@typescript/typescript6": "6.0.2",
-    "@vitejs/plugin-react": "^4.7.0",
-    "lucide-react": "^0.460.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "lucide-react": "^1.25.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "vite": "^6.3.3",
+    "vite": "catalog:",
     "vite-plugin-dts": "^5.0.3",
-    "vitest": "^3.2.4"
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "lucide-react": "^0.460.0 || ^1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.0 || ^10.0.0",
+    "remark-gfm": "^4.0.0"
   }
 }

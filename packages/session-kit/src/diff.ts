@@ -50,8 +50,10 @@ export function composeSessionDiff(events: readonly EditEvent[]): SessionDiff {
   let totalDels = 0
 
   for (const [path, fileEvents] of grouped) {
-    fileEvents.sort((left, right) => left.recordIndex - right.recordIndex
-      || left.resultRecordIndex - right.resultRecordIndex)
+    fileEvents.sort(
+      (left, right) =>
+        left.recordIndex - right.recordIndex || left.resultRecordIndex - right.resultRecordIndex,
+    )
     const file = composeFile(path, fileEvents)
     files.push(file)
     totalAdds += file.adds
@@ -73,27 +75,27 @@ function composeFile(path: string, events: readonly EditEvent[]): SessionFileDif
   const inferred = first.before === undefined ? inferInitialText(events) : null
   const oldText = first.before ?? inferred?.text ?? ''
   const originalLines = splitLines(oldText)
-  let tracked = originalLines.map((line, index): TrackedLine => ({
-    line,
-    originalIndices: [index],
-    recordIndices: [],
-  }))
+  let tracked = originalLines.map(
+    (line, index): TrackedLine => ({
+      line,
+      originalIndices: [index],
+      recordIndices: [],
+    }),
+  )
   const deletedBy = new Map<number, Set<number>>()
 
   for (const event of events) {
-    const currentText = tracked.map(item => item.line).join('')
-    const after = event.after ?? applyReplacements(
-      currentText,
-      event.replacements,
-      inferred?.occurrenceByReplacement,
-    )
+    const currentText = tracked.map((item) => item.line).join('')
+    const after =
+      event.after ??
+      applyReplacements(currentText, event.replacements, inferred?.occurrenceByReplacement)
     tracked = applyTrackedChange(tracked, after, event.recordIndex, deletedBy)
   }
 
-  const newText = tracked.map(item => item.line).join('')
+  const newText = tracked.map((item) => item.line).join('')
   const positioned = positionFinalDiff(originalLines, tracked, deletedBy)
-  const adds = positioned.filter(line => line.kind === 'add').length
-  const dels = positioned.filter(line => line.kind === 'del').length
+  const adds = positioned.filter((line) => line.kind === 'add').length
+  const dels = positioned.filter((line) => line.kind === 'del').length
   const usesFragments = first.before === undefined
   const hunks = applyKnownCoordinates(
     makeHunks(positioned, usesFragments ? 0 : HUNK_CONTEXT),
@@ -102,8 +104,9 @@ function composeFile(path: string, events: readonly EditEvent[]): SessionFileDif
   )
   // Both call and result indices: this is the reader's fetch list for
   // reconstructing the file's edits client-side (pairing needs both records).
-  const eventIndices = [...new Set(events.flatMap(event =>
-    [event.recordIndex, event.resultRecordIndex]))].sort(numberAscending)
+  const eventIndices = [
+    ...new Set(events.flatMap((event) => [event.recordIndex, event.resultRecordIndex])),
+  ].sort(numberAscending)
 
   return { path, events: eventIndices, oldText, newText, hunks, adds, dels }
 }
@@ -114,7 +117,10 @@ function applyTrackedChange(
   recordIndex: number,
   deletedBy: Map<number, Set<number>>,
 ): TrackedLine[] {
-  const atoms = diffLines(current.map(item => item.line), splitLines(afterText))
+  const atoms = diffLines(
+    current.map((item) => item.line),
+    splitLines(afterText),
+  )
   const result: TrackedLine[] = []
   let oldIndex = 0
   let deleted: TrackedLine[] = []
@@ -164,7 +170,10 @@ function positionFinalDiff(
   finalLines: readonly TrackedLine[],
   deletedBy: ReadonlyMap<number, ReadonlySet<number>>,
 ): PositionedDiffLine[] {
-  const atoms = diffLines(originalLines, finalLines.map(item => item.line))
+  const atoms = diffLines(
+    originalLines,
+    finalLines.map((item) => item.line),
+  )
   const result: PositionedDiffLine[] = []
   let oldIndex = 0
   let newIndex = 0
@@ -211,7 +220,7 @@ function positionFinalDiff(
 }
 
 function makeHunks(lines: readonly PositionedDiffLine[], context: number): DiffHunk[] {
-  const changed = lines.flatMap((line, index) => line.kind === 'context' ? [] : [index])
+  const changed = lines.flatMap((line, index) => (line.kind === 'context' ? [] : [index]))
   if (changed.length === 0) return []
 
   const windows: Array<{ start: number; end: number }> = []
@@ -226,9 +235,11 @@ function makeHunks(lines: readonly PositionedDiffLine[], context: number): DiffH
   return windows.map(({ start, end }) => {
     const selected = lines.slice(start, end + 1)
     const first = selected[0] as PositionedDiffLine
-    const oldLines = selected.filter(line => line.kind !== 'add').length
-    const newLines = selected.filter(line => line.kind !== 'del').length
-    const recordIndices = [...new Set(selected.flatMap(line => line.recordIndices))].sort(numberAscending)
+    const oldLines = selected.filter((line) => line.kind !== 'add').length
+    const newLines = selected.filter((line) => line.kind !== 'del').length
+    const recordIndices = [...new Set(selected.flatMap((line) => line.recordIndices))].sort(
+      numberAscending,
+    )
     return {
       oldStart: first.beforeOld + 1,
       oldLines,
@@ -261,9 +272,10 @@ function applyReplacements(
     const occurrence = occurrenceByReplacement?.get(replacement) ?? 0
     const index = occurrences[Math.min(occurrence, occurrences.length - 1)] ?? -1
     if (index >= 0) {
-      result = result.slice(0, index)
-        + replacement.newText
-        + result.slice(index + replacement.oldText.length)
+      result =
+        result.slice(0, index) +
+        replacement.newText +
+        result.slice(index + replacement.oldText.length)
     }
   }
   return result
@@ -277,10 +289,15 @@ function inferInitialText(events: readonly EditEvent[]): InferredText {
   for (const event of events) {
     for (const replacement of event.replacements) {
       if (replacement.oldText === '') continue
-      const candidates = fragments.filter(fragment => fragment.current.includes(replacement.oldText))
-      let target = replacement.oldStart === undefined
-        ? candidates[0]
-        : candidates.find(fragment => coordinateFallsWithin(fragment, replacement.oldStart as number))
+      const candidates = fragments.filter((fragment) =>
+        fragment.current.includes(replacement.oldText),
+      )
+      let target =
+        replacement.oldStart === undefined
+          ? candidates[0]
+          : candidates.find((fragment) =>
+              coordinateFallsWithin(fragment, replacement.oldStart as number),
+            )
       if (!target) {
         target = {
           initial: replacement.oldText,
@@ -304,13 +321,14 @@ function inferInitialText(events: readonly EditEvent[]): InferredText {
     for (const replacement of event.replacements) {
       const target = targetByReplacement.get(replacement)
       if (!target) continue
-      const candidates = fragments.filter(fragment => fragment.current.includes(replacement.oldText)
-        || fragment === target)
+      const candidates = fragments.filter(
+        (fragment) => fragment.current.includes(replacement.oldText) || fragment === target,
+      )
       occurrenceByReplacement.set(replacement, Math.max(0, candidates.indexOf(target)))
     }
   }
   return {
-    text: fragments.map(fragment => fragment.initial).join(''),
+    text: fragments.map((fragment) => fragment.initial).join(''),
     occurrenceByReplacement,
   }
 }
@@ -367,8 +385,10 @@ function applyKnownCoordinates(
   }
   if (positioned.length === 0) return [...hunks]
 
-  positioned.sort((left, right) => left.baseStart - right.baseStart
-    || left.event.recordIndex - right.event.recordIndex)
+  positioned.sort(
+    (left, right) =>
+      left.baseStart - right.baseStart || left.event.recordIndex - right.event.recordIndex,
+  )
   const regions: Array<{
     oldStart: number
     oldEnd: number
@@ -404,7 +424,7 @@ function applyKnownCoordinates(
       ...hunk,
       oldStart: region.oldStart,
       newStart: region.newStart,
-      lines: hunk.lines.map(line => ({
+      lines: hunk.lines.map((line) => ({
         ...line,
         ...(line.oldLine === undefined ? {} : { oldLine: line.oldLine + oldOffset }),
         ...(line.newLine === undefined ? {} : { newLine: line.newLine + newOffset }),
@@ -420,7 +440,7 @@ function mapCurrentLineToBaseline(
   let baseline = currentLine
   for (let iteration = 0; iteration <= changes.length; iteration += 1) {
     const deltaBefore = changes
-      .filter(change => change.baseStart < baseline)
+      .filter((change) => change.baseStart < baseline)
       .reduce((total, change) => total + change.delta, 0)
     const next = currentLine - deltaBefore
     if (next === baseline) break
@@ -433,9 +453,12 @@ function finalLineForBaseline(
   baselineLine: number,
   changes: readonly { baseStart: number; delta: number }[],
 ): number {
-  return baselineLine + changes
-    .filter(change => change.baseStart < baselineLine)
-    .reduce((total, change) => total + change.delta, 0)
+  return (
+    baselineLine +
+    changes
+      .filter((change) => change.baseStart < baselineLine)
+      .reduce((total, change) => total + change.delta, 0)
+  )
 }
 
 function splitLines(value: string): string[] {
@@ -453,9 +476,7 @@ function splitLines(value: string): string[] {
 }
 
 function stripLineEnding(line: string): string {
-  return line.endsWith('\r\n') ? line.slice(0, -2)
-    : line.endsWith('\n') ? line.slice(0, -1)
-      : line
+  return line.endsWith('\r\n') ? line.slice(0, -2) : line.endsWith('\n') ? line.slice(0, -1) : line
 }
 
 function diffLines(before: readonly string[], after: readonly string[]): DiffAtom[] {
@@ -468,9 +489,7 @@ function diffLines(before: readonly string[], after: readonly string[]): DiffAto
     for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
       const down = frontier.get(diagonal + 1) ?? Number.NEGATIVE_INFINITY
       const right = frontier.get(diagonal - 1) ?? Number.NEGATIVE_INFINITY
-      let x = diagonal === -distance || (diagonal !== distance && right < down)
-        ? down
-        : right + 1
+      let x = diagonal === -distance || (diagonal !== distance && right < down) ? down : right + 1
       if (!Number.isFinite(x)) x = 0
       let y = x - diagonal
       while (x < before.length && y < after.length && before[x] === after[y]) {
@@ -499,9 +518,10 @@ function backtrack(
     const diagonal = x - y
     const down = frontier.get(diagonal + 1) ?? Number.NEGATIVE_INFINITY
     const right = frontier.get(diagonal - 1) ?? Number.NEGATIVE_INFINITY
-    const previousDiagonal = diagonal === -distance || (diagonal !== distance && right < down)
-      ? diagonal + 1
-      : diagonal - 1
+    const previousDiagonal =
+      diagonal === -distance || (diagonal !== distance && right < down)
+        ? diagonal + 1
+        : diagonal - 1
     const previousX = frontier.get(previousDiagonal) ?? 0
     const previousY = previousX - previousDiagonal
 

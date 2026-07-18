@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import { runMigrations } from './db.js'
 
 const tempDirs: string[] = []
@@ -108,17 +110,25 @@ function seedV0(dbPath: string) {
     );
   `)
 
-  seed.prepare("INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')").run()
-  seed.prepare(`
+  seed
+    .prepare(
+      "INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')",
+    )
+    .run()
+  seed
+    .prepare(`
     INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
     VALUES (1, 1, 'sess-uuid', '/fake/sess.jsonl', 'A session', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 1)
-  `).run()
+  `)
+    .run()
   // v3 fixture: capture with connectorId in metadata (not yet promoted to capture_connectors)
-  seed.prepare(`
+  seed
+    .prepare(`
     INSERT INTO captures (source_id, capture_uuid, url, title, content_text, platform, captured_at, metadata)
     VALUES (4, 'cap-uuid', 'https://x.com/1', 'A tweet', 'tweet text', 'twitter', '2026-01-01T00:00:00Z',
       '{"connectorId":"twitter-bookmarks","extra":"keep"}')
-  `).run()
+  `)
+    .run()
   seed.prepare("INSERT INTO connector_sync_state (connector_id) VALUES ('twitter-bookmarks')").run()
 
   seed.pragma('user_version = 0')
@@ -142,19 +152,24 @@ describe('migration v1-v3 (historical connector path)', () => {
 
     // Connector tables erased by v5
     const tableNames = new Set(
-      (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[])
-        .map(r => r.name),
+      (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]
+      ).map((r) => r.name),
     )
     expect(tableNames.has('captures')).toBe(false)
     expect(tableNames.has('capture_connectors')).toBe(false)
     expect(tableNames.has('connector_sync_state')).toBe(false)
 
     // 'connector' source row dropped by v5
-    const sources = (db.prepare('SELECT name FROM sources').all() as { name: string }[]).map(s => s.name)
+    const sources = (db.prepare('SELECT name FROM sources').all() as { name: string }[]).map(
+      (s) => s.name,
+    )
     expect(sources.sort()).toEqual(['claude', 'codex', 'gemini', 'opencode', 'pi'])
 
     // Session preserved
-    const sess = db.prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'").get() as { session_uuid: string }
+    const sess = db
+      .prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'")
+      .get() as { session_uuid: string }
     expect(sess.session_uuid).toBe('sess-uuid')
 
     db.close()
@@ -177,8 +192,9 @@ describe('migration v1-v3 (historical connector path)', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     const names = new Set(
-      (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[])
-        .map(r => r.name),
+      (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]
+      ).map((r) => r.name),
     )
     expect(names.has('captures')).toBe(false)
     expect(names.has('captures_fts')).toBe(false)

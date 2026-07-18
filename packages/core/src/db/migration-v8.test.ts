@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 
@@ -80,12 +81,16 @@ describe('migration v8 (title_source column)', () => {
     const dbModule = await import('./db.js')
     const db = dbModule.getDB()
 
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(8)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(8)
 
-    const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>
-    expect(cols.map(c => c.name)).toContain('title_source')
+    const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>
+    expect(cols.map((c) => c.name)).toContain('title_source')
 
-    const row = db.prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?').get('sess-a') as { title: string; title_source: string }
+    const row = db
+      .prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-a') as { title: string; title_source: string }
     expect(row.title).toBe('old title')
     expect(row.title_source).toBe('derived')
 
@@ -111,7 +116,9 @@ describe('migration v8 (title_source column)', () => {
     const db = dbModule.getDB()
 
     // Existing user-set title_source must survive
-    const row = db.prepare('SELECT title_source FROM sessions WHERE session_uuid = ?').get('sess-a') as { title_source: string }
+    const row = db
+      .prepare('SELECT title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-a') as { title_source: string }
     expect(row.title_source).toBe('spool')
 
     db.close()
@@ -126,7 +133,7 @@ describe('migration v8 (title_source column)', () => {
     const dbPath = join(spoolDir, 'spool.db')
     seedV7(dbPath)
     const seed = new Database(dbPath)
-    seed.pragma('user_version = 8')  // bump but don't add the column
+    seed.pragma('user_version = 8') // bump but don't add the column
     seed.close()
 
     vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
@@ -134,10 +141,12 @@ describe('migration v8 (title_source column)', () => {
     const dbModule = await import('./db.js')
     const db = dbModule.getDB()
 
-    const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>
-    expect(cols.map(c => c.name)).toContain('title_source')
+    const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>
+    expect(cols.map((c) => c.name)).toContain('title_source')
 
-    const row = db.prepare('SELECT title_source FROM sessions WHERE session_uuid = ?').get('sess-a') as { title_source: string }
+    const row = db
+      .prepare('SELECT title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-a') as { title_source: string }
     expect(row.title_source).toBe('derived')
 
     db.close()
@@ -151,10 +160,16 @@ describe('migration v8 (title_source column)', () => {
     const db = dbModule.getDB()
 
     expect(dbModule.wasNewDb()).toBe(true)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(8)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(8)
 
-    const cols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string; dflt_value: string | null; notnull: number }>
-    const titleSource = cols.find(c => c.name === 'title_source')
+    const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{
+      name: string
+      dflt_value: string | null
+      notnull: number
+    }>
+    const titleSource = cols.find((c) => c.name === 'title_source')
     expect(titleSource).toBeDefined()
     expect(titleSource?.notnull).toBe(1)
     expect(titleSource?.dflt_value).toBe(`'derived'`)

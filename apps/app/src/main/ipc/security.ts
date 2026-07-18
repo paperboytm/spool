@@ -5,8 +5,6 @@
 // Effect types leak past this file, matching the rest of Spool's
 // IPC.
 
-import { ipcMain, type BrowserWindow } from 'electron'
-import { Effect, Fiber, Stream } from 'effect'
 import {
   listFindings,
   listFindingsPage,
@@ -39,75 +37,78 @@ import {
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 import type Database from 'better-sqlite3'
+import { Effect, Fiber, Stream } from 'effect'
+import { ipcMain, type BrowserWindow } from 'electron'
+
+import type { MutationWorkerProxy } from '../mutation-worker-proxy.js'
+import type { PfCoordinator } from '../security/pf-coordinator.js'
+import type { PfRuntime } from '../security/pf-runtime.js'
 import {
   loadSecurityPreferences,
   saveSecurityPreferences,
   type SecurityPreferences,
 } from '../securityPreferences.js'
-import type { PfCoordinator } from '../security/pf-coordinator.js'
-import type { PfRuntime } from '../security/pf-runtime.js'
-import type { MutationWorkerProxy } from '../mutation-worker-proxy.js'
 
 /** Channel name table. Shared via type only with the renderer adapter
  *  (no runtime import — preload uses the strings literally). */
 export const SECURITY_IPC_CHANNELS = {
   // queries
-  LIST_FINDINGS:               'security:list-findings',
-  LIST_FINDINGS_PAGE:          'security:list-findings-page',
+  LIST_FINDINGS: 'security:list-findings',
+  LIST_FINDINGS_PAGE: 'security:list-findings-page',
   LIST_SESSIONS_WITH_FINDINGS: 'security:list-sessions-with-findings',
   LIST_SESSIONS_WITH_FINDINGS_PAGE: 'security:list-sessions-with-findings-page',
   COUNT_SESSIONS_WITH_FINDINGS: 'security:count-sessions-with-findings',
-  OCCURRENCES_BY_VALUE_HASH:   'security:occurrences-by-value-hash',
-  RISK_BY_CATEGORY:            'security:risk-by-category',
-  LAST_SCAN_COMPLETED_AT:      'security:last-scan-completed-at',
-  GET_FINDING_VALUE:           'security:get-finding-value',
-  GET_FINDING_VALUES:          'security:get-finding-values',
-  GET_SCAN_STATUS:             'security:get-scan-status',
+  OCCURRENCES_BY_VALUE_HASH: 'security:occurrences-by-value-hash',
+  RISK_BY_CATEGORY: 'security:risk-by-category',
+  LAST_SCAN_COMPLETED_AT: 'security:last-scan-completed-at',
+  GET_FINDING_VALUE: 'security:get-finding-value',
+  GET_FINDING_VALUES: 'security:get-finding-values',
+  GET_SCAN_STATUS: 'security:get-scan-status',
 
   // mutations
-  DISMISS_FINDING:             'security:dismiss-finding',
-  DISMISS_FINDINGS:            'security:dismiss-findings',
-  UNDISMISS_FINDING:           'security:undismiss-finding',
-  PURGE_FINDING:               'security:purge-finding',
-  PURGE_FINDINGS:              'security:purge-findings',
-  PURGE_EVERYWHERE:            'security:purge-everywhere',
-  RESCAN_ALL:                  'security:rescan-all',
-  RESCAN_SESSION:              'security:rescan-session',
+  DISMISS_FINDING: 'security:dismiss-finding',
+  DISMISS_FINDINGS: 'security:dismiss-findings',
+  UNDISMISS_FINDING: 'security:undismiss-finding',
+  PURGE_FINDING: 'security:purge-finding',
+  PURGE_FINDINGS: 'security:purge-findings',
+  PURGE_EVERYWHERE: 'security:purge-everywhere',
+  RESCAN_ALL: 'security:rescan-all',
+  RESCAN_SESSION: 'security:rescan-session',
 
   // preferences
-  GET_PREFS:                   'security:get-prefs',
-  SET_PREFS:                   'security:set-prefs',
+  GET_PREFS: 'security:get-prefs',
+  SET_PREFS: 'security:set-prefs',
 
   // allowlist management
-  LIST_ALLOWLIST_ENTRIES:      'security:list-allowlist-entries',
-  COUNT_ALLOWLIST_ENTRIES:     'security:count-allowlist-entries',
-  REMOVE_ALLOWLIST_ENTRY:      'security:remove-allowlist-entry',
+  LIST_ALLOWLIST_ENTRIES: 'security:list-allowlist-entries',
+  COUNT_ALLOWLIST_ENTRIES: 'security:count-allowlist-entries',
+  REMOVE_ALLOWLIST_ENTRY: 'security:remove-allowlist-entry',
 
   // maintenance
-  LIST_BACKUPS:                'security:list-backups',
-  DELETE_BACKUPS:              'security:delete-backups',
+  LIST_BACKUPS: 'security:list-backups',
+  DELETE_BACKUPS: 'security:delete-backups',
 
   // Privacy Filter ML download lifecycle
-  PF_GET_STATE:                'security:pf-get-state',
-  PF_DOWNLOAD_START:           'security:pf-download-start',
-  PF_DOWNLOAD_CANCEL:          'security:pf-download-cancel',
+  PF_GET_STATE: 'security:pf-get-state',
+  PF_DOWNLOAD_START: 'security:pf-download-start',
+  PF_DOWNLOAD_CANCEL: 'security:pf-download-cancel',
   /** Returns the inference runtime info — null when the ModelHost
    *  isn't running. Polled by PfDownloadCard for the runtime badge. */
-  PF_GET_RUNTIME_INFO:         'security:pf-get-runtime-info',
+  PF_GET_RUNTIME_INFO: 'security:pf-get-runtime-info',
 
   // readiness — eagerly registered so the renderer can wait for the
   // scan worker without bumping into "No handler registered" errors
   // when Settings → Security opens during boot, and so a worker-boot
   // failure surfaces as a "Scanner unavailable" banner instead of a
   // dead UI.
-  GET_READINESS:               'security:get-readiness',
+  GET_READINESS: 'security:get-readiness',
 
   // events (push: main → renderer via webContents.send)
-  EVT_FINDINGS_CHANGED:        'security:evt-findings-changed',
-  EVT_SCAN_STATUS:             'security:evt-scan-status',
-  EVT_PREFS_CHANGED:           'security:evt-prefs-changed',
-  EVT_PF_STATE:                'security:evt-pf-state',
-  EVT_READINESS_CHANGED:       'security:evt-readiness-changed',
+  EVT_FINDINGS_CHANGED: 'security:evt-findings-changed',
+  EVT_SCAN_STATUS: 'security:evt-scan-status',
+  EVT_PREFS_CHANGED: 'security:evt-prefs-changed',
+  EVT_PF_STATE: 'security:evt-pf-state',
+  EVT_READINESS_CHANGED: 'security:evt-readiness-changed',
 } as const
 
 export type SecurityReadiness =
@@ -123,9 +124,7 @@ export type SecurityReadiness =
  *  the millisecond the window appears no longer races the worker
  *  boot, which used to produce "No handler registered for
  *  security:list-backups" errors. */
-export function registerSecurityReadinessIpc(
-  getMainWindow: () => BrowserWindow | null,
-): {
+export function registerSecurityReadinessIpc(getMainWindow: () => BrowserWindow | null): {
   setReadiness: (next: SecurityReadiness) => void
   dispose: () => void
 } {
@@ -135,16 +134,15 @@ export function registerSecurityReadinessIpc(
     setReadiness: (next) => {
       // Same-value transitions are a no-op so the renderer doesn't
       // re-render its skeleton on every boot retry.
-      if (next.ready === current.ready &&
-        (next.ready || next.reason === (current as { reason: string }).reason)) {
+      if (
+        next.ready === current.ready &&
+        (next.ready || next.reason === (current as { reason: string }).reason)
+      ) {
         return
       }
       current = next
       try {
-        getMainWindow()?.webContents.send(
-          SECURITY_IPC_CHANNELS.EVT_READINESS_CHANGED,
-          next,
-        )
+        getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_READINESS_CHANGED, next)
       } catch (err) {
         console.error('[security] readiness broadcast failed:', err)
       }
@@ -209,7 +207,16 @@ export interface SecurityIpcHandle {
  *  worker is ready so the IPC layer becomes live before that boot
  *  completes. */
 export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
-  const { db, worker, runPromise, getMainWindow, pfCoordinator, pfRuntime: hostRuntime, onPfEnabledChanged, onSearchContentChanged } = deps
+  const {
+    db,
+    worker,
+    runPromise,
+    getMainWindow,
+    pfCoordinator,
+    pfRuntime: hostRuntime,
+    onPfEnabledChanged,
+    onSearchContentChanged,
+  } = deps
   // Closure-local ref read by every mutation handler at call time —
   // lets `attachMutationWorker` swap the worker in after IPC has
   // already started taking calls. Until it's set the handlers fall
@@ -222,35 +229,32 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
   ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_FINDINGS_PAGE, (_e, filter: FindingFilter) =>
     listFindingsPage(db, filter),
   )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS, (_e, filter: SessionFindingFilter) =>
-    listSessionsWithFindings(db, filter),
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS,
+    (_e, filter: SessionFindingFilter) => listSessionsWithFindings(db, filter),
   )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS_PAGE, (_e, filter: SessionFindingFilter) =>
-    listSessionsWithFindingsPage(db, filter),
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.LIST_SESSIONS_WITH_FINDINGS_PAGE,
+    (_e, filter: SessionFindingFilter) => listSessionsWithFindingsPage(db, filter),
   )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.COUNT_SESSIONS_WITH_FINDINGS, (_e, filter: SessionFindingFilter) =>
-    countSessionsWithFindings(db, filter),
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.COUNT_SESSIONS_WITH_FINDINGS,
+    (_e, filter: SessionFindingFilter) => countSessionsWithFindings(db, filter),
   )
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.OCCURRENCES_BY_VALUE_HASH,
     (_e, args: { kind: SensitiveKind; valueHash: string }) =>
       occurrencesByValueHash(db, args.kind, args.valueHash),
   )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY, () =>
-    riskByCategory(db),
-  )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.LAST_SCAN_COMPLETED_AT, () =>
-    lastScanCompletedAt(db),
-  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY, () => riskByCategory(db))
+  ipcMain.handle(SECURITY_IPC_CHANNELS.LAST_SCAN_COMPLETED_AT, () => lastScanCompletedAt(db))
   ipcMain.handle(SECURITY_IPC_CHANNELS.GET_FINDING_VALUE, (_e, findingId: number) =>
     getFindingValue(db, findingId),
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.GET_FINDING_VALUES, (_e, ids: number[]) =>
     getFindingValues(db, ids),
   )
-  ipcMain.handle(SECURITY_IPC_CHANNELS.GET_SCAN_STATUS, () =>
-    runPromise(worker.getStatus),
-  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.GET_SCAN_STATUS, () => runPromise(worker.getStatus))
 
   // All write paths route through `currentMutationWorker` when present so
   // the main event loop stays free during multi-second bulk
@@ -271,7 +275,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       const sessionId = dismissFinding(db, args.findingId, args.scope, true)
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
-          type: 'state-changed', sessionId, findingId: args.findingId, state: 'dismissed',
+          type: 'state-changed',
+          sessionId,
+          findingId: args.findingId,
+          state: 'dismissed',
         })
       }
       return { ok: true }
@@ -287,7 +294,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       const sessionIds = dismissFindings(db, args.findingIds, args.scope)
       for (const sessionId of sessionIds) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
-          type: 'state-changed', sessionId, state: 'dismissed',
+          type: 'state-changed',
+          sessionId,
+          state: 'dismissed',
         })
       }
       return { ok: true }
@@ -303,7 +312,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       const sessionId = undismissFinding(db, args.findingId)
       if (sessionId != null) {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, {
-          type: 'state-changed', sessionId, findingId: args.findingId, state: 'active',
+          type: 'state-changed',
+          sessionId,
+          findingId: args.findingId,
+          state: 'active',
         })
       }
       return { ok: true }
@@ -315,11 +327,17 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       onSearchContentChanged?.()
       return result
     }
-    const publish = (change: Parameters<NonNullable<typeof getMainWindow extends () => infer R ? R : never>['webContents']['send']>[1]) =>
+    const publish = (
+      change: Parameters<
+        NonNullable<typeof getMainWindow extends () => infer R ? R : never>['webContents']['send']
+      >[1],
+    ) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-    })
-    const result = await runPromise(purgeFinding(findingId, { db, publish: publish as never })) as PurgeResult
+      })
+    const result = (await runPromise(
+      purgeFinding(findingId, { db, publish: publish as never }),
+    )) as PurgeResult
     onSearchContentChanged?.()
     return result
   })
@@ -332,8 +350,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
     const publish = (change: unknown) =>
       Effect.sync(() => {
         getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
-    })
-    const results = await runPromise(purgeFindings(findingIds, { db, publish: publish as never })) as PurgeResult[]
+      })
+    const results = (await runPromise(
+      purgeFindings(findingIds, { db, publish: publish as never }),
+    )) as PurgeResult[]
     onSearchContentChanged?.()
     return results
   })
@@ -349,9 +369,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
         Effect.sync(() => {
           getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED, change)
         })
-      const out = await runPromise(
+      const out = (await runPromise(
         purgeEverywhere(args.kind, args.valueHash, { db, publish: publish as never }),
-      ) as { results: PurgeResult[]; sessionIds: number[] }
+      )) as { results: PurgeResult[]; sessionIds: number[] }
       onSearchContentChanged?.()
       return { count: out.results.length, sessionIds: out.sessionIds }
     },
@@ -379,9 +399,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
       // sessions table.
       const prevKinds = new Set(prev.kindAllowlist)
       const nextKinds = new Set(saved.kindAllowlist)
-      const changed = prevKinds.size !== nextKinds.size ||
-        [...prevKinds].some(k => !nextKinds.has(k)) ||
-        [...nextKinds].some(k => !prevKinds.has(k))
+      const changed =
+        prevKinds.size !== nextKinds.size ||
+        [...prevKinds].some((k) => !nextKinds.has(k)) ||
+        [...nextKinds].some((k) => !prevKinds.has(k))
       if (changed) {
         // User clicked a kind-mute toggle — propagate the
         // user-initiated marker so the renderer's busy→idle edge
@@ -390,18 +411,18 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
         await runPromise(worker.backfill({ userInitiated: true }))
       }
       if (prev.pfEnabled !== saved.pfEnabled) {
-        try { onPfEnabledChanged?.(saved.pfEnabled) }
-        catch (err) { console.error('[security] onPfEnabledChanged threw:', err) }
+        try {
+          onPfEnabledChanged?.(saved.pfEnabled)
+        } catch (err) {
+          console.error('[security] onPfEnabledChanged threw:', err)
+        }
       }
       getMainWindow()?.webContents.send(SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED, saved)
       return saved
     },
   )
 
-  ipcMain.handle(
-    SECURITY_IPC_CHANNELS.LIST_BACKUPS,
-    (): BackupFileInfo[] => listBackups(db),
-  )
+  ipcMain.handle(SECURITY_IPC_CHANNELS.LIST_BACKUPS, (): BackupFileInfo[] => listBackups(db))
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.DELETE_BACKUPS,
     (_e, args: { names: string[] }): DeleteBackupsResult => deleteBackups(db, args.names),
@@ -410,8 +431,10 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
   // Privacy Filter ML. When pfCoordinator is null (5b production), the
   // channels return a static not-installed snapshot so the renderer
   // renders its Download affordance instead of crashing.
-  ipcMain.handle(SECURITY_IPC_CHANNELS.PF_GET_STATE, () =>
-    pfCoordinator?.getState() ?? { phase: 'not-installed', bytesDownloaded: 0, bytesTotal: 0 },
+  ipcMain.handle(
+    SECURITY_IPC_CHANNELS.PF_GET_STATE,
+    () =>
+      pfCoordinator?.getState() ?? { phase: 'not-installed', bytesDownloaded: 0, bytesTotal: 0 },
   )
   ipcMain.handle(SECURITY_IPC_CHANNELS.PF_DOWNLOAD_START, async () => {
     if (!pfCoordinator) return { ok: false, reason: 'unavailable' as const }
@@ -434,11 +457,20 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
   ipcMain.handle(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES, () => countAllowlistEntries(db))
   ipcMain.handle(
     SECURITY_IPC_CHANNELS.REMOVE_ALLOWLIST_ENTRY,
-    (_e, args: { scope: 'session' | 'global'; kind: SensitiveKind; valueHash: string; sessionUuid?: string }) => {
+    (
+      _e,
+      args: {
+        scope: 'session' | 'global'
+        kind: SensitiveKind
+        valueHash: string
+        sessionUuid?: string
+      },
+    ) => {
       if (args.scope === 'global') {
         removeAllowlistGlobal(db, args.kind, args.valueHash)
       } else if (args.sessionUuid) {
-        const row = db.prepare('SELECT id FROM sessions WHERE session_uuid = ?')
+        const row = db
+          .prepare('SELECT id FROM sessions WHERE session_uuid = ?')
           .get(args.sessionUuid) as { id: number } | undefined
         if (row) removeAllowlistSession(db, row.id, args.kind, args.valueHash)
       }
@@ -505,7 +537,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
         ),
       )
     }),
-  ).catch(() => { /* fork rejected; ignore (cleanup path) */ })
+  ).catch(() => {
+    /* fork rejected; ignore (cleanup path) */
+  })
 
   // Mutation-worker change forwarder is forked when `attachMutationWorker`
   // fires, not at registration time, so the IPC layer is live even
@@ -544,7 +578,9 @@ export function registerSecurityIpc(deps: SecurityIpcDeps): SecurityIpcHandle {
           ),
         )
       }),
-    ).catch(() => { /* fork rejected; ignore */ })
+    ).catch(() => {
+      /* fork rejected; ignore */
+    })
   }
 
   return { dispose, attachMutationWorker }

@@ -1,23 +1,30 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pfInstallStatus } from './model-state.js'
+
+import { describe, it, expect, beforeEach, afterEach } from 'vite-plus/test'
+
 import type { ModelManifest } from './model-manifest.js'
+import { pfInstallStatus } from './model-state.js'
 
 const sha256 = (buf: Buffer) => createHash('sha256').update(buf).digest('hex')
 
 function manifest(files: { path: string; body: Buffer }[]): ModelManifest {
   return {
-    hfRepo: 'r', hfCommit: 'c'.repeat(40),
+    hfRepo: 'r',
+    hfCommit: 'c'.repeat(40),
     files: files.map(({ path, body }) => ({ path, sha256: sha256(body), sizeBytes: body.length })),
   }
 }
 
 let tmp: string
-beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'spool-pf-state-')) })
-afterEach(() => { rmSync(tmp, { recursive: true, force: true }) })
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), 'spool-pf-state-'))
+})
+afterEach(() => {
+  rmSync(tmp, { recursive: true, force: true })
+})
 
 describe('pfInstallStatus', () => {
   it('not-installed when no files are on disk', () => {
@@ -30,7 +37,10 @@ describe('pfInstallStatus', () => {
     const b = Buffer.from('bbbb')
     writeFileSync(join(tmp, 'a.bin'), a)
     writeFileSync(join(tmp, 'b.bin'), b)
-    const m = manifest([{ path: 'a.bin', body: a }, { path: 'b.bin', body: b }])
+    const m = manifest([
+      { path: 'a.bin', body: a },
+      { path: 'b.bin', body: b },
+    ])
     expect(pfInstallStatus(tmp, m)).toEqual({ status: 'installed' })
   })
 
@@ -39,7 +49,10 @@ describe('pfInstallStatus', () => {
     const b = Buffer.from('bbbb')
     writeFileSync(join(tmp, 'a.bin'), a)
     writeFileSync(join(tmp, 'b.bin.part'), b.subarray(0, 2))
-    const m = manifest([{ path: 'a.bin', body: a }, { path: 'b.bin', body: b }])
+    const m = manifest([
+      { path: 'a.bin', body: a },
+      { path: 'b.bin', body: b },
+    ])
     const status = pfInstallStatus(tmp, m)
     expect(status.status).toBe('partial')
     if (status.status === 'partial') {

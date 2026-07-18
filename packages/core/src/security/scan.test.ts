@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { Effect, Ref } from 'effect'
-import Database from 'better-sqlite3'
 import type { RedactProvider, SensitiveMatch } from '@spool-lab/redact'
 import { regexProvider, hashValueForRedactExclude } from '@spool-lab/redact'
+import Database from 'better-sqlite3'
+import { Effect, Ref } from 'effect'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
-import { scanSession, ScanError } from './scan.js'
 import { addAllowlistSession, listFindings } from './repo.js'
+import { scanSession, ScanError } from './scan.js'
 import type { FindingsChange } from './types.js'
 
 function setupDb(): Database.Database {
@@ -24,7 +25,10 @@ function setupDb(): Database.Database {
 
 function makeChangeCollector() {
   const events: FindingsChange[] = []
-  const publish = (c: FindingsChange) => Effect.sync(() => { events.push(c) })
+  const publish = (c: FindingsChange) =>
+    Effect.sync(() => {
+      events.push(c)
+    })
   return { events, publish }
 }
 
@@ -36,7 +40,9 @@ const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
 
 describe('scanSession', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('produces a finding from regex provider for a seeded fake AWS key', async () => {
     db.prepare(
@@ -56,10 +62,12 @@ describe('scanSession', () => {
     expect(result.inserted).toBeGreaterThan(0)
     const rows = listFindings(db, { sessionId: 1 })
     expect(rows.length).toBeGreaterThan(0)
-    expect(rows.find(r => r.kind === 'api-key')).toBeDefined()
+    expect(rows.find((r) => r.kind === 'api-key')).toBeDefined()
     expect(events).toEqual([{ type: 'session-rescanned', sessionId: 1 }])
     // scan_profile + counters set
-    const sess = db.prepare('SELECT scan_profile, scan_finding_count FROM sessions WHERE id = 1').get() as { scan_profile: string; scan_finding_count: number }
+    const sess = db
+      .prepare('SELECT scan_profile, scan_finding_count FROM sessions WHERE id = 1')
+      .get() as { scan_profile: string; scan_finding_count: number }
     expect(sess.scan_profile).toBe('regex@3')
     expect(sess.scan_finding_count).toBe(rows.length)
   })
@@ -76,7 +84,9 @@ describe('scanSession', () => {
       }),
     )
     expect(result.inserted).toBe(0)
-    const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = 1').get() as { scan_profile: string }
+    const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = 1').get() as {
+      scan_profile: string
+    }
     expect(sess.scan_profile).toBe('regex@3')
   })
 
@@ -95,7 +105,9 @@ describe('scanSession', () => {
     const first = await Effect.runPromise(scanSession(1, deps))
     const second = await Effect.runPromise(scanSession(1, deps))
     expect(second.inserted).toBe(first.inserted)
-    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
+    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as {
+      scan_finding_count: number
+    }
     expect(counts.scan_finding_count).toBe(first.inserted)
   })
 
@@ -116,10 +128,12 @@ describe('scanSession', () => {
       }),
     )
     const allRows = listFindings(db, { sessionId: 1, state: 'any' })
-    const apiKey = allRows.find(r => r.kind === 'api-key')!
+    const apiKey = allRows.find((r) => r.kind === 'api-key')!
     expect(apiKey.state).toBe('dismissed')
     // dismissed doesnt count toward scan_finding_count
-    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
+    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as {
+      scan_finding_count: number
+    }
     expect(counts.scan_finding_count).toBe(allRows.length - 1)
   })
 
@@ -171,7 +185,9 @@ describe('scanSession', () => {
       name: 'crashy',
       displayName: 'crashy',
       available: () => true,
-      analyze: async () => { throw new Error('boom') },
+      analyze: async () => {
+        throw new Error('boom')
+      },
     }
     const exit = await Effect.runPromiseExit(
       scanSession(1, {
@@ -201,14 +217,16 @@ describe('scanSession', () => {
       available: () => true,
       analyze: async (text: string) => {
         if (!text.includes('zzz')) return []
-        return [{
-          kind: 'generic-secret',
-          value: 'zzz',
-          start: text.indexOf('zzz'),
-          end: text.indexOf('zzz') + 3,
-          confidence: 0.6,
-          provider: 'fake',
-        }]
+        return [
+          {
+            kind: 'generic-secret',
+            value: 'zzz',
+            start: text.indexOf('zzz'),
+            end: text.indexOf('zzz') + 3,
+            confidence: 0.6,
+            provider: 'fake',
+          },
+        ]
       },
     }
     await Effect.runPromise(
@@ -221,7 +239,7 @@ describe('scanSession', () => {
       }),
     )
     const before = listFindings(db, { sessionId: 1, state: 'any' })
-    expect(before.find(r => r.provider === 'fake')).toBeDefined()
+    expect(before.find((r) => r.provider === 'fake')).toBeDefined()
 
     // Second scan WITHOUT fake — providerNames excludes 'fake', so its
     // historical row should survive.
@@ -235,7 +253,7 @@ describe('scanSession', () => {
       }),
     )
     const after = listFindings(db, { sessionId: 1, state: 'any' })
-    expect(after.find(r => r.provider === 'fake')).toBeDefined()
+    expect(after.find((r) => r.provider === 'fake')).toBeDefined()
   })
 
   // Regression for the muted-kinds bug discovered against the live
@@ -262,10 +280,11 @@ describe('scanSession', () => {
         publish: () => Effect.void,
       }),
     )
-    const baseline = listFindings(db, { sessionId: 1, state: 'any' })
-      .filter(r => r.kind === 'email')
+    const baseline = listFindings(db, { sessionId: 1, state: 'any' }).filter(
+      (r) => r.kind === 'email',
+    )
     expect(baseline.length).toBe(2)
-    expect(baseline.every(r => r.state === 'active')).toBe(true)
+    expect(baseline.every((r) => r.state === 'active')).toBe(true)
 
     // Mute email → rescan with kindAllowlist=['email']. Findings flip
     // to dismissed; the dismissed *count* must equal the unique
@@ -274,16 +293,15 @@ describe('scanSession', () => {
       scanSession(1, {
         db,
         providers: [regexProvider],
-        currentProfile: "regex@3,allow@deadbeef",
+        currentProfile: 'regex@3,allow@deadbeef',
         providerNames: ['regex'],
         publish: () => Effect.void,
         kindAllowlist: new Set(['email']),
       }),
     )
-    const muted = listFindings(db, { sessionId: 1, state: 'any' })
-      .filter(r => r.kind === 'email')
+    const muted = listFindings(db, { sessionId: 1, state: 'any' }).filter((r) => r.kind === 'email')
     expect(muted.length).toBe(2)
-    expect(muted.every(r => r.state === 'dismissed')).toBe(true)
+    expect(muted.every((r) => r.state === 'dismissed')).toBe(true)
 
     // Unmute email → rescan with empty allowlist. Findings flip back
     // to active; total count stays at 2 (no phantom dismissed
@@ -297,9 +315,10 @@ describe('scanSession', () => {
         publish: () => Effect.void,
       }),
     )
-    const restored = listFindings(db, { sessionId: 1, state: 'any' })
-      .filter(r => r.kind === 'email')
+    const restored = listFindings(db, { sessionId: 1, state: 'any' }).filter(
+      (r) => r.kind === 'email',
+    )
     expect(restored.length).toBe(2)
-    expect(restored.every(r => r.state === 'active')).toBe(true)
+    expect(restored.every((r) => r.state === 'active')).toBe(true)
   })
 })

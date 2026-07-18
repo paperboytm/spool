@@ -7,13 +7,13 @@
 
 ## 0. 割裂现状盘点
 
-| 能力 | Desktop | CLI | Web |
-| --- | --- | --- | --- |
-| 分享 | v1 snapshot(styled 快照,`/api/publish`) | v2 hub(records,`/api/hub/v1`) | 两套 reader(`/s/` 与 `/session/`) |
-| 会话渲染 | MessageList/MessageBubble(Virtuoso+Markdown) | 纯文本 `spool show` | 自建 timeline(PR #449) |
-| 解析 | core parsers(Node) | core parsers | session-kit record-render(简化重写) |
-| resume | 按钮拼命令 | `spool resume` 物化+拉起 | 展示复制命令 |
-| 认证 | OAuth session bearer | API token / dev token | cookie |
+| 能力     | Desktop                                      | CLI                           | Web                                 |
+| -------- | -------------------------------------------- | ----------------------------- | ----------------------------------- |
+| 分享     | v1 snapshot(styled 快照,`/api/publish`)      | v2 hub(records,`/api/hub/v1`) | 两套 reader(`/s/` 与 `/session/`)   |
+| 会话渲染 | MessageList/MessageBubble(Virtuoso+Markdown) | 纯文本 `spool show`           | 自建 timeline(PR #449)              |
+| 解析     | core parsers(Node)                           | core parsers                  | session-kit record-render(简化重写) |
+| resume   | 按钮拼命令                                   | `spool resume` 物化+拉起      | 展示复制命令                        |
+| 认证     | OAuth session bearer                         | API token / dev token         | cookie                              |
 
 同一件事最多有三份实现。融合的原则:**每层收敛到一个实现,放进能被三端共享的最低层包**。
 

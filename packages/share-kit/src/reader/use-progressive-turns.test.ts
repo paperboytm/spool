@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import {
   READER_INITIAL_TURNS,
   READER_TURNS_PER_FRAME,

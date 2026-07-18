@@ -17,15 +17,20 @@
 // The fix is `Effect.forkDaemon`, which detaches the fiber from the
 // parent scope so it lives until explicitly interrupted.
 
-import { describe, it, expect } from 'vitest'
 import { Effect, Fiber, PubSub, Stream } from 'effect'
+import { describe, it, expect } from 'vite-plus/test'
 
 async function publishAndCollect(
-  forker: (pubsub: PubSub.PubSub<number>, sink: (n: number) => void) => Promise<Fiber.RuntimeFiber<void, never>>,
+  forker: (
+    pubsub: PubSub.PubSub<number>,
+    sink: (n: number) => void,
+  ) => Promise<Fiber.RuntimeFiber<void, never>>,
 ): Promise<number[]> {
   const received: number[] = []
   const pubsub = await Effect.runPromise(PubSub.unbounded<number>())
-  const fiber = await forker(pubsub, (n) => { received.push(n) })
+  const fiber = await forker(pubsub, (n) => {
+    received.push(n)
+  })
 
   // Give the subscriber a tick to register.
   await new Promise((r) => setTimeout(r, 20))

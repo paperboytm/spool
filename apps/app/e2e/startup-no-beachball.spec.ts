@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp } from './helpers/launch.js'
 
 /**
@@ -56,9 +57,12 @@ test('main-process event loop does not stall on cold launch', async () => {
     // Wait for the renderer to be interactive — that's the window in
     // which a regressed sync IPC handler would stall things.
     await ctx.window.waitForLoadState('domcontentloaded')
-    await ctx.window.waitForSelector('[data-testid="library-landing"], [data-testid="library-empty"], [data-testid="shares-page"]', {
-      timeout: 15_000,
-    })
+    await ctx.window.waitForSelector(
+      '[data-testid="library-landing"], [data-testid="library-empty"], [data-testid="shares-page"]',
+      {
+        timeout: 15_000,
+      },
+    )
 
     // Give the mount-time IPC storm and any background warm-up a
     // chance to clear before we read the histogram — otherwise we

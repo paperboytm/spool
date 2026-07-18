@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 function freshSpoolDir(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'spool-doctor-test-'))
@@ -16,13 +17,17 @@ async function loadRunner(): Promise<typeof import('./runner.js')> {
 describe('doctor runner', () => {
   let cleanup: () => void = () => {}
 
-  beforeEach(() => { vi.resetModules() })
-  afterEach(() => { cleanup() })
+  beforeEach(() => {
+    vi.resetModules()
+  })
+  afterEach(() => {
+    cleanup()
+  })
 
   it('lists every registered check', async () => {
     const { listChecks } = await loadRunner()
     const list = listChecks()
-    const ids = list.map(c => c.id)
+    const ids = list.map((c) => c.id)
     expect(ids).toContain('env.spool-dir')
     expect(ids).toContain('versions.schema-compat')
     expect(ids).toContain('db.exists')
@@ -36,8 +41,8 @@ describe('doctor runner', () => {
     vi.stubEnv('SPOOL_DATA_DIR', dir)
     const { runChecks } = await loadRunner()
     const results = await runChecks()
-    expect(results.filter(r => r.severity === 'error')).toEqual([])
-    expect(results.find(r => r.id === 'db.exists')?.severity).toBe('warn')
+    expect(results.filter((r) => r.severity === 'error')).toEqual([])
+    expect(results.find((r) => r.id === 'db.exists')?.severity).toBe('warn')
   })
 
   it('filters to a single check when an id is supplied', async () => {

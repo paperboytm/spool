@@ -1,9 +1,9 @@
+import type { Conversation, EditorOpts } from '@spool/share-kit'
+import { firstLinePreview } from '@spool/share-kit/timeline'
+import { Check, CheckCheck, Eraser } from 'lucide-react'
 import { forwardRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type Components } from 'react-virtuoso'
-import { Check, CheckCheck, Eraser } from 'lucide-react'
-import type { Conversation, EditorOpts } from '@spool/share-kit'
-import { firstLinePreview } from '@spool/share-kit/timeline'
 
 // Restore the list semantics + breathing room the old <ul>/<li> markup
 // carried: Virtuoso renders bare divs by default, which drops the
@@ -58,9 +58,10 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
   // in the panel — otherwise "526 of 526" looks wrong next to a
   // scrolled list of ~150 visible rows.
   const visibleTotal = visibleTurns.length
-  const visibleKept = selectedSet === null
-    ? visibleTotal
-    : visibleTurns.filter(({ originalIndex }) => selectedSet.has(originalIndex)).length
+  const visibleKept =
+    selectedSet === null
+      ? visibleTotal
+      : visibleTurns.filter(({ originalIndex }) => selectedSet.has(originalIndex)).length
 
   const writeSelection = useCallback(
     (next: number[]) => {
@@ -112,7 +113,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
       if (sc) {
         const turnRect = el.getBoundingClientRect()
         const scRect = sc.getBoundingClientRect()
-        const offsetFromContainerTop = (turnRect.top - scRect.top) + sc.scrollTop
+        const offsetFromContainerTop = turnRect.top - scRect.top + sc.scrollTop
         const centered = offsetFromContainerTop - (scRect.height - turnRect.height) / 2
         sc.scrollTop = Math.max(0, centered)
       } else {
@@ -131,16 +132,16 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
 
   if (total === 0) {
     return (
-      <div className="px-4 py-6 text-center text-[11px] text-warm-faint dark:text-dark-muted">
+      <div className="text-warm-faint dark:text-dark-muted px-4 py-6 text-center text-[11px]">
         {t('shareEditorPanel.turnSelector_empty')}
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <span className="text-[10px] tracking-wider font-medium text-warm-faint dark:text-dark-faint">
+        <span className="text-warm-faint dark:text-dark-faint text-[10px] font-medium tracking-wider">
           {t('shareEditorPanel.turnSelector_header', { kept: visibleKept, total: visibleTotal })}
         </span>
         <span className="flex items-center gap-0.5">
@@ -150,7 +151,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
             onClick={selectAll}
             title={t('shareEditorPanel.turnSelector_selectAll')}
             aria-label={t('shareEditorPanel.turnSelector_selectAll')}
-            className="w-5 h-5 inline-flex items-center justify-center rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+            className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
           >
             <CheckCheck size={13} strokeWidth={1.75} />
           </button>
@@ -160,7 +161,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
             onClick={clearAll}
             title={t('shareEditorPanel.turnSelector_deselectAll')}
             aria-label={t('shareEditorPanel.turnSelector_deselectAll')}
-            className="w-5 h-5 inline-flex items-center justify-center rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+            className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
           >
             <Eraser size={12} strokeWidth={1.75} />
           </button>
@@ -176,7 +177,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
         defaultItemHeight={26}
         increaseViewportBy={200}
         components={virtuosoComponents}
-        className="flex-1 min-h-0 scrollbar-none"
+        className="min-h-0 flex-1 scrollbar-none"
         itemContent={(_idx, { turn, originalIndex: i }) => {
           const included = selectedSet === null ? true : selectedSet.has(i)
           const preview = firstLinePreview(turn.body)
@@ -185,7 +186,7 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
               data-testid="share-editor-turn-row"
               data-row-turn-index={i}
               data-included={included ? '' : undefined}
-              className={`group flex items-center gap-3 pl-4 pr-4 py-1 transition-colors hover:bg-warm-surface dark:hover:bg-dark-surface ${
+              className={`group hover:bg-warm-surface dark:hover:bg-dark-surface flex items-center gap-3 py-1 pr-4 pl-4 transition-colors ${
                 included ? '' : 'opacity-60'
               }`}
             >
@@ -194,18 +195,24 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 data-testid="share-editor-turn-toggle"
                 data-row-turn-index={i}
                 onClick={() => toggleTurn(i)}
-                title={included ? t('shareEditorPanel.turnSelector_clickExclude') : t('shareEditorPanel.turnSelector_clickInclude')}
+                title={
+                  included
+                    ? t('shareEditorPanel.turnSelector_clickExclude')
+                    : t('shareEditorPanel.turnSelector_clickInclude')
+                }
                 aria-pressed={included}
-                aria-label={included
-                  ? t('shareEditorPanel.turnSelector_excludeMsg', { index: i + 1 })
-                  : t('shareEditorPanel.turnSelector_includeMsg', { index: i + 1 })}
-                className="shrink-0 p-1 -m-1 rounded"
+                aria-label={
+                  included
+                    ? t('shareEditorPanel.turnSelector_excludeMsg', { index: i + 1 })
+                    : t('shareEditorPanel.turnSelector_includeMsg', { index: i + 1 })
+                }
+                className="-m-1 shrink-0 rounded p-1"
               >
                 <span
-                  className={`block w-[14px] h-[14px] rounded-[3px] flex items-center justify-center transition-colors ${
+                  className={`block flex h-[14px] w-[14px] items-center justify-center rounded-[3px] transition-colors ${
                     included
                       ? 'bg-accent dark:bg-accent-dark'
-                      : 'border border-warm-border2 dark:border-dark-border2'
+                      : 'border-warm-border2 dark:border-dark-border2 border'
                   }`}
                   aria-hidden="true"
                 >
@@ -219,13 +226,17 @@ export function TurnSelector({ convo, opts, setOpts }: Props) {
                 onClick={() => jumpToTurn(i)}
                 title={previewTooltip(turn.body)}
                 aria-label={t('shareEditorPanel.turnSelector_jumpToMsg', { index: i + 1 })}
-                className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
               >
-                <span className="font-mono text-[10.5px] tabular-nums text-warm-faint dark:text-dark-faint shrink-0">
+                <span className="text-warm-faint dark:text-dark-faint shrink-0 font-mono text-[10.5px] tabular-nums">
                   {padIndex(i + 1, total)}
                 </span>
-                <span className="text-[12px] text-warm-text dark:text-dark-text truncate flex-1">
-                  {preview || <span className="text-warm-faint dark:text-dark-faint italic">{t('shareEditorPanel.turnSelector_empty_body')}</span>}
+                <span className="text-warm-text dark:text-dark-text flex-1 truncate text-[12px]">
+                  {preview || (
+                    <span className="text-warm-faint dark:text-dark-faint italic">
+                      {t('shareEditorPanel.turnSelector_empty_body')}
+                    </span>
+                  )}
                 </span>
               </button>
             </div>

@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
-import { listSessionsByIdentity, listRecentSessionsPage, listProjectDirectoryCounts } from './sessions.js'
+import {
+  listSessionsByIdentity,
+  listRecentSessionsPage,
+  listProjectDirectoryCounts,
+} from './sessions.js'
 
 describe('listSessionsByIdentity', () => {
   let db: Database.Database
@@ -26,32 +31,40 @@ describe('listSessionsByIdentity', () => {
   it('only returns sessions matching identity_key', () => {
     const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool')
     expect(sessions).toHaveLength(3)
-    expect(sessions.map(s => s.sessionUuid).sort()).toEqual(['u1', 'u2', 'u3'])
+    expect(sessions.map((s) => s.sessionUuid).sort()).toEqual(['u1', 'u2', 'u3'])
   })
 
   it('default sort is started_at DESC', () => {
     const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool')
-    expect(sessions.map(s => s.sessionUuid)).toEqual(['u1', 'u2', 'u3'])
+    expect(sessions.map((s) => s.sessionUuid)).toEqual(['u1', 'u2', 'u3'])
   })
 
   it('sortOrder oldest', () => {
-    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { sortOrder: 'oldest' })
-    expect(sessions.map(s => s.sessionUuid)).toEqual(['u3', 'u2', 'u1'])
+    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
+      sortOrder: 'oldest',
+    })
+    expect(sessions.map((s) => s.sessionUuid)).toEqual(['u3', 'u2', 'u1'])
   })
 
   it('sortOrder most_messages', () => {
-    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { sortOrder: 'most_messages' })
-    expect(sessions.map(s => s.sessionUuid)).toEqual(['u2', 'u1', 'u3'])
+    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
+      sortOrder: 'most_messages',
+    })
+    expect(sessions.map((s) => s.sessionUuid)).toEqual(['u2', 'u1', 'u3'])
   })
 
   it('sortOrder title (alphabetical)', () => {
-    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { sortOrder: 'title' })
-    expect(sessions.map(s => s.title)).toEqual(['alpha', 'beta', 'gamma'])
+    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
+      sortOrder: 'title',
+    })
+    expect(sessions.map((s) => s.title)).toEqual(['alpha', 'beta', 'gamma'])
   })
 
   it('source filter narrows to matching sources', () => {
-    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { sources: ['claude'] })
-    expect(sessions.map(s => s.sessionUuid).sort()).toEqual(['u1', 'u2'])
+    const { sessions } = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
+      sources: ['claude'],
+    })
+    expect(sessions.map((s) => s.sessionUuid).sort()).toEqual(['u1', 'u2'])
   })
 
   it('returns empty result when identity_key has no sessions', () => {
@@ -63,14 +76,14 @@ describe('listSessionsByIdentity', () => {
   it('respects limit and exposes a cursor for the next page', () => {
     const page1 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { limit: 2 })
     expect(page1.sessions).toHaveLength(2)
-    expect(page1.sessions.map(s => s.sessionUuid)).toEqual(['u1', 'u2'])
+    expect(page1.sessions.map((s) => s.sessionUuid)).toEqual(['u1', 'u2'])
     expect(page1.nextCursor).not.toBeNull()
 
     const page2 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
       limit: 2,
       cursor: page1.nextCursor!,
     })
-    expect(page2.sessions.map(s => s.sessionUuid)).toEqual(['u3'])
+    expect(page2.sessions.map((s) => s.sessionUuid)).toEqual(['u3'])
     expect(page2.nextCursor).toBeNull()
   })
 
@@ -80,20 +93,23 @@ describe('listSessionsByIdentity', () => {
   })
 
   it('keyset pagination is stable across sortOrder=most_messages', () => {
-    const page1 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', { sortOrder: 'most_messages', limit: 1 })
-    expect(page1.sessions.map(s => s.sessionUuid)).toEqual(['u2'])
+    const page1 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
+      sortOrder: 'most_messages',
+      limit: 1,
+    })
+    expect(page1.sessions.map((s) => s.sessionUuid)).toEqual(['u2'])
     const page2 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
       sortOrder: 'most_messages',
       limit: 1,
       cursor: page1.nextCursor!,
     })
-    expect(page2.sessions.map(s => s.sessionUuid)).toEqual(['u1'])
+    expect(page2.sessions.map((s) => s.sessionUuid)).toEqual(['u1'])
     const page3 = listSessionsByIdentity(db, 'github.com/spool-lab/spool', {
       sortOrder: 'most_messages',
       limit: 1,
       cursor: page2.nextCursor!,
     })
-    expect(page3.sessions.map(s => s.sessionUuid)).toEqual(['u3'])
+    expect(page3.sessions.map((s) => s.sessionUuid)).toEqual(['u3'])
     expect(page3.nextCursor).toBeNull()
   })
 
@@ -106,7 +122,7 @@ describe('listSessionsByIdentity', () => {
         limit: 1,
         ...(cursor ? { cursor } : {}),
       })
-      collected.push(...page.sessions.map(s => s.title!))
+      collected.push(...page.sessions.map((s) => s.title!))
       cursor = page.nextCursor
       if (!cursor) break
     }
@@ -132,11 +148,11 @@ describe('listRecentSessionsPage', () => {
 
   it('paginates recent sessions across the global library', () => {
     const page1 = listRecentSessionsPage(db, { limit: 2 })
-    expect(page1.sessions.map(s => s.sessionUuid)).toEqual(['c', 'b'])
+    expect(page1.sessions.map((s) => s.sessionUuid)).toEqual(['c', 'b'])
     expect(page1.nextCursor).not.toBeNull()
 
     const page2 = listRecentSessionsPage(db, { limit: 2, cursor: page1.nextCursor! })
-    expect(page2.sessions.map(s => s.sessionUuid)).toEqual(['a'])
+    expect(page2.sessions.map((s) => s.sessionUuid)).toEqual(['a'])
     expect(page2.nextCursor).toBeNull()
   })
 })
@@ -167,7 +183,9 @@ describe('listProjectDirectoryCounts', () => {
   })
 
   it('source filter narrows the rows that get grouped', () => {
-    const counts = listProjectDirectoryCounts(db, 'github.com/spool-lab/spool', { sources: ['codex'] })
+    const counts = listProjectDirectoryCounts(db, 'github.com/spool-lab/spool', {
+      sources: ['codex'],
+    })
     expect(counts).toEqual([])
   })
 })

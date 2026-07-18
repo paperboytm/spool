@@ -1,5 +1,6 @@
-import { performance } from 'node:perf_hooks'
 import { createRequire } from 'node:module'
+import { performance } from 'node:perf_hooks'
+
 import { searchSessionPreview } from '../dist/index.js'
 
 const require = createRequire(import.meta.url)
@@ -28,7 +29,9 @@ for (const query of ['a', 'search', 'search latency']) {
   const mean = durations.reduce((sum, value) => sum + value, 0) / durations.length
   const p95 = durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.95))] ?? 0
   const max = durations.at(-1) ?? 0
-  console.log(`${JSON.stringify(query)} mean=${mean.toFixed(2)}ms p95=${p95.toFixed(2)}ms max=${max.toFixed(2)}ms`)
+  console.log(
+    `${JSON.stringify(query)} mean=${mean.toFixed(2)}ms p95=${p95.toFixed(2)}ms max=${max.toFixed(2)}ms`,
+  )
   if (p95 >= p95BudgetMs || max >= blockingBudgetMs) breaches.push({ query, p95, max })
 }
 
@@ -39,7 +42,7 @@ if (breaches.length > 0) {
 }
 
 function readPositiveArg(name, fallback) {
-  const raw = process.argv.find(arg => arg.startsWith(`${name}=`))?.slice(name.length + 1)
+  const raw = process.argv.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1)
   const value = raw ? Number.parseInt(raw, 10) : fallback
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer`)
@@ -123,10 +126,12 @@ function createSchema(database) {
     END;
   `)
   database.prepare('INSERT INTO sources (id, name) VALUES (1, ?)').run('codex')
-  database.prepare(`
+  database
+    .prepare(`
     INSERT INTO projects (id, source_id, slug, display_path, display_name)
     VALUES (1, 1, 'benchmark', '/tmp/benchmark', 'benchmark')
-  `).run()
+  `)
+    .run()
 }
 
 function seed(database, sessions, messagesPerSession) {
@@ -148,9 +153,10 @@ function seed(database, sessions, messagesPerSession) {
   const fixture = database.transaction(() => {
     for (let sessionId = 1; sessionId <= sessions; sessionId += 1) {
       const startedAt = new Date(Date.UTC(2026, 0, 1) + sessionId * 60_000).toISOString()
-      const title = sessionId % 25 === 0
-        ? `Search latency investigation ${sessionId}`
-        : `Engineering session ${sessionId}`
+      const title =
+        sessionId % 25 === 0
+          ? `Search latency investigation ${sessionId}`
+          : `Engineering session ${sessionId}`
       const userText = []
       const assistantText = []
 
@@ -166,18 +172,12 @@ function seed(database, sessions, messagesPerSession) {
 
       for (let seq = 1; seq <= messagesPerSession; seq += 1) {
         const role = seq % 2 === 0 ? 'assistant' : 'user'
-        const marker = sessionId % 25 === 0 && seq === 17
-          ? 'search latency preview benchmark target'
-          : 'routine implementation discussion with deterministic fixture text'
+        const marker =
+          sessionId % 25 === 0 && seq === 17
+            ? 'search latency preview benchmark target'
+            : 'routine implementation discussion with deterministic fixture text'
         const content = `${marker} session=${sessionId} message=${seq}`
-        insertMessage.run(
-          sessionId,
-          `${sessionId}-${seq}`,
-          role,
-          content,
-          startedAt,
-          seq,
-        )
+        insertMessage.run(sessionId, `${sessionId}-${seq}`, role, content, startedAt, seq)
         ;(role === 'user' ? userText : assistantText).push(content)
       }
 

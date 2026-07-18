@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { DEFAULT_OPTS, type Conversation, type EditorOpts } from '../lib/types'
 import { Timeline, TimelineBody } from './timeline'
@@ -50,12 +50,8 @@ function turnAnchors(html: string): string[] {
 
 describe('TimelineBody', () => {
   it('is the same anchored turn body used by the complete Timeline document', () => {
-    const documentHtml = renderToStaticMarkup(
-      <Timeline convo={conversation} opts={opts} />,
-    )
-    const bodyHtml = renderToStaticMarkup(
-      <TimelineBody convo={conversation} opts={opts} />,
-    )
+    const documentHtml = renderToStaticMarkup(<Timeline convo={conversation} opts={opts} />)
+    const bodyHtml = renderToStaticMarkup(<TimelineBody convo={conversation} opts={opts} />)
 
     expect(turnAnchors(documentHtml)).toEqual(['0', '2', '3'])
     expect(turnAnchors(bodyHtml)).toEqual(turnAnchors(documentHtml))
@@ -78,12 +74,8 @@ describe('TimelineBody', () => {
       showGaps: true,
       hideEmptyTurns: true,
     }
-    const documentHtml = renderToStaticMarkup(
-      <Timeline convo={conversation} opts={selectedOpts} />,
-    )
-    const bodyHtml = renderToStaticMarkup(
-      <TimelineBody convo={conversation} opts={selectedOpts} />,
-    )
+    const documentHtml = renderToStaticMarkup(<Timeline convo={conversation} opts={selectedOpts} />)
+    const bodyHtml = renderToStaticMarkup(<TimelineBody convo={conversation} opts={selectedOpts} />)
 
     expect(turnAnchors(documentHtml)).toEqual(['0', '3'])
     expect(turnAnchors(bodyHtml)).toEqual(turnAnchors(documentHtml))
@@ -109,9 +101,7 @@ describe('TimelineBody', () => {
       typeface: 'fraunces',
       accentHex: '#D67259',
     }
-    const html = renderToStaticMarkup(
-      <TimelineBody convo={conversation} opts={styledOpts} />,
-    )
+    const html = renderToStaticMarkup(<TimelineBody convo={conversation} opts={styledOpts} />)
 
     expect(html).toContain('data-spool-timeline-body="true"')
     expect(html).toContain('--sk-accent:#D67259')
@@ -143,7 +133,7 @@ describe('TimelineBody', () => {
 
   it('only progressively limits the standalone body when explicitly enabled', () => {
     const turns = Array.from({ length: 100 }, (_, index) => ({
-      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+      role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
       body: `Turn ${index}`,
     }))
     const longConversation = { ...conversation, turns }

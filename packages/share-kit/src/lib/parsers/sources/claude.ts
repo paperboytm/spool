@@ -26,11 +26,13 @@ import {
 
 const TURN_RX = /^##\s+(?:(You said):\s*|(Claude responded):\s*)(.*)$/gm
 // Matches a standalone short-date line like "Oct 31, 2024"
-const DATE_LINE_RX = /^\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+\d{4}\s*$/i
+const DATE_LINE_RX =
+  /^\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+\d{4}\s*$/i
 // sr-only role heading inside Claude's share HTML. The class list can
 // include other utility classes, so we anchor on "sr-only" and allow
 // anything either side.
-const SR_ONLY_H2_RX = /<h2\b[^>]*\bclass="[^"]*\bsr-only\b[^"]*"[^>]*>\s*(You said|Claude responded):\s*([\s\S]*?)<\/h2>/gi
+const SR_ONLY_H2_RX =
+  /<h2\b[^>]*\bclass="[^"]*\bsr-only\b[^"]*"[^>]*>\s*(You said|Claude responded):\s*([\s\S]*?)<\/h2>/gi
 
 export const claudeSource: ParserSource = {
   id: 'claude',

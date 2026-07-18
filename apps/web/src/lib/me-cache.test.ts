@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 
 import { clearCachedMe, readCachedMe, writeCachedMe } from './me-cache'
 
@@ -109,5 +109,4 @@ describe('me-cache vs api integration', () => {
     // Don't just trust readCachedMe — confirm via raw key absence too.
     expect(localStorage.getItem(KEY)).toBeNull()
   })
-
 })

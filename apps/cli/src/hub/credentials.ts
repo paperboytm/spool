@@ -30,20 +30,18 @@ export function loadHubCredentials(options: HubCredentialOptions = {}): HubCrede
   const env = options.env ?? process.env
   const envHubUrl = nonEmpty(env['SPOOL_HUB_URL'])
   const envToken = nonEmpty(env['SPOOL_HUB_TOKEN'])
-  const stored = envHubUrl !== undefined && envToken !== undefined
-    ? undefined
-    : readStoredCredentialObject(path)
+  const stored =
+    envHubUrl !== undefined && envToken !== undefined ? undefined : readStoredCredentialObject(path)
 
   const hubUrl = normalizeHubUrl(
-    envHubUrl
-    ?? (stored?.['hubUrl'] === undefined
-      ? DEFAULT_HUB_URL
-      : requireNonEmpty(stored['hubUrl'], 'hubUrl')),
+    envHubUrl ??
+      (stored?.['hubUrl'] === undefined
+        ? DEFAULT_HUB_URL
+        : requireNonEmpty(stored['hubUrl'], 'hubUrl')),
   )
-  const token = envToken
-    ?? (stored?.['token'] === undefined
-      ? undefined
-      : requireNonEmpty(stored['token'], 'token'))
+  const token =
+    envToken ??
+    (stored?.['token'] === undefined ? undefined : requireNonEmpty(stored['token'], 'token'))
 
   return token === undefined ? { hubUrl } : { hubUrl, token }
 }
@@ -83,9 +81,7 @@ export function loadStoredHubCredentials(
 
 /** Delete the credentials file. Returns its path, or undefined when
  *  there was nothing to delete. */
-export function clearHubCredentials(
-  options: HubCredentialOptions = {},
-): string | undefined {
+export function clearHubCredentials(options: HubCredentialOptions = {}): string | undefined {
   const path = hubCredentialsPath(options)
   try {
     unlinkSync(path)

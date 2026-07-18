@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { hashValueForRedactExclude } from '@spool-lab/redact'
+import { describe, it, expect } from 'vite-plus/test'
+
+import type { Turn } from '../lib/types'
 import {
   detectPII,
   applyRedactPolicy,
@@ -8,8 +11,6 @@ import {
   SYNTHETIC_KIND_MANUAL,
   type RedactReplacement,
 } from './redact'
-import { hashValueForRedactExclude } from '@spool-lab/redact'
-import type { Turn } from '../lib/types'
 
 function turn(role: 'user' | 'assistant', body: string, opts: Partial<Turn> = {}): Turn {
   return { role, body, ...opts } as Turn
@@ -26,7 +27,9 @@ const EMAIL_FIXTURE = 'maya@hogwarts.edu'
 
 const turns: Turn[] = [
   turn('user', `reply to ${EMAIL_FIXTURE}, also ${AKIA_FIXTURE}`, { author: '[Maya]' }),
-  turn('assistant', `cat /Users/chen/.aws/credentials -> ${STRIPE_FIXTURE}`, { redact: ['custom-blob'] }),
+  turn('assistant', `cat /Users/chen/.aws/credentials -> ${STRIPE_FIXTURE}`, {
+    redact: ['custom-blob'],
+  }),
 ]
 
 const values = (list: RedactReplacement[]) => list.map((r) => r.value)
@@ -122,13 +125,15 @@ describe('collectRedactList wires policy through', () => {
   })
 
   it('with opts.redactExclude.kinds drops the named category', () => {
-    expect(values(collectRedactList(turns, { redactExclude: { kinds: ['email'] } })))
-      .not.toContain(EMAIL_FIXTURE)
+    expect(values(collectRedactList(turns, { redactExclude: { kinds: ['email'] } }))).not.toContain(
+      EMAIL_FIXTURE,
+    )
   })
 
   it('with opts.redactExclude.values whitelists a specific literal', () => {
-    expect(values(collectRedactList(turns, { redactExclude: { values: ['Maya'] } })))
-      .not.toContain('Maya')
+    expect(values(collectRedactList(turns, { redactExclude: { values: ['Maya'] } }))).not.toContain(
+      'Maya',
+    )
   })
 })
 

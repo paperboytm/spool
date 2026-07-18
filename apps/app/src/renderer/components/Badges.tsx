@@ -12,7 +12,7 @@ export function SourceBadge({ source }: { source: string }) {
     <span
       data-testid="source-badge"
       data-source={source}
-      className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
+      className="rounded px-1.5 py-0.5 font-mono text-[10px] font-medium"
       style={{
         background: `color-mix(in srgb, ${color} ${isDark ? '16%' : '12%'}, transparent)`,
         color,

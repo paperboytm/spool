@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression: when a Security pref is persisted as `true`, opening the
@@ -20,7 +21,9 @@ test.beforeAll(async () => {
   ctx = await launchApp()
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 test('Security toggles never render in fallback off-state when the pref is on', async () => {
   const { window } = ctx
@@ -29,7 +32,13 @@ test('Security toggles never render in fallback off-state when the pref is on', 
   // Seed the pref so a flash would be visible (default is false; the
   // fallback also lands at false, so the flash needs `true` to surface).
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: { setPrefs: (p: { securityPageValuesBlurred: boolean }) => Promise<unknown> } } }).spool?.security
+    const api = (
+      globalThis as {
+        spool?: {
+          security?: { setPrefs: (p: { securityPageValuesBlurred: boolean }) => Promise<unknown> }
+        }
+      }
+    ).spool?.security
     await api!.setPrefs({ securityPageValuesBlurred: true })
   })
 
@@ -75,12 +84,21 @@ test('Security toggles never render in fallback off-state when the pref is on', 
     w.__flashObs?.disconnect()
     return w.__flashSeen === true
   })
-  expect(sawFlash, 'toggle was rendered in aria-checked="false" before its persisted true state arrived').toBe(false)
+  expect(
+    sawFlash,
+    'toggle was rendered in aria-checked="false" before its persisted true state arrived',
+  ).toBe(false)
 
   // Reset so we don't leave the user-data dir in a non-default state
   // for any follow-up tests in this file.
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: { setPrefs: (p: { securityPageValuesBlurred: boolean }) => Promise<unknown> } } }).spool?.security
+    const api = (
+      globalThis as {
+        spool?: {
+          security?: { setPrefs: (p: { securityPageValuesBlurred: boolean }) => Promise<unknown> }
+        }
+      }
+    ).spool?.security
     await api!.setPrefs({ securityPageValuesBlurred: false })
   })
 })

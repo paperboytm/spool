@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import {
   DEFAULT_HUB_URL,
   hubCredentialsPath,
@@ -54,17 +56,21 @@ describe('hub credentials', () => {
       { homeDir: home },
     )
 
-    expect(loadHubCredentials({
-      homeDir: home,
-      env: { SPOOL_HUB_URL: 'http://127.0.0.1:8788' },
-    })).toEqual({
+    expect(
+      loadHubCredentials({
+        homeDir: home,
+        env: { SPOOL_HUB_URL: 'http://127.0.0.1:8788' },
+      }),
+    ).toEqual({
       hubUrl: 'http://127.0.0.1:8788',
       token: 'stored-token',
     })
-    expect(loadHubCredentials({
-      homeDir: home,
-      env: { SPOOL_HUB_TOKEN: 'environment-token' },
-    })).toEqual({
+    expect(
+      loadHubCredentials({
+        homeDir: home,
+        env: { SPOOL_HUB_TOKEN: 'environment-token' },
+      }),
+    ).toEqual({
       hubUrl: 'https://stored.example',
       token: 'environment-token',
     })
@@ -73,9 +79,7 @@ describe('hub credentials', () => {
   it('uses the production hub URL when no credentials exist', () => {
     const home = tempHome()
 
-    expect(hubCredentialsPath({ homeDir: home })).toBe(
-      join(home, '.spool', 'hub-credentials.json'),
-    )
+    expect(hubCredentialsPath({ homeDir: home })).toBe(join(home, '.spool', 'hub-credentials.json'))
     expect(loadHubCredentials({ homeDir: home, env: {} })).toEqual({
       hubUrl: DEFAULT_HUB_URL,
     })
@@ -89,7 +93,10 @@ describe('hub credentials', () => {
     const hostileUrl = `https://hub.example${'/'.repeat(100_000)}x`
 
     const start = Date.now()
-    const savedPath = saveHubCredentials({ hubUrl: hostileUrl, token: 'secret-token' }, { homeDir: home })
+    const savedPath = saveHubCredentials(
+      { hubUrl: hostileUrl, token: 'secret-token' },
+      { homeDir: home },
+    )
     const elapsedMs = Date.now() - start
 
     expect(elapsedMs).toBeLessThan(2_000)
@@ -105,13 +112,15 @@ describe('hub credentials', () => {
     mkdirSync(join(home, '.spool'), { recursive: true })
     writeFileSync(path, 'not json', 'utf8')
 
-    expect(loadHubCredentials({
-      homeDir: home,
-      env: {
-        SPOOL_HUB_URL: 'http://127.0.0.1:8788',
-        SPOOL_HUB_TOKEN: 'environment-token',
-      },
-    })).toEqual({
+    expect(
+      loadHubCredentials({
+        homeDir: home,
+        env: {
+          SPOOL_HUB_URL: 'http://127.0.0.1:8788',
+          SPOOL_HUB_TOKEN: 'environment-token',
+        },
+      }),
+    ).toEqual({
       hubUrl: 'http://127.0.0.1:8788',
       token: 'environment-token',
     })

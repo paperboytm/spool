@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -80,7 +82,9 @@ test('pinning from session detail persists', async () => {
   const pinButton = window.locator('[data-testid="session-detail"] [data-testid="pin-button"]')
   const initialState = await pinButton.getAttribute('data-pinned')
   await pinButton.click()
-  await expect(pinButton).toHaveAttribute('data-pinned', initialState === '1' ? '0' : '1', { timeout: 2000 })
+  await expect(pinButton).toHaveAttribute('data-pinned', initialState === '1' ? '0' : '1', {
+    timeout: 2000,
+  })
 })
 
 test('renders markdown: bold, headings, code blocks', async () => {
@@ -153,7 +157,9 @@ test('find keeps the previous result visible and navigable while retyping', asyn
     if (!el) throw new Error('find status missing')
     const w = window as unknown as { __findLog?: (string | null)[]; __findObs?: MutationObserver }
     w.__findLog = [el.textContent]
-    w.__findObs = new MutationObserver(() => { w.__findLog?.push(el.textContent) })
+    w.__findObs = new MutationObserver(() => {
+      w.__findLog?.push(el.textContent)
+    })
     w.__findObs.observe(el, { childList: true, characterData: true, subtree: true })
   })
 
@@ -190,7 +196,12 @@ test('find refocuses after its own buttons but not after clicks into the list', 
   await expect(status).toContainText(/^1 of \d+$/, { timeout: 5000 })
 
   const focusedTestId = () =>
-    window.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset?.['testid'] ?? document.activeElement?.tagName ?? '')
+    window.evaluate(
+      () =>
+        (document.activeElement as HTMLElement | null)?.dataset?.['testid'] ??
+        document.activeElement?.tagName ??
+        '',
+    )
 
   // Clicking the bar's own next button advances and hands focus back to the
   // input so typing stays seamless.
@@ -222,11 +233,9 @@ test('handles 1500-message session: virtualization + deep find', async () => {
   // macOS CI runners that occasionally land at 36 due to slower culling.
   // Polled to absorb the post-mount transient.
   await expect
-    .poll(
-      async () =>
-        window.locator('[data-testid="message-list-scroll"] [data-index]').count(),
-      { timeout: 3000 },
-    )
+    .poll(async () => window.locator('[data-testid="message-list-scroll"] [data-index]').count(), {
+      timeout: 3000,
+    })
     .toBeLessThan(40)
 
   const isMac = process.platform === 'darwin'
@@ -251,10 +260,9 @@ test('custom session scrollbar thumb follows pointer while dragging long session
   const scroller = window.locator('[data-testid="message-list-scroll"]')
   const thumb = window.locator('[data-testid="message-scrollbar-thumb"]')
   await expect
-    .poll(
-      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
-      { timeout: 3000 },
-    )
+    .poll(async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight), {
+      timeout: 3000,
+    })
     .toBeGreaterThan(0)
   await expect(thumb).toBeVisible()
 
@@ -305,10 +313,9 @@ test('clicking the scrollbar track jumps the message list to that position', asy
   const scroller = window.locator('[data-testid="message-list-scroll"]')
   const track = window.locator('[data-testid="message-scrollbar-track"]')
   await expect
-    .poll(
-      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
-      { timeout: 3000 },
-    )
+    .poll(async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight), {
+      timeout: 3000,
+    })
     .toBeGreaterThan(0)
   await expect(track).toBeVisible()
 
@@ -317,10 +324,7 @@ test('clicking the scrollbar track jumps the message list to that position', asy
   const trackBox = await track.boundingBox()
   if (!trackBox) throw new Error('missing scrollbar track box')
 
-  await window.mouse.click(
-    trackBox.x + trackBox.width / 2,
-    trackBox.y + trackBox.height * 0.75,
-  )
+  await window.mouse.click(trackBox.x + trackBox.width / 2, trackBox.y + trackBox.height * 0.75)
 
   await expect
     .poll(async () => scroller.evaluate((el) => el.scrollTop), { timeout: 3000 })
@@ -340,10 +344,9 @@ test('dragging the scrollbar thumb to the bottom reaches the actual list end', a
   const scroller = window.locator('[data-testid="message-list-scroll"]')
   const thumb = window.locator('[data-testid="message-scrollbar-thumb"]')
   await expect
-    .poll(
-      async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight),
-      { timeout: 3000 },
-    )
+    .poll(async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight), {
+      timeout: 3000,
+    })
     .toBeGreaterThan(0)
   await expect(thumb).toBeVisible()
 
@@ -366,10 +369,8 @@ test('dragging the scrollbar thumb to the bottom reaches the actual list end', a
   // smaller than the real measured total once markdown rows expand. With
   // scrollToIndex(rowCount - 1), the scroller must land at the true max.
   await expect
-    .poll(
-      async () =>
-        scroller.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop),
-      { timeout: 5000 },
-    )
+    .poll(async () => scroller.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop), {
+      timeout: 5000,
+    })
     .toBeLessThan(16)
 })

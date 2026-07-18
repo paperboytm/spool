@@ -24,9 +24,10 @@ export function parseHubConversation(
   records: readonly HubRecordLine[],
 ): ParsedConversation {
   const lines = records.map((record) => record.data)
-  const result = provider === 'claude'
-    ? parseClaudeSessionText(lines.join('\n'), 'hub')
-    : parseCodexSessionLines(lines, 'hub')
+  const result =
+    provider === 'claude'
+      ? parseClaudeSessionText(lines.join('\n'), 'hub')
+      : parseCodexSessionLines(lines, 'hub')
 
   if (result.kind !== 'parsed') {
     return { messages: [], title: '', recordToMessageId: new Map() }

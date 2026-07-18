@@ -1,5 +1,7 @@
-import Database from 'better-sqlite3'
 import { existsSync } from 'node:fs'
+
+import Database from 'better-sqlite3'
+
 import { DB_PATH, LATEST_SCHEMA_VERSION, getDB } from '../../db/db.js'
 import { probeSqlite } from '../preflight.js'
 import type { Check, CheckResult } from '../types.js'

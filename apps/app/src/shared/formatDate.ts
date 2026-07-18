@@ -12,10 +12,14 @@ type LooseT = (key: string, opts?: Record<string, unknown>) => string
 const fallbackT: LooseT = (key, opts) => {
   const o = (opts ?? {}) as { time?: string; bucket?: BucketKey }
   switch (key) {
-    case 'time.todayAt': return `today, ${o.time}`
-    case 'time.yesterdayAt': return `yesterday, ${o.time}`
-    case 'time.timeOnly': return o.time ?? ''
-    default: return key
+    case 'time.todayAt':
+      return `today, ${o.time}`
+    case 'time.yesterdayAt':
+      return `yesterday, ${o.time}`
+    case 'time.timeOnly':
+      return o.time ?? ''
+    default:
+      return key
   }
 }
 
@@ -24,13 +28,19 @@ const fallbackT: LooseT = (key, opts) => {
 // session row. Memoize by (locale, shape) so we pay the cost once per
 // locale switch, not once per row.
 const formatterCache = new Map<string, Intl.DateTimeFormat>()
-export function getMonthDayFormatter(locale: string | undefined, withYear: boolean): Intl.DateTimeFormat {
+export function getMonthDayFormatter(
+  locale: string | undefined,
+  withYear: boolean,
+): Intl.DateTimeFormat {
   const key = `${locale ?? ''}|${withYear ? 'ymd' : 'md'}`
   let fmt = formatterCache.get(key)
   if (!fmt) {
-    fmt = new Intl.DateTimeFormat(locale, withYear
-      ? { month: 'short', day: 'numeric', year: 'numeric' }
-      : { month: 'short', day: 'numeric' })
+    fmt = new Intl.DateTimeFormat(
+      locale,
+      withYear
+        ? { month: 'short', day: 'numeric', year: 'numeric' }
+        : { month: 'short', day: 'numeric' },
+    )
     formatterCache.set(key, fmt)
   }
   return fmt
@@ -53,14 +63,17 @@ export function formatRelativeDate(
     }
     if (dayDiff === 1) {
       const time = formatTime(d)
-      return opts?.bucket === 'yesterday' ? t('time.timeOnly', { time }) : t('time.yesterdayAt', { time })
+      return opts?.bucket === 'yesterday'
+        ? t('time.timeOnly', { time })
+        : t('time.yesterdayAt', { time })
     }
     // For older dates fall back to the platform's locale-aware
     // formatter using <html lang>. Avoids hard-coding 'en-US' which
     // produced "Sep 24" even in Chinese.
-    const locale = typeof document !== 'undefined' && document.documentElement.lang
-      ? document.documentElement.lang
-      : undefined
+    const locale =
+      typeof document !== 'undefined' && document.documentElement.lang
+        ? document.documentElement.lang
+        : undefined
     return getMonthDayFormatter(locale, d.getFullYear() !== now.getFullYear()).format(d)
   } catch {
     return iso.slice(0, 10)

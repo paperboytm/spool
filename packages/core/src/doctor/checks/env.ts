@@ -1,5 +1,6 @@
 import { accessSync, constants, mkdirSync, statfsSync } from 'node:fs'
 import { homedir } from 'node:os'
+
 import { SPOOL_DIR } from '../../db/db.js'
 import type { Check, CheckResult } from '../types.js'
 
@@ -15,13 +16,22 @@ export const envChecks: Check[] = [
       const v = process.versions.node
       const major = Number(v.split('.')[0])
       if (Number.isNaN(major)) {
-        return mk('env.node-version', 'Node.js version', 'warn',
-          `Could not parse Node version (${v})`, { version: v })
+        return mk(
+          'env.node-version',
+          'Node.js version',
+          'warn',
+          `Could not parse Node version (${v})`,
+          { version: v },
+        )
       }
       if (major < MIN_NODE_MAJOR) {
-        return mk('env.node-version', 'Node.js version', 'error',
+        return mk(
+          'env.node-version',
+          'Node.js version',
+          'error',
           `Node ${v} is below the minimum supported (≥${MIN_NODE_MAJOR})`,
-          { version: v, minMajor: MIN_NODE_MAJOR })
+          { version: v, minMajor: MIN_NODE_MAJOR },
+        )
       }
       return mk('env.node-version', 'Node.js version', 'ok', v, { version: v })
     },
@@ -37,12 +47,19 @@ export const envChecks: Check[] = [
       try {
         mkdirSync(dir, { recursive: true })
         accessSync(dir, constants.W_OK)
-        return mk('env.spool-dir', 'Spool home directory', 'ok', dir,
-          { path: dir, overrideActive, defaultDir })
+        return mk('env.spool-dir', 'Spool home directory', 'ok', dir, {
+          path: dir,
+          overrideActive,
+          defaultDir,
+        })
       } catch (err) {
-        return mk('env.spool-dir', 'Spool home directory', 'error',
+        return mk(
+          'env.spool-dir',
+          'Spool home directory',
+          'error',
           `Cannot write to ${dir}: ${(err as Error).message}`,
-          { path: dir, overrideActive, defaultDir })
+          { path: dir, overrideActive, defaultDir },
+        )
       }
     },
   },
@@ -55,12 +72,20 @@ export const envChecks: Check[] = [
         const stat = statfsSync(SPOOL_DIR)
         const free = Number(stat.bavail) * Number(stat.bsize)
         const ok = free >= MIN_FREE_BYTES
-        return mk('env.disk-space', 'Disk space', ok ? 'ok' : 'warn',
+        return mk(
+          'env.disk-space',
+          'Disk space',
+          ok ? 'ok' : 'warn',
           `${humanBytes(free)} free on ${SPOOL_DIR}`,
-          { freeBytes: free, minFreeBytes: MIN_FREE_BYTES })
+          { freeBytes: free, minFreeBytes: MIN_FREE_BYTES },
+        )
       } catch (err) {
-        return mk('env.disk-space', 'Disk space', 'warn',
-          `Could not stat filesystem: ${(err as Error).message}`)
+        return mk(
+          'env.disk-space',
+          'Disk space',
+          'warn',
+          `Could not stat filesystem: ${(err as Error).message}`,
+        )
       }
     },
   },

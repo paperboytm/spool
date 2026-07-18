@@ -20,7 +20,10 @@ export interface FetchedContent {
 }
 
 export class FetchError extends Error {
-  constructor(message: string, public reason: 'network' | 'upstream' | 'malformed') {
+  constructor(
+    message: string,
+    public reason: 'network' | 'upstream' | 'malformed',
+  ) {
     super(message)
     this.name = 'FetchError'
   }
@@ -35,7 +38,10 @@ interface JinaData {
   url?: string
 }
 
-async function jinaFetch(url: string, extraHeaders: Record<string, string> = {}): Promise<JinaData> {
+async function jinaFetch(
+  url: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<JinaData> {
   let res: Response
   try {
     res = await fetch(JINA_BASE + url, {

@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
 import {
   canonicalizeRecord,
@@ -8,17 +7,20 @@ import {
   sequenceRoot,
   type CanonicalRecord,
 } from '@spool-lab/session-kit'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequestPost as batchPost } from '../functions/api/hub/v1/objects/batch'
-import { onRequestDelete as tokensDelete, onRequestPost as tokensPost } from '../functions/api/hub/v1/tokens'
 import { onRequestPost as headPost } from '../functions/api/hub/v1/sessions/[sid]/head'
 import { onRequestGet as metaGet } from '../functions/api/hub/v1/sessions/[sid]/index'
 import { onRequestPost as pushPost } from '../functions/api/hub/v1/sessions/[sid]/push'
 import { onRequestGet as recordsGet } from '../functions/api/hub/v1/sessions/[sid]/records'
 import { onRequestGet as viewGet } from '../functions/api/hub/v1/sessions/[sid]/view'
 import { onRequestPost as withdrawPost } from '../functions/api/hub/v1/sessions/[sid]/withdraw'
+import {
+  onRequestDelete as tokensDelete,
+  onRequestPost as tokensPost,
+} from '../functions/api/hub/v1/tokens'
 import type { SessionRecord } from '../src/auth/session'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
@@ -97,16 +99,18 @@ function syntheticRecords(): unknown[] {
       timestamp: '2026-07-16T01:00:01.000Z',
       message: {
         role: 'assistant',
-        content: [{
-          type: 'tool_use',
-          id: 'edit-1',
-          name: 'Edit',
-          input: {
-            file_path: '/workspace/src/greeting.ts',
-            old_string: 'hello',
-            new_string: 'hello, friend',
+        content: [
+          {
+            type: 'tool_use',
+            id: 'edit-1',
+            name: 'Edit',
+            input: {
+              file_path: '/workspace/src/greeting.ts',
+              old_string: 'hello',
+              new_string: 'hello, friend',
+            },
           },
-        }],
+        ],
       },
     },
     {
@@ -127,10 +131,14 @@ function syntheticRecords(): unknown[] {
 }
 
 async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) {
-  const records = await Promise.all(rawRecords.map((record) => canonicalizeRecord(
-    JSON.stringify(record),
-    { workspaceRoot: '/workspace', homeDir: '/home/tester' },
-  )))
+  const records = await Promise.all(
+    rawRecords.map((record) =>
+      canonicalizeRecord(JSON.stringify(record), {
+        workspaceRoot: '/workspace',
+        homeDir: '/home/tester',
+      }),
+    ),
+  )
   const viewValue = deriveView(records, { provider: 'claude' })
   const view = await canonicalizeRecord(JSON.stringify(viewValue))
   const manifest = records.map((record) => record.oid)
@@ -178,12 +186,7 @@ function sessionUrl(sid: string, suffix = ''): string {
 }
 
 async function push(env: TestEnv, fixture: Fixture, token = USER_A_TOKEN, sid = SID) {
-  return invoke(
-    pushPost,
-    jsonPost(`${sessionUrl(sid)}/push`, fixture.head, token),
-    env,
-    { sid },
-  )
+  return invoke(pushPost, jsonPost(`${sessionUrl(sid)}/push`, fixture.head, token), env, { sid })
 }
 
 async function upload(env: TestEnv, token: string, entries: readonly CanonicalRecord[]) {
@@ -191,21 +194,11 @@ async function upload(env: TestEnv, token: string, entries: readonly CanonicalRe
 }
 
 async function commit(env: TestEnv, fixture: Fixture, token = USER_A_TOKEN, sid = SID) {
-  return invoke(
-    headPost,
-    jsonPost(`${sessionUrl(sid)}/head`, fixture.head, token),
-    env,
-    { sid },
-  )
+  return invoke(headPost, jsonPost(`${sessionUrl(sid)}/head`, fixture.head, token), env, { sid })
 }
 
 async function withdraw(env: TestEnv, token = USER_A_TOKEN, sid = SID) {
-  return invoke(
-    withdrawPost,
-    jsonPost(`${sessionUrl(sid)}/withdraw`, {}, token),
-    env,
-    { sid },
-  )
+  return invoke(withdrawPost, jsonPost(`${sessionUrl(sid)}/withdraw`, {}, token), env, { sid })
 }
 
 async function uploadAndCommit(
@@ -269,7 +262,7 @@ describe('hub authentication', () => {
       env,
     )
     expect(minted.status).toBe(200)
-    const { token } = await minted.json() as { token: string }
+    const { token } = (await minted.json()) as { token: string }
     expect(token).toMatch(/^sph_[0-9a-f]{64}$/)
 
     const pushed = await push(env, fixture, token)
@@ -299,7 +292,7 @@ describe('hub authentication', () => {
       env,
     )
     expect(minted.status).toBe(200)
-    const { token } = await minted.json() as { token: string }
+    const { token } = (await minted.json()) as { token: string }
 
     const revoked = await invoke(tokensDelete, tokensDeleteRequest(token), env)
     expect(revoked.status).toBe(200)
@@ -536,12 +529,7 @@ describe('hub public reads', () => {
   it('returns 404 for unknown session metadata', async () => {
     const env = envFor()
 
-    const response = await invoke(
-      metaGet,
-      readRequest(sessionUrl(SID)),
-      env,
-      { sid: SID },
-    )
+    const response = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
 
     expect(response.status).toBe(404)
   })
@@ -609,12 +597,9 @@ describe('hub public reads', () => {
     const fixture = await makeFixture()
     expect((await uploadAndCommit(env, fixture)).status).toBe(200)
 
-    const response = await invoke(
-      viewGet,
-      readRequest(`${sessionUrl(SID)}/view`),
-      env,
-      { sid: SID },
-    )
+    const response = await invoke(viewGet, readRequest(`${sessionUrl(SID)}/view`), env, {
+      sid: SID,
+    })
     const etag = `"${fixture.view.oid}"`
 
     expect(response.status).toBe(200)
@@ -622,12 +607,9 @@ describe('hub public reads', () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=3600')
     await expect(response.json()).resolves.toEqual(fixture.viewValue)
 
-    const cached = await invoke(
-      viewGet,
-      readRequest(`${sessionUrl(SID)}/view`, etag),
-      env,
-      { sid: SID },
-    )
+    const cached = await invoke(viewGet, readRequest(`${sessionUrl(SID)}/view`, etag), env, {
+      sid: SID,
+    })
     expect(cached.status).toBe(304)
     expect(cached.headers.get('etag')).toBe(etag)
   })
@@ -674,10 +656,7 @@ describe('hub public reads', () => {
     await seedUsers(env)
     const fixture = await makeFixture()
     const response = await uploadAndCommit(env, fixture, {
-      batches: [
-        fixture.records.slice(0, 2),
-        [...fixture.records.slice(2), fixture.view],
-      ],
+      batches: [fixture.records.slice(0, 2), [...fixture.records.slice(2), fixture.view]],
     })
     expect(response.status).toBe(200)
 
@@ -697,13 +676,15 @@ describe('hub public reads', () => {
     const env = envFor()
     await seedUsers(env)
     const chunk = 'x'.repeat(3 * 1024 * 1024)
-    const fixture = await makeFixture(Array.from({ length: 3 }, (_, index) => ({
-      type: index === 0 ? 'user' : 'assistant',
-      message: {
-        role: index === 0 ? 'user' : 'assistant',
-        content: `${index}:${chunk}`,
-      },
-    })))
+    const fixture = await makeFixture(
+      Array.from({ length: 3 }, (_, index) => ({
+        type: index === 0 ? 'user' : 'assistant',
+        message: {
+          role: index === 0 ? 'user' : 'assistant',
+          content: `${index}:${chunk}`,
+        },
+      })),
+    )
     expect((await uploadAndCommit(env, fixture)).status).toBe(200)
 
     const response = await invoke(
@@ -743,14 +724,9 @@ describe('hub public reads', () => {
       viewOid: fixture.view.oid,
     })
 
-    const view = await invoke(
-      viewGet,
-      readRequest(`${sessionUrl(SID)}/view`),
-      env,
-      { sid: SID },
-    )
+    const view = await invoke(viewGet, readRequest(`${sessionUrl(SID)}/view`), env, { sid: SID })
     expect(view.status).toBe(200)
-    const receivedView = await view.json() as { diffstat: unknown }
+    const receivedView = (await view.json()) as { diffstat: unknown }
 
     const records = await invoke(
       recordsGet,
@@ -760,10 +736,12 @@ describe('hub public reads', () => {
     )
     expect(records.status).toBe(200)
     const receivedRecords = parseNdjson(await records.text())
-    const readerDiff = composeSessionDiff(extractEditEvents(
-      receivedRecords.map(({ i, data }) => ({ i, data })),
-      { provider: 'claude' },
-    ))
+    const readerDiff = composeSessionDiff(
+      extractEditEvents(
+        receivedRecords.map(({ i, data }) => ({ i, data })),
+        { provider: 'claude' },
+      ),
+    )
 
     expect(readerDiff).toEqual(authorDiff)
     expect(receivedView.diffstat).toEqual(readerDiff.diffstat)

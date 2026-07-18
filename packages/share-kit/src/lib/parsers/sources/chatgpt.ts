@@ -12,7 +12,14 @@
 // line. ChatGPT's title is preserved by Jina as `data.title`.
 
 import type { Turn } from '../../types'
-import { ParseError, humanDate, normalizeBlock, stats, truncate, type ParserSource } from '../source'
+import {
+  ParseError,
+  humanDate,
+  normalizeBlock,
+  stats,
+  truncate,
+  type ParserSource,
+} from '../source'
 
 const TURN_RX = /^####\s+(?:(You said):|(ChatGPT said):)\s*$/gm
 
@@ -30,8 +37,7 @@ const ERROR_PAGE_PATTERNS = [
   /this shared conversation has been (removed|deleted)/i,
   /unable to load conversation/i,
 ]
-const looksLikeErrorPage = (md: string) =>
-  ERROR_PAGE_PATTERNS.some((rx) => rx.test(md))
+const looksLikeErrorPage = (md: string) => ERROR_PAGE_PATTERNS.some((rx) => rx.test(md))
 
 export const chatgptSource: ParserSource = {
   id: 'chatgpt',
@@ -44,7 +50,10 @@ export const chatgptSource: ParserSource = {
       // Catch ChatGPT's "Can't load shared conversation" stub before the
       // single-turn fallback — otherwise we'd happily render the error page.
       if (!body || looksLikeErrorPage(body)) {
-        throw new ParseError("ChatGPT couldn't load that share (it may be private, removed, or never existed)", 'malformed')
+        throw new ParseError(
+          "ChatGPT couldn't load that share (it may be private, removed, or never existed)",
+          'malformed',
+        )
       }
       // ChatGPT now sometimes serves shares behind a "See what this chat's
       // about" preview wall; Jina extracts the assistant body but loses the
@@ -56,7 +65,9 @@ export const chatgptSource: ParserSource = {
     const trimmedTitle = title.trim()
     const isGeneric = GENERIC_TITLES.some((rx) => rx.test(trimmedTitle))
     // Strip the leading "ChatGPT - " if Jina returned the browser tab title.
-    const cleanedTitle = (!isGeneric && trimmedTitle.replace(/^ChatGPT\s*[-—–]\s*/, '').trim()) || truncate(turns[0]!.body, 60)
+    const cleanedTitle =
+      (!isGeneric && trimmedTitle.replace(/^ChatGPT\s*[-—–]\s*/, '').trim()) ||
+      truncate(turns[0]!.body, 60)
     const { wordCount, readMin } = stats(turns)
 
     return {
@@ -103,7 +114,10 @@ function splitTurns(md: string): Turn[] {
     // assistant replies survive). We still want the Q→A rhythm to read
     // right, so front-load every content-bearing assistant turn with a
     // placeholder user turn whenever the preceding context is missing.
-    if (h.role === 'assistant' && (turns.length === 0 || turns[turns.length - 1]!.role === 'assistant')) {
+    if (
+      h.role === 'assistant' &&
+      (turns.length === 0 || turns[turns.length - 1]!.role === 'assistant')
+    ) {
       turns.push({ role: 'user', author: '[you]', body: HIDDEN_PROMPT })
     }
     turns.push({

@@ -10,7 +10,10 @@ import {
 import { darkPresetSeed } from './presetSeeds.js'
 
 /** Merge loose import (e.g. partial JSON) onto current state. */
-export function mergeThemeImportLoose(raw: unknown, current: ThemeEditorStateV1): ThemeEditorStateV1 | null {
+export function mergeThemeImportLoose(
+  raw: unknown,
+  current: ThemeEditorStateV1,
+): ThemeEditorStateV1 | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
   const next: ThemeEditorStateV1 = {

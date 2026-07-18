@@ -1,13 +1,30 @@
+import type { Session } from '@spool-lab/core'
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
-import type { Session } from '@spool-lab/core'
-import SessionRow from './SessionRow.js'
+
 import type { BucketKey } from '../../shared/formatDate.js'
+import SessionRow from './SessionRow.js'
 
 export type SessionListRow =
-  | { kind: 'header'; id: string; label: ReactNode; testId?: string; dataAttr?: Record<string, string>; collapsible?: boolean; defaultOpen?: boolean }
-  | { kind: 'session'; id: string; session: Session; pinned?: boolean; showProject?: boolean; bucket?: BucketKey; headerId: string | null }
+  | {
+      kind: 'header'
+      id: string
+      label: ReactNode
+      testId?: string
+      dataAttr?: Record<string, string>
+      collapsible?: boolean
+      defaultOpen?: boolean
+    }
+  | {
+      kind: 'session'
+      id: string
+      session: Session
+      pinned?: boolean
+      showProject?: boolean
+      bucket?: BucketKey
+      headerId: string | null
+    }
   | { kind: 'footer'; id: string; loading: boolean; exhausted: boolean; total: number }
 
 type Props = {
@@ -45,7 +62,7 @@ export default function VirtualSessionList({
   const [closed, setClosed] = useState<Set<string>>(new Set())
 
   const toggleHeader = useCallback((id: string) => {
-    setClosed(prev => {
+    setClosed((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -55,7 +72,7 @@ export default function VirtualSessionList({
 
   const visible = useMemo<SessionListRow[]>(() => {
     if (!collapsibleSections || closed.size === 0) return rows
-    return rows.filter(r => {
+    return rows.filter((r) => {
       if (r.kind === 'session') return r.headerId == null || !closed.has(r.headerId)
       return true
     })
@@ -78,11 +95,14 @@ export default function VirtualSessionList({
             <SectionHeader
               row={row}
               open={open}
-              onToggle={collapsibleSections && row.collapsible !== false ? () => toggleHeader(row.id) : null}
+              onToggle={
+                collapsibleSections && row.collapsible !== false ? () => toggleHeader(row.id) : null
+              }
             />
           )
         }
-        if (row.kind === 'footer') return <Footer loading={row.loading} exhausted={row.exhausted} total={row.total} />
+        if (row.kind === 'footer')
+          return <Footer loading={row.loading} exhausted={row.exhausted} total={row.total} />
         return (
           <SessionRow
             session={row.session}
@@ -110,17 +130,13 @@ function SectionHeader({
   onToggle: (() => void) | null
 }) {
   const content = (
-    <div
-      data-testid={row.testId}
-      {...(row.dataAttr ?? {})}
-      className="px-6 pt-3 pb-1"
-    >
+    <div data-testid={row.testId} {...(row.dataAttr ?? {})} className="px-6 pt-3 pb-1">
       {onToggle ? (
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={open}
-          className="group w-full flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
+          className="group text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex w-full items-center gap-1.5 text-[10px] font-semibold tracking-[0.08em] transition-colors duration-75 select-none"
         >
           <span>{row.label}</span>
           <svg
@@ -129,13 +145,19 @@ function SectionHeader({
             viewBox="0 0 12 12"
             fill="none"
             aria-hidden
-            className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+            className={`flex-none opacity-30 transition-all group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
           >
-            <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M4 2L8 6L4 10"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
       ) : (
-        <span className="block text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted select-none">
+        <span className="text-warm-faint dark:text-dark-muted block text-[10px] font-semibold tracking-[0.08em] select-none">
           {row.label}
         </span>
       )}
@@ -144,18 +166,32 @@ function SectionHeader({
   return content
 }
 
-function Footer({ loading, exhausted, total }: { loading: boolean; exhausted: boolean; total: number }) {
+function Footer({
+  loading,
+  exhausted,
+  total,
+}: {
+  loading: boolean
+  exhausted: boolean
+  total: number
+}) {
   const { t } = useTranslation()
   if (loading) {
     return (
-      <div data-testid="session-list-loading" className="flex justify-center py-6 text-[11px] text-warm-faint dark:text-dark-muted">
+      <div
+        data-testid="session-list-loading"
+        className="text-warm-faint dark:text-dark-muted flex justify-center py-6 text-[11px]"
+      >
         {t('library.footer_loadingMore')}
       </div>
     )
   }
   if (exhausted && total > 0) {
     return (
-      <div data-testid="session-list-done" className="flex justify-center py-6 text-[11px] text-warm-faint dark:text-dark-muted">
+      <div
+        data-testid="session-list-done"
+        className="text-warm-faint dark:text-dark-muted flex justify-center py-6 text-[11px]"
+      >
         {t('library.footer_endOf', { count: total })}
       </div>
     )

@@ -1,5 +1,7 @@
-import Database from 'better-sqlite3'
 import { existsSync, statSync } from 'node:fs'
+
+import Database from 'better-sqlite3'
+
 import { DB_PATH } from '../../db/db.js'
 import { probeSqlite } from '../preflight.js'
 import type { Check, CheckResult, FixDescriptor } from '../types.js'
@@ -17,7 +19,9 @@ export const dbChecks: Check[] = [
     run: (): CheckResult => {
       if (!existsSync(DB_PATH)) {
         return {
-          id: 'db.exists', category: 'db', title: 'Database file',
+          id: 'db.exists',
+          category: 'db',
+          title: 'Database file',
           severity: 'warn',
           message: `Not found at ${DB_PATH} — run \`spool sync\` to create it`,
           details: { path: DB_PATH },
@@ -25,7 +29,9 @@ export const dbChecks: Check[] = [
       }
       const size = statSync(DB_PATH).size
       return {
-        id: 'db.exists', category: 'db', title: 'Database file',
+        id: 'db.exists',
+        category: 'db',
+        title: 'Database file',
         severity: 'ok',
         message: `${humanBytes(size)} at ${DB_PATH}`,
         details: { path: DB_PATH, sizeBytes: size },
@@ -36,47 +42,53 @@ export const dbChecks: Check[] = [
     id: 'db.integrity',
     category: 'db',
     title: 'Database integrity',
-    run: (): CheckResult => withReadonlyDb('db.integrity', 'Database integrity', db => {
-      const rows = db.pragma('integrity_check') as Array<{ integrity_check: string }>
-      const messages = rows.map(r => r.integrity_check)
-      if (messages.length === 1 && messages[0] === 'ok') {
-        return { severity: 'ok', message: 'integrity_check passed' }
-      }
-      return {
-        severity: 'error',
-        message: `integrity_check reported ${messages.length} problem(s)`,
-        details: { problems: messages.slice(0, 20) },
-      }
-    }),
+    run: (): CheckResult =>
+      withReadonlyDb('db.integrity', 'Database integrity', (db) => {
+        const rows = db.pragma('integrity_check') as Array<{ integrity_check: string }>
+        const messages = rows.map((r) => r.integrity_check)
+        if (messages.length === 1 && messages[0] === 'ok') {
+          return { severity: 'ok', message: 'integrity_check passed' }
+        }
+        return {
+          severity: 'error',
+          message: `integrity_check reported ${messages.length} problem(s)`,
+          details: { problems: messages.slice(0, 20) },
+        }
+      }),
   },
   {
     id: 'db.foreign-keys',
     category: 'db',
     title: 'Foreign key consistency',
-    run: (): CheckResult => withReadonlyDb('db.foreign-keys', 'Foreign key consistency', db => {
-      const rows = db.pragma('foreign_key_check') as Array<{
-        table: string; rowid: number; parent: string; fkid: number
-      }>
-      if (rows.length === 0) {
-        return { severity: 'ok', message: 'foreign_key_check passed' }
-      }
-      const byTable = new Map<string, number>()
-      for (const r of rows) byTable.set(r.table, (byTable.get(r.table) ?? 0) + 1)
-      const summary = Array.from(byTable.entries())
-        .map(([t, n]) => `${t}: ${n}`).join(', ')
+    run: (): CheckResult =>
+      withReadonlyDb('db.foreign-keys', 'Foreign key consistency', (db) => {
+        const rows = db.pragma('foreign_key_check') as Array<{
+          table: string
+          rowid: number
+          parent: string
+          fkid: number
+        }>
+        if (rows.length === 0) {
+          return { severity: 'ok', message: 'foreign_key_check passed' }
+        }
+        const byTable = new Map<string, number>()
+        for (const r of rows) byTable.set(r.table, (byTable.get(r.table) ?? 0) + 1)
+        const summary = Array.from(byTable.entries())
+          .map(([t, n]) => `${t}: ${n}`)
+          .join(', ')
 
-      const fix: FixDescriptor = {
-        description: `Delete ${rows.length} orphaned row(s) (${summary})`,
-        destructive: false,
-        apply: () => applyForeignKeyCleanup(rows),
-      }
-      return {
-        severity: 'error',
-        message: `${rows.length} orphan row(s) — ${summary}`,
-        details: { violations: rows.slice(0, 50) },
-        fix,
-      }
-    }),
+        const fix: FixDescriptor = {
+          description: `Delete ${rows.length} orphaned row(s) (${summary})`,
+          destructive: false,
+          apply: () => applyForeignKeyCleanup(rows),
+        }
+        return {
+          severity: 'error',
+          message: `${rows.length} orphan row(s) — ${summary}`,
+          details: { violations: rows.slice(0, 50) },
+          fix,
+        }
+      }),
   },
   {
     id: 'db.wal-size',
@@ -88,19 +100,30 @@ export const dbChecks: Check[] = [
       }
       const dbSize = statSync(DB_PATH).size
       let walSize = 0
-      try { walSize = statSync(WAL_PATH).size } catch { /* WAL file optional */ }
+      try {
+        walSize = statSync(WAL_PATH).size
+      } catch {
+        /* WAL file optional */
+      }
       const ratio = dbSize > 0 ? walSize / dbSize : 0
       const oversized = walSize >= WAL_WARN_MIN_BYTES && ratio >= WAL_WARN_RATIO
       if (!oversized) {
         return {
-          id: 'db.wal-size', category: 'db', title: 'WAL size',
+          id: 'db.wal-size',
+          category: 'db',
+          title: 'WAL size',
           severity: 'ok',
-          message: walSize === 0 ? 'WAL empty' : `${humanBytes(walSize)} (${(ratio * 100).toFixed(0)}% of db)`,
+          message:
+            walSize === 0
+              ? 'WAL empty'
+              : `${humanBytes(walSize)} (${(ratio * 100).toFixed(0)}% of db)`,
           details: { walBytes: walSize, dbBytes: dbSize },
         }
       }
       return {
-        id: 'db.wal-size', category: 'db', title: 'WAL size',
+        id: 'db.wal-size',
+        category: 'db',
+        title: 'WAL size',
         severity: 'warn',
         message: `WAL is ${humanBytes(walSize)} (${(ratio * 100).toFixed(0)}% of db)`,
         details: { walBytes: walSize, dbBytes: dbSize },
@@ -116,29 +139,31 @@ export const dbChecks: Check[] = [
     id: 'db.vacuum-hint',
     category: 'db',
     title: 'Free-page ratio',
-    run: (): CheckResult => withReadonlyDb('db.vacuum-hint', 'Free-page ratio', db => {
-      const free = (db.pragma('freelist_count') as Array<{ freelist_count: number }>)[0]?.freelist_count ?? 0
-      const total = (db.pragma('page_count') as Array<{ page_count: number }>)[0]?.page_count ?? 0
-      const ratio = total > 0 ? free / total : 0
-      const hint = total > 0 && ratio >= VACUUM_HINT_RATIO
-      if (!hint) {
-        return {
-          severity: 'ok',
-          message: total === 0 ? 'empty db' : `${(ratio * 100).toFixed(1)}% free pages`,
-          details: { freePages: free, totalPages: total },
+    run: (): CheckResult =>
+      withReadonlyDb('db.vacuum-hint', 'Free-page ratio', (db) => {
+        const free =
+          (db.pragma('freelist_count') as Array<{ freelist_count: number }>)[0]?.freelist_count ?? 0
+        const total = (db.pragma('page_count') as Array<{ page_count: number }>)[0]?.page_count ?? 0
+        const ratio = total > 0 ? free / total : 0
+        const hint = total > 0 && ratio >= VACUUM_HINT_RATIO
+        if (!hint) {
+          return {
+            severity: 'ok',
+            message: total === 0 ? 'empty db' : `${(ratio * 100).toFixed(1)}% free pages`,
+            details: { freePages: free, totalPages: total },
+          }
         }
-      }
-      return {
-        severity: 'warn',
-        message: `${(ratio * 100).toFixed(1)}% of pages are free — vacuum will reclaim space`,
-        details: { freePages: free, totalPages: total },
-        fix: {
-          description: 'Run VACUUM to compact the database',
-          destructive: false,
-          apply: () => applyVacuum(),
-        },
-      }
-    }),
+        return {
+          severity: 'warn',
+          message: `${(ratio * 100).toFixed(1)}% of pages are free — vacuum will reclaim space`,
+          details: { freePages: free, totalPages: total },
+          fix: {
+            description: 'Run VACUUM to compact the database',
+            destructive: false,
+            apply: () => applyVacuum(),
+          },
+        }
+      }),
   },
 ]
 
@@ -151,7 +176,11 @@ type WithDbResult = {
   fix?: FixDescriptor
 }
 
-function withReadonlyDb(id: string, title: string, fn: (db: Database.Database) => WithDbResult): CheckResult {
+function withReadonlyDb(
+  id: string,
+  title: string,
+  fn: (db: Database.Database) => WithDbResult,
+): CheckResult {
   const sqlite = probeSqlite()
   if (!sqlite.ok) {
     return { id, category: 'db', title, severity: 'warn', message: 'skipped — see `native.sqlite`' }
@@ -168,7 +197,9 @@ function withReadonlyDb(id: string, title: string, fn: (db: Database.Database) =
 
 function skipped(id: string, title: string): CheckResult {
   return {
-    id, category: 'db', title,
+    id,
+    category: 'db',
+    title,
     severity: 'ok',
     message: 'skipped — no database',
   }
@@ -202,10 +233,18 @@ function applyForeignKeyCleanup(
 function applyWalCheckpoint(): { ok: boolean; message: string } {
   const db = new Database(DB_PATH)
   try {
-    const result = db.pragma('wal_checkpoint(TRUNCATE)') as Array<{ busy: number; log: number; checkpointed: number }>
+    const result = db.pragma('wal_checkpoint(TRUNCATE)') as Array<{
+      busy: number
+      log: number
+      checkpointed: number
+    }>
     const r = result[0]
     if (!r) return { ok: true, message: 'WAL checkpointed' }
-    if (r.busy) return { ok: false, message: 'WAL checkpoint reported busy — close other Spool processes and retry' }
+    if (r.busy)
+      return {
+        ok: false,
+        message: 'WAL checkpoint reported busy — close other Spool processes and retry',
+      }
     return { ok: true, message: `Checkpointed ${r.checkpointed}/${r.log} frames` }
   } finally {
     db.close()

@@ -9,31 +9,31 @@
  *  set is exhaustive so consumers can pattern-match it safely. */
 export type SensitiveKind =
   // ── Credentials (highest stakes) ─────────────────────────────────
-  | 'private-key'        // PEM-armoured private key block
-  | 'ssh-key'            // OpenSSH or SSH2 private key body
-  | 'api-key'            // Vendor-prefixed token (Stripe, OpenAI, …)
-  | 'cloud-cred-ini'     // ~/.aws/credentials, gcloud auth INI block
-  | 'kubeconfig-token'   // kubeconfig token/data field
-  | 'connection-string'  // postgres://, mongodb://, redis://, …
-  | 'jwt'                // RFC 7519 JWT
-  | 'bearer'             // `Authorization: Bearer …` (non-JWT)
-  | 'basic-auth'         // `Authorization: Basic …`
-  | 'env-var'            // NAME=VALUE where NAME = *_KEY|*_SECRET|…
-  | 'generic-secret'     // keyword + entropy-gated quoted value
-  | 'netrc'              // .netrc machine/login/password line
+  | 'private-key' // PEM-armoured private key block
+  | 'ssh-key' // OpenSSH or SSH2 private key body
+  | 'api-key' // Vendor-prefixed token (Stripe, OpenAI, …)
+  | 'cloud-cred-ini' // ~/.aws/credentials, gcloud auth INI block
+  | 'kubeconfig-token' // kubeconfig token/data field
+  | 'connection-string' // postgres://, mongodb://, redis://, …
+  | 'jwt' // RFC 7519 JWT
+  | 'bearer' // `Authorization: Bearer …` (non-JWT)
+  | 'basic-auth' // `Authorization: Basic …`
+  | 'env-var' // NAME=VALUE where NAME = *_KEY|*_SECRET|…
+  | 'generic-secret' // keyword + entropy-gated quoted value
+  | 'netrc' // .netrc machine/login/password line
   // ── Identity ─────────────────────────────────────────────────────
   | 'email'
   | 'phone'
-  | 'person-name'        // ML-only (Privacy Filter `person` class)
-  | 'street-address'     // ML-only (Privacy Filter `address` class)
-  | 'date-of-birth'      // ML-only, context-gated to DOB-like dates
-  | 'credit-card'        // Luhn-validated
-  | 'ssn'                // US SSN, format-only
-  | 'ip'                 // IPv4 / shortened IPv6
+  | 'person-name' // ML-only (Privacy Filter `person` class)
+  | 'street-address' // ML-only (Privacy Filter `address` class)
+  | 'date-of-birth' // ML-only, context-gated to DOB-like dates
+  | 'credit-card' // Luhn-validated
+  | 'ssn' // US SSN, format-only
+  | 'ip' // IPv4 / shortened IPv6
   // ── Location & infra ─────────────────────────────────────────────
-  | 'url-creds'          // URL with embedded user:password
-  | 'absolute-path'      // Unix/Windows home or system path
-  | 'internal-host'      // *.internal, *.corp, *.local, *.lan
+  | 'url-creds' // URL with embedded user:password
+  | 'absolute-path' // Unix/Windows home or system path
+  | 'internal-host' // *.internal, *.corp, *.local, *.lan
 
 export interface SensitiveMatch {
   kind: SensitiveKind
@@ -122,21 +122,21 @@ export const SENSITIVE_KIND_LABEL: Record<SensitiveKind, string> = {
   'kubeconfig-token': 'kubeconfig token',
   'connection-string': 'Connection string',
   'api-key': 'API key',
-  'netrc': '.netrc entry',
-  'jwt': 'JWT',
-  'bearer': 'Bearer token',
+  netrc: '.netrc entry',
+  jwt: 'JWT',
+  bearer: 'Bearer token',
   'basic-auth': 'Basic auth',
   'env-var': 'Env-var secret',
   'generic-secret': 'Generic secret',
   'url-creds': 'URL credential',
   'credit-card': 'Credit card',
-  'ssn': 'SSN',
-  'email': 'Email',
-  'phone': 'Phone',
+  ssn: 'SSN',
+  email: 'Email',
+  phone: 'Phone',
   'person-name': 'Person name',
   'street-address': 'Street address',
   'date-of-birth': 'Date of birth',
-  'ip': 'IP address',
+  ip: 'IP address',
   'absolute-path': 'Absolute path',
   'internal-host': 'Internal hostname',
 }

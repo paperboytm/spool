@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { navigateToShares } from './helpers/share'
 
@@ -22,7 +23,9 @@ test('Recent mode lists sessions; Esc closes', async () => {
   await expect(picker).toBeVisible({ timeout: 5000 })
 
   // Recent: at least one row (we have 6 fixtures including the large one).
-  await expect(picker.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({ timeout: 5000 })
+  await expect(picker.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({
+    timeout: 5000,
+  })
 
   await window.keyboard.press('Escape')
   await expect(picker).toBeHidden({ timeout: 5000 })
@@ -38,7 +41,9 @@ test('FTS search narrows results; keyboard nav + Enter opens editor', async () =
   await picker.locator('input').fill('XYLOPHONE_CANARY_42')
   // Allow debounce + FTS roundtrip. Two fixtures mention this token, so
   // we just require *some* match rather than an exact count.
-  await expect(picker.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({ timeout: 5000 })
+  await expect(picker.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({
+    timeout: 5000,
+  })
 
   // Active row is row 0 after a result set lands.
   await window.keyboard.press('ArrowDown')

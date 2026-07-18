@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { SPOOL_DIR } from '@spool-lab/core'
+
 import {
   normalizeThemeEditorState,
   type ThemeEditorStateV1,

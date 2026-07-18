@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression: SessionCard inside SecurityPage must refetch its
 // findings list when EVT_FINDINGS_CHANGED arrives for this session
@@ -29,35 +31,55 @@ test.beforeAll(async () => {
       // listSessionsWithFindings filter could unmount the card and
       // confound the test.
       const file = join(claudeDir, 'test-project', 'card-refresh.jsonl')
-      writeFileSync(file, [
-        JSON.stringify({
-          type: 'user',
-          sessionId: SID,
-          cwd: '/tmp/test-project',
-          uuid: 'cr-1',
-          timestamp: '2026-05-22T10:00:00Z',
-          message: { role: 'user', content: `rotate ${FAKE_AKIA} and email dev@fly.io` },
-        }),
-        JSON.stringify({
-          type: 'assistant',
-          uuid: 'cr-2',
-          timestamp: '2026-05-22T10:00:05Z',
-          message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
-        }),
-      ].join('\n'))
+      writeFileSync(
+        file,
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'cr-1',
+            timestamp: '2026-05-22T10:00:00Z',
+            message: { role: 'user', content: `rotate ${FAKE_AKIA} and email dev@fly.io` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'cr-2',
+            timestamp: '2026-05-22T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('SessionCard refetches findings when EVT_FINDINGS_CHANGED arrives for this session', async () => {
@@ -80,13 +102,21 @@ test('SessionCard refetches findings when EVT_FINDINGS_CHANGED arrives for this 
   // thing that turns the IPC event into a reload — without it the
   // row stays put forever.
   await window.evaluate(async (sid: string) => {
-    const api = (globalThis as { spool: {
-      security: {
-        listFindings: (f: { sessionId?: number; state?: string; limit?: number }) => Promise<Array<{ id: number; kind: string }>>
-        dismissFinding: (id: number, scope: 'session' | 'global') => Promise<void>
+    const api = (
+      globalThis as {
+        spool: {
+          security: {
+            listFindings: (f: {
+              sessionId?: number
+              state?: string
+              limit?: number
+            }) => Promise<Array<{ id: number; kind: string }>>
+            dismissFinding: (id: number, scope: 'session' | 'global') => Promise<void>
+          }
+          listSessions: () => Promise<{ sessions: Array<{ id: number; sessionUuid: string }> }>
+        }
       }
-      listSessions: () => Promise<{ sessions: Array<{ id: number; sessionUuid: string }> }>
-    } }).spool
+    ).spool
     const page = await api.listSessions()
     const sessionId = page.sessions.find((s) => s.sessionUuid === sid)?.id
     if (sessionId === undefined) throw new Error(`session ${sid} not synced`)

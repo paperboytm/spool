@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { buildSpoolDocument, ensureTurnIds, redactConversation } from './spool-file'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { DEFAULT_OPTS, type Conversation, type EditorOpts, type Turn } from '../types'
+import { buildSpoolDocument, ensureTurnIds, redactConversation } from './spool-file'
 
 // Built at runtime so GitHub's push-protection secret scanner
 // doesn't flag the literal Stripe-shaped prefix in source.

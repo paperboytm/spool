@@ -57,7 +57,10 @@ function parseScalar(raw: string): unknown {
 }
 
 function unquote(s: string): string {
-  if (s.length >= 2 && ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))) {
+  if (
+    s.length >= 2 &&
+    ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+  ) {
     return s.slice(1, -1)
   }
   return s

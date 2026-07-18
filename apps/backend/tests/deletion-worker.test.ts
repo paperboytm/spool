@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { nanoidSlug } from '../src/publish/slug'
-
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
 function envFor(state?: FakeDbState) {
@@ -64,7 +63,13 @@ async function seedShareWithAssets(
   await env.OG.put(`${slug}.png`, new Uint8Array([1, 2, 3]).buffer)
   await env.META.put(
     `meta/${slug}`,
-    JSON.stringify({ owner: user_id, visibility: 'unlisted', expires_at: null, revoked_at: null, version: 1 }),
+    JSON.stringify({
+      owner: user_id,
+      visibility: 'unlisted',
+      expires_at: null,
+      revoked_at: null,
+      version: 1,
+    }),
   )
 }
 
@@ -188,7 +193,7 @@ describe('runDeletionSweep', () => {
       if (/^SELECT 1 FROM deletion_queue WHERE user_id=\? AND cancelled=0/i.test(sql)) {
         return {
           bind: (uid: string) => ({
-            first: async () => (uid === 'user-1' ? null : ({ '1': 1 })),
+            first: async () => (uid === 'user-1' ? null : { '1': 1 }),
           }),
         } as unknown as ReturnType<typeof realPrepare>
       }
@@ -320,7 +325,10 @@ describe('runDeletionSweep', () => {
       cancelled: 0,
     })
     for (let i = 0; i < 1001; i++) {
-      await env.AVATARS.put(`avatars/user-1/${String(i).padStart(4, '0')}.png`, new Uint8Array([0]).buffer)
+      await env.AVATARS.put(
+        `avatars/user-1/${String(i).padStart(4, '0')}.png`,
+        new Uint8Array([0]).buffer,
+      )
     }
     // A sibling key under a different prefix must NOT be touched.
     await env.AVATARS.put('avatars/user-2/keep.png', new Uint8Array([0]).buffer)

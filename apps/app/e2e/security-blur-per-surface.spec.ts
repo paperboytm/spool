@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression for the per-surface blur prefs introduced 2026-05.
 //
@@ -30,39 +32,59 @@ test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
       const file = join(claudeDir, 'test-project', 'blur-fixture.jsonl')
-      writeFileSync(file, [
-        JSON.stringify({
-          type: 'user',
-          sessionId: 'blur-fixture-session',
-          cwd: '/tmp/test-project',
-          uuid: 'bf-msg-1',
-          timestamp: '2026-05-21T10:00:00Z',
-          message: { role: 'user', content: `please rotate ${FAKE_AKIA}` },
-        }),
-        JSON.stringify({
-          type: 'assistant',
-          uuid: 'bf-msg-2',
-          timestamp: '2026-05-21T10:00:05Z',
-          message: {
-            role: 'assistant',
-            model: 'claude-sonnet-4',
-            content: 'rotated',
-          },
-        }),
-      ].join('\n'))
+      writeFileSync(
+        file,
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: 'blur-fixture-session',
+            cwd: '/tmp/test-project',
+            uuid: 'bf-msg-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `please rotate ${FAKE_AKIA}` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'bf-msg-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: {
+              role: 'assistant',
+              model: 'claude-sonnet-4',
+              content: 'rotated',
+            },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Per-surface blur prefs are independent and bidirectional with the in-page icons', async () => {

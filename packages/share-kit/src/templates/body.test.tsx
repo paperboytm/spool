@@ -1,11 +1,10 @@
-import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { Body } from './body'
 
 function renderBody(text: string): string {
-  return renderToStaticMarkup(
-    <Body text={text} accent="#C85A00" accentBg="rgba(200,90,0,0.1)" />,
-  )
+  return renderToStaticMarkup(<Body text={text} accent="#C85A00" accentBg="rgba(200,90,0,0.1)" />)
 }
 
 describe('Body — link hardening', () => {
@@ -44,7 +43,8 @@ describe('Body — shared compiled redact matcher', () => {
   }
 
   it('masks every entry, and a second render off the cached matcher is byte-identical', () => {
-    const text = 'key sk_live_aaaabbbbccccdddd1111 at /Users/chen/secret.txt and again sk_live_aaaabbbbccccdddd1111'
+    const text =
+      'key sk_live_aaaabbbbccccdddd1111 at /Users/chen/secret.txt and again sk_live_aaaabbbbccccdddd1111'
     const first = renderWith(text)
     expect(first).toContain('[redacted: Stripe key]')
     expect(first).toContain('[redacted path]')

@@ -1,6 +1,6 @@
+import { toString } from 'mdast-util-to-string'
 import { remark } from 'remark'
 import remarkGfm from 'remark-gfm'
-import { toString } from 'mdast-util-to-string'
 
 const processor = remark().use(remarkGfm)
 

@@ -8,19 +8,8 @@
 // already the redacted literal the publisher chose to send — the
 // templates render it through React's text escaping.
 
-import type {
-  Conversation,
-  EditorOpts,
-  Snapshot,
-  Template,
-} from '../lib/types'
-import {
-  COLORWAYS,
-  DEFAULT_OPTS,
-  PAPERS,
-  TEMPLATES,
-  TYPEFACES,
-} from '../lib/types'
+import type { Conversation, EditorOpts, Snapshot, Template } from '../lib/types'
+import { COLORWAYS, DEFAULT_OPTS, PAPERS, TEMPLATES, TYPEFACES } from '../lib/types'
 
 const ROLE_MAP: Record<Snapshot['conversation']['turns'][number]['role'], 'user' | 'assistant'> = {
   user: 'user',
@@ -43,7 +32,8 @@ function safePaper(raw: string): EditorOpts['paper'] {
 }
 
 function safeTypeface(raw: string): EditorOpts['typeface'] {
-  return (TYPEFACES.find((t) => t.id === raw)?.id ?? DEFAULT_OPTS.typeface) as EditorOpts['typeface']
+  return (TYPEFACES.find((t) => t.id === raw)?.id ??
+    DEFAULT_OPTS.typeface) as EditorOpts['typeface']
 }
 
 function safeColorway(raw: string): { id: EditorOpts['colorway']; hex: string } {
@@ -91,9 +81,7 @@ export function decodeSnapshot(snapshot: Snapshot): DecodedSnapshot {
   }
 
   const hidden = new Set(snapshot.conversation.hidden_turns ?? [])
-  const orderIdx = new Map(
-    (snapshot.conversation.turn_order ?? []).map((id, idx) => [id, idx]),
-  )
+  const orderIdx = new Map((snapshot.conversation.turn_order ?? []).map((id, idx) => [id, idx]))
 
   const turns = snapshot.conversation.turns
     .filter((t) => !hidden.has(t.id))

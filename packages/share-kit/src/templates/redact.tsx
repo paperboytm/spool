@@ -16,8 +16,6 @@
 // and the per-kind mask to substitute. The body renderer and the
 // markdown / .spool exporters consume the same shape.
 
-import { useMemo } from 'react'
-import type { EditorOpts, RedactExclude, Turn } from '../lib/types'
 import {
   detectSensitiveSpansCached,
   groupBySensitiveKind,
@@ -26,6 +24,9 @@ import {
   type SensitiveGroup,
   type SensitiveMatch,
 } from '@spool-lab/redact'
+import { useMemo } from 'react'
+
+import type { EditorOpts, RedactExclude, Turn } from '../lib/types'
 
 // Re-export so existing share-kit consumers keep their import path;
 // the cache itself lives in @spool-lab/redact so non-React surfaces
@@ -99,7 +100,8 @@ export function applyRedactPolicy(
   const excludeValues = new Set(exclude?.values ?? [])
   const excludeHashes = new Set(exclude?.valueHashes ?? [])
   const isExcludedValue = (v: string): boolean =>
-    excludeValues.has(v) || (excludeHashes.size > 0 && excludeHashes.has(hashValueForRedactExclude(v)))
+    excludeValues.has(v) ||
+    (excludeHashes.size > 0 && excludeHashes.has(hashValueForRedactExclude(v)))
 
   // Use a Map keyed by literal so duplicate matches (same value in
   // two turns, or the same value found as both a regex match AND a
@@ -145,10 +147,7 @@ export function collectRedactList(
 /** Apply an already-resolved redact list to plain-text projections such as
  * prompt directories. Renderers may decorate masks as chips; navigation and
  * export surfaces need the same substitutions without Markdown markup. */
-export function redactPlainText(
-  text: string,
-  redactList: readonly RedactReplacement[],
-): string {
+export function redactPlainText(text: string, redactList: readonly RedactReplacement[]): string {
   if (redactList.length === 0) return text
   let compiled = plainTextRedactCache.get(redactList)
   if (compiled === undefined) {
@@ -159,10 +158,7 @@ export function redactPlainText(
     }
     plainTextRedactCache.set(redactList, compiled)
   }
-  return text.replace(
-    compiled.rx,
-    (match) => compiled.replaceMap.get(match) ?? '[redacted]',
-  )
+  return text.replace(compiled.rx, (match) => compiled.replaceMap.get(match) ?? '[redacted]')
 }
 
 const plainTextRedactCache = new WeakMap<
@@ -197,10 +193,7 @@ export function useResolvedRedactList(
   injected: RedactReplacement[] | undefined,
 ): RedactReplacement[] {
   const computed = useMemo(
-    () =>
-      injected || !opts.redact
-        ? EMPTY_REDACT_LIST
-        : collectRedactList(turns, opts),
+    () => (injected || !opts.redact ? EMPTY_REDACT_LIST : collectRedactList(turns, opts)),
     [turns, opts.redact, opts.redactExclude, injected],
   )
   return injected ?? computed

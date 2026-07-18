@@ -115,11 +115,8 @@ export class HubClient {
   }
 
   uploadObjects(objects: Iterable<HubObjectUpload>): Promise<HubObjectBatchResponse> {
-    const body = Array.from(objects, object => JSON.stringify(object)).join('\n')
-    return this.postNdjson(
-      '/api/hub/v1/objects/batch',
-      body === '' ? body : `${body}\n`,
-    )
+    const body = Array.from(objects, (object) => JSON.stringify(object)).join('\n')
+    return this.postNdjson('/api/hub/v1/objects/batch', body === '' ? body : `${body}\n`)
   }
 
   commitSessionHead(sid: string, body: HubSessionWriteRequest): Promise<HubHeadResponse> {
@@ -210,9 +207,12 @@ export class HubClient {
       // undici's bare "fetch failed" names neither host nor cause —
       // useless at a terminal. Say where we tried to go and, for local
       // hubs, what is probably missing.
-      const detail = cause instanceof Error
-        ? (cause.cause instanceof Error ? cause.cause.message : cause.message)
-        : String(cause)
+      const detail =
+        cause instanceof Error
+          ? cause.cause instanceof Error
+            ? cause.cause.message
+            : cause.message
+          : String(cause)
       const localHint = /127\.0\.0\.1|localhost/.test(this.hubUrl)
         ? ' Is the local hub running? Start it with `pnpm --filter @spool/backend dev` (and `pnpm --filter @spool/web dev` when using port 3002). Note: vite often binds IPv6-only — if the server is up but 127.0.0.1 is refused, use http://localhost:<port> instead.'
         : ''

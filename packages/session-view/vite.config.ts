@@ -1,20 +1,30 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import dts from 'vite-plugin-dts'
 import { fileURLToPath } from 'node:url'
 
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
+import dts from 'vite-plugin-dts'
+import { defineConfig, lazyPlugins } from 'vite-plus'
+
 export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    dts({
-      entryRoot: 'src',
-      include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-      bundleTypes: false,
-    }),
-  ],
+  run: {
+    tasks: {
+      build: {
+        command: 'pnpm run clean && vp build',
+        input: [{ auto: true }, '!dist/**', '!node_modules/**'],
+      },
+    },
+  },
+  plugins:
+    lazyPlugins(() => [
+      react(),
+      tailwindcss(),
+      dts({
+        entryRoot: 'src',
+        include: ['src/**/*.ts', 'src/**/*.tsx'],
+        exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+        bundleTypes: false,
+      }),
+    ]) ?? [],
   build: {
     lib: {
       entry: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
@@ -29,5 +39,9 @@ export default defineConfig({
     },
     sourcemap: true,
     emptyOutDir: true,
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 })

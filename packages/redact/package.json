@@ -2,6 +2,23 @@
   "name": "@spool-lab/redact",
   "version": "0.6.0",
   "description": "Local, pure-TS sensitive-data detection for Spool sessions. Pattern + checksum + entropy pipeline today; pluggable provider boundary for future on-device ML (e.g. OpenAI Privacy Filter via transformers.js).",
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,23 +28,20 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": [
-    "dist"
-  ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc",
-    "prepack": "pnpm run build",
+    "prepack": "vp run build",
     "dev": "tsc --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "vitest": "^3.2.4"
+    "@types/node": "^26.1.1",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

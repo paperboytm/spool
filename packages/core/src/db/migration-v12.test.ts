@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { runMigrations, LATEST_SCHEMA_VERSION } from './db.js'
 
 const userVersion = (db: Database.Database): number =>
@@ -14,7 +15,9 @@ function seedProjectAndSession(db: Database.Database, sessionUuid: string): numb
     `INSERT INTO sessions (project_id, source_id, session_uuid, file_path, started_at, ended_at)
      VALUES (1, 1, ?, ?, '2026-01-01', '2026-01-01')`,
   ).run(sessionUuid, `/p/${sessionUuid}`)
-  return (db.prepare('SELECT id FROM sessions WHERE session_uuid = ?').get(sessionUuid) as { id: number }).id
+  return (
+    db.prepare('SELECT id FROM sessions WHERE session_uuid = ?').get(sessionUuid) as { id: number }
+  ).id
 }
 
 describe('migration v12 — security scan schema', () => {
@@ -26,7 +29,7 @@ describe('migration v12 — security scan schema', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>
-    const names = new Set(cols.map(c => c.name))
+    const names = new Set(cols.map((c) => c.name))
     expect(names.has('scan_profile')).toBe(true)
     expect(names.has('scan_completed_at')).toBe(true)
     expect(names.has('scan_finding_count')).toBe(true)
@@ -39,9 +42,16 @@ describe('migration v12 — security scan schema', () => {
     runMigrations(db)
     // insert a minimal session through the schema-sanity-honoured shape
     seedProjectAndSession(db, 's')
-    const row = db.prepare(
-      'SELECT scan_finding_count, scan_high_count, scan_purged_count, scan_profile FROM sessions WHERE session_uuid = ?',
-    ).get('s') as { scan_finding_count: number; scan_high_count: number; scan_purged_count: number; scan_profile: string | null }
+    const row = db
+      .prepare(
+        'SELECT scan_finding_count, scan_high_count, scan_purged_count, scan_profile FROM sessions WHERE session_uuid = ?',
+      )
+      .get('s') as {
+      scan_finding_count: number
+      scan_high_count: number
+      scan_purged_count: number
+      scan_profile: string | null
+    }
     expect(row.scan_finding_count).toBe(0)
     expect(row.scan_high_count).toBe(0)
     expect(row.scan_purged_count).toBe(0)
@@ -52,19 +62,32 @@ describe('migration v12 — security scan schema', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     const cols = db.prepare('PRAGMA table_info(findings)').all() as Array<{ name: string }>
-    const names = cols.map(c => c.name)
-    expect(names).toEqual(expect.arrayContaining([
-      'id', 'session_id', 'message_id', 'kind', 'value_hash', 'confidence',
-      'provider', 'start_offset', 'end_offset', 'state', 'detected_at',
-      'state_changed_at',
-    ]))
+    const names = cols.map((c) => c.name)
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'id',
+        'session_id',
+        'message_id',
+        'kind',
+        'value_hash',
+        'confidence',
+        'provider',
+        'start_offset',
+        'end_offset',
+        'state',
+        'detected_at',
+        'state_changed_at',
+      ]),
+    )
     // CHECK constraint should reject unknown state values
     seedProjectAndSession(db, 's')
     expect(() =>
-      db.prepare(
-        `INSERT INTO findings (session_id, kind, value_hash, confidence, provider, start_offset, end_offset, state)
+      db
+        .prepare(
+          `INSERT INTO findings (session_id, kind, value_hash, confidence, provider, start_offset, end_offset, state)
          VALUES (1,'email','abc',1.0,'regex',0,5,'banana')`,
-      ).run(),
+        )
+        .run(),
     ).toThrow(/CHECK/)
   })
 
@@ -73,7 +96,9 @@ describe('migration v12 — security scan schema', () => {
     db.pragma('foreign_keys = ON')
     runMigrations(db)
     seedProjectAndSession(db, 's')
-    const sessionId = (db.prepare('SELECT id FROM sessions WHERE session_uuid = ?').get('s') as { id: number }).id
+    const sessionId = (
+      db.prepare('SELECT id FROM sessions WHERE session_uuid = ?').get('s') as { id: number }
+    ).id
     db.prepare(
       `INSERT INTO findings (session_id, kind, value_hash, confidence, provider, start_offset, end_offset)
        VALUES (?,'email','abc',1.0,'regex',0,5)`,
@@ -87,16 +112,21 @@ describe('migration v12 — security scan schema', () => {
     const db = new Database(':memory:')
     runMigrations(db)
     expect(
-      db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get('allowlist_session'),
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
+        .get('allowlist_session'),
     ).toBeDefined()
     expect(
-      db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get('allowlist_global'),
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
+        .get('allowlist_global'),
     ).toBeDefined()
     // The stored-preview approach was abandoned in favour of live
     // reconstruction — neither table carries a preview or reason column.
     for (const table of ['allowlist_session', 'allowlist_global']) {
-      const names = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>)
-        .map(c => c.name)
+      const names = (
+        db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+      ).map((c) => c.name)
       expect(names, `${table} should NOT have a preview column`).not.toContain('preview')
       expect(names, `${table} should NOT have a reason column`).not.toContain('reason')
     }
@@ -143,8 +173,10 @@ describe('migration v12 — security scan schema', () => {
     // The transaction wrapper should have reverted everything.
     expect(userVersion(db)).toBeLessThan(12)
     const cols = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>
-    const names = new Set(cols.map(c => c.name))
+    const names = new Set(cols.map((c) => c.name))
     expect(names.has('scan_profile'), 'scan_profile should have been rolled back').toBe(false)
-    expect(names.has('scan_purged_count'), 'scan_purged_count should have been rolled back').toBe(false)
+    expect(names.has('scan_purged_count'), 'scan_purged_count should have been rolled back').toBe(
+      false,
+    )
   })
 })

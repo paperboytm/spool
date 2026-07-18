@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Browser-side guard for the new pagination + virtualization behavior in
@@ -65,7 +67,9 @@ test.afterAll(async () => {
 async function openPicker(): Promise<void> {
   await ctx.window.locator('[data-testid="sidebar-shares"]').click()
   await expect(
-    ctx.window.locator('[data-testid="shares-empty-start"], [data-testid="shares-draft-row"]').first(),
+    ctx.window
+      .locator('[data-testid="shares-empty-start"], [data-testid="shares-draft-row"]')
+      .first(),
   ).toBeVisible({ timeout: 5000 })
   const empty = ctx.window.locator('[data-testid="shares-empty-start"]')
   const plus = ctx.window.locator('[data-testid="shares-new-draft"]')
@@ -74,7 +78,9 @@ async function openPicker(): Promise<void> {
   } else {
     await plus.click()
   }
-  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({ timeout: 5000 })
+  await expect(ctx.window.locator('[data-testid="new-draft-picker"]')).toBeVisible({
+    timeout: 5000,
+  })
 }
 
 async function closePicker(): Promise<void> {
@@ -90,7 +96,10 @@ async function scopeToBigProject(): Promise<void> {
   const popover = ctx.window.locator('[data-testid="new-draft-picker-scope-popover"]')
   await expect(popover).toBeVisible()
   // Find the project option whose label contains our bulk slug.
-  const option = popover.locator('[data-testid="new-draft-picker-scope-option"][data-identity-key]:not([data-identity-key=""])')
+  const option = popover
+    .locator(
+      '[data-testid="new-draft-picker-scope-option"][data-identity-key]:not([data-identity-key=""])',
+    )
     .filter({ hasText: /spool-e2e-big-project/i })
     .first()
   await expect(option).toBeVisible({ timeout: 3000 })
@@ -107,24 +116,31 @@ test('scoping to a >50-session project paginates rather than capping at 30', asy
   // Newest fixture (i=74) sits at row 0; its presence confirms the picker
   // bound to the scoped list.
   await expect(
-    ctx.window.locator('[data-testid="new-draft-picker-row"]').filter({ hasText: 'Bulk session 074' }),
+    ctx.window
+      .locator('[data-testid="new-draft-picker-row"]')
+      .filter({ hasText: 'Bulk session 074' }),
   ).toBeVisible({ timeout: 5000 })
 
   // Trigger pagination by scrolling to the oldest end (ordinal 000 lives
   // beyond the first 50 rows; scroll re-tries because a lone programmatic
   // scrollTo occasionally loses the race against Virtuoso's measurement).
-  await expect.poll(async () => {
-    await virtual.evaluate((node) => {
-      const scroller = node.matches('[data-virtuoso-scroller]')
-        ? node
-        : node.querySelector('[data-virtuoso-scroller]')
-      ;(scroller ?? node).scrollTo({ top: 1e7 })
-    })
-    return ctx.window
-      .locator('[data-testid="new-draft-picker-row"]')
-      .filter({ hasText: 'Bulk session 000' })
-      .count()
-  }, { timeout: 10000, intervals: [200, 300, 500, 500, 1000] }).toBeGreaterThan(0)
+  await expect
+    .poll(
+      async () => {
+        await virtual.evaluate((node) => {
+          const scroller = node.matches('[data-virtuoso-scroller]')
+            ? node
+            : node.querySelector('[data-virtuoso-scroller]')
+          ;(scroller ?? node).scrollTo({ top: 1e7 })
+        })
+        return ctx.window
+          .locator('[data-testid="new-draft-picker-row"]')
+          .filter({ hasText: 'Bulk session 000' })
+          .count()
+      },
+      { timeout: 10000, intervals: [200, 300, 500, 500, 1000] },
+    )
+    .toBeGreaterThan(0)
 
   await closePicker()
 })
@@ -142,7 +158,9 @@ test('switching scope back to Any project resets the list to page 1', async () =
   // sessions are now interleaved with other fixtures, but the list must
   // not get stuck on the previous scope's row count.
   await expect(virtual).toBeVisible({ timeout: 3000 })
-  await expect(ctx.window.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({ timeout: 3000 })
+  await expect(ctx.window.locator('[data-testid="new-draft-picker-row"]').first()).toBeVisible({
+    timeout: 3000,
+  })
 
   await closePicker()
 })

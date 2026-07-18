@@ -20,8 +20,8 @@ import {
   getCliAuthByUserCode,
   normalizeUserCode,
 } from '../../../src/cli-auth'
-import { TOKEN_MINT_RATE, mintApiToken } from '../../../src/hub/tokens'
 import { ApiError, jsonError, jsonOk } from '../../../src/errors'
+import { TOKEN_MINT_RATE, mintApiToken } from '../../../src/hub/tokens'
 import { checkRate } from '../../../src/rate-limit'
 
 type Env = {

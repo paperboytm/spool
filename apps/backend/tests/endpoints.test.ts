@@ -3,12 +3,11 @@
 // (workos), plus sign-out. The workos happy paths + identity linking
 // live in workos.test.ts.
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { onRequestGet as callbackGet } from '../functions/api/auth/[provider]/callback'
 import { onRequestGet as startGet } from '../functions/api/auth/[provider]/start'
 import { onRequestPost as signOutPost } from '../functions/api/auth/sign-out'
-
 import { getSetCookies, invoke } from './_helpers/ctx'
 import { makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 
@@ -56,23 +55,18 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
 
   it('400 when state cookie is absent', async () => {
     const env = envFor()
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=abc&state=xyz',
-    )
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=xyz')
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(400)
   })
 
   it('403 when state cookie does not match query state', async () => {
     const env = envFor()
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=abc&state=fromUrl',
-      {
-        headers: {
-          cookie: '__spool_oauth_state=otherState|/; __spool_oauth_verifier=v',
-        },
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=fromUrl', {
+      headers: {
+        cookie: '__spool_oauth_state=otherState|/; __spool_oauth_verifier=v',
       },
-    )
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(403)
   })
@@ -88,10 +82,9 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
     await env.RATE.put(`rate/oauth-callback/8.8.8.8/${slot}`, String(RATE_MAX), {
       expirationTtl: RATE_WINDOW_SEC * 2,
     })
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=abc&state=xyz',
-      { headers: { 'CF-Connecting-IP': '8.8.8.8' } },
-    )
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=xyz', {
+      headers: { 'CF-Connecting-IP': '8.8.8.8' },
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(429)
   })
@@ -101,12 +94,9 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('{"error":"invalid_grant"}', { status: 400 }),
     )
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=bad&state=S',
-      {
-        headers: { cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v' },
-      },
-    )
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=bad&state=S', {
+      headers: { cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v' },
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(403)
     expect(env.state.users).toHaveLength(0)
@@ -124,15 +114,11 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
       if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
       return res
     })
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=c&state=S',
-      {
-        headers: {
-          cookie:
-            '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
-        },
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=c&state=S', {
+      headers: {
+        cookie: '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
       },
-    )
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     const loc = res.headers.get('location') ?? ''
@@ -146,12 +132,15 @@ describe('POST /api/auth/sign-out', () => {
   it('clears KV session and returns a cleared cookie', async () => {
     const env = envFor()
     // Pre-seed a session.
-    await env.SESSIONS.put('session/tok-123', JSON.stringify({
-      user_id: 'u',
-      created: Date.now(),
-      exp: Date.now() + 1000_000,
-      last_seen: Date.now(),
-    }))
+    await env.SESSIONS.put(
+      'session/tok-123',
+      JSON.stringify({
+        user_id: 'u',
+        created: Date.now(),
+        exp: Date.now() + 1000_000,
+        last_seen: Date.now(),
+      }),
+    )
     const req = new Request('https://x/api/auth/sign-out', {
       method: 'POST',
       headers: { cookie: 'spool_session=tok-123' },
@@ -188,12 +177,9 @@ describe('start endpoint', () => {
 
   it('coerces an unsafe next param back to /', async () => {
     const env = envFor()
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/start?next=//evil.example.com',
-    )
+    const req = new Request('https://spool.pro/api/auth/workos/start?next=//evil.example.com')
     const res = await invoke(startGet, req, env, { provider: 'workos' })
-    const stateCookie =
-      getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
+    const stateCookie = getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
     // The cookie value is `${state}|${next}`. Ensure the next half is `/`.
     expect(stateCookie).toMatch(/__spool_oauth_state=[^|]+\|\/;/)
   })
@@ -210,9 +196,7 @@ describe('start endpoint', () => {
   it('callback 404s on an unknown provider', async () => {
     const env = envFor()
     for (const provider of ['github', 'google']) {
-      const req = new Request(
-        `https://spool.pro/api/auth/${provider}/callback?code=x&state=y`,
-      )
+      const req = new Request(`https://spool.pro/api/auth/${provider}/callback?code=x&state=y`)
       const res = await invoke(callbackGet, req, env, { provider })
       expect(res.status).toBe(404)
     }

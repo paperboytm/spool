@@ -1,7 +1,7 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types'
 
-import { ApiError } from '../errors'
 import { requireUser } from '../auth/require'
+import { ApiError } from '../errors'
 import { getUserById, type UserRow } from '../store/d1'
 
 // Hub auth accepts three credentials, tried in order:
@@ -56,9 +56,10 @@ async function ensureDevUser(db: D1Database): Promise<UserRow> {
   const existing = await getUserById(db, DEV_USER_ID)
   if (existing) return existing
   const now = Date.now()
-  await db.prepare(
-    'INSERT INTO users (id, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?)',
-  )
+  await db
+    .prepare(
+      'INSERT INTO users (id, email, name, avatar_url, created_at, last_signin_at) VALUES (?,?,?,?,?,?)',
+    )
     .bind(DEV_USER_ID, 'dev@localhost', 'Dev User', null, now, now)
     .run()
   const created = await getUserById(db, DEV_USER_ID)

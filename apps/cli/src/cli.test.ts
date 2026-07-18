@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { resolve, join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { existsSync, statSync, rmSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { randomUUID } from 'node:crypto'
+import { resolve, join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vite-plus/test'
 
 const BIN = resolve(import.meta.dirname, '..', 'bin', 'spool.js')
 
@@ -54,41 +55,118 @@ function createSeededDir(): { dir: string; cleanup: () => void } {
   db.exec(SCHEMA_SQL)
 
   const src = 1 // claude source id
-  db.prepare('INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (?, ?, ?, ?)').run(
-    src, 'my-project', '/Users/test/my-project', 'my-project',
-  )
+  db.prepare(
+    'INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (?, ?, ?, ?)',
+  ).run(src, 'my-project', '/Users/test/my-project', 'my-project')
 
   const insertSession = db.prepare(`
     INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count, cwd, model, raw_file_mtime)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  insertSession.run(1, src, SESSION_UUID_1, '/fake/session1.jsonl',
-    'Debugging authentication flow', '2026-04-10T10:00:00Z', '2026-04-10T11:00:00Z', 3, '/Users/test/my-project', 'claude-4', '2026-04-10')
-  insertSession.run(1, src, SESSION_UUID_2, '/fake/session2.jsonl',
-    'Refactoring database queries', '2026-04-12T14:00:00Z', '2026-04-12T15:00:00Z', 2, '/Users/test/my-project/packages/api', 'claude-4', '2026-04-12')
+  insertSession.run(
+    1,
+    src,
+    SESSION_UUID_1,
+    '/fake/session1.jsonl',
+    'Debugging authentication flow',
+    '2026-04-10T10:00:00Z',
+    '2026-04-10T11:00:00Z',
+    3,
+    '/Users/test/my-project',
+    'claude-4',
+    '2026-04-10',
+  )
+  insertSession.run(
+    1,
+    src,
+    SESSION_UUID_2,
+    '/fake/session2.jsonl',
+    'Refactoring database queries',
+    '2026-04-12T14:00:00Z',
+    '2026-04-12T15:00:00Z',
+    2,
+    '/Users/test/my-project/packages/api',
+    'claude-4',
+    '2026-04-12',
+  )
 
   const insertMsg = db.prepare(`
     INSERT INTO messages (session_id, source_id, msg_uuid, role, content_text, timestamp, tool_names, seq)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `)
-  insertMsg.run(1, src, randomUUID(), 'user', 'How do I fix the authentication middleware?', '2026-04-10T10:00:00Z', '[]', 0)
-  insertMsg.run(1, src, randomUUID(), 'assistant', 'The authentication middleware needs a token validation step.', '2026-04-10T10:01:00Z', '["Read","Edit"]', 1)
-  insertMsg.run(1, src, randomUUID(), 'user', 'That fixed it, thanks!', '2026-04-10T10:02:00Z', '[]', 2)
-  insertMsg.run(2, src, randomUUID(), 'user', 'Can you refactor the database query layer?', '2026-04-12T14:00:00Z', '[]', 0)
-  insertMsg.run(2, src, randomUUID(), 'assistant', 'I will restructure the query builder pattern.', '2026-04-12T14:01:00Z', '["Read"]', 1)
+  insertMsg.run(
+    1,
+    src,
+    randomUUID(),
+    'user',
+    'How do I fix the authentication middleware?',
+    '2026-04-10T10:00:00Z',
+    '[]',
+    0,
+  )
+  insertMsg.run(
+    1,
+    src,
+    randomUUID(),
+    'assistant',
+    'The authentication middleware needs a token validation step.',
+    '2026-04-10T10:01:00Z',
+    '["Read","Edit"]',
+    1,
+  )
+  insertMsg.run(
+    1,
+    src,
+    randomUUID(),
+    'user',
+    'That fixed it, thanks!',
+    '2026-04-10T10:02:00Z',
+    '[]',
+    2,
+  )
+  insertMsg.run(
+    2,
+    src,
+    randomUUID(),
+    'user',
+    'Can you refactor the database query layer?',
+    '2026-04-12T14:00:00Z',
+    '[]',
+    0,
+  )
+  insertMsg.run(
+    2,
+    src,
+    randomUUID(),
+    'assistant',
+    'I will restructure the query builder pattern.',
+    '2026-04-12T14:01:00Z',
+    '["Read"]',
+    1,
+  )
 
-  db.prepare('INSERT INTO session_search (session_id, title, user_text, assistant_text) VALUES (?, ?, ?, ?)').run(
-    1, 'Debugging authentication flow',
+  db.prepare(
+    'INSERT INTO session_search (session_id, title, user_text, assistant_text) VALUES (?, ?, ?, ?)',
+  ).run(
+    1,
+    'Debugging authentication flow',
     'How do I fix the authentication middleware? That fixed it, thanks!',
     'The authentication middleware needs a token validation step.',
   )
-  db.prepare('INSERT INTO session_search (session_id, title, user_text, assistant_text) VALUES (?, ?, ?, ?)').run(
-    2, 'Refactoring database queries',
+  db.prepare(
+    'INSERT INTO session_search (session_id, title, user_text, assistant_text) VALUES (?, ?, ?, ?)',
+  ).run(
+    2,
+    'Refactoring database queries',
     'Can you refactor the database query layer?',
     'I will restructure the query builder pattern.',
   )
 
-  db.prepare('INSERT INTO sync_log (source_id, file_path, status) VALUES (?, ?, ?)').run(src, '/fake', 'ok')
+  db.prepare('INSERT INTO sync_log (source_id, file_path, status) VALUES (?, ?, ?)').run(
+    src,
+    '/fake',
+    'ok',
+  )
 
   db.close()
 
@@ -214,8 +292,12 @@ describe('cli entry point', () => {
 
 describe('status', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => { seeded = createSeededDir() })
-  afterAll(() => { seeded.cleanup() })
+  beforeAll(() => {
+    seeded = createSeededDir()
+  })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('prints session counts and DB path', () => {
     const out = run(['status'], { SPOOL_DATA_DIR: seeded.dir })
@@ -247,13 +329,23 @@ describe('share session-id prefixes', () => {
         ended_at, message_count, cwd, model, raw_file_mtime
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      1, 1, AMBIGUOUS_SESSION_UUID, '/fake/ambiguous-session.jsonl',
-      'Ambiguous prefix fixture', '2026-04-09T10:00:00Z',
-      '2026-04-09T11:00:00Z', 0, '/Users/test/my-project', 'claude-4', '2026-04-09',
+      1,
+      1,
+      AMBIGUOUS_SESSION_UUID,
+      '/fake/ambiguous-session.jsonl',
+      'Ambiguous prefix fixture',
+      '2026-04-09T10:00:00Z',
+      '2026-04-09T11:00:00Z',
+      0,
+      '/Users/test/my-project',
+      'claude-4',
+      '2026-04-09',
     )
     db.close()
   })
-  afterAll(() => { seeded.cleanup() })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('rejects an ambiguous prefix and names the candidates', () => {
     const out = runFail(['share', SESSION_UUID_1.slice(0, 8)], { SPOOL_DATA_DIR: seeded.dir })
@@ -270,8 +362,12 @@ describe('share session-id prefixes', () => {
 
 describe('list', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => { seeded = createSeededDir() })
-  afterAll(() => { seeded.cleanup() })
+  beforeAll(() => {
+    seeded = createSeededDir()
+  })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('lists sessions', () => {
     const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
@@ -317,8 +413,12 @@ describe('list', () => {
 
 describe('show', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => { seeded = createSeededDir() })
-  afterAll(() => { seeded.cleanup() })
+  beforeAll(() => {
+    seeded = createSeededDir()
+  })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('prints session with messages', () => {
     const out = run(['show', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
@@ -354,8 +454,12 @@ describe('show', () => {
 
 describe('search', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => { seeded = createSeededDir() })
-  afterAll(() => { seeded.cleanup() })
+  beforeAll(() => {
+    seeded = createSeededDir()
+  })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('finds matching sessions', () => {
     const out = run(['search', 'authentication'], { SPOOL_DATA_DIR: seeded.dir })
@@ -383,14 +487,18 @@ describe('search', () => {
 
   it('exits with error when query is missing', () => {
     const out = runFail(['search'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain("missing required argument")
+    expect(out).toContain('missing required argument')
   })
 })
 
 describe('pin / unpin / pinned', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeEach(() => { seeded = createSeededDir() })
-  afterEach(() => { seeded.cleanup() })
+  beforeEach(() => {
+    seeded = createSeededDir()
+  })
+  afterEach(() => {
+    seeded.cleanup()
+  })
 
   it('pins a session and pinned lists it', () => {
     const pinOut = run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
@@ -444,8 +552,12 @@ describe('pin / unpin / pinned', () => {
 
 describe('projects', () => {
   let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => { seeded = createSeededDir() })
-  afterAll(() => { seeded.cleanup() })
+  beforeAll(() => {
+    seeded = createSeededDir()
+  })
+  afterAll(() => {
+    seeded.cleanup()
+  })
 
   it('lists project groups with session counts', () => {
     const out = run(['projects'], { SPOOL_DATA_DIR: seeded.dir })

@@ -1,8 +1,9 @@
+import { Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
-import { useHotkeys } from '../../hooks/useHotkeys.js'
+
 import { useFocusTrap } from '../../hooks/useFocusTrap.js'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 
 type Props = {
   open: boolean
@@ -25,14 +26,7 @@ type Props = {
  * (with a new URL). A popover-internal confirm reads as low-stakes;
  * the modal carries the visual weight the consequence deserves.
  */
-export function UnpublishConfirmModal({
-  open,
-  title,
-  busy,
-  error,
-  onClose,
-  onConfirm,
-}: Props) {
+export function UnpublishConfirmModal({ open, title, busy, error, onClose, onConfirm }: Props) {
   const { t } = useTranslation()
   useHotkeys(
     {
@@ -72,27 +66,29 @@ export function UnpublishConfirmModal({
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onClose()
       }}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-warm-text/30 dark:bg-black/45 backdrop-blur-[2px] px-4 animate-in fade-in duration-150"
+      className="bg-warm-text/30 animate-in fade-in fixed inset-0 z-[60] flex items-center justify-center px-4 backdrop-blur-[2px] duration-150 dark:bg-black/45"
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] rounded-[10px] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border shadow-xl flex flex-col overflow-hidden"
+        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border flex w-full max-w-[440px] flex-col overflow-hidden rounded-[10px] border shadow-xl"
       >
         <div className="px-5 pt-5 pb-3">
           <h2
             id="unpublish-confirm-title"
-            className="text-[15px] font-semibold text-warm-text dark:text-dark-text"
+            className="text-warm-text dark:text-dark-text text-[15px] font-semibold"
           >
             {t('shareEditor.unpublishConfirm.title')}
           </h2>
           <p
-            className="mt-2 px-2 py-1.5 rounded-md bg-warm-surface dark:bg-dark-surface border border-warm-border dark:border-dark-border font-mono text-[11.5px] text-warm-muted dark:text-dark-muted truncate"
+            className="bg-warm-surface dark:bg-dark-surface border-warm-border dark:border-dark-border text-warm-muted dark:text-dark-muted mt-2 truncate rounded-md border px-2 py-1.5 font-mono text-[11.5px]"
             title={title}
           >
             {title}
           </p>
-          <p className="mt-3 text-[12.5px] leading-relaxed text-warm-text dark:text-dark-text">
-            {t('shareEditor.unpublishConfirm.body_prefix')} <strong>{t('shareEditor.unpublishConfirm.body_emphasis')}</strong>{t('shareEditor.unpublishConfirm.body_suffix')}
+          <p className="text-warm-text dark:text-dark-text mt-3 text-[12.5px] leading-relaxed">
+            {t('shareEditor.unpublishConfirm.body_prefix')}{' '}
+            <strong>{t('shareEditor.unpublishConfirm.body_emphasis')}</strong>
+            {t('shareEditor.unpublishConfirm.body_suffix')}
           </p>
           {error && (
             <p
@@ -103,14 +99,14 @@ export function UnpublishConfirmModal({
             </p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 pb-5 pt-2">
+        <div className="flex items-center justify-end gap-2 px-5 pt-2 pb-5">
           <button
             type="button"
             ref={cancelRef}
             onClick={onClose}
             disabled={busy}
             data-testid="unpublish-confirm-cancel"
-            className="px-3 h-8 rounded-md text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface h-8 rounded-md px-3 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t('common.cancel')}
           </button>
@@ -119,10 +115,12 @@ export function UnpublishConfirmModal({
             onClick={onConfirm}
             disabled={busy}
             data-testid="unpublish-confirm-yes"
-            className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-[12px] font-medium text-white bg-[color:var(--color-status-error)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[color:var(--color-status-error)] px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy && <Loader2 size={11} strokeWidth={1.8} className="animate-spin" aria-hidden />}
-            {busy ? t('shareEditor.unpublishConfirm.confirming') : t('shareEditor.unpublishConfirm.confirm')}
+            {busy
+              ? t('shareEditor.unpublishConfirm.confirming')
+              : t('shareEditor.unpublishConfirm.confirm')}
           </button>
         </div>
       </div>

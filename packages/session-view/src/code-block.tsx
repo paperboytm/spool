@@ -42,10 +42,7 @@ const LANG_ALIASES: Record<string, string> = {
 function getHighlighter(): Promise<HighlighterCore> {
   if (highlighterPromise) return highlighterPromise
   highlighterPromise = createHighlighterCore({
-    themes: [
-      import('shiki/themes/github-light.mjs'),
-      import('shiki/themes/github-dark.mjs'),
-    ],
+    themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs')],
     langs: [
       import('shiki/langs/typescript.mjs'),
       import('shiki/langs/tsx.mjs'),
@@ -96,7 +93,9 @@ function CodeBlock({ code, lang, isDark }: Props) {
         }
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [code, lang, isDark])
 
   if (html) {
@@ -104,7 +103,7 @@ function CodeBlock({ code, lang, isDark }: Props) {
     // measureElement uses ResizeObserver, so the virtual list re-measures automatically.
     return (
       <div
-        className="my-2 text-[13px] leading-snug rounded-md overflow-x-auto bg-warm-surface2 dark:bg-dark-surface2 border border-warm-border dark:border-dark-border [&_pre]:!bg-transparent [&_pre]:p-3"
+        className="bg-warm-surface2 dark:bg-dark-surface2 border-warm-border dark:border-dark-border my-2 overflow-x-auto rounded-md border text-[13px] leading-snug [&_pre]:!bg-transparent [&_pre]:p-3"
         // shiki output is generated from a known string; not user HTML.
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: html }}
@@ -114,7 +113,7 @@ function CodeBlock({ code, lang, isDark }: Props) {
 
   return (
     <pre
-      className="my-2 p-3 rounded-md overflow-x-auto bg-warm-surface2 dark:bg-dark-surface2 border border-warm-border dark:border-dark-border text-[13px] leading-snug font-mono"
+      className="bg-warm-surface2 dark:bg-dark-surface2 border-warm-border dark:border-dark-border my-2 overflow-x-auto rounded-md border p-3 font-mono text-[13px] leading-snug"
       style={{ minHeight: `${reservedLines * 1.4}em` }}
     >
       <code>{code}</code>

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequest as middleware } from '../functions/_middleware'
 import { onRequestGet as healthGet } from '../functions/api/health'
@@ -23,15 +23,11 @@ async function runWithMiddleware(
 
 describe('GET /api/health', () => {
   it('returns 200 + ok + version + time and the global security headers', async () => {
-    const r = await runWithMiddleware(
-      new Request('https://spool.pro/api/health'),
-    )
+    const r = await runWithMiddleware(new Request('https://spool.pro/api/health'))
     expect(r.status).toBe(200)
     expect(r.headers.get('x-robots-tag')).toBe('noindex')
     expect(r.headers.get('x-content-type-options')).toBe('nosniff')
-    expect(r.headers.get('referrer-policy')).toBe(
-      'strict-origin-when-cross-origin',
-    )
+    expect(r.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
     expect(r.headers.get('cache-control')).toBe('no-store')
     const body = (await r.json()) as { ok: boolean; version: string; time: string }
     expect(body.ok).toBe(true)
@@ -41,10 +37,9 @@ describe('GET /api/health', () => {
   })
 
   it('surfaces BUILD_VERSION when set by the deploy', async () => {
-    const r = await runWithMiddleware(
-      new Request('https://spool.pro/api/health'),
-      { BUILD_VERSION: 'abc1234' },
-    )
+    const r = await runWithMiddleware(new Request('https://spool.pro/api/health'), {
+      BUILD_VERSION: 'abc1234',
+    })
     const body = (await r.json()) as { version: string }
     expect(body.version).toBe('abc1234')
   })

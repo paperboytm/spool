@@ -1,13 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
 import type { Conversation, EditorOpts } from '@spool/share-kit'
+import { describe, expect, it } from 'vite-plus/test'
 
-import {
-  computeUnredactedMatches,
-  publishErrorKey,
-  truncatePreview,
-} from './publish-logic.js'
 import enLocale from '../../i18n/locales/en.json'
+import { computeUnredactedMatches, publishErrorKey, truncatePreview } from './publish-logic.js'
 
 const API_KEY = 'sk_live_abcdef1234567890ABCDEF'
 
@@ -145,10 +141,7 @@ describe('computeUnredactedMatches — hidden turns', () => {
       { id: 't-0', role: 'assistant', body: `key=${API_KEY}` },
       { id: 't-1', role: 'assistant', body: `key=${API_KEY}` },
     ])
-    const r = computeUnredactedMatches(
-      conv,
-      opts({ redact: false, selected: [0] }),
-    )
+    const r = computeUnredactedMatches(conv, opts({ redact: false, selected: [0] }))
     expect(r.high.every((m) => m.turn_index !== 1)).toBe(true)
     expect(r.high.some((m) => m.turn_index === 0)).toBe(true)
   })
@@ -165,13 +158,8 @@ describe('computeUnredactedMatches — hidden turns', () => {
   })
 
   it('reports nothing when all turns are excluded', () => {
-    const conv = convo([
-      { id: 't-0', role: 'assistant', body: `key=${API_KEY}` },
-    ])
-    const r = computeUnredactedMatches(
-      conv,
-      opts({ redact: false, selected: [] }),
-    )
+    const conv = convo([{ id: 't-0', role: 'assistant', body: `key=${API_KEY}` }])
+    const r = computeUnredactedMatches(conv, opts({ redact: false, selected: [] }))
     expect(r.high).toEqual([])
     expect(r.medium).toEqual([])
   })
@@ -182,7 +170,9 @@ describe('publishErrorKey', () => {
     const en = enLocale as Record<string, unknown>
     const resolve = (key: string): unknown =>
       key.split('.').reduce<unknown>((node, part) => {
-        return node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined
+        return node && typeof node === 'object'
+          ? (node as Record<string, unknown>)[part]
+          : undefined
       }, en)
     for (const status of [401, 413, 429]) {
       const key = publishErrorKey(status)

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -15,7 +16,12 @@ test.afterEach(async () => {
   // Close any leftover modals so the next test starts from Library home.
   const { window } = ctx
   for (let i = 0; i < 3; i++) {
-    if (await window.locator('[data-testid="settings-panel"]').isVisible().catch(() => false)) {
+    if (
+      await window
+        .locator('[data-testid="settings-panel"]')
+        .isVisible()
+        .catch(() => false)
+    ) {
       await window.keyboard.press('Escape')
       await window.waitForTimeout(50)
     } else {
@@ -31,7 +37,9 @@ async function openSecurityTab(window: AppContext['window']) {
     .locator('[data-testid="settings-panel"] [aria-pressed]')
     .filter({ hasText: /Security|安全|セキュリティ|보안|Sécurité|Sicherheit/ })
     .click()
-  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({
+    timeout: 10_000,
+  })
 }
 
 test('Settings → Security pane: toggles persist across re-open', async () => {
@@ -51,7 +59,10 @@ test('Settings → Security pane: toggles persist across re-open', async () => {
   await expect(window.locator('[data-testid="settings-panel"]')).toBeHidden()
 
   await openSecurityTab(window)
-  await expect(window.locator('[data-testid="settings-info-default"]')).toHaveAttribute('aria-checked', 'true')
+  await expect(window.locator('[data-testid="settings-info-default"]')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
 })
 
 test('Settings → Security pane: Allowlist Manage modal opens with empty state', async () => {

@@ -1,10 +1,16 @@
-import type { ThemeEditorStateV1, ThemeSideConfig } from './editorTypes.js'
 import { mixHex } from './colorUtils.js'
+import type { ThemeEditorStateV1, ThemeSideConfig } from './editorTypes.js'
 
 function fontStack(custom: string, fallback: string): string {
   const t = custom.trim()
   const lower = t.toLowerCase()
-  if (!t || lower === 'inter variable' || lower === 'inter' || lower === 'geist variable' || lower === 'geist') {
+  if (
+    !t ||
+    lower === 'inter variable' ||
+    lower === 'inter' ||
+    lower === 'geist variable' ||
+    lower === 'geist'
+  ) {
     return fallback
   }
   if (/^["']/.test(t)) return `${t}, ${fallback}`
@@ -22,18 +28,10 @@ function tokensForSide(slot: ThemeSideConfig, mode: 'light' | 'dark'): Record<st
   const muted = mixHex(fg, bg, mutedT)
   const faint = mixHex(fg, bg, faintT)
 
-  const surfaceT = mode === 'light'
-    ? 0.018 + c * 0.05
-    : 0.028 + c * 0.05
-  const surface2T = mode === 'light'
-    ? 0.038 + c * 0.085
-    : 0.052 + c * 0.085
-  const borderT = mode === 'light'
-    ? 0.075 + c * 0.1
-    : 0.082 + c * 0.105
-  const border2T = mode === 'light'
-    ? 0.11 + c * 0.11
-    : 0.115 + c * 0.115
+  const surfaceT = mode === 'light' ? 0.018 + c * 0.05 : 0.028 + c * 0.05
+  const surface2T = mode === 'light' ? 0.038 + c * 0.085 : 0.052 + c * 0.085
+  const borderT = mode === 'light' ? 0.075 + c * 0.1 : 0.082 + c * 0.105
+  const border2T = mode === 'light' ? 0.11 + c * 0.11 : 0.115 + c * 0.115
 
   const surface = mixHex(bg, fg, surfaceT)
   const surface2 = mixHex(bg, fg, surface2T)

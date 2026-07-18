@@ -1,4 +1,5 @@
 import { test, expect, type Locator } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { openShareEditorFromSessionDetail } from './helpers/share'
 

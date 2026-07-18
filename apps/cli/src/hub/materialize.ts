@@ -147,16 +147,10 @@ function parseRecordObject(restored: string, index: number): Record<string, unkn
  * Tokens live inside JSON string values, so the replacement must be
  * JSON-escaped before splicing into the raw line.
  */
-export function restorePlaceholders(
-  data: string,
-  workspaceRoot: string,
-  homeDir: string,
-): string {
+export function restorePlaceholders(data: string, workspaceRoot: string, homeDir: string): string {
   const escapedWs = JSON.stringify(workspaceRoot).slice(1, -1)
   const escapedHome = JSON.stringify(homeDir).slice(1, -1)
-  return data
-    .split('$SPOOL_WS').join(escapedWs)
-    .split('$SPOOL_HOME').join(escapedHome)
+  return data.split('$SPOOL_WS').join(escapedWs).split('$SPOOL_HOME').join(escapedHome)
 }
 
 /** Claude Code names project dirs by the cwd with every non-alphanumeric character mapped to '-'. */

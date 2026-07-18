@@ -77,15 +77,18 @@ app (vite, :3002), and the Electron app pointed at the local backend.
 
 2. **Two gitignored config files** (wrangler and electron-vite each have
    their own loader):
+
    ```bash
    cp apps/backend/.dev.vars.example apps/backend/.dev.vars
    cp apps/app/.env.development.local.example apps/app/.env.development.local
    ```
+
    Fill in the WorkOS values per the comments in each file — the API key
    goes only in `.dev.vars`; the app env needs just the (public) client
    id as `SPOOL_WORKOS_CLIENT_ID`.
 
 3. **Local D1 schema**:
+
    ```bash
    cd apps/backend
    corepack pnpm wrangler d1 migrations apply spool-share-db --local

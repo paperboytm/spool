@@ -1,11 +1,13 @@
-import Database from 'better-sqlite3'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { existsSync, mkdirSync, statSync } from 'node:fs'
-import { computeIdentity, type IdentityFs } from '../projects/identity.js'
-import { realFs } from '../projects/fs.js'
+
+import Database from 'better-sqlite3'
+
 import { runAgentSearchCleanup } from '../migrations/agent-search-cleanup.js'
 import { upgradeWorktreeIdentities } from '../migrations/worktree-identity-upgrade.js'
+import { realFs } from '../projects/fs.js'
+import { computeIdentity, type IdentityFs } from '../projects/identity.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -31,8 +33,7 @@ export interface OpenOptions {
 
 export function getDB(arg?: boolean | OpenOptions): Database.Database {
   if (_db) return _db
-  const opts: OpenOptions =
-    typeof arg === 'object' && arg !== null ? arg : {}
+  const opts: OpenOptions = typeof arg === 'object' && arg !== null ? arg : {}
   const shouldRunMigrations = opts.runMigrations !== false
   mkdirSync(SPOOL_DIR, { recursive: true })
   // Capture pre-open state before better-sqlite3 creates the file. These two
@@ -44,7 +45,8 @@ export function getDB(arg?: boolean | OpenOptions): Database.Database {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   db.pragma('busy_timeout = 5000')
-  _initialUserVersion = (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version ?? 0
+  _initialUserVersion =
+    (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version ?? 0
   if (shouldRunMigrations) {
     runMigrations(db)
   }
@@ -53,10 +55,14 @@ export function getDB(arg?: boolean | OpenOptions): Database.Database {
 }
 
 /** True if the DB file did not exist before this process opened it. */
-export function wasNewDb(): boolean { return _wasNewDb }
+export function wasNewDb(): boolean {
+  return _wasNewDb
+}
 
 /** user_version of the DB before any migrations ran this process. Null if getDB() hasn't been called. */
-export function getInitialUserVersion(): number | null { return _initialUserVersion }
+export function getInitialUserVersion(): number | null {
+  return _initialUserVersion
+}
 
 export function getDBSize(): number {
   try {
@@ -578,19 +584,21 @@ export function runMigrations(db: Database.Database): void {
     // Cascades cover messages / session_search / findings / allowlist_session;
     // pins survives (keyed by session_uuid TEXT, no FK) and re-attaches on re-sync.
     db.transaction(() => {
-      const claudeSourceId = (db.prepare(
-        "SELECT id FROM sources WHERE name = 'claude'"
-      ).get() as { id: number } | undefined)?.id
+      const claudeSourceId = (
+        db.prepare("SELECT id FROM sources WHERE name = 'claude'").get() as
+          | { id: number }
+          | undefined
+      )?.id
       if (claudeSourceId !== undefined) {
         db.prepare(
           `DELETE FROM sessions
              WHERE source_id = ?
-               AND file_path LIKE '%/subagents/agent-%'`
+               AND file_path LIKE '%/subagents/agent-%'`,
         ).run(claudeSourceId)
         db.prepare(
           `DELETE FROM sync_log
              WHERE source_id = ?
-               AND file_path LIKE '%/subagents/agent-%'`
+               AND file_path LIKE '%/subagents/agent-%'`,
         ).run(claudeSourceId)
       }
       db.pragma('user_version = 13')
@@ -615,11 +623,13 @@ export function runMigrations(db: Database.Database): void {
     // Security risk numbers don't show a half-cent of drift until the
     // next sync touches them.
     db.transaction(() => {
-      const affected = db.prepare(
-        `SELECT DISTINCT session_id FROM messages
+      const affected = db
+        .prepare(
+          `SELECT DISTINCT session_id FROM messages
           WHERE msg_uuid IS NOT NULL
           GROUP BY session_id, msg_uuid HAVING COUNT(*) > 1`,
-      ).all() as Array<{ session_id: number }>
+        )
+        .all() as Array<{ session_id: number }>
 
       db.prepare(
         `DELETE FROM messages
@@ -774,9 +784,9 @@ function recreateProjectGroupsView(db: Database.Database): void {
 }
 
 export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs) {
-  const rows = db.prepare(
-    `SELECT id, display_path FROM projects WHERE identity_kind IS NULL`
-  ).all() as { id: number; display_path: string }[]
+  const rows = db
+    .prepare(`SELECT id, display_path FROM projects WHERE identity_kind IS NULL`)
+    .all() as { id: number; display_path: string }[]
   if (rows.length === 0) return
   const update = db.prepare(
     `UPDATE projects
@@ -792,15 +802,15 @@ export function backfillProjectIdentities(db: Database.Database, fs: IdentityFs)
 }
 
 function tableExists(db: Database.Database, name: string): boolean {
-  const row = db.prepare(
-    `SELECT name FROM sqlite_master WHERE type IN ('table','virtual') AND name = ?`,
-  ).get(name) as { name: string } | undefined
+  const row = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type IN ('table','virtual') AND name = ?`)
+    .get(name) as { name: string } | undefined
   return row !== undefined
 }
 
 function columnExists(db: Database.Database, table: string, column: string): boolean {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-  return rows.some(r => r.name === column)
+  return rows.some((r) => r.name === column)
 }
 
 function ensureSchemaSanity(db: Database.Database): void {
@@ -829,10 +839,7 @@ function ensureSchemaSanity(db: Database.Database): void {
  *
  * Each call writes to a distinct path; v5 and v7 produce separate files.
  */
-export function backupBeforeDestructive(
-  db: Database.Database,
-  fromVersion: number,
-): string | null {
+export function backupBeforeDestructive(db: Database.Database, fromVersion: number): string | null {
   if (db.memory) return null
   const dbPath = db.name
   if (!dbPath) return null
@@ -852,15 +859,16 @@ export function backupBeforeDestructive(
 function rebuildFtsTableIfEmpty(
   db: Database.Database,
   contentTable: 'messages' | 'session_search',
-  ftsTable:
-    | 'messages_fts_trigram'
-    | 'session_search_fts'
-    | 'session_search_fts_trigram',
+  ftsTable: 'messages_fts_trigram' | 'session_search_fts' | 'session_search_fts_trigram',
 ): void {
-  const sourceCount = (db.prepare(`SELECT COUNT(*) AS count FROM ${contentTable}`).get() as { count: number }).count
+  const sourceCount = (
+    db.prepare(`SELECT COUNT(*) AS count FROM ${contentTable}`).get() as { count: number }
+  ).count
   if (sourceCount === 0) return
 
-  const indexCount = (db.prepare(`SELECT COUNT(*) AS count FROM ${ftsTable}`).get() as { count: number }).count
+  const indexCount = (
+    db.prepare(`SELECT COUNT(*) AS count FROM ${ftsTable}`).get() as { count: number }
+  ).count
   if (indexCount > 0) return
 
   db.exec(`INSERT INTO ${ftsTable}(${ftsTable}) VALUES('rebuild')`)

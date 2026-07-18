@@ -1,11 +1,13 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SpoolWatcher, type WatcherEvent, type WatcherEventData } from './watcher.js'
-import type { Syncer } from './syncer.js'
+
+import { afterEach, describe, expect, test, vi } from 'vite-plus/test'
+
 import type { SessionSource } from '../types.js'
+import type { Syncer } from './syncer.js'
+import { SpoolWatcher, type WatcherEvent, type WatcherEventData } from './watcher.js'
 
 const FAST = { stabilityMs: 40, pollMs: 15, flushMs: 40 } as const
 
@@ -40,9 +42,22 @@ function makeTempRoots() {
   return { baseDir, claudeRoot, codexRoot, geminiRoot, opencodeRoot }
 }
 
-interface SyncCall { path: string; source: SessionSource }
+interface SyncCall {
+  path: string
+  source: SessionSource
+}
 
-function makeStubSyncer(opts: { result?: 'added' | 'updated' | 'skipped' | 'error' | ((p: string) => 'added' | 'updated' | 'skipped' | 'error'); throws?: Error } = {}) {
+function makeStubSyncer(
+  opts: {
+    result?:
+      | 'added'
+      | 'updated'
+      | 'skipped'
+      | 'error'
+      | ((p: string) => 'added' | 'updated' | 'skipped' | 'error')
+    throws?: Error
+  } = {},
+) {
   const calls: SyncCall[] = []
   const syncer = {
     syncFile(path: string, source: SessionSource) {
@@ -55,7 +70,10 @@ function makeStubSyncer(opts: { result?: 'added' | 'updated' | 'skipped' | 'erro
   return { syncer, calls }
 }
 
-async function startWatcher(syncer: Syncer, extra: Partial<ConstructorParameters<typeof SpoolWatcher>[1]> = {}) {
+async function startWatcher(
+  syncer: Syncer,
+  extra: Partial<ConstructorParameters<typeof SpoolWatcher>[1]> = {},
+) {
   const w = new SpoolWatcher(syncer, { ...FAST, ...extra })
   runningWatchers.push(w)
   w.start()
@@ -63,7 +81,7 @@ async function startWatcher(syncer: Syncer, extra: Partial<ConstructorParameters
   // after the stream is scheduled on the runloop. Events that happen before
   // it is hot can be dropped. CI runners are slower than local machines, so
   // give it a generous margin here.
-  await new Promise(r => setTimeout(r, process.platform === 'darwin' ? 500 : 150))
+  await new Promise((r) => setTimeout(r, process.platform === 'darwin' ? 500 : 150))
   return w
 }
 
@@ -71,7 +89,7 @@ const waitFor = async (pred: () => boolean, timeoutMs = 2000, stepMs = 10) => {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (pred()) return
-    await new Promise(r => setTimeout(r, stepMs))
+    await new Promise((r) => setTimeout(r, stepMs))
   }
   throw new Error('waitFor: timed out')
 }
@@ -82,7 +100,9 @@ describe('SpoolWatcher', () => {
     const { syncer, calls } = makeStubSyncer({ result: 'added' })
     const events: Array<{ event: WatcherEvent; data: WatcherEventData }> = []
     const w = await startWatcher(syncer)
-    w.on('new-sessions', (event, data) => { events.push({ event, data }) })
+    w.on('new-sessions', (event, data) => {
+      events.push({ event, data })
+    })
 
     const filePath = join(claudeRoot, 'project-a', 'abc.jsonl')
     writeFileSync(filePath, '{}\n')
@@ -105,7 +125,7 @@ describe('SpoolWatcher', () => {
     writeFileSync(join(claudeRoot, 'project-a', 'notes.txt'), 'hi')
     writeFileSync(join(claudeRoot, 'project-a', 'rando.json'), '{}')
 
-    await new Promise(r => setTimeout(r, FAST.stabilityMs * 4))
+    await new Promise((r) => setTimeout(r, FAST.stabilityMs * 4))
     expect(calls).toHaveLength(0)
   })
 
@@ -117,13 +137,13 @@ describe('SpoolWatcher', () => {
     const filePath = join(claudeRoot, 'project-a', 'live.jsonl')
     writeFileSync(filePath, '{"i":0}\n')
     for (let i = 1; i <= 8; i++) {
-      await new Promise(r => setTimeout(r, 8))
+      await new Promise((r) => setTimeout(r, 8))
       appendFileSync(filePath, `{"i":${i}}\n`)
     }
 
     await waitFor(() => calls.length >= 1)
     // Give any trailing events a chance to flush
-    await new Promise(r => setTimeout(r, FAST.stabilityMs * 3))
+    await new Promise((r) => setTimeout(r, FAST.stabilityMs * 3))
 
     expect(calls.length).toBeGreaterThanOrEqual(1)
     // The main point: we coalesce — not 9 calls, one per write
@@ -137,7 +157,12 @@ describe('SpoolWatcher', () => {
     await startWatcher(syncer)
 
     const codexFile = join(codexRoot, '2026', '04', '20', 'rollout.jsonl')
-    const geminiFile = join(geminiRoot, 'workspace', 'chats', 'session-2026-04-20T00-00-deadbeef.json')
+    const geminiFile = join(
+      geminiRoot,
+      'workspace',
+      'chats',
+      'session-2026-04-20T00-00-deadbeef.json',
+    )
     const opencodeFile = join(opencodeRoot, 'opencode.db')
     writeFileSync(codexFile, '{}\n')
     writeFileSync(geminiFile, '{}')
@@ -145,7 +170,7 @@ describe('SpoolWatcher', () => {
 
     await waitFor(() => calls.length >= 3, 3000)
 
-    const sources = new Set(calls.map(c => c.source))
+    const sources = new Set(calls.map((c) => c.source))
     expect(sources.has('codex')).toBe(true)
     expect(sources.has('gemini')).toBe(true)
     expect(sources.has('opencode')).toBe(true)
@@ -164,7 +189,9 @@ describe('SpoolWatcher', () => {
     const fakeWatch = (path: string) => {
       const ee = new EventEmitter() as EventEmitter & { path: string; close: () => void }
       ee.path = path
-      ee.close = () => { /* noop */ }
+      ee.close = () => {
+        /* noop */
+      }
       emitters.push(ee)
       return ee as unknown as import('node:fs').FSWatcher
     }
@@ -172,7 +199,7 @@ describe('SpoolWatcher', () => {
     runningWatchers.push(w)
     w.start()
 
-    const ocWatcher = emitters.find(e => e.path === opencodeRoot)
+    const ocWatcher = emitters.find((e) => e.path === opencodeRoot)
     expect(ocWatcher).toBeDefined()
     ocWatcher!.emit('change', 'change', 'opencode.db-wal')
 
@@ -185,19 +212,21 @@ describe('SpoolWatcher', () => {
     const { syncer, calls } = makeStubSyncer({ result: 'added' })
     const events: Array<WatcherEventData> = []
     const w = await startWatcher(syncer, { flushMs: 80 })
-    w.on('new-sessions', (_event, data) => { events.push(data) })
+    w.on('new-sessions', (_event, data) => {
+      events.push(data)
+    })
 
     // Write into a directory that already exists at start() time to avoid
     // racing against FSEvents delivery of the mkdir event on macOS.
     for (let i = 0; i < 5; i++) {
       writeFileSync(join(claudeRoot, 'project-a', `s${i}.jsonl`), '{}\n')
-      await new Promise(r => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, 5))
     }
 
     await waitFor(() => calls.length >= 5, 5000)
     await waitFor(() => events.length >= 1, 3000)
     // Allow flush window to close
-    await new Promise(r => setTimeout(r, 160))
+    await new Promise((r) => setTimeout(r, 160))
 
     const totalCount = events.reduce((n, d) => n + ((d as { count: number }).count ?? 0), 0)
     expect(totalCount).toBe(5)
@@ -212,7 +241,7 @@ describe('SpoolWatcher', () => {
 
     w.stop()
     writeFileSync(join(claudeRoot, 'project-a', 'after-stop.jsonl'), '{}\n')
-    await new Promise(r => setTimeout(r, FAST.stabilityMs * 4))
+    await new Promise((r) => setTimeout(r, FAST.stabilityMs * 4))
     expect(calls).toHaveLength(0)
   })
 
@@ -220,7 +249,10 @@ describe('SpoolWatcher', () => {
     vi.stubEnv('SPOOL_CLAUDE_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now()))
     vi.stubEnv('SPOOL_CODEX_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-b'))
     vi.stubEnv('SPOOL_GEMINI_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-g'))
-    vi.stubEnv('SPOOL_OPENCODE_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-o'))
+    vi.stubEnv(
+      'SPOOL_OPENCODE_DIR',
+      join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-o'),
+    )
     vi.stubEnv('SPOOL_PI_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-p'))
     const { syncer } = makeStubSyncer()
     const w = new SpoolWatcher(syncer, FAST)
@@ -235,7 +267,9 @@ describe('SpoolWatcher', () => {
     const fakeWatch = (path: string) => {
       const ee = new EventEmitter() as EventEmitter & { close: () => void }
       ;(ee as unknown as { path: string }).path = path
-      ee.close = () => { /* noop */ }
+      ee.close = () => {
+        /* noop */
+      }
       fakeWatchers.push(ee)
       return ee as unknown as import('node:fs').FSWatcher
     }
@@ -243,7 +277,10 @@ describe('SpoolWatcher', () => {
     const w = new SpoolWatcher(syncer, { ...FAST, watchFn: fakeWatch })
     runningWatchers.push(w)
     w.on('error', (_event, data) => {
-      errors.push({ root: (data as { root?: string }).root, error: (data as { error: Error }).error })
+      errors.push({
+        root: (data as { root?: string }).root,
+        error: (data as { error: Error }).error,
+      })
     })
     w.start()
 
@@ -267,7 +304,9 @@ describe('SpoolWatcher', () => {
     const { syncer } = makeStubSyncer({ throws: new Error('parse bomb') })
     const errors: Error[] = []
     const w = await startWatcher(syncer)
-    w.on('error', (_event, data) => { errors.push((data as { error: Error }).error) })
+    w.on('error', (_event, data) => {
+      errors.push((data as { error: Error }).error)
+    })
 
     writeFileSync(join(claudeRoot, 'project-a', 'bad.jsonl'), '{}\n')
 

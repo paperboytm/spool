@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
+
 import { parseClaudeSessionText } from '@spool-lab/session-kit'
+
 import type { ParseSessionResult, ParsedSession } from '../types.js'
 
 // The parsing brain lives in @spool-lab/session-kit (browser-safe, shared

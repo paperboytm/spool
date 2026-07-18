@@ -6,13 +6,14 @@
 // to recover.
 
 import { Component, memo, type ErrorInfo, type ReactNode } from 'react'
+
 import type { Conversation, EditorOpts, Template } from '../lib/types'
 import { paperTokens } from '../lib/types'
-import type { RedactReplacement } from './redact'
+import { Chat } from './chat'
 import { Forum } from './forum'
 import { Letter } from './letter'
+import type { RedactReplacement } from './redact'
 import { Timeline } from './timeline'
-import { Chat } from './chat'
 
 interface Props {
   template: Template

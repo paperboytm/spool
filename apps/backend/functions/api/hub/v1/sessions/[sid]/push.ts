@@ -1,9 +1,9 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { parseHeadBody, requireSid } from '../../../../../../src/hub/wire'
-import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { checkRate } from '../../../../../../src/rate-limit'
 
 // Step 1 of the share handshake: declare the head, learn what to upload.

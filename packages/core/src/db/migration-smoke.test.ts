@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 
@@ -38,12 +39,16 @@ async function loadGetDB(spoolDir: string) {
 
 function exerciseDb(db: Database.Database, sessionUuid: string) {
   // Insert a new session through the post-migration schema
-  const sourceId = (db.prepare(`SELECT id FROM sources WHERE name = 'claude'`).get() as { id: number }).id
+  const sourceId = (
+    db.prepare(`SELECT id FROM sources WHERE name = 'claude'`).get() as { id: number }
+  ).id
   const projectId = Number(
-    db.prepare(
-      `INSERT INTO projects (source_id, slug, display_path, display_name, identity_kind, identity_key)
+    db
+      .prepare(
+        `INSERT INTO projects (source_id, slug, display_path, display_name, identity_kind, identity_key)
        VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(sourceId, `slug-${sessionUuid}`, '/smoke/p', 'p', 'path', '/smoke/p').lastInsertRowid,
+      )
+      .run(sourceId, `slug-${sessionUuid}`, '/smoke/p', 'p', 'path', '/smoke/p').lastInsertRowid,
   )
   db.prepare(`
     INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
@@ -56,7 +61,9 @@ function exerciseDb(db: Database.Database, sessionUuid: string) {
   expect(pinned).toEqual({ session_uuid: sessionUuid })
 
   // The post-v6 view exists and responds
-  const view = db.prepare(`SELECT name FROM sqlite_master WHERE type='view' AND name='project_groups_v'`).get()
+  const view = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type='view' AND name='project_groups_v'`)
+    .get()
   expect(view).toBeDefined()
 }
 
@@ -133,16 +140,24 @@ function seedV0(dbPath: string) {
 
   // Pre-existing user data: a session and a capture with connectorId metadata
   // so v1, v2, v3 all have something to do.
-  seed.prepare("INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')").run()
-  seed.prepare(`
+  seed
+    .prepare(
+      "INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')",
+    )
+    .run()
+  seed
+    .prepare(`
     INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
     VALUES (1, 1, 'old-sess', '/old/sess.jsonl', 'old', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 1)
-  `).run()
-  seed.prepare(`
+  `)
+    .run()
+  seed
+    .prepare(`
     INSERT INTO captures (source_id, capture_uuid, url, title, content_text, platform, captured_at, metadata)
     VALUES (4, 'c1', 'https://x.com/1', 'A tweet', 'tweet text', 'twitter', '2026-01-01T00:00:00Z',
       '{"connectorId":"twitter-bookmarks"}')
-  `).run()
+  `)
+    .run()
   seed.prepare("INSERT INTO connector_sync_state (connector_id) VALUES ('twitter-bookmarks')").run()
   seed.pragma('user_version = 0')
   seed.close()
@@ -245,8 +260,9 @@ describe('migration smoke (full path through getDB)', () => {
 
     expect(dbModule.wasNewDb()).toBe(true)
     expect(dbModule.getInitialUserVersion()).toBe(0)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version)
-      .toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version,
+    ).toBeGreaterThanOrEqual(7)
 
     exerciseDb(db, 'fresh-uuid')
     db.close()
@@ -261,11 +277,14 @@ describe('migration smoke (full path through getDB)', () => {
 
     expect(dbModule.wasNewDb()).toBe(false)
     expect(dbModule.getInitialUserVersion()).toBe(0)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version)
-      .toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version,
+    ).toBeGreaterThanOrEqual(7)
 
     // Old session preserved
-    const oldSess = db.prepare(`SELECT session_uuid FROM sessions WHERE session_uuid='old-sess'`).get()
+    const oldSess = db
+      .prepare(`SELECT session_uuid FROM sessions WHERE session_uuid='old-sess'`)
+      .get()
     expect(oldSess).toEqual({ session_uuid: 'old-sess' })
 
     // New session/pin still works post-migration
@@ -299,8 +318,9 @@ describe('migration smoke (full path through getDB)', () => {
     const db = dbModule.getDB()
 
     expect(dbModule.getInitialUserVersion()).toBe(6)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version)
-      .toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0].user_version,
+    ).toBeGreaterThanOrEqual(7)
 
     const pins = db.prepare(`SELECT session_uuid, pinned_at FROM pins`).all()
     expect(pins).toEqual([{ session_uuid: 'v6-sess', pinned_at: '2026-04-15 09:00:00' }])
@@ -323,8 +343,9 @@ describe('migration smoke (full path through getDB)', () => {
     const db2 = m2.getDB()
     expect(m2.wasNewDb()).toBe(false)
     expect(m2.getInitialUserVersion()).toBeGreaterThanOrEqual(7)
-    expect((db2.pragma('user_version') as Array<{ user_version: number }>)[0].user_version)
-      .toBeGreaterThanOrEqual(7)
+    expect(
+      (db2.pragma('user_version') as Array<{ user_version: number }>)[0].user_version,
+    ).toBeGreaterThanOrEqual(7)
     exerciseDb(db2, 'reopen-uuid')
     db2.close()
   })

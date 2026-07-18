@@ -42,11 +42,21 @@ export type DisplayNameValidation = ValidDisplayName | InvalidDisplayName
 //   U+FEFF         BOM / zero-width no-break space
 const CONTROL_RE = new RegExp(
   '[' +
-    String.fromCharCode(0x0000) + '-' + String.fromCharCode(0x001f) +
-    String.fromCharCode(0x007f) + '-' + String.fromCharCode(0x009f) +
-    String.fromCharCode(0x200b) + '-' + String.fromCharCode(0x200f) +
-    String.fromCharCode(0x2028) + '-' + String.fromCharCode(0x202e) +
-    String.fromCharCode(0x2060) + '-' + String.fromCharCode(0x206f) +
+    String.fromCharCode(0x0000) +
+    '-' +
+    String.fromCharCode(0x001f) +
+    String.fromCharCode(0x007f) +
+    '-' +
+    String.fromCharCode(0x009f) +
+    String.fromCharCode(0x200b) +
+    '-' +
+    String.fromCharCode(0x200f) +
+    String.fromCharCode(0x2028) +
+    '-' +
+    String.fromCharCode(0x202e) +
+    String.fromCharCode(0x2060) +
+    '-' +
+    String.fromCharCode(0x206f) +
     String.fromCharCode(0xfeff) +
     ']',
 )

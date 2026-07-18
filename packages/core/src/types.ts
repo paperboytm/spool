@@ -74,7 +74,7 @@ export type ProjectIdentityKind =
 
 export interface ProjectIdentity {
   kind: ProjectIdentityKind
-  key: string                       // normalized origin URL / abs path / 'loose'
+  key: string // normalized origin URL / abs path / 'loose'
   displayName: string
   // Optional override for the project row's display_path. Used by synthetic
   // identities to publish a stable header path (e.g. "~/Documents/Codex")
@@ -87,7 +87,7 @@ export interface ProjectGroup {
   identityKind: ProjectIdentityKind
   identityKey: string
   displayName: string
-  sources: SessionSource[]          // unique sources contributing
+  sources: SessionSource[] // unique sources contributing
   sessionCount: number
   lastSessionAt: string | null
 }
@@ -96,8 +96,8 @@ export interface ProjectGroup {
 // every distinct cwd on each sidebar refetch; only the CLI query resolver
 // needs them (listProjectGroups with { withPaths: true }).
 export interface ProjectGroupWithPaths extends ProjectGroup {
-  displayPaths: string[]            // distinct project display_path values
-  cwds: string[]                    // distinct session cwd values
+  displayPaths: string[] // distinct project display_path values
+  cwds: string[] // distinct session cwd values
 }
 
 export interface Message {

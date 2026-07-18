@@ -2,9 +2,9 @@
 // through share-kit's TimelineBody; legacy sessions fall back to the desktop
 // MessageList fed by the same session-kit parsers.
 
-import { useEffect, useMemo, useState } from 'react'
 import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 import { SessionWorkbench } from '../components/session/workbench'
@@ -19,8 +19,8 @@ import {
   type HubSessionMeta,
   type RangeFetcher,
 } from '../lib/hub-api'
-import { deepLinkIndex, providerOf } from '../lib/session-page'
 import { parseHubConversation } from '../lib/session-messages'
+import { deepLinkIndex, providerOf } from '../lib/session-page'
 import { Tombstone } from './Tombstone'
 
 const FETCH_PAGE = 500
@@ -117,7 +117,10 @@ function useIsDark(): boolean {
     const observer = new MutationObserver(() => {
       setIsDark(document.documentElement.getAttribute('data-theme') === 'dark')
     })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    })
     return () => observer.disconnect()
   }, [])
   return isDark
@@ -129,7 +132,7 @@ export function SessionReader({ sid }: { sid: string }) {
 
   const provider = providerOf(sid)
   const initialRecordIndex = useMemo(
-    () => typeof window === 'undefined' ? null : deepLinkIndex(window.location.hash),
+    () => (typeof window === 'undefined' ? null : deepLinkIndex(window.location.hash)),
     [sid],
   )
 
@@ -157,7 +160,9 @@ export function SessionReader({ sid }: { sid: string }) {
         if (!cancelled) setState({ phase: 'error' })
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [initialRecordIndex, sid])
 
   const conversation = useMemo(
@@ -174,18 +179,18 @@ export function SessionReader({ sid }: { sid: string }) {
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
             <div className="mb-6 flex items-center gap-3">
-              <span className="rounded border border-[#C95A4F] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#C95A4F] [[data-theme=dark]_&]:border-[#D67259] [[data-theme=dark]_&]:text-[#D67259]">
+              <span className="rounded border border-[#C95A4F] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#C95A4F] uppercase [[data-theme=dark]_&]:border-[#D67259] [[data-theme=dark]_&]:text-[#D67259]">
                 Session unavailable
               </span>
               <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
             </div>
-            <h1 className="m-0 text-xl font-semibold leading-8 tracking-[-0.01em] text-[var(--text)]">
+            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
               This session was withdrawn
             </h1>
-            <p className="mb-0 mt-3 text-[13px] leading-5 text-[var(--muted)]">
+            <p className="mt-3 mb-0 text-[13px] leading-5 text-[var(--muted)]">
               The author took it off the hub. The link stays dead until they share it again.
             </p>
-            <p className="mb-0 mt-4 font-mono text-[11px] text-[var(--muted)]">
+            <p className="mt-4 mb-0 font-mono text-[11px] text-[var(--muted)]">
               Withdrawn on {humanDateTime(state.at)}.
             </p>
           </div>
@@ -201,10 +206,10 @@ export function SessionReader({ sid }: { sid: string }) {
         <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
-            <h1 className="m-0 text-xl font-semibold leading-8 tracking-[-0.01em] text-[var(--text)]">
+            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
               Could not load this session
             </h1>
-            <p className="mb-0 mt-3 text-[13px] leading-5 text-[var(--muted)]">
+            <p className="mt-3 mb-0 text-[13px] leading-5 text-[var(--muted)]">
               The hub did not answer. Try again in a moment.
             </p>
           </div>

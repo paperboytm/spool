@@ -2,7 +2,7 @@
 name: launch-video
 description: Use when creating a launch, release, or announcement video for the Spool desktop app from real screen recordings. Covers the capture pipeline (Electron + native macOS window recording), the HyperFrames composition layout, common trailer-vs-PPT pitfalls, and the first-frame poster trick for social media. Invoke when the user mentions release video, launch video, announcement video, trailer, demo video, or wants to ship a video for a Spool version bump.
 user-invocable: true
-argument-hint: "[version (e.g. v0.5.0)]"
+argument-hint: '[version (e.g. v0.5.0)]'
 ---
 
 Build a release video for a Spool version. The output is a 1080p MP4 plus a poster JPG, intended for X / Twitter. Runtime scales with feature count: 20–40s, 3–8 feature beats + brand outro, optionally a stylised capstone scene before the outro for releases whose payoff is a tangible outcome the captured clips can't show on their own.
@@ -15,6 +15,7 @@ A release video for Spool has two halves running in parallel on screen:
 2. **Right two-thirds** — the real Spool app, recorded as a native macOS window. The camera (CSS `transform-origin + scale` on the `.window`) zooms into the specific UI region for each feature.
 
 Focus on the active feature is carried by one of two devices:
+
 - **Amber annotation rectangles** inside `.window` that track the camera — good for "look at this strip" callouts. Cheap and precise when the feature is a single bounded region.
 - **Spotlight mask** — an SVG overlay that dims everything except 1–2 transparent "holes" punched through. Softer falloff means small coordinate drift disappears into the dim instead of reading as a misaligned outline. Dual holes let you keep the preview bright while a control on the right side lights up in sync with a click. See `references/spotlight.md`.
 
@@ -41,7 +42,7 @@ Read these references before you start composing. They are not optional — each
    - Records one `.mov` per feature via `recordNativeWindow()` from `helpers/native-window-capture.ts`
    - Uses `cursorClick(window, selector, opts)` / `cursorTo(...)` / `cursorPark(x, y)` from the same helper instead of bare `.click()` so the cursor's path is visibly filmed
    - Outputs to `videos/spool-vX.Y.Z/assets/live/` (gitignored)
-   - If your release gates a feature behind a Vite flag, build the app with `VITE_FEATURE_<NAME>=1 pnpm --filter @spool/app run build:electron` *before* running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time, not read at runtime
+   - If your release gates a feature behind a Vite flag, build the app with `VITE_FEATURE_<NAME>=1 pnpm --filter @spool/app run build:electron` _before_ running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time, not read at runtime
    - Bump `--global-timeout` if pacing is relaxed: Playwright's default 300s isn't enough for 7-beat spec runs (~50s of `screencapture -V` plus warmup)
 4. **Copy `videos/launch-template/` to `videos/spool-vX.Y.Z/`.**
 5. **Customise the composition** (`index.html`):
@@ -67,8 +68,8 @@ Read these references before you start composing. They are not optional — each
 
 ## Hard rules
 
-- **Synthetic cursor is allowed but must track real input.** A floating GSAP cursor that arrives at random places looks uncanny — that rule from prior releases stands. What's *not* uncanny is the cursor-overlay technique in `references/cursor-overlay.md`: a DOM cursor injected into the page that follows Playwright's actual `mouse.move()` and pulses on `mousedown`. If a scene's whole point is a click, draw the cursor. Don't draw a cursor for scenes where nothing's being clicked.
-- **Chain state across clips. Don't reset between recordings.** If clip N ends with the UI in some configuration, clip N+1 starts there. Pre-clip state resets (clicking around to clean up between recordings) cause a visible "flash" at the clipCut boundary even though both clips show valid app pixels. If a later beat needs a specific look, get to it *inside* an earlier recording (the user sees the click) or design the demo flow so the natural state at each beat is already what you want.
+- **Synthetic cursor is allowed but must track real input.** A floating GSAP cursor that arrives at random places looks uncanny — that rule from prior releases stands. What's _not_ uncanny is the cursor-overlay technique in `references/cursor-overlay.md`: a DOM cursor injected into the page that follows Playwright's actual `mouse.move()` and pulses on `mousedown`. If a scene's whole point is a click, draw the cursor. Don't draw a cursor for scenes where nothing's being clicked.
+- **Chain state across clips. Don't reset between recordings.** If clip N ends with the UI in some configuration, clip N+1 starts there. Pre-clip state resets (clicking around to clean up between recordings) cause a visible "flash" at the clipCut boundary even though both clips show valid app pixels. If a later beat needs a specific look, get to it _inside_ an earlier recording (the user sees the click) or design the demo flow so the natural state at each beat is already what you want.
 - **First frame must be the full hero state.** Brand mark + panel 1 + UI window all visible at `t=0`, not faded in. Twitter's auto-thumbnail grabs this frame.
 - **Annotations and spotlights live inside `.window`**, not on the outer canvas. They must move with the camera transform.
 - **Spotlight coords must be verified by overlay on the rendered frame.** Eyeballing them off a grid on a raw `.mov` is consistently 5–15% off. See `pitfalls.md` on the drawbox verification loop.

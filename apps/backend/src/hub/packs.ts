@@ -1,7 +1,6 @@
 import type { R2Bucket } from '@cloudflare/workers-types'
 
 import { ApiError } from '../errors'
-
 import type { ObjectLocation } from './store'
 
 // Packs are uncompressed concatenations of canonical record bytes — offsets

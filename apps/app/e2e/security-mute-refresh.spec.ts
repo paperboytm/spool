@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Fake AWS access-key fixture — see security-badge.spec.ts.
 const FAKE_AKIA = 'AKIA' + 'V3QFKW72ZDLNP4XR'
@@ -24,42 +26,62 @@ test.beforeAll(async () => {
       // One session with a single high-severity api-key. The mute
       // target is `api-key` so visibleActive should drop 1 → 0.
       const file = join(claudeDir, 'test-project', 'test-session-mute-refresh.jsonl')
-      writeFileSync(file, [
-        JSON.stringify({
-          type: 'user',
-          sessionId: 'mute-refresh-fixture',
-          cwd: '/tmp/test-project',
-          uuid: 'mr-msg-1',
-          timestamp: '2026-05-20T10:00:00Z',
-          message: {
-            role: 'user',
-            content: `leaked ${FAKE_AKIA} to a log, rotate it`,
-          },
-        }),
-        JSON.stringify({
-          type: 'assistant',
-          uuid: 'mr-msg-2',
-          timestamp: '2026-05-20T10:00:05Z',
-          message: {
-            role: 'assistant',
-            model: 'claude-sonnet-4',
-            content: 'rotating now',
-          },
-        }),
-      ].join('\n'))
+      writeFileSync(
+        file,
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: 'mute-refresh-fixture',
+            cwd: '/tmp/test-project',
+            uuid: 'mr-msg-1',
+            timestamp: '2026-05-20T10:00:00Z',
+            message: {
+              role: 'user',
+              content: `leaked ${FAKE_AKIA} to a log, rotate it`,
+            },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'mr-msg-2',
+            timestamp: '2026-05-20T10:00:05Z',
+            message: {
+              role: 'assistant',
+              model: 'claude-sonnet-4',
+              content: 'rotating now',
+            },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 async function openSecurityTab(window: AppContext['window']) {
@@ -69,7 +91,9 @@ async function openSecurityTab(window: AppContext['window']) {
     .locator('[data-testid="settings-panel"] [aria-pressed]')
     .filter({ hasText: /Security|安全|セキュリティ|보안|Sécurité|Sicherheit/ })
     .click()
-  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({
+    timeout: 10_000,
+  })
 }
 
 test('Muting a kind from Settings refreshes the Security page automatically', async () => {
@@ -85,7 +109,13 @@ test('Muting a kind from Settings refreshes the Security page automatically', as
 
   async function activeApiKey(): Promise<number> {
     return await window.evaluate(async () => {
-      const api = (globalThis as { spool?: { security?: { riskByCategory: () => Promise<Array<{ kind: string; count: number }>> } } }).spool
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: { riskByCategory: () => Promise<Array<{ kind: string; count: number }>> }
+          }
+        }
+      ).spool
       const rows = await api!.security!.riskByCategory()
       return rows.find((r) => r.kind === 'api-key')?.count ?? 0
     })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { reportMailto } from './mailto'
 
@@ -15,7 +15,9 @@ describe('reportMailto', () => {
     expect(url.searchParams.get('subject')).toBe(`Report spool.pro/s/${ID}`)
     const body = url.searchParams.get('body') ?? ''
     expect(body).toContain(`Share URL: https://spool.pro/s/${ID}`)
-    expect(body).toContain('Reason (please pick one): copyright | privacy | harassment | illegal | spam | other')
+    expect(body).toContain(
+      'Reason (please pick one): copyright | privacy | harassment | illegal | spam | other',
+    )
     expect(body).toContain('Details:')
   })
 
@@ -23,9 +25,7 @@ describe('reportMailto', () => {
     const href = reportMailto(ID, 'http://localhost:3002')
     const url = new URL(href)
     expect(url.searchParams.get('subject')).toBe(`Report localhost:3002/s/${ID}`)
-    expect(url.searchParams.get('body') ?? '').toContain(
-      `Share URL: http://localhost:3002/s/${ID}`,
-    )
+    expect(url.searchParams.get('body') ?? '').toContain(`Share URL: http://localhost:3002/s/${ID}`)
   })
 
   it('percent-encodes spaces in the query string (not "+")', () => {

@@ -1,7 +1,14 @@
 import Database from 'better-sqlite3'
-import { afterEach, describe, expect, it } from 'vitest'
-import { buildFtsQuery, buildPreviewFtsPlan, buildSearchPlan, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
+import { afterEach, describe, expect, it } from 'vite-plus/test'
+
 import { buildLikeSnippet, searchFragments, searchSessionPreview } from './queries.js'
+import {
+  buildFtsQuery,
+  buildPreviewFtsPlan,
+  buildSearchPlan,
+  selectFtsTableKind,
+  shouldUseSessionFallback,
+} from './search-query.js'
 
 const dbs: Database.Database[] = []
 
@@ -127,21 +134,32 @@ describe('searchFragments', () => {
     const results = searchFragments(db, '4242', { limit: 10 })
 
     expect(results).toHaveLength(4)
-    expect(results.map(result => result.sessionTitle)).toEqual(
-      expect.arrayContaining(['exact-phrase-change-4242', 'review-change-4242', 'mention-change-4242', 'title-and-message-change-4242']),
+    expect(results.map((result) => result.sessionTitle)).toEqual(
+      expect.arrayContaining([
+        'exact-phrase-change-4242',
+        'review-change-4242',
+        'mention-change-4242',
+        'title-and-message-change-4242',
+      ]),
     )
-    expect(results.find(result => result.sessionTitle === 'review-change-4242')?.matchCount).toBe(2)
-    expect(results.find(result => result.sessionTitle === 'mention-change-4242')?.matchCount).toBe(1)
+    expect(results.find((result) => result.sessionTitle === 'review-change-4242')?.matchCount).toBe(
+      2,
+    )
+    expect(
+      results.find((result) => result.sessionTitle === 'mention-change-4242')?.matchCount,
+    ).toBe(1)
   })
 
   it('falls back to session-level matching for short CJK terms across title and messages', () => {
     const db = createSearchTestDb()
     const results = searchFragments(db, '查看 4242', { limit: 10 })
 
-    expect(results.slice(0, 2).map(result => result.sessionTitle)).toEqual(
+    expect(results.slice(0, 2).map((result) => result.sessionTitle)).toEqual(
       expect.arrayContaining(['exact-phrase-change-4242', 'review-change-4242']),
     )
-    expect(results.find(result => result.sessionTitle === 'title-and-message-change-4242')).toBeDefined()
+    expect(
+      results.find((result) => result.sessionTitle === 'title-and-message-change-4242'),
+    ).toBeDefined()
   })
 
   it('preserves source, project scope, date, and pin filters', () => {
@@ -152,12 +170,14 @@ describe('searchFragments', () => {
     expect(searchFragments(db, '4242', { source: 'claude' })).toHaveLength(4)
     expect(searchFragments(db, '4242', { identityKey: '/tmp/test-project' })).toHaveLength(4)
     expect(searchFragments(db, '4242', { identityKey: '/tmp/other-project' })).toEqual([])
-    expect(searchFragments(db, '4242', { since: '2026-04-05T10:30:00Z' }).map(result => result.sessionUuid)).toEqual([
-      'session-title-message-4242',
-    ])
-    expect(searchFragments(db, '4242', { onlyPinned: true }).map(result => result.sessionUuid)).toEqual([
-      'session-review-4242',
-    ])
+    expect(
+      searchFragments(db, '4242', { since: '2026-04-05T10:30:00Z' }).map(
+        (result) => result.sessionUuid,
+      ),
+    ).toEqual(['session-title-message-4242'])
+    expect(
+      searchFragments(db, '4242', { onlyPinned: true }).map((result) => result.sessionUuid),
+    ).toEqual(['session-review-4242'])
   })
 })
 
@@ -187,7 +207,7 @@ describe('searchSessionPreview', () => {
     })
 
     const results = searchSessionPreview(db, '错误码 42', { limit: 5 })
-    expect(results.map(result => result.sessionUuid)).toContain('session-error-42')
+    expect(results.map((result) => result.sessionUuid)).toContain('session-error-42')
   })
 
   it('finds sessions when one term is punctuation-only', () => {
@@ -202,7 +222,7 @@ describe('searchSessionPreview', () => {
     })
 
     const results = searchSessionPreview(db, 'foo =>', { limit: 5 })
-    expect(results.map(result => result.sessionUuid)).toContain('session-arrow-fn')
+    expect(results.map((result) => result.sessionUuid)).toContain('session-arrow-fn')
   })
 
   it('finds indexed partial tokens and preserves title weighting', () => {
@@ -216,7 +236,7 @@ describe('searchSessionPreview', () => {
     const db = createSearchTestDb()
     const results = searchSessionPreview(db, '查看一下 4242', { limit: 5 })
 
-    expect(results.map(result => result.sessionTitle)).toEqual([
+    expect(results.map((result) => result.sessionTitle)).toEqual([
       'exact-phrase-change-4242',
       'review-change-4242',
     ])
@@ -387,9 +407,7 @@ function createSearchTestDb(): Database.Database {
     filePath: '/tmp/test-project/exact-phrase-4242.jsonl',
     title: 'exact-phrase-change-4242',
     startedAt: '2026-04-05T08:00:00Z',
-    messages: [
-      '请直接查看一下 4242 这个变更。',
-    ],
+    messages: ['请直接查看一下 4242 这个变更。'],
   })
 
   insertSession(db, {
@@ -398,9 +416,7 @@ function createSearchTestDb(): Database.Database {
     filePath: '/tmp/test-project/mention-4242.jsonl',
     title: 'mention-change-4242',
     startedAt: '2026-04-05T10:00:00Z',
-    messages: [
-      '顺手总结一下 #4242 改了什么。',
-    ],
+    messages: ['顺手总结一下 #4242 改了什么。'],
   })
 
   insertSession(db, {
@@ -409,10 +425,7 @@ function createSearchTestDb(): Database.Database {
     filePath: '/tmp/test-project/title-message-4242.jsonl',
     title: 'title-and-message-change-4242',
     startedAt: '2026-04-05T11:00:00Z',
-    messages: [
-      '查看这个变更的整体处理过程。',
-      '目前 #4242 已经关闭，但修复思路还值得参考。',
-    ],
+    messages: ['查看这个变更的整体处理过程。', '目前 #4242 已经关闭，但修复思路还值得参考。'],
   })
 
   return db

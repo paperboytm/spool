@@ -1,8 +1,9 @@
 import { resolve } from 'path'
+
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import { loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 
 const coreAlias = {
@@ -118,8 +119,15 @@ function inlineMainEnvPlugin(env: Map<string, string>): Plugin {
         const dotRe = new RegExp(`process\\.env\\.${key}\\b`, 'g')
         // process.env['X'] and process.env["X"]
         const bracketRe = new RegExp(`process\\.env\\[(['"])${key}\\1\\]`, 'g')
-        const replaced = out.replace(dotRe, () => { changed = true; return literal })
-          .replace(bracketRe, () => { changed = true; return literal })
+        const replaced = out
+          .replace(dotRe, () => {
+            changed = true
+            return literal
+          })
+          .replace(bracketRe, () => {
+            changed = true
+            return literal
+          })
         out = replaced
       }
       return changed ? { code: out, map: null } : null

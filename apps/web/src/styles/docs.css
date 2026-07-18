@@ -40,7 +40,9 @@
   color: var(--muted);
   text-decoration: none;
   border-radius: 6px;
-  transition: background 80ms, color 80ms;
+  transition:
+    background 80ms,
+    color 80ms;
   line-height: 1.4;
 }
 
@@ -242,17 +244,17 @@
 }
 
 .void-md .custom-block.tip {
-  border-left-color: #4ADE80;
+  border-left-color: #4ade80;
   background: var(--surface);
 }
 
 .void-md .custom-block.warning {
-  border-left-color: #FBBF24;
+  border-left-color: #fbbf24;
   background: var(--surface);
 }
 
 .void-md .custom-block.danger {
-  border-left-color: #F87171;
+  border-left-color: #f87171;
   background: var(--surface);
 }
 
@@ -305,7 +307,9 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   text-decoration: none;
-  transition: border-color 80ms, background 80ms;
+  transition:
+    border-color 80ms,
+    background 80ms;
   background: var(--surface);
 }
 

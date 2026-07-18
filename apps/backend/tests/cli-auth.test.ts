@@ -1,22 +1,21 @@
 // CLI-auth broker: start → approve (web session) → poll claims a sph_
 // token exactly once. Runs the real handlers against in-memory fakes.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
-import {
-  CLI_AUTH_START_RATE_MAX,
-  CLI_AUTH_START_RATE_WINDOW_SEC,
-  onRequestPost as startPost,
-} from '../functions/api/cli-auth/start'
 import {
   onRequestGet as approveGet,
   onRequestPost as approvePost,
 } from '../functions/api/cli-auth/approve'
 import { onRequestPost as pollPost } from '../functions/api/cli-auth/poll'
+import {
+  CLI_AUTH_START_RATE_MAX,
+  CLI_AUTH_START_RATE_WINDOW_SEC,
+  onRequestPost as startPost,
+} from '../functions/api/cli-auth/start'
 import { createSession } from '../src/auth/session'
 import { normalizeUserCode } from '../src/cli-auth'
 import { sha256Hex } from '../src/hub/auth'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 
@@ -119,11 +118,9 @@ describe('POST /api/cli-auth/start', () => {
   it('429 once the per-IP window is exhausted', async () => {
     const env = envFor()
     const slot = Math.floor(Date.now() / 1000 / CLI_AUTH_START_RATE_WINDOW_SEC)
-    await env.RATE.put(
-      `rate/cli-auth-start/1.2.3.4/${slot}`,
-      String(CLI_AUTH_START_RATE_MAX),
-      { expirationTtl: CLI_AUTH_START_RATE_WINDOW_SEC },
-    )
+    await env.RATE.put(`rate/cli-auth-start/1.2.3.4/${slot}`, String(CLI_AUTH_START_RATE_MAX), {
+      expirationTtl: CLI_AUTH_START_RATE_WINDOW_SEC,
+    })
     const req = new Request('https://spool.pro/api/cli-auth/start', {
       method: 'POST',
       headers: { 'cf-connecting-ip': '1.2.3.4' },
@@ -137,9 +134,7 @@ describe('GET /api/cli-auth/approve (page metadata)', () => {
   it('401 without a session', async () => {
     const env = envFor()
     const { user_code } = await startRequest(env)
-    const req = new Request(
-      `https://spool.pro/api/cli-auth/approve?code=${user_code}`,
-    )
+    const req = new Request(`https://spool.pro/api/cli-auth/approve?code=${user_code}`)
     const res = await invoke(approveGet, req, env)
     expect(res.status).toBe(401)
   })
@@ -162,10 +157,9 @@ describe('GET /api/cli-auth/approve (page metadata)', () => {
   it('404 on an unknown code', async () => {
     const env = envFor(stateWithUser())
     const cookie = await sessionCookie(env)
-    const req = new Request(
-      'https://spool.pro/api/cli-auth/approve?code=BBBB-BBBB',
-      { headers: { cookie } },
-    )
+    const req = new Request('https://spool.pro/api/cli-auth/approve?code=BBBB-BBBB', {
+      headers: { cookie },
+    })
     const res = await invoke(approveGet, req, env)
     expect(res.status).toBe(404)
   })

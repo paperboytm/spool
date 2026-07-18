@@ -50,9 +50,10 @@ function parseTurn(input: unknown): Turn | null {
   if (!optionalString(input.author)) return null
   if (!optionalString(input.timestamp)) return null
   if (
-    input.redact !== undefined
-    && (!Array.isArray(input.redact) || !input.redact.every((value) => typeof value === 'string'))
-  ) return null
+    input.redact !== undefined &&
+    (!Array.isArray(input.redact) || !input.redact.every((value) => typeof value === 'string'))
+  )
+    return null
 
   return {
     ...(typeof input.id === 'string' ? { id: input.id } : {}),
@@ -64,11 +65,7 @@ function parseTurn(input: unknown): Turn | null {
   }
 }
 
-function parseConversation(
-  input: UnknownRecord,
-  turns: Turn[],
-  exportedAt: string,
-): Conversation {
+function parseConversation(input: UnknownRecord, turns: Turn[], exportedAt: string): Conversation {
   const wordCount = turns.reduce(
     (total, turn) => total + turn.body.split(/\s+/).filter(Boolean).length,
     0,
@@ -92,8 +89,8 @@ function parseConversation(
 function parseOrigin(input: unknown): Origin {
   if (!isRecord(input)) return { kind: 'file', filename: 'shared.spool' }
   if (
-    input.kind === 'web-share'
-    && (input.platform === 'ChatGPT' || input.platform === 'Claude' || input.platform === 'Gemini')
+    input.kind === 'web-share' &&
+    (input.platform === 'ChatGPT' || input.platform === 'Claude' || input.platform === 'Gemini')
   ) {
     return {
       kind: 'web-share',
@@ -120,9 +117,13 @@ function parseOpts(input: unknown, turnCount: number): EditorOpts {
   const colorway = COLORWAYS.find((candidate) => candidate.id === normalized.colorway)
   const accentFallback = colorway?.swatch ?? DEFAULT_OPTS.accentHex
   const selected = Array.isArray(raw.selected)
-    ? [...new Set(raw.selected.filter(
-        (value): value is number => Number.isInteger(value) && value >= 0 && value < turnCount,
-      ))]
+    ? [
+        ...new Set(
+          raw.selected.filter(
+            (value): value is number => Number.isInteger(value) && value >= 0 && value < turnCount,
+          ),
+        ),
+      ]
     : undefined
 
   const opts: EditorOpts = {
@@ -130,24 +131,21 @@ function parseOpts(input: unknown, turnCount: number): EditorOpts {
     paper: normalized.paper,
     typeface: normalized.typeface,
     colorway: normalized.colorway,
-    accentHex: typeof raw.accentHex === 'string' && /^#[0-9a-f]{6}$/i.test(raw.accentHex)
-      ? raw.accentHex
-      : accentFallback,
-    density: raw.density === 'compact' || raw.density === 'relaxed'
-      ? raw.density
-      : DEFAULT_OPTS.density,
+    accentHex:
+      typeof raw.accentHex === 'string' && /^#[0-9a-f]{6}$/i.test(raw.accentHex)
+        ? raw.accentHex
+        : accentFallback,
+    density:
+      raw.density === 'compact' || raw.density === 'relaxed' ? raw.density : DEFAULT_OPTS.density,
     redact: typeof raw.redact === 'boolean' ? raw.redact : DEFAULT_OPTS.redact,
     selected,
     showGaps: typeof raw.showGaps === 'boolean' ? raw.showGaps : DEFAULT_OPTS.showGaps,
-    showMasthead: typeof raw.showMasthead === 'boolean'
-      ? raw.showMasthead
-      : DEFAULT_OPTS.showMasthead,
-    showColophon: typeof raw.showColophon === 'boolean'
-      ? raw.showColophon
-      : DEFAULT_OPTS.showColophon,
-    hideEmptyTurns: typeof raw.hideEmptyTurns === 'boolean'
-      ? raw.hideEmptyTurns
-      : DEFAULT_OPTS.hideEmptyTurns,
+    showMasthead:
+      typeof raw.showMasthead === 'boolean' ? raw.showMasthead : DEFAULT_OPTS.showMasthead,
+    showColophon:
+      typeof raw.showColophon === 'boolean' ? raw.showColophon : DEFAULT_OPTS.showColophon,
+    hideEmptyTurns:
+      typeof raw.hideEmptyTurns === 'boolean' ? raw.hideEmptyTurns : DEFAULT_OPTS.hideEmptyTurns,
   }
   if (normalized.redactExclude !== undefined) opts.redactExclude = normalized.redactExclude
   return opts

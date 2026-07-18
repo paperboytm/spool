@@ -1,6 +1,8 @@
-import { Command } from 'commander'
 import { spawn } from 'node:child_process'
 import { hostname } from 'node:os'
+
+import { Command } from 'commander'
+
 import {
   HubClient,
   HubHttpError,
@@ -139,9 +141,7 @@ function defaultOpenBrowser(url: string): Promise<boolean> {
   })
 }
 
-function pickCredentialOptions(
-  dependencies: HubCredentialOptions,
-): HubCredentialOptions {
+function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentialOptions {
   return {
     ...(dependencies.homeDir === undefined ? {} : { homeDir: dependencies.homeDir }),
     ...(dependencies.env === undefined ? {} : { env: dependencies.env }),

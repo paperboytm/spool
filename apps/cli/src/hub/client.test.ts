@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
+
 import { HubClient, HubHttpError } from './client.js'
 
 const SID = 'claude_11111111-2222-4333-8444-555555555555'
@@ -40,16 +41,17 @@ describe('HubClient', () => {
       fetch: fetchMock as typeof fetch,
     })
 
-    await expect(client.uploadObjects([
-      { oid: 'oid-a', data: '{"a":1}' },
-      { oid: 'oid-b', data: '{"b":2}' },
-    ])).resolves.toEqual({ stored: 2 })
+    await expect(
+      client.uploadObjects([
+        { oid: 'oid-a', data: '{"a":1}' },
+        { oid: 'oid-b', data: '{"b":2}' },
+      ]),
+    ).resolves.toEqual({ stored: 2 })
 
     const [input, init] = fetchMock.mock.calls[0]!
     expect(String(input)).toBe('https://spool.pro/api/hub/v1/objects/batch')
     expect(init?.body).toBe(
-      '{"oid":"oid-a","data":"{\\"a\\":1}"}\n' +
-      '{"oid":"oid-b","data":"{\\"b\\":2}"}\n',
+      '{"oid":"oid-a","data":"{\\"a\\":1}"}\n' + '{"oid":"oid-b","data":"{\\"b\\":2}"}\n',
     )
     expect(new Headers(init?.headers).get('content-type')).toBe('application/x-ndjson')
   })
@@ -102,17 +104,16 @@ describe('HubClient', () => {
     [404, { error: 'NOT_FOUND', detail: 'session missing' }, 'session missing'],
     [410, { error: 'GONE', detail: 'withdrawn' }, 'withdrawn'],
   ])('throws a typed error for HTTP %s', async (status, body, message) => {
-    const fetchMock = vi.fn(async () => new Response(
-      typeof body === 'string' ? body : JSON.stringify(body),
-      { status },
-    ))
+    const fetchMock = vi.fn(
+      async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }),
+    )
     const client = new HubClient({
       hubUrl: 'https://spool.pro',
       token: 'bad-token',
       fetch: fetchMock as typeof fetch,
     })
 
-    const error = await client.withdrawSession(SID).catch(value => value as unknown)
+    const error = await client.withdrawSession(SID).catch((value) => value as unknown)
     expect(error).toBeInstanceOf(HubHttpError)
     expect(error).toMatchObject({ status, bodyMessage: message })
   })
@@ -122,7 +123,9 @@ describe('HubClient', () => {
     ;(refused as { cause?: Error }).cause = new Error('connect ECONNREFUSED 127.0.0.1:3002')
     const client = new HubClient({
       hubUrl: 'http://127.0.0.1:3002',
-      fetch: (async () => { throw refused }) as typeof fetch,
+      fetch: (async () => {
+        throw refused
+      }) as typeof fetch,
     })
     await expect(client.getSession(SID)).rejects.toThrow(
       /Cannot reach the hub at http:\/\/127\.0\.0\.1:3002 \(connect ECONNREFUSED.*Is the local hub running/,

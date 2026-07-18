@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   COLORWAYS,
   PAPERS,
@@ -17,9 +15,12 @@ import {
   type SensitiveGroup,
   type SensitiveValue,
 } from '@spool/share-kit'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { useProgressiveCount } from './preview-progressive.js'
 import { TemplateThumb } from './TemplateThumb.js'
 import { TurnSelector } from './TurnSelector.js'
-import { useProgressiveCount } from './preview-progressive.js'
 
 /** Tiny helper that updates the persisted opt-out lists. Both fields
  *  are kept sorted+deduped to keep diffs/autosave snapshots stable. */
@@ -93,172 +94,196 @@ export function ControlPanel({ convo, opts, setOpts }: Props) {
     const handle = window.setTimeout(() => setPii(detectPII(convo.turns)), 0)
     return () => window.clearTimeout(handle)
   }, [convo.turns])
-  const totalRedactions = pii
-    ? pii.groups.reduce((n, g) => n + g.count, 0) + pii.names.length
-    : 0
+  const totalRedactions = pii ? pii.groups.reduce((n, g) => n + g.count, 0) + pii.names.length : 0
 
   return (
-    <div className="w-full h-full p-2 pt-0">
-    <aside
-      data-testid="share-editor-style-panel"
-      className="w-full h-full bg-warm-bg dark:bg-dark-bg flex flex-col rounded-[10px] border border-warm-border dark:border-dark-border overflow-hidden"
-    >
-      <div className="flex-none px-3 pt-3 pb-2">
-        <div
-          role="tablist"
-          aria-label={t('shareEditorPanel.panel_view')}
-          className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-warm-surface dark:bg-dark-surface"
-        >
-          <ViewTab testId="share-editor-view-style" active={view === 'style'} onClick={() => setView('style')}>{t('shareEditorPanel.tab_style')}</ViewTab>
-          <ViewTab testId="share-editor-view-messages" active={view === 'messages'} onClick={() => setView('messages')}>{t('shareEditorPanel.tab_messages')}</ViewTab>
-          <ViewTab
-            testId="share-editor-view-privacy"
-            active={view === 'privacy'}
-            onClick={() => setView('privacy')}
-          >
-            {t('shareEditorPanel.tab_privacy')}
-          </ViewTab>
-        </div>
-      </div>
-      {view === 'messages' ? (
-        <TurnSelector convo={convo} opts={opts} setOpts={setOpts} />
-      ) : view === 'privacy' ? (
-        <PrivacyView opts={opts} setOpts={setOpts} pii={pii} totalRedactions={totalRedactions} />
-      ) : (
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none">
-      <div className="px-4 pt-3 pb-4">
-        <div className="flex items-baseline justify-between mb-3">
-          <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
-            {t('shareEditorPanel.section_template')}
-          </div>
-          <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">
-            {t('shareEditorPanel.section_template_count', { count: TEMPLATES.length })}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {TEMPLATES.map((tpl) => {
-            const active = opts.template === tpl.id
-            return (
-              <button
-                key={tpl.id}
-                type="button"
-                data-testid={`share-editor-template-${tpl.id}`}
-                onClick={() => setOpts({ ...opts, template: tpl.id })}
-                className={`flex items-center gap-2.5 text-left px-2.5 py-2 rounded-md border transition-colors focus:outline-none ${
-                  active
-                    ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
-                    : 'border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg hover:border-warm-faint/50 dark:hover:border-dark-muted/40'
-                }`}
-              >
-                <TemplateThumb
-                  id={tpl.id}
-                  accent={opts.accentHex}
-                  paper={currentPaper.tokens.paper}
-                  border={currentPaper.tokens.border}
-                  text={currentPaper.tokens.text}
-                  muted={currentPaper.tokens.muted}
-                  surface={currentPaper.tokens.surface}
-                />
-                <div className="flex-1 min-w-0">
-                  <div
-                    className={`text-xs font-medium leading-tight ${
-                      active ? 'text-accent dark:text-accent-dark' : 'text-warm-text dark:text-dark-text'
-                    }`}
-                  >
-                    {tpl.name}
-                  </div>
-                  <div className="text-[10px] text-warm-muted dark:text-dark-muted font-mono leading-tight line-clamp-2">
-                    {tpl.blurb}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <Section label={t('shareEditorPanel.section_paper')} hint={currentPaper.name}>
-        <PaperPicker value={opts.paper} onChange={(p) => setOpts({ ...opts, paper: p })} />
-      </Section>
-
-      <Section label={t('shareEditorPanel.section_typeface')} hint={currentTypeface.name}>
-        <TypefacePicker value={opts.typeface} onChange={(tf) => setOpts({ ...opts, typeface: tf })} />
-      </Section>
-
-      <Section label={t('shareEditorPanel.section_colorway')} hint={currentColor.name}>
-        <div className="flex items-center gap-3">
-          {COLORWAYS.map((c) => {
-            const active = opts.colorway === c.id
-            return (
-              <button
-                key={c.id}
-                type="button"
-                data-testid={`share-editor-colorway-${c.id}`}
-                onClick={() => setOpts({ ...opts, colorway: c.id, accentHex: c.swatch })}
-                title={c.name}
-                aria-label={c.name}
-                className="w-6 h-6 rounded-full p-0 focus:outline-none"
-                style={{
-                  background: c.swatch,
-                  boxShadow: active
-                    ? `inset 0 0 0 2px var(--color-warm-text), 0 0 0 2px var(--color-warm-surface), 0 0 0 4px ${c.swatch}`
-                    : 'none',
-                }}
-              />
-            )
-          })}
-        </div>
-      </Section>
-
-
-      <Collapsible
-        label={t('shareEditorPanel.section_moreOptions')}
-        open={advancedOpen}
-        onToggle={() => setAdvancedOpen(!advancedOpen)}
+    <div className="h-full w-full p-2 pt-0">
+      <aside
+        data-testid="share-editor-style-panel"
+        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border flex h-full w-full flex-col overflow-hidden rounded-[10px] border"
       >
-        <div className="flex items-center justify-between py-2">
-          <span className="text-[12px] text-warm-text/85 dark:text-dark-text/85">{t('shareEditorPanel.section_density')}</span>
-          <div className="flex gap-1">
-            <Chip testId="share-editor-density-compact" active={opts.density === 'compact'} onClick={() => setOpts({ ...opts, density: 'compact' })}>
-              {t('shareEditor.density_compact')}
-            </Chip>
-            <Chip testId="share-editor-density-relaxed" active={opts.density === 'relaxed'} onClick={() => setOpts({ ...opts, density: 'relaxed' })}>
-              {t('shareEditor.density_relaxed')}
-            </Chip>
+        <div className="flex-none px-3 pt-3 pb-2">
+          <div
+            role="tablist"
+            aria-label={t('shareEditorPanel.panel_view')}
+            className="bg-warm-surface dark:bg-dark-surface inline-flex items-center gap-0.5 rounded-md p-0.5"
+          >
+            <ViewTab
+              testId="share-editor-view-style"
+              active={view === 'style'}
+              onClick={() => setView('style')}
+            >
+              {t('shareEditorPanel.tab_style')}
+            </ViewTab>
+            <ViewTab
+              testId="share-editor-view-messages"
+              active={view === 'messages'}
+              onClick={() => setView('messages')}
+            >
+              {t('shareEditorPanel.tab_messages')}
+            </ViewTab>
+            <ViewTab
+              testId="share-editor-view-privacy"
+              active={view === 'privacy'}
+              onClick={() => setView('privacy')}
+            >
+              {t('shareEditorPanel.tab_privacy')}
+            </ViewTab>
           </div>
         </div>
-        <Toggle
-          testId="share-editor-toggle-hideEmptyTurns"
-          label={t('shareEditorPanel.toggle_hideEmptyTurns')}
-          sub={t('shareEditorPanel.toggle_hideEmptyTurns_sub')}
-          value={opts.hideEmptyTurns}
-          onChange={(v) => setOpts({ ...opts, hideEmptyTurns: v })}
-        />
-        <Toggle
-          testId="share-editor-toggle-showGaps"
-          label={t('shareEditorPanel.toggle_gapMarkers')}
-          sub={t('shareEditorPanel.toggle_gapMarkers_sub')}
-          value={opts.showGaps}
-          onChange={(v) => setOpts({ ...opts, showGaps: v })}
-        />
-        <Toggle
-          testId="share-editor-toggle-showMasthead"
-          label={t('shareEditorPanel.toggle_masthead')}
-          sub={t('shareEditorPanel.toggle_masthead_sub')}
-          value={opts.showMasthead}
-          onChange={(v) => setOpts({ ...opts, showMasthead: v })}
-        />
-        <Toggle
-          testId="share-editor-toggle-showColophon"
-          label={t('shareEditorPanel.toggle_colophon')}
-          sub={t('shareEditorPanel.toggle_colophon_sub')}
-          value={opts.showColophon}
-          onChange={(v) => setOpts({ ...opts, showColophon: v })}
-        />
-      </Collapsible>
-      </div>
-      )}
-    </aside>
+        {view === 'messages' ? (
+          <TurnSelector convo={convo} opts={opts} setOpts={setOpts} />
+        ) : view === 'privacy' ? (
+          <PrivacyView opts={opts} setOpts={setOpts} pii={pii} totalRedactions={totalRedactions} />
+        ) : (
+          <div className="min-h-0 flex-1 scrollbar-none overflow-y-auto">
+            <div className="px-4 pt-3 pb-4">
+              <div className="mb-3 flex items-baseline justify-between">
+                <div className="text-warm-muted dark:text-dark-muted text-[11px] leading-none font-medium tracking-[0.08em]">
+                  {t('shareEditorPanel.section_template')}
+                </div>
+                <div className="text-warm-faint dark:text-dark-muted text-[11px] leading-none">
+                  {t('shareEditorPanel.section_template_count', { count: TEMPLATES.length })}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {TEMPLATES.map((tpl) => {
+                  const active = opts.template === tpl.id
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      data-testid={`share-editor-template-${tpl.id}`}
+                      onClick={() => setOpts({ ...opts, template: tpl.id })}
+                      className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors focus:outline-none ${
+                        active
+                          ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
+                          : 'border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg hover:border-warm-faint/50 dark:hover:border-dark-muted/40'
+                      }`}
+                    >
+                      <TemplateThumb
+                        id={tpl.id}
+                        accent={opts.accentHex}
+                        paper={currentPaper.tokens.paper}
+                        border={currentPaper.tokens.border}
+                        text={currentPaper.tokens.text}
+                        muted={currentPaper.tokens.muted}
+                        surface={currentPaper.tokens.surface}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className={`text-xs leading-tight font-medium ${
+                            active
+                              ? 'text-accent dark:text-accent-dark'
+                              : 'text-warm-text dark:text-dark-text'
+                          }`}
+                        >
+                          {tpl.name}
+                        </div>
+                        <div className="text-warm-muted dark:text-dark-muted line-clamp-2 font-mono text-[10px] leading-tight">
+                          {tpl.blurb}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <Section label={t('shareEditorPanel.section_paper')} hint={currentPaper.name}>
+              <PaperPicker value={opts.paper} onChange={(p) => setOpts({ ...opts, paper: p })} />
+            </Section>
+
+            <Section label={t('shareEditorPanel.section_typeface')} hint={currentTypeface.name}>
+              <TypefacePicker
+                value={opts.typeface}
+                onChange={(tf) => setOpts({ ...opts, typeface: tf })}
+              />
+            </Section>
+
+            <Section label={t('shareEditorPanel.section_colorway')} hint={currentColor.name}>
+              <div className="flex items-center gap-3">
+                {COLORWAYS.map((c) => {
+                  const active = opts.colorway === c.id
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      data-testid={`share-editor-colorway-${c.id}`}
+                      onClick={() => setOpts({ ...opts, colorway: c.id, accentHex: c.swatch })}
+                      title={c.name}
+                      aria-label={c.name}
+                      className="h-6 w-6 rounded-full p-0 focus:outline-none"
+                      style={{
+                        background: c.swatch,
+                        boxShadow: active
+                          ? `inset 0 0 0 2px var(--color-warm-text), 0 0 0 2px var(--color-warm-surface), 0 0 0 4px ${c.swatch}`
+                          : 'none',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </Section>
+
+            <Collapsible
+              label={t('shareEditorPanel.section_moreOptions')}
+              open={advancedOpen}
+              onToggle={() => setAdvancedOpen(!advancedOpen)}
+            >
+              <div className="flex items-center justify-between py-2">
+                <span className="text-warm-text/85 dark:text-dark-text/85 text-[12px]">
+                  {t('shareEditorPanel.section_density')}
+                </span>
+                <div className="flex gap-1">
+                  <Chip
+                    testId="share-editor-density-compact"
+                    active={opts.density === 'compact'}
+                    onClick={() => setOpts({ ...opts, density: 'compact' })}
+                  >
+                    {t('shareEditor.density_compact')}
+                  </Chip>
+                  <Chip
+                    testId="share-editor-density-relaxed"
+                    active={opts.density === 'relaxed'}
+                    onClick={() => setOpts({ ...opts, density: 'relaxed' })}
+                  >
+                    {t('shareEditor.density_relaxed')}
+                  </Chip>
+                </div>
+              </div>
+              <Toggle
+                testId="share-editor-toggle-hideEmptyTurns"
+                label={t('shareEditorPanel.toggle_hideEmptyTurns')}
+                sub={t('shareEditorPanel.toggle_hideEmptyTurns_sub')}
+                value={opts.hideEmptyTurns}
+                onChange={(v) => setOpts({ ...opts, hideEmptyTurns: v })}
+              />
+              <Toggle
+                testId="share-editor-toggle-showGaps"
+                label={t('shareEditorPanel.toggle_gapMarkers')}
+                sub={t('shareEditorPanel.toggle_gapMarkers_sub')}
+                value={opts.showGaps}
+                onChange={(v) => setOpts({ ...opts, showGaps: v })}
+              />
+              <Toggle
+                testId="share-editor-toggle-showMasthead"
+                label={t('shareEditorPanel.toggle_masthead')}
+                sub={t('shareEditorPanel.toggle_masthead_sub')}
+                value={opts.showMasthead}
+                onChange={(v) => setOpts({ ...opts, showMasthead: v })}
+              />
+              <Toggle
+                testId="share-editor-toggle-showColophon"
+                label={t('shareEditorPanel.toggle_colophon')}
+                sub={t('shareEditorPanel.toggle_colophon_sub')}
+                value={opts.showColophon}
+                onChange={(v) => setOpts({ ...opts, showColophon: v })}
+              />
+            </Collapsible>
+          </div>
+        )}
+      </aside>
     </div>
   )
 }
@@ -289,8 +314,7 @@ function RedactSummary({
   const excludedHashes = new Set(opts.redactExclude?.valueHashes ?? [])
 
   const isKindExcluded = (kind: string) => excludedKinds.has(kind)
-  const isValueExcluded = (value: string) =>
-    excludedHashes.has(hashValueForRedactExclude(value))
+  const isValueExcluded = (value: string) => excludedHashes.has(hashValueForRedactExclude(value))
 
   const allowKind = (kind: string) =>
     setRedactExclude(opts, setOpts, {
@@ -322,7 +346,7 @@ function RedactSummary({
     return (
       <div
         data-testid="share-editor-privacy-clean"
-        className="mt-2 px-2.5 py-2 rounded-md bg-warm-surface/50 dark:bg-dark-surface/40 text-[11.5px] text-warm-muted dark:text-dark-muted leading-snug"
+        className="bg-warm-surface/50 dark:bg-dark-surface/40 text-warm-muted dark:text-dark-muted mt-2 rounded-md px-2.5 py-2 text-[11.5px] leading-snug"
       >
         {t('shareEditorPanel.redact_noneSensitive')}
       </div>
@@ -346,7 +370,12 @@ function RedactSummary({
           minConfidence={g.minConfidence}
           kindExcluded={isKindExcluded(g.kind)}
           onAllowAll={() => allowKind(g.kind)}
-          onRedactAll={() => reRedactKind(g.kind, g.values.map((v) => v.value))}
+          onRedactAll={() =>
+            reRedactKind(
+              g.kind,
+              g.values.map((v) => v.value),
+            )
+          }
           isValueExcluded={isValueExcluded}
           onToggleValue={toggleValue}
         />
@@ -437,38 +466,35 @@ function RedactRow({
       data-testid={testId}
       className={`rounded-md transition-colors ${
         kindExcluded
-          ? 'bg-accent-bg/20 dark:bg-accent-bg-dark/15 border border-accent/20 dark:border-accent-dark/20'
+          ? 'bg-accent-bg/20 dark:bg-accent-bg-dark/15 border-accent/20 dark:border-accent-dark/20 border'
           : 'bg-warm-surface/50 dark:bg-dark-surface/40 border border-transparent'
       }`}
     >
-      <div
-        className="flex items-center gap-2 px-2.5 py-1.5"
-        data-testid={`${testId}-header`}
-      >
-        <BulkCheckbox
-          state={bulkState}
-          onClick={handleBulkClick}
-          label={label}
-        />
+      <div className="flex items-center gap-2 px-2.5 py-1.5" data-testid={`${testId}-header`}>
+        <BulkCheckbox state={bulkState} onClick={handleBulkClick} label={label} />
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex-1 min-w-0 flex items-center gap-1.5 text-left focus:outline-none"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus:outline-none"
         >
           <Chevron open={open} />
-          <span className={`flex-1 min-w-0 text-[12px] truncate ${kindExcluded ? 'text-warm-faint dark:text-dark-muted line-through' : 'text-warm-text dark:text-dark-text'}`}>
+          <span
+            className={`min-w-0 flex-1 truncate text-[12px] ${kindExcluded ? 'text-warm-faint dark:text-dark-muted line-through' : 'text-warm-text dark:text-dark-text'}`}
+          >
             {label}
           </span>
-          <span className="flex-none text-[10.5px] text-warm-faint dark:text-dark-muted font-mono tabular-nums">
+          <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[10.5px] tabular-nums">
             {totalOccurrences}
           </span>
         </button>
       </div>
 
       {open && (
-        <div className="px-2.5 pb-2 pt-1 flex flex-col gap-0.5 border-t border-warm-border/40 dark:border-dark-border/40">
-          {note && <div className="text-[10.5px] text-warm-faint dark:text-dark-muted py-1">{note}</div>}
+        <div className="border-warm-border/40 dark:border-dark-border/40 flex flex-col gap-0.5 border-t px-2.5 pt-1 pb-2">
+          {note && (
+            <div className="text-warm-faint dark:text-dark-muted py-1 text-[10.5px]">{note}</div>
+          )}
           {values.slice(0, shownValues).map((v, i) => {
             const excluded = isValueExcluded(v.value) || kindExcluded
             const interactive = !kindExcluded
@@ -500,7 +526,7 @@ function Chevron({ open }: { open: boolean }) {
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinecap="round"
-      className="flex-none text-warm-muted dark:text-dark-muted transition-transform"
+      className="text-warm-muted dark:text-dark-muted flex-none transition-transform"
       style={{ transform: open ? 'rotate(90deg)' : 'none' }}
     >
       <path d="M3.5 2L7 5L3.5 8" />
@@ -525,11 +551,12 @@ function BulkCheckbox({
 }) {
   const { t } = useTranslation()
   const filled = state !== 'none'
-  const title = state === 'none'
-    ? t('shareEditorPanel.redact_redactAll', { label })
-    : state === 'mixed'
-      ? t('shareEditorPanel.redact_mixed', { label })
-      : t('shareEditorPanel.redact_allowAll', { label })
+  const title =
+    state === 'none'
+      ? t('shareEditorPanel.redact_redactAll', { label })
+      : state === 'mixed'
+        ? t('shareEditorPanel.redact_mixed', { label })
+        : t('shareEditorPanel.redact_allowAll', { label })
   return (
     <button
       type="button"
@@ -539,19 +566,29 @@ function BulkCheckbox({
       title={title}
       onClick={onClick}
       data-testid={`share-editor-privacy-bulk-${label.toLowerCase().replace(/\s+/g, '-')}`}
-      className={`flex-none w-[14px] h-[14px] inline-flex items-center justify-center rounded-[3px] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/50 ${
+      className={`focus-visible:ring-accent/50 inline-flex h-[14px] w-[14px] flex-none items-center justify-center rounded-[3px] transition-colors focus:outline-none focus-visible:ring-1 ${
         filled
           ? 'bg-accent dark:bg-accent-dark'
-          : 'bg-transparent border border-warm-border dark:border-dark-border'
+          : 'border-warm-border dark:border-dark-border border bg-transparent'
       }`}
     >
       {state === 'all' && (
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="white"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
           <path d="M2 5L4 7L8 3" />
         </svg>
       )}
       {state === 'mixed' && (
-        <div className="w-[7px] h-[1.8px] bg-white rounded-[1px]" aria-hidden />
+        <div className="h-[1.8px] w-[7px] rounded-[1px] bg-white" aria-hidden />
       )}
     </button>
   )
@@ -583,10 +620,8 @@ function ValueRow({
     <>
       <ValueCheckbox checked={checked} interactive={interactive} />
       <span
-        className={`flex-1 min-w-0 truncate text-[11px] font-mono ${
-          checked
-            ? 'text-warm-text dark:text-dark-text'
-            : 'text-accent dark:text-accent-dark'
+        className={`min-w-0 flex-1 truncate font-mono text-[11px] ${
+          checked ? 'text-warm-text dark:text-dark-text' : 'text-accent dark:text-accent-dark'
         }`}
       >
         {displayValue(value, kind)}
@@ -594,7 +629,7 @@ function ValueRow({
       {occurrences > 1 && (
         <span
           title={t('shareEditorPanel.redact_appearsTimes_other', { count: occurrences })}
-          className="flex-none text-[10px] text-warm-faint dark:text-dark-muted font-mono tabular-nums"
+          className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[10px] tabular-nums"
         >
           {occurrences}
         </span>
@@ -606,10 +641,7 @@ function ValueRow({
   // edge), establishing a clear parent/child visual nest.
   if (!interactive) {
     return (
-      <div
-        title={value}
-        className="px-1 py-1 rounded flex items-center gap-2 cursor-default"
-      >
+      <div title={value} className="flex cursor-default items-center gap-2 rounded px-1 py-1">
         {valueContent}
       </div>
     )
@@ -619,7 +651,7 @@ function ValueRow({
       type="button"
       onClick={onClick}
       title={value}
-      className="px-1 py-1 rounded flex items-center gap-2 text-left transition-colors focus:outline-none hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60"
+      className="hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 flex items-center gap-2 rounded px-1 py-1 text-left transition-colors focus:outline-none"
     >
       {valueContent}
     </button>
@@ -630,16 +662,25 @@ function ValueCheckbox({ checked, interactive }: { checked: boolean; interactive
   return (
     <span
       aria-hidden
-      className={`flex-none w-[12px] h-[12px] inline-flex items-center justify-center rounded-[3px] ${
+      className={`inline-flex h-[12px] w-[12px] flex-none items-center justify-center rounded-[3px] ${
         checked
           ? interactive
             ? 'bg-accent dark:bg-accent-dark'
             : 'bg-accent/60 dark:bg-accent-dark/60'
-          : 'bg-transparent border border-accent/60 dark:border-accent-dark/60'
+          : 'border-accent/60 dark:border-accent-dark/60 border bg-transparent'
       }`}
     >
       {checked && (
-        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="8"
+          height="8"
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M2 5L4 7L8 3" />
         </svg>
       )}
@@ -687,17 +728,17 @@ function ViewTab({
       onClick={onClick}
       aria-selected={active}
       {...(testId ? { 'data-testid': testId } : {})}
-      className={`h-6 px-2.5 rounded text-[11.5px] font-medium transition-colors inline-flex items-center gap-1.5 ${
+      className={`inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[11.5px] font-medium transition-colors ${
         active
           ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-[0_1px_1px_rgba(0,0,0,0.2)]'
-          : 'bg-transparent text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text'
+          : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text bg-transparent'
       }`}
     >
       <span>{children}</span>
       {badge !== undefined && (
         <span
           data-testid={testId ? `${testId}-badge` : undefined}
-          className="text-[9.5px] font-semibold leading-none px-1.5 py-[3px] rounded-full bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark"
+          className="bg-accent-bg dark:bg-accent-bg-dark text-accent dark:text-accent-dark rounded-full px-1.5 py-[3px] text-[9.5px] leading-none font-semibold"
         >
           {badge}
         </span>
@@ -764,24 +805,23 @@ function PrivacyView({
   let countLabel: string
   if (!pii) countLabel = t('shareEditorPanel.privacy_scanning')
   else if (totalRedactions === 0) countLabel = t('shareEditorPanel.redact_noneDetected')
-  else if (!opts.redact) countLabel = t('shareEditorPanel.redact_willBeVisible', { count: totalRedactions })
-  else if (visibleOccurrences === 0) countLabel = t('shareEditorPanel.redact_items_other', { count: totalRedactions })
+  else if (!opts.redact)
+    countLabel = t('shareEditorPanel.redact_willBeVisible', { count: totalRedactions })
+  else if (visibleOccurrences === 0)
+    countLabel = t('shareEditorPanel.redact_items_other', { count: totalRedactions })
   else countLabel = t('shareEditorPanel.redact_visible', { count: visibleOccurrences })
 
   return (
-    <div
-      data-testid="share-editor-privacy-panel"
-      className="flex-1 min-h-0 flex flex-col"
-    >
+    <div data-testid="share-editor-privacy-panel" className="flex min-h-0 flex-1 flex-col">
       {/* Fixed header — REDACTIONS / count / Reset + master toggle.
        *  Stays put when the category list scrolls below so the user
        *  always has the master control + leak-count in view. */}
       <div className="flex-none px-4 pt-3">
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-warm-muted dark:text-dark-muted text-[11px] leading-none font-medium tracking-[0.08em]">
             {t('shareEditorPanel.section_redactions')}
           </div>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
             <div
               data-testid="share-editor-privacy-count"
               className={`flex-none text-[11px] leading-none ${
@@ -799,9 +839,19 @@ function PrivacyView({
                 aria-label={t('shareEditorPanel.redact_resetAll_aria')}
                 data-testid="share-editor-privacy-reset"
                 title={t('shareEditorPanel.redact_resetAll')}
-                className="flex-none w-4 h-4 inline-flex items-center justify-center rounded text-warm-faint/70 dark:text-dark-muted/70 hover:text-accent dark:hover:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors focus:outline-none"
+                className="text-warm-faint/70 dark:text-dark-muted/70 hover:text-accent dark:hover:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2 inline-flex h-4 w-4 flex-none items-center justify-center rounded transition-colors focus:outline-none"
               >
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 11 11"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
                   <path d="M2 5.5A3.5 3.5 0 1 1 3 8" />
                   <path d="M1 3v2.5h2.5" />
                 </svg>
@@ -818,16 +868,13 @@ function PrivacyView({
         {!opts.redact && totalRedactions > 0 && (
           <div
             data-testid="share-editor-privacy-warning"
-            className="mt-3 mb-4 px-3 py-2.5 rounded-md border leading-snug"
+            className="mt-3 mb-4 rounded-md border px-3 py-2.5 leading-snug"
             style={{ borderColor: `${opts.accentHex}4D`, background: `${opts.accentHex}1A` }}
           >
-            <div
-              className="text-[11.5px] font-medium"
-              style={{ color: opts.accentHex }}
-            >
+            <div className="text-[11.5px] font-medium" style={{ color: opts.accentHex }}>
               {t('shareEditorPanel.redact_warning_other', { count: totalRedactions })}
             </div>
-            <div className="mt-0.5 text-[11px] text-warm-muted dark:text-dark-muted">
+            <div className="text-warm-muted dark:text-dark-muted mt-0.5 text-[11px]">
               {t('shareEditorPanel.redact_warning_subtitle')}
             </div>
           </div>
@@ -836,7 +883,7 @@ function PrivacyView({
       {/* Only the categorised list scrolls. Header + master toggle
        *  stay pinned above. */}
       {opts.redact && (
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-none px-4 pb-4">
+        <div className="min-h-0 flex-1 scrollbar-none overflow-y-auto px-4 pb-4">
           {pii ? (
             <RedactSummary
               groups={pii.groups}
@@ -846,7 +893,7 @@ function PrivacyView({
               setOpts={setOpts}
             />
           ) : (
-            <div className="py-6 text-center text-[11px] text-warm-faint dark:text-dark-muted">
+            <div className="text-warm-faint dark:text-dark-muted py-6 text-center text-[11px]">
               {t('shareEditorPanel.privacy_scanning')}
             </div>
           )}
@@ -856,14 +903,26 @@ function PrivacyView({
   )
 }
 
-function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Section({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
   return (
     <div className="px-4 pt-1.5 pb-4">
-      <div className="flex items-baseline justify-between mb-3">
-        <div className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted leading-none">
+      <div className="mb-3 flex items-baseline justify-between">
+        <div className="text-warm-muted dark:text-dark-muted text-[11px] leading-none font-medium tracking-[0.08em]">
           {label}
         </div>
-        {hint && <div className="text-[11px] text-warm-faint dark:text-dark-muted leading-none">{hint}</div>}
+        {hint && (
+          <div className="text-warm-faint dark:text-dark-muted text-[11px] leading-none">
+            {hint}
+          </div>
+        )}
       </div>
       {children}
     </div>
@@ -889,13 +948,13 @@ function Collapsible({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full text-left px-4 pt-2 pb-3.5 flex items-center justify-between hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 transition-colors"
+        className="hover:bg-warm-surface2/60 dark:hover:bg-dark-surface2/60 flex w-full items-center justify-between px-4 pt-2 pb-3.5 text-left transition-colors"
       >
-        <span className="text-[11px] font-medium tracking-[0.08em] text-warm-muted dark:text-dark-muted">
+        <span className="text-warm-muted dark:text-dark-muted text-[11px] font-medium tracking-[0.08em]">
           {label}
         </span>
         <span className="flex items-center gap-2.5">
-          {hint && <span className="text-[10px] font-mono">{hint}</span>}
+          {hint && <span className="font-mono text-[10px]">{hint}</span>}
           <svg
             width="11"
             height="11"
@@ -930,10 +989,12 @@ function Toggle({
   testId?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-2 gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-[12px] text-warm-text/85 dark:text-dark-text/85">{label}</div>
-        {sub && <div className="text-[11px] text-warm-faint dark:text-dark-muted mt-0.5">{sub}</div>}
+    <div className="flex items-center justify-between gap-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="text-warm-text/85 dark:text-dark-text/85 text-[12px]">{label}</div>
+        {sub && (
+          <div className="text-warm-faint dark:text-dark-muted mt-0.5 text-[11px]">{sub}</div>
+        )}
       </div>
       <button
         type="button"
@@ -941,13 +1002,13 @@ function Toggle({
         aria-checked={value}
         onClick={() => onChange(!value)}
         {...(testId ? { 'data-testid': testId } : {})}
-        className={`relative flex-none w-8 h-[18px] rounded-full transition-colors focus:outline-none ${
+        className={`relative h-[18px] w-8 flex-none rounded-full transition-colors focus:outline-none ${
           value ? 'bg-accent dark:bg-accent-dark' : 'bg-warm-border dark:bg-dark-border'
         }`}
       >
         <span
           aria-hidden
-          className={`absolute top-[2px] block w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all ${
+          className={`absolute top-[2px] block h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-all ${
             value ? 'left-[16px]' : 'left-[2px]'
           }`}
         />
@@ -956,16 +1017,26 @@ function Toggle({
   )
 }
 
-function Chip({ active, onClick, children, testId }: { active: boolean; onClick: () => void; children: React.ReactNode; testId?: string }) {
+function Chip({
+  active,
+  onClick,
+  children,
+  testId,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+  testId?: string
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       {...(testId ? { 'data-testid': testId } : {})}
-      className={`px-2 py-0.5 rounded text-[11.5px] border transition-colors focus:outline-none ${
+      className={`rounded border px-2 py-0.5 text-[11.5px] transition-colors focus:outline-none ${
         active
           ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent dark:border-accent-dark text-accent dark:text-accent-dark font-medium'
-          : 'border-transparent text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
+          : 'text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text border-transparent'
       }`}
     >
       {children}
@@ -973,8 +1044,13 @@ function Chip({ active, onClick, children, testId }: { active: boolean; onClick:
   )
 }
 
-
-function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next: Typeface) => void }) {
+function TypefacePicker({
+  value,
+  onChange,
+}: {
+  value: Typeface
+  onChange: (next: Typeface) => void
+}) {
   return (
     <div className="flex gap-2.5">
       {TYPEFACES.map((tf) => {
@@ -987,15 +1063,17 @@ function TypefacePicker({ value, onChange }: { value: Typeface; onChange: (next:
             onClick={() => onChange(tf.id)}
             title={tf.name}
             aria-label={tf.name}
-            className={`w-11 h-8 rounded-md flex items-center justify-center transition-colors focus:outline-none border ${
+            className={`flex h-8 w-11 items-center justify-center rounded-md border transition-colors focus:outline-none ${
               active
                 ? 'bg-accent-bg dark:bg-accent-bg-dark border-accent dark:border-accent-dark'
                 : 'bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border hover:border-warm-faint/50 dark:hover:border-dark-muted/50'
             }`}
           >
             <span
-              className={`text-[12px] font-semibold leading-none ${
-                active ? 'text-accent dark:text-accent-dark' : 'text-warm-text/85 dark:text-dark-text/85'
+              className={`text-[12px] leading-none font-semibold ${
+                active
+                  ? 'text-accent dark:text-accent-dark'
+                  : 'text-warm-text/85 dark:text-dark-text/85'
               }`}
               style={{ fontFamily: tf.family, letterSpacing: '-0.02em' }}
             >
@@ -1021,7 +1099,7 @@ function PaperPicker({ value, onChange }: { value: Paper; onChange: (next: Paper
             onClick={() => onChange(p.id)}
             title={p.name}
             aria-label={p.name}
-            className="w-11 h-8 rounded-md flex items-center justify-center p-0 focus:outline-none"
+            className="flex h-8 w-11 items-center justify-center rounded-md p-0 focus:outline-none"
             style={{
               background: p.tokens.paper,
               boxShadow: active
@@ -1030,7 +1108,7 @@ function PaperPicker({ value, onChange }: { value: Paper; onChange: (next: Paper
             }}
           >
             <span
-              className="text-[12px] font-semibold pointer-events-none"
+              className="pointer-events-none text-[12px] font-semibold"
               style={{ color: p.tokens.text, letterSpacing: '-0.02em' }}
             >
               Aa

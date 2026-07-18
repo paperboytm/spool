@@ -1,9 +1,7 @@
 import { Command } from 'commander'
+
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
-import {
-  loadHubCredentials,
-  type HubCredentialOptions,
-} from '../hub/credentials.js'
+import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { resolveSessionRef } from '../hub/ref.js'
 
 export interface WithdrawCommandDependencies extends HubCredentialOptions {
@@ -65,9 +63,7 @@ function friendlyHubError(error: HubHttpError, sid: string): string {
   return `Hub returned HTTP ${error.status}: ${error.bodyMessage}`
 }
 
-function pickCredentialOptions(
-  dependencies: HubCredentialOptions,
-): HubCredentialOptions {
+function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentialOptions {
   return {
     ...(dependencies.homeDir === undefined ? {} : { homeDir: dependencies.homeDir }),
     ...(dependencies.env === undefined ? {} : { env: dependencies.env }),

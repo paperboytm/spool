@@ -5,6 +5,7 @@
 
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
+import { audit } from '../../../../src/audit'
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -13,9 +14,8 @@ import {
   readCookie,
 } from '../../../../src/auth/cookie'
 import { safeNext } from '../../../../src/auth/next'
-import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { getProvider } from '../../../../src/auth/providers/registry'
-import { audit } from '../../../../src/audit'
+import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { ApiError, jsonError } from '../../../../src/errors'
 import { publicBaseUrl } from '../../../../src/public-url'
 import { checkRate } from '../../../../src/rate-limit'

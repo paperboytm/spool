@@ -1,10 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
-import {
-  buildSessionCookie,
-  clearCookie,
-  readCookie,
-} from '../src/auth/cookie'
+import { buildSessionCookie, clearCookie, readCookie } from '../src/auth/cookie'
 import { pkceChallenge, randomUrlSafe } from '../src/auth/pkce'
 
 describe('PKCE helpers', () => {

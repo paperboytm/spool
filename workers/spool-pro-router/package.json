@@ -2,6 +2,20 @@
   "name": "spool-pro-router",
   "version": "0.0.0",
   "private": true,
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
@@ -9,7 +23,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260101.0",
-    "wrangler": "^4.0.0"
+    "@cloudflare/workers-types": "^5.20260718.1",
+    "wrangler": "^4.112.0"
   }
 }

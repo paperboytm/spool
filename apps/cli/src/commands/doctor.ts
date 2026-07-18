@@ -1,8 +1,9 @@
-import { Command } from 'commander'
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
 import { runChecks, type CheckResult, type FixResult } from '@spool-lab/core'
+import { Command } from 'commander'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -53,7 +54,7 @@ function printJson(results: CheckResult[]): void {
   const out = {
     cli: { version: cliVersion },
     app: readAppVersion(),
-    results: results.map(r => ({
+    results: results.map((r) => ({
       id: r.id,
       category: r.category,
       title: r.title,
@@ -72,8 +73,12 @@ function printJson(results: CheckResult[]): void {
 
 const ICONS = { ok: '✓', warn: '⚠', error: '✗' } as const
 const COLORS = {
-  ok: '\x1b[32m', warn: '\x1b[33m', error: '\x1b[31m',
-  dim: '\x1b[2m', bold: '\x1b[1m', reset: '\x1b[0m',
+  ok: '\x1b[32m',
+  warn: '\x1b[33m',
+  error: '\x1b[31m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  reset: '\x1b[0m',
 } as const
 
 const useColor = process.stdout.isTTY && process.env['NO_COLOR'] === undefined
@@ -93,11 +98,14 @@ const CATEGORY_LABEL: Record<CheckResult['category'], string> = {
 function printHuman(results: CheckResult[], verbose: boolean): void {
   const cliVersion = readCliVersion()
   const app = readAppVersion()
-  console.log(c('bold', `Spool Doctor`) + c('dim', `  cli ${cliVersion}` + (app ? `  ·  app ${app.version}` : '')))
+  console.log(
+    c('bold', `Spool Doctor`) +
+      c('dim', `  cli ${cliVersion}` + (app ? `  ·  app ${app.version}` : '')),
+  )
   console.log()
 
   for (const category of CATEGORY_ORDER) {
-    const rows = results.filter(r => r.category === category)
+    const rows = results.filter((r) => r.category === category)
     if (rows.length === 0) continue
     console.log(c('bold', CATEGORY_LABEL[category] ?? category))
     for (const r of rows) {
@@ -123,14 +131,16 @@ function printHuman(results: CheckResult[], verbose: boolean): void {
 }
 
 function printFixHint(results: CheckResult[]): void {
-  const safe = results.filter(r => r.fix && !r.fix.destructive).length
-  const destructive = results.filter(r => r.fix && r.fix.destructive).length
+  const safe = results.filter((r) => r.fix && !r.fix.destructive).length
+  const destructive = results.filter((r) => r.fix && r.fix.destructive).length
   if (safe === 0 && destructive === 0) return
   const parts: string[] = []
   if (safe > 0) parts.push(`${safe} safe`)
   if (destructive > 0) parts.push(`${destructive} destructive (needs --force)`)
   console.log()
-  console.log(c('dim', `Run \`spool doctor --fix\` to apply automatic fixes (${parts.join(', ')}).`))
+  console.log(
+    c('dim', `Run \`spool doctor --fix\` to apply automatic fixes (${parts.join(', ')}).`),
+  )
 }
 
 /* ── fix application ──────────────────────────────────────────────────── */
@@ -159,11 +169,21 @@ async function applyFixes(results: CheckResult[], force: boolean): Promise<FixSu
     }
     try {
       const result = await r.fix.apply()
-      applied.push({ id: r.id, description: r.fix.description, destructive: r.fix.destructive, result })
+      applied.push({
+        id: r.id,
+        description: r.fix.description,
+        destructive: r.fix.destructive,
+        result,
+      })
     } catch (err) {
       applied.push({
-        id: r.id, description: r.fix.description, destructive: r.fix.destructive,
-        result: { ok: false, message: `Threw: ${err instanceof Error ? err.message : String(err)}` },
+        id: r.id,
+        description: r.fix.description,
+        destructive: r.fix.destructive,
+        result: {
+          ok: false,
+          message: `Threw: ${err instanceof Error ? err.message : String(err)}`,
+        },
       })
     }
   }
@@ -193,21 +213,23 @@ function printFixSummary(summary: FixSummary): void {
 
 function summarize(results: CheckResult[]): { ok: number; warn: number; error: number } {
   return {
-    ok: results.filter(r => r.severity === 'ok').length,
-    warn: results.filter(r => r.severity === 'warn').length,
-    error: results.filter(r => r.severity === 'error').length,
+    ok: results.filter((r) => r.severity === 'ok').length,
+    warn: results.filter((r) => r.severity === 'warn').length,
+    error: results.filter((r) => r.severity === 'error').length,
   }
 }
 
 function setExit(results: CheckResult[]): void {
-  if (results.some(r => r.severity === 'error')) {
+  if (results.some((r) => r.severity === 'error')) {
     process.exitCode = 1
   }
 }
 
 function readCliVersion(): string {
   try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')) as { version: string }
+    const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8')) as {
+      version: string
+    }
     return pkg.version
   } catch {
     return 'unknown'
@@ -235,7 +257,10 @@ function readAppVersion(): { version: string; path: string } | null {
  */
 export function compareSemver(a: string, b: string): number {
   const parse = (s: string) =>
-    s.split(/[-+]/)[0]!.split('.').map(n => parseInt(n, 10) || 0)
+    s
+      .split(/[-+]/)[0]!
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0)
   const av = parse(a)
   const bv = parse(b)
   for (let i = 0; i < Math.max(av.length, bv.length); i++) {
@@ -260,12 +285,11 @@ export function refineForAppVersion(
 ): CheckResult[] {
   if (!app || cliVersion === 'unknown') return results
   if (compareSemver(cliVersion, app.version) <= 0) return results
-  return results.map(r => {
+  return results.map((r) => {
     if (r.id !== 'versions.schema-compat' || !r.fix) return r
     return {
       ...r,
-      message:
-        `${r.message} — Spool.app is ${app.version}, older than this CLI ${cliVersion}`,
+      message: `${r.message} — Spool.app is ${app.version}, older than this CLI ${cliVersion}`,
       fix: {
         ...r.fix,
         description:
@@ -282,5 +306,9 @@ function formatDetail(v: unknown): string {
   if (v === null || v === undefined) return String(v)
   if (typeof v === 'string') return v
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
-  try { return JSON.stringify(v) } catch { return String(v) }
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return String(v)
+  }
 }

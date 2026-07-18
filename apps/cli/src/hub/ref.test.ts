@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { resolveSessionRef } from './ref.js'
 
 const CLAUDE_SID = 'claude_11111111-2222-4333-8444-555555555555'
@@ -7,7 +8,11 @@ const CODEX_SID = 'codex_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 describe('resolveSessionRef', () => {
   it.each([
     ['bare sid', CLAUDE_SID, { sid: CLAUDE_SID, provider: 'claude' }],
-    ['bare sid with position', `${CODEX_SID}@42`, { sid: CODEX_SID, provider: 'codex', position: 42 }],
+    [
+      'bare sid with position',
+      `${CODEX_SID}@42`,
+      { sid: CODEX_SID, provider: 'codex', position: 42 },
+    ],
     [
       'share URL',
       `https://spool.pro/session/${CLAUDE_SID}`,

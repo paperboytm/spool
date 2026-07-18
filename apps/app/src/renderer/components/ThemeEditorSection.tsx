@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { parseHex, toHex, adaptiveCardTone, hexToRgba, mixHex } from '../theme/colorUtils.js'
 import type { ThemeEditorStateV1, ThemeSideConfig } from '../theme/editorTypes.js'
 import { THEME_PRESETS } from '../theme/editorTypes.js'
 import { lightPresetSeed, darkPresetSeed } from '../theme/presetSeeds.js'
-import { parseHex, toHex, adaptiveCardTone, hexToRgba, mixHex } from '../theme/colorUtils.js'
-import SegmentedPill from './SegmentedPill.js'
 import Menu from './Menu.js'
+import SegmentedPill from './SegmentedPill.js'
 
 function colorInputValue(hex: string): string {
   const parsed = parseHex(hex)
@@ -59,7 +60,7 @@ function ColorRow(props: {
       </div>
       <label
         htmlFor={`${id}-hex`}
-        className="flex-1 min-w-0 text-[12px] font-medium"
+        className="min-w-0 flex-1 text-[12px] font-medium"
         style={{ color: tone.primary }}
       >
         {label}
@@ -74,7 +75,7 @@ function ColorRow(props: {
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"
-        className={`h-7 w-[112px] text-right px-2 font-mono text-[11px] tabular-nums ${sideInputBase}`}
+        className={`h-7 w-[112px] px-2 text-right font-mono text-[11px] tabular-nums ${sideInputBase}`}
         style={{ backgroundColor: fieldBg, borderColor: divider, color: tone.primary }}
         aria-label={t('themeEditor.accent_hex_aria', { label })}
       />
@@ -116,10 +117,9 @@ function SideBlock(props: {
   }
 
   const normalizedPreset = slot.preset === 'forest' ? 'everforest' : slot.preset
-  const presetValue =
-    THEME_PRESETS.includes(normalizedPreset as (typeof THEME_PRESETS)[number])
-      ? normalizedPreset
-      : 'custom'
+  const presetValue = THEME_PRESETS.includes(normalizedPreset as (typeof THEME_PRESETS)[number])
+    ? normalizedPreset
+    : 'custom'
 
   const tone = adaptiveCardTone(slot.background)
   const prefix = `theme-${mode}`
@@ -148,9 +148,11 @@ function SideBlock(props: {
         }}
       >
         <div className="min-w-0">
-          <h4 className="text-xs font-semibold" style={{ color: tone.primary }}>{title}</h4>
+          <h4 className="text-xs font-semibold" style={{ color: tone.primary }}>
+            {title}
+          </h4>
         </div>
-        <div className="flex justify-end min-w-[168px]">
+        <div className="flex min-w-[168px] justify-end">
           <Menu
             align="right"
             items={[
@@ -158,7 +160,7 @@ function SideBlock(props: {
               { value: 'solarized', label: t('themeEditor.preset_solarized') },
               { value: 'everforest', label: t('themeEditor.preset_everforest') },
               { value: 'custom', label: t('themeEditor.preset_custom') },
-            ].map(o => ({
+            ].map((o) => ({
               label: o.label,
               active: o.value === presetValue,
               onSelect: () => onPreset(o.value),
@@ -166,10 +168,14 @@ function SideBlock(props: {
             trigger={({ open, toggle }) => {
               const currentLabel = (() => {
                 switch (presetValue) {
-                  case 'spool': return t('themeEditor.preset_spool')
-                  case 'solarized': return t('themeEditor.preset_solarized')
-                  case 'everforest': return t('themeEditor.preset_everforest')
-                  default: return t('themeEditor.preset_custom')
+                  case 'spool':
+                    return t('themeEditor.preset_spool')
+                  case 'solarized':
+                    return t('themeEditor.preset_solarized')
+                  case 'everforest':
+                    return t('themeEditor.preset_everforest')
+                  default:
+                    return t('themeEditor.preset_custom')
                 }
               })()
               return (
@@ -180,14 +186,14 @@ function SideBlock(props: {
                   aria-expanded={open}
                   aria-label={t('themeEditor.presetAria', { title })}
                   onClick={toggle}
-                  className={`inline-flex min-w-[120px] items-center gap-2 h-8 rounded-[6px] border pl-3 pr-2 text-[11px] font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:ring-[var(--side-accent)]`}
+                  className={`inline-flex h-8 min-w-[120px] items-center gap-2 rounded-[6px] border pr-2 pl-3 text-[11px] font-medium transition-colors outline-none focus-visible:ring-1 focus-visible:ring-[var(--side-accent)] focus-visible:ring-offset-0`}
                   style={{
                     backgroundColor: fieldBg,
                     borderColor: open ? slot.accent : divider,
                     color: tone.primary,
                   }}
                 >
-                  <span className="flex-1 text-left truncate">{currentLabel}</span>
+                  <span className="flex-1 truncate text-left">{currentLabel}</span>
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 12 12"
@@ -195,7 +201,13 @@ function SideBlock(props: {
                     fill="none"
                     style={{ color: tone.muted }}
                   >
-                    <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M2.5 4.5L6 8l3.5-3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </button>
               )
@@ -257,10 +269,13 @@ function SideBlock(props: {
             max={100}
             value={slot.contrast}
             onChange={(e) => onSlotChange({ ...slot, contrast: Number(e.target.value) })}
-            className="w-[180px] h-1.5"
+            className="h-1.5 w-[180px]"
             style={{ accentColor: slot.accent }}
           />
-          <span className="w-7 text-right font-mono text-[11px] tabular-nums" style={{ color: tone.muted }}>
+          <span
+            className="w-7 text-right font-mono text-[11px] tabular-nums"
+            style={{ color: tone.muted }}
+          >
             {slot.contrast}
           </span>
         </div>
@@ -278,7 +293,8 @@ export default function ThemeEditorSection(props: {
   const { t } = useTranslation()
   const { state, onChange, themeSource, onThemeMode } = props
   const [systemDark, setSystemDark] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+    () =>
+      typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
   )
 
   useEffect(() => {
@@ -288,45 +304,43 @@ export default function ThemeEditorSection(props: {
     return () => media.removeEventListener('change', onChange)
   }, [])
 
-  const preferredMode =
-    themeSource === 'system'
-      ? (systemDark ? 'dark' : 'light')
-      : themeSource
+  const preferredMode = themeSource === 'system' ? (systemDark ? 'dark' : 'light') : themeSource
 
-  const orderedSides = preferredMode === 'dark'
-    ? ([
-        {
-          title: t('themeEditor.darkTheme'),
-          mode: 'dark' as const,
-          slot: state.dark,
-          onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
-        },
-        {
-          title: t('themeEditor.lightTheme'),
-          mode: 'light' as const,
-          slot: state.light,
-          onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
-        },
-      ])
-    : ([
-        {
-          title: t('themeEditor.lightTheme'),
-          mode: 'light' as const,
-          slot: state.light,
-          onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
-        },
-        {
-          title: t('themeEditor.darkTheme'),
-          mode: 'dark' as const,
-          slot: state.dark,
-          onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
-        },
-      ])
+  const orderedSides =
+    preferredMode === 'dark'
+      ? [
+          {
+            title: t('themeEditor.darkTheme'),
+            mode: 'dark' as const,
+            slot: state.dark,
+            onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
+          },
+          {
+            title: t('themeEditor.lightTheme'),
+            mode: 'light' as const,
+            slot: state.light,
+            onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
+          },
+        ]
+      : [
+          {
+            title: t('themeEditor.lightTheme'),
+            mode: 'light' as const,
+            slot: state.light,
+            onSlotChange: (light: ThemeSideConfig) => onChange({ ...state, light }),
+          },
+          {
+            title: t('themeEditor.darkTheme'),
+            mode: 'dark' as const,
+            slot: state.dark,
+            onSlotChange: (dark: ThemeSideConfig) => onChange({ ...state, dark }),
+          },
+        ]
 
   return (
     <div className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-        <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.08em] uppercase">
+        <h4 className="text-warm-faint dark:text-dark-muted text-[11px] font-medium tracking-[0.08em] uppercase">
           {t('themeEditor.title')}
         </h4>
         <SegmentedPill
@@ -352,7 +366,6 @@ export default function ThemeEditorSection(props: {
           onSlotChange={side.onSlotChange}
         />
       ))}
-
     </div>
   )
 }

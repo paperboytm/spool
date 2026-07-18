@@ -19,42 +19,42 @@ export type ShortcutGroup = {
 }
 
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
-    {
-      id: 'global',
-      shortcuts: [
-        { id: 'search', combo: 'mod+k' },
-        { id: 'toggleSidebar', combo: 'mod+b' },
-      ],
-    },
-    {
-      id: 'search',
-      shortcuts: [
-        { id: 'navigate', combo: 'arrowup,arrowdown' },
-        { id: 'open', combo: 'enter' },
-        { id: 'runQuery', combo: 'shift+enter' },
-        { id: 'toggleScope', combo: 'tab' },
-        { id: 'close', combo: 'escape' },
-      ],
-    },
-    {
-      id: 'session',
-      shortcuts: [
-        { id: 'find', combo: 'mod+f' },
-        { id: 'prevNextMatch', combo: 'mod+arrowleft,mod+arrowright' },
-        { id: 'closeFind', combo: 'escape' },
-      ],
-    },
-    {
-      id: 'shareEditor',
-      shortcuts: [
-        { id: 'undo', combo: 'mod+z' },
-        { id: 'redo', combo: 'mod+shift+z' },
-        { id: 'zoomIn', combo: 'mod+plus' },
-        { id: 'zoomOut', combo: 'mod+minus' },
-        { id: 'zoomFit', combo: 'mod+0' },
-        { id: 'pan', combo: 'space' },
-      ],
-    },
+  {
+    id: 'global',
+    shortcuts: [
+      { id: 'search', combo: 'mod+k' },
+      { id: 'toggleSidebar', combo: 'mod+b' },
+    ],
+  },
+  {
+    id: 'search',
+    shortcuts: [
+      { id: 'navigate', combo: 'arrowup,arrowdown' },
+      { id: 'open', combo: 'enter' },
+      { id: 'runQuery', combo: 'shift+enter' },
+      { id: 'toggleScope', combo: 'tab' },
+      { id: 'close', combo: 'escape' },
+    ],
+  },
+  {
+    id: 'session',
+    shortcuts: [
+      { id: 'find', combo: 'mod+f' },
+      { id: 'prevNextMatch', combo: 'mod+arrowleft,mod+arrowright' },
+      { id: 'closeFind', combo: 'escape' },
+    ],
+  },
+  {
+    id: 'shareEditor',
+    shortcuts: [
+      { id: 'undo', combo: 'mod+z' },
+      { id: 'redo', combo: 'mod+shift+z' },
+      { id: 'zoomIn', combo: 'mod+plus' },
+      { id: 'zoomOut', combo: 'mod+minus' },
+      { id: 'zoomFit', combo: 'mod+0' },
+      { id: 'pan', combo: 'space' },
+    ],
+  },
 ]
 
 const MAC_SYMBOLS: Record<string, string> = {
@@ -107,5 +107,8 @@ export function formatComboParts(combo: string, isMac: boolean): string[] {
 }
 
 export function splitAlternatives(combo: string): string[] {
-  return combo.split(',').map((c) => c.trim()).filter(Boolean)
+  return combo
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
 }

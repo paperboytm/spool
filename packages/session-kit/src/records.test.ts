@@ -1,12 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { canonicalizeRecord, splitRecords } from './records.js'
 
 describe('splitRecords', () => {
   it('keeps non-empty JSONL records and accepts CRLF and a missing final newline', () => {
-    expect(splitRecords(' {"i":1}\r\n\r\n{"i":2}')).toEqual([
-      ' {"i":1}',
-      '{"i":2}',
-    ])
+    expect(splitRecords(' {"i":1}\r\n\r\n{"i":2}')).toEqual([' {"i":1}', '{"i":2}'])
   })
 })
 

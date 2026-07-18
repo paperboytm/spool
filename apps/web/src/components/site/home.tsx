@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
-const INSTALL_CMD = "curl -fsSL https://spool.pro/install.sh | bash";
+const INSTALL_CMD = 'curl -fsSL https://spool.pro/install.sh | bash'
 
 export default function HomePage() {
-  useScrollReveal();
+  useScrollReveal()
   return (
     <div className="home-page">
       <main className="wrap">
@@ -19,30 +19,30 @@ export default function HomePage() {
         <FinalCTA />
       </main>
     </div>
-  );
+  )
 }
 
 function useScrollReveal() {
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (typeof IntersectionObserver === "undefined") {
-      document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-visible"));
-      return;
+    if (typeof window === 'undefined') return
+    if (typeof IntersectionObserver === 'undefined') {
+      document.querySelectorAll('.reveal').forEach((el) => el.classList.add('is-visible'))
+      return
     }
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            io.unobserve(entry.target);
+            entry.target.classList.add('is-visible')
+            io.unobserve(entry.target)
           }
         }
       },
-      { rootMargin: "0px 0px -10% 0px", threshold: 0.05 }
-    );
-    document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.05 },
+    )
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
 }
 
 /* ───────────────────────────── Hero ───────────────────────────── */
@@ -69,8 +69,8 @@ function Hero() {
       </h1>
 
       <p className="hh-lede">
-        Every Claude, Codex, Gemini, and OpenCode session in one place. Browsable, pinnable, searchable —{" "}
-        <strong>and never leaves your machine</strong>.
+        Every Claude, Codex, Gemini, and OpenCode session in one place. Browsable, pinnable,
+        searchable — <strong>and never leaves your machine</strong>.
       </p>
 
       <div className="hh-cta">
@@ -103,27 +103,27 @@ function Hero() {
         </div>
       </div>
     </section>
-  );
+  )
 }
 
 interface HeroProject {
-  readonly name: string;
-  readonly count: number;
-  readonly dots: readonly string[];
-  readonly active?: boolean;
+  readonly name: string
+  readonly count: number
+  readonly dots: readonly string[]
+  readonly active?: boolean
 }
 
 const HERO_PROJECTS: readonly HeroProject[] = [
-  { name: "harbor", count: 142, dots: ["claude", "codex"], active: true },
-  { name: "tide", count: 87, dots: ["claude", "gemini"] },
-  { name: "prism", count: 53, dots: ["claude"] },
-  { name: "forge", count: 41, dots: ["codex", "claude"] },
-  { name: "ledger", count: 38, dots: ["gemini", "codex"] },
-  { name: "atlas", count: 27, dots: ["claude"] },
-  { name: "terra", count: 22, dots: ["gemini"] },
-  { name: "relay", count: 19, dots: ["claude", "codex"] },
-  { name: "vault", count: 14, dots: ["codex"] },
-];
+  { name: 'harbor', count: 142, dots: ['claude', 'codex'], active: true },
+  { name: 'tide', count: 87, dots: ['claude', 'gemini'] },
+  { name: 'prism', count: 53, dots: ['claude'] },
+  { name: 'forge', count: 41, dots: ['codex', 'claude'] },
+  { name: 'ledger', count: 38, dots: ['gemini', 'codex'] },
+  { name: 'atlas', count: 27, dots: ['claude'] },
+  { name: 'terra', count: 22, dots: ['gemini'] },
+  { name: 'relay', count: 19, dots: ['claude', 'codex'] },
+  { name: 'vault', count: 14, dots: ['codex'] },
+]
 
 function HeroSidebar() {
   return (
@@ -144,7 +144,7 @@ function HeroSidebar() {
       </div>
 
       {HERO_PROJECTS.map((p) => (
-        <div key={p.name} className={`hh-pj${p.active ? " is-active" : ""}`}>
+        <div key={p.name} className={`hh-pj${p.active ? ' is-active' : ''}`}>
           <FolderIcon />
           <span className="nm">{p.name}</span>
           <span className="dots">
@@ -171,16 +171,14 @@ function HeroSidebar() {
         </span>
       </div>
     </aside>
-  );
+  )
 }
 
 function HeroMain() {
   return (
     <div className="hh-main">
       <h2 className="hh-app-h">AI Session Library</h2>
-      <div className="hh-app-sub">
-        All your AI conversations, organized by your code projects.
-      </div>
+      <div className="hh-app-sub">All your AI conversations, organized by your code projects.</div>
 
       <div className="hh-feed">
         <div className="hh-seg">
@@ -236,7 +234,7 @@ function HeroMain() {
         />
       </div>
     </div>
-  );
+  )
 }
 
 function SessionRow({
@@ -245,18 +243,18 @@ function SessionRow({
   meta,
   pinned,
 }: {
-  src: "claude" | "codex" | "gemini";
-  title: string;
-  meta: string;
-  pinned?: boolean;
+  src: 'claude' | 'codex' | 'gemini'
+  title: string
+  meta: string
+  pinned?: boolean
 }) {
   const dimSeparators = (text: string) =>
-    text.split(" · ").map((part, i, arr) => (
+    text.split(' · ').map((part, i, arr) => (
       <span key={i}>
         {part}
         {i < arr.length - 1 && <span className="dim"> · </span>}
       </span>
-    ));
+    ))
   return (
     <div className="hh-row">
       <span className={`hh-bd hh-bd-${src}`}>{src}</span>
@@ -266,21 +264,24 @@ function SessionRow({
       </div>
       {pinned ? <PinIcon /> : <span />}
     </div>
-  );
+  )
 }
 
 function InstallPill() {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
   const onClick = () => {
-    void navigator.clipboard.writeText(INSTALL_CMD).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    }).catch(() => {});
-  };
+    void navigator.clipboard
+      .writeText(INSTALL_CMD)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+      })
+      .catch(() => {})
+  }
   return (
     <button
       type="button"
-      className={`hh-install${copied ? " is-copied" : ""}`}
+      className={`hh-install${copied ? ' is-copied' : ''}`}
       onClick={onClick}
       aria-label="Copy install command"
     >
@@ -288,18 +289,36 @@ function InstallPill() {
       <code>{INSTALL_CMD}</code>
       <span className="copy">
         {copied ? (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="20 6 9 17 4 12" />
           </svg>
         ) : (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="9" y="9" width="13" height="13" rx="2" />
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
         )}
       </span>
     </button>
-  );
+  )
 }
 
 /* ─────────────────── Pillar sections (Browse / Pin / Search) ─────────────────── */
@@ -309,9 +328,9 @@ function PillarHead({
   title,
   sub,
 }: {
-  kicker: string;
-  title: React.ReactNode;
-  sub: React.ReactNode;
+  kicker: string
+  title: React.ReactNode
+  sub: React.ReactNode
 }) {
   return (
     <div className="s-head s-head-edit">
@@ -319,7 +338,7 @@ function PillarHead({
       <h2 className="s-title">{title}</h2>
       <p className="s-sub">{sub}</p>
     </div>
-  );
+  )
 }
 
 function BrowseSection() {
@@ -340,7 +359,7 @@ function BrowseSection() {
         <BrowseDiagram />
       </div>
     </section>
-  );
+  )
 }
 
 function BrowseDiagram() {
@@ -393,7 +412,16 @@ function BrowseDiagram() {
       </div>
 
       <div className="bd-arrow" aria-hidden>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M5 12h14M13 5l7 7-7 7" />
         </svg>
         <span className="bd-arrow-lbl">grouped by working dir</span>
@@ -407,25 +435,27 @@ function BrowseDiagram() {
         </div>
         <div className="bd-out-stats">
           <div className="bd-out-stat">
-            <span className="bd-stat-dot" style={{ background: "var(--src-claude)" }} />
+            <span className="bd-stat-dot" style={{ background: 'var(--src-claude)' }} />
             <span className="bd-stat-num">87</span>
             <span className="bd-stat-lbl">claude</span>
           </div>
           <div className="bd-out-stat">
-            <span className="bd-stat-dot" style={{ background: "var(--src-codex)" }} />
+            <span className="bd-stat-dot" style={{ background: 'var(--src-codex)' }} />
             <span className="bd-stat-num">42</span>
             <span className="bd-stat-lbl">codex</span>
           </div>
           <div className="bd-out-stat">
-            <span className="bd-stat-dot" style={{ background: "var(--src-gemini)" }} />
+            <span className="bd-stat-dot" style={{ background: 'var(--src-gemini)' }} />
             <span className="bd-stat-num">13</span>
             <span className="bd-stat-lbl">gemini</span>
           </div>
         </div>
-        <div className="bd-out-foot">All under <code>/Users/you/code/harbor</code></div>
+        <div className="bd-out-foot">
+          All under <code>/Users/you/code/harbor</code>
+        </div>
       </div>
     </div>
-  );
+  )
 }
 
 function PinSection() {
@@ -446,44 +476,44 @@ function PinSection() {
         <PinBoard />
       </div>
     </section>
-  );
+  )
 }
 
 function PinBoard() {
   const pins = [
     {
       rotate: -2.4,
-      src: "claude" as const,
-      project: "harbor",
-      title: "auth middleware: JWT rotation with refresh tokens",
-      note: "the canonical rotation discussion — link this anywhere auth comes up",
-      date: "Mar 15",
+      src: 'claude' as const,
+      project: 'harbor',
+      title: 'auth middleware: JWT rotation with refresh tokens',
+      note: 'the canonical rotation discussion — link this anywhere auth comes up',
+      date: 'Mar 15',
     },
     {
       rotate: 1.6,
-      src: "gemini" as const,
-      project: "atlas",
-      title: "RAG pipeline: llamaindex vs custom orchestration",
-      note: "decision tree we worked out before the spike",
-      date: "Apr 02",
+      src: 'gemini' as const,
+      project: 'atlas',
+      title: 'RAG pipeline: llamaindex vs custom orchestration',
+      note: 'decision tree we worked out before the spike',
+      date: 'Apr 02',
     },
     {
       rotate: -0.8,
-      src: "codex" as const,
-      project: "ledger",
-      title: "webhook idempotency keys: design + migration plan",
-      note: "every part of the design that survived review is here",
-      date: "Apr 18",
+      src: 'codex' as const,
+      project: 'ledger',
+      title: 'webhook idempotency keys: design + migration plan',
+      note: 'every part of the design that survived review is here',
+      date: 'Apr 18',
     },
     {
       rotate: 2.8,
-      src: "claude" as const,
-      project: "tide",
-      title: "B+ tree write path spike — leaf split edge case",
+      src: 'claude' as const,
+      project: 'tide',
+      title: 'B+ tree write path spike — leaf split edge case',
       note: "you'll forget the off-by-one. don't reinvent it.",
-      date: "Jan 30",
+      date: 'Jan 30',
     },
-  ];
+  ]
 
   return (
     <div className="pb">
@@ -501,7 +531,7 @@ function PinBoard() {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 function SearchSection() {
@@ -517,7 +547,7 @@ function SearchSection() {
         }
         sub={
           <>
-            <strong>Fast</strong> runs FTS5 across every indexed session, instantly.{" "}
+            <strong>Fast</strong> runs FTS5 across every indexed session, instantly.{' '}
             <strong>AI</strong> hands the query to an agent on your machine, which synthesizes an
             answer with sources. The <code>local</code> label never goes away.
           </>
@@ -528,7 +558,7 @@ function SearchSection() {
         <CmdKOverlay />
       </div>
     </section>
-  );
+  )
 }
 
 /* ───────────────────────── ⌘K overlay specimen ───────────────────────── */
@@ -585,31 +615,52 @@ function CmdKOverlay() {
           <CmdKRow
             src="claude"
             project="harbor"
-            title={<>auth middleware: JWT <mark>rotation</mark> with <mark>refresh tokens</mark></>}
+            title={
+              <>
+                auth middleware: JWT <mark>rotation</mark> with <mark>refresh tokens</mark>
+              </>
+            }
             date="today"
           />
           <CmdKRow
             src="claude"
             project="tide"
-            title={<><mark>refresh token rotation</mark> edge cases — concurrent requests</>}
+            title={
+              <>
+                <mark>refresh token rotation</mark> edge cases — concurrent requests
+              </>
+            }
             date="2d ago"
           />
           <CmdKRow
             src="codex"
             project="harbor"
-            title={<>jwt vs opaque <mark>tokens</mark>: short-lived access + rotating <mark>refresh</mark></>}
+            title={
+              <>
+                jwt vs opaque <mark>tokens</mark>: short-lived access + rotating{' '}
+                <mark>refresh</mark>
+              </>
+            }
             date="5d ago"
           />
           <CmdKRow
             src="gemini"
             project="ledger"
-            title={<>session <mark>refresh</mark> with redis TTL spike</>}
+            title={
+              <>
+                session <mark>refresh</mark> with redis TTL spike
+              </>
+            }
             date="Jan 22"
           />
           <CmdKRow
             src="claude"
             project="atlas"
-            title={<>webhook idempotency keys: <mark>token</mark> expiry handling</>}
+            title={
+              <>
+                webhook idempotency keys: <mark>token</mark> expiry handling
+              </>
+            }
             date="Jan 14"
           />
         </div>
@@ -623,7 +674,7 @@ function CmdKOverlay() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function CmdKRow({
@@ -632,10 +683,10 @@ function CmdKRow({
   title,
   date,
 }: {
-  src: "claude" | "codex" | "gemini";
-  project: string;
-  title: React.ReactNode;
-  date: string;
+  src: 'claude' | 'codex' | 'gemini'
+  project: string
+  title: React.ReactNode
+  date: string
 }) {
   return (
     <div className="cmdk-row">
@@ -644,7 +695,7 @@ function CmdKRow({
       <span className="cmdk-ttl">{title}</span>
       <span className="cmdk-date">{date}</span>
     </div>
-  );
+  )
 }
 
 function BoltIcon() {
@@ -652,7 +703,7 @@ function BoltIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M14.5 2 3 14h7l-1.5 8L21 10h-7l.5-8z" />
     </svg>
-  );
+  )
 }
 
 function SparkleIcon() {
@@ -660,7 +711,7 @@ function SparkleIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M12 2.5l2 6.5 6.5 2-6.5 2-2 6.5-2-6.5L3.5 11l6.5-2 2-6.5z" />
     </svg>
-  );
+  )
 }
 
 /* ─────────────────────────── Agent integration ─────────────────────────── */
@@ -678,10 +729,10 @@ function AgentSection() {
         }
         sub={
           <>
-            Drop the <code>/spool</code> skill into Claude Code and ask things like
-            "build on the auth-middleware discussion from last week." It shells out to{" "}
-            <code>spool search</code>, returns matching fragments, and lets the agent load any
-            session in full. Any tool-using agent can do the same via the CLI.
+            Drop the <code>/spool</code> skill into Claude Code and ask things like "build on the
+            auth-middleware discussion from last week." It shells out to <code>spool search</code>,
+            returns matching fragments, and lets the agent load any session in full. Any tool-using
+            agent can do the same via the CLI.
           </>
         }
       />
@@ -691,7 +742,7 @@ function AgentSection() {
           <div>
             <h3>01 — Ask what it ought to know.</h3>
             <p>
-              "Build on the auth-middleware discussion from last week." Claude invokes{" "}
+              "Build on the auth-middleware discussion from last week." Claude invokes{' '}
               <code>/spool</code>, the skill runs <code>spool search</code> against your local
               index, and matching fragments flow back into the conversation.
             </p>
@@ -725,15 +776,15 @@ function AgentSection() {
 
           <div className="out">
             <div className="line">
-              <span className="sys">◉</span>{" "}
+              <span className="sys">◉</span>{' '}
               <span className="sys">/spool — searching your library…</span>
             </div>
             <div className="frag">
               <span
                 className="tag"
                 style={{
-                  background: "color-mix(in srgb, var(--src-claude) 20%, transparent)",
-                  color: "var(--src-claude)",
+                  background: 'color-mix(in srgb, var(--src-claude) 20%, transparent)',
+                  color: 'var(--src-claude)',
                 }}
               >
                 claude
@@ -745,8 +796,8 @@ function AgentSection() {
               <span
                 className="tag"
                 style={{
-                  background: "color-mix(in srgb, var(--src-codex) 20%, transparent)",
-                  color: "var(--src-codex)",
+                  background: 'color-mix(in srgb, var(--src-codex) 20%, transparent)',
+                  color: 'var(--src-codex)',
                 }}
               >
                 codex
@@ -758,8 +809,8 @@ function AgentSection() {
               <span
                 className="tag"
                 style={{
-                  background: "color-mix(in srgb, var(--src-gemini) 20%, transparent)",
-                  color: "var(--src-gemini)",
+                  background: 'color-mix(in srgb, var(--src-gemini) 20%, transparent)',
+                  color: 'var(--src-gemini)',
                 }}
               >
                 gemini
@@ -773,7 +824,7 @@ function AgentSection() {
         </div>
       </div>
     </section>
-  );
+  )
 }
 
 /* ──────────────────────────── Principles ──────────────────────────── */
@@ -781,26 +832,26 @@ function AgentSection() {
 function PrinciplesSection() {
   const principles = [
     {
-      n: "i.",
-      title: "Library, not search box.",
-      body: "The shell is the home — sidebar of projects, main pane of sessions. ⌘K is one entry point among several, not the whole product.",
+      n: 'i.',
+      title: 'Library, not search box.',
+      body: 'The shell is the home — sidebar of projects, main pane of sessions. ⌘K is one entry point among several, not the whole product.',
     },
     {
-      n: "ii.",
-      title: "Local, always.",
-      body: "On-device index, on-device queries, on-device inference. Your machine is the only place your sessions ever live.",
+      n: 'ii.',
+      title: 'Local, always.',
+      body: 'On-device index, on-device queries, on-device inference. Your machine is the only place your sessions ever live.',
     },
     {
-      n: "iii.",
-      title: "First-person metadata.",
-      body: "\"You discussed this · Mar 15\" beats \"Claude Code · Mar 15.\" The library is yours; the language should say so.",
+      n: 'iii.',
+      title: 'First-person metadata.',
+      body: '"You discussed this · Mar 15" beats "Claude Code · Mar 15." The library is yours; the language should say so.',
     },
     {
-      n: "iv.",
-      title: "Agents read it too.",
-      body: "Anything humans can browse, an agent can query. The /spool skill ships with the repo; the same JSON CLI is your public surface.",
+      n: 'iv.',
+      title: 'Agents read it too.',
+      body: 'Anything humans can browse, an agent can query. The /spool skill ships with the repo; the same JSON CLI is your public surface.',
     },
-  ];
+  ]
   return (
     <section className="reveal">
       <PillarHead
@@ -824,7 +875,7 @@ function PrinciplesSection() {
         ))}
       </div>
     </section>
-  );
+  )
 }
 
 /* ──────────────────────────── Final CTA ──────────────────────────── */
@@ -850,7 +901,7 @@ function FinalCTA() {
       </div>
       <div className="plat">macOS · Apple Silicon · MIT · Built in the open</div>
     </section>
-  );
+  )
 }
 
 /* ──────────────────────────── Icons ──────────────────────────── */
@@ -870,7 +921,7 @@ function SearchIcon({ size = 16 }: { size?: number }) {
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </svg>
-  );
+  )
 }
 
 function PinIcon() {
@@ -890,7 +941,7 @@ function PinIcon() {
       <path d="M9 15l-4.5 4.5" fill="none" />
       <path d="M14.5 4l5.5 5.5" fill="none" />
     </svg>
-  );
+  )
 }
 
 function FolderIcon({ dashed }: { dashed?: boolean }) {
@@ -904,11 +955,11 @@ function FolderIcon({ dashed }: { dashed?: boolean }) {
       strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={dashed ? { strokeDasharray: "2 2", opacity: 0.6 } : undefined}
+      style={dashed ? { strokeDasharray: '2 2', opacity: 0.6 } : undefined}
     >
       <path d="M1 3.5a1 1 0 0 1 1-1h3l1.5 1.5h5.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3.5z" />
     </svg>
-  );
+  )
 }
 
 function GhIcon() {
@@ -916,5 +967,5 @@ function GhIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.9 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
     </svg>
-  );
+  )
 }

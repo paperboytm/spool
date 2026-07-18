@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { dropFileOn, navigateToShares, seedShareDraft } from './helpers/share'
 
@@ -97,6 +98,8 @@ test('dropping a .spool with valid JSON but missing required fields surfaces a r
     'application/spool+json',
   )
 
-  await expect(window.getByText(/Couldn't import shape-mismatch\.spool/)).toBeVisible({ timeout: 5000 })
+  await expect(window.getByText(/Couldn't import shape-mismatch\.spool/)).toBeVisible({
+    timeout: 5000,
+  })
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeHidden()
 })

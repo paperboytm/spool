@@ -4,6 +4,7 @@
 import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+
 import type { ModelManifest } from './model-manifest.js'
 
 export type PfInstallStatus =
@@ -27,7 +28,9 @@ export function pfInstallStatus(modelDir: string, manifest: ModelManifest): PfIn
     // Count partial bytes so the progress dial survives a restart.
     try {
       bytesPresent += statSync(part).size
-    } catch { /* no .part */ }
+    } catch {
+      /* no .part */
+    }
   }
   if (allInstalled) return { status: 'installed' }
   if (bytesPresent === 0) return { status: 'not-installed' }

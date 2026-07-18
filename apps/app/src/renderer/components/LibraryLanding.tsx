@@ -1,10 +1,11 @@
+import type { Session, SessionsCursor } from '@spool-lab/core'
+import { Layers3 as LibraryIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Layers3 as LibraryIcon } from 'lucide-react'
-import type { Session, SessionsCursor } from '@spool-lab/core'
-import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
-import { FeaturedEmptyState } from './EmptyState.js'
+
 import { insertSessionSorted } from '../../shared/sessionSort.js'
+import { FeaturedEmptyState } from './EmptyState.js'
+import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
 
 type BucketKey = 'today' | 'yesterday' | 'earlierWeek' | 'earlierMonth' | 'older'
 
@@ -42,7 +43,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
   const pinnedSessionsRef = useRef<Session[]>([])
   pinnedSessionsRef.current = pinnedSessions
   const pinnedUuidsRef = useRef(new Set<string>())
-  pinnedUuidsRef.current = new Set(pinnedSessions.map(s => s.sessionUuid))
+  pinnedUuidsRef.current = new Set(pinnedSessions.map((s) => s.sessionUuid))
 
   useEffect(() => {
     const token = ++fetchTokenRef.current
@@ -55,9 +56,9 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
     ])
       .then(([pinned, page]) => {
         if (fetchTokenRef.current !== token) return
-        const pinnedUuids = new Set(pinned.map(s => s.sessionUuid))
+        const pinnedUuids = new Set(pinned.map((s) => s.sessionUuid))
         setPinnedSessions(pinned)
-        setRecentSessions(page.sessions.filter(s => !pinnedUuids.has(s.sessionUuid)))
+        setRecentSessions(page.sessions.filter((s) => !pinnedUuids.has(s.sessionUuid)))
         setCursor(page.nextCursor)
       })
       .catch(() => {
@@ -81,16 +82,17 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
     // loadMore filters dedupe against already-loaded UUIDs so the
     // keyset query won't surface this session a second time.
     function handlePinEvent() {
-      window.spool.listPinnedSessions()
-        .then(freshPinned => {
-          const freshUuids = new Set(freshPinned.map(s => s.sessionUuid))
+      window.spool
+        .listPinnedSessions()
+        .then((freshPinned) => {
+          const freshUuids = new Set(freshPinned.map((s) => s.sessionUuid))
           const newlyUnpinned = pinnedSessionsRef.current.filter(
-            s => !freshUuids.has(s.sessionUuid),
+            (s) => !freshUuids.has(s.sessionUuid),
           )
           setPinnedSessions(freshPinned)
-          setRecentSessions(prev => {
+          setRecentSessions((prev) => {
             if (!prev) return prev
-            let acc = prev.filter(s => !freshUuids.has(s.sessionUuid))
+            let acc = prev.filter((s) => !freshUuids.has(s.sessionUuid))
             for (const candidate of newlyUnpinned) {
               acc = insertSessionSorted(acc, candidate, 'recent', true)
             }
@@ -109,40 +111,44 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
     // (`loadingMore`) because the merge would race with that fetch.
     const off = window.spool.onNewSessions(() => {
       if (loadingRef.current) return
-      window.spool.listSessions({ limit: PAGE_SIZE })
-        .then(page => {
-          setRecentSessions(prev => {
+      window.spool
+        .listSessions({ limit: PAGE_SIZE })
+        .then((page) => {
+          setRecentSessions((prev) => {
             if (prev === null) return page.sessions
-            const known = new Set(prev.map(s => s.sessionUuid))
+            const known = new Set(prev.map((s) => s.sessionUuid))
             const pinnedUuids = pinnedUuidsRef.current
-            const additions = page.sessions.filter(s =>
-              !known.has(s.sessionUuid) && !pinnedUuids.has(s.sessionUuid),
+            const additions = page.sessions.filter(
+              (s) => !known.has(s.sessionUuid) && !pinnedUuids.has(s.sessionUuid),
             )
             return additions.length === 0 ? prev : [...additions, ...prev]
           })
         })
         .catch(() => {})
     })
-    return () => { off() }
+    return () => {
+      off()
+    }
   }, [])
 
   const loadMore = useCallback(() => {
     if (loadingRef.current || !cursorRef.current) return
     const token = ++fetchTokenRef.current
     setLoadingMore(true)
-    window.spool.listSessions({ limit: PAGE_SIZE, cursor: cursorRef.current })
-      .then(page => {
+    window.spool
+      .listSessions({ limit: PAGE_SIZE, cursor: cursorRef.current })
+      .then((page) => {
         if (fetchTokenRef.current !== token) return
-        setRecentSessions(prev => {
+        setRecentSessions((prev) => {
           const base = prev ?? []
           // Dedupe against pinned + already-loaded. The keyset cursor
           // alone would suffice if nothing else mutated the list, but
           // handlePinEvent reinserts unpinned candidates regardless of
           // whether they sit beyond the loaded range, so they can
           // re-appear here when the page is fetched.
-          const seen = new Set(base.map(s => s.sessionUuid))
-          const additions = page.sessions.filter(s =>
-            !pinnedUuidsRef.current.has(s.sessionUuid) && !seen.has(s.sessionUuid),
+          const seen = new Set(base.map((s) => s.sessionUuid))
+          const additions = page.sessions.filter(
+            (s) => !pinnedUuidsRef.current.has(s.sessionUuid) && !seen.has(s.sessionUuid),
           )
           return [...base, ...additions]
         })
@@ -158,18 +164,18 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
 
   function handlePinChange(sessionUuid: string, pinned: boolean) {
     if (pinned) {
-      const candidate = recentSessions?.find(s => s.sessionUuid === sessionUuid)
+      const candidate = recentSessions?.find((s) => s.sessionUuid === sessionUuid)
       if (candidate) {
-        setRecentSessions(prev => (prev ?? []).filter(s => s.sessionUuid !== sessionUuid))
-        setPinnedSessions(prev => [candidate, ...prev])
+        setRecentSessions((prev) => (prev ?? []).filter((s) => s.sessionUuid !== sessionUuid))
+        setPinnedSessions((prev) => [candidate, ...prev])
       }
     } else {
-      const candidate = pinnedSessions.find(s => s.sessionUuid === sessionUuid)
-      setPinnedSessions(prev => prev.filter(s => s.sessionUuid !== sessionUuid))
+      const candidate = pinnedSessions.find((s) => s.sessionUuid === sessionUuid)
+      setPinnedSessions((prev) => prev.filter((s) => s.sessionUuid !== sessionUuid))
       if (candidate) {
         // exhausted=true so an unpinned session deeper than the loaded
         // range still appears — see handlePinEvent for the rationale.
-        setRecentSessions(prev =>
+        setRecentSessions((prev) =>
           prev ? insertSessionSorted(prev, candidate, 'recent', true) : prev,
         )
       }
@@ -200,7 +206,14 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         testId: 'library-pinned-header',
       })
       for (const s of pinnedSessions) {
-        out.push({ kind: 'session', id: `p-${s.sessionUuid}`, session: s, pinned: true, showProject: true, headerId: 'pinned' })
+        out.push({
+          kind: 'session',
+          id: `p-${s.sessionUuid}`,
+          session: s,
+          pinned: true,
+          showProject: true,
+          headerId: 'pinned',
+        })
       }
     }
     for (const bucket of buckets) {
@@ -222,12 +235,18 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         })
       }
     }
-    out.push({ kind: 'footer', id: 'footer', loading: loadingMore, exhausted, total: totalSessions })
+    out.push({
+      kind: 'footer',
+      id: 'footer',
+      loading: loadingMore,
+      exhausted,
+      total: totalSessions,
+    })
     return out
   }, [pinnedSessions, pinnedLabel, buckets, loadingMore, exhausted, totalSessions])
 
   return (
-    <div data-testid="library-landing" className="flex flex-col h-full overflow-hidden">
+    <div data-testid="library-landing" className="flex h-full flex-col overflow-hidden">
       {recentSessions === null ? (
         <SessionRowsSkeleton count={6} />
       ) : totalSessions === 0 ? (
@@ -273,9 +292,9 @@ export function CollapsibleSection({
     <div data-testid={testId} {...(dataAttr ?? {})}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="group w-full flex items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors duration-75 select-none"
+        className="group text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex w-full items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] transition-colors duration-75 select-none"
       >
         <span>{label}</span>
         <svg
@@ -284,9 +303,15 @@ export function CollapsibleSection({
           viewBox="0 0 12 12"
           fill="none"
           aria-hidden
-          className={`flex-none transition-all opacity-30 group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+          className={`flex-none opacity-30 transition-all group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
         >
-          <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M4 2L8 6L4 10"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
       {open && children}
@@ -299,12 +324,12 @@ function SessionRowsSkeleton({ count }: { count: number }) {
     <div aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-start gap-3 px-5 py-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <div className="h-4 w-12 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
-              <div className="h-4 w-1/2 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex items-center gap-2">
+              <div className="bg-warm-surface2 dark:bg-dark-surface2 h-4 w-12 animate-pulse rounded opacity-60" />
+              <div className="bg-warm-surface2 dark:bg-dark-surface2 h-4 w-1/2 animate-pulse rounded opacity-60" />
             </div>
-            <div className="h-3 w-1/3 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
+            <div className="bg-warm-surface2 dark:bg-dark-surface2 h-3 w-1/3 animate-pulse rounded opacity-60" />
           </div>
         </div>
       ))}
@@ -317,12 +342,18 @@ type TranslateFn = (key: string) => string
 export function bucketSessionsByDate(sessions: Session[], t?: TranslateFn): DateBucket[] {
   const fallback: TranslateFn = (key: string) => {
     switch (key) {
-      case 'library.bucket_today': return 'Today'
-      case 'library.bucket_yesterday': return 'Yesterday'
-      case 'library.bucket_earlierWeek': return 'Earlier this week'
-      case 'library.bucket_earlierMonth': return 'Earlier this month'
-      case 'library.bucket_older': return 'Older'
-      default: return key
+      case 'library.bucket_today':
+        return 'Today'
+      case 'library.bucket_yesterday':
+        return 'Yesterday'
+      case 'library.bucket_earlierWeek':
+        return 'Earlier this week'
+      case 'library.bucket_earlierMonth':
+        return 'Earlier this month'
+      case 'library.bucket_older':
+        return 'Older'
+      default:
+        return key
     }
   }
   return bucketByDate(sessions, t ?? fallback)
@@ -355,10 +386,23 @@ function bucketByDate(sessions: Session[], t: TranslateFn): DateBucket[] {
   }
 
   const buckets: DateBucket[] = []
-  if (today.length > 0) buckets.push({ key: 'today', label: t('library.bucket_today'), sessions: today })
-  if (yesterday.length > 0) buckets.push({ key: 'yesterday', label: t('library.bucket_yesterday'), sessions: yesterday })
-  if (earlierWeek.length > 0) buckets.push({ key: 'earlierWeek', label: t('library.bucket_earlierWeek'), sessions: earlierWeek })
-  if (earlierMonth.length > 0) buckets.push({ key: 'earlierMonth', label: t('library.bucket_earlierMonth'), sessions: earlierMonth })
-  if (older.length > 0) buckets.push({ key: 'older', label: t('library.bucket_older'), sessions: older })
+  if (today.length > 0)
+    buckets.push({ key: 'today', label: t('library.bucket_today'), sessions: today })
+  if (yesterday.length > 0)
+    buckets.push({ key: 'yesterday', label: t('library.bucket_yesterday'), sessions: yesterday })
+  if (earlierWeek.length > 0)
+    buckets.push({
+      key: 'earlierWeek',
+      label: t('library.bucket_earlierWeek'),
+      sessions: earlierWeek,
+    })
+  if (earlierMonth.length > 0)
+    buckets.push({
+      key: 'earlierMonth',
+      label: t('library.bucket_earlierMonth'),
+      sessions: earlierMonth,
+    })
+  if (older.length > 0)
+    buckets.push({ key: 'older', label: t('library.bucket_older'), sessions: older })
   return buckets
 }

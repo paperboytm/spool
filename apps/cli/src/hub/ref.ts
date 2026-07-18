@@ -1,7 +1,5 @@
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
-const SESSION_REF_PATTERN = new RegExp(
-  `^((claude|codex)_${UUID_PATTERN})(?:@(0|[1-9][0-9]*))?$`,
-)
+const SESSION_REF_PATTERN = new RegExp(`^((claude|codex)_${UUID_PATTERN})(?:@(0|[1-9][0-9]*))?$`)
 
 export type SessionRefProvider = 'claude' | 'codex'
 
@@ -34,11 +32,11 @@ function resolveShareUrl(value: string): ResolvedSessionRef {
   // hubs; anything else must be https.
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   if (
-    (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))
-    || url.username !== ''
-    || url.password !== ''
-    || url.search !== ''
-    || url.hash !== ''
+    (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.search !== '' ||
+    url.hash !== ''
   ) {
     return invalidSessionRef(value)
   }

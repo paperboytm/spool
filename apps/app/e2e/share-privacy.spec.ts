@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import {
   installSaveFilePickerMock,
@@ -87,7 +88,10 @@ async function openSeededDraft(window: Page, title: string): Promise<void> {
   // SharesPage is already mounted (after a previous test's safeExit
   // left us there), the cached draft list does NOT auto-refresh and
   // the newly-seeded card never appears.
-  await window.locator('[data-testid="sidebar-library"]').click().catch(() => {})
+  await window
+    .locator('[data-testid="sidebar-library"]')
+    .click()
+    .catch(() => {})
   await navigateToShares(window)
   const card = window
     .locator(`[data-testid="shares-draft-row"][aria-label="Open ${title}"]`)
@@ -156,11 +160,15 @@ test('Privacy tab lists every detected category for a mixed-sensitive draft', as
       await expect(panel.locator(`[data-testid="share-editor-privacy-row-${slug}"]`)).toBeVisible()
     }
     // Synthetic row from the bracketed [Maya] author.
-    await expect(panel.locator('[data-testid="share-editor-privacy-row-author-name"]')).toBeVisible()
+    await expect(
+      panel.locator('[data-testid="share-editor-privacy-row-author-name"]'),
+    ).toBeVisible()
 
     // All bulk checkboxes default to 'all' (every match will be masked).
-    await expect(panel.locator('[data-testid="share-editor-privacy-bulk-email"]'))
-      .toHaveAttribute('aria-checked', 'true')
+    await expect(panel.locator('[data-testid="share-editor-privacy-bulk-email"]')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
   })
 })
 
@@ -179,8 +187,9 @@ test('Master toggle off hides the summary and shows the visible-count warning', 
     await expect(warn).toContainText('will be visible')
     await expect(warn).toContainText('Enable redaction before sharing or exporting')
 
-    await expect(window.locator('[data-testid="share-editor-privacy-count"]'))
-      .toContainText('will be visible')
+    await expect(window.locator('[data-testid="share-editor-privacy-count"]')).toContainText(
+      'will be visible',
+    )
   })
 })
 
@@ -197,8 +206,9 @@ test('Bulk checkbox toggles whole category and surfaces Reset; Reset clears', as
     await emailBulk.click()
     await expect(emailBulk).toHaveAttribute('aria-checked', 'false')
     await expect(reset).toBeVisible()
-    await expect(window.locator('[data-testid="share-editor-privacy-count"]'))
-      .toContainText('visible')
+    await expect(window.locator('[data-testid="share-editor-privacy-count"]')).toContainText(
+      'visible',
+    )
 
     // Click again returns to all-masked.
     await emailBulk.click()
@@ -225,9 +235,7 @@ test('Expanding a category reveals the real value rows', async () => {
     // STRIPE_SECRET_KEY=… line is grabbed by env-var, not api-key.
     await window.locator('[data-testid="share-editor-privacy-row-api-key-header"]').click()
     await expect(window.getByTitle(FAKE_AKIA, { exact: true })).toBeVisible()
-    await expect(
-      window.getByTitle(STRIPE_RK, { exact: true }),
-    ).toBeVisible()
+    await expect(window.getByTitle(STRIPE_RK, { exact: true })).toBeVisible()
   })
 })
 
@@ -309,8 +317,9 @@ test('Per-item opt-out keeps that value verbatim in the sanitised .spool', async
     await window.getByTitle(EMAIL, { exact: true }).click()
 
     await expect(window.locator('[data-testid="share-editor-privacy-reset"]')).toBeVisible()
-    await expect(window.locator('[data-testid="share-editor-privacy-count"]'))
-      .toContainText('visible')
+    await expect(window.locator('[data-testid="share-editor-privacy-count"]')).toContainText(
+      'visible',
+    )
 
     await installSaveFilePickerMock(window)
     await window.locator('[data-testid="share-menu-trigger"]').click()
@@ -388,10 +397,10 @@ test('No sensitive data → empty state', async () => {
     await gotoPrivacyTab(ctx.window)
 
     await expect(ctx.window.locator('[data-testid="share-editor-privacy-clean"]')).toBeVisible()
-    await expect(ctx.window.locator('[data-testid="share-editor-privacy-count"]'))
-      .toContainText('none detected')
-    await expect(ctx.window.locator('[data-testid^="share-editor-privacy-row-"]'))
-      .toHaveCount(0)
+    await expect(ctx.window.locator('[data-testid="share-editor-privacy-count"]')).toContainText(
+      'none detected',
+    )
+    await expect(ctx.window.locator('[data-testid^="share-editor-privacy-row-"]')).toHaveCount(0)
   } finally {
     await safeExit(ctx.window)
   }

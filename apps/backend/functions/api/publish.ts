@@ -1,17 +1,12 @@
-import type {
-  D1Database,
-  KVNamespace,
-  PagesFunction,
-  R2Bucket,
-} from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace, PagesFunction, R2Bucket } from '@cloudflare/workers-types'
 
 import { audit } from '../../src/audit'
 import { requireUser } from '../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../src/errors'
+import { publicBaseUrl } from '../../src/public-url'
 import { renderOgPng } from '../../src/publish/og'
 import { isValidSlug, nanoidSlug } from '../../src/publish/slug'
 import { PublishRequest } from '../../src/publish/validators'
-import { publicBaseUrl } from '../../src/public-url'
 import { checkRate } from '../../src/rate-limit'
 
 type Env = {
@@ -112,7 +107,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       .first<{ id: string; version: number }>()
     if (idempotent) {
       if (req.override_slug && idempotent.id !== req.override_slug) {
-        throw new ApiError('CONFLICT', 'another live share carries the same idempotency token; edit content or revoke the other share')
+        throw new ApiError(
+          'CONFLICT',
+          'another live share carries the same idempotency token; edit content or revoke the other share',
+        )
       }
       return jsonOk({
         id: idempotent.id,
@@ -197,7 +195,10 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         // surface "edit your content or unpublish the other share".
         const msg = updateErr instanceof Error ? updateErr.message : String(updateErr)
         if (/UNIQUE constraint/i.test(msg)) {
-          throw new ApiError('CONFLICT', 'another live share carries the same idempotency token; edit content or revoke the other share')
+          throw new ApiError(
+            'CONFLICT',
+            'another live share carries the same idempotency token; edit content or revoke the other share',
+          )
         }
         throw updateErr
       }
@@ -283,18 +284,20 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       httpMetadata: { contentType: 'application/json' },
     })
 
-    ctx.waitUntil((async () => {
-      try {
-        const png = await renderOgPng(fullSnap)
-        await ctx.env.OG.put(`${slug}.png`, png, {
-          httpMetadata: { contentType: 'image/png' },
-        })
-      } catch (e) {
-        // OG is non-critical; log so a broken renderer is visible without
-        // failing the publish response.
-        console.error('og render failed for', slug, e)
-      }
-    })())
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const png = await renderOgPng(fullSnap)
+          await ctx.env.OG.put(`${slug}.png`, png, {
+            httpMetadata: { contentType: 'image/png' },
+          })
+        } catch (e) {
+          // OG is non-critical; log so a broken renderer is visible without
+          // failing the publish response.
+          console.error('og render failed for', slug, e)
+        }
+      })(),
+    )
 
     return jsonOk({
       id: slug,

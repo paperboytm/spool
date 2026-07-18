@@ -1,23 +1,27 @@
-import { program } from 'commander'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { searchCommand } from './commands/search.js'
-import { syncCommand } from './commands/sync.js'
-import { listCommand } from './commands/list.js'
-import { statusCommand } from './commands/status.js'
-import { showCommand } from './commands/show.js'
-import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
-import { projectsCommand } from './commands/projects.js'
+
+import { program } from 'commander'
+
 import { doctorCommand } from './commands/doctor.js'
+import { listCommand } from './commands/list.js'
 import { loginCommand } from './commands/login.js'
 import { logoutCommand } from './commands/logout.js'
-import { shareCommand } from './commands/share.js'
+import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
+import { projectsCommand } from './commands/projects.js'
 import { resumeCommand } from './commands/resume.js'
+import { searchCommand } from './commands/search.js'
+import { shareCommand } from './commands/share.js'
+import { showCommand } from './commands/show.js'
+import { statusCommand } from './commands/status.js'
+import { syncCommand } from './commands/sync.js'
 import { withdrawCommand } from './commands/withdraw.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version: string }
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as {
+  version: string
+}
 
 program
   .name('spool')

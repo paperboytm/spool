@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
+
 import Database from 'better-sqlite3'
 
 // Resolve home at call time (not module load) so tests can redirect via
@@ -25,8 +26,12 @@ export interface WorktreeUpstreamResolver {
   resolve(cwd: string): string | null
 }
 
-function supersetDbPath(): string { return join(getHome(), '.superset', 'local.db') }
-function supersetDefaultBase(): string { return join(getHome(), '.superset', 'worktrees') }
+function supersetDbPath(): string {
+  return join(getHome(), '.superset', 'local.db')
+}
+function supersetDefaultBase(): string {
+  return join(getHome(), '.superset', 'worktrees')
+}
 
 interface SupersetProjectRow {
   name: string
@@ -68,21 +73,25 @@ function loadSupersetProjects(): { projects: SupersetProjectRow[]; globalBase: s
   try {
     db = new Database(dbPath, { readonly: true, fileMustExist: true })
 
-    const settings = db.prepare(
-      `SELECT worktree_base_dir FROM settings WHERE id = 1`,
-    ).get() as { worktree_base_dir: string | null } | undefined
+    const settings = db.prepare(`SELECT worktree_base_dir FROM settings WHERE id = 1`).get() as
+      | { worktree_base_dir: string | null }
+      | undefined
     const globalBase = settings?.worktree_base_dir || supersetDefaultBase()
 
-    const projects = db.prepare(
-      `SELECT name, main_repo_path, worktree_base_dir FROM projects`,
-    ).all() as SupersetProjectRow[]
+    const projects = db
+      .prepare(`SELECT name, main_repo_path, worktree_base_dir FROM projects`)
+      .all() as SupersetProjectRow[]
 
     _supersetCache = { projects, globalBase }
     return _supersetCache
   } catch {
     return null
   } finally {
-    try { db?.close() } catch { /* ignore */ }
+    try {
+      db?.close()
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -234,8 +243,8 @@ export const orcaResolver: WorktreeUpstreamResolver = {
     if (!repoName) return null
     const candidates = new Set(
       data.repos
-        .filter(repo => repo.displayName === repoName || basename(repo.path) === repoName)
-        .map(repo => repo.path),
+        .filter((repo) => repo.displayName === repoName || basename(repo.path) === repoName)
+        .map((repo) => repo.path),
     )
     return candidates.size === 1 ? [...candidates][0]! : null
   },

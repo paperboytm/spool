@@ -10,12 +10,14 @@
 // so we treat any pf-model:// path as a relative join against the
 // model directory and refuse to escape it.
 
-import { protocol } from 'electron'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
+
+import { protocol } from 'electron'
+
 import { pfModelsRoot } from './model-paths.js'
 
 /** ORT WASM/JS files are loaded by the inference renderer at runtime
@@ -126,21 +128,23 @@ export function registerPfModelProtocol(): void {
  *  renderer treats `pf-model://` as an opaque origin and CSP/fetch
  *  reject it silently. */
 export function registerPfModelScheme(): void {
-  protocol.registerSchemesAsPrivileged([{
-    scheme: 'pf-model',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      // The inference renderer is loaded from http://localhost in dev
-      // (Vite) and file:// in prod; either way the document origin
-      // differs from pf-model:// so Chromium's CORS layer would block
-      // the fetch without explicit allow. Our handler only serves files
-      // inside pfModelsRoot() (path-traversal refused with 403), no
-      // sensitive surface to widen.
-      corsEnabled: true,
-      bypassCSP: false,
-      stream: true,
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'pf-model',
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        // The inference renderer is loaded from http://localhost in dev
+        // (Vite) and file:// in prod; either way the document origin
+        // differs from pf-model:// so Chromium's CORS layer would block
+        // the fetch without explicit allow. Our handler only serves files
+        // inside pfModelsRoot() (path-traversal refused with 403), no
+        // sensitive surface to widen.
+        corsEnabled: true,
+        bypassCSP: false,
+        stream: true,
+      },
     },
-  }])
+  ])
 }

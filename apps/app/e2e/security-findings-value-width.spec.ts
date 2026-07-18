@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression test for the finding-row value over-truncation (May 2026):
 //
@@ -25,15 +27,29 @@ test.beforeAll(async () => {
       writeFileSync(
         join(claudeDir, 'test-project', 'value-width-fixture.jsonl'),
         [
-          JSON.stringify({ type: 'user', sessionId: 'value-width', cwd: '/tmp/test-project', uuid: 'vw-1', timestamp: '2026-05-20T10:00:00Z', message: { role: 'user', content: 'key AKIAV3QFKW72ZDLNP4XX leaked, rotate it' } }),
-          JSON.stringify({ type: 'assistant', uuid: 'vw-2', timestamp: '2026-05-20T10:00:01Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'rotating' } }),
+          JSON.stringify({
+            type: 'user',
+            sessionId: 'value-width',
+            cwd: '/tmp/test-project',
+            uuid: 'vw-1',
+            timestamp: '2026-05-20T10:00:00Z',
+            message: { role: 'user', content: 'key AKIAV3QFKW72ZDLNP4XX leaked, rotate it' },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'vw-2',
+            timestamp: '2026-05-20T10:00:01Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'rotating' },
+          }),
         ].join('\n'),
       )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 test('finding value spans the full row width and actions stay reachable on hover', async () => {
   const { window } = ctx
@@ -53,7 +69,7 @@ test('finding value spans the full row width and actions stay reachable on hover
   const cell = row.locator('[data-testid="finding-value-cell"]')
   const rowBox = (await row.boundingBox())!
   const cellBox = (await cell.boundingBox())!
-  expect((rowBox.x + rowBox.width) - (cellBox.x + cellBox.width)).toBeLessThan(40)
+  expect(rowBox.x + rowBox.width - (cellBox.x + cellBox.width)).toBeLessThan(40)
 
   // The value text is shown (not clipped to nothing by a reserved column).
   await expect(value).toBeVisible()

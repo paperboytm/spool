@@ -6,10 +6,11 @@
 // before importing the module so each suite gets its own filesystem
 // without touching the user's real ~/.spool/.
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vite-plus/test'
 
 let tmpDir: string
 let configPath: string
@@ -66,14 +67,17 @@ describe('loadSecurityPreferences', () => {
   })
 
   it('honours stored values', () => {
-    writeFileSync(configPath, JSON.stringify({
-      kindAllowlist: ['email', 'phone'],
-      infoDefaultVisible: true,
-      rescanAfterSync: 'manual',
-      securityPageValuesBlurred: true,
-      findingsStripValuesBlurred: false,
-      pfEnabled: true,
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        kindAllowlist: ['email', 'phone'],
+        infoDefaultVisible: true,
+        rescanAfterSync: 'manual',
+        securityPageValuesBlurred: true,
+        findingsStripValuesBlurred: false,
+        pfEnabled: true,
+      }),
+    )
     const prefs = mod.loadSecurityPreferences()
     expect(prefs.kindAllowlist).toEqual(['email', 'phone'])
     expect(prefs.infoDefaultVisible).toBe(true)
@@ -87,12 +91,15 @@ describe('loadSecurityPreferences', () => {
     // The reader is strict-`=== true`; "true", 1, etc. should not
     // promote to true. This prevents a corrupted/edited file from
     // silently flipping screen-share mode etc.
-    writeFileSync(configPath, JSON.stringify({
-      infoDefaultVisible: 'true',
-      securityPageValuesBlurred: 1,
-      findingsStripValuesBlurred: 'yes',
-      pfEnabled: 'yes',
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        infoDefaultVisible: 'true',
+        securityPageValuesBlurred: 1,
+        findingsStripValuesBlurred: 'yes',
+        pfEnabled: 'yes',
+      }),
+    )
     const prefs = mod.loadSecurityPreferences()
     expect(prefs.infoDefaultVisible).toBe(false)
     expect(prefs.securityPageValuesBlurred).toBe(false)
@@ -122,10 +129,13 @@ describe('loadSecurityPreferences', () => {
     it('ignores the legacy flag once either new field is present', () => {
       // The user has already migrated and explicitly turned the page
       // blur off — the stale legacy flag must NOT override.
-      writeFileSync(configPath, JSON.stringify({
-        revealValuesOnHoverOnly: true,
-        securityPageValuesBlurred: false,
-      }))
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          revealValuesOnHoverOnly: true,
+          securityPageValuesBlurred: false,
+        }),
+      )
       const prefs = mod.loadSecurityPreferences()
       expect(prefs.securityPageValuesBlurred).toBe(false)
       // Strip field absent → still treated as false because the new-
@@ -135,9 +145,12 @@ describe('loadSecurityPreferences', () => {
   })
 
   it('filters non-string entries out of kindAllowlist', () => {
-    writeFileSync(configPath, JSON.stringify({
-      kindAllowlist: ['email', 42, null, undefined, 'phone', { kind: 'bad' }],
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        kindAllowlist: ['email', 42, null, undefined, 'phone', { kind: 'bad' }],
+      }),
+    )
     expect(mod.loadSecurityPreferences().kindAllowlist).toEqual(['email', 'phone'])
   })
 
@@ -179,14 +192,17 @@ describe('loadSecurityPreferences', () => {
 describe('saveSecurityPreferences', () => {
   it('writes a partial update without dropping unrelated keys on disk', () => {
     // Seed with all fields set.
-    writeFileSync(configPath, JSON.stringify({
-      kindAllowlist: ['email'],
-      infoDefaultVisible: true,
-      rescanAfterSync: 'manual',
-      securityPageValuesBlurred: true,
-      findingsStripValuesBlurred: true,
-      pfEnabled: true,
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        kindAllowlist: ['email'],
+        infoDefaultVisible: true,
+        rescanAfterSync: 'manual',
+        securityPageValuesBlurred: true,
+        findingsStripValuesBlurred: true,
+        pfEnabled: true,
+      }),
+    )
     // Update only one field.
     mod.saveSecurityPreferences({ kindAllowlist: ['phone'] })
     const onDisk = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
@@ -221,10 +237,13 @@ describe('saveSecurityPreferences', () => {
   })
 
   it('preserves unknown forward-compat keys', () => {
-    writeFileSync(configPath, JSON.stringify({
-      kindAllowlist: ['email'],
-      experimentalThing: { nested: 1 },
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        kindAllowlist: ['email'],
+        experimentalThing: { nested: 1 },
+      }),
+    )
     mod.saveSecurityPreferences({ kindAllowlist: ['phone'] })
     const onDisk = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
     expect(onDisk['experimentalThing']).toEqual({ nested: 1 })
@@ -277,7 +296,7 @@ describe('saveSecurityPreferences', () => {
   })
 
   it('explicit pfCalloutDismissed:false can re-arm the callout', () => {
-    mod.saveSecurityPreferences({ pfEnabled: true })  // also flips dismissed to true
+    mod.saveSecurityPreferences({ pfEnabled: true }) // also flips dismissed to true
     expect(mod.loadSecurityPreferences().pfCalloutDismissed).toBe(true)
     mod.saveSecurityPreferences({ pfEnabled: false, pfCalloutDismissed: false })
     expect(mod.loadSecurityPreferences().pfCalloutDismissed).toBe(false)
@@ -292,12 +311,20 @@ describe('saveSecurityPreferences', () => {
       chmodSync(configPath, 0o000)
       // If the platform still lets us read, skip the assertion.
       let denied = false
-      try { readFileSync(configPath, 'utf8') } catch { denied = true }
+      try {
+        readFileSync(configPath, 'utf8')
+      } catch {
+        denied = true
+      }
       if (!denied) return
       const prefs = mod.loadSecurityPreferences()
       expect(prefs.kindAllowlist).toEqual([])
     } finally {
-      try { chmodSync(configPath, 0o600) } catch { /* ignore */ }
+      try {
+        chmodSync(configPath, 0o600)
+      } catch {
+        /* ignore */
+      }
     }
   })
 })

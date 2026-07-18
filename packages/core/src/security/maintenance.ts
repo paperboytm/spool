@@ -1,10 +1,6 @@
-import {
-  existsSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from 'node:fs'
+import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+
 import type Database from 'better-sqlite3'
 
 // Listed in the UI: any snapshot Spool itself produced under
@@ -85,4 +81,3 @@ export function deleteBackups(
   }
   return { deleted, bytesFreed }
 }
-

@@ -36,17 +36,14 @@ export function snapshotFromSpoolDocument(doc: SpoolDocument): Snapshot {
   return {
     schema_version: 1,
     source: {
-      kind:
-        conversation.origin.kind === 'agent-session' ? 'spool-session' : 'imported-file',
+      kind: conversation.origin.kind === 'agent-session' ? 'spool-session' : 'imported-file',
       captured_at: toIsoOrNow(conversation.createdAt || doc.exportedAt),
     },
     conversation: {
       title: conversation.title || 'Untitled',
       turns: snapshotTurns,
       turn_order: snapshotTurns.map((turn) => turn.id),
-      hidden_turns: snapshotTurns
-        .filter((_, idx) => hiddenIndices.has(idx))
-        .map((turn) => turn.id),
+      hidden_turns: snapshotTurns.filter((_, idx) => hiddenIndices.has(idx)).map((turn) => turn.id),
     },
     editor_opts: {
       template: doc.opts.template,

@@ -1,11 +1,6 @@
-import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
-import {
-  PAPERS,
-  SnapshotReader,
-  TEMPLATE_RATIO,
-  decodeSnapshot,
-} from '@spool/share-kit'
+import { PAPERS, SnapshotReader, TEMPLATE_RATIO, decodeSnapshot } from '@spool/share-kit'
 import type { Snapshot } from '@spool/share-kit'
+import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 import { fetchSnapshot, type SnapshotFetchResult } from '../lib/api'
@@ -33,10 +28,7 @@ function naturalWidthFor(snapshot: Snapshot | null): number {
 // regression or a content-driven render edge case shouldn't blank the
 // page silently — show the same tombstone the user would see for a
 // 404 / network error.
-class SnapshotErrorBoundary extends Component<
-  { children: ReactNode },
-  { failed: boolean }
-> {
+class SnapshotErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false }
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true }
@@ -113,10 +105,7 @@ export function Reader({ id }: { id: string }) {
     <Page>
       <Header />
       <div className="reader-canvas">
-        <div
-          className="reader-paper"
-          style={{ width: naturalWidth, background: paperHex }}
-        >
+        <div className="reader-paper" style={{ width: naturalWidth, background: paperHex }}>
           <SnapshotErrorBoundary>
             <SnapshotReader snapshot={state.snapshot} />
           </SnapshotErrorBoundary>

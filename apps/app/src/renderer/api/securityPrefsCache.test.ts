@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
+
 import type { SecurityPreferences } from '../../preload/index.js'
 
 const setPrefs = vi.fn()
@@ -46,7 +47,9 @@ describe('patchSecurityPrefs optimistic update', () => {
 
   it('reverts the cache and notifies subscribers on IPC rejection', async () => {
     let notifications = 0
-    const unsub = subscribe(() => { notifications += 1 })
+    const unsub = subscribe(() => {
+      notifications += 1
+    })
     setPrefs.mockRejectedValueOnce(new Error('ipc down'))
     await patchSecurityPrefs({ pfEnabled: true })
     // optimistic apply (1) + rollback (1) = 2 emits
@@ -58,7 +61,10 @@ describe('patchSecurityPrefs optimistic update', () => {
   it('does not clobber a newer authoritative value that landed during the in-flight IPC', async () => {
     let rejectIpc: (e: unknown) => void = () => {}
     setPrefs.mockImplementationOnce(
-      () => new Promise((_res, rej) => { rejectIpc = rej }),
+      () =>
+        new Promise((_res, rej) => {
+          rejectIpc = rej
+        }),
     )
     const p = patchSecurityPrefs({ pfEnabled: true })
     // Authoritative broadcast lands while setPrefs is still pending.

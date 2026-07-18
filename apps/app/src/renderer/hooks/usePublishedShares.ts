@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PublishedShareCacheItem } from '@spool-lab/core'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import type { MyShare } from '../../shared/share-publish.js'
 
 /** Convert a wire-format `MyShare` into the local cache row shape. The

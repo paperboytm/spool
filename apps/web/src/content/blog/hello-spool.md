@@ -1,6 +1,6 @@
 ---
-title: "Introducing Spool: The Missing Search Engine for Your Own Data"
-description: "Why we built a local search engine for developers who think with AI — and how it works."
+title: 'Introducing Spool: The Missing Search Engine for Your Own Data'
+description: 'Why we built a local search engine for developers who think with AI — and how it works.'
 date: 2026-04-02
 author: Yifeng
 tags: [announcement, product]

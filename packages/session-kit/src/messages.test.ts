@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { parseClaudeSessionText } from './messages.js'
 
 const line = (value: unknown): string => JSON.stringify(value)
@@ -37,7 +38,7 @@ describe('parseClaudeSessionText — tag stripping', () => {
     expect(result.kind).toBe('parsed')
     if (result.kind !== 'parsed') return
     expect(result.session.title).not.toContain('<script')
-    const userText = result.session.messages.find(m => m.role === 'user')?.contentText
+    const userText = result.session.messages.find((m) => m.role === 'user')?.contentText
     expect(userText).not.toContain('<script')
   })
 
@@ -50,7 +51,11 @@ describe('parseClaudeSessionText — tag stripping', () => {
     const start = Date.now()
     const result = parse([
       baseRecord({ type: 'user', uuid: 'u1', message: { role: 'user', content: hostile } }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
     const elapsedMs = Date.now() - start
 
@@ -65,10 +70,15 @@ describe('parseClaudeSessionText — tag stripping', () => {
         uuid: 'u1',
         message: {
           role: 'user',
-          content: '<spool-system-prelude>\nsystem stuff\n</spool-system-prelude>\n\nwhat did I do today?',
+          content:
+            '<spool-system-prelude>\nsystem stuff\n</spool-system-prelude>\n\nwhat did I do today?',
         },
       }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
 
     expect(result.kind).toBe('parsed')
@@ -88,15 +98,22 @@ describe('parseClaudeSessionText — tag stripping', () => {
         uuid: 'u1',
         message: {
           role: 'user',
-          content: '<spool-system-prelude>\nsystem stuff without a close tag\n\nwhat did I do today?',
+          content:
+            '<spool-system-prelude>\nsystem stuff without a close tag\n\nwhat did I do today?',
         },
       }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
 
     expect(result.kind).toBe('parsed')
     if (result.kind !== 'parsed') return
-    expect(result.session.messages[0]?.contentText).toBe('system stuff without a close tag\n\nwhat did I do today?')
+    expect(result.session.messages[0]?.contentText).toBe(
+      'system stuff without a close tag\n\nwhat did I do today?',
+    )
   })
 })
 
@@ -108,10 +125,15 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
         uuid: 'u1',
         message: {
           role: 'user',
-          content: '<command-name>/foo</command-name>\n<command-message>foo</command-message>\n<command-args>bar baz</command-args>\n\nafter text',
+          content:
+            '<command-name>/foo</command-name>\n<command-message>foo</command-message>\n<command-args>bar baz</command-args>\n\nafter text',
         },
       }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
 
     expect(result.kind).toBe('parsed')
@@ -129,7 +151,11 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
           content: 'before text <command-name>/model</command-name> after text',
         },
       }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
 
     expect(result.kind).toBe('parsed')
@@ -147,10 +173,15 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
         uuid: 'u1',
         message: {
           role: 'user',
-          content: 'I saw <command-args>weird-payload</command-args> in the logs, what does it mean?',
+          content:
+            'I saw <command-args>weird-payload</command-args> in the logs, what does it mean?',
         },
       }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
 
     expect(result.kind).toBe('parsed')
@@ -159,7 +190,9 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
     // matches; the <command-args>/</command-args> tag markers themselves
     // are removed later by the final generic tag strip, but "weird-payload"
     // survives — same as the old regex path.
-    expect(result.session.messages[0]?.contentText).toBe('I saw weird-payload in the logs, what does it mean?')
+    expect(result.session.messages[0]?.contentText).toBe(
+      'I saw weird-payload in the logs, what does it mean?',
+    )
   })
 
   it('does not hang on a long run of unterminated <command-name> opens (ReDoS probe)', () => {
@@ -170,7 +203,11 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
     const start = Date.now()
     const result = parse([
       baseRecord({ type: 'user', uuid: 'u1', message: { role: 'user', content: hostile } }),
-      baseRecord({ type: 'assistant', uuid: 'a1', message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' } }),
+      baseRecord({
+        type: 'assistant',
+        uuid: 'a1',
+        message: { role: 'assistant', content: 'ok', model: 'claude-opus-4-6' },
+      }),
     ])
     const elapsedMs = Date.now() - start
 

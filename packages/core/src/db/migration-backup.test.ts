@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import { backupBeforeDestructive, runMigrations } from './db.js'
 
 const tempDirs: string[] = []
@@ -60,7 +62,9 @@ describe('backupBeforeDestructive', () => {
 
     // Backup is a valid SQLite DB containing the seeded session
     const backupDb = new Database(result!, { readonly: true })
-    const row = backupDb.prepare(`SELECT session_uuid FROM sessions`).get() as { session_uuid: string }
+    const row = backupDb.prepare(`SELECT session_uuid FROM sessions`).get() as {
+      session_uuid: string
+    }
     expect(row.session_uuid).toBe('sess-1')
     backupDb.close()
   })
@@ -106,7 +110,11 @@ describe('backupBeforeDestructive', () => {
     expect(result).toBeNull()
     // backups dir is not created when there's nothing to back up
     let backupsExisted = true
-    try { readdirSync(join(dir, 'backups')) } catch { backupsExisted = false }
+    try {
+      readdirSync(join(dir, 'backups'))
+    } catch {
+      backupsExisted = false
+    }
     expect(backupsExisted).toBe(false)
   })
 })
@@ -154,7 +162,7 @@ describe('migration backup integration', () => {
     db.close()
 
     const backups = readdirSync(join(dir, 'backups'))
-    expect(backups.some(f => /^spool-pre-v5-.*\.db$/.test(f))).toBe(true)
+    expect(backups.some((f) => /^spool-pre-v5-.*\.db$/.test(f))).toBe(true)
   })
 
   it('skips backup on a fresh-install migration (no prior session data)', () => {
@@ -167,7 +175,11 @@ describe('migration backup integration', () => {
     db.close()
 
     let backupsExisted = true
-    try { readdirSync(join(dir, 'backups')) } catch { backupsExisted = false }
+    try {
+      readdirSync(join(dir, 'backups'))
+    } catch {
+      backupsExisted = false
+    }
     expect(backupsExisted).toBe(false)
   })
 })

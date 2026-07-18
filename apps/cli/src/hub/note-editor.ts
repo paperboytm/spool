@@ -58,14 +58,14 @@ export function editNote(prefillDraft: string, options: NoteEditorOptions = {}):
 function commentPrefill(prefillDraft: string): string {
   return normalizeNewlines(prefillDraft)
     .split('\n')
-    .map(line => line === '' ? '#' : `# ${line}`)
+    .map((line) => (line === '' ? '#' : `# ${line}`))
     .join('\n')
 }
 
 function stripCommentLines(note: string): string {
   return normalizeNewlines(note)
     .split('\n')
-    .filter(line => !line.startsWith('#'))
+    .filter((line) => !line.startsWith('#'))
     .join('\n')
     .trim()
 }

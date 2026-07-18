@@ -36,21 +36,10 @@
 // match by text — the i18n migration lands strings behind t() and any
 // text-based selector would flake the moment the en.json copy edits.
 
-import { test, expect, type Page } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-import {
-  launchApp,
-  restartApp,
-  waitForSync,
-  type AppContext,
-} from './helpers/launch'
-import {
-  startSharePublishMockBackend,
-  type SharePublishMockHandle,
-} from './helpers/share-publish-mock-backend'
-import { navigateToShares, openShareEditorFromSessionDetail } from './helpers/share'
+import { test, expect, type Page } from '@playwright/test'
 
 // Error-copy assertions read the expected strings from the same en.json
 // the renderer renders from — the selector discipline below bans
@@ -58,6 +47,12 @@ import { navigateToShares, openShareEditorFromSessionDetail } from './helpers/sh
 // rendered?" is only observable through copy, so we source it from the
 // single source of truth instead of duplicating it here.
 import en from '../src/renderer/i18n/locales/en.json'
+import { launchApp, restartApp, waitForSync, type AppContext } from './helpers/launch'
+import { navigateToShares, openShareEditorFromSessionDetail } from './helpers/share'
+import {
+  startSharePublishMockBackend,
+  type SharePublishMockHandle,
+} from './helpers/share-publish-mock-backend'
 
 const SESSION_UUID = 'test-session-uuid-001'
 
@@ -112,9 +107,7 @@ test('Share popover opens with the ConnectCard when signed out', async () => {
 
   await window.locator('[data-testid="share-menu-trigger"]').click()
   await window.locator('[data-testid="share-menu-popover"]').waitFor({ state: 'visible' })
-  await expect(
-    window.locator('[data-testid="connect-card-signin"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="connect-card-signin"]')).toBeVisible()
 })
 
 test('Sign-in transitions the popover to the publish form', async () => {
@@ -123,22 +116,14 @@ test('Sign-in transitions the popover to the publish form', async () => {
   await window.locator('[data-testid="connect-card-signin"]').click()
   // Form renders only once useShareAuth resolves to a signed-in user;
   // covers the auth-bus EventTarget sync between main and renderer.
-  await expect(
-    window.locator('[data-testid="share-menu-form"]'),
-  ).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="share-menu-form"]')).toBeVisible({ timeout: 5_000 })
   // Profiles are cut from launch: the visibility picker must stay
   // hidden and every publish goes out link-only (asserted on the mock
   // backend in the publish test below). The snapshot summary card
   // replaces the picker as the form's body.
-  await expect(
-    window.locator('[data-testid="share-menu-visibility-link-only"]'),
-  ).toHaveCount(0)
-  await expect(
-    window.locator('[data-testid="share-menu-snapshot-card"]'),
-  ).toBeVisible()
-  await expect(
-    window.locator('[data-testid="share-menu-submit"]'),
-  ).toBeEnabled()
+  await expect(window.locator('[data-testid="share-menu-visibility-link-only"]')).toHaveCount(0)
+  await expect(window.locator('[data-testid="share-menu-snapshot-card"]')).toBeVisible()
+  await expect(window.locator('[data-testid="share-menu-submit"]')).toBeEnabled()
 })
 
 test('Settings → Account offers no handle claim while profiles are cut', async () => {
@@ -157,12 +142,8 @@ test('Settings → Account offers no handle claim while profiles are cut', async
   // Signed in without a handle — the pre-cut UI showed the claim
   // input here. Sign-out row proves the pane rendered (absence of the
   // input isn't a pass if the whole pane failed to mount).
-  await expect(
-    window.locator('[data-testid="settings-account-signout"]'),
-  ).toBeVisible()
-  await expect(
-    window.locator('[data-testid="settings-account-handle-input"]'),
-  ).toHaveCount(0)
+  await expect(window.locator('[data-testid="settings-account-signout"]')).toBeVisible()
+  await expect(window.locator('[data-testid="settings-account-handle-input"]')).toHaveCount(0)
 
   // The delete-account confirm must not mention a handle either: it
   // renders exactly the two bullets that survive the profile cut.
@@ -170,9 +151,7 @@ test('Settings → Account offers no handle claim while profiles are cut', async
   const modal = window.locator('[data-testid="delete-account-confirm"]')
   await expect(modal).toBeVisible()
   await expect(modal.locator('ul > li')).toHaveCount(2)
-  await expect(modal.locator('ul')).not.toContainText(
-    en.settings.account.deleteConfirm_item_handle,
-  )
+  await expect(modal.locator('ul')).not.toContainText(en.settings.account.deleteConfirm_item_handle)
   await window.locator('[data-testid="delete-account-confirm-cancel"]').click()
 })
 
@@ -183,9 +162,9 @@ test('Publish lands in the manage view with slug + copy-link + unpublish', async
   // Submit. The renderer derives idempotency_key from the snapshot;
   // we only need to assert the manage view eventually appears.
   await window.locator('[data-testid="share-menu-submit"]').click()
-  await expect(
-    window.locator('[data-testid="share-menu-manage-view"]'),
-  ).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="share-menu-manage-view"]')).toBeVisible({
+    timeout: 10_000,
+  })
 
   await expect(window.locator('[data-testid="share-menu-copy"]')).toBeVisible()
   await expect(window.locator('[data-testid="share-menu-republish"]')).toBeVisible()
@@ -209,19 +188,13 @@ test('Unpublish requires confirm and tombstones the share', async () => {
   // The dedicated centered modal — NOT a popover-internal click-twice.
   // This is the regression guard for the destructive-action discipline
   // codified in PR #371.
-  await expect(
-    window.locator('[data-testid="unpublish-confirm"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeVisible()
 
   await window.locator('[data-testid="unpublish-confirm-yes"]').click()
 
-  await expect(
-    window.locator('[data-testid="unpublish-confirm"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeHidden()
   // Popover falls back to the publish form once the live share is gone.
-  await expect(
-    window.locator('[data-testid="share-menu-form"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="share-menu-form"]')).toBeVisible()
 
   // Backend state: row carries revoked_at.
   const shares = Array.from(mock.state.shares.values())
@@ -238,18 +211,12 @@ test('Cancel on the unpublish modal leaves the share live', async () => {
   await signInAndPublish(window)
 
   await window.locator('[data-testid="share-menu-unpublish"]').click()
-  await expect(
-    window.locator('[data-testid="unpublish-confirm"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeVisible()
 
   await window.locator('[data-testid="unpublish-confirm-cancel"]').click()
-  await expect(
-    window.locator('[data-testid="unpublish-confirm"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="unpublish-confirm"]')).toBeHidden()
   // Manage view still rendered, share state unchanged.
-  await expect(
-    window.locator('[data-testid="share-menu-manage-view"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="share-menu-manage-view"]')).toBeVisible()
   const shares = Array.from(mock.state.shares.values())
   expect(shares).toHaveLength(1)
   expect(shares[0]!.revoked_at).toBeNull()
@@ -303,9 +270,9 @@ test('High-risk PII gate: override does not re-arm the same "Publish anyway" but
 
   // The explicit confirm publishes.
   await confirm.click()
-  await expect(
-    window.locator('[data-testid="share-menu-manage-view"]'),
-  ).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="share-menu-manage-view"]')).toBeVisible({
+    timeout: 10_000,
+  })
   expect(mock.state.shares.size).toBe(1)
 })
 
@@ -354,9 +321,9 @@ test('Publish rate-limit (429) shows the error inline and retry succeeds', async
   // Backend recovers → the same submit button retries to success.
   mock.state.failures.publish = null
   await window.locator('[data-testid="share-menu-submit"]').click()
-  await expect(
-    window.locator('[data-testid="share-menu-manage-view"]'),
-  ).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="share-menu-manage-view"]')).toBeVisible({
+    timeout: 10_000,
+  })
   expect(mock.state.shares.size).toBe(1)
 })
 
@@ -402,13 +369,9 @@ test('Published tab lists a live share with open/copy/unpublish affordances', as
   // Leave the share editor — the full-page editor covers the sidebar,
   // so close the popover (Esc) and back out before navigating.
   await window.keyboard.press('Escape')
-  await expect(
-    window.locator('[data-testid="share-menu-popover"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="share-menu-popover"]')).toBeHidden()
   await window.locator('[data-testid="share-editor-back"]').click()
-  await expect(
-    window.locator('[data-testid="share-editor-page"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="share-editor-page"]')).toBeHidden()
 
   await navigateToShares(window)
   await window.locator('[data-testid="shares-tab-published"]').click()
@@ -436,9 +399,7 @@ test('Published tab lists a live share with open/copy/unpublish affordances', as
   await window.keyboard.press('Escape')
   // Live row — no stale banner, no revoked styling.
   await expect(row).not.toHaveAttribute('data-revoked', '')
-  await expect(
-    window.locator('[data-testid="published-stale-banner"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="published-stale-banner"]')).toBeHidden()
 })
 
 test('Row menu lists a share on the profile and back', async () => {
@@ -472,7 +433,9 @@ test('Row menu lists a share on the profile and back', async () => {
   // And back.
   await row.hover()
   await row.getByLabel(en.common.moreActions).click()
-  await window.getByRole('menuitem', { name: en.shares.publishedTab.action_unlistFromProfile }).click()
+  await window
+    .getByRole('menuitem', { name: en.shares.publishedTab.action_unlistFromProfile })
+    .click()
   await expect(row.getByLabel(en.shares.publishedTab.vis_unlisted)).toBeVisible({ timeout: 5_000 })
   expect(Array.from(mock.state.shares.values())[0]!.visibility).toBe('unlisted')
 })
@@ -544,9 +507,7 @@ test('Revoked row offers Open draft — back into the editor, or a toast when th
   // leave their own drafts in the shared tmpdir DB, so `.first()` can
   // re-resolve to a survivor after the delete and fail the hidden
   // assertion.
-  const card = window.locator(
-    '[data-testid="shares-draft-row"][aria-label*="XYLOPHONE_CANARY_42"]',
-  )
+  const card = window.locator('[data-testid="shares-draft-row"][aria-label*="XYLOPHONE_CANARY_42"]')
   await expect(card).toBeVisible({ timeout: 5_000 })
   // Hover the wrapping <div> so the DeleteChip mounts, then the
   // click-twice-in-place confirm pattern.
@@ -564,7 +525,9 @@ test('Revoked row offers Open draft — back into the editor, or a toast when th
     .locator('[data-testid="published-row"][data-revoked] [data-testid="revoked-open-draft"]')
     .first()
     .click()
-  await expect(window.getByText(en.shares.publishedTab.draftMissing)).toBeVisible({ timeout: 5_000 })
+  await expect(window.getByText(en.shares.publishedTab.draftMissing)).toBeVisible({
+    timeout: 5_000,
+  })
   // Still on the Shares page — no broken navigation into a dead editor.
   await expect(window.locator('[data-testid="shares-page"]')).toBeVisible()
 })

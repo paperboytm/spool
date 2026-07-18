@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { afterEach, describe, expect, it } from 'vitest'
+
+import { afterEach, describe, expect, it } from 'vite-plus/test'
 
 const PACKAGE_ROOT = resolve(__dirname, '..')
 const OUT_DIR = mkdtempSync(join(tmpdir(), 'spool-session-view-build-output-test-'))

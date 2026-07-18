@@ -1,14 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
+import { onRequestGet as metaGet } from '../functions/api/meta/[id]'
 import { onRequestPost as publishPost } from '../functions/api/publish'
 import { onRequestPost as revokePost } from '../functions/api/revoke/[id]'
-import { onRequestGet as metaGet } from '../functions/api/meta/[id]'
 import { onRequestGet as snapshotGet } from '../functions/api/snapshots/[id]'
 import type { SessionRecord } from '../src/auth/session'
 import { isValidSlug, nanoidSlug } from '../src/publish/slug'
 import { PublishRequest } from '../src/publish/validators'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
@@ -21,9 +20,7 @@ vi.mock('workers-og', () => ({
       return new Uint8Array([137, 80, 78, 71]).buffer
     },
   })),
-  loadGoogleFont: vi
-    .fn()
-    .mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
+  loadGoogleFont: vi.fn().mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
 }))
 
 const TOKEN = 'p'.repeat(40)
@@ -192,8 +189,15 @@ describe('PublishRequest.override_slug', () => {
           hidden_turns: [],
         },
         editor_opts: {
-          template: 'forum', paper: 'cream', typeface: 'geist', colorway: 'amber',
-          density: 'relaxed', masthead: true, colophon: true, avatars: true, show_byline: true,
+          template: 'forum',
+          paper: 'cream',
+          typeface: 'geist',
+          colorway: 'amber',
+          density: 'relaxed',
+          masthead: true,
+          colophon: true,
+          avatars: true,
+          show_byline: true,
         },
       },
       visibility: 'unlisted',
@@ -231,7 +235,11 @@ describe('POST /api/publish', () => {
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
     const big = 'x'.repeat(2 * 1024 * 1024 + 10)
-    const req = authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted', _pad: big })
+    const req = authedReq('https://x/api/publish', {
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+      _pad: big,
+    })
     const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(422)
     expect(((await res.json()) as { detail: string }).detail).toMatch(/too large/)
@@ -247,7 +255,7 @@ describe('POST /api/publish', () => {
     const req = authedReq('https://x/api/publish', { snapshot: bad, visibility: 'unlisted' })
     const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(422)
-    const body = await res.json() as { issues?: unknown[] }
+    const body = (await res.json()) as { issues?: unknown[] }
     expect(Array.isArray(body.issues)).toBe(true)
   })
 
@@ -273,7 +281,9 @@ describe('POST /api/publish', () => {
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
     const snap = makeSnapshot() as ReturnType<typeof makeSnapshot> & {
-      conversation: { turns: Array<{ id: string; role: string; content: string; redacted?: boolean }> }
+      conversation: {
+        turns: Array<{ id: string; role: string; content: string; redacted?: boolean }>
+      }
     }
     snap.conversation.turns = [
       { id: 't1', role: 'user', content: 'I emailed [redacted].', redacted: true },
@@ -283,7 +293,7 @@ describe('POST /api/publish', () => {
     const req = authedReq('https://x/api/publish', { snapshot: snap, visibility: 'unlisted' })
     const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(200)
-    const body = await res.json() as { id: string }
+    const body = (await res.json()) as { id: string }
     const stored = env._snapshots.get(`${body.id}.json`)
     expect(stored).toBeTruthy()
     const full = JSON.parse(new TextDecoder().decode(stored!.bytes)) as {
@@ -418,7 +428,7 @@ describe('POST /api/publish', () => {
     })
     const res = await invoke(publishPost, req, env)
     expect(res.status).toBe(200)
-    const body = await res.json() as { id: string; version: number; url: string }
+    const body = (await res.json()) as { id: string; version: number; url: string }
     expect(isValidSlug(body.id)).toBe(true)
     expect(body.version).toBe(1)
     expect(body.url).toBe(`https://spool.pro/s/${body.id}`)
@@ -426,7 +436,12 @@ describe('POST /api/publish', () => {
     expect(env._snapshots.has(`${body.id}.json`)).toBe(true)
     const metaRaw = await env.META.get(`meta/${body.id}`)
     expect(metaRaw).not.toBeNull()
-    const meta = JSON.parse(metaRaw!) as { owner: string; version: number; revoked_at: number | null; title: string | null }
+    const meta = JSON.parse(metaRaw!) as {
+      owner: string
+      version: number
+      revoked_at: number | null
+      title: string | null
+    }
     expect(meta.owner).toBe('user-1')
     expect(meta.version).toBe(1)
     expect(meta.revoked_at).toBeNull()
@@ -439,7 +454,9 @@ describe('POST /api/publish', () => {
     expect(row).toBeTruthy()
     expect(row?.user_id).toBe('user-1')
     expect(row?.version).toBe(1)
-    expect(env.state.audit.some((a) => a.action === 'publish' && a.target_id === body.id)).toBe(true)
+    expect(env.state.audit.some((a) => a.action === 'publish' && a.target_id === body.id)).toBe(
+      true,
+    )
   })
 
   it('does not leak owner_user_id in the public snapshot JSON', async () => {
@@ -485,7 +502,7 @@ describe('GET /api/snapshots/[id]', () => {
     const res = await invoke(snapshotGet, req, env, { id })
     expect(res.status).toBe(200)
     expect(res.headers.get('etag')).toBe(`"${id}-1"`)
-    const body = await res.json() as { id: string; publish: { version: number } }
+    const body = (await res.json()) as { id: string; publish: { version: number } }
     expect(body.id).toBe(id)
     expect(body.publish.version).toBe(1)
   })
@@ -520,7 +537,7 @@ describe('GET /api/snapshots/[id]', () => {
     const req = new Request(`https://x/api/snapshots/${id}`)
     const res = await invoke(snapshotGet, req, env, { id })
     expect(res.status).toBe(410)
-    const body = await res.json() as { revoked: boolean; at: number }
+    const body = (await res.json()) as { revoked: boolean; at: number }
     expect(body.revoked).toBe(true)
     expect(typeof body.at).toBe('number')
   })
@@ -574,7 +591,7 @@ describe('GET /api/meta/[id]', () => {
     const req = new Request(`https://x/api/meta/${id}`)
     const res = await invoke(metaGet, req, env, { id })
     expect(res.status).toBe(200)
-    const body = await res.json() as {
+    const body = (await res.json()) as {
       title: string | null
       visibility: string
       version: number
@@ -596,7 +613,7 @@ describe('GET /api/meta/[id]', () => {
     const { id } = await publishOne(env)
     const req = new Request(`https://x/api/meta/${id}`)
     const res = await invoke(metaGet, req, env, { id })
-    const body = await res.json() as Record<string, unknown>
+    const body = (await res.json()) as Record<string, unknown>
     expect(body.owner).toBeUndefined()
     expect(body.user_id).toBeUndefined()
   })
@@ -615,7 +632,7 @@ describe('GET /api/meta/[id]', () => {
     const req = new Request(`https://x/api/meta/${id}`)
     const res = await invoke(metaGet, req, env, { id })
     expect(res.status).toBe(410)
-    const body = await res.json() as { revoked: boolean }
+    const body = (await res.json()) as { revoked: boolean }
     expect(body.revoked).toBe(true)
   })
 
@@ -656,17 +673,20 @@ describe('GET /api/meta/[id]', () => {
     // og:image is built independently and still works).
     const env = envFor()
     const id = 'legacysharelegacyshrx' // 21-char slug
-    await env.META.put(`meta/${id}`, JSON.stringify({
-      owner: 'user-1',
-      visibility: 'unlisted',
-      expires_at: null,
-      revoked_at: null,
-      version: 1,
-    }))
+    await env.META.put(
+      `meta/${id}`,
+      JSON.stringify({
+        owner: 'user-1',
+        visibility: 'unlisted',
+        expires_at: null,
+        revoked_at: null,
+        version: 1,
+      }),
+    )
     const req = new Request(`https://x/api/meta/${id}`)
     const res = await invoke(metaGet, req, env, { id })
     expect(res.status).toBe(200)
-    const body = await res.json() as { title: string | null }
+    const body = (await res.json()) as { title: string | null }
     expect(body.title).toBeNull()
   })
 
@@ -699,7 +719,7 @@ describe('republish + revoke', () => {
       authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
       env,
     )
-    const first = await firstRes.json() as { id: string; version: number }
+    const first = (await firstRes.json()) as { id: string; version: number }
     expect(first.version).toBe(1)
 
     const updated = makeSnapshot()
@@ -713,7 +733,7 @@ describe('republish + revoke', () => {
       }),
       env,
     )
-    const second = await secondRes.json() as { id: string; version: number }
+    const second = (await secondRes.json()) as { id: string; version: number }
     expect(second.id).toBe(first.id)
     expect(second.version).toBe(2)
 
@@ -730,7 +750,9 @@ describe('republish + revoke', () => {
     // R2 snapshot replaced.
     const stored = env._snapshots.get(`${first.id}.json`)
     expect(stored).toBeTruthy()
-    const fullSnap = JSON.parse(new TextDecoder().decode(stored!.bytes)) as { publish: { version: number } }
+    const fullSnap = JSON.parse(new TextDecoder().decode(stored!.bytes)) as {
+      publish: { version: number }
+    }
     expect(fullSnap.publish.version).toBe(2)
 
     // Two audit rows: one publish, one republish.
@@ -753,7 +775,7 @@ describe('republish + revoke', () => {
       authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
       env,
     )
-    const first = await firstRes.json() as { id: string }
+    const first = (await firstRes.json()) as { id: string }
 
     // Force the WHERE version=? clause to miss by mutating the stored
     // row's version *after* the seeded SELECT path would observe v=1.
@@ -827,7 +849,7 @@ describe('republish + revoke', () => {
       authedReq('https://x/api/publish', { snapshot: makeSnapshot(), visibility: 'unlisted' }),
       env,
     )
-    const { id } = await pRes.json() as { id: string }
+    const { id } = (await pRes.json()) as { id: string }
 
     const revokeReq = authedReq(`https://x/api/revoke/${id}`)
     const revokeRes = await invoke(revokePost, revokeReq, env, { id })

@@ -10,6 +10,7 @@
 // production DB. Don't do that.)
 
 import { spawn } from 'node:child_process'
+
 import { resolveSpoolDataDir } from './lib/spool-data-dir.mjs'
 
 const { value, source } = resolveSpoolDataDir(process.env)

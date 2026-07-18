@@ -2,10 +2,28 @@
   "name": "@spool-lab/cli",
   "version": "0.6.0",
   "private": false,
-  "type": "module",
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
   "bin": {
     "spool": "./bin/spool.js"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "type": "module",
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -24,32 +42,29 @@
       "import": "./dist/hub/index.js"
     }
   },
-  "files": [
-    "dist",
-    "bin"
-  ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "pnpm run clean && tsc && chmod +x bin/spool.js",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "test": "vitest run --no-file-parallelism --maxWorkers=1",
-    "prepack": "pnpm run build"
+    "test": "vp test run --no-file-parallelism --maxWorkers=1",
+    "prepack": "vp run build"
   },
   "dependencies": {
     "@spool-lab/core": "workspace:^",
     "@spool-lab/redact": "workspace:^",
     "@spool-lab/session-kit": "workspace:^",
-    "commander": "^13.1.0",
-    "undici": "^6.23.0"
+    "commander": "^15.0.0",
+    "undici": "^8.7.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.19.17",
+    "@types/node": "^26.1.1",
     "better-sqlite3": "11.10.0",
-    "vitest": "^3.2.4"
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

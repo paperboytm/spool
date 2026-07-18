@@ -1,4 +1,3 @@
-import { ipcMain } from 'electron'
 import {
   getDB,
   getByDraftId as getCachedByDraftId,
@@ -8,8 +7,8 @@ import {
   upsertMany as upsertCachedPublished,
   type PublishedShareCacheItem,
 } from '@spool-lab/core'
-import { authedFetch } from '../share/api-client.js'
-import { clearToken } from '../auth/session-store.js'
+import { ipcMain } from 'electron'
+
 import {
   MAX_PUBLISH_BODY_BYTES,
   type PublishRequestBody,
@@ -22,6 +21,8 @@ import {
   type SetVisibilityResult,
   type Visibility,
 } from '../../shared/share-publish.js'
+import { clearToken } from '../auth/session-store.js'
+import { authedFetch } from '../share/api-client.js'
 
 async function readBody(res: Response): Promise<Record<string, unknown>> {
   try {
@@ -32,68 +33,71 @@ async function readBody(res: Response): Promise<Record<string, unknown>> {
 }
 
 export function registerSharePublishIpc(): void {
-  ipcMain.handle('share-publish:publish', async (_e, body: PublishRequestBody): Promise<PublishResult> => {
-    const payload = JSON.stringify(body)
-    // Fail fast on oversized payloads rather than buffering the whole
-    // body up to the server just to get a 422 back. The renderer maps
-    // this 413 to a localized "too large" message. Measured in UTF-8
-    // bytes (what actually transits and what the server caps), not
-    // string length — those differ by up to 3x for CJK content.
-    if (Buffer.byteLength(payload, 'utf8') > MAX_PUBLISH_BODY_BYTES) {
-      return { ok: false, status: 413, error: { error: 'PAYLOAD_TOO_LARGE' } }
-    }
-    const r = await authedFetch('/api/publish', {
-      method: 'POST',
-      body: payload,
-    })
-    const json = await readBody(r)
-    if (!r.ok) {
-      if (r.status === 401) clearToken()
-      const error: PublishErrorBody = {
-        error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
+  ipcMain.handle(
+    'share-publish:publish',
+    async (_e, body: PublishRequestBody): Promise<PublishResult> => {
+      const payload = JSON.stringify(body)
+      // Fail fast on oversized payloads rather than buffering the whole
+      // body up to the server just to get a 422 back. The renderer maps
+      // this 413 to a localized "too large" message. Measured in UTF-8
+      // bytes (what actually transits and what the server caps), not
+      // string length — those differ by up to 3x for CJK content.
+      if (Buffer.byteLength(payload, 'utf8') > MAX_PUBLISH_BODY_BYTES) {
+        return { ok: false, status: 413, error: { error: 'PAYLOAD_TOO_LARGE' } }
       }
-      if (typeof json['detail'] === 'string') error.detail = json['detail'] as string
-      if (json['issues'] !== undefined) error.issues = json['issues']
-      return { ok: false, status: r.status, error }
-    }
-    const id = String(json['id'] ?? '')
-    const url = String(json['url'] ?? '')
-    const version = Number(json['version'] ?? 1)
+      const r = await authedFetch('/api/publish', {
+        method: 'POST',
+        body: payload,
+      })
+      const json = await readBody(r)
+      if (!r.ok) {
+        if (r.status === 401) clearToken()
+        const error: PublishErrorBody = {
+          error: typeof json['error'] === 'string' ? (json['error'] as string) : `HTTP_${r.status}`,
+        }
+        if (typeof json['detail'] === 'string') error.detail = json['detail'] as string
+        if (json['issues'] !== undefined) error.issues = json['issues']
+        return { ok: false, status: r.status, error }
+      }
+      const id = String(json['id'] ?? '')
+      const url = String(json['url'] ?? '')
+      const version = Number(json['version'] ?? 1)
 
-    // Write the new (or refreshed) row into the local cache so the
-    // editor's on-mount draft lookup and the Shares list reflect this
-    // publish without waiting for the next /api/me/shares poll.
-    // visibility comes straight from the request, title from the
-    // snapshot — the backend echoes neither in the publish response.
-    const now = Date.now()
-    const item: PublishedShareCacheItem = {
-      id,
-      title: body.snapshot.conversation.title,
-      visibility: body.visibility,
-      version,
-      published_at: now,
-      revoked_at: null,
-      draft_id: body.draft_id,
-      client_request_id: body.idempotency_key,
-      updated_at: now,
-    }
-    try {
-      upsertCachedPublished(getDB(), [item])
-    } catch (err) {
-      // Cache write failures are non-fatal — the next myShares poll
-      // will reconcile. Log so we notice systemic issues.
-      console.warn('[share-publish] cache upsert after publish failed:', err)
-    }
+      // Write the new (or refreshed) row into the local cache so the
+      // editor's on-mount draft lookup and the Shares list reflect this
+      // publish without waiting for the next /api/me/shares poll.
+      // visibility comes straight from the request, title from the
+      // snapshot — the backend echoes neither in the publish response.
+      const now = Date.now()
+      const item: PublishedShareCacheItem = {
+        id,
+        title: body.snapshot.conversation.title,
+        visibility: body.visibility,
+        version,
+        published_at: now,
+        revoked_at: null,
+        draft_id: body.draft_id,
+        client_request_id: body.idempotency_key,
+        updated_at: now,
+      }
+      try {
+        upsertCachedPublished(getDB(), [item])
+      } catch (err) {
+        // Cache write failures are non-fatal — the next myShares poll
+        // will reconcile. Log so we notice systemic issues.
+        console.warn('[share-publish] cache upsert after publish failed:', err)
+      }
 
-    // Cast: PublishedShareCacheItem stores `visibility` as a plain
-    // string for forward-compat with future visibility tokens we
-    // haven't taught core about yet, while the IPC wire `PublishedRow`
-    // enforces the Visibility enum. The body.visibility we just
-    // composed `item` from IS a Visibility, so the narrowing is safe;
-    // we add the cast at the boundary rather than re-typing the cache
-    // module to keep core import-free of the share-publish wire.
-    return { ok: true, data: { id, url, version }, row: { ...item, visibility: body.visibility } }
-  })
+      // Cast: PublishedShareCacheItem stores `visibility` as a plain
+      // string for forward-compat with future visibility tokens we
+      // haven't taught core about yet, while the IPC wire `PublishedRow`
+      // enforces the Visibility enum. The body.visibility we just
+      // composed `item` from IS a Visibility, so the narrowing is safe;
+      // we add the cast at the boundary rather than re-typing the cache
+      // module to keep core import-free of the share-publish wire.
+      return { ok: true, data: { id, url, version }, row: { ...item, visibility: body.visibility } }
+    },
+  )
 
   ipcMain.handle('share-publish:revoke', async (_e, id: string): Promise<{ ok: true }> => {
     const r = await authedFetch(`/api/revoke/${encodeURIComponent(id)}`, { method: 'POST' })
@@ -151,28 +155,34 @@ export function registerSharePublishIpc(): void {
     return (await r.json()) as MySharesResponse
   })
 
-  ipcMain.handle('share-publish:claim-handle', async (_e, handle: string): Promise<HandleClaimResponse> => {
-    const r = await authedFetch('/api/handles/claim', {
-      method: 'POST',
-      body: JSON.stringify({ handle }),
-    })
-    if (!r.ok) {
-      if (r.status === 401) clearToken()
-      const body = await readBody(r)
-      const detail = typeof body['detail'] === 'string' ? body['detail'] : `claim ${r.status}`
-      throw new Error(detail)
-    }
-    return (await r.json()) as HandleClaimResponse
-  })
+  ipcMain.handle(
+    'share-publish:claim-handle',
+    async (_e, handle: string): Promise<HandleClaimResponse> => {
+      const r = await authedFetch('/api/handles/claim', {
+        method: 'POST',
+        body: JSON.stringify({ handle }),
+      })
+      if (!r.ok) {
+        if (r.status === 401) clearToken()
+        const body = await readBody(r)
+        const detail = typeof body['detail'] === 'string' ? body['detail'] : `claim ${r.status}`
+        throw new Error(detail)
+      }
+      return (await r.json()) as HandleClaimResponse
+    },
+  )
 
-  ipcMain.handle('share-publish:check-handle', async (_e, handle: string): Promise<HandleCheckResponse> => {
-    const r = await authedFetch(`/api/handles/check?h=${encodeURIComponent(handle)}`)
-    if (!r.ok) {
-      if (r.status === 401) clearToken()
-      throw new Error(`check ${r.status}`)
-    }
-    return (await r.json()) as HandleCheckResponse
-  })
+  ipcMain.handle(
+    'share-publish:check-handle',
+    async (_e, handle: string): Promise<HandleCheckResponse> => {
+      const r = await authedFetch(`/api/handles/check?h=${encodeURIComponent(handle)}`)
+      if (!r.ok) {
+        if (r.status === 401) clearToken()
+        throw new Error(`check ${r.status}`)
+      }
+      return (await r.json()) as HandleCheckResponse
+    },
+  )
 
   ipcMain.handle('share-publish:cached-published', (): PublishedShareCacheItem[] => {
     return listCachedPublished(getDB())

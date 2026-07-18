@@ -6,11 +6,17 @@
 
 import type { Conversation, EditorOpts } from '../lib/types'
 import { typefaceFamily } from '../lib/types'
-import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
+import { Body } from './body'
+import { GapMarker } from './gap-marker'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
-import { GapMarker } from './gap-marker'
-import { Body } from './body'
+import {
+  accentBgFor,
+  templateTokens,
+  bodyStyleVars,
+  BODY_VAR_PROPS,
+  BODY_VAR_BLOCK_BORDER,
+} from './tokens'
 
 interface Props {
   convo: Conversation
@@ -84,7 +90,16 @@ export function Chat({ convo, opts, redactList: injectedRedactList }: Props) {
       >
         {convo.title}
       </h2>
-      <div style={{ width: 36, height: 2, background: accent, borderRadius: 1, marginTop: 10, marginBottom: 26 }} />
+      <div
+        style={{
+          width: 36,
+          height: 2,
+          background: accent,
+          borderRadius: 1,
+          marginTop: 10,
+          marginBottom: 26,
+        }}
+      />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: turnGap }}>
         {segments.turns.map((turn, i) => {
@@ -135,7 +150,13 @@ export function Chat({ convo, opts, redactList: injectedRedactList }: Props) {
                         color: accent,
                       }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="currentColor"
+                        aria-hidden
+                      >
                         <path d="M7 0.5 L8.3 5.2 L13 6.5 L8.3 7.8 L7 12.5 L5.7 7.8 L1 6.5 L5.7 5.2 Z" />
                       </svg>
                     </span>

@@ -11,10 +11,11 @@
 // → restart re-enqueues from scratch. If it dies inside the
 // transaction, SQLite atomicity guarantees no half-applied state.
 
-import { Data, Effect } from 'effect'
-import type Database from 'better-sqlite3'
 import type { SensitiveMatch, RedactProvider } from '@spool-lab/redact'
 import { hashValueForRedactExclude } from '@spool-lab/redact'
+import type Database from 'better-sqlite3'
+import { Data, Effect } from 'effect'
+
 import {
   deleteRefreshableFindings,
   insertFindings,
@@ -81,12 +82,14 @@ export function scanSession(
     // 1. Load messages outside the transaction.
     const messages = yield* Effect.try({
       try: () =>
-        deps.db.prepare(
-          `SELECT id, content_text
+        deps.db
+          .prepare(
+            `SELECT id, content_text
              FROM messages
             WHERE session_id = ?
             ORDER BY seq ASC`,
-        ).all(sessionId) as MessageRow[],
+          )
+          .all(sessionId) as MessageRow[],
       catch: (cause) => new ScanError({ sessionId, cause, reason: 'db-failed' }),
     })
 
@@ -137,9 +140,10 @@ export function scanSession(
       provider: m.provider,
       startOffset: m.start,
       endOffset: m.end,
-      state: (deps.kindAllowlist?.has(m.kind) || isAllowlisted(allow, m.kind, m.valueHash))
-        ? 'dismissed'
-        : 'active',
+      state:
+        deps.kindAllowlist?.has(m.kind) || isAllowlisted(allow, m.kind, m.valueHash)
+          ? 'dismissed'
+          : 'active',
     }))
 
     // 5. Apply atomically.
@@ -159,9 +163,7 @@ export function scanSession(
     yield* Effect.annotateCurrentSpan('inserted', inputs.length)
 
     return { sessionId, inserted: inputs.length, profile: deps.currentProfile }
-  }).pipe(
-    Effect.withSpan('security.scan.session', { attributes: { sessionId } }),
-  )
+  }).pipe(Effect.withSpan('security.scan.session', { attributes: { sessionId } }))
 }
 
 function applyEmpty(sessionId: number, deps: ScanSessionDeps): Effect.Effect<void, ScanError> {

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import type { Session } from '@spool-lab/core'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { insertSessionSorted } from './sessionSort.js'
 
 function s(partial: Partial<Session> & { sessionUuid: string; startedAt: string }): Session {
@@ -31,7 +32,7 @@ describe('insertSessionSorted', () => {
     ]
     const candidate = s({ sessionUuid: 'x', startedAt: '2026-05-09T00:00:00Z' })
     const out = insertSessionSorted(list, candidate, 'recent', true)
-    expect(out.map(r => r.sessionUuid)).toEqual(['a', 'x', 'b', 'c'])
+    expect(out.map((r) => r.sessionUuid)).toEqual(['a', 'x', 'b', 'c'])
   })
 
   it('drops candidate older than the last loaded row when not exhausted', () => {
@@ -50,7 +51,7 @@ describe('insertSessionSorted', () => {
     ]
     const candidate = s({ sessionUuid: 'x', startedAt: '2026-05-01T00:00:00Z' })
     const out = insertSessionSorted(list, candidate, 'recent', true)
-    expect(out.map(r => r.sessionUuid)).toEqual(['a', 'b', 'x'])
+    expect(out.map((r) => r.sessionUuid)).toEqual(['a', 'b', 'x'])
   })
 
   it('sorts by message_count then started_at for "most_messages"', () => {
@@ -61,7 +62,7 @@ describe('insertSessionSorted', () => {
     ]
     const candidate = s({ sessionUuid: 'x', startedAt: '2026-05-09T00:00:00Z', messageCount: 80 })
     const out = insertSessionSorted(list, candidate, 'most_messages', true)
-    expect(out.map(r => r.sessionUuid)).toEqual(['a', 'x', 'b', 'c'])
+    expect(out.map((r) => r.sessionUuid)).toEqual(['a', 'x', 'b', 'c'])
   })
 
   it('sorts alphabetically for "title"', () => {
@@ -71,7 +72,7 @@ describe('insertSessionSorted', () => {
     ]
     const candidate = s({ sessionUuid: 'x', startedAt: '2026-05-09T00:00:00Z', title: 'bravo' })
     const out = insertSessionSorted(list, candidate, 'title', true)
-    expect(out.map(r => r.sessionUuid)).toEqual(['a', 'x', 'b'])
+    expect(out.map((r) => r.sessionUuid)).toEqual(['a', 'x', 'b'])
   })
 
   it('uses uuid as a stable tiebreaker', () => {
@@ -81,6 +82,6 @@ describe('insertSessionSorted', () => {
     ]
     const candidate = s({ sessionUuid: 'b', startedAt: '2026-05-10T00:00:00Z' })
     const out = insertSessionSorted(list, candidate, 'recent', true)
-    expect(out.map(r => r.sessionUuid)).toEqual(['a', 'b', 'c'])
+    expect(out.map((r) => r.sessionUuid)).toEqual(['a', 'b', 'c'])
   })
 })

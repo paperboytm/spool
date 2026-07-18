@@ -25,7 +25,7 @@
 //     thread" in the IPC layer.
 
 import { parentPort, threadId } from 'node:worker_threads'
-import { Effect } from 'effect'
+
 import {
   getDB,
   purgeFinding as purgeFindingEff,
@@ -38,6 +38,8 @@ import {
   type PurgeResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
+import { Effect } from 'effect'
+
 import {
   exitToWireResult,
   flattenPurgeError,
@@ -83,7 +85,9 @@ function reportFatal(err: unknown): void {
   const error = err instanceof Error ? (err.stack ?? err.message) : String(err)
   try {
     port.postMessage({ type: 'fatal', error } satisfies FromWorker)
-  } catch { /* parent gone */ }
+  } catch {
+    /* parent gone */
+  }
   process.exit(1)
 }
 
@@ -101,7 +105,11 @@ console.log('[security] mutation worker thread booted; threadId =', threadId)
 const db = getDB({ runMigrations: false })
 
 function postSafe(msg: FromWorker): void {
-  try { port.postMessage(msg) } catch { /* parent gone */ }
+  try {
+    port.postMessage(msg)
+  } catch {
+    /* parent gone */
+  }
 }
 
 /** Forward a `FindingsChange` to main as it happens. The core purge
@@ -127,10 +135,17 @@ async function handle(cmd: MutationCommand): Promise<MutationResult> {
         : { ok: false, error: wire.error }
     }
     case 'purgeEverywhere': {
-      const exit = await Effect.runPromiseExit(purgeEverywhereEff(cmd.kind, cmd.valueHash, { db, publish }))
+      const exit = await Effect.runPromiseExit(
+        purgeEverywhereEff(cmd.kind, cmd.valueHash, { db, publish }),
+      )
       const wire = exitToWireResult(exit, (value) => value)
       return wire.ok
-        ? { ok: true, cmd: 'purgeEverywhere', results: wire.success.results, sessionIds: wire.success.sessionIds }
+        ? {
+            ok: true,
+            cmd: 'purgeEverywhere',
+            results: wire.success.results,
+            sessionIds: wire.success.sessionIds,
+          }
         : { ok: false, error: wire.error }
     }
     case 'dismissFinding': {
@@ -138,7 +153,12 @@ async function handle(cmd: MutationCommand): Promise<MutationResult> {
       if (sessionId != null) {
         postSafe({
           type: 'event-change',
-          change: { type: 'state-changed', sessionId, findingId: cmd.findingId, state: 'dismissed' },
+          change: {
+            type: 'state-changed',
+            sessionId,
+            findingId: cmd.findingId,
+            state: 'dismissed',
+          },
         })
       }
       return { ok: true, cmd: 'dismissFinding', sessionId }
@@ -168,7 +188,11 @@ async function handle(cmd: MutationCommand): Promise<MutationResult> {
 
 port.on('message', (msg: ToWorker) => {
   if (msg.type === 'shutdown') {
-    try { db.close() } catch { /* best effort */ }
+    try {
+      db.close()
+    } catch {
+      /* best effort */
+    }
     process.exit(0)
   }
   if (msg.type !== 'cmd') return
@@ -181,11 +205,12 @@ port.on('message', (msg: ToWorker) => {
   // here just hands the next request to better-sqlite3, which queues.
   void handle(msg.payload).then(
     (result) => postSafe({ type: 'cmd-result', reqId: msg.reqId, result }),
-    (err) => postSafe({
-      type: 'cmd-result',
-      reqId: msg.reqId,
-      result: { ok: false, error: flattenPurgeError(err) },
-    }),
+    (err) =>
+      postSafe({
+        type: 'cmd-result',
+        reqId: msg.reqId,
+        result: { ok: false, error: flattenPurgeError(err) },
+      }),
   )
 })
 

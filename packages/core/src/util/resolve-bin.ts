@@ -21,9 +21,10 @@ export function nvmVersionBins(home: string, name: string): string[] {
   const versionsDir = join(home, '.nvm', 'versions', 'node')
   try {
     return readdirSync(versionsDir)
-      .filter(d => d.startsWith('v'))
-      .sort().reverse()
-      .map(d => join(versionsDir, d, 'bin', name))
+      .filter((d) => d.startsWith('v'))
+      .sort()
+      .reverse()
+      .map((d) => join(versionsDir, d, 'bin', name))
   } catch {
     return []
   }
@@ -52,9 +53,17 @@ export function miseVersionBins(home: string, name: string): string[] {
     let versions: string[]
     try {
       versions = readdirSync(pluginDir)
-    } catch { continue }
+    } catch {
+      continue
+    }
     const ordered = versions.includes('latest')
-      ? ['latest', ...versions.filter(v => v !== 'latest').sort().reverse()]
+      ? [
+          'latest',
+          ...versions
+            .filter((v) => v !== 'latest')
+            .sort()
+            .reverse(),
+        ]
       : versions.sort().reverse()
     for (const v of ordered) {
       result.push(join(pluginDir, v, 'bin', name))
@@ -92,7 +101,11 @@ function shellLookup(shell: string, flags: string, name: string, timeoutMs: numb
 export function resolveSystemBinary(name: string, extraSearchPaths: string[] = []): string | null {
   // 1. Current process PATH — fast path for terminal-launched contexts
   try {
-    const p = execSync(`command -v ${name}`, { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
+    const p = execSync(`command -v ${name}`, {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim()
     if (p) return p
   } catch {}
 
@@ -147,7 +160,12 @@ export function clearResolveCache(name: string): void {
 // is reserved for users whose binaries genuinely only exist behind a
 // shell-activated alias or function.
 
-async function shellLookupAsync(shell: string, flags: string, name: string, timeoutMs: number): Promise<string | null> {
+async function shellLookupAsync(
+  shell: string,
+  flags: string,
+  name: string,
+  timeoutMs: number,
+): Promise<string | null> {
   try {
     const { stdout } = await execAsync(`${shell} ${flags} 'command -v ${name}'`, {
       encoding: 'utf8',
@@ -160,7 +178,10 @@ async function shellLookupAsync(shell: string, flags: string, name: string, time
   }
 }
 
-export async function resolveSystemBinaryAsync(name: string, extraSearchPaths: string[] = []): Promise<string | null> {
+export async function resolveSystemBinaryAsync(
+  name: string,
+  extraSearchPaths: string[] = [],
+): Promise<string | null> {
   // 1. Current process PATH — fastest, covers terminal-launched contexts
   try {
     const { stdout } = await execAsync(`command -v ${name}`, { encoding: 'utf8', timeout: 3000 })
@@ -195,7 +216,10 @@ export async function resolveSystemBinaryAsync(name: string, extraSearchPaths: s
  *  it instantly. Path validation: cached entries are verified with a
  *  filesystem check before being returned, so a brew upgrade or manual
  *  removal triggers a re-resolve instead of leaking a stale path. */
-export async function cachedResolveAsync(name: string, extras: string[] = []): Promise<string | null> {
+export async function cachedResolveAsync(
+  name: string,
+  extras: string[] = [],
+): Promise<string | null> {
   if (name in resolvedPaths) {
     const cached = resolvedPaths[name] ?? null
     if (cached === null) return null

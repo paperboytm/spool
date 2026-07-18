@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { remoteToCacheItems, toCacheItem } from './usePublishedShares.js'
+import { describe, expect, it } from 'vite-plus/test'
+
 import type { MyShare } from '../../shared/share-publish.js'
+import { remoteToCacheItems, toCacheItem } from './usePublishedShares.js'
 
 const remote = (over: Partial<MyShare> = {}): MyShare => ({
   id: 'abc',

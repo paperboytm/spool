@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads'
+
 import { getDB, Syncer } from '@spool-lab/core'
 import type { SyncProgressEvent } from '@spool-lab/core'
 import type { SyncResult } from '@spool-lab/core'
@@ -14,7 +15,9 @@ function reportAndExit(err: unknown): void {
       type: 'error',
       error: err instanceof Error ? (err.stack ?? err.message) : String(err),
     } satisfies SyncWorkerMessage)
-  } catch { /* parent gone — nothing we can do */ }
+  } catch {
+    /* parent gone — nothing we can do */
+  }
   process.exit(1)
 }
 

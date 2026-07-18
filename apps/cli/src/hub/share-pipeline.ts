@@ -72,10 +72,12 @@ export async function prepareShare(opts: {
   const records: CanonicalRecord[] = []
   for (let index = 0; index < shared.length; index += 1) {
     try {
-      records.push(await canonicalizeRecord(shared[index] as string, {
-        workspaceRoot: opts.workspaceRoot,
-        homeDir: opts.homeDir,
-      }))
+      records.push(
+        await canonicalizeRecord(shared[index] as string, {
+          workspaceRoot: opts.workspaceRoot,
+          homeDir: opts.homeDir,
+        }),
+      )
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
       throw new Error(`Record ${index} cannot be canonicalized: ${message}`)

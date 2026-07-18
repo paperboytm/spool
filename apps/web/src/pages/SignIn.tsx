@@ -123,8 +123,8 @@ export function SignIn({ next }: Props) {
               <Icon name="lock" size={14} />
             </span>
             <span>
-              We use your provider only to verify your identity — nothing beyond your email,
-              name, and picture.
+              We use your provider only to verify your identity — nothing beyond your email, name,
+              and picture.
             </span>
           </div>
           <p className="sw-signin-legal">

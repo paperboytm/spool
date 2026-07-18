@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { decideSnapshotState } from './api'
 
@@ -49,4 +49,3 @@ describe('decideSnapshotState', () => {
     expect(decideSnapshotState(403, null)).toEqual({ kind: 'error' })
   })
 })
-

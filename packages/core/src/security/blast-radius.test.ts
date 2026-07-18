@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
 import { insertFindings, occurrencesByValueHash, dismissFinding, listFindings } from './repo.js'
 
@@ -45,21 +46,71 @@ describe('occurrencesByValueHash', () => {
     db = setupDb()
     insertFindings(db, [
       // session 1 — two occurrences of the shared value
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: 10, endOffset: 15, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 10,
+        endOffset: 15,
+        state: 'active',
+      },
       // session 2 — one occurrence
-      { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+      {
+        sessionId: 2,
+        messageId: 20,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
       // session 3 (other project) — one occurrence
-      { sessionId: 3, messageId: 30, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+      {
+        sessionId: 3,
+        messageId: 30,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
       // session 4 — a DIFFERENT value, same kind
-      { sessionId: 4, messageId: 40, kind: 'api-key', valueHash: OTHER, confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+      {
+        sessionId: 4,
+        messageId: 40,
+        kind: 'api-key',
+        valueHash: OTHER,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
     ])
   })
 
   it('aggregates per-session counts across all sessions and projects', () => {
     const rows = occurrencesByValueHash(db, 'api-key', HASH)
     expect(rows).toHaveLength(3) // sessions 1, 2, 3 — not 4 (other hash)
-    const bySession = new Map(rows.map(r => [r.sessionId, r]))
+    const bySession = new Map(rows.map((r) => [r.sessionId, r]))
     expect(bySession.get(1)!.count).toBe(2)
     expect(bySession.get(2)!.count).toBe(1)
     expect(bySession.get(3)!.count).toBe(1)
@@ -68,7 +119,7 @@ describe('occurrencesByValueHash', () => {
 
   it('carries project + title + uuid + lastSeen for each session', () => {
     const rows = occurrencesByValueHash(db, 'api-key', HASH)
-    const s3 = rows.find(r => r.sessionId === 3)!
+    const s3 = rows.find((r) => r.sessionId === 3)!
     expect(s3.project).toBe('beta')
     expect(s3.sessionTitle).toBe('Session Three')
     expect(s3.sessionUuid).toBe('s-3')
@@ -78,7 +129,7 @@ describe('occurrencesByValueHash', () => {
     // a real timestamp string rather than the seeded session date.
     expect(typeof s3.lastSeen).toBe('string')
     expect(s3.lastSeen.length).toBeGreaterThan(0)
-    expect(rows.find(r => r.sessionId === 1)!.project).toBe('alpha')
+    expect(rows.find((r) => r.sessionId === 1)!.project).toBe('alpha')
   })
 
   it('orders by most-recent detection, with session id as a stable tiebreak', () => {
@@ -86,17 +137,17 @@ describe('occurrencesByValueHash', () => {
     // ties; the id DESC tiebreak makes the order deterministic
     // (newest-inserted session first → 3, 2, 1).
     const rows = occurrencesByValueHash(db, 'api-key', HASH)
-    expect(rows.map(r => r.sessionId)).toEqual([3, 2, 1])
+    expect(rows.map((r) => r.sessionId)).toEqual([3, 2, 1])
   })
 
   it('counts ONLY active findings — dismissing one drops it from the radius', () => {
     // Dismiss session 2's only occurrence.
-    const f2 = listFindings(db, { sessionId: 2 }).find(f => f.valueHash === HASH)!
+    const f2 = listFindings(db, { sessionId: 2 }).find((f) => f.valueHash === HASH)!
     dismissFinding(db, f2.id, 'session')
     const rows = occurrencesByValueHash(db, 'api-key', HASH)
-    expect(rows.map(r => r.sessionId).sort()).toEqual([1, 3])
+    expect(rows.map((r) => r.sessionId).sort()).toEqual([1, 3])
     // session 1 still ×2 (untouched).
-    expect(rows.find(r => r.sessionId === 1)!.count).toBe(2)
+    expect(rows.find((r) => r.sessionId === 1)!.count).toBe(2)
   })
 
   it('returns [] when no session contains the value', () => {
@@ -105,7 +156,17 @@ describe('occurrencesByValueHash', () => {
 
   it('keys on kind too — a different kind with the same hash is separate', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'jwt', valueHash: HASH, confidence: 0.9, provider: 'regex', startOffset: 20, endOffset: 25, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'jwt',
+        valueHash: HASH,
+        confidence: 0.9,
+        provider: 'regex',
+        startOffset: 20,
+        endOffset: 25,
+        state: 'active',
+      },
     ])
     // The api-key radius is unchanged (still 3 sessions).
     expect(occurrencesByValueHash(db, 'api-key', HASH)).toHaveLength(3)

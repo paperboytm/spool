@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import { useShareAuth } from '../../hooks/useShareAuth.js'
 
 /** Embedded sign-in card. Lives inside the Share popover's Publish
@@ -14,11 +15,7 @@ import { useShareAuth } from '../../hooks/useShareAuth.js'
  *  on Settings → close Settings → Shares page reflects signed-in"
  *  work. Caller still receives onSignedIn so it can advance its own
  *  UI (e.g. refresh editor state). */
-export function ConnectCard({
-  onSignedIn,
-}: {
-  onSignedIn?: () => void
-}) {
+export function ConnectCard({ onSignedIn }: { onSignedIn?: () => void }) {
   const { t } = useTranslation()
   const { signIn: dispatchSignIn } = useShareAuth()
   const [busy, setBusy] = useState(false)
@@ -39,23 +36,25 @@ export function ConnectCard({
   }
 
   return (
-    <div className="rounded-lg border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface p-5">
-      <h4 className="text-[14px] font-semibold text-warm-text dark:text-dark-text mb-1.5">
+    <div className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface rounded-lg border p-5">
+      <h4 className="text-warm-text dark:text-dark-text mb-1.5 text-[14px] font-semibold">
         {t('shareEditor.connectCard.title')}
       </h4>
-      <p className="text-[12px] leading-snug text-warm-muted dark:text-dark-muted mb-4">
+      <p className="text-warm-muted dark:text-dark-muted mb-4 text-[12px] leading-snug">
         {t('shareEditor.connectCard.body')}
       </p>
       <button
         type="button"
-        onClick={() => { void signIn() }}
+        onClick={() => {
+          void signIn()
+        }}
         disabled={busy}
         data-testid="connect-card-signin"
-        className="inline-flex items-center justify-center gap-2 h-7 px-3 rounded-md text-[12px] font-medium bg-white dark:bg-dark-surface2 text-[#1C1C18] dark:text-dark-text border border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        className="dark:bg-dark-surface2 dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-7 items-center justify-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium text-[#1C1C18] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? (
           <>
-            <span className="inline-block w-3 h-3 rounded-full border-[1.6px] border-current border-t-transparent animate-spin" />
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border-[1.6px] border-current border-t-transparent" />
             {t('shareEditor.connectCard.waitingForBrowser')}
           </>
         ) : (

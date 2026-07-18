@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+
 import { loadCodexSessionGitRemote } from '../parsers/codex.js'
 import { computeIdentity, type IdentityFs } from '../projects/identity.js'
 
@@ -38,9 +39,9 @@ export function upgradeWorktreeIdentities(
   fs: IdentityFs,
   readCodexGitRemote: (filePath: string) => string | null = loadCodexSessionGitRemote,
 ): WorktreeUpgradeResult {
-  const rows = db.prepare(
-    `SELECT id, identity_key FROM projects WHERE identity_kind = 'path'`,
-  ).all() as Array<{ id: number; identity_key: string }>
+  const rows = db
+    .prepare(`SELECT id, identity_key FROM projects WHERE identity_kind = 'path'`)
+    .all() as Array<{ id: number; identity_key: string }>
 
   if (rows.length === 0) return { examined: 0, upgraded: 0 }
 

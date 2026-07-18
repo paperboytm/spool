@@ -7,9 +7,11 @@
 // against model installation — no point spawning the window if the
 // ONNX weights aren't on disk yet.
 
+import { join } from 'node:path'
+
 import { Effect, Exit, Scope } from 'effect'
 import { BrowserWindow, app, ipcMain } from 'electron'
-import { join } from 'node:path'
+
 import { makeModelHost, type ModelHost, type ModelHostDeps, type PfState } from './model-host.js'
 import { MODEL_MANIFEST } from './model-manifest.js'
 import { pfInstallStatus } from './model-state.js'
@@ -79,10 +81,13 @@ export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
         const settled = yield* builtHost.getState
         yield* Effect.annotateCurrentSpan('pf.status', settled.status)
         if (settled.runtime) yield* Effect.annotateCurrentSpan('pf.runtime', settled.runtime)
-        if (settled.adapterLabel) yield* Effect.annotateCurrentSpan('pf.adapter', settled.adapterLabel)
+        if (settled.adapterLabel)
+          yield* Effect.annotateCurrentSpan('pf.adapter', settled.adapterLabel)
         if (settled.error) yield* Effect.annotateCurrentSpan('pf.error', settled.error)
       }).pipe(Effect.withSpan('pf.runtime.start')),
-    ).finally(() => { starting = null })
+    ).finally(() => {
+      starting = null
+    })
     await starting
   }
 
@@ -104,12 +109,10 @@ export function makePfRuntime(deps: PfRuntimeDeps = {}): PfRuntime {
     if (!host) return []
     return run(
       host.analyze(text).pipe(
-        Effect.tap((matches) =>
-          Effect.annotateCurrentSpan('pf.matches', matches.length)),
+        Effect.tap((matches) => Effect.annotateCurrentSpan('pf.matches', matches.length)),
         Effect.catchAll((err) =>
-          Effect.annotateCurrentSpan('pf.error', String(err.cause)).pipe(
-            Effect.as<unknown[]>([]),
-          )),
+          Effect.annotateCurrentSpan('pf.error', String(err.cause)).pipe(Effect.as<unknown[]>([])),
+        ),
         Effect.withSpan('pf.analyze', { attributes: { text_len: text.length } }),
       ),
     )
@@ -188,9 +191,9 @@ async function defaultSpawnWindow(): Promise<BrowserWindow> {
     if (title !== INFERENCE_DOC_TITLE) {
       throw new Error(
         `[pf-runtime] dev loadURL returned wrong document (title=${JSON.stringify(title)}; ` +
-        `expected ${JSON.stringify(INFERENCE_DOC_TITLE)}). The Vite dev server probably hit ` +
-        `its SPA fallback — check src/renderer/pf-inference.html exists and that the load URL ` +
-        `points at it.`,
+          `expected ${JSON.stringify(INFERENCE_DOC_TITLE)}). The Vite dev server probably hit ` +
+          `its SPA fallback — check src/renderer/pf-inference.html exists and that the load URL ` +
+          `points at it.`,
       )
     }
   } else {

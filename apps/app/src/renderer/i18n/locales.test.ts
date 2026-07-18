@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
+import de from './locales/de.json'
 import en from './locales/en.json'
-import zhCN from './locales/zh-CN.json'
-import zhTW from './locales/zh-TW.json'
+import fr from './locales/fr.json'
 import ja from './locales/ja.json'
 import ko from './locales/ko.json'
-import de from './locales/de.json'
-import fr from './locales/fr.json'
+import zhCN from './locales/zh-CN.json'
+import zhTW from './locales/zh-TW.json'
 
 type Tree = Record<string, unknown>
 
@@ -31,7 +32,11 @@ function leafPaths(tree: Tree, prefix = ''): Set<string> {
   return out
 }
 
-function flattenLeaves(tree: Tree, prefix = '', out = new Map<string, unknown>()): Map<string, unknown> {
+function flattenLeaves(
+  tree: Tree,
+  prefix = '',
+  out = new Map<string, unknown>(),
+): Map<string, unknown> {
   for (const [key, value] of Object.entries(tree)) {
     const path = prefix ? `${prefix}.${key}` : key
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -57,13 +62,13 @@ const EN_PATHS = leafPaths(en as Tree)
 describe('locale key parity vs en.json', () => {
   it.each(LOCALES)('%s covers every translatable key in en.json', (name, tree) => {
     const present = leafPaths(tree)
-    const missing = [...EN_PATHS].filter(p => !present.has(p))
+    const missing = [...EN_PATHS].filter((p) => !present.has(p))
     expect(missing, `${name} is missing keys present in en.json`).toEqual([])
   })
 
   it.each(LOCALES)('%s has no extra keys not declared in en.json', (name, tree) => {
     const present = leafPaths(tree)
-    const extra = [...present].filter(p => !EN_PATHS.has(p))
+    const extra = [...present].filter((p) => !EN_PATHS.has(p))
     expect(extra, `${name} has keys that en.json does not`).toEqual([])
   })
 
@@ -120,7 +125,7 @@ describe('locale key parity vs en.json', () => {
       if (typeof value !== 'string') continue
       if (!value.includes('{{count}}')) continue
       const base = path.replace(PLURAL_SUFFIX, '')
-      const hasOther = [...enFlat.keys()].some(p => p === `${base}_other`)
+      const hasOther = [...enFlat.keys()].some((p) => p === `${base}_other`)
       if (!hasOther) missing.push(base)
     }
     // Sort both sides so the diff is stable and easy to triage.

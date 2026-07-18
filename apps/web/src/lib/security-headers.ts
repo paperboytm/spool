@@ -20,7 +20,10 @@
 
 const IMG_SRC_READER = "'self' data: https://spool.pro https://lh3.googleusercontent.com"
 
-function csp(nonce: string | undefined, opts: { formAction: 'self' | 'none'; imgSrc: string }): string {
+function csp(
+  nonce: string | undefined,
+  opts: { formAction: 'self' | 'none'; imgSrc: string },
+): string {
   const scriptSrc = nonce ? `'self' 'nonce-${nonce}'` : "'self'"
   return [
     "default-src 'self'",
@@ -50,14 +53,7 @@ const BASE_HEADERS: Record<string, string> = {
  *  the noindex defaults. */
 const READER_PREFIXES = ['/s/', '/session/', '/@']
 const ACCOUNT_PATHS = ['/me', '/sign-in', '/cli-auth']
-const PRERENDERED_PREFIXES = [
-  '/daemon',
-  '/connectors',
-  '/blog',
-  '/docs',
-  '/terms',
-  '/privacy',
-]
+const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']
 
 export function securityHeadersFor(
   pathname: string,

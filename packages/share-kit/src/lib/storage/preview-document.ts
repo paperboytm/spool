@@ -17,8 +17,8 @@
 // on the resulting preview so the thumbnail's downstream
 // selectSegments doesn't re-filter and re-empty the array.
 
-import type { SpoolDocument } from '../types'
 import { selectSegments } from '../../templates/selection'
+import type { SpoolDocument } from '../types'
 
 /** Number of turns the Shares-grid card thumbnail actually renders.
  *  Anything beyond this is fade-clipped, so storing them in

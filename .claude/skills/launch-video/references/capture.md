@@ -33,7 +33,11 @@ const PROJECTS: ProjectSeed[] = [
     name: 'spool',
     total: 79,
     leadSessions: [
-      { title: 'Audit the share flow in a fresh worktree', source: 'claude', iso: '2026-05-13T15:12:00Z' },
+      {
+        title: 'Audit the share flow in a fresh worktree',
+        source: 'claude',
+        iso: '2026-05-13T15:12:00Z',
+      },
       // ... more titles per project
     ],
     fillerSources: ['claude', 'codex'],
@@ -68,18 +72,19 @@ const PROJECTS = [/* per-release seed */]
 const OUT_DIR = path.join(__dirname, '../../../videos/spool-vX.Y.Z/assets/live')
 
 test('record release clips', async () => {
-  test.setTimeout(540_000)  // ~9min — relaxed pacing across 7 beats can take longer than the default 30s test timeout
+  test.setTimeout(540_000) // ~9min — relaxed pacing across 7 beats can take longer than the default 30s test timeout
 
   const ctx = await launchDemoApp(PROJECTS)
   await setDemoWindowBounds(ctx, 1080, 740)
   await waitForDemoSync(ctx.window)
-  await installCursorOverlay(ctx.window)         // synthetic cursor for the rest of the spec
-  await cursorPark(ctx.window, 120, 360)          // park off to the side before clip 1
+  await installCursorOverlay(ctx.window) // synthetic cursor for the rest of the spec
+  await cursorPark(ctx.window, 120, 360) // park off to the side before clip 1
 
   await recordNativeWindow(ctx.app, path.join(OUT_DIR, '01-home.mov'), 4.0, async () => {
-    await ctx.window.waitForTimeout(500)         // settle so the cursor is in the first filmed frame
+    await ctx.window.waitForTimeout(500) // settle so the cursor is in the first filmed frame
     await cursorClick(ctx.window, '[data-testid="<feature-gated-element>"]', {
-      preClickPause: 260, postClickPause: 280,
+      preClickPause: 260,
+      postClickPause: 280,
     })
     // ... drive the rest of the scene
   })
@@ -99,7 +104,7 @@ pnpm --filter @spool/app exec playwright test e2e/release-capture.spec.ts \
 
 `--global-timeout` is required for relaxed-pacing releases — Playwright's config default is 300s and a 7-beat spec with relaxed `postClickPause` values can easily exceed that. `--retries=0` because a flaky capture (Electron failing to focus, screencapture permission glitch) on first run can spawn a second Electron whose window overlaps the first — the capture then records the wrong app state. Better to fail loudly and re-run by hand than auto-retry and ship wrong frames.
 
-If the feature being demoed is behind a build-time flag (e.g. `VITE_FEATURE_<NAME>`), build the app with the flag *before* running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time:
+If the feature being demoed is behind a build-time flag (e.g. `VITE_FEATURE_<NAME>`), build the app with the flag _before_ running the spec — `import.meta.env.VITE_FEATURE_<NAME>` is inlined at build time:
 
 ```bash
 VITE_FEATURE_<NAME>=1 pnpm --filter @spool/app run build:electron
@@ -109,12 +114,12 @@ If the feature is also gated by a runtime opt-in stored in `agents.json` (e.g. a
 
 ## Capture-time constants
 
-| | Value | Why |
-|---|---|---|
-| Window logical size | 1080×740 | Matches app default (`packages/app/src/main/index.ts`); the composition assumes this aspect |
-| Theme | dark forced | `nativeTheme.themeSource = 'dark'` in `setDemoWindowBounds()` |
-| GPU | disabled | `ELECTRON_DISABLE_GPU=1` for deterministic frames |
-| `screencapture` cursor | off | Default; don't add `-C`. The real OS cursor doesn't move with Playwright, so capturing it would film a stationary system arrow in some corner. Use the synthetic DOM cursor from `cursor-overlay.md` instead |
+|                        | Value       | Why                                                                                                                                                                                                          |
+| ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Window logical size    | 1080×740    | Matches app default (`packages/app/src/main/index.ts`); the composition assumes this aspect                                                                                                                  |
+| Theme                  | dark forced | `nativeTheme.themeSource = 'dark'` in `setDemoWindowBounds()`                                                                                                                                                |
+| GPU                    | disabled    | `ELECTRON_DISABLE_GPU=1` for deterministic frames                                                                                                                                                            |
+| `screencapture` cursor | off         | Default; don't add `-C`. The real OS cursor doesn't move with Playwright, so capturing it would film a stationary system arrow in some corner. Use the synthetic DOM cursor from `cursor-overlay.md` instead |
 
 ## Common capture issues
 

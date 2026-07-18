@@ -21,18 +21,19 @@
 // next scan surfaces it again. NOT destructive — click-twice in-place
 // confirm, no trash icon, hidden until hover.
 
-import { useEffect, useMemo, useState, type ComponentProps } from 'react'
-import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
-import { X, Search, ChevronDown } from 'lucide-react'
-import { useHotkeys } from '../../hooks/useHotkeys.js'
 import type { AllowlistEntryRow } from '@spool-lab/core'
 import { SENSITIVE_KIND_LABEL, type SensitiveKind } from '@spool-lab/redact'
+import type { TFunction } from 'i18next'
+import { X, Search, ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useState, type ComponentProps } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { securityApi } from '../../api/security.js'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 import Menu from '../Menu.js'
+import { filterIgnoredEntries } from './filter-ignored.js'
 import { formatScanAgo } from './page-helpers.js'
 import { truncateValue } from './truncate-value.js'
-import { filterIgnoredEntries } from './filter-ignored.js'
 
 interface Props {
   onClose: () => void
@@ -48,11 +49,16 @@ export default function AllowlistManageModal({ onClose }: Props) {
   const [scopeFilter, setScopeFilter] = useState<'all' | 'global' | 'session'>('all')
 
   useEffect(() => {
-    void securityApi.listAllowlistEntries().then(setEntries).catch(() => setEntries([]))
+    void securityApi
+      .listAllowlistEntries()
+      .then(setEntries)
+      .catch(() => setEntries([]))
   }, [])
   // Clear a pending in-place confirm when the filters change, so a row
   // that's filtered out and later reappears doesn't come back mid-confirm.
-  useEffect(() => { setConfirmKey(null) }, [filter, kindFilter, scopeFilter])
+  useEffect(() => {
+    setConfirmKey(null)
+  }, [filter, kindFilter, scopeFilter])
   useHotkeys({ Escape: onClose }, { modal: true })
 
   const total = entries?.length ?? 0
@@ -63,7 +69,8 @@ export default function AllowlistManageModal({ onClose }: Props) {
     if (!entries) return [] as Array<{ kind: string; label: string }>
     const seen = new Map<string, string>()
     for (const e of entries) {
-      if (!seen.has(e.kind)) seen.set(e.kind, SENSITIVE_KIND_LABEL[e.kind as SensitiveKind] ?? e.kind)
+      if (!seen.has(e.kind))
+        seen.set(e.kind, SENSITIVE_KIND_LABEL[e.kind as SensitiveKind] ?? e.kind)
     }
     return [...seen.entries()]
       .map(([kind, label]) => ({ kind, label }))
@@ -77,7 +84,10 @@ export default function AllowlistManageModal({ onClose }: Props) {
 
   async function stopIgnoring(entry: AllowlistEntryRow) {
     const key = rowKey(entry)
-    if (confirmKey !== key) { setConfirmKey(key); return }
+    if (confirmKey !== key) {
+      setConfirmKey(key)
+      return
+    }
     setBusyKey(key)
     try {
       await securityApi.removeAllowlistEntry({
@@ -98,15 +108,17 @@ export default function AllowlistManageModal({ onClose }: Props) {
       data-testid="ignored-manage"
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-text/50 dark:bg-black/65 backdrop-blur-md pt-[15vh]"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className="bg-warm-text/50 fixed inset-0 z-50 flex items-start justify-center pt-[15vh] backdrop-blur-md dark:bg-black/65"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div
-        className="bg-warm-bg dark:bg-dark-bg rounded-[10px] w-[720px] max-w-[calc(100vw-64px)] min-h-[240px] max-h-[70vh] flex flex-col overflow-hidden border border-warm-border dark:border-dark-border"
+        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border flex max-h-[70vh] min-h-[240px] w-[720px] max-w-[calc(100vw-64px)] flex-col overflow-hidden rounded-[10px] border"
         style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
       >
         <header className="flex items-center justify-between gap-4 px-5 pt-4 pb-2">
-          <h2 className="min-w-0 text-[15px] leading-[20px] font-semibold tracking-[-0.005em] text-warm-text dark:text-dark-text">
+          <h2 className="text-warm-text dark:text-dark-text min-w-0 text-[15px] leading-[20px] font-semibold tracking-[-0.005em]">
             {t('settings.security.allowlist_modal_title', { defaultValue: 'Ignored items' })}
           </h2>
           <button
@@ -114,7 +126,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
             aria-label={t('common.close', { defaultValue: 'Close' })}
             data-testid="ignored-close"
             onClick={onClose}
-            className="flex-none w-7 h-7 inline-flex items-center justify-center text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface rounded-md -mr-1"
+            className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface -mr-1 inline-flex h-7 w-7 flex-none items-center justify-center rounded-md"
           >
             <X size={16} strokeWidth={1.75} aria-hidden />
           </button>
@@ -129,13 +141,35 @@ export default function AllowlistManageModal({ onClose }: Props) {
                 scopeFilter === 'all'
                   ? t('settings.security.allowlist_all_scopes', { defaultValue: 'All scopes' })
                   : scopeFilter === 'global'
-                    ? t('settings.security.allowlist_scope_everywhere', { defaultValue: 'Everywhere' })
-                    : t('settings.security.allowlist_bucket_session', { defaultValue: 'Per session' })
+                    ? t('settings.security.allowlist_scope_everywhere', {
+                        defaultValue: 'Everywhere',
+                      })
+                    : t('settings.security.allowlist_bucket_session', {
+                        defaultValue: 'Per session',
+                      })
               }
               items={[
-                { label: t('settings.security.allowlist_all_scopes', { defaultValue: 'All scopes' }), active: scopeFilter === 'all', onSelect: () => setScopeFilter('all') },
-                { label: t('settings.security.allowlist_scope_everywhere', { defaultValue: 'Everywhere' }), active: scopeFilter === 'global', onSelect: () => setScopeFilter('global') },
-                { label: t('settings.security.allowlist_bucket_session', { defaultValue: 'Per session' }), active: scopeFilter === 'session', onSelect: () => setScopeFilter('session') },
+                {
+                  label: t('settings.security.allowlist_all_scopes', {
+                    defaultValue: 'All scopes',
+                  }),
+                  active: scopeFilter === 'all',
+                  onSelect: () => setScopeFilter('all'),
+                },
+                {
+                  label: t('settings.security.allowlist_scope_everywhere', {
+                    defaultValue: 'Everywhere',
+                  }),
+                  active: scopeFilter === 'global',
+                  onSelect: () => setScopeFilter('global'),
+                },
+                {
+                  label: t('settings.security.allowlist_bucket_session', {
+                    defaultValue: 'Per session',
+                  }),
+                  active: scopeFilter === 'session',
+                  onSelect: () => setScopeFilter('session'),
+                },
               ]}
             />
             <FilterMenu
@@ -146,39 +180,59 @@ export default function AllowlistManageModal({ onClose }: Props) {
                   : t('settings.security.allowlist_all_types', { defaultValue: 'All types' })
               }
               items={[
-                { label: t('settings.security.allowlist_all_types', { defaultValue: 'All types' }), active: kindFilter === null, onSelect: () => setKindFilter(null) },
-                ...presentKinds.map((k) => ({ label: k.label, active: kindFilter === k.kind, onSelect: () => setKindFilter(k.kind) })),
+                {
+                  label: t('settings.security.allowlist_all_types', { defaultValue: 'All types' }),
+                  active: kindFilter === null,
+                  onSelect: () => setKindFilter(null),
+                },
+                ...presentKinds.map((k) => ({
+                  label: k.label,
+                  active: kindFilter === k.kind,
+                  onSelect: () => setKindFilter(k.kind),
+                })),
               ]}
             />
-            <div className="flex items-center gap-1.5 h-6 flex-1 min-w-0 max-w-[220px] ml-1 px-2 rounded bg-warm-surface dark:bg-dark-surface">
-              <Search size={12} strokeWidth={1.75} className="text-warm-faint dark:text-dark-faint shrink-0" aria-hidden />
+            <div className="bg-warm-surface dark:bg-dark-surface ml-1 flex h-6 max-w-[220px] min-w-0 flex-1 items-center gap-1.5 rounded px-2">
+              <Search
+                size={12}
+                strokeWidth={1.75}
+                className="text-warm-faint dark:text-dark-faint shrink-0"
+                aria-hidden
+              />
               <input
                 type="text"
                 data-testid="ignored-filter"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder={t('settings.security.allowlist_filter_placeholder', { defaultValue: 'Filter…' })}
-                className="flex-1 min-w-0 bg-transparent text-[12px] text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-faint outline-none"
+                placeholder={t('settings.security.allowlist_filter_placeholder', {
+                  defaultValue: 'Filter…',
+                })}
+                className="text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-faint min-w-0 flex-1 bg-transparent text-[12px] outline-none"
               />
             </div>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-2 pb-2 [scrollbar-gutter:stable]">
+        <div className="flex-1 [scrollbar-gutter:stable] overflow-y-auto px-2 pb-2">
           {entries === null ? (
-            <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
+            <p className="text-warm-muted dark:text-dark-muted py-6 text-center text-sm">
               {t('common.loading', { defaultValue: 'Loading…' })}
             </p>
           ) : total === 0 ? (
-            <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
-              {t('settings.security.allowlist_empty', { defaultValue: 'Nothing ignored yet. Findings you choose to ignore will appear here.' })}
+            <p className="text-warm-muted dark:text-dark-muted py-6 text-center text-sm">
+              {t('settings.security.allowlist_empty', {
+                defaultValue:
+                  'Nothing ignored yet. Findings you choose to ignore will appear here.',
+              })}
             </p>
           ) : visible.length === 0 ? (
-            <p className="text-sm text-warm-muted dark:text-dark-muted py-6 text-center">
-              {t('settings.security.allowlist_no_matches', { defaultValue: 'No ignored items match your filter.' })}
+            <p className="text-warm-muted dark:text-dark-muted py-6 text-center text-sm">
+              {t('settings.security.allowlist_no_matches', {
+                defaultValue: 'No ignored items match your filter.',
+              })}
             </p>
           ) : (
-            <ul className="list-none m-0 p-0">
+            <ul className="m-0 list-none p-0">
               {visible.map((entry) => (
                 <IgnoredRow
                   key={rowKey(entry)}
@@ -208,7 +262,9 @@ function IgnoredRow({ entry, isConfirming, isBusy, onStopIgnoring }: RowProps) {
   const hasValue = entry.value !== null && entry.value !== undefined
   const kindOrUnavailable = hasValue
     ? kindLabel
-    : t('settings.security.allowlist_value_unavailable', { defaultValue: 'original no longer available' })
+    : t('settings.security.allowlist_value_unavailable', {
+        defaultValue: 'original no longer available',
+      })
   // Kind + scope live together under the value; the right column is a
   // clean, consistent time stamp (no ragged scope text floating right).
   const subtitle = `${kindOrUnavailable} · ${scopeLabel(entry, t)}`
@@ -216,17 +272,23 @@ function IgnoredRow({ entry, isConfirming, isBusy, onStopIgnoring }: RowProps) {
   return (
     <li
       data-testid="ignored-row"
-      className="group flex items-center gap-3 px-3 py-2 rounded-md hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+      className="group hover:bg-warm-surface dark:hover:bg-dark-surface flex items-center gap-3 rounded-md px-3 py-2 transition-colors"
     >
       <div className="min-w-0 flex-1">
-        {hasValue
-          ? <IgnoredValue value={entry.value as string} />
-          : <span className="block text-[13px] text-warm-muted dark:text-dark-muted truncate">{kindLabel}</span>}
-        <div className="text-[11px] text-warm-faint dark:text-dark-faint truncate mt-0.5">{subtitle}</div>
+        {hasValue ? (
+          <IgnoredValue value={entry.value as string} />
+        ) : (
+          <span className="text-warm-muted dark:text-dark-muted block truncate text-[13px]">
+            {kindLabel}
+          </span>
+        )}
+        <div className="text-warm-faint dark:text-dark-faint mt-0.5 truncate text-[11px]">
+          {subtitle}
+        </div>
       </div>
-      <div className="relative flex-none flex items-center justify-end min-w-[100px]">
+      <div className="relative flex min-w-[100px] flex-none items-center justify-end">
         <span
-          className={`whitespace-nowrap text-[11px] tabular-nums text-warm-faint dark:text-dark-faint transition-opacity duration-100 ${
+          className={`text-warm-faint dark:text-dark-faint text-[11px] whitespace-nowrap tabular-nums transition-opacity duration-100 ${
             isConfirming ? 'opacity-0' : 'group-hover:opacity-0'
           }`}
         >
@@ -257,7 +319,12 @@ function IgnoredRow({ entry, isConfirming, isBusy, onStopIgnoring }: RowProps) {
 // Compact filter dropdown used for both the scope and the kind filters
 // in the toolbar — a subtle pill whose label reflects the current
 // selection, opening the shared Menu.
-function FilterMenu({ testId, label, items, first }: {
+function FilterMenu({
+  testId,
+  label,
+  items,
+  first,
+}: {
   testId: string
   label: string
   items: ComponentProps<typeof Menu>['items']
@@ -280,14 +347,24 @@ function FilterMenu({ testId, label, items, first }: {
           onClick={toggle}
           aria-haspopup="menu"
           aria-expanded={open}
-          className={`flex-none inline-flex items-center gap-1 h-6 px-1.5 rounded text-[12px] text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors ${first ? '-ml-1.5' : ''}`}
+          className={`text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface inline-flex h-6 flex-none items-center gap-1 rounded px-1.5 text-[12px] transition-colors ${first ? '-ml-1.5' : ''}`}
         >
           <span className="grid max-w-[160px] text-left">
             {labels.map((l) => (
-              <span key={l} className={`col-start-1 row-start-1 truncate ${l === label ? '' : 'invisible'}`}>{l}</span>
+              <span
+                key={l}
+                className={`col-start-1 row-start-1 truncate ${l === label ? '' : 'invisible'}`}
+              >
+                {l}
+              </span>
             ))}
           </span>
-          <ChevronDown size={12} strokeWidth={1.7} aria-hidden className="shrink-0 text-warm-faint dark:text-dark-faint" />
+          <ChevronDown
+            size={12}
+            strokeWidth={1.7}
+            aria-hidden
+            className="text-warm-faint dark:text-dark-faint shrink-0"
+          />
         </button>
       )}
       items={items}
@@ -316,7 +393,7 @@ function IgnoredValue({ value }: { value: string }) {
     <span
       data-testid="ignored-value"
       title={value}
-      className="block font-mono text-xs truncate text-warm-text dark:text-dark-text select-text"
+      className="text-warm-text dark:text-dark-text block truncate font-mono text-xs select-text"
     >
       {truncateValue(value)}
     </span>

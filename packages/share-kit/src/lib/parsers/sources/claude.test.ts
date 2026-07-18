@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { claudeSource } from './claude'
 
 const URL = 'https://claude.ai/share/11111111-2222-3333-4444-555555555555'

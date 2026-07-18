@@ -15,8 +15,9 @@
 //     `reason: 'unknown'` envelope so the renderer falls back to its
 //     generic error toast instead of branching on the wrong reason.
 
-import { describe, it, expect } from 'vitest'
 import { Data, Effect } from 'effect'
+import { describe, it, expect } from 'vite-plus/test'
+
 import {
   exitToWireResult,
   flattenPurgeError,
@@ -58,7 +59,9 @@ describe('unwrapEffectFailure', () => {
   it('returns null for a thrown synchronous exception inside a generator', async () => {
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
-        yield* Effect.sync(() => { throw new Error('oops') })
+        yield* Effect.sync(() => {
+          throw new Error('oops')
+        })
       }),
     )
     expect(unwrapEffectFailure(exit)).toBeNull()
@@ -66,20 +69,21 @@ describe('unwrapEffectFailure', () => {
 })
 
 describe('flattenPurgeError', () => {
-  it.each([
-    'not-found',
-    'already-purged',
-    'message-missing',
-    'db-failed',
-  ] as const)('preserves reason=%s and findingId from a typed PurgeError-shaped object', (reason) => {
-    expect(flattenPurgeError({ reason, findingId: 5 })).toEqual({ reason, findingId: 5 })
-  })
+  it.each(['not-found', 'already-purged', 'message-missing', 'db-failed'] as const)(
+    'preserves reason=%s and findingId from a typed PurgeError-shaped object',
+    (reason) => {
+      expect(flattenPurgeError({ reason, findingId: 5 })).toEqual({ reason, findingId: 5 })
+    },
+  )
 
   it('attaches cause.message when present, omits when not', () => {
-    expect(flattenPurgeError({ reason: 'db-failed', findingId: 9, cause: new Error('disk full') }))
-      .toEqual({ reason: 'db-failed', findingId: 9, message: 'disk full' })
-    expect(flattenPurgeError({ reason: 'db-failed', findingId: 9 }))
-      .toEqual({ reason: 'db-failed', findingId: 9 })
+    expect(
+      flattenPurgeError({ reason: 'db-failed', findingId: 9, cause: new Error('disk full') }),
+    ).toEqual({ reason: 'db-failed', findingId: 9, message: 'disk full' })
+    expect(flattenPurgeError({ reason: 'db-failed', findingId: 9 })).toEqual({
+      reason: 'db-failed',
+      findingId: 9,
+    })
   })
 
   it('downgrades a plain Error to reason=unknown with its message', () => {

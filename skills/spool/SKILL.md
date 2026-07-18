@@ -28,7 +28,7 @@ If missing, tell the user: install with `npm install -g @spool-lab/cli`, then `s
 Only **claude** and **codex** sessions can be shared. Sharing publishes the full transcript to the hub and prints a URL.
 
 1. `spool sync` — the session must be indexed, and this picks up the newest turns.
-2. Pick the target: inside Claude Code use `$CLAUDE_CODE_SESSION_ID`; in other agents (or if unset) omit the argument to share the most recent session in the current directory, or pass a UUID from `spool list`. `<uuid>@<n>` shares only the first *n* records.
+2. Pick the target: inside Claude Code use `$CLAUDE_CODE_SESSION_ID`; in other agents (or if unset) omit the argument to share the most recent session in the current directory, or pass a UUID from `spool list`. `<uuid>@<n>` shares only the first _n_ records.
 3. Compose the note yourself — 1–3 sentences, intent → outcome — and pass it with `-m` (there is no interactive editor here):
 
 ```bash
@@ -63,28 +63,28 @@ Done when you hold at least one relevant UUID — or you have synced, retried, a
 
 Pick the cheapest view that answers the question; the full transcript is the most expensive and rarely the right first move:
 
-| Question about the session | Command |
-|---|---|
-| what happened, step by step | `spool show <uuid> --log` — one line per record |
-| what code it changed | `spool show <uuid> --diff` — net diff across the whole session |
-| one specific record | `spool show <uuid>@r<n>` — raw record JSON |
-| the full conversation | `spool show <uuid>` |
+| Question about the session  | Command                                                        |
+| --------------------------- | -------------------------------------------------------------- |
+| what happened, step by step | `spool show <uuid> --log` — one line per record                |
+| what code it changed        | `spool show <uuid> --diff` — net diff across the whole session |
+| one specific record         | `spool show <uuid>@r<n>` — raw record JSON                     |
+| the full conversation       | `spool show <uuid>`                                            |
 
 ### 3. Use it
 
-Fold what you found into your reply as ordinary context, citing the source per claim — `[codex · 7/15 · parallel-world]`. When the user wants to *continue* that session rather than read it, hand over the native resume command that `spool search` already printed: `claude -r <uuid>`, `codex resume <uuid>`, `pi --session <uuid>`.
+Fold what you found into your reply as ordinary context, citing the source per claim — `[codex · 7/15 · parallel-world]`. When the user wants to _continue_ that session rather than read it, hand over the native resume command that `spool search` already printed: `claude -r <uuid>`, `codex resume <uuid>`, `pi --session <uuid>`.
 
 ## Command reference
 
-| Command | Does |
-|---|---|
-| `spool sync [--watch]` | index new sessions; `--watch` stays running |
-| `spool search <query>` | full-text search; prints native resume commands |
-| `spool list` | recent sessions; `-s`/`-p` filter a recent window, so raise `-n` when filtering |
-| `spool projects [name]` | project groups, or one project's sessions |
-| `spool show <uuid\|sid\|url>` | transcript/summary; `--log` timeline, `--diff` net change, `@r<n>` record |
-| `spool pin/unpin/pinned <uuid>` | bookmark sessions — state shared with the Spool app Library |
-| `spool status` / `spool doctor [--fix]` | index stats / environment diagnostics |
-| `spool login` / `spool logout` | hub auth: browser device flow / revoke + clear |
-| `spool share` / `spool withdraw` | publish to the hub / unpublish |
-| `spool resume <sid\|url>[@<n>]` | materialize a shared session locally, fork it natively; `--no-exec` prints the command only |
+| Command                                 | Does                                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `spool sync [--watch]`                  | index new sessions; `--watch` stays running                                                 |
+| `spool search <query>`                  | full-text search; prints native resume commands                                             |
+| `spool list`                            | recent sessions; `-s`/`-p` filter a recent window, so raise `-n` when filtering             |
+| `spool projects [name]`                 | project groups, or one project's sessions                                                   |
+| `spool show <uuid\|sid\|url>`           | transcript/summary; `--log` timeline, `--diff` net change, `@r<n>` record                   |
+| `spool pin/unpin/pinned <uuid>`         | bookmark sessions — state shared with the Spool app Library                                 |
+| `spool status` / `spool doctor [--fix]` | index stats / environment diagnostics                                                       |
+| `spool login` / `spool logout`          | hub auth: browser device flow / revoke + clear                                              |
+| `spool share` / `spool withdraw`        | publish to the hub / unpublish                                                              |
+| `spool resume <sid\|url>[@<n>]`         | materialize a shared session locally, fork it natively; `--no-exec` prints the command only |

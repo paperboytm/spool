@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // EmptyState copy split: the empty Security page must distinguish a
@@ -25,8 +26,12 @@ import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
 
-test.beforeAll(async () => { ctx = await launchApp() })
-test.afterAll(async () => { await ctx?.cleanup() })
+test.beforeAll(async () => {
+  ctx = await launchApp()
+})
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 test('Empty Security page reads "clean" after a scan completes with no findings', async () => {
   const { window } = ctx

@@ -106,7 +106,10 @@ function splitSegments(body: string): string[] {
   const padded = '\n' + body
   const parts = padded.split(YOU_SAID_SPLIT_RX)
   // The first element is the intro before the first `You said`; discard.
-  return parts.slice(1).map((s) => s.trim()).filter(Boolean)
+  return parts
+    .slice(1)
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function splitUserAssistant(segment: string): [string, string] {

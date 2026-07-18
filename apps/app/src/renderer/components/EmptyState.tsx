@@ -12,17 +12,17 @@ export function FeaturedEmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6">
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <div
-        className="w-14 h-14 rounded-full flex items-center justify-center mb-5 bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted"
+        className="bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted mb-5 flex h-14 w-14 items-center justify-center rounded-full"
         aria-hidden="true"
       >
         {icon}
       </div>
-      <h2 className="text-xl font-semibold tracking-[-0.01em] text-warm-text dark:text-dark-text mb-2">
+      <h2 className="text-warm-text dark:text-dark-text mb-2 text-xl font-semibold tracking-[-0.01em]">
         {title}
       </h2>
-      <p className="text-sm leading-relaxed text-warm-muted dark:text-dark-muted max-w-[360px]">
+      <p className="text-warm-muted dark:text-dark-muted max-w-[360px] text-sm leading-relaxed">
         {hint}
       </p>
       {action && <div className="mt-6">{action}</div>}
@@ -32,7 +32,7 @@ export function FeaturedEmptyState({
 
 export function SmallEmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center justify-center px-6 py-16 text-sm text-warm-muted dark:text-dark-muted text-center">
+    <div className="text-warm-muted dark:text-dark-muted flex items-center justify-center px-6 py-16 text-center text-sm">
       {children}
     </div>
   )

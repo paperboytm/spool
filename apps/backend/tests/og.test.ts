@@ -1,15 +1,14 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
+import { describe, expect, it, vi, beforeEach } from 'vite-plus/test'
 
 import type { SessionRecord } from '../src/auth/session'
-
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
 // Mock workers-og so tests don't try to load Satori/wasm in node.
 const imageResponseCalls: Array<{ html: string; opts: unknown }> = []
 
 vi.mock('workers-og', () => ({
-  ImageResponse: vi.fn().mockImplementation((html: string, opts: unknown) => {
+  ImageResponse: vi.fn().mockImplementation(function ImageResponse(html: string, opts: unknown) {
     imageResponseCalls.push({ html, opts })
     return {
       async arrayBuffer() {
@@ -21,9 +20,7 @@ vi.mock('workers-og', () => ({
   // Tests don't exercise the Google Fonts network — stub to a tiny
   // ArrayBuffer so renderOgPng's font-load path completes without
   // actually fetching. The real subset-fetch is exercised in prod.
-  loadGoogleFont: vi
-    .fn()
-    .mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
+  loadGoogleFont: vi.fn().mockImplementation(() => Promise.resolve(new Uint8Array([0]).buffer)),
 }))
 
 const TOKEN = 'p'.repeat(40)
@@ -70,14 +67,20 @@ function envFor(state?: FakeDbState) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ctxFor(req: Request, env: Record<string, unknown>, params: Record<string, string> = {}): any {
+function ctxFor(
+  req: Request,
+  env: Record<string, unknown>,
+  params: Record<string, string> = {},
+): any {
   const waits: Promise<unknown>[] = []
   return {
     request: req,
     env,
     next: async () => new Response('not-found', { status: 404 }),
     params,
-    waitUntil: (p: Promise<unknown>) => { waits.push(p) },
+    waitUntil: (p: Promise<unknown>) => {
+      waits.push(p)
+    },
     passThroughOnException: () => undefined,
     data: {},
     _waits: waits,

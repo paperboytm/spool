@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Exercises the "Ignored items" modal toolbar end-to-end: the scope
 // dropdown, the type dropdown, the free-text filter, and the
@@ -25,24 +27,61 @@ test.beforeAll(async () => {
       // Give the session a clean custom title so it does NOT echo the
       // secrets — otherwise the title (which falls back to first-message
       // text) would itself match the value text filter.
-      writeFileSync(join(claudeDir, 'test-project', 'ignored-filter.jsonl'), [
-        JSON.stringify({ type: 'custom-title', sessionId: SID, cwd: '/tmp/test-project', customTitle: 'Credentials review' }),
-        JSON.stringify({ type: 'user', sessionId: SID, cwd: '/tmp/test-project', uuid: 'if-1', timestamp: '2026-05-21T10:00:00Z', message: { role: 'user', content: `key ${FAKE_AKIA} and contact ${FAKE_EMAIL}` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'if-2', timestamp: '2026-05-21T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'noted' } }),
-      ].join('\n'))
+      writeFileSync(
+        join(claudeDir, 'test-project', 'ignored-filter.jsonl'),
+        [
+          JSON.stringify({
+            type: 'custom-title',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            customTitle: 'Credentials review',
+          }),
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'if-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `key ${FAKE_AKIA} and contact ${FAKE_EMAIL}` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'if-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'noted' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Ignored items modal: scope / type / text filters narrow the list and Stop ignoring removes a row', async () => {
@@ -52,10 +91,16 @@ test('Ignored items modal: scope / type / text filters narrow the list and Stop 
 
   // Ignore the api-key everywhere and the email in this session.
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: {
-      listFindings: (f: unknown) => Promise<Array<{ id: number; kind: string }>>
-      dismissFinding: (id: number, scope: string) => Promise<unknown>
-    } } }).spool
+    const api = (
+      globalThis as {
+        spool?: {
+          security?: {
+            listFindings: (f: unknown) => Promise<Array<{ id: number; kind: string }>>
+            dismissFinding: (id: number, scope: string) => Promise<unknown>
+          }
+        }
+      }
+    ).spool
     const rows = await api!.security!.listFindings({ state: 'active' })
     const key = rows.find((r) => r.kind === 'api-key')
     const email = rows.find((r) => r.kind === 'email')
@@ -92,7 +137,9 @@ test('Ignored items modal: scope / type / text filters narrow the list and Stop 
   await modal.locator('[data-testid="ignored-kind-filter"]').click()
   await window.getByRole('menuitem', { name: 'Email', exact: true }).click()
   await expect(rows).toHaveCount(1)
-  await expect(rows.first().locator('[data-testid="ignored-value"]')).toContainText('@ignored-filter.test')
+  await expect(rows.first().locator('[data-testid="ignored-value"]')).toContainText(
+    '@ignored-filter.test',
+  )
 
   // Reset type back to all.
   await modal.locator('[data-testid="ignored-kind-filter"]').click()

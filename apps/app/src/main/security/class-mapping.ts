@@ -82,10 +82,7 @@ const DOB_CONTEXT_RX = /\b(dob|date\s+of\s+birth|born\s+on|birthday|d\.?o\.?b\.?
  *  IDs + hashes) is well out of distribution. */
 const PF_MIN_CONFIDENCE = 0.85
 
-export function mapPfMatch(
-  pf: PfRawMatch,
-  ctx: MappingContext,
-): SensitiveMatch | null {
+export function mapPfMatch(pf: PfRawMatch, ctx: MappingContext): SensitiveMatch | null {
   // Universal confidence floor — applied before any per-class logic
   // so noise gets dropped regardless of suppression rules.
   if (pf.score < PF_MIN_CONFIDENCE) return null

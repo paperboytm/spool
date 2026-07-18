@@ -1,3 +1,7 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 /**
  * Launch the Spool Electron app pre-seeded with a programmatic project list
  * for release-video captures. Separate from `launchApp()` in `launch.ts`,
@@ -5,9 +9,6 @@
  */
 import { _electron as electron, expect } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 
 import { buildDemoFixtures, type ProjectSeed, type BuildDemoFixturesOptions } from './demo-fixtures'
 
@@ -44,11 +45,15 @@ export async function launchDemoApp(
   if (launchOptions.agentsConfig) {
     const spoolHome = join(tmpDir, 'spool-home')
     mkdirSync(spoolHome, { recursive: true })
-    writeFileSync(join(spoolHome, 'agents.json'), JSON.stringify(launchOptions.agentsConfig), 'utf8')
+    writeFileSync(
+      join(spoolHome, 'agents.json'),
+      JSON.stringify(launchOptions.agentsConfig),
+      'utf8',
+    )
   }
 
   const env: Record<string, string> = {
-    ...process.env as Record<string, string>,
+    ...(process.env as Record<string, string>),
     SPOOL_DATA_DIR: join(tmpDir, 'data'),
     SPOOL_ELECTRON_USER_DATA_DIR: join(tmpDir, 'electron-user-data'),
     SPOOL_HOME: join(tmpDir, 'spool-home'),
@@ -81,16 +86,23 @@ export async function launchDemoApp(
  * Force the Electron window into the given logical size + dark theme.
  * Use `1080×740` to match the app's documented default for release videos.
  */
-export async function setDemoWindowBounds(ctx: AppContext, width: number, height: number): Promise<void> {
-  await ctx.app.evaluate(async ({ app, BrowserWindow, nativeTheme }, bounds) => {
-    nativeTheme.themeSource = 'dark'
-    const win = BrowserWindow.getAllWindows()[0]
-    if (!win) throw new Error('No Electron window found')
-    win.setBounds(bounds)
-    win.center()
-    win.show()
-    app.focus({ steal: true })
-  }, { width, height })
+export async function setDemoWindowBounds(
+  ctx: AppContext,
+  width: number,
+  height: number,
+): Promise<void> {
+  await ctx.app.evaluate(
+    async ({ app, BrowserWindow, nativeTheme }, bounds) => {
+      nativeTheme.themeSource = 'dark'
+      const win = BrowserWindow.getAllWindows()[0]
+      if (!win) throw new Error('No Electron window found')
+      win.setBounds(bounds)
+      win.center()
+      win.show()
+      app.focus({ steal: true })
+    },
+    { width, height },
+  )
   await ctx.window.emulateMedia({ colorScheme: 'dark' })
   await ctx.window.waitForTimeout(300)
 }
@@ -100,5 +112,7 @@ export async function setDemoWindowBounds(ctx: AppContext, width: number, height
  * a non-zero session count.
  */
 export async function waitForDemoSync(window: Page): Promise<void> {
-  await expect(window.locator('[data-testid="status-text"]')).toContainText(/[1-9]\d*\s+session/, { timeout: 15000 })
+  await expect(window.locator('[data-testid="status-text"]')).toContainText(/[1-9]\d*\s+session/, {
+    timeout: 15000,
+  })
 }

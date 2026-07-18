@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { dispatchDeepLink } from './deep-link.js'
 
@@ -91,9 +91,7 @@ describe('signInWithWorkos (PKCE + spool:// callback orchestrator)', () => {
 
     expect(opened).toHaveLength(1)
     const auth = new URL(opened[0]!)
-    expect(auth.origin + auth.pathname).toBe(
-      'https://api.workos.com/user_management/authorize',
-    )
+    expect(auth.origin + auth.pathname).toBe('https://api.workos.com/user_management/authorize')
     expect(auth.searchParams.get('client_id')).toBe('client_test_123')
     expect(auth.searchParams.get('provider')).toBe('authkit')
     expect(auth.searchParams.get('response_type')).toBe('code')

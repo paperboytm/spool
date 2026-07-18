@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, type AppContext } from './helpers/launch'
 
 // Regression test for a white flash visible at the window edge during

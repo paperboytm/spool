@@ -135,28 +135,30 @@ function makeClaudeSession(
 function makeCodexSession(sessionId: string, cwd: string, title: string, iso: string): string {
   const t0 = new Date(Date.parse(iso) + 2_000).toISOString()
   const t1 = new Date(Date.parse(iso) + 10_000).toISOString()
-  return [
-    JSON.stringify({
-      timestamp: iso,
-      type: 'session_meta',
-      payload: { id: sessionId, cwd },
-    }),
-    JSON.stringify({
-      timestamp: t0,
-      type: 'turn_context',
-      payload: { model: 'gpt-5.4', cwd },
-    }),
-    JSON.stringify({
-      timestamp: t0,
-      type: 'event_msg',
-      payload: { type: 'user_message', message: title },
-    }),
-    JSON.stringify({
-      timestamp: t1,
-      type: 'event_msg',
-      payload: { type: 'agent_message', message: `Shaping a rollout plan for ${title}.` },
-    }),
-  ].join('\n') + '\n'
+  return (
+    [
+      JSON.stringify({
+        timestamp: iso,
+        type: 'session_meta',
+        payload: { id: sessionId, cwd },
+      }),
+      JSON.stringify({
+        timestamp: t0,
+        type: 'turn_context',
+        payload: { model: 'gpt-5.4', cwd },
+      }),
+      JSON.stringify({
+        timestamp: t0,
+        type: 'event_msg',
+        payload: { type: 'user_message', message: title },
+      }),
+      JSON.stringify({
+        timestamp: t1,
+        type: 'event_msg',
+        payload: { type: 'agent_message', message: `Shaping a rollout plan for ${title}.` },
+      }),
+    ].join('\n') + '\n'
+  )
 }
 
 /**
@@ -207,7 +209,9 @@ export function buildDemoFixtures(
       sessions.push({
         title,
         source,
-        iso: new Date(Date.UTC(2026, 4, Math.max(1, 10 - dayOffset), hour, minute, 0)).toISOString(),
+        iso: new Date(
+          Date.UTC(2026, 4, Math.max(1, 10 - dayOffset), hour, minute, 0),
+        ).toISOString(),
       })
       fillerTitleIndex += 1
     }
@@ -216,8 +220,14 @@ export function buildDemoFixtures(
       const sessionId = toUuid(sessionCounter++)
       if (session.source === 'claude') {
         const relDir = join(claudeDir, project.name.toLowerCase())
-        const filePath = join(relDir, `${project.name.toLowerCase()}-${String(index + 1).padStart(3, '0')}.jsonl`)
-        writeText(filePath, makeClaudeSession(sessionId, cwd, session.title, session.iso, session.turns))
+        const filePath = join(
+          relDir,
+          `${project.name.toLowerCase()}-${String(index + 1).padStart(3, '0')}.jsonl`,
+        )
+        writeText(
+          filePath,
+          makeClaudeSession(sessionId, cwd, session.title, session.iso, session.turns),
+        )
         return
       }
 

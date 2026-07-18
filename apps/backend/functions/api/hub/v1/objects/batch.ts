@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { ApiError, jsonError, jsonOk } from '../../../../../src/errors'
 import { requireHubUser, sha256Hex } from '../../../../../src/hub/auth'
 import type { HubEnv } from '../../../../../src/hub/head'
 import { packKeyFor, writePack } from '../../../../../src/hub/packs'
@@ -10,7 +11,6 @@ import {
   OID_RE,
   USER_QUOTA_BYTES,
 } from '../../../../../src/hub/wire'
-import { ApiError, jsonError, jsonOk } from '../../../../../src/errors'
 import { checkRate } from '../../../../../src/rate-limit'
 
 // Step 2 of the share handshake: content-addressed object upload. Body is
@@ -58,7 +58,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       if (typeof oid !== 'string' || !OID_RE.test(oid) || typeof data !== 'string') {
         throw new ApiError('UNPROCESSABLE', 'line must be { oid, data }')
       }
-      if (await sha256Hex(data) !== oid) {
+      if ((await sha256Hex(data)) !== oid) {
         throw new ApiError('UNPROCESSABLE', 'oid does not match data', { oid })
       }
       if (seen.has(oid)) continue
@@ -66,7 +66,11 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       entries.push({ oid, data })
     }
 
-    const present = await presentOids(ctx.env.DB, user.id, entries.map((e) => e.oid))
+    const present = await presentOids(
+      ctx.env.DB,
+      user.id,
+      entries.map((e) => e.oid),
+    )
     const fresh = entries.filter((e) => !present.has(e.oid))
     if (fresh.length === 0) {
       return jsonOk({ stored: 0, duplicate: entries.length })

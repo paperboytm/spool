@@ -51,7 +51,7 @@ const CLAUDE_SKIP_TYPES = new Set([
 ])
 
 export function parseClaudeSessionText(raw: string, filePath: string): ParseProviderResult {
-  const lines = raw.split('\n').filter(l => l.trim().length > 0)
+  const lines = raw.split('\n').filter((l) => l.trim().length > 0)
   const messages: ParsedMessage[] = []
   let sessionUuid = ''
   let cwd = ''
@@ -127,13 +127,17 @@ export function parseClaudeSessionText(raw: string, filePath: string): ParseProv
 
   if (messages.length === 0) return { kind: 'skipped' }
 
-  const firstUserMsg = messages.find(m => m.role === 'user' && m.contentText.length > 0 && !m.isSidechain)
-  const title = customTitle
-    || (firstUserMsg
-      ? stripAngleTags(firstUserMsg.contentText).trim().slice(0, 120)
-      : '(no title)')
+  const firstUserMsg = messages.find(
+    (m) => m.role === 'user' && m.contentText.length > 0 && !m.isSidechain,
+  )
+  const title =
+    customTitle ||
+    (firstUserMsg ? stripAngleTags(firstUserMsg.contentText).trim().slice(0, 120) : '(no title)')
 
-  const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort()
+  const timestamps = messages
+    .map((m) => m.timestamp)
+    .filter(Boolean)
+    .sort()
 
   return {
     kind: 'parsed',
@@ -240,8 +244,8 @@ function extractText(content: unknown): string {
     raw = content
   } else if (Array.isArray(content)) {
     raw = (content as ContentItem[])
-      .filter(item => item.type === 'text')
-      .map(item => item.text ?? '')
+      .filter((item) => item.type === 'text')
+      .map((item) => item.text ?? '')
       .join('\n')
   } else {
     return ''
@@ -257,8 +261,8 @@ function extractText(content: unknown): string {
 function extractToolNames(content: unknown): string[] {
   if (!Array.isArray(content)) return []
   return (content as ContentItem[])
-    .filter(item => item.type === 'tool_use' && item.name)
-    .map(item => item.name!)
+    .filter((item) => item.type === 'tool_use' && item.name)
+    .map((item) => item.name!)
 }
 
 // ── Codex ───────────────────────────────────────────────────────────────
@@ -303,7 +307,9 @@ export function parseCodexSessionLines(
   // which has no overlap with the trailing UUID-`-`-separator, so the
   // engine matches in O(n) with no backtracking. Codex hasn't changed
   // its rollout filename format since the parser was written.
-  const fileMatch = baseName(filePath).match(/^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/)
+  const fileMatch = baseName(filePath).match(
+    /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/,
+  )
   if (fileMatch?.[1]) sessionUuid = fileMatch[1]
 
   for (const line of lines) {
@@ -380,8 +386,8 @@ export function parseCodexSessionLines(
         const content = payload['content']
         if (Array.isArray(content)) {
           const text = (content as Array<{ type?: string; text?: string }>)
-            .filter(c => c.type === 'output_text' || c.type === 'text')
-            .map(c => c.text ?? '')
+            .filter((c) => c.type === 'output_text' || c.type === 'text')
+            .map((c) => c.text ?? '')
             .join('\n')
             .trim()
           if (looksLikeInternalCodexAssessment(text)) {
@@ -428,9 +434,12 @@ export function parseCodexSessionLines(
   // Re-number seq
   messages = messages.map((m, i) => ({ ...m, seq: i }))
 
-  const firstUserMsg = messages.find(m => m.role === 'user' && !m.isSidechain)
+  const firstUserMsg = messages.find((m) => m.role === 'user' && !m.isSidechain)
   const title = firstUserMsg?.contentText.slice(0, 120) ?? '(no title)'
-  const timestamps = messages.filter(m => !m.isSidechain).map(m => m.timestamp).sort()
+  const timestamps = messages
+    .filter((m) => !m.isSidechain)
+    .map((m) => m.timestamp)
+    .sort()
 
   return {
     kind: 'parsed',
@@ -463,5 +472,5 @@ function isGuardianSubagentSource(source: unknown): boolean {
 
 function looksLikeInternalCodexAssessment(text: string): boolean {
   if (!text) return false
-  return INTERNAL_CODEX_SESSION_MARKERS.some(marker => text.includes(marker))
+  return INTERNAL_CODEX_SESSION_MARKERS.some((marker) => text.includes(marker))
 }

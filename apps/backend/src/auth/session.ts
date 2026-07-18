@@ -35,10 +35,7 @@ export async function createSession(
   return { token, exp }
 }
 
-export async function loadSession(
-  kv: KVNamespace,
-  token: string,
-): Promise<SessionRecord | null> {
+export async function loadSession(kv: KVNamespace, token: string): Promise<SessionRecord | null> {
   if (!token || token.length < MIN_TOKEN_CHARS) return null
   const v = await kv.get(`session/${token}`)
   if (!v) return null
@@ -50,10 +47,7 @@ export async function loadSession(
   }
   if (now - rec.last_seen > SLIDING_REFRESH_MS) {
     rec.last_seen = now
-    const ttlRemain = Math.max(
-      MIN_REMAINING_TTL_SEC,
-      Math.floor((rec.exp - now) / 1000),
-    )
+    const ttlRemain = Math.max(MIN_REMAINING_TTL_SEC, Math.floor((rec.exp - now) / 1000))
     await kv.put(`session/${token}`, JSON.stringify(rec), { expirationTtl: ttlRemain })
   }
   return rec

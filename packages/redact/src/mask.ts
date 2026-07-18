@@ -40,7 +40,8 @@ export function maskValueByKind(value: string, kind: SensitiveKind | string): st
 
     case 'cloud-cred-ini': {
       if (/aws_(access|secret|session)_/i.test(value)) return '[redacted AWS credentials]'
-      if (/refresh_token|client_secret|access_token/i.test(value)) return '[redacted Google credentials]'
+      if (/refresh_token|client_secret|access_token/i.test(value))
+        return '[redacted Google credentials]'
       return '[redacted cloud credentials]'
     }
     case 'kubeconfig-token': {

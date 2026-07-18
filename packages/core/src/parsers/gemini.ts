@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -110,7 +111,7 @@ export function loadGeminiSession(filePath: string): ParseSessionResult {
   const raw = readFileSync(filePath, 'utf8')
   const record = filePath.endsWith('.jsonl')
     ? loadJsonlRecord(raw)
-    : JSON.parse(raw) as GeminiSessionRecord
+    : (JSON.parse(raw) as GeminiSessionRecord)
 
   if (record.kind === 'subagent') return { kind: 'filtered' }
   if (!Array.isArray(record.messages) || record.messages.length === 0) return { kind: 'skipped' }
@@ -136,23 +137,28 @@ export function loadGeminiSession(filePath: string): ParseSessionResult {
       parentUuid: null,
       role: toParsedRole(type),
       contentText,
-      timestamp: message.timestamp ?? record.lastUpdated ?? record.startTime ?? new Date().toISOString(),
+      timestamp:
+        message.timestamp ?? record.lastUpdated ?? record.startTime ?? new Date().toISOString(),
       isSidechain: false,
       toolNames,
       seq: messages.length,
     })
   }
 
-  if (!messages.some(message => message.role === 'user' || message.role === 'assistant')) {
+  if (!messages.some((message) => message.role === 'user' || message.role === 'assistant')) {
     return { kind: 'skipped' }
   }
 
-  const firstUserMessage = messages.find(message => message.role === 'user' && message.contentText.trim().length > 0)
-  const title = record.summary?.trim()
-    || firstUserMessage?.contentText.slice(0, 120)
-    || '(no title)'
+  const firstUserMessage = messages.find(
+    (message) => message.role === 'user' && message.contentText.trim().length > 0,
+  )
+  const title =
+    record.summary?.trim() || firstUserMessage?.contentText.slice(0, 120) || '(no title)'
 
-  const timestamps = messages.map(message => message.timestamp).filter(Boolean).sort()
+  const timestamps = messages
+    .map((message) => message.timestamp)
+    .filter(Boolean)
+    .sort()
   const cwd = resolveGeminiProjectRoot(filePath)
 
   return {
@@ -194,15 +200,17 @@ function extractText(content: unknown): string {
   }
   if (!Array.isArray(content)) return ''
 
-  return stripSpoolSystemPrelude(content
-    .map(item => {
-      if (typeof item === 'string') return item
-      if (!item || typeof item !== 'object') return ''
-      const text = (item as Record<string, unknown>)['text']
-      return typeof text === 'string' ? text : ''
-    })
-    .filter(Boolean)
-    .join('\n'))
+  return stripSpoolSystemPrelude(
+    content
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (!item || typeof item !== 'object') return ''
+        const text = (item as Record<string, unknown>)['text']
+        return typeof text === 'string' ? text : ''
+      })
+      .filter(Boolean)
+      .join('\n'),
+  )
 }
 
 function stripSessionContext(text: string): string {
@@ -221,7 +229,7 @@ function extractToolNames(toolCalls: unknown): string[] {
   if (!Array.isArray(toolCalls)) return []
 
   return toolCalls
-    .map(toolCall => {
+    .map((toolCall) => {
       if (!toolCall || typeof toolCall !== 'object') return undefined
       const record = toolCall as GeminiToolCall
       return record.displayName ?? record.name
@@ -250,8 +258,9 @@ function resolveGeminiProjectRoot(filePath: string): string {
     const rawProjects = JSON.parse(readFileSync(projectsPath, 'utf8')) as {
       projects?: Record<string, string>
     }
-    const entry = Object.entries(rawProjects.projects ?? {})
-      .find(([, shortId]) => shortId === identifier)
+    const entry = Object.entries(rawProjects.projects ?? {}).find(
+      ([, shortId]) => shortId === identifier,
+    )
     return entry?.[0] ?? ''
   } catch {
     return ''

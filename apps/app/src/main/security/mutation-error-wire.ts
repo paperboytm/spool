@@ -45,7 +45,10 @@ export function unwrapEffectFailure<A, E>(exit: Exit.Exit<A, E>): E | null {
  *  us something exotic. */
 export function flattenPurgeError(err: unknown): WireError {
   if (
-    err && typeof err === 'object' && 'reason' in err && 'findingId' in err &&
+    err &&
+    typeof err === 'object' &&
+    'reason' in err &&
+    'findingId' in err &&
     typeof (err as { reason: unknown }).reason === 'string' &&
     typeof (err as { findingId: unknown }).findingId === 'number'
   ) {

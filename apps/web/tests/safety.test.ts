@@ -16,7 +16,8 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+
+import { describe, expect, it } from 'vite-plus/test'
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..', '..')
 
@@ -163,9 +164,7 @@ describe('share-web + reader path safety', () => {
     }
 
     if (offenders.length > 0) {
-      const summary = offenders
-        .map((o) => `  ${o.file}:${o.line}  ${o.text}`)
-        .join('\n')
+      const summary = offenders.map((o) => `  ${o.file}:${o.line}  ${o.text}`).join('\n')
       throw new Error(
         `Found ${offenders.length} use(s) of ${FORBIDDEN} in the reader/share-web path:\n${summary}`,
       )

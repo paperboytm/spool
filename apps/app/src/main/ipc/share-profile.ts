@@ -76,9 +76,7 @@ export function registerShareProfileIpc(): void {
       })
       if (!r.ok) {
         const detail = await readErrorDetail(r)
-        console.error(
-          `[share-profile] upload-avatar failed: status=${r.status} detail=${detail}`,
-        )
+        console.error(`[share-profile] upload-avatar failed: status=${r.status} detail=${detail}`)
         throw new Error(detail)
       }
       return (await r.json()) as AvatarUploadResponse

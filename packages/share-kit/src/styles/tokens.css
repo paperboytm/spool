@@ -4,44 +4,44 @@
 
 :root,
 [data-theme='light'] {
-  --bg: #FAFAF8;
-  --surface: #F4F4F0;
-  --surface2: #EEEEE9;
-  --border: #E8E8E2;
-  --border2: #D8D8D0;
-  --text: #1C1C18;
-  --muted: #6B6B60;
-  --faint: #ADADAA;
-  --accent: #C85A00;
-  --accent-bg: #FFF3E8;
-  --paper: #F6F5EF;
+  --bg: #fafaf8;
+  --surface: #f4f4f0;
+  --surface2: #eeeee9;
+  --border: #e8e8e2;
+  --border2: #d8d8d0;
+  --text: #1c1c18;
+  --muted: #6b6b60;
+  --faint: #adadaa;
+  --accent: #c85a00;
+  --accent-bg: #fff3e8;
+  --paper: #f6f5ef;
   --rule-faint: rgba(28, 28, 24, 0.06);
-  --err: #B23A1E;
-  --err-bg: #FBE9DF;
+  --err: #b23a1e;
+  --err-bg: #fbe9df;
 
   /* Source badges */
-  --src-chatgpt: #10A37F;
-  --src-claude: #C26A4E;
-  --src-gemini: #5887D0;
+  --src-chatgpt: #10a37f;
+  --src-claude: #c26a4e;
+  --src-gemini: #5887d0;
 }
 
 [data-theme='dark'] {
   --bg: #141410;
-  --surface: #1C1C18;
+  --surface: #1c1c18;
   --surface2: #242420;
-  --border: #2E2E28;
-  --border2: #3A3A34;
-  --text: #F2F2EC;
-  --muted: #8A8A80;
+  --border: #2e2e28;
+  --border2: #3a3a34;
+  --text: #f2f2ec;
+  --muted: #8a8a80;
   --faint: #505048;
-  --accent: #F07020;
-  --accent-bg: #2A1800;
-  --paper: #1A1A16;
+  --accent: #f07020;
+  --accent-bg: #2a1800;
+  --paper: #1a1a16;
   --rule-faint: rgba(242, 242, 236, 0.07);
-  --err: #E07A4E;
-  --err-bg: #2A1508;
+  --err: #e07a4e;
+  --err-bg: #2a1508;
 
-  --src-chatgpt: #20C38F;
-  --src-claude: #E89A7C;
-  --src-gemini: #8AB0E5;
+  --src-chatgpt: #20c38f;
+  --src-claude: #e89a7c;
+  --src-gemini: #8ab0e5;
 }

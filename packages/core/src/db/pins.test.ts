@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 const openDbs: Array<{ close: () => void }> = []
@@ -36,9 +37,13 @@ describe('pins', () => {
     const { db, seedSession } = mod
     seedSession('x', 'P', 'T')
     mod.pinSession(db, 'x')
-    const first = db.prepare('SELECT pinned_at FROM pins WHERE session_uuid=?').get('x') as { pinned_at: string }
+    const first = db.prepare('SELECT pinned_at FROM pins WHERE session_uuid=?').get('x') as {
+      pinned_at: string
+    }
     mod.pinSession(db, 'x')
-    const second = db.prepare('SELECT pinned_at FROM pins WHERE session_uuid=?').get('x') as { pinned_at: string }
+    const second = db.prepare('SELECT pinned_at FROM pins WHERE session_uuid=?').get('x') as {
+      pinned_at: string
+    }
     expect(second.pinned_at).toBe(first.pinned_at)
   })
 

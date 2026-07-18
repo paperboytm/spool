@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vite-plus/test'
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..', '..')
 const WEB_ROOT = resolve(PROJECT_ROOT, 'apps/web')
@@ -37,22 +38,31 @@ function resolveEntrypoints(specifiers: string[], conditions: string[] = []) {
     )));
   `
 
-  return JSON.parse(execFileSync(process.execPath, [
-    ...conditions.map((condition) => `--conditions=${condition}`),
-    '--input-type=module',
-    '--eval',
-    script,
-  ], {
-    cwd: WEB_ROOT,
-    encoding: 'utf8',
-  })) as Record<string, string>
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        ...conditions.map((condition) => `--conditions=${condition}`),
+        '--input-type=module',
+        '--eval',
+        script,
+      ],
+      {
+        cwd: WEB_ROOT,
+        encoding: 'utf8',
+      },
+    ),
+  ) as Record<string, string>
 }
 
 function expectResolvedEntrypoints(
   target: 'development' | 'production',
   conditions: string[] = [],
 ) {
-  const resolved = resolveEntrypoints(ENTRYPOINTS.map(({ specifier }) => specifier), conditions)
+  const resolved = resolveEntrypoints(
+    ENTRYPOINTS.map(({ specifier }) => specifier),
+    conditions,
+  )
 
   for (const { specifier, [target]: expectedPath } of ENTRYPOINTS) {
     expect(fileURLToPath(resolved[specifier] ?? '')).toBe(resolve(PROJECT_ROOT, expectedPath))

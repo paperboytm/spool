@@ -1,12 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import type { KVNamespace } from '@cloudflare/workers-types'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 import { safeNext } from '../src/auth/next'
-import { API_CSP } from '../src/security/csp'
-
-import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 import type { SessionRecord } from '../src/auth/session'
-import type { KVNamespace } from '@cloudflare/workers-types'
 import { nanoidSlug } from '../src/publish/slug'
+import { API_CSP } from '../src/security/csp'
+import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
 // Mock workers-og so importing publish.ts doesn't pull in Satori/wasm.
 vi.mock('workers-og', () => ({
@@ -64,13 +63,19 @@ async function seedSession(kv: KVNamespace, token: string, user_id: string): Pro
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ctxFor(req: Request, env: Record<string, unknown>, params: Record<string, string> = {}): any {
+function ctxFor(
+  req: Request,
+  env: Record<string, unknown>,
+  params: Record<string, string> = {},
+): any {
   return {
     request: req,
     env,
     next: async () => new Response('not-found', { status: 404 }),
     params,
-    waitUntil: (p: Promise<unknown>) => { void p },
+    waitUntil: (p: Promise<unknown>) => {
+      void p
+    },
     passThroughOnException: () => undefined,
     data: {},
   }
@@ -144,10 +149,12 @@ describe('_middleware security headers', () => {
       headers: { 'content-type': 'application/json' },
     })
     const req = new Request('https://x/api/me', { method: 'GET' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('content-security-policy')).toBe(API_CSP)
     expect(res.headers.get('x-robots-tag')).toBe('noindex')
     expect(res.headers.get('x-content-type-options')).toBe('nosniff')
@@ -160,10 +167,12 @@ describe('_middleware security headers', () => {
       headers: { 'content-type': 'application/json' },
     })
     const req = new Request('https://x/api/publish', { method: 'POST' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
@@ -173,10 +182,12 @@ describe('_middleware security headers', () => {
       headers: { 'cache-control': 'private, max-age=5' },
     })
     const req = new Request('https://x/api/something', { method: 'POST' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('cache-control')).toBe('private, max-age=5')
   })
 
@@ -186,10 +197,12 @@ describe('_middleware security headers', () => {
       headers: { 'cache-control': 'public, max-age=60' },
     })
     const req = new Request('https://x/api/snapshots/abc', { method: 'GET' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('cache-control')).toBe('public, max-age=60')
   })
 
@@ -204,10 +217,12 @@ describe('_middleware security headers', () => {
       headers: { 'content-type': 'application/json' },
     })
     const req = new Request('https://x/api/me', { method: 'GET' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
@@ -215,10 +230,12 @@ describe('_middleware security headers', () => {
     const { onRequest } = await import('../functions/_middleware')
     const inner = new Response('<html/>', { headers: { 'content-type': 'text/html' } })
     const req = new Request('https://x/some-page', { method: 'GET' })
-    const res = await (onRequest as unknown as (c: {
-      request: Request
-      next: () => Promise<Response>
-    }) => Promise<Response>)({ request: req, next: async () => inner })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
     expect(res.headers.get('content-security-policy')).toBeNull()
   })
 })
@@ -269,9 +286,15 @@ describe('authorization isolation', () => {
     await seedSession(env.SESSIONS, TOKEN, 'me')
     const theirs = nanoidSlug()
     env.state.published_shares.push({
-      id: theirs, user_id: 'them', title: 't', visibility: 'unlisted',
-      expires_at: null, version: 1, published_at: Date.now(),
-      republished_at: null, revoked_at: null,
+      id: theirs,
+      user_id: 'them',
+      title: 't',
+      visibility: 'unlisted',
+      expires_at: null,
+      version: 1,
+      published_at: Date.now(),
+      republished_at: null,
+      revoked_at: null,
     })
     const req = authedReq(`https://x/api/revoke/${theirs}`, undefined, 'POST')
     const res = await onRequestPost(ctxFor(req, env, { id: theirs }))
@@ -286,12 +309,20 @@ describe('authorization isolation', () => {
     await seedSession(env.SESSIONS, TOKEN, 'me')
     const theirs = nanoidSlug()
     env.state.published_shares.push({
-      id: theirs, user_id: 'them', title: 't', visibility: 'unlisted',
-      expires_at: null, version: 1, published_at: Date.now(),
-      republished_at: null, revoked_at: null,
+      id: theirs,
+      user_id: 'them',
+      title: 't',
+      visibility: 'unlisted',
+      expires_at: null,
+      version: 1,
+      published_at: Date.now(),
+      republished_at: null,
+      revoked_at: null,
     })
     const req = authedReq('https://x/api/publish', {
-      snapshot: makeSnapshot(), visibility: 'unlisted', override_slug: theirs,
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
+      override_slug: theirs,
     })
     const res = await onRequestPost(ctxFor(req, env))
     expect(res.status).toBe(404)
@@ -354,14 +385,13 @@ describe('safeNext', () => {
   it('start endpoint coerces ?next=https://evil.com to /', async () => {
     const { onRequestGet } = await import('../functions/api/auth/[provider]/start')
     const env = envFor()
-    const req = new Request(
-      'https://spool.share/api/auth/workos/start?next=https://evil.com',
-    )
+    const req = new Request('https://spool.share/api/auth/workos/start?next=https://evil.com')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await (onRequestGet as any)(ctxFor(req, env, { provider: 'workos' }))
     expect(res.status).toBe(302)
-    const setCookies: string[] =
-      res.headers.getSetCookie?.() ?? [res.headers.get('set-cookie') ?? '']
+    const setCookies: string[] = res.headers.getSetCookie?.() ?? [
+      res.headers.get('set-cookie') ?? '',
+    ]
     const stateCookie = setCookies.find((c) => c.includes('__spool_oauth_state=')) ?? ''
     expect(stateCookie).toMatch(/__spool_oauth_state=[^|]+\|\/;/)
   })
@@ -381,7 +411,8 @@ describe('publish rate limit', () => {
     // Pre-fill the bucket to 30 (the cap).
     await env.RATE.put(`rate/publish-h/user-1/${slot}`, '30', { expirationTtl: 3600 * 2 })
     const req = authedReq('https://x/api/publish', {
-      snapshot: makeSnapshot(), visibility: 'unlisted',
+      snapshot: makeSnapshot(),
+      visibility: 'unlisted',
     })
     const res = await onRequestPost(ctxFor(req, env))
     expect(res.status).toBe(429)

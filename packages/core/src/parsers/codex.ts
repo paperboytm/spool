@@ -1,6 +1,8 @@
 import { closeSync, openSync, readSync } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
+
 import { parseCodexSessionLines } from '@spool-lab/session-kit'
+
 import type { ParseSessionResult, ParsedSession } from '../types.js'
 
 // The parsing brain lives in @spool-lab/session-kit (browser-safe, shared
@@ -14,9 +16,7 @@ export function loadCodexSession(filePath: string): ParseSessionResult {
   const result = parseCodexSessionLines(readNonEmptyLines(filePath), filePath)
   if (result.kind !== 'parsed') return result
   const gitRemote = loadCodexSessionGitRemote(filePath)
-  return gitRemote
-    ? { kind: 'parsed', session: { ...result.session, gitRemote } }
-    : result
+  return gitRemote ? { kind: 'parsed', session: { ...result.session, gitRemote } } : result
 }
 
 function* readNonEmptyLines(filePath: string): Iterable<string> {
@@ -77,9 +77,7 @@ export function loadCodexSessionGitRemote(filePath: string): string | null {
       const git = (payload as Record<string, unknown>)['git']
       if (!git || typeof git !== 'object') return null
       const repositoryUrl = (git as Record<string, unknown>)['repository_url']
-      return typeof repositoryUrl === 'string' && repositoryUrl.trim()
-        ? repositoryUrl
-        : null
+      return typeof repositoryUrl === 'string' && repositoryUrl.trim() ? repositoryUrl : null
     }
     return null
   } catch {

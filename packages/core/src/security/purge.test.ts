@@ -1,10 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { Effect } from 'effect'
 import Database from 'better-sqlite3'
+import { Effect } from 'effect'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
 import { refreshSessionSearchFromMessages } from '../db/queries.js'
+import {
+  purgeFinding,
+  purgeFindings,
+  purgeEverywhere,
+  orderForBulkPurge,
+  PurgeError,
+} from './purge.js'
 import { insertFindings, listFindings, updateSessionCounts } from './repo.js'
-import { purgeFinding, purgeFindings, purgeEverywhere, orderForBulkPurge, PurgeError } from './purge.js'
 import { occurrencesByValueHash } from './repo.js'
 
 function setupDb(): Database.Database {
@@ -35,17 +42,28 @@ const deps = (db: Database.Database) => ({
 
 describe('purgeFinding', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('rewrites messages.content_text with the per-kind mask and flips state', async () => {
     const raw = 'AKIAIOSFODNN7EXAMPLE'
     const content = `Found ${raw} in logs`
     insertMessage(db, 10, content)
     const start = content.indexOf(raw)
-    insertFindings(db, [{
-      sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95,
-      provider: 'regex', startOffset: start, endOffset: start + raw.length, state: 'active',
-    }])
+    insertFindings(db, [
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: start,
+        endOffset: start + raw.length,
+        state: 'active',
+      },
+    ])
     updateSessionCounts(db, 1)
     const f = listFindings(db, { sessionId: 1 })[0]!
 
@@ -53,7 +71,9 @@ describe('purgeFinding', () => {
     expect(result.findingId).toBe(f.id)
     expect(result.maskUsed).toBe('[redacted: AWS key]')
 
-    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 10').get() as { content_text: string }
+    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 10').get() as {
+      content_text: string
+    }
     expect(msg.content_text).toBe('Found [redacted: AWS key] in logs')
     expect(msg.content_text.includes(raw)).toBe(false)
 
@@ -61,7 +81,9 @@ describe('purgeFinding', () => {
     expect(after[0]!.state).toBe('purged')
 
     // counts: 'purged' shouldn't be counted in scan_finding_count
-    const counts = db.prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number; scan_high_count: number }
+    const counts = db
+      .prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1')
+      .get() as { scan_finding_count: number; scan_high_count: number }
     expect(counts.scan_finding_count).toBe(0)
     expect(counts.scan_high_count).toBe(0)
   })
@@ -71,37 +93,46 @@ describe('purgeFinding', () => {
     const content = `My token is ${raw} please rotate`
     insertMessage(db, 11, content)
     const start = content.indexOf(raw)
-    insertFindings(db, [{
-      sessionId: 1, messageId: 11, kind: 'api-key', valueHash: 'h2', confidence: 0.98,
-      provider: 'regex', startOffset: start, endOffset: start + raw.length, state: 'active',
-    }])
+    insertFindings(db, [
+      {
+        sessionId: 1,
+        messageId: 11,
+        kind: 'api-key',
+        valueHash: 'h2',
+        confidence: 0.98,
+        provider: 'regex',
+        startOffset: start,
+        endOffset: start + raw.length,
+        state: 'active',
+      },
+    ])
     const f = listFindings(db, { sessionId: 1 })[0]!
     db.prepare('UPDATE sessions SET title = ? WHERE id = 1').run(`Token ${raw}`)
     refreshSessionSearchFromMessages(db, 1)
 
     // FTS contains the raw value before purge
-    const beforeHits = db.prepare(
-      "SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?",
-    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    const beforeHits = db
+      .prepare('SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?')
+      .get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(beforeHits.n).toBe(1)
-    const beforeSessionHits = db.prepare(
-      'SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?',
-    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    const beforeSessionHits = db
+      .prepare('SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?')
+      .get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(beforeSessionHits.n).toBe(1)
 
     await Effect.runPromise(purgeFinding(f.id, deps(db)))
 
-    const afterHits = db.prepare(
-      "SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?",
-    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    const afterHits = db
+      .prepare('SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?')
+      .get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(afterHits.n).toBe(0)
-    const afterSessionHits = db.prepare(
-      'SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?',
-    ).get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
+    const afterSessionHits = db
+      .prepare('SELECT COUNT(*) AS n FROM session_search_fts WHERE session_search_fts MATCH ?')
+      .get('"ghp_abcdefghijklmnopqrstuvwxyz0123456789"') as { n: number }
     expect(afterSessionHits.n).toBe(0)
-    const title = db.prepare(
-      'SELECT title, title_source AS titleSource FROM sessions WHERE id = 1',
-    ).get() as { title: string; titleSource: string }
+    const title = db
+      .prepare('SELECT title, title_source AS titleSource FROM sessions WHERE id = 1')
+      .get() as { title: string; titleSource: string }
     expect(title).toEqual({
       title: 'Token [redacted: GitHub key]',
       titleSource: 'security',
@@ -111,10 +142,19 @@ describe('purgeFinding', () => {
   it('refuses to re-purge an already purged finding', async () => {
     const raw = 'AKIAIOSFODNN7EXAMPLE'
     insertMessage(db, 12, `prefix ${raw} suffix`)
-    insertFindings(db, [{
-      sessionId: 1, messageId: 12, kind: 'api-key', valueHash: 'h3', confidence: 0.95,
-      provider: 'regex', startOffset: 7, endOffset: 7 + raw.length, state: 'active',
-    }])
+    insertFindings(db, [
+      {
+        sessionId: 1,
+        messageId: 12,
+        kind: 'api-key',
+        valueHash: 'h3',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 7,
+        endOffset: 7 + raw.length,
+        state: 'active',
+      },
+    ])
     const f = listFindings(db, { sessionId: 1 })[0]!
     await Effect.runPromise(purgeFinding(f.id, deps(db)))
     const exit = await Effect.runPromiseExit(purgeFinding(f.id, deps(db)))
@@ -133,7 +173,9 @@ describe('purgeFinding', () => {
 
 describe('purgeFindings bulk', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('purges multiple findings in one message in descending offset order so spans stay valid', async () => {
     // Two values in one message; if applied earlier-first the second
@@ -141,17 +183,37 @@ describe('purgeFindings bulk', () => {
     const content = 'AKIAIOSFODNN7AAAAAAA and AKIAIOSFODNN7BBBBBBB'
     insertMessage(db, 13, content)
     insertFindings(db, [
-      { sessionId: 1, messageId: 13, kind: 'api-key', valueHash: 'hA', confidence: 0.95,
-        provider: 'regex', startOffset: 0, endOffset: 20, state: 'active' },
-      { sessionId: 1, messageId: 13, kind: 'api-key', valueHash: 'hB', confidence: 0.95,
-        provider: 'regex', startOffset: 25, endOffset: 45, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 13,
+        kind: 'api-key',
+        valueHash: 'hA',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 20,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 13,
+        kind: 'api-key',
+        valueHash: 'hB',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 25,
+        endOffset: 45,
+        state: 'active',
+      },
     ])
     const rows = listFindings(db, { sessionId: 1 })
     // Order findingIds with descending offset (highest first).
-    const orderedIds = [...rows].sort((a, b) => b.startOffset - a.startOffset).map(r => r.id)
+    const orderedIds = [...rows].sort((a, b) => b.startOffset - a.startOffset).map((r) => r.id)
     const results = await Effect.runPromise(purgeFindings(orderedIds, deps(db)))
     expect(results).toHaveLength(2)
-    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 13').get() as { content_text: string }
+    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 13').get() as {
+      content_text: string
+    }
     expect(msg.content_text.includes('AAAAAAA')).toBe(false)
     expect(msg.content_text.includes('BBBBBBB')).toBe(false)
     expect(msg.content_text).toBe('[redacted: AWS key] and [redacted: AWS key]')
@@ -160,10 +222,19 @@ describe('purgeFindings bulk', () => {
   it('skips already-purged findings in bulk and continues with the rest', async () => {
     const raw = 'AKIAIOSFODNN7EXAMPLE'
     insertMessage(db, 14, `text ${raw}`)
-    insertFindings(db, [{
-      sessionId: 1, messageId: 14, kind: 'api-key', valueHash: 'h', confidence: 0.95,
-      provider: 'regex', startOffset: 5, endOffset: 5 + raw.length, state: 'active',
-    }])
+    insertFindings(db, [
+      {
+        sessionId: 1,
+        messageId: 14,
+        kind: 'api-key',
+        valueHash: 'h',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 5,
+        endOffset: 5 + raw.length,
+        state: 'active',
+      },
+    ])
     const f = listFindings(db, { sessionId: 1 })[0]!
     await Effect.runPromise(purgeFinding(f.id, deps(db)))
     // Second pass — should not throw; should return empty array.
@@ -184,14 +255,22 @@ describe('purgeFindings bulk', () => {
     insertMessage(db, 20, content)
     insertFindings(db, [
       {
-        sessionId: 1, messageId: 20, kind: 'api-key', valueHash: 'ha', confidence: 0.95,
+        sessionId: 1,
+        messageId: 20,
+        kind: 'api-key',
+        valueHash: 'ha',
+        confidence: 0.95,
         provider: 'regex',
         startOffset: content.indexOf(a),
         endOffset: content.indexOf(a) + a.length,
         state: 'active',
       },
       {
-        sessionId: 1, messageId: 20, kind: 'api-key', valueHash: 'hb', confidence: 0.95,
+        sessionId: 1,
+        messageId: 20,
+        kind: 'api-key',
+        valueHash: 'hb',
+        confidence: 0.95,
         provider: 'regex',
         startOffset: content.indexOf(b),
         endOffset: content.indexOf(b) + b.length,
@@ -206,13 +285,14 @@ describe('purgeFindings bulk', () => {
     const ascendingIds = findings
       .slice()
       .sort((x, y) => x.startOffset - y.startOffset)
-      .map(r => r.id)
+      .map((r) => r.id)
 
     const results = await Effect.runPromise(purgeFindings(ascendingIds, deps(db)))
     expect(results).toHaveLength(2)
 
-    const after = db.prepare('SELECT content_text FROM messages WHERE id = 20')
-      .get() as { content_text: string }
+    const after = db.prepare('SELECT content_text FROM messages WHERE id = 20').get() as {
+      content_text: string
+    }
     // Neither raw value should survive anywhere in the message.
     expect(after.content_text.includes(a)).toBe(false)
     expect(after.content_text.includes(b)).toBe(false)
@@ -252,24 +332,35 @@ describe('purgeFindings bulk', () => {
            VALUES (?, ?, 1, 'user', ?, '2026-01-01', ?)`,
         ).run(messageId, s, content, f)
         const start = content.indexOf(raw)
-        insertFindings(db, [{
-          sessionId: s, messageId, kind: 'absolute-path',
-          valueHash: `h-${s}-${f}`, confidence: 0.9, provider: 'regex',
-          startOffset: start, endOffset: start + raw.length, state: 'active',
-        }])
+        insertFindings(db, [
+          {
+            sessionId: s,
+            messageId,
+            kind: 'absolute-path',
+            valueHash: `h-${s}-${f}`,
+            confidence: 0.9,
+            provider: 'regex',
+            startOffset: start,
+            endOffset: start + raw.length,
+            state: 'active',
+          },
+        ])
       }
     }
 
     const events: Array<{ type: string; sessionId: number; findingId?: number }> = []
-    const ids = (db.prepare('SELECT id FROM findings').all() as Array<{ id: number }>).map(r => r.id)
+    const ids = (db.prepare('SELECT id FROM findings').all() as Array<{ id: number }>).map(
+      (r) => r.id,
+    )
     expect(ids.length).toBe(SESSIONS * FINDINGS_PER_SESSION)
 
     const results = await Effect.runPromise(
       purgeFindings(ids, {
         db,
-        publish: (c) => Effect.sync(() => {
-          events.push(c as { type: string; sessionId: number; findingId?: number })
-        }),
+        publish: (c) =>
+          Effect.sync(() => {
+            events.push(c as { type: string; sessionId: number; findingId?: number })
+          }),
       }),
     )
 
@@ -277,13 +368,13 @@ describe('purgeFindings bulk', () => {
     // Exactly one event per affected session — the load-bearing
     // coalescing assertion for issue #344.
     expect(events).toHaveLength(SESSIONS)
-    expect(events.every(e => e.type === 'state-changed')).toBe(true)
-    expect(new Set(events.map(e => e.sessionId))).toEqual(new Set([1, 2, 3, 4, 5]))
+    expect(events.every((e) => e.type === 'state-changed')).toBe(true)
+    expect(new Set(events.map((e) => e.sessionId))).toEqual(new Set([1, 2, 3, 4, 5]))
 
     // Every message body now contains the mask, no raw path survives.
-    const surviving = db.prepare(
-      "SELECT COUNT(*) AS n FROM messages WHERE content_text LIKE ?",
-    ).get(`%${raw}%`) as { n: number }
+    const surviving = db
+      .prepare('SELECT COUNT(*) AS n FROM messages WHERE content_text LIKE ?')
+      .get(`%${raw}%`) as { n: number }
     expect(surviving.n).toBe(0)
   })
 
@@ -292,12 +383,42 @@ describe('purgeFindings bulk', () => {
       insertMessage(db, 30, 'msg A')
       insertMessage(db, 31, 'msg B')
       insertFindings(db, [
-        { sessionId: 1, messageId: 30, kind: 'api-key', valueHash: 'h1', confidence: 0.9, provider: 'regex', startOffset: 10, endOffset: 20, state: 'active' },
-        { sessionId: 1, messageId: 30, kind: 'api-key', valueHash: 'h2', confidence: 0.9, provider: 'regex', startOffset: 50, endOffset: 60, state: 'active' },
-        { sessionId: 1, messageId: 31, kind: 'api-key', valueHash: 'h3', confidence: 0.9, provider: 'regex', startOffset: 5, endOffset: 15, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 30,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 10,
+          endOffset: 20,
+          state: 'active',
+        },
+        {
+          sessionId: 1,
+          messageId: 30,
+          kind: 'api-key',
+          valueHash: 'h2',
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 50,
+          endOffset: 60,
+          state: 'active',
+        },
+        {
+          sessionId: 1,
+          messageId: 31,
+          kind: 'api-key',
+          valueHash: 'h3',
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 5,
+          endOffset: 15,
+          state: 'active',
+        },
       ])
       const findings = listFindings(db, { sessionId: 1 })
-      const byHash = new Map(findings.map(f => [f.valueHash, f.id]))
+      const byHash = new Map(findings.map((f) => [f.valueHash, f.id]))
       const ascending = [byHash.get('h1')!, byHash.get('h2')!, byHash.get('h3')!]
       const ordered = orderForBulkPurge(db, ascending)
       // Same message: h2 (start 50) before h1 (start 10). Across
@@ -343,12 +464,54 @@ describe('purgeEverywhere', () => {
     const idx10a = `first ${RAW} then ${RAW} done`.indexOf(RAW)
     const idx10b = `first ${RAW} then ${RAW} done`.lastIndexOf(RAW)
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: idx10a, endOffset: idx10a + RAW.length, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: idx10b, endOffset: idx10b + RAW.length, state: 'active' },
-      { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: `only ${RAW} here`.indexOf(RAW), endOffset: `only ${RAW} here`.indexOf(RAW) + RAW.length, state: 'active' },
-      { sessionId: 3, messageId: 30, kind: 'api-key', valueHash: HASH, confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: RAW.length, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: idx10a,
+        endOffset: idx10a + RAW.length,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: idx10b,
+        endOffset: idx10b + RAW.length,
+        state: 'active',
+      },
+      {
+        sessionId: 2,
+        messageId: 20,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: `only ${RAW} here`.indexOf(RAW),
+        endOffset: `only ${RAW} here`.indexOf(RAW) + RAW.length,
+        state: 'active',
+      },
+      {
+        sessionId: 3,
+        messageId: 30,
+        kind: 'api-key',
+        valueHash: HASH,
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: RAW.length,
+        state: 'active',
+      },
     ])
-    updateSessionCounts(db, 1); updateSessionCounts(db, 2); updateSessionCounts(db, 3)
+    updateSessionCounts(db, 1)
+    updateSessionCounts(db, 2)
+    updateSessionCounts(db, 3)
   })
 
   function findById(db: Database.Database) {
@@ -359,7 +522,9 @@ describe('purgeEverywhere', () => {
     const out = await Effect.runPromise(purgeEverywhere('api-key', HASH, deps(db)))
     expect(out.results).toHaveLength(4) // 2 + 1 + 1
     for (const id of [10, 20, 30]) {
-      const msg = db.prepare('SELECT content_text FROM messages WHERE id = ?').get(id) as { content_text: string }
+      const msg = db.prepare('SELECT content_text FROM messages WHERE id = ?').get(id) as {
+        content_text: string
+      }
       expect(msg.content_text.includes(RAW)).toBe(false)
       expect(msg.content_text.includes('[redacted: GitHub key]')).toBe(true)
     }
@@ -375,21 +540,21 @@ describe('purgeEverywhere', () => {
     await Effect.runPromise(purgeEverywhere('api-key', HASH, deps(db)))
     const all = findById(db)
     for (const sid of [1, 2, 3]) {
-      expect(all(sid).every(f => f.state === 'purged')).toBe(true)
+      expect(all(sid).every((f) => f.state === 'purged')).toBe(true)
     }
     // No active occurrences remain anywhere → blast radius is empty.
     expect(occurrencesByValueHash(db, 'api-key', HASH)).toHaveLength(0)
   })
 
   it('keeps messages_fts in sync so search no longer surfaces the value', async () => {
-    const before = db.prepare(
-      'SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?',
-    ).get(`"${RAW}"`) as { n: number }
+    const before = db
+      .prepare('SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?')
+      .get(`"${RAW}"`) as { n: number }
     expect(before.n).toBe(3) // one per message containing the key
     await Effect.runPromise(purgeEverywhere('api-key', HASH, deps(db)))
-    const after = db.prepare(
-      'SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?',
-    ).get(`"${RAW}"`) as { n: number }
+    const after = db
+      .prepare('SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?')
+      .get(`"${RAW}"`) as { n: number }
     expect(after.n).toBe(0)
   })
 
@@ -402,10 +567,22 @@ describe('purgeEverywhere', () => {
     ).run()
     db.prepare('UPDATE messages SET session_id = 4 WHERE id = 40').run()
     insertFindings(db, [
-      { sessionId: 4, messageId: 40, kind: 'api-key', valueHash: 'gh-other', confidence: 0.95, provider: 'regex', startOffset: `unrelated `.length, endOffset: `unrelated `.length + OTHER.length, state: 'active' },
+      {
+        sessionId: 4,
+        messageId: 40,
+        kind: 'api-key',
+        valueHash: 'gh-other',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: `unrelated `.length,
+        endOffset: `unrelated `.length + OTHER.length,
+        state: 'active',
+      },
     ])
     await Effect.runPromise(purgeEverywhere('api-key', HASH, deps(db)))
-    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 40').get() as { content_text: string }
+    const msg = db.prepare('SELECT content_text FROM messages WHERE id = 40').get() as {
+      content_text: string
+    }
     expect(msg.content_text.includes(OTHER)).toBe(true) // untouched
   })
 

@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
 import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression test for a bundler-hoisting bug that silently routed dev

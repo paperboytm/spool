@@ -14,16 +14,17 @@ view object 内容(全部可从 records 重算,作者篡改可被重算揭穿):
 ```jsonc
 {
   "v": 1,
-  "index": [            // 每条 record 一行:类型/尺寸/触碰文件,不含正文
+  "index": [
+    // 每条 record 一行:类型/尺寸/触碰文件,不含正文
     { "i": 0, "kind": "user", "ts": "...", "size": 812, "excerpt": "修复 OAuth 回调…" },
     { "i": 7, "kind": "edit", "file": "src/auth/pkce.ts", "size": 4096 },
-    { "i": 8, "kind": "tool", "tool": "Bash", "size": 20480 }
+    { "i": 8, "kind": "tool", "tool": "Bash", "size": 20480 },
   ],
-  "files":   [ { "path": "src/auth/pkce.ts", "events": [7, 12, 31], "adds": 40, "dels": 6 } ],
-  "outline": [ { "i": 0, "excerpt": "…" } ],          // user prompts 章节大纲
+  "files": [{ "path": "src/auth/pkce.ts", "events": [7, 12, 31], "adds": 40, "dels": 6 }],
+  "outline": [{ "i": 0, "excerpt": "…" }], // user prompts 章节大纲
   "firstPrompt": "…(截断 4KB)…",
-  "lastReply":   "…(截断 4KB)…",
-  "diffstat": { "files": 12, "adds": 340, "dels": 85 }
+  "lastReply": "…(截断 4KB)…",
+  "diffstat": { "files": 12, "adds": 340, "dels": 85 },
 }
 ```
 
@@ -128,15 +129,15 @@ share-web/src/pages/SessionReader.tsx
 
 ## 7. 实施位置与 PR 切分
 
-| # | PR | 位置 | 依赖 |
-| --- | --- | --- | --- |
-| 1 | session-kit:view 推导 + composeSessionDiff + golden 测试 | packages/session-kit | Phase 1 |
-| 2 | hub 写路径:迁移 0003 + push/batch/head(hermetic 测试;R2 fake 需补 ranged GET) | share-backend | 1 |
-| 3 | hub 读路径:meta/view/records + ACL/墓碑/缓存 + pentest 项 | share-backend | 2 |
-| 4 | CLI `spool share` 接线(note 编辑器 + redact 闸 + 三步握手) | cli | 2 |
-| 5 | Reader 第一层:FirstScreen + OG + 路由(router 加 /session/*) | share-web, router | 3 |
-| 6 | Reader 第二三层:Timeline/Diff/深链 | share-web | 5 |
-| 7 | withdraw + /me 管理列表 + 账号删除扩展 | share-backend, share-web | 3 |
+| #   | PR                                                                            | 位置                     | 依赖    |
+| --- | ----------------------------------------------------------------------------- | ------------------------ | ------- |
+| 1   | session-kit:view 推导 + composeSessionDiff + golden 测试                      | packages/session-kit     | Phase 1 |
+| 2   | hub 写路径:迁移 0003 + push/batch/head(hermetic 测试;R2 fake 需补 ranged GET) | share-backend            | 1       |
+| 3   | hub 读路径:meta/view/records + ACL/墓碑/缓存 + pentest 项                     | share-backend            | 2       |
+| 4   | CLI `spool share` 接线(note 编辑器 + redact 闸 + 三步握手)                    | cli                      | 2       |
+| 5   | Reader 第一层:FirstScreen + OG + 路由(router 加 /session/*)                   | share-web, router        | 3       |
+| 6   | Reader 第二三层:Timeline/Diff/深链                                            | share-web                | 5       |
+| 7   | withdraw + /me 管理列表 + 账号删除扩展                                        | share-backend, share-web | 3       |
 
 集成测试基线:一个 fixture session 走完整 round-trip——本地 store → 三步握手推到 fakes → 读端点逐个断言 → session-kit 在"浏览器侧"重算 diff 与作者侧一致。
 

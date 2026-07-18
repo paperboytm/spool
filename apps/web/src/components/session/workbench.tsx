@@ -1,19 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Check,
-  Clock3,
-  Copy,
-  GitBranch,
-  GitCommitHorizontal,
-  MessageSquareText,
-  UserRound,
-} from 'lucide-react'
+import type { SessionViewV1 } from '@spool-lab/session-kit'
 import {
   MessageList,
   type ConversationMessage,
   type MessageListHandle,
 } from '@spool-lab/session-view'
-import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
 import {
   TimelineBody,
@@ -23,16 +13,26 @@ import {
   selectSegments,
   type RedactReplacement,
 } from '@spool/share-kit/timeline'
+import {
+  Check,
+  Clock3,
+  Copy,
+  GitBranch,
+  GitCommitHorizontal,
+  MessageSquareText,
+  UserRound,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { humanDateTime, relativeDate } from '../../lib/dates'
 import type { HubSessionMeta } from '../../lib/hub-api'
+import type { ParsedConversation } from '../../lib/session-messages'
 import {
   authorLabel,
   parseWorkspaceCard,
   repositoryUrlForRemote,
   resumeCommandFor,
 } from '../../lib/session-page'
-import type { ParsedConversation } from '../../lib/session-messages'
 import { CliInstallDialog } from './cli-install-dialog'
 import { SessionNote } from './session-note'
 
@@ -62,9 +62,7 @@ const MAX_PROMPT_EXCERPT_LENGTH = 100
 const MAX_SESSION_TITLE_LENGTH = 96
 
 /** The public-session table of contents is a projection of authored prompts only. */
-export function getUserPromptEntries(
-  messages: readonly ConversationMessage[],
-): UserPromptEntry[] {
+export function getUserPromptEntries(messages: readonly ConversationMessage[]): UserPromptEntry[] {
   const entries: UserPromptEntry[] = []
 
   for (const message of messages) {
@@ -82,10 +80,9 @@ export function getSpoolPromptEntries(
   document: SpoolDocument,
   injectedRedactList?: readonly RedactReplacement[],
 ): SpoolPromptEntry[] {
-  const redactList = injectedRedactList
-    ?? (document.opts.redact
-      ? collectRedactList(document.conversation.turns, document.opts)
-      : [])
+  const redactList =
+    injectedRedactList ??
+    (document.opts.redact ? collectRedactList(document.conversation.turns, document.opts) : [])
   return selectSegments(document.conversation, document.opts).turns.flatMap((turn) => {
     if (turn.role !== 'user') return []
     const body = document.opts.redact ? redactPlainText(turn.body, redactList) : turn.body
@@ -101,9 +98,10 @@ function promptDetails(content: string): { excerpt: string; preview: string } | 
 
   const firstLine = firstLinePreview(content)
   const summary = firstLine || preview.replace(/\s+/g, ' ')
-  const excerpt = summary.length <= MAX_PROMPT_EXCERPT_LENGTH
-    ? summary
-    : `${summary.slice(0, MAX_PROMPT_EXCERPT_LENGTH - 1).trimEnd()}…`
+  const excerpt =
+    summary.length <= MAX_PROMPT_EXCERPT_LENGTH
+      ? summary
+      : `${summary.slice(0, MAX_PROMPT_EXCERPT_LENGTH - 1).trimEnd()}…`
 
   return { excerpt, preview }
 }
@@ -134,9 +132,10 @@ export function SessionWorkbench({
   initialRecordIndex,
   spoolDocument,
 }: Props) {
-  const initialMessageId = initialRecordIndex === null
-    ? null
-    : conversation.recordToMessageId.get(initialRecordIndex) ?? null
+  const initialMessageId =
+    initialRecordIndex === null
+      ? null
+      : (conversation.recordToMessageId.get(initialRecordIndex) ?? null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
   const [targetTurnIndex, setTargetTurnIndex] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
@@ -156,45 +155,48 @@ export function SessionWorkbench({
     [conversation.messages],
   )
   const spoolRedactList = useMemo(
-    () => spoolDocument !== null && spoolDocument.opts.redact
-      ? collectRedactList([
-          ...spoolDocument.conversation.turns,
-          { role: 'user', body: spoolDocument.conversation.title },
-        ], spoolDocument.opts)
-      : [],
+    () =>
+      spoolDocument !== null && spoolDocument.opts.redact
+        ? collectRedactList(
+            [
+              ...spoolDocument.conversation.turns,
+              { role: 'user', body: spoolDocument.conversation.title },
+            ],
+            spoolDocument.opts,
+          )
+        : [],
     [spoolDocument],
   )
   const spoolTitle = spoolDocument?.conversation.title.trim() ?? ''
-  const fullTitle = (spoolDocument !== null && spoolDocument.opts.redact
-    ? redactPlainText(spoolTitle, spoolRedactList)
-    : spoolTitle)
-    || conversation.title.trim()
-    || 'Shared session'
+  const fullTitle =
+    (spoolDocument !== null && spoolDocument.opts.redact
+      ? redactPlainText(spoolTitle, spoolRedactList)
+      : spoolTitle) ||
+    conversation.title.trim() ||
+    'Shared session'
   const title = compactSessionTitle(fullTitle)
   const spoolPrompts = useMemo(
-    () => spoolDocument === null
-      ? []
-      : getSpoolPromptEntries(spoolDocument, spoolRedactList),
+    () => (spoolDocument === null ? [] : getSpoolPromptEntries(spoolDocument, spoolRedactList)),
     [spoolDocument, spoolRedactList],
   )
-  const prompts = spoolDocument === null
-    ? rawPrompts.map((entry) => ({
-        key: `message-${entry.id}`,
-        excerpt: entry.excerpt,
-        preview: entry.preview,
-        messageId: entry.id,
-        turnIndex: null,
-      }))
-    : spoolPrompts.map((entry) => ({
-        key: `turn-${entry.turnIndex}`,
-        excerpt: entry.excerpt,
-        preview: entry.preview,
-        messageId: null,
-        turnIndex: entry.turnIndex,
-      }))
-  const messageCount = spoolDocument === null
-    ? conversation.messages.length
-    : visibleSpoolTurnCount(spoolDocument)
+  const prompts =
+    spoolDocument === null
+      ? rawPrompts.map((entry) => ({
+          key: `message-${entry.id}`,
+          excerpt: entry.excerpt,
+          preview: entry.preview,
+          messageId: entry.id,
+          turnIndex: null,
+        }))
+      : spoolPrompts.map((entry) => ({
+          key: `turn-${entry.turnIndex}`,
+          excerpt: entry.excerpt,
+          preview: entry.preview,
+          messageId: null,
+          turnIndex: entry.turnIndex,
+        }))
+  const messageCount =
+    spoolDocument === null ? conversation.messages.length : visibleSpoolTurnCount(spoolDocument)
 
   const jumpToTurn = useCallback((turnIndex: number) => {
     setTargetTurnIndex(turnIndex)
@@ -235,11 +237,14 @@ export function SessionWorkbench({
     focusTurn()
   }, [])
 
-  useEffect(() => () => {
-    if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current)
-    if (jumpFrameRef.current !== null) window.cancelAnimationFrame(jumpFrameRef.current)
-    focusedTurnRef.current?.removeAttribute('tabindex')
-  }, [])
+  useEffect(
+    () => () => {
+      if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current)
+      if (jumpFrameRef.current !== null) window.cancelAnimationFrame(jumpFrameRef.current)
+      focusedTurnRef.current?.removeAttribute('tabindex')
+    },
+    [],
+  )
 
   const copy = () => {
     void navigator.clipboard.writeText(resume)
@@ -295,11 +300,13 @@ export function SessionWorkbench({
                 />
                 {providerLabel}
               </span>
-              <span title={humanDateTime(meta.updatedAt)}>Shared {relativeDate(meta.updatedAt)}</span>
+              <span title={humanDateTime(meta.updatedAt)}>
+                Shared {relativeDate(meta.updatedAt)}
+              </span>
             </div>
             <h1
               id="sw-workbench-title"
-              className="m-0 max-w-[760px] [overflow-wrap:anywhere] text-xl font-semibold leading-8 tracking-[-0.02em] text-[var(--text)] md:text-2xl"
+              className="m-0 max-w-[760px] text-xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-[var(--text)] md:text-2xl"
               title={fullTitle}
             >
               {title}
@@ -322,13 +329,17 @@ export function SessionWorkbench({
                 aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
                 onClick={copy}
               >
-                {copied
-                  ? <Check size={14} strokeWidth={1.8} aria-hidden="true" />
-                  : <Copy size={14} strokeWidth={1.8} aria-hidden="true" />}
-                <span className="sr-only" aria-live="polite">{copied ? 'Copied' : ''}</span>
+                {copied ? (
+                  <Check size={14} strokeWidth={1.8} aria-hidden="true" />
+                ) : (
+                  <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
+                )}
+                <span className="sr-only" aria-live="polite">
+                  {copied ? 'Copied' : ''}
+                </span>
               </button>
             </div>
-            <p className="mb-0 mt-2 text-[11px] leading-4 text-[var(--muted)]">
+            <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
               Don&apos;t have the Spool CLI?{' '}
               <button
                 type="button"
@@ -348,14 +359,21 @@ export function SessionWorkbench({
 
             <section aria-labelledby="session-timeline-title">
               <div className="mb-4 flex items-baseline justify-between gap-4">
-                <h2 id="session-timeline-title" className="m-0 text-base font-semibold text-[var(--text)]">
+                <h2
+                  id="session-timeline-title"
+                  className="m-0 text-base font-semibold text-[var(--text)]"
+                >
                   Session
                 </h2>
-                <span className="font-mono text-[11px] tabular-nums text-[var(--faint)]">
+                <span className="font-mono text-[11px] text-[var(--faint)] tabular-nums">
                   {messageCount}{' '}
                   {spoolDocument === null
-                    ? (messageCount === 1 ? 'message' : 'messages')
-                    : (messageCount === 1 ? 'turn' : 'turns')}
+                    ? messageCount === 1
+                      ? 'message'
+                      : 'messages'
+                    : messageCount === 1
+                      ? 'turn'
+                      : 'turns'}
                 </span>
               </div>
 
@@ -363,20 +381,21 @@ export function SessionWorkbench({
                 {prompts.length > 0 && (
                   <nav className="relative z-30 mb-4 min-w-0 lg:mb-0" aria-label="User prompts">
                     <div className="mb-2 flex items-center justify-between gap-3 lg:hidden">
-                      <h3 className="m-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+                      <h3 className="m-0 text-[10px] font-semibold tracking-[0.08em] text-[var(--muted)] uppercase">
                         Prompts
                       </h3>
-                      <span className="font-mono text-[10px] tabular-nums text-[var(--faint)]">
+                      <span className="font-mono text-[10px] text-[var(--faint)] tabular-nums">
                         {prompts.length}
                       </span>
                     </div>
                     <div className="sw-session-sticky lg:sticky lg:py-1">
                       <h3 className="sr-only">User prompts</h3>
-                      <ol className="m-0 flex list-none snap-x gap-2 overflow-x-auto p-0 pb-2 lg:block lg:overflow-visible lg:pb-0">
+                      <ol className="m-0 flex snap-x list-none gap-2 overflow-x-auto p-0 pb-2 lg:block lg:overflow-visible lg:pb-0">
                         {prompts.map((entry, index) => {
-                          const active = entry.turnIndex !== null
-                            ? targetTurnIndex === entry.turnIndex
-                            : targetMessageId === entry.messageId
+                          const active =
+                            entry.turnIndex !== null
+                              ? targetTurnIndex === entry.turnIndex
+                              : targetMessageId === entry.messageId
                           const tooltipId = `prompt-preview-${entry.key}`
                           const showPreview = previewPromptKey === entry.key
                           return (
@@ -408,7 +427,7 @@ export function SessionWorkbench({
                                 aria-current={active ? 'location' : undefined}
                                 onClick={() => jumpToPrompt(entry.messageId, entry.turnIndex)}
                               >
-                                <span className="font-mono text-[10px] tabular-nums text-[var(--accent)] lg:hidden">
+                                <span className="font-mono text-[10px] text-[var(--accent)] tabular-nums lg:hidden">
                                   {String(index + 1).padStart(2, '0')}
                                 </span>
                                 <span className="line-clamp-2 min-w-0 text-[11px] leading-4 lg:hidden">
@@ -418,7 +437,7 @@ export function SessionWorkbench({
                                   className={`hidden h-px transition-[width,background-color] duration-150 ease-out lg:block ${
                                     active
                                       ? 'w-6 bg-[var(--accent)]'
-                                      : 'w-4 bg-[var(--border-strong)] group-hover:w-6 group-hover:bg-[var(--text)] group-focus-within:w-6 group-focus-within:bg-[var(--text)]'
+                                      : 'w-4 bg-[var(--border-strong)] group-focus-within:w-6 group-focus-within:bg-[var(--text)] group-hover:w-6 group-hover:bg-[var(--text)]'
                                   }`}
                                   aria-hidden="true"
                                 />
@@ -427,7 +446,7 @@ export function SessionWorkbench({
                                 <span
                                   id={tooltipId}
                                   role="tooltip"
-                                  className="absolute left-7 top-[-4px] z-50 hidden max-h-72 w-72 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-[12px] leading-[18px] text-[var(--text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--text)_10%,transparent)] lg:block"
+                                  className="absolute top-[-4px] left-7 z-50 hidden max-h-72 w-72 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-[12px] leading-[18px] break-words whitespace-pre-wrap text-[var(--text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--text)_10%,transparent)] lg:block"
                                 >
                                   {entry.preview}
                                 </span>
@@ -484,7 +503,7 @@ export function SessionWorkbench({
             <div>
               <h2
                 id="workspace-title"
-                className="m-0 border-b border-[var(--border)] py-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]"
+                className="m-0 border-b border-[var(--border)] py-3 text-[10px] font-semibold tracking-[0.08em] text-[var(--muted)] uppercase"
               >
                 Workspace
               </h2>
@@ -541,17 +560,32 @@ export function SessionWorkbench({
                             <RemoteValue key={remote} remote={remote} />
                           ))}
                         </span>
-                      ) : '—'}
+                      ) : (
+                        '—'
+                      )}
                     </MetadataRow>
                     <MetadataRow label="Branch">
-                      <span className="inline-flex min-w-0 items-start gap-2 [overflow-wrap:anywhere] font-mono">
-                        <GitBranch className="mt-0.5 shrink-0" size={12} strokeWidth={1.7} aria-hidden="true" />
+                      <span className="inline-flex min-w-0 items-start gap-2 font-mono [overflow-wrap:anywhere]">
+                        <GitBranch
+                          className="mt-0.5 shrink-0"
+                          size={12}
+                          strokeWidth={1.7}
+                          aria-hidden="true"
+                        />
                         {card.branch ?? '(detached)'}
                       </span>
                     </MetadataRow>
                     <MetadataRow label="Head">
-                      <span className="inline-flex min-w-0 items-start gap-2 [overflow-wrap:anywhere] font-mono" title={card.head ?? undefined}>
-                        <GitCommitHorizontal className="mt-0.5 shrink-0" size={12} strokeWidth={1.7} aria-hidden="true" />
+                      <span
+                        className="inline-flex min-w-0 items-start gap-2 font-mono [overflow-wrap:anywhere]"
+                        title={card.head ?? undefined}
+                      >
+                        <GitCommitHorizontal
+                          className="mt-0.5 shrink-0"
+                          size={12}
+                          strokeWidth={1.7}
+                          aria-hidden="true"
+                        />
                         {card.head ?? '—'}
                       </span>
                     </MetadataRow>
@@ -565,7 +599,9 @@ export function SessionWorkbench({
                         <time className="font-mono" dateTime={card.observed} title={card.observed}>
                           {formatObserved(card.observed)}
                         </time>
-                      ) : '—'}
+                      ) : (
+                        '—'
+                      )}
                     </MetadataRow>
                   </>
                 )}
@@ -596,7 +632,7 @@ function RemoteValue({ remote }: { remote: string }) {
   const href = repositoryUrlForRemote(remote)
   if (!href) {
     return (
-      <span className="[overflow-wrap:anywhere] font-mono" title={remote}>
+      <span className="font-mono [overflow-wrap:anywhere]" title={remote}>
         {remote}
       </span>
     )
@@ -607,7 +643,7 @@ function RemoteValue({ remote }: { remote: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="[overflow-wrap:anywhere] font-mono text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      className="font-mono [overflow-wrap:anywhere] text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       title={`Open ${remote}`}
     >
       {remote}

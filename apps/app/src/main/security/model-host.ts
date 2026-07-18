@@ -8,10 +8,14 @@
 
 import { Effect, Ref, Data, Scope } from 'effect'
 import { ipcMain, type BrowserWindow, type IpcMainEvent } from 'electron'
+
 import {
   PF_IPC,
-  type PfReadyMessage, type PfFailedMessage, type PfRuntime,
-  type PfAnalyzeRequest, type PfAnalyzeResult,
+  type PfReadyMessage,
+  type PfFailedMessage,
+  type PfRuntime,
+  type PfAnalyzeRequest,
+  type PfAnalyzeResult,
 } from '../../renderer/inference/types.js'
 
 export type { PfRuntime }
@@ -77,9 +81,7 @@ export interface ModelHostDeps {
  *  `failed` and `ready` stays false. Callers check `getState` before
  *  enabling pf in the UI, so a failed spawn doesn't tear the whole
  *  app down. */
-export function makeModelHost(
-  deps: ModelHostDeps,
-): Effect.Effect<ModelHost, never, Scope.Scope> {
+export function makeModelHost(deps: ModelHostDeps): Effect.Effect<ModelHost, never, Scope.Scope> {
   return Effect.gen(function* () {
     const ipc = deps.ipc ?? ipcMain
     // 90 s default for pf:ready — cold WASM model load can take close
@@ -87,11 +89,14 @@ export function makeModelHost(
     const readyTimeoutMs = deps.readyTimeoutMs ?? 90_000
     const analyzeTimeoutMs = deps.analyzeTimeoutMs ?? 30_000
     const stateRef = yield* Ref.make<PfState>({ status: 'loading', runtime: null })
-    const pending = new Map<number, {
-      resolve: (matches: PfMatchResult[]) => void
-      reject: (err: ModelHostError) => void
-      timer: ReturnType<typeof setTimeout>
-    }>()
+    const pending = new Map<
+      number,
+      {
+        resolve: (matches: PfMatchResult[]) => void
+        reject: (err: ModelHostError) => void
+        timer: ReturnType<typeof setTimeout>
+      }
+    >()
     let nextReqId = 1
 
     const failWith = (err: unknown) =>
@@ -129,7 +134,9 @@ export function makeModelHost(
             status: 'ready',
             runtime: handshake.runtime,
             detectionMs: handshake.detectionMs,
-            ...(handshake.adapterLabel !== undefined ? { adapterLabel: handshake.adapterLabel } : {}),
+            ...(handshake.adapterLabel !== undefined
+              ? { adapterLabel: handshake.adapterLabel }
+              : {}),
           })
         } else if (handshake?.kind === 'failed') {
           yield* Ref.set(stateRef, { status: 'failed', runtime: null, error: handshake.message })
@@ -158,12 +165,19 @@ export function makeModelHost(
       const wc = win.webContents
       const onRenderGone = () => {
         rejectAllPending('render process gone')
-        void Effect.runPromise(failWith(new ModelHostError({ stage: 'analyze', cause: 'render process gone' })))
+        void Effect.runPromise(
+          failWith(new ModelHostError({ stage: 'analyze', cause: 'render process gone' })),
+        )
         deps.onCrash?.()
       }
       yield* Effect.acquireRelease(
-        Effect.sync(() => { wc.on('render-process-gone', onRenderGone) }),
-        () => Effect.sync(() => { wc.removeListener('render-process-gone', onRenderGone) }),
+        Effect.sync(() => {
+          wc.on('render-process-gone', onRenderGone)
+        }),
+        () =>
+          Effect.sync(() => {
+            wc.removeListener('render-process-gone', onRenderGone)
+          }),
       )
     }
 
@@ -185,8 +199,13 @@ export function makeModelHost(
       }
     }
     yield* Effect.acquireRelease(
-      Effect.sync(() => { ipc.on(PF_IPC.ANALYZE_RESULT, onAnalyzeResult) }),
-      () => Effect.sync(() => { ipc.removeListener(PF_IPC.ANALYZE_RESULT, onAnalyzeResult) }),
+      Effect.sync(() => {
+        ipc.on(PF_IPC.ANALYZE_RESULT, onAnalyzeResult)
+      }),
+      () =>
+        Effect.sync(() => {
+          ipc.removeListener(PF_IPC.ANALYZE_RESULT, onAnalyzeResult)
+        }),
     )
 
     function analyze(text: string): Effect.Effect<PfMatchResult[], ModelHostError> {
@@ -199,10 +218,14 @@ export function makeModelHost(
         const result = yield* Effect.async<PfMatchResult[], ModelHostError>((resume) => {
           const timer = setTimeout(() => {
             pending.delete(reqId)
-            resume(Effect.fail(new ModelHostError({
-              stage: 'analyze',
-              cause: `analyze timed out after ${analyzeTimeoutMs}ms`,
-            })))
+            resume(
+              Effect.fail(
+                new ModelHostError({
+                  stage: 'analyze',
+                  cause: `analyze timed out after ${analyzeTimeoutMs}ms`,
+                }),
+              ),
+            )
           }, analyzeTimeoutMs)
           pending.set(reqId, {
             resolve: (matches) => resume(Effect.succeed(matches)),
@@ -267,7 +290,8 @@ function awaitReady(
       if (event.sender.id === targetId) settle({ kind: 'failed', message: payload.message })
     }
     const timer = setTimeout(
-      () => settle({ kind: 'failed', message: `pf:ready handshake timed out after ${timeoutMs}ms` }),
+      () =>
+        settle({ kind: 'failed', message: `pf:ready handshake timed out after ${timeoutMs}ms` }),
       timeoutMs,
     )
     ipc.on(PF_IPC.READY, onReady)

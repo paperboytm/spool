@@ -58,14 +58,14 @@ ffmpeg -i renders/spool-vX.Y.Z-final.mp4 \
 
 ## What lives where
 
-| | Where |
-|---|---|
-| Capture primitives | `packages/app/e2e/helpers/` (committed) |
-| Per-release seed + recording spec | ad-hoc, not committed |
-| Composition skeleton | `videos/launch-template/` (committed) |
-| Per-release composition source | `videos/spool-vX.Y.Z/index.html` etc. (committed) |
-| Per-release `assets/` (clips, audio, logos) | gitignored — regenerated per release |
-| Rendered `.mp4` / poster `.jpg` | `videos/*/renders/` (gitignored — ship to social, not git) |
-| Methodology + checklists | the `launch-video` skill |
+|                                             | Where                                                      |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| Capture primitives                          | `packages/app/e2e/helpers/` (committed)                    |
+| Per-release seed + recording spec           | ad-hoc, not committed                                      |
+| Composition skeleton                        | `videos/launch-template/` (committed)                      |
+| Per-release composition source              | `videos/spool-vX.Y.Z/index.html` etc. (committed)          |
+| Per-release `assets/` (clips, audio, logos) | gitignored — regenerated per release                       |
+| Rendered `.mp4` / poster `.jpg`             | `videos/*/renders/` (gitignored — ship to social, not git) |
+| Methodology + checklists                    | the `launch-video` skill                                   |
 
 The `assets/` directory under each release is **entirely gitignored**. Raw `.mov` captures come from the e2e helpers; audio tracks are sourced per release (licensing varies); Spool brand assets (logo SVGs) should be referenced from the main repo or inlined into `index.html`, not duplicated into each video project.
