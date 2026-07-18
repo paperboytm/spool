@@ -16,6 +16,7 @@ export interface ParsedMessage {
 export interface ParsedSession {
   source: SessionSource
   sessionUuid: string
+  parentSessionUuid?: string | null
   filePath: string
   title: string
   cwd: string
@@ -37,6 +38,7 @@ export interface Session {
   projectId: number
   sourceId: number
   sessionUuid: string
+  parentSessionUuid: string | null
   filePath: string
   title: string | null
   startedAt: string

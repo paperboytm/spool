@@ -48,6 +48,7 @@
     "projects": "프로젝트",
     "collapse": "사이드바 접기",
     "expand": "사이드바 펼치기",
+    "resize": "사이드바 너비 조절",
     "copySessionId": "세션 ID 복사",
     "shareSession": "세션 공유",
     "pin": "고정",
@@ -144,6 +145,7 @@
     "bucket_earlierWeek": "이번 주 초",
     "bucket_earlierMonth": "이번 달 초",
     "bucket_older": "이전",
+    "childSessions_other": "하위 세션 {{count}}개",
     "footer_loadingMore": "이전 세션 불러오는 중…",
     "footer_endOf_other": "총 {{count}}개 세션"
   },

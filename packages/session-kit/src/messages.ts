@@ -20,6 +20,7 @@ export interface ParsedMessage {
 export interface ParsedProviderSession {
   source: 'claude' | 'codex'
   sessionUuid: string
+  parentSessionUuid?: string | null
   filePath: string
   title: string
   cwd: string
@@ -293,6 +294,7 @@ export function parseCodexSessionLines(
   const eventMessages: ParsedMessage[] = []
   const responseMessages: ParsedMessage[] = []
   let sessionUuid = ''
+  let parentSessionUuid: string | null = null
   let cwd = ''
   let model = ''
   let isInternalAssessmentSession = false
@@ -326,6 +328,9 @@ export function parseCodexSessionLines(
 
     if (type === 'session_meta' && payload) {
       if (!sessionUuid && payload['id']) sessionUuid = payload['id'] as string
+      if (typeof payload['parent_thread_id'] === 'string') {
+        parentSessionUuid = payload['parent_thread_id'] || null
+      }
       if (payload['cwd']) cwd = payload['cwd'] as string
       const source = payload['source']
       if (isGuardianSubagentSource(source)) isInternalAssessmentSession = true
@@ -446,6 +451,7 @@ export function parseCodexSessionLines(
     session: {
       source: 'codex',
       sessionUuid: sessionUuid || filePath,
+      parentSessionUuid,
       filePath,
       title,
       cwd,

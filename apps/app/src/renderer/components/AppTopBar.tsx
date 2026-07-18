@@ -2,10 +2,14 @@ import { PanelLeft } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DEFAULT_SIDEBAR_WIDTH } from './SidebarRail.js'
+
 type Props = {
   sidebarCollapsed: boolean
   onToggleSidebar: () => void
   trafficLightInset?: boolean
+  sidebarWidth?: number
+  sidebarResizing?: boolean
   /** Page-level chrome (page title, primary action). Rendered into a
    *  flex slot to the right of the sidebar fold toggle. */
   children?: ReactNode
@@ -22,6 +26,8 @@ export default function AppTopBar({
   sidebarCollapsed,
   onToggleSidebar,
   trafficLightInset = true,
+  sidebarWidth = DEFAULT_SIDEBAR_WIDTH,
+  sidebarResizing = false,
   children,
 }: Props) {
   const { t } = useTranslation()
@@ -30,6 +36,8 @@ export default function AppTopBar({
   const sidebarTitle = sidebarCollapsed
     ? `${t('sidebar.expand')} (⌘B)`
     : `${t('sidebar.collapse')} (⌘B)`
+  const collapsedWidth = trafficLightInset ? 0 : 48
+  const widthTransition = sidebarResizing ? '' : 'transition-[width] duration-[280ms] ease-out'
 
   if (!trafficLightInset && !children) {
     return null
@@ -48,10 +56,8 @@ export default function AppTopBar({
           with the content pane below. */}
       <div className="pointer-events-none absolute inset-0 flex" aria-hidden="true">
         <div
-          className={[
-            'flex-none transition-[width] duration-[280ms] ease-out bg-warm-surface dark:bg-dark-surface',
-            sidebarCollapsed ? (trafficLightInset ? 'w-0' : 'w-12') : 'w-60',
-          ].join(' ')}
+          className={`flex-none ${widthTransition} bg-warm-surface dark:bg-dark-surface`}
+          style={{ width: sidebarCollapsed ? collapsedWidth : sidebarWidth }}
         />
         <div className="bg-warm-bg dark:bg-dark-bg flex-1" />
       </div>
@@ -74,19 +80,15 @@ export default function AppTopBar({
               />
             </div>
             <div
-              className={[
-                'flex-none transition-[width] duration-[280ms] ease-out',
-                sidebarCollapsed ? 'w-0' : 'w-[134px]',
-              ].join(' ')}
+              className={`flex-none ${widthTransition}`}
+              style={{ width: sidebarCollapsed ? 0 : Math.max(0, sidebarWidth - 106) }}
               aria-hidden="true"
             />
           </>
         ) : (
           <div
-            className={[
-              'flex-none transition-[width] duration-[280ms] ease-out',
-              sidebarCollapsed ? 'w-12' : 'w-60',
-            ].join(' ')}
+            className={`flex-none ${widthTransition}`}
+            style={{ width: sidebarCollapsed ? 48 : sidebarWidth }}
             aria-hidden="true"
           />
         )}

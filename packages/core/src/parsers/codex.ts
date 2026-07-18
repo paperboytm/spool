@@ -8,7 +8,7 @@ import type { ParseSessionResult, ParsedSession } from '../types.js'
 // The parsing brain lives in @spool-lab/session-kit (browser-safe, shared
 // with the web reader); this wrapper owns only the streamed file I/O.
 
-export const CODEX_INDEX_VERSION = 'codex-v6-project-identity-from-session-git-remote'
+export const CODEX_INDEX_VERSION = 'codex-v7-parent-session-tree'
 
 const READ_CHUNK_SIZE = 1024 * 1024
 

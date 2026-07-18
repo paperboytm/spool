@@ -47,7 +47,8 @@ import ShareEditorPage from './components/ShareEditorPage.js'
 import ShareSessionDialog from './components/ShareSessionDialog.js'
 import SharesPage from './components/SharesPage.js'
 import Sidebar from './components/Sidebar.js'
-import SidebarRail from './components/SidebarRail.js'
+import SidebarRail, { DEFAULT_SIDEBAR_WIDTH } from './components/SidebarRail.js'
+import SidebarResizeHandle, { clampSidebarWidth } from './components/SidebarResizeHandle.js'
 import { useHotkeys } from './hooks/useHotkeys.js'
 import { useLanguageBootstrap } from './i18n/useLanguageBootstrap.js'
 import { composeFromSession, sessionDraftId } from './lib/compose-from-session.js'
@@ -58,6 +59,7 @@ import { loadThemeEditorState, saveThemeEditorState } from './theme/persist.js'
 
 type View = 'search' | 'session' | 'shares' | 'share-editor' | 'security'
 type SettingsTab = 'general' | 'appearance' | 'shortcuts' | 'sources' | 'agent' | 'security'
+const SIDEBAR_WIDTH_STORAGE_KEY = 'spool:sidebar-width'
 
 type FragmentSearchResult = FragmentResult & { kind: 'fragment' }
 
@@ -145,6 +147,8 @@ export default function App() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false)
   const [searchScopeProject, setSearchScopeProject] = useState<ScopeValue | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth)
+  const [sidebarResizing, setSidebarResizing] = useState(false)
   const [sharePanelOpen, setSharePanelOpen] = useState(true)
   const trafficLightInset = typeof window !== 'undefined' && window.spool?.platform === 'darwin'
   /** Active share-editor session: conversation, the user's last
@@ -1040,6 +1044,7 @@ export default function App() {
           }
         : {})}
       chromeOnly={!trafficLightInset && sidebarCollapsed}
+      width={sidebarWidth}
       onSettingsClick={() => {
         setSettingsTab('general')
         setShowSettings(true)
@@ -1084,6 +1089,14 @@ export default function App() {
           onTogglePanel={() => setSharePanelOpen((v) => !v)}
           sidebar={sidebarElement}
           sidebarCollapsed={sidebarCollapsed}
+          sidebarWidth={sidebarWidth}
+          sidebarResizing={sidebarResizing}
+          onSidebarWidthChange={setSidebarWidth}
+          onSidebarResizeStart={() => setSidebarResizing(true)}
+          onSidebarResizeEnd={(width) => {
+            setSidebarResizing(false)
+            persistSidebarWidth(width)
+          }}
           onToggleSidebar={toggleSidebar}
           trafficLightInset={trafficLightInset}
         />
@@ -1146,14 +1159,29 @@ export default function App() {
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={toggleSidebar}
         trafficLightInset={trafficLightInset}
+        sidebarWidth={sidebarWidth}
+        sidebarResizing={sidebarResizing}
       />
       <div className="flex min-h-0 flex-1">
         <SidebarRail
           collapsed={sidebarCollapsed}
           collapsedWidth={!trafficLightInset ? 'chrome' : 'none'}
+          width={sidebarWidth}
+          resizing={sidebarResizing}
         >
           {sidebarElement}
         </SidebarRail>
+        {!sidebarCollapsed && (
+          <SidebarResizeHandle
+            width={sidebarWidth}
+            onWidthChange={setSidebarWidth}
+            onResizeStart={() => setSidebarResizing(true)}
+            onResizeEnd={(width) => {
+              setSidebarResizing(false)
+              persistSidebarWidth(width)
+            }}
+          />
+        )}
         <div className="relative flex min-w-0 flex-1 flex-col">
           <div className="relative flex min-h-0 flex-1 flex-col">
             {isSharesView ? (
@@ -1392,6 +1420,23 @@ export default function App() {
       {hubSummaryShareDialogElement}
     </div>
   )
+}
+
+function loadSidebarWidth(): number {
+  try {
+    const stored = Number.parseInt(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY) ?? '', 10)
+    return Number.isFinite(stored) ? clampSidebarWidth(stored) : DEFAULT_SIDEBAR_WIDTH
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH
+  }
+}
+
+function persistSidebarWidth(width: number): void {
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clampSidebarWidth(width)))
+  } catch {
+    // Storage may be unavailable in hardened or test renderers.
+  }
 }
 
 const AgentSelector = memo(function AgentSelector({

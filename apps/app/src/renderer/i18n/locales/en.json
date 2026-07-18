@@ -48,6 +48,7 @@
     "projects": "Projects",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
+    "resize": "Resize sidebar",
     "copySessionId": "Copy session ID",
     "shareSession": "Share session",
     "pin": "Pin",
@@ -149,6 +150,8 @@
     "bucket_earlierWeek": "Earlier this week",
     "bucket_earlierMonth": "Earlier this month",
     "bucket_older": "Older",
+    "childSessions_one": "{{count}} child session",
+    "childSessions_other": "{{count}} child sessions",
     "footer_loadingMore": "Loading older sessions…",
     "footer_endOf_one": "End of {{count}} session",
     "footer_endOf_other": "End of {{count}} sessions"

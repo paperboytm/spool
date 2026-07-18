@@ -67,6 +67,29 @@ describe('parseCodexSession', () => {
     expect(parseCodexSession(fp)?.gitRemote).toBe('git@github.com:paperboytm/im.git')
   })
 
+  it('preserves the parent thread for review and spawned subagent sessions', () => {
+    const fp = writeTmpSession([
+      {
+        timestamp: '2026-04-05T12:05:00Z',
+        type: 'session_meta',
+        payload: {
+          id: 'session-child',
+          parent_thread_id: 'session-parent',
+          thread_source: 'subagent',
+          source: { subagent: 'review' },
+          cwd: '/tmp/project',
+        },
+      },
+      {
+        timestamp: '2026-04-05T12:05:01Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'Review the current changes.' },
+      },
+    ])
+
+    expect(parseCodexSession(fp)?.parentSessionUuid).toBe('session-parent')
+  })
+
   it('filters guardian approval transcript sessions from indexing', () => {
     const fp = writeTmpSession([
       {

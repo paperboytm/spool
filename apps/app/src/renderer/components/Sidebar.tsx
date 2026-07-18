@@ -29,6 +29,7 @@ import {
 } from '../../shared/sidebarSort.js'
 import Menu from './Menu.js'
 import PinIcon from './PinIcon.js'
+import { DEFAULT_SIDEBAR_WIDTH } from './SidebarRail.js'
 
 type Props = {
   activeIdentityKey: string | null
@@ -58,6 +59,7 @@ type Props = {
     onToggle: () => void
   }
   chromeOnly?: boolean
+  width?: number
 }
 
 export default function Sidebar({
@@ -85,6 +87,7 @@ export default function Sidebar({
   onShareSession,
   sidebarToggle,
   chromeOnly = false,
+  width = DEFAULT_SIDEBAR_WIDTH,
 }: Props) {
   const { t } = useTranslation()
   const sidebarSortLabel = (value: SidebarSortOrder): string => {
@@ -166,9 +169,10 @@ export default function Sidebar({
     <aside
       data-testid="sidebar"
       className={[
-        'w-60 flex-none flex flex-col h-full overflow-hidden transition-colors duration-[280ms] ease-out',
+        'flex-none flex flex-col h-full overflow-hidden transition-colors duration-[280ms] ease-out',
         chromeOnly ? 'bg-warm-bg dark:bg-dark-bg' : 'bg-warm-surface dark:bg-dark-surface',
       ].join(' ')}
+      style={{ width }}
     >
       {sidebarToggle && (
         <div className="flex flex-none flex-col gap-0.5 px-2 pt-1">
