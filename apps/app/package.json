@@ -77,6 +77,7 @@
     "i18next": "^26.3.6",
     "lucide-react": "^1.25.0",
     "mdast-util-to-string": "^4",
+    "pi-acp": "^0.0.31",
     "pure-rand": "^8.4.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -110,10 +111,6 @@
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
-  "optionalDependencies": {
-    "acp-extension-codex-darwin-arm64": "^0.16.0",
-    "acp-extension-codex-linux-x64": "^0.16.0"
-  },
   "build": {
     "appId": "com.linkclaw.spool",
     "productName": "Spool",
@@ -140,11 +137,12 @@
       "node_modules/file-uri-to-path/**",
       "node_modules/acp-extension-claude/**",
       "node_modules/acp-extension-codex/**",
-      "node_modules/acp-extension-codex-darwin-arm64/**",
-      "node_modules/acp-extension-codex-linux-x64/**",
       "node_modules/acp-extension-core/**",
+      "node_modules/pi-acp/**",
       "node_modules/@agentclientprotocol/**",
       "node_modules/@anthropic-ai/claude-agent-sdk/**",
+      "node_modules/@openai/codex/**",
+      "node_modules/@openai/codex-*/**",
       "node_modules/zod/**"
     ],
     "mac": {

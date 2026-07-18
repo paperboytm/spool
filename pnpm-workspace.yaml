@@ -8,8 +8,6 @@ allowBuilds:
   electron: true
   esbuild: true
   workerd: true
-  acp-extension-codex-linux-x64: true
-  acp-extension-codex-darwin-arm64: true
   electron-winstaller: false
   msgpackr-extract: false
   onnxruntime-node: false
