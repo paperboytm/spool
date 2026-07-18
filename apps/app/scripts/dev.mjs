@@ -11,25 +11,44 @@
 
 import { spawn } from 'node:child_process'
 
+import { DEV_LAUNCH_PLAN } from './lib/dev-launch-plan.mjs'
 import { resolveSpoolDataDir } from './lib/spool-data-dir.mjs'
 
 const { value, source } = resolveSpoolDataDir(process.env)
 process.env.SPOOL_DATA_DIR = value
 console.log(`[dev] SPOOL_DATA_DIR=${value}${source === 'env' ? ' (inherited)' : ''}`)
 
-const child = spawn('electron-vite', ['dev'], {
-  stdio: 'inherit',
-  shell: true,
-  env: process.env,
-})
-
-const forward = (sig) => () => {
-  if (!child.killed) child.kill(sig)
+let child = null
+const forward = (signal) => () => {
+  if (child && !child.killed) child.kill(signal)
 }
 process.on('SIGINT', forward('SIGINT'))
 process.on('SIGTERM', forward('SIGTERM'))
 
-child.on('exit', (code, signal) => {
-  if (signal) process.kill(process.pid, signal)
-  else process.exit(code ?? 0)
-})
+function runStep(step) {
+  console.log(`[dev] Starting ${step.label}`)
+  return new Promise((resolve) => {
+    child = spawn(step.command, step.args, {
+      stdio: 'inherit',
+      shell: true,
+      env: process.env,
+    })
+    child.on('exit', (code, signal) => resolve({ code, signal }))
+  })
+}
+
+async function main() {
+  for (const step of DEV_LAUNCH_PLAN) {
+    const { code, signal } = await runStep(step)
+    if (signal) {
+      process.kill(process.pid, signal)
+      return
+    }
+    if (code !== 0) {
+      process.exitCode = code ?? 1
+      return
+    }
+  }
+}
+
+void main()

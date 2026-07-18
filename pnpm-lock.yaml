@@ -114,6 +114,9 @@ importers:
       mdast-util-to-string:
         specifier: ^4
         version: 4.0.0
+      pi-acp:
+        specifier: ^0.0.31
+        version: 0.0.31
       pure-rand:
         specifier: ^8.4.2
         version: 8.4.2
@@ -205,13 +208,6 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))
-    optionalDependencies:
-      acp-extension-codex-darwin-arm64:
-        specifier: ^0.16.0
-        version: 0.16.0
-      acp-extension-codex-linux-x64:
-        specifier: ^0.16.0
-        version: 0.16.0
 
   apps/backend:
     dependencies:
@@ -568,6 +564,11 @@ importers:
         version: 4.112.0(@cloudflare/workers-types@5.20260718.1)
 
 packages:
+
+  '@agentclientprotocol/sdk@0.26.0':
+    resolution: {integrity: sha512-ialrcI+RzKOYe+fw+TfpyTdRmEoqIkXLlwbTi6XgaXXfdhNcdod7TmE1VsTnG3yTlox8TMTSMQgWbLLbz3r86Q==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
 
   '@agentclientprotocol/sdk@1.1.0':
     resolution: {integrity: sha512-NT2KqphUJ3w6EksUL51ZhJgIYgq/ZLGcBPkyMKgRSO5PMVwe9DnKKX+Htnvk6KHh6dUuh34UHK4gKp+4te1Mdg==}
@@ -2866,18 +2867,6 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  acp-extension-codex-darwin-arm64@0.16.0:
-    resolution: {integrity: sha512-jZPONII6g5SFttE45pjIN4ZXXsnfFyKBZI1UsVAnLaE1VcUhsQXKjJvvmBuqEzhZ9eymprY9J1BdZ0TP9zUCxQ==}
-    cpu: [arm64]
-    os: [darwin]
-    hasBin: true
-
-  acp-extension-codex-linux-x64@0.16.0:
-    resolution: {integrity: sha512-7c32P58H4balUK19QArVVLkKgiLRRAa0MdFl2I9MaHXLYHxEFmZxi2mSaOy4hZlLjaZ/OTX3IJRxPp8nZfL+nA==}
-    cpu: [x64]
-    os: [linux]
-    hasBin: true
-
   acp-extension-codex@1.1.2:
     resolution: {integrity: sha512-NPEt7fD52rEzsjuvsDdC7W1juSc8cdK662lO0+J7ygfiNwv5EbEdJ03bWKaZ92ar865BUfTdlsqGgmcT1FZjNA==}
     hasBin: true
@@ -4516,6 +4505,11 @@ packages:
     resolution: {integrity: sha512-eRWB5LBz7PpDu4PUlwT0PhnQfTQJlDDdPa35urV4Osrm0t0AqQFGn+UIkU3klZvwJ8KPO3VbBFsXquA6p6kqZw==}
     engines: {node: '>=12', npm: '>=6'}
 
+  pi-acp@0.0.31:
+    resolution: {integrity: sha512-LZm1EUV/ax27V+m3pjvK2QvhCfHNTFZsKLNwplVlFuyaSKOFTVdh3IRwfbtM5xqaDe0wmToosI6g3DgScx5aGA==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -5534,6 +5528,9 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
@@ -5559,6 +5556,10 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
+  '@agentclientprotocol/sdk@0.26.0(zod@3.25.76)':
+    dependencies:
+      zod: 3.25.76
 
   '@agentclientprotocol/sdk@1.1.0(zod@4.4.3)':
     dependencies:
@@ -7411,12 +7412,6 @@ snapshots:
     transitivePeerDependencies:
       - '@anthropic-ai/sdk'
       - '@modelcontextprotocol/sdk'
-
-  acp-extension-codex-darwin-arm64@0.16.0:
-    optional: true
-
-  acp-extension-codex-linux-x64@0.16.0:
-    optional: true
 
   acp-extension-codex@1.1.2:
     dependencies:
@@ -9373,6 +9368,11 @@ snapshots:
 
   pe-library@0.4.1: {}
 
+  pi-acp@0.0.31:
+    dependencies:
+      '@agentclientprotocol/sdk': 0.26.0(zod@3.25.76)
+      zod: 3.25.76
+
   picocolors@1.1.1: {}
 
   picomatch@4.0.5: {}
@@ -10561,6 +10561,8 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
       zod: 4.4.3
+
+  zod@3.25.76: {}
 
   zod@4.4.3: {}
 

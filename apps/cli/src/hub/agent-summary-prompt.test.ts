@@ -61,6 +61,10 @@ describe('buildSessionSummaryPrompt', () => {
     expect(result.prompt).not.toContain('subagent scratchpad')
     expect(result.prompt).toContain('Do not run tools, commands, searches, or file reads')
     expect(result.prompt).toContain('Write in the predominant language of the transcript')
+    expect(result.prompt).toContain('Treat the first user prompt as the clearest statement')
+    expect(result.prompt).toContain('compact visual progress map')
+    expect(result.prompt).toContain('unusually specific or insightful user prompt')
+    expect(result.prompt).toContain('Result vs. original goal')
     expect(result.authoredTitle).toBe('Summary: Fix the cache race')
   })
 

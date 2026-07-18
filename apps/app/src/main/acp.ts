@@ -2,9 +2,17 @@
 // first user-triggered ACP query — never on the launch path. Safe.
 // eslint-disable-next-line no-restricted-imports
 import { spawn, execSync, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import type {
@@ -93,7 +101,7 @@ interface AcpSession {
  * ACP Manager — connects to local agents via the Agent Client Protocol.
  *
  * Supports three connection modes:
- *   - extension: via acp-extension-{name} npm packages (Claude Code, Codex CLI)
+ *   - extension: via packaged ACP adapters (Claude Code, Codex CLI, Pi)
  *   - native:    CLI itself is ACP server, spawn `{bin} {acpArgs}` (Gemini, Kimi, OpenCode)
  *   - websocket: HTTP + WebSocket API, non-ACP (Alma)
  */
@@ -135,6 +143,7 @@ interface AgentConfig {
   bin: string
   acpMode: AcpMode
   acpArgs?: string[] // native mode: args to start ACP server (default: ['acp'])
+  extensionPackage?: string // extension mode: package name when it is not acp-extension-{id}
   wsEndpoint?: string // websocket mode: WebSocket URL
   healthCheck?: string // websocket mode: HTTP health check URL
   envSetup?: () => Promise<Record<string, string>>
@@ -154,6 +163,20 @@ const BUILTIN_AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Codex CLI',
     bin: 'codex',
     acpMode: 'extension',
+    envSetup: async () => {
+      const codexPath = await cachedResolveAsyncPersistent('codex')
+      return codexPath ? { CODEX_PATH: codexPath } : {}
+    },
+  },
+  pi: {
+    name: 'Pi',
+    bin: 'pi',
+    acpMode: 'extension',
+    extensionPackage: 'pi-acp',
+    envSetup: async () => {
+      const piPath = await cachedResolveAsyncPersistent('pi')
+      return piPath ? { PI_ACP_PI_COMMAND: piPath } : {}
+    },
   },
   gemini: {
     name: 'Gemini CLI',
@@ -206,11 +229,17 @@ function ensureAgentSearchCwd(): string {
 /**
  * Map an agentId from BUILTIN_AGENT_CONFIGS / custom config to a SessionSource.
  * Only agents whose local session output is indexable (Claude Code, Codex,
- * Gemini, OpenCode) have a source — others (kimi, alma, custom) return null and skip
- * the Spool-authored session write.
+ * Gemini, OpenCode, Pi) have a source — others (kimi, alma, custom) return null
+ * and skip the Spool-authored session write.
  */
 function agentIdToSource(agentId: string): SessionSource | null {
-  if (agentId === 'claude' || agentId === 'codex' || agentId === 'gemini' || agentId === 'opencode')
+  if (
+    agentId === 'claude' ||
+    agentId === 'codex' ||
+    agentId === 'gemini' ||
+    agentId === 'opencode' ||
+    agentId === 'pi'
+  )
     return agentId
   return null
 }
@@ -257,6 +286,88 @@ function getEffectiveConfigs(): Record<string, AgentConfig> {
   }
 
   return result
+}
+
+const ACP_STDERR_LIMIT = 64 * 1024
+const GENERIC_ACP_ERRORS = new Set(['Internal error', 'Unknown error', 'Agent error'])
+
+function appendBounded(current: string, next: string): string {
+  const combined = current + next
+  return combined.length <= ACP_STDERR_LIMIT ? combined : combined.slice(-ACP_STDERR_LIMIT)
+}
+
+function extractLastJsonMessage(text: string): string | null {
+  let marker = text.lastIndexOf('"message"')
+  while (marker >= 0) {
+    const colon = text.indexOf(':', marker + 9)
+    if (colon < 0) return null
+    let start = colon + 1
+    while (start < text.length && /\s/.test(text[start]!)) start += 1
+    if (text[start] === '"') {
+      let escaped = false
+      for (let end = start + 1; end < text.length; end += 1) {
+        const char = text[end]
+        if (char === '"' && !escaped) {
+          try {
+            const value = JSON.parse(text.slice(start, end + 1)) as unknown
+            if (typeof value === 'string' && value.trim()) return value.trim()
+          } catch {}
+          break
+        }
+        escaped = char === '\\' && !escaped
+        if (char !== '\\') escaped = false
+      }
+    }
+    marker = text.lastIndexOf('"message"', marker - 1)
+  }
+  return null
+}
+
+/** Preserve a useful adapter/server message when an ACP bridge collapses it
+ * to a generic "Internal error" response. */
+export function actionableAcpError(message: string, stderr: string): string {
+  if (!GENERIC_ACP_ERRORS.has(message.trim())) return message
+  return extractLastJsonMessage(stderr) ?? message
+}
+
+function defaultAcpExtensionRoots(): string[] {
+  return [
+    resolve(__dirname, '..', '..', 'node_modules'),
+    resolve(__dirname, '..', 'node_modules'),
+    resolve(__dirname, '..', '..', '..', 'node_modules'),
+  ]
+}
+
+/** Resolve only the current JS ACP adapter package. Older platform wrapper
+ * packages bundled stale agent runtimes and ignored the user's upgraded CLI. */
+export function resolveAcpExtensionEntry(
+  agentId: string,
+  packageName = `acp-extension-${agentId}`,
+  roots = defaultAcpExtensionRoots(),
+): string {
+  const entryPoints = ['dist/index.js', `bin/${packageName}.js`]
+  for (const root of roots) {
+    for (const entry of entryPoints) {
+      const candidate = join(root, packageName, entry)
+      if (existsSync(candidate)) return candidate.replace('app.asar', 'app.asar.unpacked')
+    }
+  }
+  throw new Error(`Could not find ${packageName}. Run: pnpm add ${packageName}`)
+}
+
+export function createRestrictedPiCommand(): { path: string; dispose: () => void } {
+  const directory = mkdtempSync(join(tmpdir(), 'spool-pi-summary-'))
+  const windows = process.platform === 'win32'
+  const commandPath = join(directory, windows ? 'pi-summary.cmd' : 'pi-summary')
+  const source = windows
+    ? '@echo off\r\n"%SPOOL_PI_EXECUTABLE%" --no-tools %*\r\n'
+    : '#!/bin/sh\nexec "$SPOOL_PI_EXECUTABLE" --no-tools "$@"\n'
+  writeFileSync(commandPath, source, 'utf8')
+  if (!windows) chmodSync(commandPath, 0o700)
+  return {
+    path: commandPath,
+    dispose: () => rmSync(directory, { recursive: true, force: true }),
+  }
 }
 
 export class AcpManager {
@@ -383,7 +494,7 @@ export class AcpManager {
 
   /**
    * Query via ACP protocol.
-   * For 'extension' mode: spawns acp-extension-{name} package.
+   * For 'extension' mode: spawns the agent's packaged ACP adapter.
    * For 'native' mode: spawns `{bin} {acpArgs}` directly (gemini, kimi, opencode).
    * Establishes ClientSideConnection, then does initialize → newSession → prompt
    * with streaming sessionUpdate chunks.
@@ -403,13 +514,14 @@ export class AcpManager {
     const acp = await import('@agentclientprotocol/sdk')
 
     const shellEnv = getLoginShellEnv()
-    const agentEnv = {
+    const agentEnv: Record<string, string> = {
       ...(process.env as Record<string, string>),
       ...shellEnv,
       ...(config.envSetup ? await config.envSetup() : {}),
     }
 
     let proc: ChildProcess
+    let restrictedPiCommand: { path: string; dispose: () => void } | null = null
 
     if (config.acpMode === 'native') {
       // Native ACP: the CLI itself is the ACP server
@@ -422,27 +534,40 @@ export class AcpManager {
         env: agentEnv,
       })
     } else {
-      // Extension mode: resolve acp-extension-{name} npm package
-      const { path: agentBin, native } = this.resolveAcpExtension(agentId)
+      const override = process.env['SPOOL_ACP_AGENT_BIN']
+      const agentBin =
+        override ?? resolveAcpExtensionEntry(agentId, config.extensionPackage ?? undefined)
+      const nodePath = await cachedResolveAsyncPersistent('node')
+      if (!nodePath)
+        throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
 
-      if (native) {
-        proc = spawn(agentBin, [], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: agentEnv,
-        })
-      } else {
-        const nodePath = await cachedResolveAsyncPersistent('node')
-        if (!nodePath)
-          throw new Error('Could not find Node.js. Ensure node is installed and in PATH.')
+      // pi-acp normally lets Pi execute its own local tools. Summary prompts
+      // contain transcript data and must be model-only, so route pi-acp through
+      // a tiny temporary command that prepends Pi's --no-tools guardrail.
+      if (agentId === 'pi' && !allowTools) {
+        const piPath = agentEnv['PI_ACP_PI_COMMAND']
+        if (!piPath) throw new Error('Could not find pi. Ensure it is installed and in PATH.')
+        restrictedPiCommand = createRestrictedPiCommand()
+        agentEnv['SPOOL_PI_EXECUTABLE'] = piPath
+        agentEnv['PI_ACP_PI_COMMAND'] = restrictedPiCommand.path
+      }
+
+      try {
         proc = spawn(nodePath, [agentBin], {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: agentEnv,
         })
+      } catch (error) {
+        restrictedPiCommand?.dispose()
+        throw error
       }
     }
 
+    let agentStderr = ''
     proc.stderr?.on('data', (d: Buffer) => {
-      console.error(`[acp-${agentId}] ${d.toString().trim()}`)
+      const text = d.toString()
+      agentStderr = appendBounded(agentStderr, text)
+      console.error(`[acp-${agentId}] ${text.trim()}`)
     })
 
     // Convert Node streams to Web streams for the ACP SDK
@@ -710,55 +835,12 @@ export class AcpManager {
           : typeof err === 'object' && err !== null && 'message' in err
             ? String((err as Record<string, unknown>).message)
             : String(err)
-      throw new Error(msg)
+      throw new Error(actionableAcpError(msg, agentStderr))
     } finally {
       cleanupAllTerminals()
       this.killSession()
+      restrictedPiCommand?.dispose()
     }
-  }
-
-  /**
-   * Resolve the ACP extension entry point for a given agent.
-   *
-   * acp-extension-claude is a pure JS package (dist/index.js) → run with Node.
-   * acp-extension-codex is a native binary wrapper → resolve the platform-specific
-   * binary directly (acp-extension-codex-darwin-arm64/bin/acp-extension-codex).
-   */
-  private resolveAcpExtension(name: string): { path: string; native: boolean } {
-    const override = process.env['SPOOL_ACP_AGENT_BIN']
-    if (override) return { path: override, native: false }
-
-    const pkg = `acp-extension-${name}`
-    const roots = [
-      resolve(__dirname, '..', '..', 'node_modules'),
-      resolve(__dirname, '..', 'node_modules'),
-      resolve(__dirname, '..', '..', '..', 'node_modules'),
-    ]
-
-    // For codex, resolve the platform-specific native binary directly
-    if (name === 'codex') {
-      const platformPkg = `acp-extension-codex-${process.platform}-${process.arch}`
-      const binaryName =
-        process.platform === 'win32' ? 'acp-extension-codex.exe' : 'acp-extension-codex'
-      for (const root of roots) {
-        const candidate = join(root, platformPkg, 'bin', binaryName)
-        if (existsSync(candidate)) {
-          return { path: candidate.replace('app.asar', 'app.asar.unpacked'), native: true }
-        }
-      }
-    }
-
-    // JS entry points (claude and fallback)
-    const entryPoints = ['dist/index.js', `bin/${pkg}.js`]
-    for (const root of roots) {
-      for (const entry of entryPoints) {
-        const candidate = join(root, pkg, entry)
-        if (existsSync(candidate)) {
-          return { path: candidate.replace('app.asar', 'app.asar.unpacked'), native: false }
-        }
-      }
-    }
-    throw new Error(`Could not find ${pkg}. Run: pnpm add ${pkg}`)
   }
 
   /**
@@ -969,17 +1051,17 @@ export class AcpManager {
    */
   private buildPrompt(userQuery: string): string {
     // System instructions are wrapped in a <spool-system-prelude> marker so
-    // the parsers (claude/codex/gemini/opencode) can strip them when indexing the
+    // the parsers (claude/codex/gemini/opencode/pi) can strip them when indexing the
     // on-disk JSONL. The user's actual query is sent OUTSIDE the marker, so
     // after stripping the prelude only the bare query remains as the first
     // user message — clean derived title, clean FTS, clean session detail.
     const systemBody = [
-      "You have access to a local knowledge base called Spool that indexes the user's AI coding sessions (Claude Code, Codex CLI, Gemini CLI, OpenCode).",
+      "You have access to a local knowledge base called Spool that indexes the user's AI coding sessions (Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi).",
       '',
       'The database is at ~/.spool/spool.db (SQLite with FTS5). You can query it directly with the `sqlite3` CLI.',
       '',
       '── Schema ──',
-      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", "gemini", or "opencode"',
+      '  sources(id, name TEXT, base_path TEXT)  -- "claude", "codex", "gemini", "opencode", or "pi"',
       '  projects(id, source_id, slug, display_path, display_name, last_synced)',
       '  sessions(id, project_id, source_id, session_uuid TEXT, title TEXT, started_at TEXT, ended_at TEXT, message_count INT, has_tool_use INT)',
       '  messages(id, session_id, source_id, role TEXT, content_text TEXT, timestamp TEXT, tool_names TEXT)',
@@ -994,7 +1076,7 @@ export class AcpManager {
       '',
       'Important:',
       "- Interpret the user's intent and decide what to search. Don't just match their exact words.",
-      '- If the user names a specific source (claude/codex/gemini/opencode), only return results from that source unless they explicitly ask for cross-source search.',
+      '- If the user names a specific source (claude/codex/gemini/opencode/pi), only return results from that source unless they explicitly ask for cross-source search.',
       '- For cross-source questions, first identify the relevant sources, then query each source separately, confirm hits or no-hits per source, and only then merge them into one answer.',
       '- For temporal queries ("what did I do recently"), use explicit date filters and be conservative when comparing times across different sources.',
       '- You may run multiple queries to find relevant information.',

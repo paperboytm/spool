@@ -143,7 +143,7 @@ function inlineMainEnvPlugin(env: Map<string, string>): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ command, mode }) => ({
   main: {
     // Build-time-replaced constants. The only build-time switch in the
     // codebase is __SPOOL_E2E__ — flipped to `true` ONLY when test:e2e
@@ -182,6 +182,10 @@ export default defineConfig(({ mode }) => ({
       runtimeExternalPlugin(),
     ],
     build: {
+      // Dev builds are preceded by the isolated worker build. Keep those
+      // entries when electron-vite rebuilds out/main; production builds retain
+      // the default clean output directory and then build workers afterward.
+      emptyOutDir: command === 'serve' ? false : undefined,
       rollupOptions: {
         output: {
           format: 'es',

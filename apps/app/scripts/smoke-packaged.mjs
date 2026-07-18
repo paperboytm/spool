@@ -26,10 +26,12 @@ assert(
   'packaged Claude ACP extension is missing',
 )
 assert(
-  existsSync(
-    join(unpackedModules, 'acp-extension-codex-darwin-arm64', 'bin', 'acp-extension-codex'),
-  ),
+  existsSync(join(unpackedModules, 'acp-extension-codex', 'dist', 'index.js')),
   'packaged Codex ACP extension is missing',
+)
+assert(
+  existsSync(join(unpackedModules, 'pi-acp', 'dist', 'index.js')),
+  'packaged Pi ACP extension is missing',
 )
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -74,7 +76,7 @@ writeFileSync(
   join(spoolHome, 'agents.json'),
   JSON.stringify({ securityEnabled: true, defaultAgent: 'claude' }),
 )
-for (const name of ['claude', 'codex']) {
+for (const name of ['claude', 'codex', 'pi']) {
   const path = join(mockBinDir, name)
   writeFileSync(path, '#!/bin/sh\nexit 0\n')
   chmodSync(path, 0o755)
@@ -119,7 +121,7 @@ try {
   assert(searchResults.length > 0, 'packaged SQLite search returned no fixture result')
 
   const agents = await window.evaluate(async () => globalThis.spool.getAiAgents())
-  for (const agentId of ['claude', 'codex']) {
+  for (const agentId of ['claude', 'codex', 'pi']) {
     assert(
       agents.some((agent) => agent.id === agentId && agent.status === 'ready'),
       `${agentId} was not detected`,
