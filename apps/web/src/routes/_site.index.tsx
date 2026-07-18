@@ -2,16 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import HomePage from '../components/site/home'
 
-const TITLE = 'Spool — Publish and discover agent sessions'
+const TITLE = 'Spool — Share and continue agent sessions'
 const DESC =
-  'Spool is where people publish, discover, understand, and continue real agent sessions.'
+  'Turn real coding-agent Sessions into durable, readable links that others can understand and resume.'
 
 const JSON_LD = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Spool',
   description:
-    'The publishing platform for agent sessions. Read real workflows, inspect their evidence, and continue useful work in your own agent.',
+    'Share real coding-agent Sessions as durable, readable links and continue them as new native work.',
   url: 'https://spool.pro',
   author: { '@type': 'Organization', name: 'Spool', url: 'https://spool.pro' },
 })
