@@ -8,16 +8,19 @@ function envFor(state?: FakeDbState) {
   const snapshots = makeR2()
   const og = makeR2()
   const avatars = makeR2()
+  const hub = makeR2()
   return {
     DB: db,
     META: makeKv(),
     SNAPSHOTS: snapshots.bucket,
     OG: og.bucket,
     AVATARS: avatars.bucket,
+    HUB: hub.bucket,
     state: s,
     _snapshots: snapshots.store,
     _og: og.store,
     _avatars: avatars.store,
+    _hub: hub.store,
   }
 }
 
@@ -73,10 +76,59 @@ async function seedShareWithAssets(
   )
 }
 
+async function seedHubData(
+  env: ReturnType<typeof envFor>,
+  options: {
+    userId: string
+    sid: string
+    root: string
+    packKey: string
+    oids: string[]
+  },
+): Promise<void> {
+  const now = Date.now()
+  env.state.hub_sessions.push({
+    sid: options.sid,
+    owner_user_id: options.userId,
+    root: options.root,
+    record_count: options.oids.length,
+    sig: null,
+    card_json: null,
+    note_md: null,
+    lineage_json: null,
+    view_oid: options.oids[0] ?? null,
+    spool_file_oid: null,
+    visibility: 'unlisted',
+    withdrawn_at: null,
+    created_at: now,
+    updated_at: now,
+  })
+  for (const [index, oid] of options.oids.entries()) {
+    env.state.hub_objects.push({
+      owner_user_id: options.userId,
+      oid,
+      size: 1,
+      pack_key: options.packKey,
+      offset: index,
+      length: 1,
+      created_at: now,
+    })
+  }
+  await env.HUB.put(options.packKey, new Uint8Array(options.oids.length).buffer)
+}
+
 describe('runDeletionSweep', () => {
-  it('purges a due user: R2 snapshots + OG cleared, handle released, user soft-deleted, queue row removed', async () => {
+  it('purges a due user with no Hub data and removes the queue row', async () => {
     const env = envFor()
     seedUser(env.state, 'user-1')
+    env.state.api_tokens.push({
+      id: 'token-1',
+      user_id: 'user-1',
+      token_hash: 'hash-1',
+      label: 'CLI',
+      created_at: Date.now(),
+      last_used_at: null,
+    })
     env.state.handles.push({
       handle: 'alice',
       user_id: 'user-1',
@@ -122,8 +174,202 @@ describe('runDeletionSweep', () => {
     // identity links dropped — re-sign-in with the same Google account
     // misses the JOIN in upsertUserByIdentity and creates a fresh user.
     expect(env.state.user_identities.filter((i) => i.user_id === 'user-1')).toEqual([])
+    expect(env.state.api_tokens.filter((token) => token.user_id === 'user-1')).toEqual([])
+    expect(env.state.hub_sessions).toEqual([])
+    expect(env.state.hub_objects).toEqual([])
+    expect(env._hub.size).toBe(0)
     // queue row gone
     expect(env.state.deletion_queue.find((r) => r.user_id === 'user-1')).toBeUndefined()
+  })
+
+  it('withdraws every Hub Session before deleting each distinct owner pack and its D1 rows', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    seedUser(env.state, 'user-2')
+    const sharedPack = 'hub/packs/user-1/shared-pack'
+    const secondPack = 'hub/packs/user-1/second-pack'
+    const orphanPack = 'hub/packs/user-1/orphan-pack'
+    const siblingPack = 'hub/packs/user-2/keep-pack'
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_due-a',
+      root: 'root-a',
+      packKey: sharedPack,
+      oids: ['oid-a', 'oid-b'],
+    })
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_due-b',
+      root: 'root-b',
+      packKey: sharedPack,
+      oids: ['oid-c'],
+    })
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_due-c',
+      root: 'root-c',
+      packKey: secondPack,
+      oids: ['oid-d'],
+    })
+    await seedHubData(env, {
+      userId: 'user-2',
+      sid: 'codex_keep',
+      // Manifests are globally content-addressed, so another owner can
+      // legitimately reference the same root as a due user.
+      root: 'root-a',
+      packKey: siblingPack,
+      oids: ['oid-a', 'oid-b'],
+    })
+    // Simulates writePack succeeding before insertObjects fails: there is
+    // no hub_objects row from which DISTINCT pack_key could discover it.
+    await env.HUB.put(orphanPack, new Uint8Array([9]).buffer)
+    await env.HUB.put('hub/manifests/root-a', 'oid-a\noid-b\n')
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: Date.now() - 1000,
+      cancelled: 0,
+    })
+
+    const deletedHubKeys: string[] = []
+    let failClosedAtPhysicalDelete = false
+    const realHubDelete = env.HUB.delete.bind(env.HUB)
+    ;(
+      env.HUB as unknown as {
+        delete(keys: string | string[]): Promise<void>
+      }
+    ).delete = async (keys) => {
+      const batch = Array.isArray(keys) ? keys : [keys]
+      deletedHubKeys.push(...batch)
+      failClosedAtPhysicalDelete = env.state.hub_sessions
+        .filter((session) => session.owner_user_id === 'user-1')
+        .every((session) => session.withdrawn_at !== null)
+      await realHubDelete(keys)
+    }
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    expect(failClosedAtPhysicalDelete).toBe(true)
+    expect([...deletedHubKeys].sort()).toEqual([orphanPack, secondPack, sharedPack])
+    expect(env._hub.has(sharedPack)).toBe(false)
+    expect(env._hub.has(secondPack)).toBe(false)
+    expect(env._hub.has(orphanPack)).toBe(false)
+    expect(env._hub.has(siblingPack)).toBe(true)
+    expect(env._hub.has('hub/manifests/root-a')).toBe(true)
+    expect(env.state.hub_objects.every((row) => row.owner_user_id === 'user-2')).toBe(true)
+    expect(env.state.hub_sessions.map((session) => session.sid)).toEqual(['codex_keep'])
+    expect(env.state.deletion_queue).toEqual([])
+  })
+
+  it('keeps Hub Sessions withdrawn and queued when the orphan-prefix list fails, then finishes on retry', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    const packKey = 'hub/packs/user-1/retry-pack'
+    const orphanPack = 'hub/packs/user-1/retry-orphan-pack'
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_retry-r2',
+      root: 'root-retry-r2',
+      packKey,
+      oids: ['oid-retry-r2'],
+    })
+    await env.HUB.put(orphanPack, new Uint8Array([9]).buffer)
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: Date.now() - 1000,
+      cancelled: 0,
+    })
+
+    const realHubList = env.HUB.list.bind(env.HUB)
+    let failOnce = true
+    ;(env.HUB as unknown as { list: typeof env.HUB.list }).list = async (options) => {
+      if (failOnce) {
+        failOnce = false
+        throw new Error('synthetic Hub R2 list failure')
+      }
+      return realHubList(options)
+    }
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    const { requireReadableSession } = await import('../src/hub/head')
+    await runDeletionSweep(env, Date.now())
+
+    expect(env.state.hub_sessions[0]?.withdrawn_at).not.toBeNull()
+    await expect(requireReadableSession(env.DB, 'codex_retry-r2')).rejects.toMatchObject({
+      code: 'GONE',
+    })
+    expect(env.state.hub_objects).toHaveLength(1)
+    expect(env._hub.has(packKey)).toBe(false)
+    expect(env._hub.has(orphanPack)).toBe(true)
+    expect(env.state.deletion_queue).toHaveLength(1)
+    expect(env.state.users[0]?.deleted_at).toBeNull()
+
+    await runDeletionSweep(env, Date.now())
+
+    expect(env._hub.has(packKey)).toBe(false)
+    expect(env._hub.has(orphanPack)).toBe(false)
+    expect(env.state.hub_objects).toEqual([])
+    expect(env.state.hub_sessions).toEqual([])
+    expect(env.state.deletion_queue).toEqual([])
+    expect(env.state.users[0]?.deleted_at).not.toBeNull()
+  })
+
+  it('retries safely after a partial Hub D1 cleanup failure', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    const packKey = 'hub/packs/user-1/retry-d1-pack'
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_retry-d1',
+      root: 'root-retry-d1',
+      packKey,
+      oids: ['oid-retry-d1'],
+    })
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: Date.now() - 1000,
+      cancelled: 0,
+    })
+
+    const realPrepare = env.DB.prepare.bind(env.DB)
+    let failOnce = true
+    const intercept = (sql: string) => {
+      const stmt = realPrepare(sql)
+      if (/^DELETE FROM hub_sessions WHERE owner_user_id=\?$/i.test(sql)) {
+        return {
+          bind: (userId: string) => ({
+            run: async () => {
+              if (failOnce) {
+                failOnce = false
+                throw new Error('synthetic Hub D1 failure')
+              }
+              return stmt.bind(userId).run()
+            },
+          }),
+        } as unknown as ReturnType<typeof realPrepare>
+      }
+      return stmt
+    }
+    ;(env.DB as unknown as { prepare: typeof realPrepare }).prepare =
+      intercept as unknown as typeof realPrepare
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    // The fake batch is deliberately non-transactional, so this models
+    // the harsh boundary where hub_objects committed before hub_sessions
+    // failed. The physical pack is already gone; the withdrawn Session
+    // and queue row make the state safe and retryable.
+    expect(env._hub.has(packKey)).toBe(false)
+    expect(env.state.hub_objects).toEqual([])
+    expect(env.state.hub_sessions[0]?.withdrawn_at).not.toBeNull()
+    expect(env.state.deletion_queue).toHaveLength(1)
+
+    await runDeletionSweep(env, Date.now())
+
+    expect(env.state.hub_sessions).toEqual([])
+    expect(env.state.deletion_queue).toEqual([])
+    expect(env.state.users[0]?.deleted_at).not.toBeNull()
   })
 
   it('leaves cancelled rows alone', async () => {

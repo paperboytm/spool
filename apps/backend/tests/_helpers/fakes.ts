@@ -441,6 +441,21 @@ export function makeDb(state: FakeDbState = emptyState()): {
           return { success: true, meta: { changes: 1 } }
         }
         if (
+          /^UPDATE hub_sessions SET withdrawn_at=\?, updated_at=\? WHERE owner_user_id=\? AND withdrawn_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [withdrawnAt, updatedAt, ownerUserId] = params as [number, number, string]
+          let changes = 0
+          for (const row of state.hub_sessions) {
+            if (row.owner_user_id !== ownerUserId || row.withdrawn_at !== null) continue
+            row.withdrawn_at = withdrawnAt
+            row.updated_at = updatedAt
+            changes += 1
+          }
+          return { success: true, meta: { changes } }
+        }
+        if (
           /^INSERT OR IGNORE INTO hub_objects \(owner_user_id, oid, size, pack_key, offset, length, created_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?\)$/i.test(
             sql,
           )
@@ -480,6 +495,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const [tokenHash] = params as [string]
           const before = state.api_tokens.length
           state.api_tokens = state.api_tokens.filter((row) => row.token_hash !== tokenHash)
+          return { success: true, meta: { changes: before - state.api_tokens.length } }
+        }
+        if (/^DELETE FROM api_tokens WHERE user_id=\?$/i.test(sql)) {
+          const [userId] = params as [string]
+          const before = state.api_tokens.length
+          state.api_tokens = state.api_tokens.filter((row) => row.user_id !== userId)
           return { success: true, meta: { changes: before - state.api_tokens.length } }
         }
         if (
@@ -799,9 +820,30 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (idx >= 0) state.deletion_queue.splice(idx, 1)
           return { success: true, meta: { changes: 1 } }
         }
+        if (/^DELETE FROM hub_objects WHERE owner_user_id=\?$/i.test(sql)) {
+          const [ownerUserId] = params as [string]
+          const before = state.hub_objects.length
+          state.hub_objects = state.hub_objects.filter((row) => row.owner_user_id !== ownerUserId)
+          return { success: true, meta: { changes: before - state.hub_objects.length } }
+        }
+        if (/^DELETE FROM hub_sessions WHERE owner_user_id=\?$/i.test(sql)) {
+          const [ownerUserId] = params as [string]
+          const before = state.hub_sessions.length
+          state.hub_sessions = state.hub_sessions.filter((row) => row.owner_user_id !== ownerUserId)
+          return { success: true, meta: { changes: before - state.hub_sessions.length } }
+        }
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
       async all<T = unknown>(): Promise<{ results: T[] }> {
+        if (/^SELECT DISTINCT pack_key FROM hub_objects WHERE owner_user_id=\?$/i.test(sql)) {
+          const [ownerUserId] = params as [string]
+          const packKeys = new Set(
+            state.hub_objects
+              .filter((row) => row.owner_user_id === ownerUserId)
+              .map((row) => row.pack_key),
+          )
+          return { results: [...packKeys].map((pack_key) => ({ pack_key })) as T[] }
+        }
         if (
           /^SELECT oid FROM hub_objects WHERE owner_user_id=\? AND oid IN \(\?(?:,\?)*\)$/i.test(
             sql,
@@ -999,8 +1041,9 @@ export function makeR2(): {
         ...(v.contentType ? { httpMetadata: { contentType: v.contentType } } : {}),
       }
     },
-    async delete(key: string) {
-      store.delete(key)
+    async delete(keyOrKeys: string | string[]) {
+      const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys]
+      for (const key of keys) store.delete(key)
     },
     async list(opts?: { prefix?: string; limit?: number; cursor?: string }) {
       // Mirrors the R2 list shape: page through `prefix`-matching keys

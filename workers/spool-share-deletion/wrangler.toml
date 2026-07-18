@@ -46,3 +46,7 @@ bucket_name = "spool-og"
 [[r2_buckets]]
 binding = "AVATARS"
 bucket_name = "spool-avatars"
+
+[[r2_buckets]]
+binding = "HUB"
+bucket_name = "spool-hub"
