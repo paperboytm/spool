@@ -11,14 +11,22 @@ const coreAlias = {
   '@spool-lab/redact': resolve(__dirname, '../../packages/redact/dist/index.js'),
 }
 
-// better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
-// It must NOT be bundled — it must stay as a real require() in the output.
-function nativeExternalPlugin(): Plugin {
+// Runtime-owned modules must stay external to the Electron bundles:
+//   - electron is provided by the Electron executable. Bundling the npm
+//     downloader package makes the launched app try to install Electron again.
+//   - better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
+//     It must stay as a real require() so the addon can be discovered.
+function runtimeExternalPlugin(): Plugin {
   return {
-    name: 'native-external',
+    name: 'runtime-external',
     enforce: 'pre',
     resolveId(id) {
-      if (id === 'better-sqlite3' || id.startsWith('better-sqlite3/')) {
+      if (
+        id === 'electron' ||
+        id.startsWith('electron/') ||
+        id === 'better-sqlite3' ||
+        id.startsWith('better-sqlite3/')
+      ) {
         return { id, external: true }
       }
       return null
@@ -28,7 +36,7 @@ function nativeExternalPlugin(): Plugin {
 
 // Main-process env vars whose values get inlined into the bundle at
 // build time via Rollup `define`. Renderer reads its own env via
-// `import.meta.env.VITE_*`, but the main process bundle is plain CJS —
+// `import.meta.env.VITE_*`, but the main process bundle is plain ESM —
 // it has no equivalent at runtime, so we substitute `process.env.X`
 // references with literal strings before they reach the output.
 //
@@ -171,7 +179,7 @@ export default defineConfig(({ mode }) => ({
           'electron-store',
         ],
       }),
-      nativeExternalPlugin(),
+      runtimeExternalPlugin(),
     ],
     build: {
       rollupOptions: {
@@ -186,7 +194,10 @@ export default defineConfig(({ mode }) => ({
     resolve: { alias: coreAlias },
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] }),
+      runtimeExternalPlugin(),
+    ],
     build: {
       rollupOptions: {
         input: {

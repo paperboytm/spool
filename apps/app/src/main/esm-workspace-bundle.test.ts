@@ -32,8 +32,13 @@ describe('main-process ESM workspace bundles', () => {
 
     const mainEntry = join(OUT_DIR, 'main', 'index.mjs')
     const preloadEntry = join(OUT_DIR, 'preload', 'index.mjs')
+    const inferencePreloadEntry = join(OUT_DIR, 'preload', 'inference.mjs')
     expect(existsSync(mainEntry), `expected ${mainEntry} to exist after build`).toBe(true)
     expect(existsSync(preloadEntry), `expected ${preloadEntry} to exist after build`).toBe(true)
+    expect(
+      existsSync(inferencePreloadEntry),
+      `expected ${inferencePreloadEntry} to exist after build`,
+    ).toBe(true)
 
     const bundle = readFileSync(mainEntry, 'utf8')
     expect(bundle).toContain('../preload/index.mjs')
@@ -44,6 +49,19 @@ describe('main-process ESM workspace bundles', () => {
         hasRuntimeRequire,
         `main bundle externalized import-only ${packageName} as a CommonJS require`,
       ).toBe(false)
+    }
+
+    for (const entry of [mainEntry, preloadEntry, inferencePreloadEntry]) {
+      const output = readFileSync(entry, 'utf8')
+      expect(output, `${entry} bundled Electron's npm downloader`).not.toContain(
+        'Downloading Electron binary...',
+      )
+      expect(output, `${entry} bundled Electron's npm package`).not.toContain(
+        'node_modules/.pnpm/electron@',
+      )
+      expect(output, `${entry} should import Electron from the runtime`).toMatch(
+        /(?:from\s+|require\()['"]electron['"]\)?/,
+      )
     }
   }, 60_000)
 })
