@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "spool-web",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "spool.pro/*",
+      "zone_name": "spool.pro",
+    },
+  ],
+  "vars": {
+    "ORIGIN_BACKEND": "https://spool-share-backend.pages.dev",
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "env": {
+    "staging": {
+      "name": "spool-web-staging",
+      "routes": [
+        {
+          "pattern": "staging.spool.pro/*",
+          "zone_name": "spool.pro",
+        },
+      ],
+      "vars": {
+        "ORIGIN_BACKEND": "https://spool-share-backend-staging.pages.dev",
+      },
+    },
+  },
+}

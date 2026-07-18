@@ -3,13 +3,11 @@ name: Deploy Web
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'packages/session-kit/**'
-      - 'packages/session-view/**'
-      - 'packages/share-kit/**'
-      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
+
+concurrency:
+  group: deploy-web-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -30,17 +28,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # void deploy runs the app's own vite build, but the workspace
-      # libraries it imports (@spool/share-kit, @spool-lab/session-*)
-      # ship dist/ artifacts that must exist first.
+      # The web build imports workspace libraries that ship dist/
+      # artifacts, so build those before Wrangler builds the app.
       - name: Build workspace dependencies
         run: pnpm vp run --filter '@spool/web^...' build
 
-      - name: Deploy to Void
+      - name: Deploy to Cloudflare Workers
         env:
-          VOID_TOKEN: ${{ secrets.VOID_TOKEN }}
-          # The void project kept the pre-merge `spool-landing` resource
-          # name so the public origin (see workers/spool-pro-router)
-          # didn't move when share-web merged into this app.
-          VOID_PROJECT: spool-landing
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm --filter @spool/web run deploy

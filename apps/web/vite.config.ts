@@ -1,9 +1,9 @@
+import { cloudflare } from '@cloudflare/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import type { Plugin } from 'vite-plus'
 import { defineConfig, lazyPlugins } from 'vite-plus'
-import { voidPlugin } from 'void'
 
 // Dev-only relay for the backend's server-side WorkOS calls (code
 // exchange + identities). workerd (wrangler pages dev) makes its
@@ -69,15 +69,25 @@ function devWorkosRelay(): Plugin {
 // and per-route security headers (see src/start.ts).
 const PRERENDER_ROOTS = ['/', '/daemon', '/connectors', '/blog', '/terms', '/privacy']
 
-export default defineConfig(({ mode }) => ({
-  // Vitest used to have a standalone config with no application plugins.
-  // Keep that isolation because Void's Cloudflare runner is only needed for
-  // application build and development.
+export default defineConfig(({ mode, command }) => ({
+  // Vitest uses no application plugins. Keep it isolated from the
+  // Cloudflare runtime, which is only needed for application build and dev.
   plugins:
     mode === 'test'
       ? []
       : (lazyPlugins(() => [
-          voidPlugin(), // must come before the framework plugin
+          cloudflare({
+            viteEnvironment: { name: 'ssr' },
+            ...(command === 'serve'
+              ? {
+                  config: {
+                    vars: {
+                      ORIGIN_BACKEND: process.env['SPOOL_SHARE_BACKEND'] ?? 'http://localhost:8788',
+                    },
+                  },
+                }
+              : {}),
+          }), // must precede the framework plugin
           tailwindcss(),
           tanstackStart({
             prerender: {

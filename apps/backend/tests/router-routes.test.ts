@@ -1,14 +1,12 @@
-// Route-table guard for the spool.pro dispatcher (same cross-package
-// pattern as deletion-worker-deploy.test.ts). Since the landing/share
-// merge the table is two-way: /api/* to the backend, everything else —
-// marketing pages, docs, readers, account pages — to the merged web
-// app (apps/web).
+// Route-table guard for the spool.pro entry Worker (same cross-package
+// pattern as deletion-worker-deploy.test.ts). /api/* goes to the Pages
+// backend; marketing, docs, readers, and account pages stay in apps/web.
 
 import { describe, expect, it } from 'vite-plus/test'
 
-import { routeFor } from '../../../workers/spool-pro-router/src/worker'
+import { routeFor } from '../../web/src/edge-router'
 
-describe('spool-pro-router routeFor', () => {
+describe('spool-web routeFor', () => {
   it('routes the API to the backend', () => {
     expect(routeFor('/api/hub/v1/sessions/x')).toBe('backend')
     expect(routeFor('/api/cli-auth/start')).toBe('backend')
