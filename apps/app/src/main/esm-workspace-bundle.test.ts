@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -30,7 +30,13 @@ describe('main-process ESM workspace bundles', () => {
       env: { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' },
     })
 
-    const bundle = readFileSync(join(OUT_DIR, 'main', 'index.mjs'), 'utf8')
+    const mainEntry = join(OUT_DIR, 'main', 'index.mjs')
+    const preloadEntry = join(OUT_DIR, 'preload', 'index.mjs')
+    expect(existsSync(mainEntry), `expected ${mainEntry} to exist after build`).toBe(true)
+    expect(existsSync(preloadEntry), `expected ${preloadEntry} to exist after build`).toBe(true)
+
+    const bundle = readFileSync(mainEntry, 'utf8')
+    expect(bundle).toContain('../preload/index.mjs')
     for (const packageName of IMPORT_ONLY_WORKSPACE_PACKAGES) {
       const hasRuntimeRequire =
         bundle.includes(`require("${packageName}")`) || bundle.includes(`require('${packageName}')`)

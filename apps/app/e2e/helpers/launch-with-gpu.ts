@@ -58,7 +58,7 @@ export async function launchAppWithGpu(): Promise<AppContext> {
     // viewer needs GPU rasterisation to paint.
   }
 
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   args.unshift('--force-prefers-reduced-motion')
 

@@ -103,7 +103,7 @@ export async function launchApp(
   const spoolHome = join(tmpDir, 'spool-home')
   mkdirSync(spoolHome, { recursive: true })
 
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   // Force prefers-reduced-motion at the Chromium level so transitions /
   // animations resolve instantly — Playwright's "wait for element to be
@@ -137,7 +137,7 @@ export async function launchApp(
  */
 export async function restartApp(ctx: AppContext): Promise<AppContext> {
   await ctx.app.close()
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   args.unshift('--force-prefers-reduced-motion')
   const app = await electron.launch({ args, cwd: APP_DIR, env: ctx.env })

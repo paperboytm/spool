@@ -145,7 +145,7 @@ export default defineConfig(({ mode }) => ({
     // those branches contain) from the output bundle. The test-mode
     // modules under src/main/e2e-mode/ are therefore never loaded — they
     // don't even resolve through Rollup — in any production binary. A
-    // ci unit test grep-asserts this invariant against out/main/index.js.
+    // ci unit test grep-asserts this invariant against out/main/index.mjs.
     define: {
       __SPOOL_E2E__: JSON.stringify(process.env['SPOOL_E2E_TEST'] === '1'),
     },

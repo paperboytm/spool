@@ -65,7 +65,7 @@ export async function launchDemoApp(
     SPOOL_E2E_TEST: '1',
   }
 
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
 
   const app = await electron.launch({ args, cwd: APP_DIR, env })
