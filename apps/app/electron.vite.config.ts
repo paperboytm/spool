@@ -200,6 +200,10 @@ export default defineConfig(({ mode }) => ({
     ],
     build: {
       rollupOptions: {
+        // BrowserWindow renderers stay sandboxed. Electron runs sandboxed
+        // preloads as plain JavaScript without an ESM loader, so these entries
+        // must remain CommonJS and load the Electron bridge via require().
+        output: { format: 'cjs' },
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           // Hidden Privacy Filter inference window has its own preload —

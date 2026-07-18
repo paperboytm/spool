@@ -32,8 +32,8 @@ describe('main-process ESM workspace bundles', () => {
     })
 
     const mainEntry = join(OUT_DIR, 'main', 'index.mjs')
-    const preloadEntry = join(OUT_DIR, 'preload', 'index.mjs')
-    const inferencePreloadEntry = join(OUT_DIR, 'preload', 'inference.mjs')
+    const preloadEntry = join(OUT_DIR, 'preload', 'index.js')
+    const inferencePreloadEntry = join(OUT_DIR, 'preload', 'inference.js')
     expect(existsSync(mainEntry), `expected ${mainEntry} to exist after build`).toBe(true)
     expect(existsSync(preloadEntry), `expected ${preloadEntry} to exist after build`).toBe(true)
     expect(
@@ -46,7 +46,8 @@ describe('main-process ESM workspace bundles', () => {
     }
 
     const bundle = readFileSync(mainEntry, 'utf8')
-    expect(bundle).toContain('../preload/index.mjs')
+    expect(bundle).toContain('../preload/index.js')
+    expect(bundle).not.toContain('../preload/index.mjs')
     for (const workerEntry of WORKER_ENTRIES) {
       expect(bundle, `main bundle should launch ${workerEntry}`).toContain(workerEntry)
       expect(bundle, `main bundle should not launch a .js build of ${workerEntry}`).not.toContain(
@@ -72,6 +73,16 @@ describe('main-process ESM workspace bundles', () => {
       )
       expect(output, `${entry} should import Electron from the runtime`).toMatch(
         /(?:from\s+|require\()['"]electron['"]\)?/,
+      )
+    }
+
+    for (const entry of [preloadEntry, inferencePreloadEntry]) {
+      const output = readFileSync(entry, 'utf8')
+      expect(output, `${entry} must use CommonJS inside Electron's sandbox`).toMatch(
+        /require\(['"]electron['"]\)/,
+      )
+      expect(output, `${entry} must not use ESM imports inside Electron's sandbox`).not.toMatch(
+        /from\s+['"]electron['"]/,
       )
     }
   }, 60_000)
