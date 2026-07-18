@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 
@@ -120,17 +121,31 @@ describe('migration v5 (connector subsystem removal)', () => {
     `)
 
     // Seed a session, a capture, and one star of each kind
-    seed.prepare("INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')").run()
-    seed.prepare(`
+    seed
+      .prepare(
+        "INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')",
+      )
+      .run()
+    seed
+      .prepare(`
       INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
       VALUES (1, 1, 'sess-uuid', '/fake/sess.jsonl', 'A session', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 1)
-    `).run()
-    seed.prepare(`
+    `)
+      .run()
+    seed
+      .prepare(`
       INSERT INTO captures (source_id, capture_uuid, url, title, platform, captured_at)
       VALUES (4, 'cap-uuid', 'https://x.com/1', 'A tweet', 'twitter', '2026-01-01T00:00:00Z')
-    `).run()
-    seed.prepare("INSERT INTO capture_connectors (capture_id, connector_id) VALUES (1, 'twitter-bookmarks')").run()
-    seed.prepare("INSERT INTO connector_sync_state (connector_id) VALUES ('twitter-bookmarks')").run()
+    `)
+      .run()
+    seed
+      .prepare(
+        "INSERT INTO capture_connectors (capture_id, connector_id) VALUES (1, 'twitter-bookmarks')",
+      )
+      .run()
+    seed
+      .prepare("INSERT INTO connector_sync_state (connector_id) VALUES ('twitter-bookmarks')")
+      .run()
 
     seed.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('session', 'sess-uuid')").run()
     seed.prepare("INSERT INTO stars (item_type, item_uuid) VALUES ('capture', 'cap-uuid')").run()
@@ -149,11 +164,15 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(dbModule.getInitialUserVersion()).toBe(4)
 
     // user_version bumped past 5 (current head is 6)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(5)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(5)
 
     // Connector tables and FTS gone
-    const tablesAfter = db.prepare("SELECT name FROM sqlite_master WHERE type='table' OR type='virtual'").all() as Array<{ name: string }>
-    const tableNames = new Set(tablesAfter.map(r => r.name))
+    const tablesAfter = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' OR type='virtual'")
+      .all() as Array<{ name: string }>
+    const tableNames = new Set(tablesAfter.map((r) => r.name))
     expect(tableNames.has('captures')).toBe(false)
     expect(tableNames.has('captures_fts')).toBe(false)
     expect(tableNames.has('captures_fts_trigram')).toBe(false)
@@ -162,7 +181,13 @@ describe('migration v5 (connector subsystem removal)', () => {
 
     // 'connector' source row also dropped
     const sources = db.prepare('SELECT name FROM sources').all() as Array<{ name: string }>
-    expect(sources.map(s => s.name).sort()).toEqual(['claude', 'codex', 'gemini', 'opencode', 'pi'])
+    expect(sources.map((s) => s.name).sort()).toEqual([
+      'claude',
+      'codex',
+      'gemini',
+      'opencode',
+      'pi',
+    ])
 
     // After v7: stars dropped, session star preserved as pin, capture star gone
     expect(tableNames.has('stars')).toBe(false)
@@ -171,7 +196,9 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(pins).toEqual([{ session_uuid: 'sess-uuid' }])
 
     // Session itself still there
-    const sess = db.prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'").get() as { session_uuid: string }
+    const sess = db
+      .prepare("SELECT session_uuid FROM sessions WHERE session_uuid='sess-uuid'")
+      .get() as { session_uuid: string }
     expect(sess.session_uuid).toBe('sess-uuid')
 
     db.close()
@@ -188,7 +215,9 @@ describe('migration v5 (connector subsystem removal)', () => {
     expect(dbModule.wasNewDb()).toBe(true)
     expect(dbModule.getInitialUserVersion()).toBe(0)
 
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(7)
 
     // Fresh install lands on v7 schema: pins exists, stars dropped
     db.prepare('INSERT INTO pins (session_uuid) VALUES (?)').run('x')

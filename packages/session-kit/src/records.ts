@@ -6,8 +6,8 @@ const textEncoder = new TextEncoder()
 export function splitRecords(jsonl: string): string[] {
   return jsonl
     .split('\n')
-    .map(line => line.endsWith('\r') ? line.slice(0, -1) : line)
-    .filter(line => line.trim().length > 0)
+    .map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line))
+    .filter((line) => line.trim().length > 0)
 }
 
 export async function canonicalizeRecord(
@@ -37,17 +37,23 @@ function serializeCanonical(value: JsonValue): string {
   }
 
   if (Array.isArray(value)) {
-    return `[${value.map(item => serializeCanonical(item)).join(',')}]`
+    return `[${value.map((item) => serializeCanonical(item)).join(',')}]`
   }
 
   const keys = Object.keys(value).sort()
-  return `{${keys.map(key => {
-    assertUnicodeScalarString(key)
-    return `${JSON.stringify(key)}:${serializeCanonical(value[key] as JsonValue)}`
-  }).join(',')}}`
+  return `{${keys
+    .map((key) => {
+      assertUnicodeScalarString(key)
+      return `${JSON.stringify(key)}:${serializeCanonical(value[key] as JsonValue)}`
+    })
+    .join(',')}}`
 }
 
-function rewriteOccurrence(data: string, original: string | undefined, replacement: string): string {
+function rewriteOccurrence(
+  data: string,
+  original: string | undefined,
+  replacement: string,
+): string {
   if (!original) return data
   assertUnicodeScalarString(original)
 
@@ -61,7 +67,8 @@ function assertUnicodeScalarString(value: string): void {
     const code = value.charCodeAt(index)
     if (code >= 0xd800 && code <= 0xdbff) {
       const next = value.charCodeAt(index + 1)
-      if (next < 0xdc00 || next > 0xdfff) throw new TypeError('JCS strings cannot contain lone surrogates')
+      if (next < 0xdc00 || next > 0xdfff)
+        throw new TypeError('JCS strings cannot contain lone surrogates')
       index += 1
     } else if (code >= 0xdc00 && code <= 0xdfff) {
       throw new TypeError('JCS strings cannot contain lone surrogates')

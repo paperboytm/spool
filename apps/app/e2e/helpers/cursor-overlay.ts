@@ -99,7 +99,11 @@ async function centerOf(window: Page, selector: string): Promise<{ x: number; y:
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
-export async function cursorTo(window: Page, selector: string, opts: MoveOptions = {}): Promise<void> {
+export async function cursorTo(
+  window: Page,
+  selector: string,
+  opts: MoveOptions = {},
+): Promise<void> {
   const { x, y } = await centerOf(window, selector)
   await window.mouse.move(x, y, { steps: opts.steps ?? 16 })
   if (opts.settle) await window.waitForTimeout(opts.settle)

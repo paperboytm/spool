@@ -10,7 +10,7 @@ export default function Hint({ keys, label }: Props) {
       {keys.map((k, i) => (
         <kbd
           key={i}
-          className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted"
+          className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-muted dark:text-dark-muted rounded border px-1 py-px font-mono text-[9.5px]"
         >
           {k}
         </kbd>

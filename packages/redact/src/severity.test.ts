@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { severityOf, HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS } from './severity.js'
 
 describe('severity', () => {

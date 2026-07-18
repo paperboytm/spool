@@ -1,19 +1,6 @@
-import { ipcMain, net } from 'electron'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { getDB, getSessionWithMessages } from '@spool-lab/core'
-import {
-  canonicalizeRecord,
-  parseClaudeSessionText,
-  parseCodexSessionLines,
-} from '@spool-lab/session-kit'
-// Type-only: share-kit's runtime bundle needs a DOM at import time and
-// must never be required from the main process. The document is
-// constructed as plain JSON matching the .spool v2 shape; sanitization
-// runs through @spool-lab/redact directly (the same detectors share-kit's
-// redact pipeline wraps).
-import type { SpoolDocument } from '@spool/share-kit'
-import { detectSensitiveSpans, maskValueByKind } from '@spool-lab/redact'
+
 import {
   HubClient,
   HubHttpError,
@@ -26,13 +13,24 @@ import {
   type PreparedShare,
   type WorkspaceCard,
 } from '@spool-lab/cli/hub'
+import { getDB, getSessionWithMessages } from '@spool-lab/core'
+import { detectSensitiveSpans, maskValueByKind } from '@spool-lab/redact'
+import {
+  canonicalizeRecord,
+  parseClaudeSessionText,
+  parseCodexSessionLines,
+} from '@spool-lab/session-kit'
+// Type-only: share-kit's runtime bundle needs a DOM at import time and
+// must never be required from the main process. The document is
+// constructed as plain JSON matching the .spool v2 shape; sanitization
+// runs through @spool-lab/redact directly (the same detectors share-kit's
+// redact pipeline wraps).
+import type { SpoolDocument } from '@spool/share-kit'
+import { ipcMain, net } from 'electron'
 
+import type { HubSharePrepareResult, HubSharePublishResult } from '../../shared/hub-share.js'
 import { loadToken } from '../auth/session-store.js'
 import { backendUrl } from '../share/backend-url.js'
-import type {
-  HubSharePrepareResult,
-  HubSharePublishResult,
-} from '../../shared/hub-share.js'
 
 // One-click share to the hub: the same pipeline `spool share` runs, driven
 // from the app. Auth is the app's existing sign-in session — the hub
@@ -71,7 +69,9 @@ function resolveTargetFromIndex(sessionUuid: string) {
   if (!found) throw new Error(`Session not found in the local index: ${sessionUuid}`)
   const { session } = found
   if (session.source !== 'claude' && session.source !== 'codex') {
-    throw new Error(`Sharing ${session.source} sessions is not supported yet (claude and codex only)`)
+    throw new Error(
+      `Sharing ${session.source} sessions is not supported yet (claude and codex only)`,
+    )
   }
   if (session.filePath.startsWith('spool:')) {
     throw new Error('This session has no provider file on disk yet')
@@ -84,10 +84,7 @@ function resolveTargetFromIndex(sessionUuid: string) {
   }
 }
 
-async function prepareEntry(
-  sessionUuid: string,
-  deps: HubShareIpcDeps,
-): Promise<PreparedEntry> {
+async function prepareEntry(sessionUuid: string, deps: HubShareIpcDeps): Promise<PreparedEntry> {
   const resolveTarget = deps.resolveTarget ?? resolveTargetFromIndex
   const target = resolveTarget(sessionUuid)
   const workspaceRoot = detectWorkspaceRoot(target.cwd ?? process.cwd())
@@ -118,16 +115,19 @@ async function buildAttachedSpoolFile(
   target: { provider: 'claude' | 'codex'; sessionUuid: string; filePath: string },
   jsonl: string,
 ): Promise<{ oid: string; data: string } | null> {
-  const result = target.provider === 'claude'
-    ? parseClaudeSessionText(jsonl, target.filePath)
-    : parseCodexSessionLines(jsonl.split('\n'), target.filePath)
+  const result =
+    target.provider === 'claude'
+      ? parseClaudeSessionText(jsonl, target.filePath)
+      : parseCodexSessionLines(jsonl.split('\n'), target.filePath)
   if (result.kind !== 'parsed') return null
 
   const turns = result.session.messages
-    .filter((message) =>
-      !message.isSidechain
-      && (message.role === 'user' || message.role === 'assistant')
-      && message.contentText.trim() !== '')
+    .filter(
+      (message) =>
+        !message.isSidechain &&
+        (message.role === 'user' || message.role === 'assistant') &&
+        message.contentText.trim() !== '',
+    )
     .map((message) => ({
       role: message.role as 'user' | 'assistant',
       body: sanitizeBody(message.contentText),
@@ -181,8 +181,9 @@ async function buildAttachedSpoolFile(
 function sanitizeBody(body: string): string {
   const matches = detectSensitiveSpans(body)
   if (matches.length === 0) return body
-  const literals = [...new Set(matches.map((match) => match.value))]
-    .sort((a, b) => b.length - a.length)
+  const literals = [...new Set(matches.map((match) => match.value))].sort(
+    (a, b) => b.length - a.length,
+  )
   let out = body
   for (const literal of literals) {
     const kind = matches.find((match) => match.value === literal)?.kind
@@ -193,73 +194,80 @@ function sanitizeBody(body: string): string {
 }
 
 export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
-  ipcMain.handle('hub-share:prepare', async (_e, args: { sessionUuid: string }): Promise<HubSharePrepareResult> => {
-    try {
-      const { prepared, card } = await prepareEntry(args.sessionUuid, deps)
-      const secrets = scanRecordsForSecrets(prepared.records.map((record) => record.data))
-      return {
-        ok: true,
-        prepared: {
-          sid: prepared.sid,
+  ipcMain.handle(
+    'hub-share:prepare',
+    async (_e, args: { sessionUuid: string }): Promise<HubSharePrepareResult> => {
+      try {
+        const { prepared, card } = await prepareEntry(args.sessionUuid, deps)
+        const secrets = scanRecordsForSecrets(prepared.records.map((record) => record.data))
+        return {
+          ok: true,
+          prepared: {
+            sid: prepared.sid,
+            count: prepared.count,
+            files: prepared.view.diffstat.files,
+            adds: prepared.view.diffstat.adds,
+            dels: prepared.view.diffstat.dels,
+            secrets: { total: secrets.total, high: secrets.high, byKind: secrets.byKind },
+            notePrefill: buildNotePrefill({ view: prepared.view, card, count: prepared.count }),
+          },
+        }
+      } catch (cause) {
+        return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'hub-share:publish',
+    async (_e, args: { sessionUuid: string; note: string }): Promise<HubSharePublishResult> => {
+      try {
+        const token = (deps.loadTokenFn ?? loadToken)()
+        if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
+
+        const entry =
+          preparedCache.get(args.sessionUuid) ?? (await prepareEntry(args.sessionUuid, deps))
+        const { prepared, card, spoolFile } = entry
+
+        const client = new HubClient({
+          hubUrl: backendUrl(),
+          token,
+          fetch: deps.fetchFn ?? defaultFetch,
+        })
+
+        const head = {
+          root: prepared.root,
           count: prepared.count,
-          files: prepared.view.diffstat.files,
-          adds: prepared.view.diffstat.adds,
-          dels: prepared.view.diffstat.dels,
-          secrets: { total: secrets.total, high: secrets.high, byKind: secrets.byKind },
-          notePrefill: buildNotePrefill({ view: prepared.view, card, count: prepared.count }),
-        },
+          manifest: prepared.manifest,
+          sig: null,
+          cardJson: card === null ? null : JSON.stringify(card),
+          noteMd: args.note.trim() === '' ? null : args.note,
+          lineageJson: prepared.lineageJson,
+          viewOid: prepared.viewOid,
+          spoolFileOid: spoolFile === null ? null : spoolFile.oid,
+        }
+
+        const { missing } = await client.pushSession(prepared.sid, head)
+        const missingSet = new Set(missing)
+        const uploads = [
+          ...prepared.records.map((record) => ({ oid: record.oid, data: record.data })),
+          { oid: prepared.viewOid, data: prepared.viewData },
+          ...(spoolFile === null ? [] : [spoolFile]),
+        ].filter((object) => missingSet.has(object.oid))
+
+        for (const batch of chunkUploads(uploads)) {
+          await client.uploadObjects(batch)
+        }
+
+        const { url } = await client.commitSessionHead(prepared.sid, head)
+        preparedCache.delete(args.sessionUuid)
+        return { ok: true, url }
+      } catch (cause) {
+        if (cause instanceof HubHttpError && cause.status === 401) {
+          return { ok: false, error: 'UNAUTHENTICATED' }
+        }
+        return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
       }
-    } catch (cause) {
-      return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
-    }
-  })
-
-  ipcMain.handle('hub-share:publish', async (_e, args: { sessionUuid: string; note: string }): Promise<HubSharePublishResult> => {
-    try {
-      const token = (deps.loadTokenFn ?? loadToken)()
-      if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
-
-      const entry = preparedCache.get(args.sessionUuid) ?? await prepareEntry(args.sessionUuid, deps)
-      const { prepared, card, spoolFile } = entry
-
-      const client = new HubClient({
-        hubUrl: backendUrl(),
-        token,
-        fetch: deps.fetchFn ?? defaultFetch,
-      })
-
-      const head = {
-        root: prepared.root,
-        count: prepared.count,
-        manifest: prepared.manifest,
-        sig: null,
-        cardJson: card === null ? null : JSON.stringify(card),
-        noteMd: args.note.trim() === '' ? null : args.note,
-        lineageJson: prepared.lineageJson,
-        viewOid: prepared.viewOid,
-        spoolFileOid: spoolFile === null ? null : spoolFile.oid,
-      }
-
-      const { missing } = await client.pushSession(prepared.sid, head)
-      const missingSet = new Set(missing)
-      const uploads = [
-        ...prepared.records.map((record) => ({ oid: record.oid, data: record.data })),
-        { oid: prepared.viewOid, data: prepared.viewData },
-        ...(spoolFile === null ? [] : [spoolFile]),
-      ].filter((object) => missingSet.has(object.oid))
-
-      for (const batch of chunkUploads(uploads)) {
-        await client.uploadObjects(batch)
-      }
-
-      const { url } = await client.commitSessionHead(prepared.sid, head)
-      preparedCache.delete(args.sessionUuid)
-      return { ok: true, url }
-    } catch (cause) {
-      if (cause instanceof HubHttpError && cause.status === 401) {
-        return { ok: false, error: 'UNAUTHENTICATED' }
-      }
-      return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
-    }
-  })
+    },
+  )
 }

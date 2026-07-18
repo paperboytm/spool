@@ -12,10 +12,11 @@
 // loading → ready / loading → failed transition surfaces without a
 // page refresh.
 
-import { useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Sparkles, AlertTriangle, Loader2, Shield } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { securityApi, type PfRuntimeInfo } from '../../api/security.js'
 
 export default function DetectorsChip({ profile }: { profile: string | null }) {
@@ -26,15 +27,23 @@ export default function DetectorsChip({ profile }: { profile: string | null }) {
   const regexVersion = profile?.match(/regex@(\d+)/)?.[1] ?? null
 
   useEffect(() => {
-    if (!hasPf) { setPfRuntime(null); return }
+    if (!hasPf) {
+      setPfRuntime(null)
+      return
+    }
     let cancelled = false
     const tick = async () => {
       const info = await securityApi.pfGetRuntimeInfo().catch(() => null)
       if (!cancelled) setPfRuntime(info)
     }
     void tick()
-    const id = setInterval(() => { void tick() }, 3000)
-    return () => { cancelled = true; clearInterval(id) }
+    const id = setInterval(() => {
+      void tick()
+    }, 3000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
   }, [hasPf])
 
   if (!profile) return null
@@ -63,18 +72,22 @@ export default function DetectorsChip({ profile }: { profile: string | null }) {
 }
 
 function DetectorPill({
-  label, meta, tone, icon,
+  label,
+  meta,
+  tone,
+  icon,
 }: {
   label: string
   meta: string | null
   tone: 'active' | 'loading' | 'failed'
   icon: React.ReactNode
 }) {
-  const palette = tone === 'failed'
-    ? 'text-accent dark:text-accent-dark border-accent/40 dark:border-accent-dark/40'
-    : tone === 'loading'
-      ? 'text-warm-muted dark:text-dark-muted border-warm-border dark:border-dark-border'
-      : 'text-warm-muted dark:text-dark-muted border-warm-border dark:border-dark-border'
+  const palette =
+    tone === 'failed'
+      ? 'text-accent dark:text-accent-dark border-accent/40 dark:border-accent-dark/40'
+      : tone === 'loading'
+        ? 'text-warm-muted dark:text-dark-muted border-warm-border dark:border-dark-border'
+        : 'text-warm-muted dark:text-dark-muted border-warm-border dark:border-dark-border'
   return (
     <span
       data-tone={tone}
@@ -82,28 +95,23 @@ function DetectorPill({
       // typography exactly — sans-at-same-px optically reads bigger
       // than the mono digits next to it, which made the chips bulge
       // out of the row.
-      className={`inline-flex items-center gap-[3px] h-[18px] px-1.5 rounded-[4px] border bg-warm-surface dark:bg-dark-surface font-mono text-[10px] ${palette}`}
+      className={`bg-warm-surface dark:bg-dark-surface inline-flex h-[18px] items-center gap-[3px] rounded-[4px] border px-1.5 font-mono text-[10px] ${palette}`}
     >
       {icon}
       <span>{label}</span>
-      {meta && (
-        <span className="text-warm-faint dark:text-dark-muted tabular-nums">{meta}</span>
-      )}
+      {meta && <span className="text-warm-faint dark:text-dark-muted tabular-nums">{meta}</span>}
     </span>
   )
 }
 
 function pfTone(info: PfRuntimeInfo | null): 'active' | 'loading' | 'failed' {
-  if (!info) return 'loading'  // null = host not yet running
+  if (!info) return 'loading' // null = host not yet running
   if (info.status === 'failed') return 'failed'
   if (info.status === 'ready') return 'active'
   return 'loading'
 }
 
-function pfMetaText(
-  info: PfRuntimeInfo | null,
-  t: TFunction,
-): string | null {
+function pfMetaText(info: PfRuntimeInfo | null, t: TFunction): string | null {
   if (!info) return t('security.detector_pf_runtime_loading', { defaultValue: 'starting…' })
   if (info.status === 'ready') {
     return info.runtime === 'webgpu'

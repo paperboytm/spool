@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
 import type { ShareDraftListItem, ShareDraftRow } from '@spool-lab/core'
+import { useCallback, useEffect, useState } from 'react'
 
 interface UseShareDraftsResult {
   drafts: ShareDraftListItem[]
@@ -43,33 +43,39 @@ export function useShareDrafts(opts: { limit?: number } = {}): UseShareDraftsRes
     void refresh()
   }, [refresh])
 
-  const removeDraft = useCallback(async (draftId: string): Promise<ShareDraftRow | null> => {
-    // Fetch the full row first so the caller can offer Undo with the
-    // snapshot intact. listShareDrafts omits snapshot_json on purpose.
-    const full = await window.spool.shareDraft.get(draftId)
-    if (!full) return null
-    setDrafts(prev => prev.filter(d => d.draft_id !== draftId))
-    try {
-      await window.spool.shareDraft.delete(draftId)
-      return full
-    } catch (err) {
-      // Roll back the optimistic remove if the delete itself failed.
-      void refresh()
-      throw err
-    }
-  }, [refresh])
+  const removeDraft = useCallback(
+    async (draftId: string): Promise<ShareDraftRow | null> => {
+      // Fetch the full row first so the caller can offer Undo with the
+      // snapshot intact. listShareDrafts omits snapshot_json on purpose.
+      const full = await window.spool.shareDraft.get(draftId)
+      if (!full) return null
+      setDrafts((prev) => prev.filter((d) => d.draft_id !== draftId))
+      try {
+        await window.spool.shareDraft.delete(draftId)
+        return full
+      } catch (err) {
+        // Roll back the optimistic remove if the delete itself failed.
+        void refresh()
+        throw err
+      }
+    },
+    [refresh],
+  )
 
-  const restoreDraft = useCallback(async (row: ShareDraftRow): Promise<void> => {
-    await window.spool.shareDraft.upsert({
-      draft_id: row.draft_id,
-      source_kind: row.source_kind,
-      source_origin: row.source_origin,
-      title: row.title,
-      snapshot_json: row.snapshot_json,
-      preview_json: row.preview_json,
-    })
-    await refresh()
-  }, [refresh])
+  const restoreDraft = useCallback(
+    async (row: ShareDraftRow): Promise<void> => {
+      await window.spool.shareDraft.upsert({
+        draft_id: row.draft_id,
+        source_kind: row.source_kind,
+        source_origin: row.source_origin,
+        title: row.title,
+        snapshot_json: row.snapshot_json,
+        preview_json: row.preview_json,
+      })
+      await refresh()
+    },
+    [refresh],
+  )
 
   return { drafts, loading, error, refresh, removeDraft, restoreDraft }
 }
@@ -87,10 +93,17 @@ export function useDraftCountForSession(sessionUuid: string): number {
 
   useEffect(() => {
     let cancelled = false
-    window.spool.shareDraft.countBySession(sessionUuid)
-      .then((n) => { if (!cancelled) setCount(n) })
-      .catch(() => { if (!cancelled) setCount(0) })
-    return () => { cancelled = true }
+    window.spool.shareDraft
+      .countBySession(sessionUuid)
+      .then((n) => {
+        if (!cancelled) setCount(n)
+      })
+      .catch(() => {
+        if (!cancelled) setCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [sessionUuid])
 
   return count

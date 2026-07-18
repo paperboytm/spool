@@ -1,12 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import {
-  COLORWAYS,
-  DEFAULT_OPTS,
-  PAPERS,
-  TEMPLATES,
-  TYPEFACES,
-  normalizeOpts,
-} from './types'
+import { describe, expect, it } from 'vite-plus/test'
+
+import { COLORWAYS, DEFAULT_OPTS, PAPERS, TEMPLATES, TYPEFACES, normalizeOpts } from './types'
 
 describe('curated option lists match the app picker (4 of each)', () => {
   // The app surfaces exactly 4 options for each axis. share-kit's

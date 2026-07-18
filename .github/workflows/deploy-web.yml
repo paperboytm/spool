@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/web/**"
-      - "packages/session-kit/**"
-      - "packages/session-view/**"
-      - "packages/share-kit/**"
-      - ".github/workflows/deploy-web.yml"
+      - 'apps/web/**'
+      - 'packages/session-kit/**'
+      - 'packages/session-view/**'
+      - 'packages/share-kit/**'
+      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
       # libraries it imports (@spool/share-kit, @spool-lab/session-*)
       # ship dist/ artifacts that must exist first.
       - name: Build workspace dependencies
-        run: pnpm turbo run build --filter=@spool/web^...
+        run: pnpm vp run --filter '@spool/web^...' build
 
       - name: Deploy to Void
         env:

@@ -61,14 +61,17 @@ export type {
 export { scanSession, ScanError } from './scan.js'
 export type { ScanResult, ScanSessionDeps } from './scan.js'
 
-export { purgeFinding, purgeFindings, purgeEverywhere, orderForBulkPurge, PurgeError } from './purge.js'
+export {
+  purgeFinding,
+  purgeFindings,
+  purgeEverywhere,
+  orderForBulkPurge,
+  PurgeError,
+} from './purge.js'
 export type { PurgeResult, PurgeDeps } from './purge.js'
 
 export { makeScanWorker, waitForIdle } from './worker.js'
 export type { ScanWorker, WorkerConfig } from './worker.js'
 
 export { listBackups, deleteBackups, backupDirFor } from './maintenance.js'
-export type {
-  BackupFileInfo,
-  DeleteBackupsResult,
-} from './maintenance.js'
+export type { BackupFileInfo, DeleteBackupsResult } from './maintenance.js'

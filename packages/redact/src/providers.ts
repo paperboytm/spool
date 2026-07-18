@@ -44,8 +44,8 @@
 //   • In the Settings panel, gate behind a toggle showing model
 //     size, where the file lives, and how to delete it
 
-import type { SensitiveMatch } from './types.js'
 import { detectWithRegex } from './detectors.js'
+import type { SensitiveMatch } from './types.js'
 
 export interface RedactProvider {
   /** Stable identifier used in `SensitiveMatch.provider` and shown
@@ -79,7 +79,9 @@ export async function analyzeWith(
 ): Promise<SensitiveMatch[]> {
   if (providers.length === 0) return []
   const lists = await Promise.all(
-    providers.map((p) => (p.available() ? p.analyze(text) : Promise.resolve([] as SensitiveMatch[]))),
+    providers.map((p) =>
+      p.available() ? p.analyze(text) : Promise.resolve([] as SensitiveMatch[]),
+    ),
   )
   const claimed: { start: number; end: number }[] = []
   const out: SensitiveMatch[] = []

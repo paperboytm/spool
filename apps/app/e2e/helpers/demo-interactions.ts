@@ -17,13 +17,16 @@ export type UpdateStatusPayload =
  * Push an updater-state IPC event into the renderer so the Auto-update banner
  * paints the requested state without needing a real download cycle.
  */
-export async function emitUpdateStatus(app: ElectronApplication, payload: UpdateStatusPayload): Promise<void> {
+export async function emitUpdateStatus(
+  app: ElectronApplication,
+  payload: UpdateStatusPayload,
+): Promise<void> {
   await app.evaluate(async ({ BrowserWindow }, data) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) throw new Error('No Electron window found')
     win.webContents.send('spool:update-status', data)
   }, payload)
-  await new Promise(resolve => setTimeout(resolve, 200))
+  await new Promise((resolve) => setTimeout(resolve, 200))
 }
 
 /**
@@ -32,7 +35,10 @@ export async function emitUpdateStatus(app: ElectronApplication, payload: Update
  * assertions.
  */
 export async function pinFirstRowInProject(window: Page, projectName: string): Promise<string> {
-  const projectRow = window.locator('[data-testid="sidebar-project-row"]').filter({ hasText: projectName }).first()
+  const projectRow = window
+    .locator('[data-testid="sidebar-project-row"]')
+    .filter({ hasText: projectName })
+    .first()
   await expect(projectRow).toBeVisible({ timeout: 5000 })
   await projectRow.click()
   const sessionRow = window.locator('[data-testid="session-row"]').first()

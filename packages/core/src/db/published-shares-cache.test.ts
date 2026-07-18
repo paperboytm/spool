@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import type { PublishedShareCacheItem } from './published-shares-cache.js'
 
 const tempDirs: string[] = []
@@ -36,9 +38,12 @@ function row(over: Partial<PublishedShareCacheItem> & { id: string }): Published
 describe('published_shares_cache schema (v15)', () => {
   it('creates the table with expected columns and pk', async () => {
     const { db } = await load()
-    const columns = db
-      .prepare('PRAGMA table_info(published_shares_cache)')
-      .all() as Array<{ name: string; type: string; notnull: number; pk: number }>
+    const columns = db.prepare('PRAGMA table_info(published_shares_cache)').all() as Array<{
+      name: string
+      type: string
+      notnull: number
+      pk: number
+    }>
     const byName = new Map(columns.map((c) => [c.name, c]))
     expect(byName.get('id')?.pk).toBe(1)
     expect(byName.get('visibility')?.notnull).toBe(1)
@@ -51,7 +56,9 @@ describe('published_shares_cache schema (v15)', () => {
   it('creates the draft_id partial index', async () => {
     const { db } = await load()
     const idx = db
-      .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='published_shares_cache'`)
+      .prepare(
+        `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='published_shares_cache'`,
+      )
       .all() as Array<{ name: string }>
     const names = idx.map((i) => i.name)
     expect(names).toContain('idx_published_shares_cache_draft_id')
@@ -67,7 +74,13 @@ describe('published_shares_cache schema (v15)', () => {
     const { db, mod } = await load()
     mod.upsertMany(db, [
       row({ id: 'a', title: 'A', published_at: 100, updated_at: 100 }),
-      row({ id: 'b', title: 'B', visibility: 'profile-listed', published_at: 200, updated_at: 200 }),
+      row({
+        id: 'b',
+        title: 'B',
+        visibility: 'profile-listed',
+        published_at: 200,
+        updated_at: 200,
+      }),
       row({ id: 'c', title: 'C', version: 2, published_at: 150, revoked_at: 175, updated_at: 200 }),
     ])
     const rows = mod.listAll(db)
@@ -79,7 +92,15 @@ describe('published_shares_cache schema (v15)', () => {
     const { db, mod } = await load()
     mod.upsertMany(db, [row({ id: 'x', title: 'first', published_at: 100, updated_at: 100 })])
     mod.upsertMany(db, [
-      row({ id: 'x', title: 'second', visibility: 'profile-listed', version: 2, published_at: 100, revoked_at: 999, updated_at: 999 }),
+      row({
+        id: 'x',
+        title: 'second',
+        visibility: 'profile-listed',
+        version: 2,
+        published_at: 100,
+        revoked_at: 999,
+        updated_at: 999,
+      }),
     ])
     const rows = mod.listAll(db)
     expect(rows).toHaveLength(1)

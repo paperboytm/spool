@@ -10,7 +10,8 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
     const token =
       readCookie(ctx.request, COOKIE_NAME) ??
-      (ctx.request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null)
+      ctx.request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
+      null
     if (token) await destroySession(ctx.env.SESSIONS, token)
     const headers = new Headers({ 'content-type': 'application/json' })
     headers.append('Set-Cookie', clearCookie(COOKIE_NAME))

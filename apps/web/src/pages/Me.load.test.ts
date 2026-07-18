@@ -1,10 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
-import type {
-  MeFetchResult,
-  MeResponse,
-  MySharesFetchResult,
-} from '../lib/api'
+import type { MeFetchResult, MeResponse, MySharesFetchResult } from '../lib/api'
 import { resolveLoadOutcome } from './Me'
 
 const ME: MeResponse = {
@@ -20,9 +16,9 @@ const meOk: MeFetchResult = { kind: 'ok', me: ME }
 
 describe('resolveLoadOutcome', () => {
   it('redirects when /api/me is unauthenticated', () => {
-    expect(
-      resolveLoadOutcome({ kind: 'unauthenticated' }, { kind: 'ok', shares: [] }),
-    ).toEqual({ kind: 'redirect' })
+    expect(resolveLoadOutcome({ kind: 'unauthenticated' }, { kind: 'ok', shares: [] })).toEqual({
+      kind: 'redirect',
+    })
   })
 
   it('surfaces an error when /api/me fails', () => {

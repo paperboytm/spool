@@ -1,3 +1,7 @@
+import { execFileSync, spawn } from 'node:child_process'
+import { mkdirSync, rmSync } from 'node:fs'
+import { dirname } from 'node:path'
+
 /**
  * macOS-only helpers for capturing the Spool Electron window as a real OS window
  * (with traffic lights, rounded corners, shadow — not the WebContents-only
@@ -7,9 +11,6 @@
  * e2e suite. Requires `swift` and `screencapture` on PATH (Xcode CLT).
  */
 import type { ElectronApplication } from '@playwright/test'
-import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
-import { dirname } from 'node:path'
 
 export interface NativeWindowInfo {
   id: string
@@ -91,15 +92,19 @@ if let best {
 }
 `
 
-  const raw = execFileSync('swift', [
-    '-e',
-    swiftScript,
-    String(meta.pid),
-    String(meta.width),
-    String(meta.height),
-    String(meta.x),
-    String(meta.y),
-  ], { encoding: 'utf8' }).trim()
+  const raw = execFileSync(
+    'swift',
+    [
+      '-e',
+      swiftScript,
+      String(meta.pid),
+      String(meta.width),
+      String(meta.height),
+      String(meta.x),
+      String(meta.y),
+    ],
+    { encoding: 'utf8' },
+  ).trim()
 
   return JSON.parse(raw) as NativeWindowInfo
 }
@@ -108,7 +113,10 @@ if let best {
  * Capture a single PNG of the native window (includes traffic lights + rounded
  * corners + shadow). Output path is created if missing.
  */
-export async function captureNativeWindow(app: ElectronApplication, outputPath: string): Promise<void> {
+export async function captureNativeWindow(
+  app: ElectronApplication,
+  outputPath: string,
+): Promise<void> {
   await app.evaluate(async ({ app: electronApp, BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) throw new Error('No Electron window found')
@@ -158,10 +166,10 @@ export async function recordNativeWindow(
 
   await new Promise<void>((resolve, reject) => {
     let stderr = ''
-    proc.stderr?.on('data', chunk => {
+    proc.stderr?.on('data', (chunk) => {
       stderr += String(chunk)
     })
-    proc.on('close', code => {
+    proc.on('close', (code) => {
       if (code === 0) {
         resolve()
         return

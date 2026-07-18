@@ -2,13 +2,12 @@
 // stub fetch per-call; the callback tests run the real handler against
 // the in-memory fakes (plumbing edges live in endpoints.test.ts).
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { onRequestGet as callbackGet } from '../functions/api/auth/[provider]/callback'
 import { onRequestGet as startGet } from '../functions/api/auth/[provider]/start'
 import { workosProvider } from '../src/auth/providers/workos'
 import { upsertUserByIdentity } from '../src/store/d1'
-
 import { getSetCookies, invoke } from './_helpers/ctx'
 import { makeDb, makeKv, emptyState, type FakeDbState } from './_helpers/fakes'
 
@@ -49,16 +48,12 @@ describe('workosProvider.buildAuthRequestUrl', () => {
         ENV,
       ),
     )
-    expect(url.origin + url.pathname).toBe(
-      'https://api.workos.com/user_management/authorize',
-    )
+    expect(url.origin + url.pathname).toBe('https://api.workos.com/user_management/authorize')
     expect(url.searchParams.get('client_id')).toBe('client_123')
     expect(url.searchParams.get('provider')).toBe('authkit')
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('state')).toBe('S1')
-    expect(url.searchParams.get('redirect_uri')).toBe(
-      'https://spool.pro/api/auth/workos/callback',
-    )
+    expect(url.searchParams.get('redirect_uri')).toBe('https://spool.pro/api/auth/workos/callback')
     // Confidential client: the PKCE challenge from /start must NOT be
     // forwarded — WorkOS rejects mixing code_challenge with client_secret.
     expect(url.searchParams.get('code_challenge')).toBeNull()
@@ -113,9 +108,7 @@ describe('workosProvider.exchangeCode', () => {
   })
 
   it('FORBIDDEN on a non-2xx exchange', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ error: 'invalid_grant' }, 400),
-    )
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400))
     await expect(
       workosProvider.exchangeCode(
         { code: 'bad', codeVerifier: 'v', redirectUri: 'https://x/cb' },
@@ -150,19 +143,15 @@ describe('workosProvider.resolveAliasIdentities', () => {
     const refs = await workosProvider.resolveAliasIdentities!('user_wos_1', ENV)
     expect(refs).toEqual([{ provider: 'google', sub: 'g-sub-9' }])
     const [url, init] = fetchSpy.mock.calls[0]! as [string, RequestInit]
-    expect(url).toBe(
-      'https://api.workos.com/user_management/users/user_wos_1/identities',
-    )
-    expect(new Headers(init.headers).get('authorization')).toBe(
-      'Bearer sk_test_abc',
-    )
+    expect(url).toBe('https://api.workos.com/user_management/users/user_wos_1/identities')
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer sk_test_abc')
   })
 
   it('propagates failure instead of failing open', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, 500))
-    await expect(
-      workosProvider.resolveAliasIdentities!('user_wos_1', ENV),
-    ).rejects.toThrow(/identities/)
+    await expect(workosProvider.resolveAliasIdentities!('user_wos_1', ENV)).rejects.toThrow(
+      /identities/,
+    )
   })
 })
 
@@ -275,9 +264,7 @@ describe('workos web flow endpoints', () => {
     const res = await invoke(startGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     const loc = new URL(res.headers.get('location') ?? '')
-    expect(loc.origin + loc.pathname).toBe(
-      'https://api.workos.com/user_management/authorize',
-    )
+    expect(loc.origin + loc.pathname).toBe('https://api.workos.com/user_management/authorize')
     expect(loc.searchParams.get('provider')).toBe('authkit')
     const cookies = getSetCookies(res).join('\n')
     expect(cookies).toMatch(/__spool_oauth_state=/)
@@ -314,14 +301,11 @@ describe('workos web flow endpoints', () => {
       throw new Error(`unexpected fetch: ${url}`)
     })
 
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=goodcode&state=S',
-      {
-        headers: {
-          cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
-        },
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=goodcode&state=S', {
+      headers: {
+        cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
       },
-    )
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     expect(res.headers.get('location')).toBe('/me')
@@ -347,14 +331,11 @@ describe('workos web flow endpoints', () => {
       }
       return jsonResponse({}, 500)
     })
-    const req = new Request(
-      'https://spool.pro/api/auth/workos/callback?code=c&state=S',
-      {
-        headers: {
-          cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
-        },
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=c&state=S', {
+      headers: {
+        cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
       },
-    )
+    })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(500)
     expect(env.state.users).toHaveLength(0)

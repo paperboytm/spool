@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import type { Message, Session } from '@spool-lab/core'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { composeFromSession } from './compose-from-session'
 
 const baseSession: Session = {
@@ -20,7 +21,12 @@ const baseSession: Session = {
   projectDisplayName: 'work',
 }
 
-function msg(seq: number, role: Message['role'], body: string, overrides: Partial<Message> = {}): Message {
+function msg(
+  seq: number,
+  role: Message['role'],
+  body: string,
+  overrides: Partial<Message> = {},
+): Message {
   return {
     id: seq,
     sessionId: 1,
@@ -72,19 +78,15 @@ describe('composeFromSession', () => {
   })
 
   it('derives title from first user message when session.title is null', () => {
-    const convo = composeFromSession(
-      { ...baseSession, title: null },
-      [msg(0, 'user', 'Why is the cache stale')],
-    )
+    const convo = composeFromSession({ ...baseSession, title: null }, [
+      msg(0, 'user', 'Why is the cache stale'),
+    ])
     expect(convo.title).toBe('Why is the cache stale')
   })
 
   it('truncates a long derived title with an ellipsis', () => {
     const long = 'a '.repeat(50).trim()
-    const convo = composeFromSession(
-      { ...baseSession, title: null },
-      [msg(0, 'user', long)],
-    )
+    const convo = composeFromSession({ ...baseSession, title: null }, [msg(0, 'user', long)])
     expect(convo.title.endsWith('…')).toBe(true)
     expect(convo.title.length).toBeLessThanOrEqual(60)
   })
@@ -97,14 +99,19 @@ describe('composeFromSession', () => {
   })
 
   it('emits an agent-session origin tagged with source and uuid', () => {
-    expect(composeFromSession(baseSession, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'agent-session', agent: 'claude', sessionUuid: 'sess-1' })
+    expect(composeFromSession(baseSession, [msg(0, 'user', 'x')]).origin).toEqual({
+      kind: 'agent-session',
+      agent: 'claude',
+      sessionUuid: 'sess-1',
+    })
 
-    expect(composeFromSession({ ...baseSession, source: 'gemini' }, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'agent-session', agent: 'gemini', sessionUuid: 'sess-1' })
+    expect(
+      composeFromSession({ ...baseSession, source: 'gemini' }, [msg(0, 'user', 'x')]).origin,
+    ).toEqual({ kind: 'agent-session', agent: 'gemini', sessionUuid: 'sess-1' })
 
-    expect(composeFromSession({ ...baseSession, source: 'codex' }, [msg(0, 'user', 'x')]).origin)
-      .toEqual({ kind: 'agent-session', agent: 'codex', sessionUuid: 'sess-1' })
+    expect(
+      composeFromSession({ ...baseSession, source: 'codex' }, [msg(0, 'user', 'x')]).origin,
+    ).toEqual({ kind: 'agent-session', agent: 'codex', sessionUuid: 'sess-1' })
   })
 
   it('computes word count and read time', () => {
@@ -116,10 +123,9 @@ describe('composeFromSession', () => {
   })
 
   it('returns Untitled when no user message is present', () => {
-    const convo = composeFromSession(
-      { ...baseSession, title: null },
-      [msg(0, 'assistant', 'lonely answer')],
-    )
+    const convo = composeFromSession({ ...baseSession, title: null }, [
+      msg(0, 'assistant', 'lonely answer'),
+    ])
     expect(convo.title).toBe('Untitled')
   })
 })

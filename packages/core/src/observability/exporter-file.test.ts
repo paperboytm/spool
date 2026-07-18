@@ -1,15 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import {
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs'
-import { join } from 'node:path'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { Effect } from 'effect'
+import { describe, it, expect, beforeEach, afterEach } from 'vite-plus/test'
+
 import { RotatingFileSpanExporter, listLogFiles } from './exporter-file.js'
 import { observabilityLayer } from './layer.js'
 
@@ -28,15 +23,21 @@ function makeTempDir(): string {
   return d
 }
 
-async function emitSpan(name: string, attrs: Record<string, unknown>, exporter: RotatingFileSpanExporter): Promise<void> {
+async function emitSpan(
+  name: string,
+  attrs: Record<string, unknown>,
+  exporter: RotatingFileSpanExporter,
+): Promise<void> {
   await Effect.runPromise(
     Effect.succeed(undefined).pipe(
       Effect.withSpan(name, { attributes: attrs }),
-      Effect.provide(observabilityLayer({
-        serviceName: 'test',
-        env: 'test',
-        testExporter: exporter,
-      })),
+      Effect.provide(
+        observabilityLayer({
+          serviceName: 'test',
+          env: 'test',
+          testExporter: exporter,
+        }),
+      ),
     ),
   )
 }
@@ -73,7 +74,7 @@ describe('RotatingFileSpanExporter', () => {
     const content = readFileSync(join(dir, 'spool-2026-05-21.jsonl'), 'utf8')
     const lines = content.trim().split('\n')
     expect(lines).toHaveLength(3)
-    expect(lines.map(l => JSON.parse(l).name)).toEqual(['a', 'b', 'c'])
+    expect(lines.map((l) => JSON.parse(l).name)).toEqual(['a', 'b', 'c'])
   })
 
   it('drops oldest files when total size exceeds the cap', async () => {

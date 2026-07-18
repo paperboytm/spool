@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
 import { sequenceRoot } from '@spool-lab/session-kit'
+import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
 
 import type { HubSharePrepareResult, HubSharePublishResult } from '../../shared/hub-share.js'
 
@@ -54,11 +55,13 @@ function makeHub() {
     const match = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)\/(push|head)$/)
     if (match && method === 'POST') {
       const body = JSON.parse(String(init?.body)) as StoredHead
-      const wanted = [...new Set([
-        ...body.manifest,
-        body.viewOid,
-        ...(body.spoolFileOid ? [body.spoolFileOid] : []),
-      ])]
+      const wanted = [
+        ...new Set([
+          ...body.manifest,
+          body.viewOid,
+          ...(body.spoolFileOid ? [body.spoolFileOid] : []),
+        ]),
+      ]
       const missing = wanted.filter((oid) => !objects.has(oid))
       if (match[2] === 'push') return json({ missing })
       if (missing.length > 0) return json({ error: 'CONFLICT' }, 409)
@@ -74,16 +77,25 @@ const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
 
 function writeFixture(dir: string): string {
   const line = (r: Record<string, unknown>) => JSON.stringify(r)
-  const jsonl = [
-    line({
-      type: 'user', uuid: 'u-1', sessionId: 'orig', cwd: dir, timestamp: '2026-07-16T10:00:00.000Z',
-      message: { role: 'user', content: 'hello, ship the demo. token AKIAABCDEFGHIJKLMNOP' },
-    }),
-    line({
-      type: 'assistant', uuid: 'u-2', parentUuid: 'u-1', sessionId: 'orig', timestamp: '2026-07-16T10:00:05.000Z',
-      message: { role: 'assistant', content: [{ type: 'text', text: 'Shipped.' }] },
-    }),
-  ].join('\n') + '\n'
+  const jsonl =
+    [
+      line({
+        type: 'user',
+        uuid: 'u-1',
+        sessionId: 'orig',
+        cwd: dir,
+        timestamp: '2026-07-16T10:00:00.000Z',
+        message: { role: 'user', content: 'hello, ship the demo. token AKIAABCDEFGHIJKLMNOP' },
+      }),
+      line({
+        type: 'assistant',
+        uuid: 'u-2',
+        parentUuid: 'u-1',
+        sessionId: 'orig',
+        timestamp: '2026-07-16T10:00:05.000Z',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Shipped.' }] },
+      }),
+    ].join('\n') + '\n'
   const filePath = join(dir, 'session.jsonl')
   writeFileSync(filePath, jsonl, 'utf8')
   return filePath
@@ -115,7 +127,9 @@ describe('hub-share IPC', () => {
 
   it('prepare computes counts, diffstat, redact findings, and a note prefill locally', async () => {
     setup()
-    const result = await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
+    const result = await invoke<HubSharePrepareResult>('hub-share:prepare', {
+      sessionUuid: SESSION_UUID,
+    })
     if (!result.ok) throw new Error(result.error)
     expect(result.prepared.sid).toBe(`claude_${SESSION_UUID}`)
     expect(result.prepared.count).toBe(2)

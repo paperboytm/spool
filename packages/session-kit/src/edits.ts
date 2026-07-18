@@ -121,9 +121,10 @@ function claudeEvent(
   workspaceRoot: string | undefined,
 ): EditEvent | null {
   const result = objectAt(resultRecord, 'toolUseResult')
-  const pathValue = call.tool === 'NotebookEdit'
-    ? stringAt(call.input, 'notebook_path')
-    : stringAt(call.input, 'file_path')
+  const pathValue =
+    call.tool === 'NotebookEdit'
+      ? stringAt(call.input, 'notebook_path')
+      : stringAt(call.input, 'file_path')
   if (!pathValue) return null
 
   const path = normalizePath(pathValue, workspaceRoot)
@@ -137,12 +138,13 @@ function claudeEvent(
     after = stringAt(call.input, 'content') ?? stringAt(result, 'content')
     if (before === undefined && result?.['originalFile'] === null) before = ''
   } else if (call.tool === 'Edit') {
-    const replacement = replacementFrom(
-      call.input,
-      'old_string',
-      'new_string',
-      booleanAt(call.input, 'replace_all'),
-    ) ?? replacementFrom(result, 'oldString', 'newString', booleanAt(result, 'replaceAll'))
+    const replacement =
+      replacementFrom(
+        call.input,
+        'old_string',
+        'new_string',
+        booleanAt(call.input, 'replace_all'),
+      ) ?? replacementFrom(result, 'oldString', 'newString', booleanAt(result, 'replaceAll'))
     if (!replacement) return null
     replacements = [replacement]
     if (before === undefined) before = replacement.oldText
@@ -150,7 +152,7 @@ function claudeEvent(
   } else if (call.tool === 'MultiEdit') {
     const edits = call.input['edits']
     if (!Array.isArray(edits)) return null
-    replacements = edits.flatMap(rawEdit => {
+    replacements = edits.flatMap((rawEdit) => {
       if (!isObject(rawEdit)) return []
       const replacement = replacementFrom(
         rawEdit,
@@ -169,8 +171,11 @@ function claudeEvent(
     if (oldSource !== undefined && newSource !== undefined) {
       replacements = [{ oldText: oldSource, newText: newSource }]
     }
-    after = stringAt(result, 'content')
-      ?? (before !== undefined && replacements.length > 0 ? applyReplacements(before, replacements) : newSource)
+    after =
+      stringAt(result, 'content') ??
+      (before !== undefined && replacements.length > 0
+        ? applyReplacements(before, replacements)
+        : newSource)
   }
 
   if (after === undefined) return null
@@ -228,7 +233,10 @@ function extractCodexEvents(
       continue
     }
 
-    if (payload['type'] === 'custom_tool_call_output' || payload['type'] === 'function_call_output') {
+    if (
+      payload['type'] === 'custom_tool_call_output' ||
+      payload['type'] === 'function_call_output'
+    ) {
       pending.delete(callId)
       if (!codexOutputSucceeded(payload)) continue
       events.push(...codexEventsFromPatch(call, recordIndex, workspaceRoot))
@@ -272,17 +280,19 @@ function codexEventsFromResult(
       return []
     }
 
-    return [{
-      provider: 'codex' as const,
-      recordIndex: call.recordIndex,
-      resultRecordIndex,
-      tool: 'apply_patch' as const,
-      path,
-      replacements,
-      ...(timestamp === undefined ? {} : { timestamp }),
-      ...(before === undefined ? {} : { before }),
-      ...(after === undefined ? {} : { after }),
-    }]
+    return [
+      {
+        provider: 'codex' as const,
+        recordIndex: call.recordIndex,
+        resultRecordIndex,
+        tool: 'apply_patch' as const,
+        path,
+        replacements,
+        ...(timestamp === undefined ? {} : { timestamp }),
+        ...(before === undefined ? {} : { before }),
+        ...(after === undefined ? {} : { after }),
+      },
+    ]
   })
 }
 
@@ -293,7 +303,7 @@ function codexEventsFromPatch(
 ): EditEvent[] {
   const patch = stringAt(call.input, 'patch') ?? ''
   const timestamp = stringAt(call.record, 'timestamp')
-  return parseApplyPatch(patch).map(parsed => ({
+  return parseApplyPatch(patch).map((parsed) => ({
     provider: 'codex',
     recordIndex: call.recordIndex,
     resultRecordIndex,
@@ -429,8 +439,8 @@ function parseApplyPatch(patch: string): Array<{
 
     if (kind === 'Add') {
       const after = splitLinesWithEndings(body)
-        .filter(line => line.startsWith('+'))
-        .map(line => line.slice(1))
+        .filter((line) => line.startsWith('+'))
+        .map((line) => line.slice(1))
         .join('')
       result.push({ path, before: '', after, replacements: [] })
     } else if (kind === 'Delete') {

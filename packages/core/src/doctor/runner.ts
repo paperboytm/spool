@@ -1,5 +1,5 @@
-import type { Check, CheckResult } from './types.js'
 import { allChecks } from './checks/index.js'
+import type { Check, CheckResult } from './types.js'
 
 /**
  * Run every check (or a filtered subset by id). Each check is isolated:
@@ -10,9 +10,10 @@ import { allChecks } from './checks/index.js'
  * (read-only) sqlite connections, and parallelism would buy almost nothing.
  */
 export async function runChecks(filterIds?: readonly string[]): Promise<CheckResult[]> {
-  const selected = filterIds && filterIds.length > 0
-    ? allChecks.filter(c => filterIds.includes(c.id))
-    : allChecks
+  const selected =
+    filterIds && filterIds.length > 0
+      ? allChecks.filter((c) => filterIds.includes(c.id))
+      : allChecks
   const results: CheckResult[] = []
   for (const check of selected) {
     results.push(await runOne(check))

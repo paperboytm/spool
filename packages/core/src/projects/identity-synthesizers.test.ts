@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vite-plus/test'
+
 import { codexScratchSynthesizer } from './identity-synthesizers.js'
 
 describe('codexScratchSynthesizer', () => {
@@ -27,9 +28,7 @@ describe('codexScratchSynthesizer', () => {
   })
 
   it('returns the same key for any date or slug', () => {
-    const a = codexScratchSynthesizer.synthesize(
-      '/Users/chen/Documents/Codex/2026-05-11/new-chat',
-    )
+    const a = codexScratchSynthesizer.synthesize('/Users/chen/Documents/Codex/2026-05-11/new-chat')
     const b = codexScratchSynthesizer.synthesize(
       '/Users/chen/Documents/Codex/2027-01-02/something-else',
     )
@@ -47,14 +46,10 @@ describe('codexScratchSynthesizer', () => {
   it('honors $HOME override', () => {
     process.env['HOME'] = '/tmp/fake-home'
     expect(
-      codexScratchSynthesizer.synthesize(
-        '/Users/chen/Documents/Codex/2026-05-11/x',
-      ),
+      codexScratchSynthesizer.synthesize('/Users/chen/Documents/Codex/2026-05-11/x'),
     ).toBeNull()
     expect(
-      codexScratchSynthesizer.synthesize(
-        '/tmp/fake-home/Documents/Codex/2026-05-11/x',
-      )?.key,
+      codexScratchSynthesizer.synthesize('/tmp/fake-home/Documents/Codex/2026-05-11/x')?.key,
     ).toBe('codex:scratch')
   })
 })

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 
@@ -87,10 +88,14 @@ describe('migration v7 (stars → pins)', () => {
     const dbModule = await import('./db.js')
     const db = dbModule.getDB()
 
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(7)
 
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>
-    const tableNames = new Set(tables.map(r => r.name))
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{
+      name: string
+    }>
+    const tableNames = new Set(tables.map((r) => r.name))
     expect(tableNames.has('stars')).toBe(false)
     expect(tableNames.has('pins')).toBe(true)
 
@@ -111,10 +116,14 @@ describe('migration v7 (stars → pins)', () => {
     const db = dbModule.getDB()
 
     expect(dbModule.wasNewDb()).toBe(true)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version).toBeGreaterThanOrEqual(7)
+    expect(
+      (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version,
+    ).toBeGreaterThanOrEqual(7)
 
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>
-    const tableNames = new Set(tables.map(r => r.name))
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{
+      name: string
+    }>
+    const tableNames = new Set(tables.map((r) => r.name))
     expect(tableNames.has('pins')).toBe(true)
     expect(tableNames.has('stars')).toBe(false)
 

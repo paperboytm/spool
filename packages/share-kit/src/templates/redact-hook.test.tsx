@@ -1,14 +1,13 @@
-import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { useResolvedRedactList, type RedactReplacement } from './redact'
+import { describe, it, expect } from 'vite-plus/test'
+
 import type { EditorOpts, Turn } from '../lib/types'
+import { useResolvedRedactList, type RedactReplacement } from './redact'
 
 // Built at runtime so the source literal doesn't trip secret scanners.
 const STRIPE_FIXTURE = 'sk_' + 'live_' + 'aH1xK9pQrSt7VwYzA3bC5dF8gJ'
 
-const turns: Turn[] = [
-  { role: 'assistant', body: `here is a key: ${STRIPE_FIXTURE}` } as Turn,
-]
+const turns: Turn[] = [{ role: 'assistant', body: `here is a key: ${STRIPE_FIXTURE}` } as Turn]
 
 // Render a probe component so the hook runs inside a real React render
 // (useMemo executes during server render; effects don't, which is fine

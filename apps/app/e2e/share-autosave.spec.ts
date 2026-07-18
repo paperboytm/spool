@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, restartApp, waitForSync, type AppContext } from './helpers/launch'
 import { openShareEditorFromSessionDetail, navigateToShares } from './helpers/share'
 
@@ -30,7 +31,9 @@ test('opts mutations + title rename survive a full app restart', async () => {
   await expect(input).toBeVisible()
   await input.fill('Autosave checkpoint')
   await ctx.window.locator('[data-testid="rename-draft-save"]').click()
-  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText('Autosave checkpoint')
+  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText(
+    'Autosave checkpoint',
+  )
 
   // Autosave is debounced at 400ms — give it a safe margin before
   // tearing down the renderer.
@@ -47,7 +50,9 @@ test('opts mutations + title rename survive a full app restart', async () => {
   await expect(draftCard).toBeVisible({ timeout: 5000 })
   await draftCard.click()
 
-  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText('Autosave checkpoint')
+  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText(
+    'Autosave checkpoint',
+  )
   const preview = ctx.window.locator('[data-testid="share-preview-render"]')
   await expect(preview).toHaveAttribute('data-template', 'forum')
   await expect(preview).toHaveAttribute('data-paper', 'ink')
@@ -72,7 +77,9 @@ test('rename modal updates the live preview render (not just the topbar)', async
   await ctx.window.locator('[data-testid="rename-draft-save"]').click()
 
   // Topbar reflects immediately.
-  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText('Live preview rename')
+  await expect(ctx.window.locator('[data-testid="share-editor-title"]')).toHaveText(
+    'Live preview rename',
+  )
 
   // The rendered template's title heading must also show the new title.
   const preview = ctx.window.locator('[data-testid="share-preview-render"]')

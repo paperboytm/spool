@@ -9,8 +9,9 @@
 // findings. The dedupe path therefore has to cascade-clean findings
 // and re-derive the denormalised counts on the touched sessions.
 
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations, LATEST_SCHEMA_VERSION } from './db.js'
 
 function seedV13(): Database.Database {
@@ -33,16 +34,29 @@ function seedV13(): Database.Database {
   return db
 }
 
-function insertMsg(db: Database.Database, opts: {
-  id: number; sessionId: number; uuid: string | null;
-  role?: string; content?: string; seq: number; sidechain?: boolean;
-}): void {
+function insertMsg(
+  db: Database.Database,
+  opts: {
+    id: number
+    sessionId: number
+    uuid: string | null
+    role?: string
+    content?: string
+    seq: number
+    sidechain?: boolean
+  },
+): void {
   db.prepare(
     `INSERT INTO messages (id, session_id, source_id, msg_uuid, role, content_text, timestamp, is_sidechain, seq)
      VALUES (?, ?, 1, ?, ?, ?, '2026-01-01', ?, ?)`,
   ).run(
-    opts.id, opts.sessionId, opts.uuid, opts.role ?? 'assistant',
-    opts.content ?? '', opts.sidechain ? 1 : 0, opts.seq,
+    opts.id,
+    opts.sessionId,
+    opts.uuid,
+    opts.role ?? 'assistant',
+    opts.content ?? '',
+    opts.sidechain ? 1 : 0,
+    opts.seq,
   )
 }
 
@@ -54,7 +68,9 @@ function bumpToV14(db: Database.Database): void {
 
 describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
   let db: Database.Database
-  beforeEach(() => { db = seedV13() })
+  beforeEach(() => {
+    db = seedV13()
+  })
 
   it('collapses identical-content dupes to the lowest id and bumps user_version', () => {
     insertMsg(db, { id: 10, sessionId: 1, uuid: 'a', content: 'hello', seq: 0 })
@@ -63,12 +79,17 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
 
     bumpToV14(db)
 
-    const rows = db.prepare('SELECT id, msg_uuid FROM messages ORDER BY id').all() as Array<{ id: number; msg_uuid: string }>
+    const rows = db.prepare('SELECT id, msg_uuid FROM messages ORDER BY id').all() as Array<{
+      id: number
+      msg_uuid: string
+    }>
     expect(rows).toEqual([
       { id: 10, msg_uuid: 'a' },
       { id: 12, msg_uuid: 'b' },
     ])
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(LATEST_SCHEMA_VERSION)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(
+      LATEST_SCHEMA_VERSION,
+    )
   })
 
   it('cascade-deletes findings on dropped duplicate rows', () => {
@@ -85,7 +106,10 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
 
     bumpToV14(db)
 
-    const findings = db.prepare('SELECT id, message_id FROM findings ORDER BY id').all() as Array<{ id: number; message_id: number }>
+    const findings = db.prepare('SELECT id, message_id FROM findings ORDER BY id').all() as Array<{
+      id: number
+      message_id: number
+    }>
     expect(findings).toEqual([{ id: 100, message_id: 20 }])
   })
 
@@ -98,7 +122,9 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
 
     bumpToV14(db)
 
-    const row = db.prepare('SELECT message_count FROM sessions WHERE id = 1').get() as { message_count: number }
+    const row = db.prepare('SELECT message_count FROM sessions WHERE id = 1').get() as {
+      message_count: number
+    }
     // 2 non-sidechain after dedupe (x kept once, y), z is sidechain.
     expect(row.message_count).toBe(2)
   })
@@ -125,17 +151,20 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
 
     bumpToV14(db)
 
-    const row = db.prepare(
-      'SELECT scan_finding_count, scan_high_count, scan_purged_count FROM sessions WHERE id = 1',
-    ).get() as { scan_finding_count: number; scan_high_count: number; scan_purged_count: number }
+    const row = db
+      .prepare(
+        'SELECT scan_finding_count, scan_high_count, scan_purged_count FROM sessions WHERE id = 1',
+      )
+      .get() as { scan_finding_count: number; scan_high_count: number; scan_purged_count: number }
     expect(row).toEqual({ scan_finding_count: 2, scan_high_count: 1, scan_purged_count: 1 })
   })
 
   it('adds a partial UNIQUE index that rejects future duplicates', () => {
     bumpToV14(db)
     insertMsg(db, { id: 50, sessionId: 1, uuid: 'p', seq: 0 })
-    expect(() => insertMsg(db, { id: 51, sessionId: 1, uuid: 'p', seq: 1 }))
-      .toThrow(/UNIQUE constraint/)
+    expect(() => insertMsg(db, { id: 51, sessionId: 1, uuid: 'p', seq: 1 })).toThrow(
+      /UNIQUE constraint/,
+    )
   })
 
   it('allows multiple NULL msg_uuid rows in the same session (partial index)', () => {
@@ -143,8 +172,7 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
     // No current parser emits NULL, but the schema doesn't forbid it
     // — the partial index must mirror that and stay out of NULL rows.
     insertMsg(db, { id: 60, sessionId: 1, uuid: null, seq: 0 })
-    expect(() => insertMsg(db, { id: 61, sessionId: 1, uuid: null, seq: 1 }))
-      .not.toThrow()
+    expect(() => insertMsg(db, { id: 61, sessionId: 1, uuid: null, seq: 1 })).not.toThrow()
   })
 
   it('leaves messages_fts in sync after cascade DELETE', () => {
@@ -154,9 +182,9 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
     bumpToV14(db)
 
     // FTS should hit exactly once (one surviving row), not twice.
-    const hits = db.prepare(
-      'SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?',
-    ).get('"searchable-token"') as { n: number }
+    const hits = db
+      .prepare('SELECT COUNT(*) AS n FROM messages_fts WHERE messages_fts MATCH ?')
+      .get('"searchable-token"') as { n: number }
     expect(hits.n).toBe(1)
   })
 
@@ -164,11 +192,15 @@ describe('migration v14: dedupe + UNIQUE INDEX(session_id, msg_uuid)', () => {
     insertMsg(db, { id: 80, sessionId: 1, uuid: 'r', seq: 0 })
     insertMsg(db, { id: 81, sessionId: 1, uuid: 'r', seq: 1 })
     bumpToV14(db)
-    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(LATEST_SCHEMA_VERSION)
+    expect((db.pragma('user_version') as Array<{ user_version: number }>)[0]!.user_version).toBe(
+      LATEST_SCHEMA_VERSION,
+    )
 
     // Second pass — no-op.
     runMigrations(db)
-    const count = db.prepare('SELECT COUNT(*) AS c FROM messages WHERE msg_uuid = ?').get('r') as { c: number }
+    const count = db.prepare('SELECT COUNT(*) AS c FROM messages WHERE msg_uuid = ?').get('r') as {
+      c: number
+    }
     expect(count.c).toBe(1)
   })
 })

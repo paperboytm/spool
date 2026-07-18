@@ -93,13 +93,7 @@ export default function AppToaster() {
             className="text-[color:var(--color-status-warning)] dark:text-[color:var(--color-status-warning-dark)]"
           />
         ),
-        info: (
-          <Info
-            size={16}
-            strokeWidth={2}
-            className="text-warm-muted dark:text-dark-muted"
-          />
-        ),
+        info: <Info size={16} strokeWidth={2} className="text-warm-muted dark:text-dark-muted" />,
       }}
     />
   )

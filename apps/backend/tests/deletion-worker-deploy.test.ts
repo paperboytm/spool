@@ -8,11 +8,16 @@
 // so they get pinned here, in a suite CI already runs.
 
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vite-plus/test'
 
 import { DELETION_BINDING_NAMES } from '../functions/_scheduled/deletion-worker'
 
-const WORKER_DIR = new URL('../../../workers/spool-share-deletion/', import.meta.url)
+const WORKER_DIR = fileURLToPath(
+  new URL('../../../workers/spool-share-deletion/', import.meta.url).href,
+)
 
 describe('spool-share-deletion deploy shape', () => {
   it('the Worker entry re-exports a scheduled handler', async () => {
@@ -23,13 +28,13 @@ describe('spool-share-deletion deploy shape', () => {
   })
 
   it('wrangler.toml declares exactly the bindings DeletionEnv needs', () => {
-    const toml = readFileSync(new URL('wrangler.toml', WORKER_DIR), 'utf8')
+    const toml = readFileSync(join(WORKER_DIR, 'wrangler.toml'), 'utf8')
     const bindings = [...toml.matchAll(/^binding = "(\w+)"$/gm)].map((m) => m[1])
     expect(new Set(bindings)).toEqual(new Set(DELETION_BINDING_NAMES))
   })
 
   it('wrangler.toml keeps the cron and the entry path', () => {
-    const toml = readFileSync(new URL('wrangler.toml', WORKER_DIR), 'utf8')
+    const toml = readFileSync(join(WORKER_DIR, 'wrangler.toml'), 'utf8')
     expect(toml).toMatch(/^crons = \["0 \*\/6 \* \* \*"\]$/m)
     expect(toml).toMatch(/^main = "src\/worker\.ts"$/m)
     // Resource names are shared with the backend's Pages bindings — a

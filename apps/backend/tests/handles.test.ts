@@ -1,21 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { validateHandle } from '../src/handles'
 
 describe('validateHandle', () => {
-  it.each([
-    ['chen'],
-    ['chen-2'],
-    ['a_b'],
-    ['abc'],
-    ['user_name'],
-    ['a1b2c3'],
-    ['a'.repeat(32)],
-  ])('accepts %s', (h) => {
-    const r = validateHandle(h)
-    expect(r.ok).toBe(true)
-    if (r.ok) expect(r.handle).toBe(h)
-  })
+  it.each([['chen'], ['chen-2'], ['a_b'], ['abc'], ['user_name'], ['a1b2c3'], ['a'.repeat(32)]])(
+    'accepts %s',
+    (h) => {
+      const r = validateHandle(h)
+      expect(r.ok).toBe(true)
+      if (r.ok) expect(r.handle).toBe(h)
+    },
+  )
 
   it('lowercases mixed-case input', () => {
     const r = validateHandle('Chen-2')
@@ -39,14 +34,11 @@ describe('validateHandle', () => {
     if (!r.ok) expect(r.reason).toBe('invalid format')
   })
 
-  it.each(['admin', 'support', 'spool', 'api', 'help', 'editor'])(
-    'rejects reserved %s',
-    (h) => {
-      const r = validateHandle(h)
-      expect(r.ok).toBe(false)
-      if (!r.ok) expect(r.reason).toBe('reserved')
-    },
-  )
+  it.each(['admin', 'support', 'spool', 'api', 'help', 'editor'])('rejects reserved %s', (h) => {
+    const r = validateHandle(h)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('reserved')
+  })
 
   it('rejects non-strings', () => {
     expect(validateHandle(undefined).ok).toBe(false)

@@ -90,7 +90,8 @@ export function hasQuotedEntropy(min: number): (value: string) => boolean {
 
 /** "[redacted]" / "<redacted>" / "[SECRET:…]" / "【已隐藏】" — set by a
  *  user or an upstream tool to flag the literal was scrubbed. */
-const REDACTION_MARKER_RX = /\[(?:redacted|hidden|secret|removed|masked)(?::[^\]]*)?\]|<(?:redacted|hidden)>|【已?隐藏】/i
+const REDACTION_MARKER_RX =
+  /\[(?:redacted|hidden|secret|removed|masked)(?::[^\]]*)?\]|<(?:redacted|hidden)>|【已?隐藏】/i
 
 export function containsRedactionMarker(value: string): boolean {
   return REDACTION_MARKER_RX.test(value)
@@ -106,14 +107,14 @@ export function containsEllipsis(value: string): boolean {
 /** Self-evidently-fake placeholder values: `xxxx-xxxx-xxxx`, repeated
  *  chars, `<your-key>`, `letmein`, `hunter2`, alphabet-sequence dumps. */
 const PLACEHOLDER_PATTERNS: ReadonlyArray<RegExp> = [
-  /^[xX]+(?:[-_ ][xX]+)*$/,                                   // xxxx, xxxx-xxxx
-  /^(.)\1{4,}$/,                                              // 5+ repeats: aaaaa, 00000
-  /^<[a-zA-Z0-9_\-\s]+>$/,                                    // <YOUR_TOKEN>
+  /^[xX]+(?:[-_ ][xX]+)*$/, // xxxx, xxxx-xxxx
+  /^(.)\1{4,}$/, // 5+ repeats: aaaaa, 00000
+  /^<[a-zA-Z0-9_\-\s]+>$/, // <YOUR_TOKEN>
   /\byour[_-]?(?:secret|key|token|password|api[_-]?key)\b/i,
   /\b(?:placeholder|todo|fixme|example|sample|dummy|fake|test[_-]?value)\b/i,
   /^(?:letmein|changeme|password|passwd|hunter2|123456|qwerty|abc123|admin)$/i,
-  /^abcdefghijklmnopqrstuvwxyz/,                              // alphabet dumps
-  /^0?123456789/,                                             // sequential digits
+  /^abcdefghijklmnopqrstuvwxyz/, // alphabet dumps
+  /^0?123456789/, // sequential digits
 ]
 
 export function looksLikePlaceholder(value: string): boolean {
@@ -124,10 +125,27 @@ export function looksLikePlaceholder(value: string): boolean {
  *  (b) generic "fake company" domains that show up constantly in
  *  documentation. Source: RFC 2606 + RFC 6761. */
 const RESERVED_DOMAINS = new Set([
-  'example.com', 'example.net', 'example.org', 'example.edu',
-  'test.com', 'test.net', 'test.org', 'invalid', 'localhost', 'example', 'test',
-  'company.com', 'mycompany.com', 'yourcompany.com', 'yourdomain.com', 'mydomain.com',
-  'domain.com', 'domain.net', 'foo.com', 'bar.com', 'foobar.com',
+  'example.com',
+  'example.net',
+  'example.org',
+  'example.edu',
+  'test.com',
+  'test.net',
+  'test.org',
+  'invalid',
+  'localhost',
+  'example',
+  'test',
+  'company.com',
+  'mycompany.com',
+  'yourcompany.com',
+  'yourdomain.com',
+  'mydomain.com',
+  'domain.com',
+  'domain.net',
+  'foo.com',
+  'bar.com',
+  'foobar.com',
 ])
 
 export function isReservedDomain(domain: string): boolean {
@@ -146,7 +164,8 @@ export function looksLikeImageAsset(value: string): boolean {
  *  bundle these to the client / commit them to repos:
  *    NEXT_PUBLIC_*, VITE_*, REACT_APP_*, NUXT_PUBLIC_*, EXPO_PUBLIC_*,
  *    GATSBY_*, VUE_APP_*, STORYBOOK_* */
-const PUBLIC_ENV_PREFIX_RX = /^(?:NEXT_PUBLIC|REACT_APP|VITE|PUBLIC|VUE_APP|GATSBY|EXPO_PUBLIC|NUXT_PUBLIC|STORYBOOK)_/
+const PUBLIC_ENV_PREFIX_RX =
+  /^(?:NEXT_PUBLIC|REACT_APP|VITE|PUBLIC|VUE_APP|GATSBY|EXPO_PUBLIC|NUXT_PUBLIC|STORYBOOK)_/
 
 export function hasPublicEnvPrefix(name: string): boolean {
   return PUBLIC_ENV_PREFIX_RX.test(name)
@@ -162,9 +181,7 @@ export function isVendorExampleKey(value: string): boolean {
 
 /** Composite filter used by every text-credential rule. */
 export function isObviouslyNonSecretValue(value: string): boolean {
-  return containsRedactionMarker(value)
-      || containsEllipsis(value)
-      || looksLikePlaceholder(value)
+  return containsRedactionMarker(value) || containsEllipsis(value) || looksLikePlaceholder(value)
 }
 
 /** Any non-ASCII character. Used by detectors whose regex would

@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import { runMigrations } from './db.js'
 
 const tempDirs: string[] = []
@@ -103,11 +105,17 @@ function seedV3(dbPath: string) {
     );
   `)
 
-  seed.prepare("INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')").run()
-  seed.prepare(`
+  seed
+    .prepare(
+      "INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (1, 'p', '/p', 'p')",
+    )
+    .run()
+  seed
+    .prepare(`
     INSERT INTO sessions (project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
     VALUES (1, 1, 'sess-uuid', '/fake/sess.jsonl', 'A session', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 1)
-  `).run()
+  `)
+    .run()
 
   seed.pragma('user_version = 3')
   seed.close()
@@ -128,8 +136,9 @@ describe('migration v4 (introduce stars table)', () => {
     expect(v).toBeGreaterThanOrEqual(7)
 
     const tables = new Set(
-      (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[])
-        .map(r => r.name),
+      (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]
+      ).map((r) => r.name),
     )
     expect(tables.has('stars')).toBe(false) // dropped by v7
     expect(tables.has('pins')).toBe(true)
@@ -157,8 +166,9 @@ describe('migration v4 (introduce stars table)', () => {
     runMigrations(db)
 
     const tables = new Set(
-      (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[])
-        .map(r => r.name),
+      (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]
+      ).map((r) => r.name),
     )
     expect(tables.has('session_stars')).toBe(false)
 

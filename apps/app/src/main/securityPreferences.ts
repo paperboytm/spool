@@ -11,6 +11,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { SPOOL_DIR } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
 
@@ -127,8 +128,7 @@ export function loadSecurityPreferences(): SecurityPreferences {
   // opted into hover-blur keeps that posture after upgrading. Once
   // either new field has been written, the legacy value is ignored.
   const hasNewBlurFields =
-    c.securityPageValuesBlurred !== undefined
-    || c.findingsStripValuesBlurred !== undefined
+    c.securityPageValuesBlurred !== undefined || c.findingsStripValuesBlurred !== undefined
   const legacyBlurred = c.revealValuesOnHoverOnly === true
   return {
     kindAllowlist: normalizeKinds(c.kindAllowlist),
@@ -155,10 +155,14 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
   // Validate the new values, falling back to defaults on bad input.
   const merged: SecurityConfigFile = { ...current }
   if (next.kindAllowlist !== undefined) merged.kindAllowlist = normalizeKinds(next.kindAllowlist)
-  if (next.infoDefaultVisible !== undefined) merged.infoDefaultVisible = next.infoDefaultVisible === true
-  if (next.rescanAfterSync !== undefined) merged.rescanAfterSync = normalizeRescan(next.rescanAfterSync)
-  if (next.securityPageValuesBlurred !== undefined) merged.securityPageValuesBlurred = next.securityPageValuesBlurred === true
-  if (next.findingsStripValuesBlurred !== undefined) merged.findingsStripValuesBlurred = next.findingsStripValuesBlurred === true
+  if (next.infoDefaultVisible !== undefined)
+    merged.infoDefaultVisible = next.infoDefaultVisible === true
+  if (next.rescanAfterSync !== undefined)
+    merged.rescanAfterSync = normalizeRescan(next.rescanAfterSync)
+  if (next.securityPageValuesBlurred !== undefined)
+    merged.securityPageValuesBlurred = next.securityPageValuesBlurred === true
+  if (next.findingsStripValuesBlurred !== undefined)
+    merged.findingsStripValuesBlurred = next.findingsStripValuesBlurred === true
   if (next.pfEnabled !== undefined) {
     merged.pfEnabled = next.pfEnabled === true
     // Enabling pf supersedes the in-page discovery nudge — once a user
@@ -168,8 +172,10 @@ export function saveSecurityPreferences(next: Partial<SecurityPreferences>): Sec
     // separate signals gated by pfActivationPending, not by this flag.
     if (next.pfEnabled === true) merged.pfCalloutDismissed = true
   }
-  if (next.pfCalloutDismissed !== undefined) merged.pfCalloutDismissed = next.pfCalloutDismissed === true
-  if (next.pfActivationPending !== undefined) merged.pfActivationPending = next.pfActivationPending === true
+  if (next.pfCalloutDismissed !== undefined)
+    merged.pfCalloutDismissed = next.pfCalloutDismissed === true
+  if (next.pfActivationPending !== undefined)
+    merged.pfActivationPending = next.pfActivationPending === true
   if (next.sessionRowRiskIconVisible !== undefined) {
     // Symmetric with the load-side read: only a literal `false` writes
     // false; anything else (including a buggy `'false'` string) writes

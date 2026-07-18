@@ -38,16 +38,30 @@ export function sniffMime(buf: Uint8Array): SupportedMime | null {
   if (buf.length < 12) return null
   // PNG
   if (
-    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
-    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
-  ) return 'image/png'
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  )
+    return 'image/png'
   // JPEG
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
   // WebP: 'RIFF' (52 49 46 46), then 4 bytes file size, then 'WEBP'
   if (
-    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
-    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
-  ) return 'image/webp'
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  )
+    return 'image/webp'
   return null
 }
 
@@ -61,7 +75,10 @@ export function sniffMime(buf: Uint8Array): SupportedMime | null {
  * only need width/height for sanity bounds. The header structure of
  * all three formats is tiny and well-specified.
  */
-export function readDimensions(mime: SupportedMime, buf: Uint8Array): { width: number; height: number } | null {
+export function readDimensions(
+  mime: SupportedMime,
+  buf: Uint8Array,
+): { width: number; height: number } | null {
   if (mime === 'image/png') return readPngDimensions(buf)
   if (mime === 'image/jpeg') return readJpegDimensions(buf)
   if (mime === 'image/webp') return readWebpDimensions(buf)
@@ -75,8 +92,8 @@ function readPngDimensions(buf: Uint8Array): { width: number; height: number } |
   // bitwise math and the `<= 0` guard rejects it as malformed even though
   // the PNG header is technically well-formed.
   if (buf.length < 24) return null
-  const width = (((buf[16]! << 24) | (buf[17]! << 16) | (buf[18]! << 8) | buf[19]!) >>> 0)
-  const height = (((buf[20]! << 24) | (buf[21]! << 16) | (buf[22]! << 8) | buf[23]!) >>> 0)
+  const width = ((buf[16]! << 24) | (buf[17]! << 16) | (buf[18]! << 8) | buf[19]!) >>> 0
+  const height = ((buf[20]! << 24) | (buf[21]! << 16) | (buf[22]! << 8) | buf[23]!) >>> 0
   if (width <= 0 || height <= 0) return null
   return { width, height }
 }
@@ -95,8 +112,7 @@ function readJpegDimensions(buf: Uint8Array): { width: number; height: number } 
       marker = buf[i + 1]!
     }
     const sof =
-      (marker >= 0xc0 && marker <= 0xcf) &&
-      marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+      marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
     if (sof) {
       if (i + 9 >= buf.length) return null
       const height = (buf[i + 5]! << 8) | buf[i + 6]!
@@ -126,7 +142,10 @@ function readWebpDimensions(buf: Uint8Array): { width: number; height: number } 
   if (fourcc === 'VP8L') {
     // 14-bit width-minus-1, height-minus-1 packed into 4 bytes after signature
     if (buf.length < 25) return null
-    const b1 = buf[21]!, b2 = buf[22]!, b3 = buf[23]!, b4 = buf[24]!
+    const b1 = buf[21]!,
+      b2 = buf[22]!,
+      b3 = buf[23]!,
+      b4 = buf[24]!
     const width = 1 + (((b2 & 0x3f) << 8) | b1)
     const height = 1 + (((b4 & 0x0f) << 10) | (b3 << 2) | ((b2 & 0xc0) >> 6))
     return width > 0 && height > 0 ? { width, height } : null
@@ -159,8 +178,7 @@ function stripPngMetadata(buf: Uint8Array): Uint8Array {
   const SKIP = new Set(['eXIf', 'iTXt', 'tEXt', 'zTXt', 'iCCP'])
   let i = 8
   while (i + 12 <= buf.length) {
-    const len =
-      (buf[i]! << 24) | (buf[i + 1]! << 16) | (buf[i + 2]! << 8) | buf[i + 3]!
+    const len = (buf[i]! << 24) | (buf[i + 1]! << 16) | (buf[i + 2]! << 8) | buf[i + 3]!
     const type = String.fromCharCode(buf[i + 4]!, buf[i + 5]!, buf[i + 6]!, buf[i + 7]!)
     const total = 12 + len
     if (i + total > buf.length) break // truncated — bail
@@ -214,10 +232,7 @@ function stripJpegMetadata(buf: Uint8Array): Uint8Array {
     // Keep:
     //   APP0  (FFE0) JFIF — structural, defines pixel density
     //   APP14 (FFEE) Adobe — colour-space flag some decoders rely on
-    const strip =
-      (marker >= 0xe1 && marker <= 0xed) ||
-      marker === 0xef ||
-      marker === 0xfe
+    const strip = (marker >= 0xe1 && marker <= 0xed) || marker === 0xef || marker === 0xfe
     if (!strip) {
       for (let j = 0; j < total; j++) out.push(buf[i + j]!)
     }

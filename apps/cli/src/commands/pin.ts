@@ -1,4 +1,3 @@
-import { Command } from 'commander'
 import {
   getDB,
   getSessionWithMessages,
@@ -7,6 +6,8 @@ import {
   pinSession,
   unpinSession,
 } from '@spool-lab/core'
+import { Command } from 'commander'
+
 import { printSession } from '../format.js'
 
 export const pinCommand = new Command('pin')

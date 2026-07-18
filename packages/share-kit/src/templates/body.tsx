@@ -17,6 +17,7 @@
 import { memo, useMemo, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
 import type { RedactReplacement } from './redact'
 
 interface BodyProps {
@@ -48,7 +49,15 @@ interface BodyProps {
  * showing the browser's broken-image glyph, render a quiet placeholder
  * box that preserves the alt text and clearly labels the media type.
  */
-function MarkdownImage({ src, alt, accent }: { src?: string | undefined; alt?: string | undefined; accent: string }) {
+function MarkdownImage({
+  src,
+  alt,
+  accent,
+}: {
+  src?: string | undefined
+  alt?: string | undefined
+  accent: string
+}) {
   const [state, setState] = useState<'loading' | 'ok' | 'fail'>(src ? 'loading' : 'fail')
   return (
     <span
@@ -82,13 +91,37 @@ function MarkdownImage({ src, alt, accent }: { src?: string | undefined; alt?: s
           {/* stroke via style, not the SVG attribute — the accent may be
               a `var(--sk-accent)` reference, which only resolves in CSS
               contexts (presentation attributes don't evaluate var()). */}
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, stroke: accent }}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0, stroke: accent }}
+          >
             <rect x="2.5" y="2.5" width="13" height="13" rx="1.5" />
             <circle cx="6.5" cy="6.5" r="1.2" />
             <path d="M15 11l-3.5-3.5L4 14" />
           </svg>
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'Geist, sans-serif' }}>
-            <span style={{ fontSize: 11, fontWeight: 500, color: accent, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          <span
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              fontFamily: 'Geist, sans-serif',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: accent,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
               {state === 'fail' ? 'Image' : 'Loading…'}
             </span>
             {alt && (
@@ -145,59 +178,81 @@ function preprocess(text: string, redact?: RedactReplacement[]): string {
 // props. On large documents the markdown parse dominates render cost,
 // so bailing out here is what keeps unrelated state changes (zoom,
 // pan, progressive-mount growth) from re-parsing thousands of turns.
-export const Body = memo(function Body({ text, redact, mono, sansFont, fontSize: sizeOverride, accent, accentBg, blockBorder }: BodyProps) {
+export const Body = memo(function Body({
+  text,
+  redact,
+  mono,
+  sansFont,
+  fontSize: sizeOverride,
+  accent,
+  accentBg,
+  blockBorder,
+}: BodyProps) {
   const processed = useMemo(() => preprocess(text, redact), [text, redact])
   const blockStroke = blockBorder ?? accent
 
-  const baseFont = mono
-    ? "'Geist Mono', monospace"
-    : sansFont ?? "'Geist', system-ui, sans-serif"
+  const baseFont = mono ? "'Geist Mono', monospace" : (sansFont ?? "'Geist', system-ui, sans-serif")
   const fontSize = sizeOverride ?? (mono ? 12 : 13)
 
   // react-markdown's Components type is broad enough that lambda params
   // don't inherit useful types via contextual typing. We accept any-typed
   // props here; the markdown library guarantees their runtime shape.
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const components = useMemo<Components>(() => ({
-    code({ className, children, node: _node, ...props }: any) {
-      const codeText = String(children).replace(/\n$/, '')
-      if (codeText.startsWith(REDACT_CHIP_MARKER)) {
-        // Strip the marker before showing the per-kind mask.
-        const label = codeText.slice(REDACT_CHIP_MARKER.length)
-        return (
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '0 4px',
-              borderRadius: 2,
-              background: accentBg,
-              color: accent,
-              fontFamily: 'Geist Mono, monospace',
-              fontSize: '0.9em',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {label}
-          </span>
-        )
-      }
-      // react-markdown v10: block code carries a `language-xxx` class
-      // from the fence; inline code has no className.
-      const isBlock = typeof className === 'string' && className.startsWith('language-')
-      if (!isBlock) {
+  const components = useMemo<Components>(
+    () => ({
+      code({ className, children, node: _node, ...props }: any) {
+        const codeText = String(children).replace(/\n$/, '')
+        if (codeText.startsWith(REDACT_CHIP_MARKER)) {
+          // Strip the marker before showing the per-kind mask.
+          const label = codeText.slice(REDACT_CHIP_MARKER.length)
+          return (
+            <span
+              style={{
+                display: 'inline-block',
+                padding: '0 4px',
+                borderRadius: 2,
+                background: accentBg,
+                color: accent,
+                fontFamily: 'Geist Mono, monospace',
+                fontSize: '0.9em',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {label}
+            </span>
+          )
+        }
+        // react-markdown v10: block code carries a `language-xxx` class
+        // from the fence; inline code has no className.
+        const isBlock = typeof className === 'string' && className.startsWith('language-')
+        if (!isBlock) {
+          return (
+            <code
+              className={className}
+              {...props}
+              style={{
+                fontFamily: 'Geist Mono, monospace',
+                fontSize: '0.92em',
+                padding: '1px 5px',
+                borderRadius: 3,
+                background: 'rgba(128,128,128,0.12)',
+                // Long unbreakable mono tokens (file paths, hashes) can blow
+                // out of narrow containers. Break anywhere so the token stays
+                // inside its column at the cost of mid-word linebreaks.
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+              }}
+            >
+              {children}
+            </code>
+          )
+        }
         return (
           <code
             className={className}
             {...props}
             style={{
               fontFamily: 'Geist Mono, monospace',
-              fontSize: '0.92em',
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: 'rgba(128,128,128,0.12)',
-              // Long unbreakable mono tokens (file paths, hashes) can blow
-              // out of narrow containers. Break anywhere so the token stays
-              // inside its column at the cost of mid-word linebreaks.
               overflowWrap: 'anywhere',
               wordBreak: 'break-word',
             }}
@@ -205,117 +260,136 @@ export const Body = memo(function Body({ text, redact, mono, sansFont, fontSize:
             {children}
           </code>
         )
-      }
-      return (
-        <code className={className} {...props} style={{ fontFamily: 'Geist Mono, monospace', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-          {children}
-        </code>
-      )
-    },
-    pre({ children }: { children?: React.ReactNode }) {
-      return (
-        <pre
+      },
+      pre({ children }: { children?: React.ReactNode }) {
+        return (
+          <pre
+            style={{
+              background: 'rgba(128,128,128,0.08)',
+              padding: '10px 12px',
+              borderRadius: 3,
+              overflow: 'auto',
+              fontFamily: 'Geist Mono, monospace',
+              fontSize: '0.92em',
+              lineHeight: 1.55,
+              margin: '8px 0',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+            }}
+          >
+            {children}
+          </pre>
+        )
+      },
+      h1: (props: any) => <h3 style={headStyle(18)} {...props} />,
+      h2: (props: any) => <h3 style={headStyle(16)} {...props} />,
+      h3: (props: any) => <h3 style={headStyle(14)} {...props} />,
+      h4: (props: any) => <h4 style={headStyle(13)} {...props} />,
+      h5: (props: any) => <h4 style={headStyle(12)} {...props} />,
+      h6: (props: any) => <h4 style={headStyle(12)} {...props} />,
+      p: (props: any) => <p style={{ margin: '6px 0' }} {...props} />,
+      ul: (props: any) => (
+        <ul style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'disc' }} {...props} />
+      ),
+      ol: (props: any) => (
+        <ol style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'decimal' }} {...props} />
+      ),
+      li: (props: any) => <li style={{ margin: '2px 0' }} {...props} />,
+      strong: (props: any) => <strong style={{ color: 'inherit', fontWeight: 600 }} {...props} />,
+      em: (props: any) => <em {...props} />,
+      blockquote: (props: any) => (
+        <blockquote
           style={{
-            background: 'rgba(128,128,128,0.08)',
-            padding: '10px 12px',
-            borderRadius: 3,
-            overflow: 'auto',
-            fontFamily: 'Geist Mono, monospace',
-            fontSize: '0.92em',
-            lineHeight: 1.55,
-            margin: '8px 0',
-            whiteSpace: 'pre-wrap',
-            overflowWrap: 'anywhere',
-            wordBreak: 'break-word',
+            borderLeft: `2px solid ${blockStroke}`,
+            margin: '6px 0',
+            padding: '2px 0 2px 10px',
+            opacity: 0.9,
           }}
-        >
-          {children}
-        </pre>
-      )
-    },
-    h1: (props: any) => <h3 style={headStyle(18)} {...props} />,
-    h2: (props: any) => <h3 style={headStyle(16)} {...props} />,
-    h3: (props: any) => <h3 style={headStyle(14)} {...props} />,
-    h4: (props: any) => <h4 style={headStyle(13)} {...props} />,
-    h5: (props: any) => <h4 style={headStyle(12)} {...props} />,
-    h6: (props: any) => <h4 style={headStyle(12)} {...props} />,
-    p: (props: any) => <p style={{ margin: '6px 0' }} {...props} />,
-    ul: (props: any) => <ul style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'disc' }} {...props} />,
-    ol: (props: any) => <ol style={{ margin: '4px 0', paddingLeft: 20, listStyle: 'decimal' }} {...props} />,
-    li: (props: any) => <li style={{ margin: '2px 0' }} {...props} />,
-    strong: (props: any) => <strong style={{ color: 'inherit', fontWeight: 600 }} {...props} />,
-    em: (props: any) => <em {...props} />,
-    blockquote: (props: any) => (
-      <blockquote
-        style={{
-          borderLeft: `2px solid ${blockStroke}`,
-          margin: '6px 0',
-          padding: '2px 0 2px 10px',
-          opacity: 0.9,
-        }}
-        {...props}
-      />
-    ),
-    hr: () => <hr style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.2, margin: '10px 0' }} />,
-    // Tables get explicit styles so desktop preview (Tailwind preflight
-    // zeroes cell padding) and share-web (UA centers th) render identically.
-    // react-markdown turns GFM column alignment into a `style` prop
-    // (tableCellAlignToStyle), so incoming style must merge over ours.
-    // `width: max-content` (no max-width) keeps every column at its
-    // natural width — short cells never wrap; only cells past the
-    // 360px cap do. Wide tables scroll inside the wrapper, whose
-    // hover-reveal scrollbar lives in each consumer's stylesheet
-    // (.spool-md-scroll).
-    table: ({ node: _node, style, ...props }: any) => (
-      <div className="spool-md-scroll" style={{ overflowX: 'auto', margin: '8px 0' }}>
-        <table style={{ borderCollapse: 'collapse', width: 'max-content', ...style }} {...props} />
-      </div>
-    ),
-    th: ({ node: _node, style, ...props }: any) => (
-      <th
-        style={{
-          textAlign: 'left',
-          fontWeight: 600,
-          padding: '4px 8px',
-          maxWidth: 360,
-          borderBottom: '1px solid rgba(128,128,128,0.4)',
-          ...style,
-        }}
-        {...props}
-      />
-    ),
-    td: ({ node: _node, style, ...props }: any) => (
-      <td
-        style={{
-          textAlign: 'left',
-          padding: '4px 8px',
-          maxWidth: 360,
-          borderBottom: '1px solid rgba(128,128,128,0.18)',
-          ...style,
-        }}
-        {...props}
-      />
-    ),
-    a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => {
-      // In-page anchors stay same-frame; everything else opens in a new
-      // tab with `noreferrer noopener` so a reader click can't navigate
-      // the top frame and the destination can't reach back through
-      // `window.opener`. (react-markdown v10 already neutralizes
-      // `javascript:`/`data:` hrefs via its default urlTransform, so no
-      // extra sanitization is needed here.)
-      const inPage = !!href && href.startsWith('#')
-      return (
-        <a
-          href={href}
-          {...(inPage ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
-          style={{ color: accent, textDecoration: 'none', borderBottom: `1px solid ${accent}`, overflowWrap: 'anywhere' }}
-        >
-          {children}
-        </a>
-      )
-    },
-    img: ({ src, alt }: { src?: string | undefined; alt?: string | undefined }) => <MarkdownImage src={src} alt={alt} accent={accent} />,
-  }), [accent, accentBg, blockStroke])
+          {...props}
+        />
+      ),
+      hr: () => (
+        <hr
+          style={{
+            border: 'none',
+            borderTop: '1px solid currentColor',
+            opacity: 0.2,
+            margin: '10px 0',
+          }}
+        />
+      ),
+      // Tables get explicit styles so desktop preview (Tailwind preflight
+      // zeroes cell padding) and share-web (UA centers th) render identically.
+      // react-markdown turns GFM column alignment into a `style` prop
+      // (tableCellAlignToStyle), so incoming style must merge over ours.
+      // `width: max-content` (no max-width) keeps every column at its
+      // natural width — short cells never wrap; only cells past the
+      // 360px cap do. Wide tables scroll inside the wrapper, whose
+      // hover-reveal scrollbar lives in each consumer's stylesheet
+      // (.spool-md-scroll).
+      table: ({ node: _node, style, ...props }: any) => (
+        <div className="spool-md-scroll" style={{ overflowX: 'auto', margin: '8px 0' }}>
+          <table
+            style={{ borderCollapse: 'collapse', width: 'max-content', ...style }}
+            {...props}
+          />
+        </div>
+      ),
+      th: ({ node: _node, style, ...props }: any) => (
+        <th
+          style={{
+            textAlign: 'left',
+            fontWeight: 600,
+            padding: '4px 8px',
+            maxWidth: 360,
+            borderBottom: '1px solid rgba(128,128,128,0.4)',
+            ...style,
+          }}
+          {...props}
+        />
+      ),
+      td: ({ node: _node, style, ...props }: any) => (
+        <td
+          style={{
+            textAlign: 'left',
+            padding: '4px 8px',
+            maxWidth: 360,
+            borderBottom: '1px solid rgba(128,128,128,0.18)',
+            ...style,
+          }}
+          {...props}
+        />
+      ),
+      a: ({ href, children }: { href?: string | undefined; children?: React.ReactNode }) => {
+        // In-page anchors stay same-frame; everything else opens in a new
+        // tab with `noreferrer noopener` so a reader click can't navigate
+        // the top frame and the destination can't reach back through
+        // `window.opener`. (react-markdown v10 already neutralizes
+        // `javascript:`/`data:` hrefs via its default urlTransform, so no
+        // extra sanitization is needed here.)
+        const inPage = !!href && href.startsWith('#')
+        return (
+          <a
+            href={href}
+            {...(inPage ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
+            style={{
+              color: accent,
+              textDecoration: 'none',
+              borderBottom: `1px solid ${accent}`,
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {children}
+          </a>
+        )
+      },
+      img: ({ src, alt }: { src?: string | undefined; alt?: string | undefined }) => (
+        <MarkdownImage src={src} alt={alt} accent={accent} />
+      ),
+    }),
+    [accent, accentBg, blockStroke],
+  )
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   return (

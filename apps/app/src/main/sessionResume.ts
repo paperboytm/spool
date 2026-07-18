@@ -1,6 +1,7 @@
 import { existsSync, statSync } from 'node:fs'
-import { basename, dirname } from 'node:path'
 import { homedir } from 'node:os'
+import { basename, dirname } from 'node:path'
+
 import { decodeProjectSlug, type Session } from '@spool-lab/core'
 
 type ResumeSessionContext = Pick<Session, 'source' | 'cwd' | 'projectDisplayPath' | 'filePath'>

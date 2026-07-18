@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, search, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression coverage for issue #248: every "Copy resume command" menu item
@@ -85,7 +86,9 @@ test('Sidebar pinned row Copy resume command includes cd <cwd> prefix', async ()
   await firstRow.hover()
   await firstRow.locator('[data-testid="pin-button"]').click()
 
-  const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
+  const pinnedRow = window.locator(
+    `[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`,
+  )
   await expect(pinnedRow).toBeVisible({ timeout: 5000 })
   await pinnedRow.hover()
   await pinnedRow.locator('[data-testid="sidebar-pinned-menu-trigger"]').click()

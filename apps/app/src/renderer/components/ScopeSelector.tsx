@@ -1,8 +1,9 @@
+import type { ProjectGroup } from '@spool-lab/core'
+import { X as XIcon, ChevronDown } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { X as XIcon, ChevronDown } from 'lucide-react'
-import type { ProjectGroup } from '@spool-lab/core'
+
 import { useHotkeys } from '../hooks/useHotkeys.js'
 
 /**
@@ -34,10 +35,17 @@ export default function ScopeSelector({
 
   useEffect(() => {
     let cancelled = false
-    window.spool.listProjectGroups()
-      .then((rows) => { if (!cancelled) setProjects(rows) })
-      .catch(() => { if (!cancelled) setProjects([]) })
-    return () => { cancelled = true }
+    window.spool
+      .listProjectGroups()
+      .then((rows) => {
+        if (!cancelled) setProjects(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setProjects([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (
@@ -48,16 +56,14 @@ export default function ScopeSelector({
         data-testid={`${testIdPrefix}-trigger`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen(v => !v)}
-        className={`text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors ${
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors ${
           value
             ? 'text-accent dark:text-accent-dark bg-accent/10 dark:bg-accent-dark/10 hover:bg-accent/15 dark:hover:bg-accent-dark/15'
             : 'text-warm-faint dark:text-dark-muted bg-warm-surface2/60 dark:bg-dark-surface2/60 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
         }`}
       >
-        <span className="max-w-[220px] truncate">
-          {value ? value.displayName : t('scope.any')}
-        </span>
+        <span className="max-w-[220px] truncate">{value ? value.displayName : t('scope.any')}</span>
         <ChevronDown size={10} strokeWidth={2} aria-hidden className="opacity-60" />
       </button>
       {value && (
@@ -66,7 +72,7 @@ export default function ScopeSelector({
           data-testid={`${testIdPrefix}-clear`}
           onClick={() => onChange(null)}
           aria-label={t('scope.clear')}
-          className="p-0.5 rounded text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2"
+          className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 rounded p-0.5"
         >
           <XIcon size={11} strokeWidth={2} aria-hidden />
         </button>
@@ -129,7 +135,9 @@ function ScopePopover({
     }
   }, [anchorRef])
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   // Modal layer: Escape closes the popover before any outer modal sees it.
   useHotkeys({ Escape: onClose }, { modal: true })
@@ -149,9 +157,7 @@ function ScopePopover({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = q
-      ? projects.filter(p => p.displayName.toLowerCase().includes(q))
-      : projects
+    const list = q ? projects.filter((p) => p.displayName.toLowerCase().includes(q)) : projects
     return [...list].sort((a, b) => (b.lastSessionAt ?? '').localeCompare(a.lastSessionAt ?? ''))
   }, [projects, query])
 
@@ -164,7 +170,7 @@ function ScopePopover({
       role="dialog"
       onMouseDown={(e) => e.stopPropagation()}
       style={{ top: pos.top, left: pos.left }}
-      className="fixed z-[60] w-[280px] rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-lg overflow-hidden"
+      className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg fixed z-[60] w-[280px] overflow-hidden rounded-md border shadow-lg"
     >
       <input
         ref={inputRef}
@@ -172,7 +178,7 @@ function ScopePopover({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('scope.searchPlaceholder')}
-        className="w-full px-3 py-2 text-[12px] bg-transparent outline-none text-warm-text dark:text-dark-text placeholder:text-warm-faint border-b border-warm-border/50 dark:border-dark-border/50"
+        className="text-warm-text dark:text-dark-text placeholder:text-warm-faint border-warm-border/50 dark:border-dark-border/50 w-full border-b bg-transparent px-3 py-2 text-[12px] outline-none"
       />
       <div className="max-h-[240px] overflow-y-auto py-1">
         <button
@@ -180,7 +186,7 @@ function ScopePopover({
           data-testid={`${testIdPrefix}-option`}
           data-identity-key=""
           onClick={() => onSelect(null)}
-          className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-warm-surface2 dark:hover:bg-dark-surface2 ${
+          className={`hover:bg-warm-surface2 dark:hover:bg-dark-surface2 w-full px-3 py-1.5 text-left text-[12px] ${
             selectedKey === null
               ? 'text-warm-text dark:text-dark-text font-medium'
               : 'text-warm-muted dark:text-dark-muted'
@@ -189,7 +195,7 @@ function ScopePopover({
           {t('scope.any')}
         </button>
         {filtered.length === 0 ? (
-          <p className="px-3 py-2 text-[11px] text-warm-faint dark:text-dark-muted">
+          <p className="text-warm-faint dark:text-dark-muted px-3 py-2 text-[11px]">
             {query.trim() ? t('scope.noMatch') : t('scope.noProjects')}
           </p>
         ) : (
@@ -200,14 +206,14 @@ function ScopePopover({
               data-testid={`${testIdPrefix}-option`}
               data-identity-key={p.identityKey}
               onClick={() => onSelect({ identityKey: p.identityKey, displayName: p.displayName })}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] hover:bg-warm-surface2 dark:hover:bg-dark-surface2 ${
+              className={`hover:bg-warm-surface2 dark:hover:bg-dark-surface2 flex w-full items-center justify-between gap-2 px-3 py-1.5 text-[12px] ${
                 p.identityKey === selectedKey
                   ? 'text-warm-text dark:text-dark-text font-medium'
                   : 'text-warm-muted dark:text-dark-muted'
               }`}
             >
               <span className="truncate">{p.displayName}</span>
-              <span className="flex-none font-mono text-[10px] text-warm-faint dark:text-dark-muted tabular-nums">
+              <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[10px] tabular-nums">
                 {p.sessionCount}
               </span>
             </button>

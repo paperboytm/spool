@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Layer 2 — cross-session blast radius.
 //
@@ -19,39 +21,91 @@ let ctx: AppContext
 test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
-      writeFileSync(join(claudeDir, 'test-project', 'blast-a.jsonl'), [
-        JSON.stringify({ type: 'user', sessionId: SID_A, cwd: '/tmp/test-project', uuid: 'ba-1', timestamp: '2026-05-21T10:00:00Z', message: { role: 'user', content: `key ${FAKE_AKIA} and email me@x.io` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'ba-2', timestamp: '2026-05-21T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' } }),
-      ].join('\n'))
-      writeFileSync(join(claudeDir, 'test-project', 'blast-b.jsonl'), [
-        JSON.stringify({ type: 'user', sessionId: SID_B, cwd: '/tmp/test-project', uuid: 'bb-1', timestamp: '2026-05-22T10:00:00Z', message: { role: 'user', content: `same key ${FAKE_AKIA} again` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'bb-2', timestamp: '2026-05-22T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' } }),
-      ].join('\n'))
+      writeFileSync(
+        join(claudeDir, 'test-project', 'blast-a.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID_A,
+            cwd: '/tmp/test-project',
+            uuid: 'ba-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `key ${FAKE_AKIA} and email me@x.io` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'ba-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+        ].join('\n'),
+      )
+      writeFileSync(
+        join(claudeDir, 'test-project', 'blast-b.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID_B,
+            cwd: '/tmp/test-project',
+            uuid: 'bb-1',
+            timestamp: '2026-05-22T10:00:00Z',
+            message: { role: 'user', content: `same key ${FAKE_AKIA} again` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'bb-2',
+            timestamp: '2026-05-22T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 // Worker-idle can be a FALSE idle (queued=0 in the window before the new
 // session's scan is enqueued), so findings/risk categories aren't there
 // yet. Wait until they've actually been produced before driving the UI.
 async function waitForFindings(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { riskByCategory: () => Promise<unknown[]> } } }).spool
-    if (!api?.security) return false
-    const cats = await api.security.riskByCategory()
-    return Array.isArray(cats) && cats.length > 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as { spool?: { security?: { riskByCategory: () => Promise<unknown[]> } } }
+      ).spool
+      if (!api?.security) return false
+      const cats = await api.security.riskByCategory()
+      return Array.isArray(cats) && cats.length > 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('credential finding shows cross-session blast radius; PII does not', async () => {
@@ -72,9 +126,12 @@ test('credential finding shows cross-session blast radius; PII does not', async 
   // The api-key value row carries a quiet ⧉N badge. The same key leaks
   // in 2 sessions; the count is framed around the OTHER session (the
   // finding's own is excluded), so the badge reports 1.
-  const apiRow = window.locator('[data-testid="finding-row-wrap"]').filter({
-    has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
-  }).first()
+  const apiRow = window
+    .locator('[data-testid="finding-row-wrap"]')
+    .filter({
+      has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
+    })
+    .first()
   const badge = apiRow.locator('[data-testid="blast-badge"]')
   await expect(badge).toBeVisible({ timeout: 10_000 })
   await expect(badge).toHaveAttribute('data-sessions', '1')
@@ -84,7 +141,9 @@ test('credential finding shows cross-session blast radius; PII does not', async 
   await badge.click()
   const radius = apiRow.locator('[data-testid="blast-radius"]')
   await expect(radius.locator('[data-testid="blast-radius-row"]')).toHaveCount(1)
-  await expect(radius.locator('[data-testid="blast-radius-row"] [data-testid="source-dot"]')).toHaveCount(1)
+  await expect(
+    radius.locator('[data-testid="blast-radius-row"] [data-testid="source-dot"]'),
+  ).toHaveCount(1)
 })
 
 test('purge everywhere scrubs every copy and collapses the radius', async () => {
@@ -92,9 +151,12 @@ test('purge everywhere scrubs every copy and collapses the radius', async () => 
   await window.locator('[data-testid="sidebar-security"]').click()
   await expect(window.locator('[data-testid="security-page"]')).toBeVisible()
 
-  const apiRow = window.locator('[data-testid="finding-row-wrap"]').filter({
-    has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
-  }).first()
+  const apiRow = window
+    .locator('[data-testid="finding-row-wrap"]')
+    .filter({
+      has: window.locator('[data-testid="finding-row"][data-kind="api-key"]'),
+    })
+    .first()
   const badge = apiRow.locator('[data-testid="blast-badge"]')
   await expect(badge).toBeVisible({ timeout: 10_000 })
   // Expand idempotently — the badge's `expanded` state may already be

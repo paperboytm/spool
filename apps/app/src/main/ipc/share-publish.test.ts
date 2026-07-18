@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  MAX_PUBLISH_BODY_BYTES,
-  type PublishRequestBody,
-} from '../../shared/share-publish.js'
+
+import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
+
+import { MAX_PUBLISH_BODY_BYTES, type PublishRequestBody } from '../../shared/share-publish.js'
 
 type Handler = (e: unknown, ...args: unknown[]) => unknown
 

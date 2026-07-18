@@ -30,8 +30,7 @@ export function formatBytes(bytes: number): string {
     value /= 1000
     unit += 1
   }
-  const formatted = value >= 100 || unit === 0
-    ? Math.round(value).toString()
-    : value.toFixed(1).replace(/\.0$/, '')
+  const formatted =
+    value >= 100 || unit === 0 ? Math.round(value).toString() : value.toFixed(1).replace(/\.0$/, '')
   return `${formatted} ${units[unit]}`
 }

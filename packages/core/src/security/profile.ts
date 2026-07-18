@@ -103,7 +103,10 @@ function hashKindAllowlist(kinds: readonly string[] | undefined): string | null 
  *  worker treats them as "stale, rescan". */
 export function parseProfile(s: string | null | undefined): ParsedProfile | null {
   if (!s) return null
-  const parts = s.split(',').map(p => p.trim()).filter(Boolean)
+  const parts = s
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
   let regex: number | undefined
   let pf: string | undefined
   let allow: string | undefined

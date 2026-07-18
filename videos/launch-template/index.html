@@ -22,7 +22,7 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap");
+      @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap');
 
       :root {
         --bg: #141410;
@@ -32,19 +32,24 @@
         --accent: #f07020;
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
 
-      html, body {
+      html,
+      body {
         margin: 0;
         width: 1920px;
         height: 1080px;
         overflow: hidden;
         background: var(--bg);
         color: var(--text);
-        font-family: "Geist", sans-serif;
+        font-family: 'Geist', sans-serif;
         -webkit-font-smoothing: antialiased;
       }
-      body { position: relative; }
+      body {
+        position: relative;
+      }
 
       #root {
         position: relative;
@@ -67,9 +72,9 @@
         display: flex;
         align-items: center;
         gap: 14px;
-        font-family: "Geist Mono", monospace;
+        font-family: 'Geist Mono', monospace;
         font-size: 13px;
-        letter-spacing: 0.30em;
+        letter-spacing: 0.3em;
         text-transform: uppercase;
         color: var(--soft);
         margin-bottom: 28px;
@@ -80,7 +85,9 @@
         height: 2px;
         background: var(--accent);
       }
-      .panel-kicker .index { color: var(--text); }
+      .panel-kicker .index {
+        color: var(--text);
+      }
       .panel-headline {
         font-size: 70px;
         line-height: 0.97;
@@ -93,7 +100,9 @@
         opacity: 0;
         will-change: transform, opacity, filter;
       }
-      .panel-headline .accent { color: var(--accent); }
+      .panel-headline .accent {
+        color: var(--accent);
+      }
       .panel-sub {
         margin-top: 32px;
         font-size: 18px;
@@ -105,9 +114,15 @@
 
       /* First-frame friendly: scene 1 visible at t=0 so social-media auto-thumbnails
          grab a complete hero state. */
-      #panel1 { opacity: 1; }
-      #panel1 .panel-headline .word { opacity: 1; }
-      #panel1 .panel-sub { opacity: 1; }
+      #panel1 {
+        opacity: 1;
+      }
+      #panel1 .panel-headline .word {
+        opacity: 1;
+      }
+      #panel1 .panel-sub {
+        opacity: 1;
+      }
 
       /* ---- Persistent brand mark (top-left, visible from t=0) ---- */
       .brand-mark {
@@ -126,11 +141,13 @@
         letter-spacing: -0.045em;
         color: var(--text);
       }
-      .brand-mark .wordmark .accent { color: var(--accent); }
+      .brand-mark .wordmark .accent {
+        color: var(--accent);
+      }
       .brand-mark .version {
-        font-family: "Geist Mono", monospace;
+        font-family: 'Geist Mono', monospace;
         font-size: 11px;
-        letter-spacing: 0.30em;
+        letter-spacing: 0.3em;
         text-transform: uppercase;
         color: var(--muted);
       }
@@ -146,10 +163,8 @@
         transform-origin: 50% 50%;
         border-radius: 8px;
         overflow: hidden;
-        filter:
-          drop-shadow(0 60px 120px rgba(0, 0, 0, 0.75))
-          drop-shadow(0 24px 48px rgba(0, 0, 0, 0.55))
-          drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+        filter: drop-shadow(0 60px 120px rgba(0, 0, 0, 0.75))
+          drop-shadow(0 24px 48px rgba(0, 0, 0, 0.55)) drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
         opacity: 1;
       }
       .window-media {
@@ -162,7 +177,9 @@
         left: 0;
         opacity: 0;
       }
-      .window-media.lead { opacity: 1; }
+      .window-media.lead {
+        opacity: 1;
+      }
 
       /* ---- Feature annotations (inside .window so they track the camera) ---- */
       .annot {
@@ -178,7 +195,7 @@
       }
       .annot-label {
         position: absolute;
-        font-family: "Geist Mono", monospace;
+        font-family: 'Geist Mono', monospace;
         font-size: 9px;
         letter-spacing: 0.26em;
         font-weight: 600;
@@ -204,7 +221,10 @@
         width: 21%;
         height: 16%;
       }
-      #annot-feature-a-label { left: 1%; top: 10.5%; }
+      #annot-feature-a-label {
+        left: 1%;
+        top: 10.5%;
+      }
 
       /* ---- Outro lockup ---- */
       .outro-scene {
@@ -228,17 +248,28 @@
         gap: 24px;
         opacity: 0;
       }
-      .outro-logo { width: 92px; height: 92px; color: var(--text); }
-      .outro-logo svg { display: block; width: 100%; height: 100%; stroke: currentColor; }
+      .outro-logo {
+        width: 92px;
+        height: 92px;
+        color: var(--text);
+      }
+      .outro-logo svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        stroke: currentColor;
+      }
       .outro-wordmark {
         font-size: 68px;
         line-height: 1;
         font-weight: 700;
         letter-spacing: -0.05em;
       }
-      .outro-wordmark .period { color: var(--accent); }
+      .outro-wordmark .period {
+        color: var(--accent);
+      }
       .outro-version {
-        font-family: "Geist Mono", monospace;
+        font-family: 'Geist Mono', monospace;
         font-size: 13px;
         letter-spacing: 0.24em;
         text-transform: uppercase;
@@ -309,10 +340,12 @@
           <span><span class="index">01</span> — Feature A</span>
         </div>
         <div class="panel-headline">
-          <span class="word">Headline</span>&nbsp;<span class="word">line</span><br>
-          <span class="word">one,</span>&nbsp;<span class="word">two<span class="accent">.</span></span>
+          <span class="word">Headline</span>&nbsp;<span class="word">line</span><br />
+          <span class="word">one,</span>&nbsp;<span class="word"
+            >two<span class="accent">.</span></span
+          >
         </div>
-        <div class="panel-sub">Short supporting copy.<br>One or two lines max.</div>
+        <div class="panel-sub">Short supporting copy.<br />One or two lines max.</div>
       </div>
       <!-- Add #panel2, #panel3, ... per feature. -->
 
@@ -331,7 +364,14 @@
                 <line x1="9" y1="11" x2="9" y2="20" stroke-width="1.2"></line>
                 <line x1="23" y1="11" x2="23" y2="20" stroke-width="1.2"></line>
                 <path d="M9 20 C9 21.5 12 23 16 23 C20 23 23 21.5 23 20" stroke-width="1.2"></path>
-                <ellipse cx="16" cy="11" rx="3" ry="1.2" fill="currentColor" stroke="none"></ellipse>
+                <ellipse
+                  cx="16"
+                  cy="11"
+                  rx="3"
+                  ry="1.2"
+                  fill="currentColor"
+                  stroke="none"
+                ></ellipse>
               </svg>
             </div>
             <div class="outro-wordmark">Spool<span class="period">.</span></div>
@@ -345,47 +385,71 @@
       // Minimal timeline skeleton. Add panel-in/out, camera zooms, clip-swaps,
       // and annotation reveals per release. See references/composition.md in
       // the launch-video skill for the patterns used in v0.4.11.
-      window.__timelines = window.__timelines || {};
-      const tl = gsap.timeline({ paused: true });
+      window.__timelines = window.__timelines || {}
+      const tl = gsap.timeline({ paused: true })
 
       // Panel helpers
       function panelIn(sel, at) {
-        tl.set(sel, { opacity: 1 }, at - 0.001);
-        tl.fromTo(`${sel} .panel-kicker`,
+        tl.set(sel, { opacity: 1 }, at - 0.001)
+        tl.fromTo(
+          `${sel} .panel-kicker`,
           { x: -10, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.30, ease: "power3.out" }, at);
-        tl.fromTo(`${sel} .word`,
-          { y: 18, opacity: 0, filter: "blur(6px)" },
-          { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.38, ease: "power3.out", stagger: 0.055 }, at + 0.04);
-        tl.fromTo(`${sel} .panel-sub`,
+          { x: 0, opacity: 1, duration: 0.3, ease: 'power3.out' },
+          at,
+        )
+        tl.fromTo(
+          `${sel} .word`,
+          { y: 18, opacity: 0, filter: 'blur(6px)' },
+          {
+            y: 0,
+            opacity: 1,
+            filter: 'blur(0px)',
+            duration: 0.38,
+            ease: 'power3.out',
+            stagger: 0.055,
+          },
+          at + 0.04,
+        )
+        tl.fromTo(
+          `${sel} .panel-sub`,
           { y: 10, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.36, ease: "power2.out" }, at + 0.28);
+          { y: 0, opacity: 1, duration: 0.36, ease: 'power2.out' },
+          at + 0.28,
+        )
       }
       function panelOut(sel, at) {
-        tl.to(`${sel} .panel-kicker`, { x: -8, opacity: 0, duration: 0.26, ease: "power2.in" }, at);
-        tl.to(`${sel} .word`, { y: -12, opacity: 0, filter: "blur(4px)", duration: 0.30, ease: "power2.in" }, at + 0.02);
-        tl.to(`${sel} .panel-sub`, { opacity: 0, duration: 0.24, ease: "power2.in" }, at);
-        tl.set(sel, { opacity: 0 }, at + 0.36);
+        tl.to(`${sel} .panel-kicker`, { x: -8, opacity: 0, duration: 0.26, ease: 'power2.in' }, at)
+        tl.to(
+          `${sel} .word`,
+          { y: -12, opacity: 0, filter: 'blur(4px)', duration: 0.3, ease: 'power2.in' },
+          at + 0.02,
+        )
+        tl.to(`${sel} .panel-sub`, { opacity: 0, duration: 0.24, ease: 'power2.in' }, at)
+        tl.set(sel, { opacity: 0 }, at + 0.36)
       }
 
       // Camera zoom (transform-origin + scale on .window)
-      function zoomTo(originX, originY, scale, at, duration = 0.60) {
-        tl.to("#window", {
-          transformOrigin: `${originX}% ${originY}%`,
-          scale,
-          duration,
-          ease: "power2.inOut",
-        }, at);
+      function zoomTo(originX, originY, scale, at, duration = 0.6) {
+        tl.to(
+          '#window',
+          {
+            transformOrigin: `${originX}% ${originY}%`,
+            scale,
+            duration,
+            ease: 'power2.inOut',
+          },
+          at,
+        )
       }
 
       // Clip cross-fade (use during camera motion so the swap is hidden)
       function clipFade(outSel, inSel, at, duration = 0.18) {
-        tl.to(outSel, { opacity: 0, duration, ease: "power2.in" }, at);
-        tl.to(inSel, { opacity: 1, duration, ease: "power2.out" }, at);
+        tl.to(outSel, { opacity: 0, duration, ease: 'power2.in' }, at)
+        tl.to(inSel, { opacity: 1, duration, ease: 'power2.out' }, at)
       }
 
       // Scene 1 — panel 1 is statically visible from t=0 (no panelIn).
-      panelOut("#panel1", 2.95);
+      panelOut('#panel1', 2.95)
       // zoomTo(8, 50, 1.18, 3.10, 0.55);
       // clipFade("#clip-feature-a", "#clip-feature-b", 3.50);
       // ... add per-scene logic.
@@ -400,7 +464,7 @@
       //   { y: 0, opacity: 1, scale: 1, duration: 0.66, ease: "power3.out" }, 18.40);
       // tl.set("#outro-lockup", { opacity: 1, y: 0, scale: 1 }, 19.30);
 
-      window.__timelines["main"] = tl;
+      window.__timelines['main'] = tl
     </script>
   </body>
 </html>

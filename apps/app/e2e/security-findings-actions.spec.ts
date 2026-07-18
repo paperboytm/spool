@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Covers the unified findings-action surface work (2026-05):
 //
@@ -29,25 +31,69 @@ let ctx: AppContext
 test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
-      writeFileSync(join(claudeDir, 'test-project', 'findings-actions.jsonl'), [
-        JSON.stringify({ type: 'user', sessionId: SID, cwd: '/tmp/test-project', uuid: 'fa-1', timestamp: '2026-05-21T10:00:00Z', message: { role: 'user', content: `rotate ${FAKE_AKIA} please` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'fa-2', timestamp: '2026-05-21T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' } }),
-        JSON.stringify({ type: 'user', sessionId: SID, cwd: '/tmp/test-project', uuid: 'fa-3', timestamp: '2026-05-21T10:00:10Z', message: { role: 'user', content: `again, the key ${FAKE_AKIA} and email dev@fly.io` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'fa-4', timestamp: '2026-05-21T10:00:15Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'done' } }),
-      ].join('\n'))
+      writeFileSync(
+        join(claudeDir, 'test-project', 'findings-actions.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'fa-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `rotate ${FAKE_AKIA} please` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'fa-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'fa-3',
+            timestamp: '2026-05-21T10:00:10Z',
+            message: { role: 'user', content: `again, the key ${FAKE_AKIA} and email dev@fly.io` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'fa-4',
+            timestamp: '2026-05-21T10:00:15Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'done' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 async function openStrip(window: Page): Promise<void> {
@@ -119,7 +165,11 @@ test('REGRESSION: Dismiss all clears the strip and refreshes the meta-row pill',
   await window.locator('[role="menu"] [role="menuitem"]').first().click()
 
   // Strip flips to its cleared state…
-  await expect(window.locator('[data-testid="findings-strip"]')).toHaveAttribute('data-cleared', '1', { timeout: 10_000 })
+  await expect(window.locator('[data-testid="findings-strip"]')).toHaveAttribute(
+    'data-cleared',
+    '1',
+    { timeout: 10_000 },
+  )
   // …and the pill must disappear (0 active, 0 purged). Pre-fix it stayed
   // visible with the stale count because no findings-changed event fired.
   await expect(riskPill).toBeHidden({ timeout: 10_000 })

@@ -66,7 +66,13 @@ const EVERFOREST_LIGHT: Pick<
 export function lightPresetSeed(id: NamedThemePreset, base: ThemeSideConfig): ThemeSideConfig {
   if (id === 'spool') {
     const d = defaultLightSide()
-    return { ...base, preset: 'spool', accent: d.accent, background: d.background, foreground: d.foreground }
+    return {
+      ...base,
+      preset: 'spool',
+      accent: d.accent,
+      background: d.background,
+      foreground: d.foreground,
+    }
   }
   if (id === 'solarized') {
     return { ...base, preset: 'solarized', ...SOLARIZED_LIGHT }
@@ -77,7 +83,13 @@ export function lightPresetSeed(id: NamedThemePreset, base: ThemeSideConfig): Th
 export function darkPresetSeed(id: NamedThemePreset, base: ThemeSideConfig): ThemeSideConfig {
   if (id === 'spool') {
     const d = defaultDarkSide()
-    return { ...base, preset: 'spool', accent: d.accent, background: d.background, foreground: d.foreground }
+    return {
+      ...base,
+      preset: 'spool',
+      accent: d.accent,
+      background: d.background,
+      foreground: d.foreground,
+    }
   }
   if (id === 'solarized') {
     return { ...base, preset: 'solarized', ...SOLARIZED_DARK }

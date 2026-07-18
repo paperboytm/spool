@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, test, vi } from 'vite-plus/test'
+
 import { detectSessionSource, getSessionRoots, getSessionWatchPatterns } from './source-paths.js'
 
 const tempDirs: string[] = []
@@ -26,10 +28,7 @@ describe('getSessionRoots', () => {
 
     vi.stubEnv('SPOOL_CLAUDE_DIR', `${workProfile}\n${personalProjects}`)
 
-    expect(getSessionRoots('claude')).toEqual([
-      join(workProfile, 'projects'),
-      personalProjects,
-    ])
+    expect(getSessionRoots('claude')).toEqual([join(workProfile, 'projects'), personalProjects])
   })
 
   test('should normalize configured Gemini home paths to the temp directory root', () => {
@@ -40,9 +39,7 @@ describe('getSessionRoots', () => {
     mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
     vi.stubEnv('GEMINI_CLI_HOME', baseDir)
 
-    expect(getSessionRoots('gemini')).toEqual([
-      join(geminiHome, 'tmp'),
-    ])
+    expect(getSessionRoots('gemini')).toEqual([join(geminiHome, 'tmp')])
   })
 
   test('should normalize explicit Gemini CLI home overrides to the chats temp root', () => {
@@ -53,9 +50,7 @@ describe('getSessionRoots', () => {
     mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
     vi.stubEnv('SPOOL_GEMINI_DIR', baseDir)
 
-    expect(getSessionRoots('gemini')).toEqual([
-      join(geminiHome, 'tmp'),
-    ])
+    expect(getSessionRoots('gemini')).toEqual([join(geminiHome, 'tmp')])
   })
 
   test('does not re-nest the Gemini root when a workspace directory is named "tmp"', () => {
@@ -69,9 +64,7 @@ describe('getSessionRoots', () => {
     mkdirSync(join(geminiHome, 'tmp', 'workspace', 'chats'), { recursive: true })
     vi.stubEnv('GEMINI_CLI_HOME', baseDir)
 
-    expect(getSessionRoots('gemini')).toEqual([
-      join(geminiHome, 'tmp'),
-    ])
+    expect(getSessionRoots('gemini')).toEqual([join(geminiHome, 'tmp')])
   })
 
   test('should normalize pi home overrides to the agent sessions directory', () => {
@@ -81,9 +74,7 @@ describe('getSessionRoots', () => {
     mkdirSync(join(baseDir, 'agent', 'sessions', '--Users-me-work--'), { recursive: true })
     vi.stubEnv('SPOOL_PI_DIR', baseDir)
 
-    expect(getSessionRoots('pi')).toEqual([
-      join(baseDir, 'agent', 'sessions'),
-    ])
+    expect(getSessionRoots('pi')).toEqual([join(baseDir, 'agent', 'sessions')])
   })
 
   test('should normalize OpenCode data directories and database paths', () => {
@@ -95,9 +86,7 @@ describe('getSessionRoots', () => {
     writeFileSync(join(opencodeDir, 'opencode.db'), '')
     vi.stubEnv('SPOOL_OPENCODE_DIR', join(opencodeDir, 'opencode.db'))
 
-    expect(getSessionRoots('opencode')).toEqual([
-      opencodeDir,
-    ])
+    expect(getSessionRoots('opencode')).toEqual([opencodeDir])
   })
 })
 
@@ -122,11 +111,22 @@ describe('detectSessionSource', () => {
       opencode: [opencodeRoot],
     } as const
 
-    expect(detectSessionSource(join(claudeRoot, 'project-a', 'session.jsonl'), sourceRoots)).toBe('claude')
-    expect(detectSessionSource(join(codexRoot, '2026', '03', '29', 'rollout.jsonl'), sourceRoots)).toBe('codex')
-    expect(detectSessionSource(join(geminiRoot, 'workspace', 'chats', 'session-2026-04-08T00-00-deadbeef.json'), sourceRoots)).toBe('gemini')
+    expect(detectSessionSource(join(claudeRoot, 'project-a', 'session.jsonl'), sourceRoots)).toBe(
+      'claude',
+    )
+    expect(
+      detectSessionSource(join(codexRoot, '2026', '03', '29', 'rollout.jsonl'), sourceRoots),
+    ).toBe('codex')
+    expect(
+      detectSessionSource(
+        join(geminiRoot, 'workspace', 'chats', 'session-2026-04-08T00-00-deadbeef.json'),
+        sourceRoots,
+      ),
+    ).toBe('gemini')
     expect(detectSessionSource(join(opencodeRoot, 'opencode.db'), sourceRoots)).toBe('opencode')
-    expect(detectSessionSource(join(baseDir, 'other', 'session.jsonl'), sourceRoots)).toBeUndefined()
+    expect(
+      detectSessionSource(join(baseDir, 'other', 'session.jsonl'), sourceRoots),
+    ).toBeUndefined()
   })
 
   test('rejects nested Claude files (subagent scratchpads) below the slug directory', () => {
@@ -134,9 +134,12 @@ describe('detectSessionSource', () => {
     tempDirs.push(baseDir)
 
     const claudeRoot = join(baseDir, '.claude', 'projects')
-    mkdirSync(join(claudeRoot, '-Users-me-spool', 'c3859389-e126-4b46-b207-63f322f41893', 'subagents'), {
-      recursive: true,
-    })
+    mkdirSync(
+      join(claudeRoot, '-Users-me-spool', 'c3859389-e126-4b46-b207-63f322f41893', 'subagents'),
+      {
+        recursive: true,
+      },
+    )
 
     const sourceRoots = {
       claude: [claudeRoot],
@@ -195,7 +198,11 @@ describe('detectSessionSource', () => {
     // Slug with "subagents" substring must still classify as claude.
     expect(
       detectSessionSource(
-        join(claudeRoot, '-Users-me-work-subagents-app', 'fffe1234-5678-90ab-cdef-000000000000.jsonl'),
+        join(
+          claudeRoot,
+          '-Users-me-work-subagents-app',
+          'fffe1234-5678-90ab-cdef-000000000000.jsonl',
+        ),
         sourceRoots,
       ),
     ).toBe('claude')
@@ -258,7 +265,11 @@ describe('detectSessionSource — pi', () => {
 
     expect(
       detectSessionSource(
-        join(piRoot, '--Users-me-work-paperboy--', '2026-04-02T09-05-13-662Z_f41a7803-b075-4b88-8d74-f46a3a06f67d.jsonl'),
+        join(
+          piRoot,
+          '--Users-me-work-paperboy--',
+          '2026-04-02T09-05-13-662Z_f41a7803-b075-4b88-8d74-f46a3a06f67d.jsonl',
+        ),
         sourceRoots,
       ),
     ).toBe('pi')

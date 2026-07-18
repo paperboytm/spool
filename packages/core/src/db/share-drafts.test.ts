@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
+
 import type { ShareDraftListItem } from './share-drafts.js'
 
 const tempDirs: string[] = []
@@ -21,9 +23,12 @@ describe('share_drafts schema (v11)', () => {
   it('creates the table with expected columns and indexes', async () => {
     const { db } = await load()
 
-    const columns = db
-      .prepare('PRAGMA table_info(share_drafts)')
-      .all() as Array<{ name: string; type: string; notnull: number; pk: number }>
+    const columns = db.prepare('PRAGMA table_info(share_drafts)').all() as Array<{
+      name: string
+      type: string
+      notnull: number
+      pk: number
+    }>
 
     const byName = new Map(columns.map((c) => [c.name, c]))
     expect(byName.get('draft_id')?.pk).toBe(1)
@@ -51,9 +56,7 @@ describe('share_drafts schema (v11)', () => {
         `INSERT INTO share_drafts (draft_id, source_kind, snapshot_json) VALUES (?, ?, ?)`,
       ).run(`d-${k}`, k, '{}')
     }
-    const count = (
-      db.prepare('SELECT COUNT(*) AS n FROM share_drafts').get() as { n: number }
-    ).n
+    const count = (db.prepare('SELECT COUNT(*) AS n FROM share_drafts').get() as { n: number }).n
     expect(count).toBe(4)
   })
 
@@ -117,8 +120,9 @@ describe('share_drafts schema (v11)', () => {
     // SQLite datetime('now') has 1-second granularity, so we have to
     // shift the row's created_at backward to observe the timestamp
     // movement in a sub-second test.
-    db.prepare(`UPDATE share_drafts SET updated_at = datetime('now', '-2 seconds') WHERE draft_id = ?`)
-      .run('d-1')
+    db.prepare(
+      `UPDATE share_drafts SET updated_at = datetime('now', '-2 seconds') WHERE draft_id = ?`,
+    ).run('d-1')
 
     mod.upsertShareDraft(db, {
       draft_id: 'd-1',
@@ -148,9 +152,18 @@ describe('share_drafts schema (v11)', () => {
       })
     }
     // Force a predictable order by stamping updated_at in reverse.
-    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-01 00:00:00', 'a')
-    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-02 00:00:00', 'b')
-    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run('2026-01-03 00:00:00', 'c')
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run(
+      '2026-01-01 00:00:00',
+      'a',
+    )
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run(
+      '2026-01-02 00:00:00',
+      'b',
+    )
+    db.prepare(`UPDATE share_drafts SET updated_at = ? WHERE draft_id = ?`).run(
+      '2026-01-03 00:00:00',
+      'c',
+    )
 
     const rows = mod.listShareDrafts(db)
     expect(rows.map((r: ShareDraftListItem) => r.draft_id)).toEqual(['c', 'b', 'a'])
@@ -240,9 +253,11 @@ describe('share_drafts schema (v11)', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDir)
 
     const first = await loadInto(spoolDir)
-    first.db.prepare(
-      `INSERT INTO share_drafts (draft_id, source_kind, title, snapshot_json) VALUES (?, ?, ?, ?)`,
-    ).run('keep-me', 'pasted-url', 'persisted draft', '{"v":1}')
+    first.db
+      .prepare(
+        `INSERT INTO share_drafts (draft_id, source_kind, title, snapshot_json) VALUES (?, ?, ?, ?)`,
+      )
+      .run('keep-me', 'pasted-url', 'persisted draft', '{"v":1}')
     first.db.close()
     openDbs.length = 0
 

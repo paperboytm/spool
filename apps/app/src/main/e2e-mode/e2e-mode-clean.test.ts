@@ -24,10 +24,17 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+
+import { describe, expect, it } from 'vite-plus/test'
 
 const APP_ROOT = resolve(__dirname, '..', '..', '..')
 const OUT_DIR = resolve(APP_ROOT, 'out-e2e-clean-check')
+const ELECTRON_VITE = resolve(
+  APP_ROOT,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'electron-vite.CMD' : 'electron-vite',
+)
 
 const FORBIDDEN_TOKENS = [
   // Strings unique to share-auth-e2e.ts. If any of these survive into
@@ -40,7 +47,7 @@ const FORBIDDEN_TOKENS = [
 ]
 
 describe('production bundle is free of e2e-mode/', () => {
-  it('main/index.js contains zero references to the e2e composition root', () => {
+  it('main/index.mjs contains zero references to the e2e composition root', () => {
     // Clean any prior tmp out before building so we're never grepping a
     // stale file from a previous test run.
     rmSync(OUT_DIR, { recursive: true, force: true })
@@ -55,22 +62,14 @@ describe('production bundle is free of e2e-mode/', () => {
     // well inside the unit-test budget.
     const env = { ...process.env }
     delete env['SPOOL_E2E_TEST']
-    execFileSync(
-      'npx',
-      [
-        'electron-vite',
-        'build',
-        '--outDir',
-        OUT_DIR,
-      ],
-      {
-        cwd: APP_ROOT,
-        env,
-        stdio: 'pipe',
-      },
-    )
+    env['ELECTRON_SKIP_BINARY_DOWNLOAD'] = '1'
+    execFileSync(ELECTRON_VITE, ['build', '--outDir', OUT_DIR], {
+      cwd: APP_ROOT,
+      env,
+      stdio: 'pipe',
+    })
 
-    const bundlePath = join(OUT_DIR, 'main', 'index.js')
+    const bundlePath = join(OUT_DIR, 'main', 'index.mjs')
     expect(existsSync(bundlePath), `expected ${bundlePath} to exist after build`).toBe(true)
 
     const bundle = readFileSync(bundlePath, 'utf8')

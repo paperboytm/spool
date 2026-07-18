@@ -1,6 +1,15 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
+
 import MessageBubble, { type FindRange } from './message-bubble.js'
 import { DEFAULT_LABELS, type ConversationMessage, type MessageListLabels } from './types.js'
 
@@ -35,7 +44,13 @@ interface Props {
 /** A virtualised row is either an actual message or a day-divider header. */
 export type Row =
   | { kind: 'msg'; msg: ConversationMessage; showAvatar: boolean }
-  | { kind: 'sidechain'; key: string; label: string; timestamp: string; messages: ConversationMessage[] }
+  | {
+      kind: 'sidechain'
+      key: string
+      label: string
+      timestamp: string
+      messages: ConversationMessage[]
+    }
   | { kind: 'divider'; key: string; isoDay: string; label: string }
 
 /** Stable per-local-day key used for divider grouping + dedup. */
@@ -52,7 +67,11 @@ function sameLocalDay(a: Date, b: Date): boolean {
   )
 }
 
-export function makeDividerLabel(today: string, yesterday: string, locale: string | undefined): DividerLabel {
+export function makeDividerLabel(
+  today: string,
+  yesterday: string,
+  locale: string | undefined,
+): DividerLabel {
   return (iso, now) => {
     const d = new Date(iso)
     if (sameLocalDay(d, now)) return today
@@ -73,7 +92,9 @@ function sidechainKey(message: ConversationMessage): string {
 }
 
 function isSubagentHeader(message: ConversationMessage): boolean {
-  return message.role === 'system' && message.contentText.startsWith(OPENCODE_SUBAGENT_HEADER_PREFIX)
+  return (
+    message.role === 'system' && message.contentText.startsWith(OPENCODE_SUBAGENT_HEADER_PREFIX)
+  )
 }
 
 function makeSidechainLabel(messages: ConversationMessage[]): string {
@@ -83,10 +104,12 @@ function makeSidechainLabel(messages: ConversationMessage[]): string {
 }
 
 function visibleSidechainMessages(messages: ConversationMessage[]): ConversationMessage[] {
-  return messages.filter(message => !isSubagentHeader(message))
+  return messages.filter((message) => !isSubagentHeader(message))
 }
 
-function groupSidechainMessages(messages: ConversationMessage[]): Map<string, ConversationMessage[]> {
+function groupSidechainMessages(
+  messages: ConversationMessage[],
+): Map<string, ConversationMessage[]> {
   const groups = new Map<string, ConversationMessage[]>()
   for (const message of messages) {
     if (!message.isSidechain) continue
@@ -130,8 +153,7 @@ export function buildRows(messages: ConversationMessage[], label: DividerLabel):
         messages: visibleSidechainMessages(group),
       }
     } else {
-      const showAvatar: boolean =
-        !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
+      const showAvatar: boolean = !prevMsg || prevMsg.role !== msg.role || prevMsg.role === 'system'
       row = { kind: 'msg', msg, showAvatar }
     }
 
@@ -160,8 +182,11 @@ function shouldShowAvatarInGroup(messages: ConversationMessage[], index: number)
   return !message || !previous || previous.role !== message.role || previous.role === 'system'
 }
 
-function hasFindMatch(messages: ConversationMessage[], messageFindRanges: Map<number, MatchState>): boolean {
-  return messages.some(message => messageFindRanges.has(message.id))
+function hasFindMatch(
+  messages: ConversationMessage[],
+  messageFindRanges: Map<number, MatchState>,
+): boolean {
+  return messages.some((message) => messageFindRanges.has(message.id))
 }
 
 function formatRowTime(iso: string, locale: string | undefined): string {
@@ -234,30 +259,37 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useImperativeHandle(ref, () => ({
-    scrollToMessageId(id) {
-      const idx = idToRowIndex.get(id)
-      if (idx == null) return
-      virtuosoRef.current?.scrollIntoView({ index: idx, align: 'center', behavior: 'auto' })
-    },
-  }), [idToRowIndex])
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToMessageId(id) {
+        const idx = idToRowIndex.get(id)
+        if (idx == null) return
+        virtuosoRef.current?.scrollIntoView({ index: idx, align: 'center', behavior: 'auto' })
+      },
+    }),
+    [idToRowIndex],
+  )
 
   // Custom scrollbar maps thumb position → row index → Virtuoso scrollToIndex.
   // We can't use scrollTop directly because Virtuoso estimates scrollHeight
   // from defaultItemHeight; real rows (markdown bubbles) are usually taller,
   // so a pixel-ratio map can't reach the actual top/bottom until rows measure.
   const rowCount = rows.length
-  const scrollToRatio = useCallback((ratio: number) => {
-    const handle = virtuosoRef.current
-    if (!handle || rowCount === 0) return
-    const clamped = Math.max(0, Math.min(1, ratio))
-    const index = Math.round(clamped * (rowCount - 1))
-    handle.scrollToIndex({ index, align: 'start', behavior: 'auto' })
-  }, [rowCount])
+  const scrollToRatio = useCallback(
+    (ratio: number) => {
+      const handle = virtuosoRef.current
+      if (!handle || rowCount === 0) return
+      const clamped = Math.max(0, Math.min(1, ratio))
+      const index = Math.round(clamped * (rowCount - 1))
+      handle.scrollToIndex({ index, align: 'start', behavior: 'auto' })
+    },
+    [rowCount],
+  )
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-warm-faint dark:text-dark-muted">
+      <div className="text-warm-faint dark:text-dark-muted flex flex-1 items-center justify-center">
         <p className="text-sm">No messages to display.</p>
       </div>
     )
@@ -270,19 +302,20 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
           data-index={index}
           data-testid="day-divider"
           data-day={row.isoDay}
-          className="px-6 pt-5 pb-2 flex items-center gap-3 select-none"
+          className="flex items-center gap-3 px-6 pt-5 pb-2 select-none"
         >
-          <span className="flex-1 h-px bg-warm-border dark:bg-dark-border" />
-          <span className="text-[10px] font-semibold tracking-[0.08em] uppercase text-warm-faint dark:text-dark-muted">
+          <span className="bg-warm-border dark:bg-dark-border h-px flex-1" />
+          <span className="text-warm-faint dark:text-dark-muted text-[10px] font-semibold tracking-[0.08em] uppercase">
             {row.label}
           </span>
-          <span className="flex-1 h-px bg-warm-border dark:bg-dark-border" />
+          <span className="bg-warm-border dark:bg-dark-border h-px flex-1" />
         </div>
       )
     }
     if (row.kind === 'sidechain') {
       const rowHasFindMatch = showFindBar && hasFindMatch(row.messages, messageFindRanges)
-      const rowHasTarget = targetMessageId != null && row.messages.some(message => message.id === targetMessageId)
+      const rowHasTarget =
+        targetMessageId != null && row.messages.some((message) => message.id === targetMessageId)
       const expanded = expandedSidechains.has(row.key) || rowHasFindMatch || rowHasTarget
       const rowTime = formatRowTime(row.timestamp, locale)
 
@@ -298,29 +331,40 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
                 return next
               })
             }}
-            className="w-full min-w-0 flex items-center gap-2 rounded-md border border-warm-border dark:border-dark-border bg-warm-surface/70 dark:bg-dark-surface/70 px-3 py-2 text-left hover:bg-warm-surface2 dark:hover:bg-dark-surface2 transition-colors"
+            className="border-warm-border dark:border-dark-border bg-warm-surface/70 dark:bg-dark-surface/70 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 flex w-full min-w-0 items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors"
           >
             {expanded ? (
-              <ChevronDown size={14} strokeWidth={1.8} className="flex-none text-warm-faint dark:text-dark-muted" aria-hidden />
+              <ChevronDown
+                size={14}
+                strokeWidth={1.8}
+                className="text-warm-faint dark:text-dark-muted flex-none"
+                aria-hidden
+              />
             ) : (
-              <ChevronRight size={14} strokeWidth={1.8} className="flex-none text-warm-faint dark:text-dark-muted" aria-hidden />
+              <ChevronRight
+                size={14}
+                strokeWidth={1.8}
+                className="text-warm-faint dark:text-dark-muted flex-none"
+                aria-hidden
+              />
             )}
-            <span className="flex-1 min-w-0 truncate text-xs font-medium text-warm-muted dark:text-dark-muted">
+            <span className="text-warm-muted dark:text-dark-muted min-w-0 flex-1 truncate text-xs font-medium">
               {row.label}
             </span>
-            <span className="flex-none text-[10px] font-mono text-warm-faint dark:text-dark-muted">
+            <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[10px]">
               {labels.messagesCount(row.messages.length)}
               {rowTime ? ` · ${rowTime}` : ''}
             </span>
           </button>
 
           {expanded && (
-            <div className="mt-2 ml-2 border-l border-warm-border dark:border-dark-border">
+            <div className="border-warm-border dark:border-dark-border mt-2 ml-2 border-l">
               {row.messages.map((message, messageIndex) => {
                 const matchState = showFindBar ? messageFindRanges.get(message.id) : undefined
-                const containsActive = matchState != null
-                  && activeMatchIndex >= matchState.offset
-                  && activeMatchIndex < matchState.offset + matchState.ranges.length
+                const containsActive =
+                  matchState != null &&
+                  activeMatchIndex >= matchState.offset &&
+                  activeMatchIndex < matchState.offset + matchState.ranges.length
                 const isTarget = message.id === targetMessageId
 
                 return (
@@ -337,7 +381,9 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
                       message={message}
                       isDark={isDark}
                       showAvatar={shouldShowAvatarInGroup(row.messages, messageIndex)}
-                      {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
+                      {...(matchState
+                        ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset }
+                        : {})}
                       activeMatchIndex={containsActive ? activeMatchIndex : -1}
                       {...(containsActive ? { onActiveMatchRef } : {})}
                     />
@@ -351,9 +397,10 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
     }
     const msg = row.msg
     const matchState = showFindBar ? messageFindRanges.get(msg.id) : undefined
-    const containsActive = matchState != null
-      && activeMatchIndex >= matchState.offset
-      && activeMatchIndex < matchState.offset + matchState.ranges.length
+    const containsActive =
+      matchState != null &&
+      activeMatchIndex >= matchState.offset &&
+      activeMatchIndex < matchState.offset + matchState.ranges.length
     const isTarget = msg.id === targetMessageId
 
     return (
@@ -370,7 +417,9 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
           message={msg}
           isDark={isDark}
           showAvatar={row.showAvatar}
-          {...(matchState ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset } : {})}
+          {...(matchState
+            ? { findRanges: matchState.ranges, matchIndexOffset: matchState.offset }
+            : {})}
           activeMatchIndex={containsActive ? activeMatchIndex : -1}
           {...(containsActive ? { onActiveMatchRef } : {})}
         />
@@ -379,23 +428,29 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
   }
 
   return (
-    <div className={useWindowScroll
-      ? 'relative min-w-0 max-w-full overflow-x-hidden'
-      : 'relative flex-1 min-h-0'}>
+    <div
+      className={
+        useWindowScroll
+          ? 'relative max-w-full min-w-0 overflow-x-hidden'
+          : 'relative min-h-0 flex-1'
+      }
+    >
       <Virtuoso
         ref={virtuosoRef}
         {...(useWindowScroll ? {} : { scrollerRef: bindVirtuosoScroller })}
         data={rows}
-        computeItemKey={(_index, row) => row.kind === 'msg' ? `m-${row.msg.id}` : row.key}
+        computeItemKey={(_index, row) => (row.kind === 'msg' ? `m-${row.msg.id}` : row.key)}
         defaultItemHeight={64}
         {...(initialIndex ? { initialTopMostItemIndex: initialIndex } : {})}
         increaseViewportBy={400}
         {...(useWindowScroll ? {} : { totalListHeightChanged: requestScrollbarSync })}
         useWindowScroll={useWindowScroll}
         data-testid="message-list-scroll"
-        className={useWindowScroll
-          ? 'scrollbar-none'
-          : 'h-full scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]'}
+        className={
+          useWindowScroll
+            ? 'scrollbar-none'
+            : 'h-full scrollbar-none [mask-image:linear-gradient(to_bottom,black_calc(100%_-_24px),transparent)]'
+        }
         itemContent={renderRowContent}
       />
       {!useWindowScroll && (
@@ -430,14 +485,17 @@ function MessageScrollbar({
   })
   const [dragThumbTop, setDragThumbTop] = useState<number | null>(null)
 
-  useEffect(() => () => {
-    const active = activeDragRef.current
-    if (!active) return
-    window.removeEventListener('pointermove', active.move)
-    window.removeEventListener('pointerup', active.up)
-    window.removeEventListener('pointercancel', active.up)
-    activeDragRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      const active = activeDragRef.current
+      if (!active) return
+      window.removeEventListener('pointermove', active.move)
+      window.removeEventListener('pointerup', active.up)
+      window.removeEventListener('pointercancel', active.up)
+      activeDragRef.current = null
+    },
+    [],
+  )
 
   const syncMetrics = useCallback(() => {
     if (!scroller || draggingRef.current) return
@@ -484,7 +542,10 @@ function MessageScrollbar({
 
   const trackInset = 4
   const trackHeight = Math.max(0, metrics.clientHeight - trackInset * 2)
-  const thumbHeight = Math.max(24, Math.round((metrics.clientHeight / metrics.scrollHeight) * trackHeight))
+  const thumbHeight = Math.max(
+    24,
+    Math.round((metrics.clientHeight / metrics.scrollHeight) * trackHeight),
+  )
   const maxThumbTop = Math.max(0, trackHeight - thumbHeight)
   const maxScrollTop = Math.max(1, metrics.scrollHeight - metrics.clientHeight)
   const syncedThumbTop = Math.round((metrics.scrollTop / maxScrollTop) * maxThumbTop)
@@ -500,7 +561,7 @@ function MessageScrollbar({
     <div
       ref={trackRef}
       data-testid="message-scrollbar-track"
-      className="absolute right-0 top-1 bottom-1 w-3 z-10"
+      className="absolute top-1 right-0 bottom-1 z-10 w-3"
       aria-hidden
       onPointerDown={(event) => {
         if (event.target !== event.currentTarget) return

@@ -1,10 +1,15 @@
-import { exec, execSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
+const SAFE_BINARY_NAME = /^[A-Za-z0-9._+-]+$/
+
+function isSafeBinaryName(name: string): boolean {
+  return name.length > 0 && SAFE_BINARY_NAME.test(name)
+}
 
 /**
  * Resolve a binary path that works in both terminal-launched and
@@ -18,12 +23,14 @@ const execAsync = promisify(exec)
  */
 
 export function nvmVersionBins(home: string, name: string): string[] {
+  if (!isSafeBinaryName(name)) return []
   const versionsDir = join(home, '.nvm', 'versions', 'node')
   try {
     return readdirSync(versionsDir)
-      .filter(d => d.startsWith('v'))
-      .sort().reverse()
-      .map(d => join(versionsDir, d, 'bin', name))
+      .filter((d) => d.startsWith('v'))
+      .sort()
+      .reverse()
+      .map((d) => join(versionsDir, d, 'bin', name))
   } catch {
     return []
   }
@@ -36,6 +43,7 @@ export function nvmVersionBins(home: string, name: string): string[] {
  * (it's a stable entry point), then scan installed versions newest-first.
  */
 export function miseVersionBins(home: string, name: string): string[] {
+  if (!isSafeBinaryName(name)) return []
   const root = join(home, '.local', 'share', 'mise')
   const result: string[] = [join(root, 'shims', name)]
 
@@ -52,9 +60,17 @@ export function miseVersionBins(home: string, name: string): string[] {
     let versions: string[]
     try {
       versions = readdirSync(pluginDir)
-    } catch { continue }
+    } catch {
+      continue
+    }
     const ordered = versions.includes('latest')
-      ? ['latest', ...versions.filter(v => v !== 'latest').sort().reverse()]
+      ? [
+          'latest',
+          ...versions
+            .filter((v) => v !== 'latest')
+            .sort()
+            .reverse(),
+        ]
       : versions.sort().reverse()
     for (const v of ordered) {
       result.push(join(pluginDir, v, 'bin', name))
@@ -65,6 +81,7 @@ export function miseVersionBins(home: string, name: string): string[] {
 
 /** Ordered list of filesystem paths to probe for `name`. Pure. */
 export function wellKnownBinPaths(name: string, home: string, extras: string[] = []): string[] {
+  if (!isSafeBinaryName(name)) return []
   return [
     ...extras,
     `/usr/local/bin/${name}`,
@@ -77,8 +94,9 @@ export function wellKnownBinPaths(name: string, home: string, extras: string[] =
 }
 
 function shellLookup(shell: string, flags: string, name: string, timeoutMs: number): string | null {
+  if (!isSafeBinaryName(name)) return null
   try {
-    const p = execSync(`${shell} ${flags} 'command -v ${name}'`, {
+    const p = execFileSync(shell, [flags, 'command -v -- "$1"', 'spool-resolve', name], {
       encoding: 'utf8',
       timeout: timeoutMs,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -90,11 +108,10 @@ function shellLookup(shell: string, flags: string, name: string, timeoutMs: numb
 }
 
 export function resolveSystemBinary(name: string, extraSearchPaths: string[] = []): string | null {
+  if (!isSafeBinaryName(name)) return null
   // 1. Current process PATH — fast path for terminal-launched contexts
-  try {
-    const p = execSync(`command -v ${name}`, { encoding: 'utf8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim()
-    if (p) return p
-  } catch {}
+  const processPathMatch = shellLookup('/bin/sh', '-c', name, 3000)
+  if (processPathMatch) return processPathMatch
 
   // 2. User's login+interactive shell — covers mise/asdf/fnm activated in .zshrc/.bashrc
   const userShell = process.env['SHELL']
@@ -132,7 +149,7 @@ export function clearResolveCache(name: string): void {
 }
 
 // ── Async API ─────────────────────────────────────────────────────────────
-// The sync variants above use execSync('<shell> -ilc ...') which spawns a
+// The sync variants above use execFileSync('<shell>', ['-ilc', ...]) which spawns a
 // fresh interactive login shell and can take seconds when the user's
 // .zshrc is heavy. Awaiting calls to those from the Electron main process
 // stalls the event loop and produces a launch beachball. Async callers
@@ -147,12 +164,19 @@ export function clearResolveCache(name: string): void {
 // is reserved for users whose binaries genuinely only exist behind a
 // shell-activated alias or function.
 
-async function shellLookupAsync(shell: string, flags: string, name: string, timeoutMs: number): Promise<string | null> {
+async function shellLookupAsync(
+  shell: string,
+  flags: string,
+  name: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  if (!isSafeBinaryName(name)) return null
   try {
-    const { stdout } = await execAsync(`${shell} ${flags} 'command -v ${name}'`, {
-      encoding: 'utf8',
-      timeout: timeoutMs,
-    })
+    const { stdout } = await execFileAsync(
+      shell,
+      [flags, 'command -v -- "$1"', 'spool-resolve', name],
+      { encoding: 'utf8', timeout: timeoutMs },
+    )
     const p = stdout.trim()
     return p || null
   } catch {
@@ -160,13 +184,14 @@ async function shellLookupAsync(shell: string, flags: string, name: string, time
   }
 }
 
-export async function resolveSystemBinaryAsync(name: string, extraSearchPaths: string[] = []): Promise<string | null> {
+export async function resolveSystemBinaryAsync(
+  name: string,
+  extraSearchPaths: string[] = [],
+): Promise<string | null> {
+  if (!isSafeBinaryName(name)) return null
   // 1. Current process PATH — fastest, covers terminal-launched contexts
-  try {
-    const { stdout } = await execAsync(`command -v ${name}`, { encoding: 'utf8', timeout: 3000 })
-    const p = stdout.trim()
-    if (p) return p
-  } catch {}
+  const processPathMatch = await shellLookupAsync('/bin/sh', '-c', name, 3000)
+  if (processPathMatch) return processPathMatch
 
   // 2. Well-known install locations — pure filesystem probes, no shell exec.
   //    Covers homebrew, ~/.local/bin, nvm versions, and mise installs/shims.
@@ -195,7 +220,10 @@ export async function resolveSystemBinaryAsync(name: string, extraSearchPaths: s
  *  it instantly. Path validation: cached entries are verified with a
  *  filesystem check before being returned, so a brew upgrade or manual
  *  removal triggers a re-resolve instead of leaking a stale path. */
-export async function cachedResolveAsync(name: string, extras: string[] = []): Promise<string | null> {
+export async function cachedResolveAsync(
+  name: string,
+  extras: string[] = [],
+): Promise<string | null> {
   if (name in resolvedPaths) {
     const cached = resolvedPaths[name] ?? null
     if (cached === null) return null

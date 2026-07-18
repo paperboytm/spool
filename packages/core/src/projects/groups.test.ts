@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
 import { listProjectGroups } from './groups.js'
 
@@ -71,10 +72,7 @@ describe('listProjectGroups', () => {
     expect(groups[0]).toMatchObject({
       identityKey: '/Users/me/foo,bar',
       displayPaths: ['/Users/me/foo,bar'],
-      cwds: expect.arrayContaining([
-        '/Users/me/foo,bar',
-        '/Users/me/foo,bar/packages/core',
-      ]),
+      cwds: expect.arrayContaining(['/Users/me/foo,bar', '/Users/me/foo,bar/packages/core']),
     })
     expect(groups[0].displayPaths).not.toContain('/Users/me/foo')
     expect(groups[0].cwds).not.toContain('bar')
@@ -94,6 +92,6 @@ describe('listProjectGroups', () => {
         (3,1,'u-l','/pl','t','2026-04-29T10:00:00Z','2026-04-29T11:00:00Z',1,0,'2026-04-29T11:00:00Z');
     `)
     const groups = listProjectGroups(db)
-    expect(groups.map(g => g.identityKind)).toEqual(['path', 'path', 'loose'])
+    expect(groups.map((g) => g.identityKind)).toEqual(['path', 'path', 'loose'])
   })
 })

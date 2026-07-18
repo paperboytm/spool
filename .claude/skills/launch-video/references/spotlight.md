@@ -6,30 +6,34 @@ An SVG-mask overlay that dims everything outside 1–2 transparent "holes". An a
 
 Both techniques live inside `.window` so the camera transform applies to them. Pick based on what you want the viewer to do:
 
-| Goal | Use |
-|---|---|
-| "Look at this strip" (specific feature region, no ambiguity) | Amber rectangle (precise, geometric) |
-| "Read this preview while also watching this control" | Dual spotlight (preview hole always bright, control hole retargets) |
-| "Focus tightens as the click happens" | Spotlight retarget (single hole moves) |
-| The amber outline keeps reading as "misaligned" no matter how you measure | Spotlight (soft falloff hides drift) |
+| Goal                                                                      | Use                                                                 |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| "Look at this strip" (specific feature region, no ambiguity)              | Amber rectangle (precise, geometric)                                |
+| "Read this preview while also watching this control"                      | Dual spotlight (preview hole always bright, control hole retargets) |
+| "Focus tightens as the click happens"                                     | Spotlight retarget (single hole moves)                              |
+| The amber outline keeps reading as "misaligned" no matter how you measure | Spotlight (soft falloff hides drift)                                |
 
 Amber rectangles are unforgiving about pixel alignment — if your measured coords are 4px off, the outline reads as "wrong". Spotlight holes have a dim falloff around their edge that absorbs small drift; you can be ±10px and the eye still lands where you want it.
 
 ## The mask structure
 
-A single SVG covers the window. Inside is a `<mask>` with a white "shows everything" rect and 1–2 black "punches a hole" rects. The output rectangle is filled with the dim colour and references the mask, so wherever the mask is black, the dim is *not* applied (those holes show the video underneath at full brightness).
+A single SVG covers the window. Inside is a `<mask>` with a white "shows everything" rect and 1–2 black "punches a hole" rects. The output rectangle is filled with the dim colour and references the mask, so wherever the mask is black, the dim is _not_ applied (those holes show the video underneath at full brightness).
 
 ```html
-<svg id="spotlight" viewBox="0 0 100 100" preserveAspectRatio="none"
-     style="position:absolute; inset:0; z-index:18; pointer-events:none; opacity:0">
+<svg
+  id="spotlight"
+  viewBox="0 0 100 100"
+  preserveAspectRatio="none"
+  style="position:absolute; inset:0; z-index:18; pointer-events:none; opacity:0"
+>
   <defs>
     <mask id="spotlight-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
-      <rect width="100" height="100" fill="white"/>
-      <rect id="hole-primary"   x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black"/>
-      <rect id="hole-secondary" x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black"/>
+      <rect width="100" height="100" fill="white" />
+      <rect id="hole-primary" x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black" />
+      <rect id="hole-secondary" x="50" y="50" width="0" height="0" rx="0.8" ry="0.8" fill="black" />
     </mask>
   </defs>
-  <rect width="100" height="100" fill="#121210" fill-opacity="0.70" mask="url(#spotlight-holes)"/>
+  <rect width="100" height="100" fill="#121210" fill-opacity="0.70" mask="url(#spotlight-holes)" />
 </svg>
 ```
 
@@ -42,24 +46,24 @@ Each hole's default size is 0×0 (invisible). GSAP retargets them via `attr` twe
 These belong in the composition script next to `panelIn` / `clipCut`:
 
 ```js
-const NULL_HOLE = { x: 50, y: 50, w: 0, h: 0 };
+const NULL_HOLE = { x: 50, y: 50, w: 0, h: 0 }
 
 function setHole(sel, rect, at) {
-  const r = rect || NULL_HOLE;
-  tl.set(sel, { attr: { x: r.x, y: r.y, width: r.w, height: r.h } }, at);
+  const r = rect || NULL_HOLE
+  tl.set(sel, { attr: { x: r.x, y: r.y, width: r.w, height: r.h } }, at)
 }
 function spotlightOn(primary, at, secondary) {
-  setHole("#hole-primary",   primary,   at);
-  setHole("#hole-secondary", secondary, at);
-  tl.set("#spotlight", { opacity: 1 }, at);
+  setHole('#hole-primary', primary, at)
+  setHole('#hole-secondary', secondary, at)
+  tl.set('#spotlight', { opacity: 1 }, at)
 }
 function spotlightOff(at) {
-  tl.set("#spotlight", { opacity: 0 }, at);
+  tl.set('#spotlight', { opacity: 0 }, at)
 }
 function spotlightSnap(primary, at, secondary) {
   // Retarget without changing the overall on/off state.
-  setHole("#hole-primary",   primary,   at);
-  setHole("#hole-secondary", secondary, at);
+  setHole('#hole-primary', primary, at)
+  setHole('#hole-secondary', secondary, at)
 }
 ```
 
@@ -67,21 +71,21 @@ Define your focus rectangles once near the top of the script, in `% of .window`.
 
 ```js
 const F = {
-  sidebarTarget:  { x: 0.6,  y: 10.0, w: 20,   h: 3.4 },
-  primaryRegion:  { x: 1,    y: 1,    w: 68,   h: 98 },
-  controlPanel:   { x: 71.5, y: 11,   w: 26.5, h: 41 },
+  sidebarTarget: { x: 0.6, y: 10.0, w: 20, h: 3.4 },
+  primaryRegion: { x: 1, y: 1, w: 68, h: 98 },
+  controlPanel: { x: 71.5, y: 11, w: 26.5, h: 41 },
   // ...
-};
+}
 ```
 
 Then in scene code:
 
 ```js
-spotlightOn(F.sidebarTarget, 0.45);                       // single, dim everything else
-spotlightSnap(F.primaryRegion, 1.55);                     // retarget, still on
-spotlightSnap(F.primaryRegion, 10.15, F.controlPanel);    // dual: preview + control
-spotlightSnap(F.primaryRegion, 30.15);                    // collapse secondary, single again
-spotlightOff(34.50);
+spotlightOn(F.sidebarTarget, 0.45) // single, dim everything else
+spotlightSnap(F.primaryRegion, 1.55) // retarget, still on
+spotlightSnap(F.primaryRegion, 10.15, F.controlPanel) // dual: preview + control
+spotlightSnap(F.primaryRegion, 30.15) // collapse secondary, single again
+spotlightOff(34.5)
 ```
 
 ## Hard snaps only — no morph
@@ -112,10 +116,10 @@ When the cause-and-effect has played its loop, collapse the secondary to `NULL_H
 
 ```js
 // Dual: outcome + control both bright while the user toggles.
-spotlightSnap(F.primaryRegion, 25.65, F.controlPanel);
+spotlightSnap(F.primaryRegion, 25.65, F.controlPanel)
 // After the final click, kill the secondary.
 // Only the outcome stays lit — its state change reads as the answer.
-spotlightSnap(F.primaryRegion, 29.65);
+spotlightSnap(F.primaryRegion, 29.65)
 ```
 
 This is a deliberate 0.5–1.0s moment of "look here, this is the answer." Particularly useful for features whose payoff is subtle (a count collapsing, a state flip, a value vanishing) and would get lost in a busy dual-spotlight frame.
@@ -132,17 +136,17 @@ Same workflow as amber rectangles, but with one advantage: spotlight is forgivin
 
 ## clipCut interaction
 
-`spotlightSnap` doesn't change which clip is visible — it just moves the holes. When a scene changes underlying clips, the spotlight coords usually don't need to change if the layout is the same (controls in the same place, outcome in the same place). Retarget only when the *active control* changes from one row/element to another.
+`spotlightSnap` doesn't change which clip is visible — it just moves the holes. When a scene changes underlying clips, the spotlight coords usually don't need to change if the layout is the same (controls in the same place, outcome in the same place). Retarget only when the _active control_ changes from one row/element to another.
 
 Order of operations at scene boundaries:
 
 ```js
 // Panel anchors first (0.4s lead — see composition.md on panel-leads-spotlight)
-panelIn("#panelN", 14.85);
+panelIn('#panelN', 14.85)
 // Clip swaps next
-clipCut("#clip-prev", "#clip-next", 14.65);
+clipCut('#clip-prev', '#clip-next', 14.65)
 // Spotlight retargets last
-spotlightSnap(F.primaryRegion, 15.25, F.controlPanel);
+spotlightSnap(F.primaryRegion, 15.25, F.controlPanel)
 ```
 
 ## Common pitfalls

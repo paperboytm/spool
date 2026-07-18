@@ -2,52 +2,46 @@
   "name": "spool",
   "version": "0.6.0",
   "private": true,
-  "packageManager": "pnpm@10.33.0",
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "type": "module",
   "scripts": {
-    "build": "turbo build",
-    "package": "turbo build --filter=@spool/app... && pnpm --filter @spool/app package",
-    "package:mac": "turbo build --filter=@spool/app... && pnpm --filter @spool/app package:mac",
-    "package:linux": "turbo build --filter=@spool/app... && pnpm --filter @spool/app package:linux",
-    "dev": "turbo dev --concurrency 11",
-    "typecheck": "turbo typecheck",
-    "pretest": "pnpm run rebuild:native:node",
-    "test": "turbo test --concurrency=1",
+    "dev": "pnpm run build && pnpm -r --parallel run dev",
+    "build": "vp run -r build",
+    "package": "vp run --filter '@spool/app...' build && pnpm --filter @spool/app package",
+    "package:mac": "vp run --filter '@spool/app...' build && pnpm --filter @spool/app package:mac",
+    "package:linux": "vp run --filter '@spool/app...' build && pnpm --filter @spool/app package:linux",
+    "typecheck": "vp run -r typecheck",
+    "pretest": "pnpm run rebuild:native:node && pnpm --filter @spool/app run ensure:electron-runtime",
+    "test": "vp run -r --concurrency-limit 1 test",
     "test:core": "pnpm --filter @spool-lab/core test",
     "test:e2e": "pnpm --filter @spool/app test:e2e",
     "test:share-backend": "pnpm --filter @spool/backend test",
     "rebuild:native:node": "pnpm --filter @spool-lab/core run rebuild:native:node",
     "rebuild:native:electron": "pnpm --filter @spool/app run rebuild:native:electron",
-    "lint": "oxlint --type-aware .",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
-    "clean": "turbo clean",
+    "check": "vp check --fix",
+    "lint": "vp lint --fix",
+    "fmt": "vp fmt",
+    "ci": "vp check && pnpm run test && pnpm run build",
+    "up": "taze major -Ir",
+    "clean": "vp run -r clean",
     "check:phantom-independence": "scripts/phantom-independence-check.sh",
     "dev:install:mac": "scripts/dev-install-mac.sh",
-    "spool": "node apps/cli/bin/spool.js"
+    "spool": "node apps/cli/bin/spool.js",
+    "prepare": "vp config"
   },
   "devDependencies": {
-    "oxlint": "1.73.0",
-    "oxlint-tsgolint": "0.24.0",
-    "turbo": "^2.9.6",
-    "typescript": "7.0.2"
+    "taze": "^19.14.1",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "electron",
-      "esbuild",
-      "workerd",
-      "acp-extension-codex-linux-x64"
-    ],
-    "peerDependencyRules": {
-      "allowAny": [
-        "vite",
-        "vitest"
-      ]
-    },
-    "overrides": {
-      "pathe@catalog:": "^2.0.3",
-      "wrangler@catalog:": "^4.0.0",
-      "@cloudflare/workers-types@catalog:": "^4.20260415.1"
-    }
-  }
+  "packageManager": "pnpm@11.14.0"
 }

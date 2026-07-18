@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
-import {
-  Avatar,
-  Footer,
-  Header,
-  Icon,
-  Page,
-} from '../components/Chrome'
+import { Avatar, Footer, Header, Icon, Page } from '../components/Chrome'
+import { ProfileEditor } from '../components/ProfileEditor'
 import {
   cancelAccountDeletion,
   checkHandle,
@@ -23,7 +18,6 @@ import {
   type MySharesFetchResult,
 } from '../lib/api'
 import { humanDate, humanDateTime } from '../lib/dates'
-import { ProfileEditor } from '../components/ProfileEditor'
 
 // Public profiles (/@handle pages) are cut from the launch scope. This
 // gates the handle-claim entry point; the backend gates the API side
@@ -175,10 +169,7 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
             value={value}
             onChange={(e) =>
               setValue(
-                e.target.value
-                  .toLowerCase()
-                  .replace(HANDLE_NORMALISE, '')
-                  .slice(0, HANDLE_MAX_LEN),
+                e.target.value.toLowerCase().replace(HANDLE_NORMALISE, '').slice(0, HANDLE_MAX_LEN),
               )
             }
           />
@@ -216,9 +207,7 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
   )
 }
 
-function renderAvailability(
-  a: HandleAvailability,
-): {
+function renderAvailability(a: HandleAvailability): {
   tone: 'muted' | 'ok' | 'warn'
   text: string
   icon: 'check-circle' | 'x-circle' | 'alert' | 'spin' | null
@@ -271,9 +260,7 @@ function ShareRow({
   }
 
   return (
-    <li
-      className={`sw-share${revoked ? ' revoked' : ''}${disabled ? ' disabled' : ''}`}
-    >
+    <li className={`sw-share${revoked ? ' revoked' : ''}${disabled ? ' disabled' : ''}`}>
       <a
         className="sw-share-link"
         href={`/s/${encodeURIComponent(row.id)}`}
@@ -394,7 +381,12 @@ function RowMenu({
           {/* Copy keeps the menu open so the "Copied" confirmation is
            *  visible where the click happened; the parent resets the
            *  copied flag after 1.5s. */}
-          <button type="button" role="menuitem" className={`sw-rowmenu-item${copied ? ' ok' : ''}`} onClick={onCopy}>
+          <button
+            type="button"
+            role="menuitem"
+            className={`sw-rowmenu-item${copied ? ' ok' : ''}`}
+            onClick={onCopy}
+          >
             <Icon name={copied ? 'check' : 'link'} size={13} />
             {copied ? 'Copied' : 'Copy link'}
           </button>
@@ -539,8 +531,8 @@ function DeleteAccountModal({
         </p>
       ) : (
         <p className="sw-modal-body">
-          Unpublishes every share and removes your account record after 24
-          hours. You can undo this from the same place within that window.
+          Unpublishes every share and removes your account record after 24 hours. You can undo this
+          from the same place within that window.
         </p>
       )}
       {err && (
@@ -549,12 +541,7 @@ function DeleteAccountModal({
         </p>
       )}
       <div className="sw-modal-actions">
-        <button
-          type="button"
-          className="sw-btn sw-btn-ghost"
-          onClick={onClose}
-          disabled={busy}
-        >
+        <button type="button" className="sw-btn sw-btn-ghost" onClick={onClose} disabled={busy}>
           Cancel
         </button>
         {pending ? (
@@ -593,12 +580,7 @@ function UnpublishConfirmModal({
   onConfirm: () => void
 }) {
   return (
-    <ModalShell
-      open={target !== null}
-      busy={busy}
-      onClose={onClose}
-      labelledBy="unpublish-title"
-    >
+    <ModalShell open={target !== null} busy={busy} onClose={onClose} labelledBy="unpublish-title">
       <h2 id="unpublish-title" className="sw-modal-title">
         Unpublish this share?
       </h2>
@@ -608,25 +590,15 @@ function UnpublishConfirmModal({
         </p>
       )}
       <p className="sw-modal-body">
-        This permanently deletes the snapshot from R2 and locks the URL to <span className="sw-mono">410 Gone</span>. The
-        slug can never be reused. To share this conversation again, republish from the desktop app
-        — you'll get a new URL.
+        This permanently deletes the snapshot from R2 and locks the URL to{' '}
+        <span className="sw-mono">410 Gone</span>. The slug can never be reused. To share this
+        conversation again, republish from the desktop app — you'll get a new URL.
       </p>
       <div className="sw-modal-actions">
-        <button
-          type="button"
-          className="sw-btn sw-btn-ghost"
-          onClick={onClose}
-          disabled={busy}
-        >
+        <button type="button" className="sw-btn sw-btn-ghost" onClick={onClose} disabled={busy}>
           Cancel
         </button>
-        <button
-          type="button"
-          className="sw-btn sw-btn-danger"
-          onClick={onConfirm}
-          disabled={busy}
-        >
+        <button type="button" className="sw-btn sw-btn-danger" onClick={onConfirm} disabled={busy}>
           {busy ? 'Unpublishing…' : 'Yes, unpublish permanently'}
         </button>
       </div>
@@ -680,13 +652,14 @@ export function Me() {
 
   // Keep the unpublish-target ref in lockstep with the rendered target so
   // confirmUnpublish never reads a stale closed-over value.
-  const currentTarget = state.kind === 'ok' ? state.unpublishTarget ?? null : null
+  const currentTarget = state.kind === 'ok' ? (state.unpublishTarget ?? null) : null
   useEffect(() => {
     unpublishTargetRef.current = currentTarget
   }, [currentTarget])
 
   async function onToggleVisibility(row: MeShareRow): Promise<{ ok: boolean; reason?: string }> {
-    const next = row.visibility === 'profile-listed' ? 'unlisted' as const : 'profile-listed' as const
+    const next =
+      row.visibility === 'profile-listed' ? ('unlisted' as const) : ('profile-listed' as const)
     const r = await setShareVisibility(row.id, next)
     if (r.kind === 'ok') {
       setState((s) => {
@@ -724,9 +697,7 @@ export function Me() {
         if (s.kind !== 'ok') return s
         return {
           ...s,
-          shares: s.shares.map((x) =>
-            x.id === id ? { ...x, revoked_at: Date.now() } : x,
-          ),
+          shares: s.shares.map((x) => (x.id === id ? { ...x, revoked_at: Date.now() } : x)),
         }
       })
       return { ok: true }
@@ -754,9 +725,7 @@ export function Me() {
   }
 
   function onDeletionCancelled(): void {
-    setState((s) =>
-      s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: null } } : s,
-    )
+    setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: null } } : s))
     void fetchMyShares().then((r) => {
       if (r.kind !== 'ok') return
       setState((s) => (s.kind === 'ok' ? { ...s, shares: r.shares } : s))
@@ -822,17 +791,13 @@ export function Me() {
     setState((s) => (s.kind === 'ok' ? { ...s, deleteOpen: false } : s))
   }
   function onDeletionScheduled(at: number) {
-    setState((s) =>
-      s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: at } } : s,
-    )
+    setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: at } } : s))
   }
   function requestUnpublish(row: MeShareRow) {
     setState((s) => (s.kind === 'ok' ? { ...s, unpublishTarget: row, unpublishErr: null } : s))
   }
   function closeUnpublish() {
-    setState((s) =>
-      s.kind === 'ok' ? { ...s, unpublishTarget: null, unpublishErr: null } : s,
-    )
+    setState((s) => (s.kind === 'ok' ? { ...s, unpublishTarget: null, unpublishErr: null } : s))
   }
   async function confirmUnpublish() {
     // Read the target from the ref, not the closed-over `state`: a
@@ -873,11 +838,7 @@ export function Me() {
             <span>
               <strong>Account deletion is pending.</strong>{' '}
               {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null}{' '}
-              <button
-                type="button"
-                className="sw-banner-action"
-                onClick={openDelete}
-              >
+              <button type="button" className="sw-banner-action" onClick={openDelete}>
                 Cancel deletion
               </button>{' '}
               to restore access.
@@ -900,11 +861,7 @@ export function Me() {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                className="sw-btn sw-btn-ghost sw-btn-sm"
-                onClick={onSignOut}
-              >
+              <button type="button" className="sw-btn sw-btn-ghost sw-btn-sm" onClick={onSignOut}>
                 Sign out
               </button>
             </div>
@@ -913,11 +870,7 @@ export function Me() {
               <div className="sw-me-header-main">
                 <ProfileEditor me={me} onChanged={refreshMe} />
               </div>
-              <button
-                type="button"
-                className="sw-btn sw-btn-ghost sw-btn-sm"
-                onClick={onSignOut}
-              >
+              <button type="button" className="sw-btn sw-btn-ghost sw-btn-sm" onClick={onSignOut}>
                 Sign out
               </button>
             </div>
@@ -928,9 +881,7 @@ export function Me() {
               <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
               <HandleClaim
                 onClaimed={(handle) =>
-                  setState((s) =>
-                    s.kind === 'ok' ? { ...s, me: { ...s.me, handle } } : s,
-                  )
+                  setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, handle } } : s))
                 }
               />
             </>
@@ -939,7 +890,9 @@ export function Me() {
           <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
           <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
             Your shares
-            {!pending && liveShares.length > 0 && <span className="count">{liveShares.length}</span>}
+            {!pending && liveShares.length > 0 && (
+              <span className="count">{liveShares.length}</span>
+            )}
           </h2>
           {pending ? (
             <p className="sw-empty">
@@ -1012,11 +965,7 @@ export function Me() {
               <Icon name="lock" size={11} />
             </span>
             <span>Signed in as {me.email}</span>
-            <button
-              type="button"
-              className="sw-link-quiet"
-              onClick={openDelete}
-            >
+            <button type="button" className="sw-link-quiet" onClick={openDelete}>
               {pending ? 'Cancel deletion' : 'Delete account'}
             </button>
           </p>

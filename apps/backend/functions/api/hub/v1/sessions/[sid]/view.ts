@@ -1,10 +1,10 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { ApiError, jsonError } from '../../../../../../src/errors'
 import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
 import { readObjects } from '../../../../../../src/hub/packs'
 import { locateObjects } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
-import { ApiError, jsonError } from '../../../../../../src/errors'
 
 // The author-computed view object: content-addressed, so cacheable hard.
 // Readers treat it as a layout hint — the diff pane recomputes from records,

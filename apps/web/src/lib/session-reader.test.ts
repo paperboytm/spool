@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   batchEventRanges,
@@ -9,8 +9,8 @@ import {
   type RangeFetcher,
 } from './hub-api'
 import { sessionOgHead } from './og-meta'
-import { parseHubConversation } from './session-messages'
 import { routeFor } from './route'
+import { parseHubConversation } from './session-messages'
 import {
   deepLinkHash,
   deepLinkIndex,
@@ -31,7 +31,10 @@ describe('route /session/:sid', () => {
       sid: 'claude_6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b',
     })
     expect(routeFor('/session/codex_abcd1234')).toEqual({ kind: 'session', sid: 'codex_abcd1234' })
-    expect(routeFor('/session/gemini_abcd1234')).toEqual({ kind: 'tombstone', reason: 'not-found' })
+    expect(routeFor('/session/gemini_abcd1234')).toEqual({
+      kind: 'tombstone',
+      reason: 'not-found',
+    })
     expect(routeFor('/session/claude_x')).toEqual({ kind: 'tombstone', reason: 'not-found' })
     expect(routeFor('/session/')).toEqual({ kind: 'tombstone', reason: 'not-found' })
   })
@@ -55,7 +58,11 @@ describe('record fetching', () => {
     }
     const records = await fetchRecordsExact(fetchRange, 0, 5)
     expect(records.map((r) => r.i)).toEqual([0, 1, 2, 3, 4])
-    expect(calls).toEqual([[0, 5], [2, 5], [4, 5]])
+    expect(calls).toEqual([
+      [0, 5],
+      [2, 5],
+      [4, 5],
+    ])
   })
 
   it('aborts instead of looping when the server makes no progress', async () => {
@@ -78,10 +85,19 @@ describe('record fetching', () => {
 
 describe('hub spool document', () => {
   it('turns an invalid attached document into the raw-record fallback signal', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      version: 2,
-      conversation: { turns: [{ role: 'user', body: 42 }] },
-    }), { status: 200 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              version: 2,
+              conversation: { turns: [{ role: 'user', body: 42 }] },
+            }),
+            { status: 200 },
+          ),
+      ),
+    )
 
     await expect(fetchHubSpoolFile('claude_12345678')).resolves.toBeNull()
   })
@@ -91,8 +107,11 @@ describe('workbench metadata', () => {
   it('parses workspace cards defensively', () => {
     expect(parseWorkspaceCard(null)).toBeNull()
     expect(parseWorkspaceCard('not json')).toBeNull()
-    expect(parseWorkspaceCard('{"remotes":["origin: x"],"branch":"main","head":"abc","dirty":[],"observed":"t"}'))
-      .toEqual({ remotes: ['origin: x'], branch: 'main', head: 'abc', dirty: [], observed: 't' })
+    expect(
+      parseWorkspaceCard(
+        '{"remotes":["origin: x"],"branch":"main","head":"abc","dirty":[],"observed":"t"}',
+      ),
+    ).toEqual({ remotes: ['origin: x'], branch: 'main', head: 'abc', dirty: [], observed: 't' })
   })
 })
 
@@ -108,17 +127,21 @@ describe('deep links and helpers', () => {
   it('derives provider and resume command', () => {
     expect(providerOf('codex_abc12345')).toBe('codex')
     expect(providerOf('claude_abc12345')).toBe('claude')
-    expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69'))
-      .toBe('spool resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')
+    expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')).toBe(
+      'spool resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69',
+    )
   })
 
   it('turns browser-addressable git remotes into repository links', () => {
-    expect(repositoryUrlForRemote('origin: git@github.com:paperboytm/spool.git'))
-      .toBe('https://github.com/paperboytm/spool')
-    expect(repositoryUrlForRemote('upstream: ssh://git@gitlab.com/spool-lab/spool.git'))
-      .toBe('https://gitlab.com/spool-lab/spool')
-    expect(repositoryUrlForRemote('origin: https://github.com/paperboytm/spool.git'))
-      .toBe('https://github.com/paperboytm/spool')
+    expect(repositoryUrlForRemote('origin: git@github.com:paperboytm/spool.git')).toBe(
+      'https://github.com/paperboytm/spool',
+    )
+    expect(repositoryUrlForRemote('upstream: ssh://git@gitlab.com/spool-lab/spool.git')).toBe(
+      'https://gitlab.com/spool-lab/spool',
+    )
+    expect(repositoryUrlForRemote('origin: https://github.com/paperboytm/spool.git')).toBe(
+      'https://github.com/paperboytm/spool',
+    )
   })
 
   it('does not link local or malformed git remotes', () => {
@@ -128,24 +151,51 @@ describe('deep links and helpers', () => {
 })
 
 describe('hub records → desktop-identical conversation', () => {
-  const record = (i: number, data: Record<string, unknown>): { i: number; oid: string; data: string } =>
-    ({ i, oid: `oid-${i}`, data: JSON.stringify(data) })
+  const record = (
+    i: number,
+    data: Record<string, unknown>,
+  ): { i: number; oid: string; data: string } => ({
+    i,
+    oid: `oid-${i}`,
+    data: JSON.stringify(data),
+  })
 
   const claudeRecords = [
     record(0, {
-      type: 'user', uuid: 'u-1', sessionId: 's', timestamp: '2026-07-16T10:00:00.000Z',
+      type: 'user',
+      uuid: 'u-1',
+      sessionId: 's',
+      timestamp: '2026-07-16T10:00:00.000Z',
       message: { role: 'user', content: 'rename alpha to beta' },
     }),
     record(1, {
-      type: 'assistant', uuid: 'u-2', parentUuid: 'u-1', sessionId: 's', timestamp: '2026-07-16T10:00:05.000Z',
-      message: { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: {} }] },
+      type: 'assistant',
+      uuid: 'u-2',
+      parentUuid: 'u-1',
+      sessionId: 's',
+      timestamp: '2026-07-16T10:00:05.000Z',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: {} }],
+      },
     }),
     record(2, {
-      type: 'user', uuid: 'u-3', parentUuid: 'u-2', sessionId: 's', timestamp: '2026-07-16T10:00:06.000Z',
-      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }] },
+      type: 'user',
+      uuid: 'u-3',
+      parentUuid: 'u-2',
+      sessionId: 's',
+      timestamp: '2026-07-16T10:00:06.000Z',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }],
+      },
     }),
     record(3, {
-      type: 'assistant', uuid: 'u-4', parentUuid: 'u-3', sessionId: 's', timestamp: '2026-07-16T10:00:09.000Z',
+      type: 'assistant',
+      uuid: 'u-4',
+      parentUuid: 'u-3',
+      sessionId: 's',
+      timestamp: '2026-07-16T10:00:09.000Z',
       message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] },
     }),
   ]
@@ -172,11 +222,13 @@ describe('hub records → desktop-identical conversation', () => {
   it('parses codex event messages by timestamp mapping', () => {
     const codexRecords = [
       record(0, {
-        type: 'event_msg', timestamp: '2026-07-16T10:00:00.000Z',
+        type: 'event_msg',
+        timestamp: '2026-07-16T10:00:00.000Z',
         payload: { type: 'user_message', message: 'hello codex' },
       }),
       record(1, {
-        type: 'event_msg', timestamp: '2026-07-16T10:00:09.000Z',
+        type: 'event_msg',
+        timestamp: '2026-07-16T10:00:09.000Z',
         payload: { type: 'agent_message', message: 'hi!' },
       }),
     ]

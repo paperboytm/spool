@@ -1,15 +1,16 @@
+import type { Session, SearchResult, SessionSource, SessionsCursor } from '@spool-lab/core'
+import { AlertCircle, Inbox, Search as SearchIcon, SearchX, SlidersHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
-import { AlertCircle, Inbox, Search as SearchIcon, SearchX, SlidersHorizontal } from 'lucide-react'
-import type { Session, SearchResult, SessionSource, SessionsCursor } from '@spool-lab/core'
+
+import { formatRelativeDate } from '../../shared/formatDate.js'
+import { useHotkeys } from '../hooks/useHotkeys.js'
+import { snippetToStrongHtml } from '../lib/snippet.js'
 import { SourceBadge } from './Badges.js'
 import Hint from './Hint.js'
-import ScopeSelector, { type ScopeValue } from './ScopeSelector.js'
-import { formatRelativeDate } from '../../shared/formatDate.js'
-import { snippetToStrongHtml } from '../lib/snippet.js'
-import { useHotkeys } from '../hooks/useHotkeys.js'
 import { bucketSessionsByDate } from './LibraryLanding.js'
+import ScopeSelector, { type ScopeValue } from './ScopeSelector.js'
 
 /**
  * Unified row shape. Recent mode populates everything except snippet;
@@ -128,9 +129,14 @@ export default function CommandPalette({
 
   // Re-seed query whenever the caller pushes a new initialQuery (e.g. cmdk
   // re-opening with a different starting term).
-  useEffect(() => { setQuery(initialQuery) }, [initialQuery])
+  useEffect(() => {
+    setQuery(initialQuery)
+  }, [initialQuery])
 
-  useEffect(() => { inputRef.current?.focus(); inputRef.current?.select() }, [])
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
 
   // Modal layer — stacks below any popover (e.g. ScopeSelector popover)
   // and routes Escape to onClose.
@@ -220,19 +226,19 @@ export default function CommandPalette({
           setIsSearching(false)
         })
     }, DEBOUNCE_MS)
-    return () => { clearTimeout(handle) }
+    return () => {
+      clearTimeout(handle)
+    }
   }, [query, scope?.identityKey, searchDisabled])
 
   const inSearchMode = !searchDisabled && query.trim().length > 0
   const recentRows = useMemo(
-    () => recent?.map(s => sessionToRow(s, noTitle)) ?? null,
+    () => recent?.map((s) => sessionToRow(s, noTitle)) ?? null,
     [recent, noTitle],
   )
   const rows: PaletteRow[] | null = inSearchMode ? results : recentRows
 
-  const queryTokens = inSearchMode
-    ? query.trim().toLowerCase().split(/\s+/).filter(Boolean)
-    : []
+  const queryTokens = inSearchMode ? query.trim().toLowerCase().split(/\s+/).filter(Boolean) : []
 
   const showProjectOnRow = !scope
 
@@ -242,7 +248,12 @@ export default function CommandPalette({
   const tLoose = t as unknown as (k: string) => string
   const virtualRecents = useMemo<{ items: VirtualItem[]; rowIndexToVirtualIndex: number[] }>(() => {
     if (!recent) return { items: [], rowIndexToVirtualIndex: [] }
-    return buildVirtualRecents(recent, noTitle, groupRecentsByDate ? tLoose : null, recentLoadingMore)
+    return buildVirtualRecents(
+      recent,
+      noTitle,
+      groupRecentsByDate ? tLoose : null,
+      recentLoadingMore,
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recent, noTitle, groupRecentsByDate, recentLoadingMore, t])
 
@@ -285,10 +296,10 @@ export default function CommandPalette({
     if (!rows || rows.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex(i => Math.min(rows.length - 1, i + 1))
+      setActiveIndex((i) => Math.min(rows.length - 1, i + 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex(i => Math.max(0, i - 1))
+      setActiveIndex((i) => Math.max(0, i - 1))
     } else if (e.key === 'Home') {
       e.preventDefault()
       setActiveIndex(0)
@@ -303,20 +314,22 @@ export default function CommandPalette({
       role="dialog"
       aria-modal="true"
       data-testid={testId}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[12vh] animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      className="bg-warm-bg/60 dark:bg-dark-bg/70 animate-in fade-in fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh] backdrop-blur-sm duration-150"
     >
       <div
-        className="w-full max-w-[560px] max-h-[70vh] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+        className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg flex max-h-[70vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[10px] border shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Search row */}
-        <div className="flex-none flex items-center gap-2.5 px-5 py-3">
+        <div className="flex flex-none items-center gap-2.5 px-5 py-3">
           <SearchIcon
             size={15}
             strokeWidth={1.6}
             aria-hidden
-            className="flex-none text-warm-faint dark:text-dark-muted"
+            className="text-warm-faint dark:text-dark-muted flex-none"
           />
           <input
             ref={inputRef}
@@ -326,10 +339,12 @@ export default function CommandPalette({
             onKeyDown={handleInputKey}
             placeholder={placeholder}
             data-testid={`${testId}-input`}
-            className="flex-1 bg-transparent outline-none text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted"
+            className="text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted flex-1 bg-transparent text-sm outline-none"
           />
           {isSearching && (
-            <span className="flex-none text-[10px] text-warm-faint dark:text-dark-muted">{t('search.searchingShort')}</span>
+            <span className="text-warm-faint dark:text-dark-muted flex-none text-[10px]">
+              {t('search.searchingShort')}
+            </span>
           )}
           {headerExtras && <div className="flex-none">{headerExtras}</div>}
           <button
@@ -338,10 +353,10 @@ export default function CommandPalette({
             aria-pressed={filtersOpen}
             aria-label={t('palette.toggleOptions')}
             onClick={() => {
-              setFiltersOpen(v => !v)
+              setFiltersOpen((v) => !v)
               inputRef.current?.focus()
             }}
-            className={`flex-none rounded-md p-1 -ml-1 transition-colors ${
+            className={`-ml-1 flex-none rounded-md p-1 transition-colors ${
               scope
                 ? 'text-accent hover:bg-accent/10 dark:text-accent-dark dark:hover:bg-accent-dark/10'
                 : filtersOpen
@@ -357,7 +372,7 @@ export default function CommandPalette({
         {filtersOpen && (
           <div
             data-testid={`${testId}-options-row`}
-            className="flex-none px-5 pb-2 flex items-center gap-1.5"
+            className="flex flex-none items-center gap-1.5 px-5 pb-2"
           >
             <ScopeSelector
               value={scope}
@@ -373,9 +388,11 @@ export default function CommandPalette({
             {showTabScopeHint && contextualScope && (
               <span
                 data-testid={`${testId}-scope-tabhint`}
-                className="flex items-center gap-1.5 text-[10px] text-warm-faint dark:text-dark-muted ml-1"
+                className="text-warm-faint dark:text-dark-muted ml-1 flex items-center gap-1.5 text-[10px]"
               >
-                <kbd className="font-mono text-[9.5px] px-1 py-px rounded border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg">Tab</kbd>
+                <kbd className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg rounded border px-1 py-px font-mono text-[9.5px]">
+                  Tab
+                </kbd>
                 <span>{t('search.scope_switchHint')}</span>
               </span>
             )}
@@ -386,7 +403,7 @@ export default function CommandPalette({
         {/* Results / recents. Min-height keeps the modal a usable shape even
             when Virtuoso has no intrinsic height to push against the modal's
             max-h-[70vh]; each branch owns its scroll context. */}
-        <div ref={listRef} className="flex-1 min-h-[40vh] flex flex-col">
+        <div ref={listRef} className="flex min-h-[40vh] flex-1 flex-col">
           {rows === null ? (
             <div className="overflow-y-auto">
               <PaletteSkeleton count={6} />
@@ -398,17 +415,23 @@ export default function CommandPalette({
             />
           ) : rows.length === 0 ? (
             <PaletteEmpty
-              icon={inSearchMode
-                ? <SearchX size={18} strokeWidth={1.6} aria-hidden />
-                : <Inbox size={18} strokeWidth={1.6} aria-hidden />}
-              message={inSearchMode
-                ? labels.noMatches(query.trim())
-                : scope
-                  ? labels.emptyInProject(scope.displayName)
-                  : labels.emptyNoSessions}
+              icon={
+                inSearchMode ? (
+                  <SearchX size={18} strokeWidth={1.6} aria-hidden />
+                ) : (
+                  <Inbox size={18} strokeWidth={1.6} aria-hidden />
+                )
+              }
+              message={
+                inSearchMode
+                  ? labels.noMatches(query.trim())
+                  : scope
+                    ? labels.emptyInProject(scope.displayName)
+                    : labels.emptyNoSessions
+              }
             />
           ) : inSearchMode ? (
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               <FlatList
                 testId={testId}
                 rows={rows}
@@ -434,8 +457,8 @@ export default function CommandPalette({
         </div>
 
         {/* Footer */}
-        <div className="flex-none w-full px-4 py-2 text-[11px] flex items-center justify-between text-warm-faint dark:text-dark-muted gap-3">
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="text-warm-faint dark:text-dark-muted flex w-full flex-none items-center justify-between gap-3 px-4 py-2 text-[11px]">
+          <div className="flex flex-wrap items-center gap-3">
             {rows && rows.length > 0 && (
               <>
                 <Hint keys={['↑', '↓']} label={t('newDraft.navigate')} />
@@ -447,20 +470,22 @@ export default function CommandPalette({
             )}
             <Hint keys={['esc']} label={t('newDraft.close')} />
           </div>
-          {inSearchMode && labels.resultsTotal && rows && rows.length > 0 && (
-            onCommit ? (
+          {inSearchMode &&
+            labels.resultsTotal &&
+            rows &&
+            rows.length > 0 &&
+            (onCommit ? (
               <button
                 type="button"
                 data-testid={`${testId}-results-total`}
                 onClick={() => onCommit(query)}
-                className="flex-none rounded-md px-1.5 py-0.5 -my-0.5 hover:bg-warm-surface2 hover:text-warm-text dark:hover:bg-dark-surface2 dark:hover:text-dark-text transition-colors"
+                className="hover:bg-warm-surface2 hover:text-warm-text dark:hover:bg-dark-surface2 dark:hover:text-dark-text -my-0.5 flex-none rounded-md px-1.5 py-0.5 transition-colors"
               >
                 {labels.resultsTotal(rows.length)}
               </button>
             ) : (
               <span className="flex-none">{labels.resultsTotal(rows.length)}</span>
-            )
-          )}
+            ))}
         </div>
       </div>
     </div>
@@ -572,13 +597,13 @@ function VirtualRecents({
       increaseViewportBy={200}
       endReached={onEndReached}
       role="listbox"
-      className="flex-1 min-h-0"
+      className="min-h-0 flex-1"
       itemContent={(_virtualIndex, item) => {
         if (item.kind === 'header') {
           return (
             <div
               data-testid={`${testId}-bucket-header`}
-              className="px-5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.04em] text-warm-faint dark:text-dark-muted"
+              className="text-warm-faint dark:text-dark-muted px-5 pt-2 pb-1 text-[10px] font-semibold tracking-[0.04em]"
             >
               {item.label}
             </div>
@@ -588,7 +613,7 @@ function VirtualRecents({
           return (
             <div
               data-testid={`${testId}-loading-more`}
-              className="px-5 py-3 text-center text-[11px] text-warm-faint dark:text-dark-muted"
+              className="text-warm-faint dark:text-dark-muted px-5 py-3 text-center text-[11px]"
             >
               {t('library.footer_loadingMore')}
             </div>
@@ -633,7 +658,9 @@ function PaletteRowButton({
   onSelect: () => void
 }) {
   const { t } = useTranslation()
-  const date = formatRelativeDate(row.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })
+  const date = formatRelativeDate(row.startedAt, {
+    t: t as unknown as (k: string, o?: Record<string, unknown>) => string,
+  })
   const inSearchMode = queryTokens.length > 0
   const snippetHtml = inSearchMode && row.snippet ? snippetToStrongHtml(row.snippet) : null
   const activeBg = active ? 'bg-warm-surface2 dark:bg-dark-surface2' : ''
@@ -646,26 +673,29 @@ function PaletteRowButton({
       data-session-uuid={row.sessionUuid}
       onClick={onSelect}
       title={projectVisible ? `${row.title} · ${row.projectLabel}` : row.title}
-      className={`w-full flex items-start gap-3 px-5 py-2 text-left transition-colors duration-75 ${activeBg}`}
+      className={`flex w-full items-start gap-3 px-5 py-2 text-left transition-colors duration-75 ${activeBg}`}
     >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
           <SourceBadge source={row.source} />
-          <span className="flex-1 min-w-0 text-sm truncate">
+          <span className="min-w-0 flex-1 truncate text-sm">
             <span className="text-warm-text dark:text-dark-text">{row.title}</span>
             {projectVisible && (
-              <span className="text-[11px] text-warm-faint dark:text-dark-muted"> · {row.projectLabel}</span>
+              <span className="text-warm-faint dark:text-dark-muted text-[11px]">
+                {' '}
+                · {row.projectLabel}
+              </span>
             )}
           </span>
         </div>
         {snippetHtml && (
           <div
-            className="mt-0.5 pl-1.5 text-[11px] text-warm-faint dark:text-dark-muted truncate [&_strong]:font-medium [&_strong]:text-accent dark:[&_strong]:text-accent-dark"
+            className="text-warm-faint dark:text-dark-muted [&_strong]:text-accent dark:[&_strong]:text-accent-dark mt-0.5 truncate pl-1.5 text-[11px] [&_strong]:font-medium"
             dangerouslySetInnerHTML={{ __html: snippetHtml }}
           />
         )}
       </div>
-      <span className="flex-none font-mono text-[11px] leading-[20px] text-warm-faint dark:text-dark-muted tabular-nums">
+      <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[11px] leading-[20px] tabular-nums">
         {date}
       </span>
     </button>
@@ -674,14 +704,14 @@ function PaletteRowButton({
 
 function PaletteEmpty({ icon, message }: { icon: ReactNode; message: string }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
       <div
-        className="w-11 h-11 rounded-full flex items-center justify-center bg-warm-surface dark:bg-dark-surface text-warm-faint dark:text-dark-muted"
+        className="bg-warm-surface dark:bg-dark-surface text-warm-faint dark:text-dark-muted flex h-11 w-11 items-center justify-center rounded-full"
         aria-hidden
       >
         {icon}
       </div>
-      <p className="text-sm text-warm-muted dark:text-dark-muted max-w-[320px]">{message}</p>
+      <p className="text-warm-muted dark:text-dark-muted max-w-[320px] text-sm">{message}</p>
     </div>
   )
 }
@@ -691,9 +721,9 @@ function PaletteSkeleton({ count }: { count: number }) {
     <div aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 px-5 py-2">
-          <div className="h-4 w-12 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
-          <div className="flex-1 h-4 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-60 animate-pulse" />
-          <div className="h-3 w-16 rounded bg-warm-surface2 dark:bg-dark-surface2 opacity-40 animate-pulse" />
+          <div className="bg-warm-surface2 dark:bg-dark-surface2 h-4 w-12 animate-pulse rounded opacity-60" />
+          <div className="bg-warm-surface2 dark:bg-dark-surface2 h-4 flex-1 animate-pulse rounded opacity-60" />
+          <div className="bg-warm-surface2 dark:bg-dark-surface2 h-3 w-16 animate-pulse rounded opacity-40" />
         </div>
       ))}
     </div>

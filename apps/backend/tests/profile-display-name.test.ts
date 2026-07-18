@@ -1,9 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
-import {
-  resolveDisplayName,
-  validateDisplayName,
-} from '../src/profile/display-name'
+import { resolveDisplayName, validateDisplayName } from '../src/profile/display-name'
 
 describe('validateDisplayName', () => {
   it('accepts a normal ASCII name', () => {
@@ -77,34 +74,42 @@ describe('validateDisplayName', () => {
 
 describe('resolveDisplayName', () => {
   it('prefers display_name override over provider name', () => {
-    expect(resolveDisplayName({
-      display_name: 'Custom',
-      name: 'Provider',
-      email: 'a@example.com',
-    })).toBe('Custom')
+    expect(
+      resolveDisplayName({
+        display_name: 'Custom',
+        name: 'Provider',
+        email: 'a@example.com',
+      }),
+    ).toBe('Custom')
   })
 
   it('falls through to provider name when override missing', () => {
-    expect(resolveDisplayName({
-      display_name: null,
-      name: 'Provider',
-      email: 'a@example.com',
-    })).toBe('Provider')
+    expect(
+      resolveDisplayName({
+        display_name: null,
+        name: 'Provider',
+        email: 'a@example.com',
+      }),
+    ).toBe('Provider')
   })
 
   it('falls through to email local-part when both missing', () => {
-    expect(resolveDisplayName({
-      display_name: null,
-      name: null,
-      email: 'localpart@example.com',
-    })).toBe('localpart')
+    expect(
+      resolveDisplayName({
+        display_name: null,
+        name: null,
+        email: 'localpart@example.com',
+      }),
+    ).toBe('localpart')
   })
 
   it('treats empty-string display_name as missing', () => {
-    expect(resolveDisplayName({
-      display_name: '',
-      name: 'Provider',
-      email: 'a@example.com',
-    })).toBe('Provider')
+    expect(
+      resolveDisplayName({
+        display_name: '',
+        name: 'Provider',
+        email: 'a@example.com',
+      }),
+    ).toBe('Provider')
   })
 })

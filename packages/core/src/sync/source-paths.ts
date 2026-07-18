@@ -1,8 +1,9 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import type { SessionSource } from '../types.js'
+
 import { OPENCODE_DB_NAME, isOpenCodeDatabaseFile } from '../parsers/opencode.js'
+import type { SessionSource } from '../types.js'
 
 const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
   claude: 'projects',
@@ -30,13 +31,13 @@ const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode' 
 export function getSessionRoots(source: SessionSource): string[] {
   const configured = process.env[SOURCE_ENV_VARS[source]]
   if (configured) {
-    return dedupePaths(splitConfiguredPaths(configured).map(path => normalizeSourceRoot(source, path)))
+    return dedupePaths(
+      splitConfiguredPaths(configured).map((path) => normalizeSourceRoot(source, path)),
+    )
   }
 
   if (source === 'gemini') {
-    return dedupePaths([
-      normalizeSourceRoot('gemini', join(getGeminiBaseDir(), 'tmp')),
-    ])
+    return dedupePaths([normalizeSourceRoot('gemini', join(getGeminiBaseDir(), 'tmp'))])
   }
 
   if (source === 'opencode') {
@@ -44,9 +45,7 @@ export function getSessionRoots(source: SessionSource): string[] {
   }
 
   if (source === 'pi') {
-    return dedupePaths([
-      normalizeSourceRoot('pi', join(homedir(), '.pi', 'agent', 'sessions')),
-    ])
+    return dedupePaths([normalizeSourceRoot('pi', join(homedir(), '.pi', 'agent', 'sessions'))])
   }
 
   const home = homedir()
@@ -80,7 +79,7 @@ export function detectSessionSource(
   },
 ): SessionSource | undefined {
   for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
-    if (sourceRoots[source]?.some(root => isSessionFileForSource(source, filePath, root))) {
+    if (sourceRoots[source]?.some((root) => isSessionFileForSource(source, filePath, root))) {
       return source
     }
   }
@@ -92,22 +91,20 @@ export function getSessionWatchPatterns(
   roots = getSessionRoots(source),
 ): string[] {
   if (source === 'gemini') {
-    return roots.flatMap(root => [
+    return roots.flatMap((root) => [
       join(root, '**', 'session-*.json'),
       join(root, '**', 'session-*.jsonl'),
     ])
   }
-  const pattern = source === 'opencode'
-    ? OPENCODE_DB_NAME
-    : '*.jsonl'
-  return roots.map(root => join(root, '**', pattern))
+  const pattern = source === 'opencode' ? OPENCODE_DB_NAME : '*.jsonl'
+  return roots.map((root) => join(root, '**', pattern))
 }
 
 function splitConfiguredPaths(value: string): string[] {
   return value
     .split(/\r?\n/)
-    .flatMap(part => part.split(delimiter))
-    .map(part => part.trim())
+    .flatMap((part) => part.split(delimiter))
+    .map((part) => part.trim())
     .filter(Boolean)
 }
 
@@ -137,7 +134,8 @@ function normalizeSourceRoot(source: SessionSource, filePath: string): string {
 
   if (source === 'pi') {
     if (basename(resolvedPath) === 'sessions') return resolvedPath
-    if (existsSync(join(resolvedPath, 'agent', 'sessions'))) return join(resolvedPath, 'agent', 'sessions')
+    if (existsSync(join(resolvedPath, 'agent', 'sessions')))
+      return join(resolvedPath, 'agent', 'sessions')
     if (existsSync(join(resolvedPath, 'sessions'))) return join(resolvedPath, 'sessions')
     return resolvedPath
   }
@@ -156,7 +154,7 @@ function expandHome(filePath: string): string {
 }
 
 function dedupePaths(paths: string[]): string[] {
-  return Array.from(new Set(paths.map(path => resolve(expandHome(path)))))
+  return Array.from(new Set(paths.map((path) => resolve(expandHome(path)))))
 }
 
 function getGeminiBaseDir(): string {
@@ -176,7 +174,11 @@ function getOpenCodeBaseDir(): string {
   return join(homedir(), '.local', 'share', 'opencode')
 }
 
-export function isSessionFileForSource(source: SessionSource, filePath: string, root: string): boolean {
+export function isSessionFileForSource(
+  source: SessionSource,
+  filePath: string,
+  root: string,
+): boolean {
   if (!isWithinRoot(filePath, root)) return false
   if (source === 'gemini') {
     if (!filePath.endsWith('.json') && !filePath.endsWith('.jsonl')) return false

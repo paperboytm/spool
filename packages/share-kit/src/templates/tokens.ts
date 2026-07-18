@@ -20,7 +20,10 @@ export function accentBgFor(accentHex: string, alphaHex = '26'): string {
   if (!m) return accentHex
   let hex = m[1]!
   if (hex.length === 3) {
-    hex = hex.split('').map((c) => c + c).join('')
+    hex = hex
+      .split('')
+      .map((c) => c + c)
+      .join('')
   } else if (hex.length === 8) {
     hex = hex.slice(0, 6)
   } else if (hex.length !== 6) {

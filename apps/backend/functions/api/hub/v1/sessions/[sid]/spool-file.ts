@@ -1,10 +1,10 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { ApiError, jsonError } from '../../../../../../src/errors'
 import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
 import { readObjects } from '../../../../../../src/hub/packs'
 import { locateObjects } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
-import { ApiError, jsonError } from '../../../../../../src/errors'
 
 // The attached .spool document (curated publication artifact) — served
 // exactly like the view object: content-addressed, immutable-cached.

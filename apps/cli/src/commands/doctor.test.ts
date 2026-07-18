@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
 import type { CheckResult } from '@spool-lab/core'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { compareSemver, refineForAppVersion } from './doctor.js'
 
 describe('compareSemver', () => {
@@ -63,11 +64,10 @@ describe('refineForAppVersion', () => {
   })
 
   it('reframes the message and marks fix destructive when CLI is ahead of app', () => {
-    const out = refineForAppVersion(
-      [schemaCompatErr()],
-      '0.5.0',
-      { version: '0.4.11', path: '/Applications/Spool.app' },
-    )
+    const out = refineForAppVersion([schemaCompatErr()], '0.5.0', {
+      version: '0.4.11',
+      path: '/Applications/Spool.app',
+    })
     const refined = out[0]
     expect(refined?.message).toContain('Spool.app is 0.4.11')
     expect(refined?.message).toContain('older than this CLI 0.5.0')
@@ -77,11 +77,10 @@ describe('refineForAppVersion', () => {
   })
 
   it('preserves the original apply function so --fix --force still works', async () => {
-    const out = refineForAppVersion(
-      [schemaCompatErr()],
-      '0.5.0',
-      { version: '0.4.11', path: '/x' },
-    )
+    const out = refineForAppVersion([schemaCompatErr()], '0.5.0', {
+      version: '0.4.11',
+      path: '/x',
+    })
     const result = await out[0]?.fix?.apply()
     expect(result).toEqual({ ok: true, message: 'migrated' })
   })
@@ -94,11 +93,10 @@ describe('refineForAppVersion', () => {
       severity: 'error',
       message: 'broken',
     }
-    const out = refineForAppVersion(
-      [unrelated, schemaCompatErr()],
-      '0.5.0',
-      { version: '0.4.11', path: '/x' },
-    )
+    const out = refineForAppVersion([unrelated, schemaCompatErr()], '0.5.0', {
+      version: '0.4.11',
+      path: '/x',
+    })
     expect(out[0]).toEqual(unrelated)
     expect(out[1]?.fix?.destructive).toBe(true)
   })

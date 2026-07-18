@@ -34,13 +34,22 @@ module.exports = async (context) => {
 
   for (const dmg of dmgs) {
     console.log(`[notarize-dmg] submitting ${dmg}`)
-    await execFileAsync('xcrun', [
-      'notarytool', 'submit', dmg,
-      '--apple-id', appleId,
-      '--password', password,
-      '--team-id', teamId,
-      '--wait',
-    ], { maxBuffer: 32 * 1024 * 1024 })
+    await execFileAsync(
+      'xcrun',
+      [
+        'notarytool',
+        'submit',
+        dmg,
+        '--apple-id',
+        appleId,
+        '--password',
+        password,
+        '--team-id',
+        teamId,
+        '--wait',
+      ],
+      { maxBuffer: 32 * 1024 * 1024 },
+    )
 
     console.log(`[notarize-dmg] stapling ${dmg}`)
     await execFileAsync('xcrun', ['stapler', 'staple', dmg], {

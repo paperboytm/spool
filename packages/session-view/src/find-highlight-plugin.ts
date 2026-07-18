@@ -77,7 +77,10 @@ export const findHighlightPlugin = (options: Options): Transformer => {
         const nodeStart = cursor
         const nodeEnd = cursor + value.length
         cursor = nodeEnd
-        const segments = splitValue(value, nodeStart, nodeEnd, (slice) => ({ type: 'text', value: slice }))
+        const segments = splitValue(value, nodeStart, nodeEnd, (slice) => ({
+          type: 'text',
+          value: slice,
+        }))
         if (segments && parent && parent.children) {
           parent.children.splice(indexInParent, 1, ...(segments as AnyNode[]))
           return segments.length
@@ -91,7 +94,12 @@ export const findHighlightPlugin = (options: Options): Transformer => {
         const nodeEnd = cursor + value.length
         cursor = nodeEnd
         const codeType = node.type
-        const segments = splitValue(value, nodeStart, nodeEnd, (slice) => ({ type: codeType, value: slice } as AnyNode))
+        const segments = splitValue(
+          value,
+          nodeStart,
+          nodeEnd,
+          (slice) => ({ type: codeType, value: slice }) as AnyNode,
+        )
         if (segments && parent && parent.children) {
           parent.children.splice(indexInParent, 1, ...(segments as AnyNode[]))
           return segments.length

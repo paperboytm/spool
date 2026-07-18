@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import type { AllowlistEntryRow } from '@spool-lab/core'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { filterIgnoredEntries } from './filter-ignored.js'
 
 function row(p: Partial<AllowlistEntryRow>): AllowlistEntryRow {
@@ -16,9 +17,31 @@ function row(p: Partial<AllowlistEntryRow>): AllowlistEntryRow {
 }
 
 const entries: AllowlistEntryRow[] = [
-  row({ kind: 'api-key', scope: 'global', valueHash: 'a', value: 'AKIAEXAMPLE123', createdAt: '2026-05-01T00:00:00Z' }),
-  row({ kind: 'email', scope: 'session', valueHash: 'b', value: 'jane@acme.test', sessionUuid: 's1', sessionTitle: 'Billing chat', createdAt: '2026-05-03T00:00:00Z' }),
-  row({ kind: 'api-key', scope: 'session', valueHash: 'c', value: 'sk-secret-xyz', sessionUuid: 's2', sessionTitle: 'Infra notes', createdAt: '2026-05-02T00:00:00Z' }),
+  row({
+    kind: 'api-key',
+    scope: 'global',
+    valueHash: 'a',
+    value: 'AKIAEXAMPLE123',
+    createdAt: '2026-05-01T00:00:00Z',
+  }),
+  row({
+    kind: 'email',
+    scope: 'session',
+    valueHash: 'b',
+    value: 'jane@acme.test',
+    sessionUuid: 's1',
+    sessionTitle: 'Billing chat',
+    createdAt: '2026-05-03T00:00:00Z',
+  }),
+  row({
+    kind: 'api-key',
+    scope: 'session',
+    valueHash: 'c',
+    value: 'sk-secret-xyz',
+    sessionUuid: 's2',
+    sessionTitle: 'Infra notes',
+    createdAt: '2026-05-02T00:00:00Z',
+  }),
 ]
 
 describe('filterIgnoredEntries', () => {

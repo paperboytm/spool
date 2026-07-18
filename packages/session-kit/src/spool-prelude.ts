@@ -26,7 +26,10 @@ export function stripSpoolSystemPrelude(text: string): string {
   let result = text
   let open = result.indexOf(SPOOL_SYSTEM_PRELUDE_OPEN)
   while (open !== -1) {
-    const close = result.indexOf(SPOOL_SYSTEM_PRELUDE_CLOSE, open + SPOOL_SYSTEM_PRELUDE_OPEN.length)
+    const close = result.indexOf(
+      SPOOL_SYSTEM_PRELUDE_CLOSE,
+      open + SPOOL_SYSTEM_PRELUDE_OPEN.length,
+    )
     if (close === -1) break // unterminated marker — leave the remainder intact
     result = result.slice(0, open) + result.slice(close + SPOOL_SYSTEM_PRELUDE_CLOSE.length)
     open = result.indexOf(SPOOL_SYSTEM_PRELUDE_OPEN)

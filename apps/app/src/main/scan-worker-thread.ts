@@ -23,9 +23,9 @@
 //
 // Protocol — see `ToWorker` / `FromWorker` unions below.
 
-import { parentPort, threadId } from 'node:worker_threads'
 import { join } from 'node:path'
-import { Effect, Exit, Fiber, Scope, Stream } from 'effect'
+import { parentPort, threadId } from 'node:worker_threads'
+
 import {
   currentProfileString,
   getDB,
@@ -36,14 +36,16 @@ import {
   type ScanStatus,
 } from '@spool-lab/core'
 import { regexProvider, type RedactProvider, type SensitiveMatch } from '@spool-lab/redact'
-import { loadSecurityPreferences } from './securityPreferences.js'
-import { mapPfMatches, setUnknownLabelSink, type PfRawMatch } from './security/class-mapping.js'
 import { detectWithRegex } from '@spool-lab/redact'
+import { Effect, Exit, Fiber, Scope, Stream } from 'effect'
+
+import { mapPfMatches, setUnknownLabelSink, type PfRawMatch } from './security/class-mapping.js'
 // Import directly from pf-version (no `electron` import). Going through
 // model-paths.ts pulls `import { app } from 'electron'` into a shared
 // Rollup chunk and crashes the worker at load with
 // "Cannot find module 'electron'".
 import { PF_PROFILE_VERSION } from './security/pf-version.js'
+import { loadSecurityPreferences } from './securityPreferences.js'
 
 if (!parentPort) {
   throw new Error('scan-worker-thread.ts is only meant to run as a worker_thread child')
@@ -90,7 +92,9 @@ function reportFatal(err: unknown): void {
   const error = err instanceof Error ? (err.stack ?? err.message) : String(err)
   try {
     port.postMessage({ type: 'fatal', error } satisfies FromWorker)
-  } catch { /* parent gone */ }
+  } catch {
+    /* parent gone */
+  }
   process.exit(1)
 }
 
@@ -139,7 +143,10 @@ void (async () => {
   // anything before deciding whether to call this provider.
   let pfOnline = false
   let pfNextReqId = 1
-  const pfPending = new Map<number, { resolve: (m: PfRawMatchWire[]) => void; reject: (e: Error) => void }>()
+  const pfPending = new Map<
+    number,
+    { resolve: (m: PfRawMatchWire[]) => void; reject: (e: Error) => void }
+  >()
 
   const pfProvider: RedactProvider = {
     name: 'pf',
@@ -176,11 +183,12 @@ void (async () => {
       makeScanWorker({
         db,
         providers: [regexProvider, pfProvider],
-        currentProfile: () => currentProfileString({
-          kindAllowlist: loadSecurityPreferences().kindAllowlist,
-          pfEnabled: loadSecurityPreferences().pfEnabled && pfOnline,
-          pfVersion: PF_PROFILE_VERSION,
-        }),
+        currentProfile: () =>
+          currentProfileString({
+            kindAllowlist: loadSecurityPreferences().kindAllowlist,
+            pfEnabled: loadSecurityPreferences().pfEnabled && pfOnline,
+            pfVersion: PF_PROFILE_VERSION,
+          }),
         providerNames: ['regex', 'pf'],
         getKindAllowlist: () => new Set(loadSecurityPreferences().kindAllowlist),
       }),
@@ -200,15 +208,17 @@ void (async () => {
   // tears down the fiber and every subsequent event is dropped.
   function safePost(msg: FromWorker): Effect.Effect<void> {
     return Effect.sync(() => {
-      try { port.postMessage(msg) } catch { /* parent gone */ }
+      try {
+        port.postMessage(msg)
+      } catch {
+        /* parent gone */
+      }
     })
   }
 
   const changesFiber = await runEff(
     Effect.forkDaemon(
-      Stream.runForEach(worker.changes, (change) =>
-        safePost({ type: 'event-change', change }),
-      ),
+      Stream.runForEach(worker.changes, (change) => safePost({ type: 'event-change', change })),
     ),
   )
   const statusFiber = await runEff(
@@ -235,7 +245,10 @@ void (async () => {
       })()
       return
     }
-    if (msg.type === 'pf-online') { pfOnline = true; return }
+    if (msg.type === 'pf-online') {
+      pfOnline = true
+      return
+    }
     if (msg.type === 'pf-offline') {
       pfOnline = false
       // Reject every pending analyze so the scan loop unblocks.
@@ -264,7 +277,9 @@ void (async () => {
             result = await runEff(worker.rescanAll())
             break
           case 'backfill':
-            result = await runEff(worker.backfill({ userInitiated: payload.userInitiated === true }))
+            result = await runEff(
+              worker.backfill({ userInitiated: payload.userInitiated === true }),
+            )
             break
           case 'getStatus':
             result = await runEff(worker.getStatus)

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { SPOOL_DIR } from '../../db/db.js'
 import type { Category, Check, CheckResult } from '../types.js'
 
@@ -15,7 +16,7 @@ const FILES: ConfigFile[] = [
     id: 'config.agents',
     filename: 'agents.json',
     required: false,
-    validate: parsed => {
+    validate: (parsed) => {
       if (parsed === null || typeof parsed !== 'object') return 'expected JSON object'
       return null
     },
@@ -24,7 +25,7 @@ const FILES: ConfigFile[] = [
     id: 'config.ui',
     filename: 'ui.json',
     required: false,
-    validate: parsed => {
+    validate: (parsed) => {
       if (parsed === null || typeof parsed !== 'object') return 'expected JSON object'
       return null
     },
@@ -36,7 +37,7 @@ const FILES: ConfigFile[] = [
   },
 ]
 
-export const configChecks: Check[] = FILES.map(file => ({
+export const configChecks: Check[] = FILES.map((file) => ({
   id: file.id,
   category: 'config' as Category,
   title: file.filename,

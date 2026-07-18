@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
 import type { Conversation, EditorOpts, Turn } from '@spool/share-kit'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 // share-kit's main entry transitively imports a markdown helper that
 // touches `document`. The adapter only needs `ensureTurnIds` (identity
@@ -86,10 +86,7 @@ describe('buildSnapshotFromEditor — hidden-turn body redaction', () => {
       opts: opts({ redact: false }),
     })
     expect(snap.conversation.hidden_turns).toEqual([])
-    expect(snap.conversation.turns.map((t) => t.content)).toEqual([
-      'hello',
-      'world',
-    ])
+    expect(snap.conversation.turns.map((t) => t.content)).toEqual(['hello', 'world'])
   })
 
   it('blanks every body when no turns are selected', () => {

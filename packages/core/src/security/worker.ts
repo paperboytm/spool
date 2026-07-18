@@ -11,11 +11,12 @@
 // for the DB lock and gain nothing. Backfill UX surfaces "session N
 // of M" progress for the user.
 
-import { Effect, Fiber, PubSub, Queue, Ref, Stream, Scope } from 'effect'
-import type Database from 'better-sqlite3'
 import type { RedactProvider } from '@spool-lab/redact'
-import { scanSession, type ScanResult } from './scan.js'
+import type Database from 'better-sqlite3'
+import { Effect, Fiber, PubSub, Queue, Ref, Stream, Scope } from 'effect'
+
 import { listSessionsNeedingScan } from './repo.js'
+import { scanSession, type ScanResult } from './scan.js'
 import type { FindingsChange, ScanStatus } from './types.js'
 
 export interface WorkerConfig {
@@ -130,12 +131,8 @@ export function makeScanWorker(
         // anchoring the total to it makes the progress bar strictly
         // forward.
         const fullyIdle =
-          after.backfillRemaining === 0 &&
-          after.queued === 0 &&
-          after.scanning === null
-        const backfillTotal = fullyIdle
-          ? 0
-          : Math.max(prev.backfillTotal, after.backfillRemaining)
+          after.backfillRemaining === 0 && after.queued === 0 && after.scanning === null
+        const backfillTotal = fullyIdle ? 0 : Math.max(prev.backfillTotal, after.backfillRemaining)
         // `manualBurstInFlight` rides along with the burst. The
         // worker.rescanAll() mutation flips it on; this wrapper
         // flips it off the instant the worker drains, so the
@@ -191,9 +188,7 @@ export function makeScanWorker(
         yield* Ref.update(statusRef, (prev) => {
           const after = f(prev)
           const fullyIdle =
-            after.backfillRemaining === 0 &&
-            after.queued === 0 &&
-            after.scanning === null
+            after.backfillRemaining === 0 && after.queued === 0 && after.scanning === null
           const backfillTotal = fullyIdle ? 0 : after.backfillRemaining
           const manualBurstInFlight = fullyIdle ? false : after.manualBurstInFlight
           return { ...after, backfillTotal, manualBurstInFlight }
@@ -244,8 +239,7 @@ export function makeScanWorker(
     // duration but keeps the app responsive.
     const drain = Stream.fromQueue(queue).pipe(
       Stream.mapEffect(
-        (sessionId: number) =>
-          scanOne(sessionId).pipe(Effect.tap(() => Effect.sleep('50 millis'))),
+        (sessionId: number) => scanOne(sessionId).pipe(Effect.tap(() => Effect.sleep('50 millis'))),
         { concurrency: 1 },
       ),
       Stream.runDrain,
@@ -315,9 +309,7 @@ export function makeScanWorker(
         // changed kindAllowlist sees the updated hash before invoking
         // backfill.
         const profile = resolveProfile(config)
-        const stale = yield* Effect.sync(() =>
-          listSessionsNeedingScan(config.db, profile),
-        )
+        const stale = yield* Effect.sync(() => listSessionsNeedingScan(config.db, profile))
         // Fresh burst: drain any leftover queue items (they belong to
         // a previous profile snapshot — see `resetBurst` notes), reset
         // queued/backfillRemaining/backfillTotal to this burst's stale

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -81,7 +82,8 @@ test('directory chip count matches the actual number of rows for that cwd', asyn
 
   const chips = window.locator('[data-testid="project-directory-chip"]')
   const chipCount = await chips.count()
-  if (chipCount < 2) test.skip(true, 'project has no sub-directories in fixtures — chip strip absent')
+  if (chipCount < 2)
+    test.skip(true, 'project has no sub-directories in fixtures — chip strip absent')
 
   // Pick the first non-"All" chip; its badge value must equal the number of
   // session-row entries that follow when isolated to that cwd.
@@ -101,7 +103,7 @@ test('pin then unpin keeps the session visible in recent (no vanishing)', async 
   await window.locator('[data-testid="sidebar-project-row"]').first().click()
   // Make sure we start from a clean state: clear any pre-existing pins.
   let stalePinned = window.locator('[data-testid="session-row"][data-pinned]').first()
-  while (await stalePinned.count() > 0) {
+  while ((await stalePinned.count()) > 0) {
     await stalePinned.locator('[data-testid="pin-button"]').click()
     await expect(stalePinned).toBeHidden({ timeout: 2000 })
     stalePinned = window.locator('[data-testid="session-row"][data-pinned]').first()
@@ -128,6 +130,8 @@ test('pin then unpin keeps the session visible in recent (no vanishing)', async 
   // forgetting to reinsert into the recent list.
   await expect(window.locator(pinnedRowSel)).toBeHidden({ timeout: 5000 })
   await expect(
-    window.locator(`[data-testid="session-row"][data-session-uuid="${targetUuid}"]:not([data-pinned])`),
+    window.locator(
+      `[data-testid="session-row"][data-session-uuid="${targetUuid}"]:not([data-pinned])`,
+    ),
   ).toBeVisible({ timeout: 5000 })
 })

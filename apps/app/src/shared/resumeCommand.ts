@@ -17,12 +17,14 @@ export function getSessionResumeCommandPrefix(source: string): string | null {
   return RESUME_COMMAND_TEMPLATES[source]?.prefix ?? null
 }
 
-export function getSessionResumeCommand(source: string, sessionUuid: string, cwd?: string | null): string | null {
+export function getSessionResumeCommand(
+  source: string,
+  sessionUuid: string,
+  cwd?: string | null,
+): string | null {
   const template = RESUME_COMMAND_TEMPLATES[source]
   if (!template) return null
-  const base = [template.prefix, shellQuote(sessionUuid), template.suffix]
-    .filter(Boolean)
-    .join(' ')
+  const base = [template.prefix, shellQuote(sessionUuid), template.suffix].filter(Boolean).join(' ')
   return cwd ? `cd ${shellQuote(cwd)} && ${base}` : base
 }
 

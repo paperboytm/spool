@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import type { Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 async function searchInAgentMode(window: Page, query: string) {
   const overlay = window.locator('[data-testid="search-overlay"]')

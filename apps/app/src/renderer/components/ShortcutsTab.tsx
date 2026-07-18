@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
   SHORTCUT_GROUPS,
   formatComboParts,
@@ -20,7 +21,12 @@ export default function ShortcutsTab() {
         <Section key={g.id} title={t(`settings.shortcuts_group_${g.id}`)}>
           <ul>
             {g.shortcuts.map((s) => (
-              <Row key={s.id} entry={s} label={t(`settings.shortcuts_action_${s.id}`)} isMac={isMac} />
+              <Row
+                key={s.id}
+                entry={s}
+                label={t(`settings.shortcuts_action_${s.id}`)}
+                isMac={isMac}
+              />
             ))}
           </ul>
         </Section>
@@ -32,7 +38,7 @@ export default function ShortcutsTab() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h4 className="text-[11px] font-medium text-warm-faint dark:text-dark-muted tracking-[0.08em] uppercase mb-2">
+      <h4 className="text-warm-faint dark:text-dark-muted mb-2 text-[11px] font-medium tracking-[0.08em] uppercase">
         {title}
       </h4>
       {children}
@@ -44,13 +50,11 @@ function Row({ entry, label, isMac }: { entry: ShortcutEntry; label: string; isM
   const alternatives = splitAlternatives(entry.combo)
   return (
     <li className="flex items-center justify-between gap-4 py-2">
-      <span className="text-xs text-warm-text dark:text-dark-text">{label}</span>
-      <span className="flex items-center gap-1.5 flex-none">
+      <span className="text-warm-text dark:text-dark-text text-xs">{label}</span>
+      <span className="flex flex-none items-center gap-1.5">
         {alternatives.map((combo, ai) => (
           <span key={ai} className="flex items-center gap-1.5">
-            {ai > 0 && (
-              <span className="text-[10px] text-warm-faint dark:text-dark-muted">/</span>
-            )}
+            {ai > 0 && <span className="text-warm-faint dark:text-dark-muted text-[10px]">/</span>}
             <span className="flex items-center gap-1">
               {formatComboParts(combo, isMac).map((part, pi) => (
                 <Kbd key={pi}>{part}</Kbd>
@@ -65,7 +69,7 @@ function Row({ entry, label, isMac }: { entry: ShortcutEntry; label: string; isM
 
 function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="font-mono text-[10px] leading-none min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[4px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text">
+    <kbd className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[4px] border px-1.5 font-mono text-[10px] leading-none">
       {children}
     </kbd>
   )

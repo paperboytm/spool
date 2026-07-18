@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import {
   installSaveFilePickerMock,
@@ -18,7 +19,10 @@ test.afterAll(async () => {
   await ctx?.cleanup()
 })
 
-async function exportAs(window: Awaited<ReturnType<typeof launchApp>>['window'], k: 'png' | 'pdf' | 'md' | 'spool') {
+async function exportAs(
+  window: Awaited<ReturnType<typeof launchApp>>['window'],
+  k: 'png' | 'pdf' | 'md' | 'spool',
+) {
   // Old surface: <DownloadButton> exposed a flat trigger + per-format option.
   // New surface: <ShareMenu> popover. When VITE_FEATURE_SHAREPUBLISH is
   // unset, the popover opens directly on the Export tab (no tab strip).

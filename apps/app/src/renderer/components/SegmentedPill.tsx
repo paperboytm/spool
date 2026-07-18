@@ -27,7 +27,7 @@ export default function SegmentedPill<T extends string>({
   return (
     <div
       role="tablist"
-      className="flex bg-warm-surface dark:bg-dark-surface rounded-full p-[2px]"
+      className="bg-warm-surface dark:bg-dark-surface flex rounded-full p-[2px]"
       aria-label={ariaLabel}
     >
       {options.map((option) => {

@@ -12,13 +12,14 @@
 // degrade: the gutter shows a dash and no gaps are drawn.
 
 import { useMemo } from 'react'
+
 import type { Conversation, EditorOpts } from '../lib/types'
 import { typefaceFamily } from '../lib/types'
 import { useProgressiveTurns } from '../reader/use-progressive-turns'
-import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
+import { Body } from './body'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments, type SelectedSegments } from './selection'
-import { Body } from './body'
+import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS } from './tokens'
 
 interface Props {
   convo: Conversation
@@ -105,7 +106,9 @@ export function Timeline({ convo, opts, redactList: injectedRedactList }: Props)
       >
         {convo.title}
       </h1>
-      <div style={{ width: 56, height: 2.5, background: accent, borderRadius: 1, marginBottom: 12 }} />
+      <div
+        style={{ width: 56, height: 2.5, background: accent, borderRadius: 1, marginBottom: 12 }}
+      />
       <div
         style={{
           fontFamily: 'Geist Mono, monospace',
@@ -114,17 +117,14 @@ export function Timeline({ convo, opts, redactList: injectedRedactList }: Props)
           letterSpacing: '0.04em',
         }}
       >
-        with {convo.sourceLabel} · {formatStartDate(segments.turns, convo.createdAt)} · {segments.isExcerpt
+        with {convo.sourceLabel} · {formatStartDate(segments.turns, convo.createdAt)} ·{' '}
+        {segments.isExcerpt
           ? `${segments.kept} of ${segments.total} turns`
-          : `${segments.total} turns`} · ~{convo.readMin} min
+          : `${segments.total} turns`}{' '}
+        · ~{convo.readMin} min
       </div>
 
-      <TimelineBodyContent
-        convo={convo}
-        opts={opts}
-        redactList={redactList}
-        segments={segments}
-      />
+      <TimelineBodyContent convo={convo} opts={opts} redactList={redactList} segments={segments} />
 
       {opts.showColophon && (
         <div
@@ -379,7 +379,20 @@ function localDayKey(iso: string): string | null {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /** Compact date for the title meta — "Wed · 14 May 2026". Picks the

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { launchDemoApp, setDemoWindowBounds, waitForDemoSync } from './helpers/demo-launch'
+
 import type { ProjectSeed } from './helpers/demo-fixtures'
+import { launchDemoApp, setDemoWindowBounds, waitForDemoSync } from './helpers/demo-launch'
 
 const PROJECTS: ProjectSeed[] = [
   {

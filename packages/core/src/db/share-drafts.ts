@@ -38,7 +38,8 @@ export interface UpsertShareDraftInput {
   preview_json: string
 }
 
-const LIST_COLS = 'draft_id, source_kind, source_origin, title, preview_json, created_at, updated_at'
+const LIST_COLS =
+  'draft_id, source_kind, source_origin, title, preview_json, created_at, updated_at'
 const FULL_COLS = `${LIST_COLS}, snapshot_json`
 
 /** Lists drafts for the Shares grid. Intentionally omits `snapshot_json`
@@ -56,9 +57,9 @@ export function listShareDrafts(
 
 export function getShareDraft(db: Database.Database, draftId: string): ShareDraftRow | null {
   return (
-    (db
-      .prepare(`SELECT ${FULL_COLS} FROM share_drafts WHERE draft_id = ?`)
-      .get(draftId) as ShareDraftRow | undefined) ?? null
+    (db.prepare(`SELECT ${FULL_COLS} FROM share_drafts WHERE draft_id = ?`).get(draftId) as
+      | ShareDraftRow
+      | undefined) ?? null
   )
 }
 

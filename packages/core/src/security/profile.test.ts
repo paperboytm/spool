@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import {
   REDACT_DETECTOR_VERSION,
   currentProfileString,
@@ -15,9 +16,9 @@ describe('currentProfileString', () => {
     expect(currentProfileString({ regexVersion: 7 })).toBe('regex@7')
   })
   it('emits pf segment when enabled', () => {
-    expect(
-      currentProfileString({ pfEnabled: true, pfVersion: '1.5b-q4' }),
-    ).toBe(`regex@${REDACT_DETECTOR_VERSION},pf@1.5b-q4`)
+    expect(currentProfileString({ pfEnabled: true, pfVersion: '1.5b-q4' })).toBe(
+      `regex@${REDACT_DETECTOR_VERSION},pf@1.5b-q4`,
+    )
   })
   it('throws when pfEnabled without pfVersion', () => {
     expect(() => currentProfileString({ pfEnabled: true })).toThrow(/pfVersion/)
@@ -29,7 +30,9 @@ describe('currentProfileString', () => {
     expect(currentProfileString({ kindAllowlist: [] })).not.toMatch(/allow@/)
   })
   it('appends `allow@<hex>` when kinds are present', () => {
-    expect(currentProfileString({ kindAllowlist: ['email'] })).toMatch(/^regex@\d+,allow@[0-9a-f]{8}$/)
+    expect(currentProfileString({ kindAllowlist: ['email'] })).toMatch(
+      /^regex@\d+,allow@[0-9a-f]{8}$/,
+    )
   })
   it('is order-insensitive over the kind list', () => {
     const a = currentProfileString({ kindAllowlist: ['email', 'phone'] })
@@ -42,8 +45,9 @@ describe('currentProfileString', () => {
     expect(a).not.toBe(b)
   })
   it("deduplicates so ['a','a'] hashes the same as ['a']", () => {
-    expect(currentProfileString({ kindAllowlist: ['email', 'email'] }))
-      .toBe(currentProfileString({ kindAllowlist: ['email'] }))
+    expect(currentProfileString({ kindAllowlist: ['email', 'email'] })).toBe(
+      currentProfileString({ kindAllowlist: ['email'] }),
+    )
   })
   it('parses and round-trips the allow segment', () => {
     const s = currentProfileString({ kindAllowlist: ['email', 'phone'] })
@@ -71,12 +75,12 @@ describe('parseProfile', () => {
     expect(parseProfile('   ')).toBeNull()
   })
   it('rejects malformed segments', () => {
-    expect(parseProfile('regex')).toBeNull()        // no @
-    expect(parseProfile('regex@')).toBeNull()       // empty version
-    expect(parseProfile('@3')).toBeNull()           // empty name
-    expect(parseProfile('regex@x')).toBeNull()      // non-integer
-    expect(parseProfile('regex@-1')).toBeNull()     // negative
-    expect(parseProfile('regex@3.5')).toBeNull()    // non-integer
+    expect(parseProfile('regex')).toBeNull() // no @
+    expect(parseProfile('regex@')).toBeNull() // empty version
+    expect(parseProfile('@3')).toBeNull() // empty name
+    expect(parseProfile('regex@x')).toBeNull() // non-integer
+    expect(parseProfile('regex@-1')).toBeNull() // negative
+    expect(parseProfile('regex@3.5')).toBeNull() // non-integer
   })
   it('rejects unknown provider names (forward-compat: treat as stale)', () => {
     expect(parseProfile('regex@3,wat@1')).toBeNull()

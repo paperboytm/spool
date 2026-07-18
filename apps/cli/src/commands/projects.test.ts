@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
 import type { ProjectGroupWithPaths } from '@spool-lab/core'
+import { describe, expect, it } from 'vite-plus/test'
+
 import { resolveProjectQuery } from './projects.js'
 
 function group(displayName: string, identityKey: string): ProjectGroupWithPaths {
@@ -37,8 +38,10 @@ describe('resolveProjectQuery', () => {
   })
 
   it('resolves on a full identity key', () => {
-    expect(resolveProjectQuery(groups, 'github.com/spool-lab/spool-daemon'))
-      .toEqual({ kind: 'match', group: groups[1] })
+    expect(resolveProjectQuery(groups, 'github.com/spool-lab/spool-daemon')).toEqual({
+      kind: 'match',
+      group: groups[1],
+    })
   })
 
   it('matches against the identity key as well as the name', () => {
@@ -59,7 +62,10 @@ describe('resolveProjectQuery', () => {
       displayPaths: ['/Users/me/src/platform'],
       cwds: ['/Users/me/src/platform/packages/api'],
     }
-    expect(resolveProjectQuery([monorepo], 'packages/api')).toEqual({ kind: 'match', group: monorepo })
+    expect(resolveProjectQuery([monorepo], 'packages/api')).toEqual({
+      kind: 'match',
+      group: monorepo,
+    })
   })
 
   it('uses cwd substring matches only when names and identity keys do not match', () => {
@@ -99,7 +105,10 @@ describe('resolveProjectQuery', () => {
       cwds: ['/Users/example/work/data-service'],
     }
 
-    expect(resolveProjectQuery([service, scratch, worker], 'data-service')).toEqual({ kind: 'match', group: service })
+    expect(resolveProjectQuery([service, scratch, worker], 'data-service')).toEqual({
+      kind: 'match',
+      group: service,
+    })
   })
 
   it('reports ambiguity when several projects match a substring', () => {
@@ -123,8 +132,10 @@ describe('resolveProjectQuery', () => {
       expect(res.groups).toEqual(sameName)
     }
     // The full identity key still resolves uniquely.
-    expect(resolveProjectQuery(sameName, 'github.com/openclaw/openclaw'))
-      .toEqual({ kind: 'match', group: sameName[1] })
+    expect(resolveProjectQuery(sameName, 'github.com/openclaw/openclaw')).toEqual({
+      kind: 'match',
+      group: sameName[1],
+    })
   })
 
   it('reports none when nothing matches', () => {

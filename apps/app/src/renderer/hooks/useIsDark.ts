@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 
 export function useIsDark(): boolean {
-  const [isDark, setIsDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const [isDark, setIsDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+  )
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => setIsDark(mq.matches)

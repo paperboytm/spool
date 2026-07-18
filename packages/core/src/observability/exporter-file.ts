@@ -1,11 +1,6 @@
-import {
-  appendFileSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from 'node:fs'
+import { appendFileSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { SpanStatusCode } from '@opentelemetry/api'
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base'
 
@@ -61,8 +56,12 @@ export class RotatingFileSpanExporter implements SpanExporter {
     }
   }
 
-  shutdown(): Promise<void> { return Promise.resolve() }
-  forceFlush(): Promise<void> { return Promise.resolve() }
+  shutdown(): Promise<void> {
+    return Promise.resolve()
+  }
+  forceFlush(): Promise<void> {
+    return Promise.resolve()
+  }
 
   private todayPath(): string {
     const d = this.now()
@@ -82,7 +81,11 @@ export class RotatingFileSpanExporter implements SpanExporter {
     entries.sort((a, b) => a.mtimeMs - b.mtimeMs)
     for (const e of entries) {
       if (total <= this.maxTotalBytes) break
-      try { rmSync(e.path, { force: true }) } catch { continue }
+      try {
+        rmSync(e.path, { force: true })
+      } catch {
+        continue
+      }
       total -= e.size
     }
     this.totalBytes = total
@@ -110,9 +113,11 @@ function spanToJsonLine(span: ReadableSpan): string {
     spanId: span.spanContext().spanId,
     parentSpanId: span.parentSpanContext?.spanId ?? null,
     status:
-      span.status.code === SpanStatusCode.OK ? 'ok'
-      : span.status.code === SpanStatusCode.ERROR ? 'error'
-      : 'unset',
+      span.status.code === SpanStatusCode.OK
+        ? 'ok'
+        : span.status.code === SpanStatusCode.ERROR
+          ? 'error'
+          : 'unset',
     ...(span.status.message ? { statusMessage: span.status.message } : {}),
     attributes: { ...span.attributes },
   }
@@ -128,11 +133,19 @@ function hrTimeToMs(hr: [number, number]): number {
   return hr[0] * 1000 + hr[1] / 1_000_000
 }
 
-interface FileEntry { path: string; size: number; mtimeMs: number }
+interface FileEntry {
+  path: string
+  size: number
+  mtimeMs: number
+}
 
 function listEntries(dir: string): FileEntry[] {
   let names: string[]
-  try { names = readdirSync(dir) } catch { return [] }
+  try {
+    names = readdirSync(dir)
+  } catch {
+    return []
+  }
   return names
     .filter((name) => name.startsWith(FILE_PREFIX) && name.endsWith(FILE_SUFFIX))
     .map((name): FileEntry | null => {
@@ -140,7 +153,9 @@ function listEntries(dir: string): FileEntry[] {
       try {
         const st = statSync(path)
         return { path, size: st.size, mtimeMs: st.mtimeMs }
-      } catch { return null }
+      } catch {
+        return null
+      }
     })
     .filter((e): e is FileEntry => e !== null)
 }
@@ -152,5 +167,7 @@ function readDirTotal(dir: string): number {
 /** Test-only utility — exported for fixtures that need to enumerate
  *  rotated files. Not part of the public surface. */
 export function listLogFiles(dir: string): string[] {
-  return listEntries(dir).map((e) => e.path.split('/').pop() ?? '').sort()
+  return listEntries(dir)
+    .map((e) => e.path.split('/').pop() ?? '')
+    .sort()
 }

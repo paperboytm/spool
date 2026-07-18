@@ -1,17 +1,36 @@
-import { contextBridge, ipcRenderer } from 'electron'
 import type {
-  FragmentResult, Session, Message, StatusInfo, SyncResult, SearchResult, ProjectGroup,
-  ListSessionsByIdentityOptions, ProjectSessionSortOrder, SessionsCursor, SessionsPage, DirectoryCount,
-  ShareDraftRow, ShareDraftListItem, UpsertShareDraftInput,
+  FragmentResult,
+  Session,
+  Message,
+  StatusInfo,
+  SyncResult,
+  SearchResult,
+  ProjectGroup,
+  ListSessionsByIdentityOptions,
+  ProjectSessionSortOrder,
+  SessionsCursor,
+  SessionsPage,
+  DirectoryCount,
+  ShareDraftRow,
+  ShareDraftListItem,
+  UpsertShareDraftInput,
   PublishedShareCacheItem,
   SessionSource,
-  FindingRow, SessionWithFindingCounts, RiskByCategoryRow, OccurrenceBySession,
-  FindingsChange, ScanStatus, FindingFilter, SessionFindingFilter,
+  FindingRow,
+  SessionWithFindingCounts,
+  RiskByCategoryRow,
+  OccurrenceBySession,
+  FindingsChange,
+  ScanStatus,
+  FindingFilter,
+  SessionFindingFilter,
   AllowlistEntryRow,
   Page,
-  BackupFileInfo, DeleteBackupsResult,
+  BackupFileInfo,
+  DeleteBackupsResult,
 } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
+import { contextBridge, ipcRenderer } from 'electron'
 
 export interface SecurityPreferences {
   kindAllowlist: SensitiveKind[]
@@ -25,11 +44,7 @@ export interface SecurityPreferences {
   sessionRowRiskIconVisible: boolean
 }
 
-export type PfPhase =
-  | 'not-installed'
-  | 'downloading'
-  | 'installed'
-  | 'failed'
+export type PfPhase = 'not-installed' | 'downloading' | 'installed' | 'failed'
 
 export interface PfDownloadState {
   phase: PfPhase
@@ -49,10 +64,10 @@ export interface PfRuntimeInfo {
 export type SecurityReadiness =
   | { ready: true }
   | { ready: false; reason: 'booting' | 'scanner-unavailable' }
-import type { SearchSortOrder } from '../shared/searchSort.js'
-import type { SidebarSortOrder } from '../shared/sidebarSort.js'
-import type { PinnedSortOrder } from '../shared/pinnedSort.js'
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
+import type { HubSharePrepareResult, HubSharePublishResult } from '../shared/hub-share.js'
+import type { PinnedSortOrder } from '../shared/pinnedSort.js'
+import type { SearchSortOrder } from '../shared/searchSort.js'
 import type {
   PublishRequestBody,
   PublishResult,
@@ -63,10 +78,7 @@ import type {
   SetVisibilityResult,
   Visibility,
 } from '../shared/share-publish.js'
-import type {
-  HubSharePrepareResult,
-  HubSharePublishResult,
-} from '../shared/hub-share.js'
+import type { SidebarSortOrder } from '../shared/sidebarSort.js'
 
 export interface AgentInfo {
   id: string
@@ -96,14 +108,17 @@ export interface AgentsConfig {
   projectSortOrder?: ProjectSessionSortOrder
   /** UI language; 'system' follows OS preference (default). */
   language?: LanguagePreference
-  customAgents?: Record<string, {
-    name?: string
-    bin: string
-    acpMode: 'extension' | 'native' | 'websocket'
-    acpArgs?: string[]
-    wsEndpoint?: string
-    healthCheck?: string
-  }>
+  customAgents?: Record<
+    string,
+    {
+      name?: string
+      bin: string
+      acpMode: 'extension' | 'native' | 'websocket'
+      acpArgs?: string[]
+      wsEndpoint?: string
+      healthCheck?: string
+    }
+  >
 }
 
 export type SpoolAPI = typeof api
@@ -111,7 +126,13 @@ export type SpoolAPI = typeof api
 const api = {
   platform: process.platform as RuntimePlatform,
 
-  search: (query: string, limit?: number, source?: string, onlyPinned?: boolean, identityKey?: string): Promise<SearchResult[]> =>
+  search: (
+    query: string,
+    limit?: number,
+    source?: string,
+    onlyPinned?: boolean,
+    identityKey?: string,
+  ): Promise<SearchResult[]> =>
     ipcRenderer.invoke('spool:search', { query, limit, source, onlyPinned, identityKey }),
 
   searchPreview: (query: string, limit?: number, source?: string): Promise<SearchResult[]> =>
@@ -120,20 +141,24 @@ const api = {
   listSessions: (options?: { limit?: number; cursor?: SessionsCursor }): Promise<SessionsPage> =>
     ipcRenderer.invoke('spool:list-sessions', options ?? {}),
 
-  listProjectGroups: (): Promise<ProjectGroup[]> =>
-    ipcRenderer.invoke('spool:list-project-groups'),
+  listProjectGroups: (): Promise<ProjectGroup[]> => ipcRenderer.invoke('spool:list-project-groups'),
 
-  listSessionsByIdentity: (identityKey: string, options?: ListSessionsByIdentityOptions): Promise<SessionsPage> =>
+  listSessionsByIdentity: (
+    identityKey: string,
+    options?: ListSessionsByIdentityOptions,
+  ): Promise<SessionsPage> =>
     ipcRenderer.invoke('spool:list-sessions-by-identity', { identityKey, options }),
 
-  listProjectDirectoryCounts: (identityKey: string, sources?: SessionSource[]): Promise<DirectoryCount[]> =>
+  listProjectDirectoryCounts: (
+    identityKey: string,
+    sources?: SessionSource[],
+  ): Promise<DirectoryCount[]> =>
     ipcRenderer.invoke('spool:list-project-directory-counts', { identityKey, sources }),
 
   getSession: (sessionUuid: string): Promise<{ session: Session; messages: Message[] } | null> =>
     ipcRenderer.invoke('spool:get-session', { sessionUuid }),
 
-  getStatus: (): Promise<StatusInfo> =>
-    ipcRenderer.invoke('spool:get-status'),
+  getStatus: (): Promise<StatusInfo> => ipcRenderer.invoke('spool:get-status'),
 
   pinSession: (uuid: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:pin-session', { uuid }),
@@ -141,11 +166,9 @@ const api = {
   unpinSession: (uuid: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:unpin-session', { uuid }),
 
-  getPinnedUuids: (): Promise<string[]> =>
-    ipcRenderer.invoke('spool:get-pinned-uuids'),
+  getPinnedUuids: (): Promise<string[]> => ipcRenderer.invoke('spool:get-pinned-uuids'),
 
-  listPinnedSessions: (): Promise<Session[]> =>
-    ipcRenderer.invoke('spool:list-pinned-sessions'),
+  listPinnedSessions: (): Promise<Session[]> => ipcRenderer.invoke('spool:list-pinned-sessions'),
 
   listPinnedSessionsByIdentity: (identityKey: string): Promise<Session[]> =>
     ipcRenderer.invoke('spool:list-pinned-sessions-by-identity', { identityKey }),
@@ -157,23 +180,25 @@ const api = {
   getSystemLocale: (): Promise<'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'de' | 'fr'> =>
     ipcRenderer.invoke('spool:get-system-locale'),
 
-  syncNow: (): Promise<SyncResult> =>
-    ipcRenderer.invoke('spool:sync-now'),
+  syncNow: (): Promise<SyncResult> => ipcRenderer.invoke('spool:sync-now'),
 
-  forceResyncSession: (sessionUuid: string): Promise<
-    { ok: true; result: 'added' | 'updated' | 'skipped' }
-    | { ok: false; error: string }
-  > =>
-    ipcRenderer.invoke('spool:force-resync-session', { sessionUuid }),
+  forceResyncSession: (
+    sessionUuid: string,
+  ): Promise<
+    { ok: true; result: 'added' | 'updated' | 'skipped' } | { ok: false; error: string }
+  > => ipcRenderer.invoke('spool:force-resync-session', { sessionUuid }),
 
-  resumeCLI: (sessionUuid: string, source: string, cwd?: string): Promise<{ ok: boolean; error?: string }> =>
+  resumeCLI: (
+    sessionUuid: string,
+    source: string,
+    cwd?: string,
+  ): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('spool:resume-cli', { sessionUuid, source, cwd }),
 
   copyFragment: (text: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:copy-fragment', { text }),
 
-  getSidebarCollapsed: (): Promise<boolean> =>
-    ipcRenderer.invoke('spool:get-sidebar-collapsed'),
+  getSidebarCollapsed: (): Promise<boolean> => ipcRenderer.invoke('spool:get-sidebar-collapsed'),
 
   setSidebarCollapsed: (collapsed: boolean): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:set-sidebar-collapsed', { collapsed }),
@@ -192,19 +217,21 @@ const api = {
   },
 
   // AI / ACP
-  getAiAgents: (): Promise<AgentInfo[]> =>
-    ipcRenderer.invoke('spool:ai-agents'),
+  getAiAgents: (): Promise<AgentInfo[]> => ipcRenderer.invoke('spool:ai-agents'),
 
   getBuiltinAgents: (): Promise<Record<string, BuiltinAgent>> =>
     ipcRenderer.invoke('spool:ai-builtin-agents'),
 
-  getAgentsConfig: (): Promise<AgentsConfig> =>
-    ipcRenderer.invoke('spool:ai-get-config'),
+  getAgentsConfig: (): Promise<AgentsConfig> => ipcRenderer.invoke('spool:ai-get-config'),
 
   setAgentsConfig: (config: AgentsConfig): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:ai-set-config', { config }),
 
-  aiSearch: (query: string, agentId: string, context: FragmentResult[]): Promise<{ ok: boolean; fullText?: string; error?: string }> =>
+  aiSearch: (
+    query: string,
+    agentId: string,
+    context: FragmentResult[],
+  ): Promise<{ ok: boolean; fullText?: string; error?: string }> =>
     ipcRenderer.invoke('spool:ai-search', { query, agentId, context }),
 
   aiCancel: (agentId: string): Promise<{ ok: boolean }> =>
@@ -217,25 +244,33 @@ const api = {
   },
 
   onAiDone: (cb: (data: { fullText: string; error?: string }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { fullText: string; error?: string })
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+      cb(data as { fullText: string; error?: string })
     ipcRenderer.on('spool:ai-done', handler)
     return () => ipcRenderer.removeListener('spool:ai-done', handler)
   },
 
-  onAiToolCall: (cb: (data: { toolCallId: string; title: string; status: string; kind?: string }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { toolCallId: string; title: string; status: string; kind?: string })
+  onAiToolCall: (
+    cb: (data: { toolCallId: string; title: string; status: string; kind?: string }) => void,
+  ) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+      cb(data as { toolCallId: string; title: string; status: string; kind?: string })
     ipcRenderer.on('spool:ai-tool-call', handler)
     return () => ipcRenderer.removeListener('spool:ai-tool-call', handler)
   },
 
-  onAiSessionStarted: (cb: (data: { sessionUuid: string; source: string; cwd: string }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { sessionUuid: string; source: string; cwd: string })
+  onAiSessionStarted: (
+    cb: (data: { sessionUuid: string; source: string; cwd: string }) => void,
+  ) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+      cb(data as { sessionUuid: string; source: string; cwd: string })
     ipcRenderer.on('spool:ai-session-started', handler)
     return () => ipcRenderer.removeListener('spool:ai-session-started', handler)
   },
 
   onSyncProgress: (cb: (e: { phase: string; count: number; total: number }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { phase: string; count: number; total: number })
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+      cb(data as { phase: string; count: number; total: number })
     ipcRenderer.on('spool:sync-progress', handler)
     return () => ipcRenderer.removeListener('spool:sync-progress', handler)
   },
@@ -246,8 +281,7 @@ const api = {
     return () => ipcRenderer.removeListener('spool:new-sessions', handler)
   },
 
-  getTheme: (): Promise<'system' | 'light' | 'dark'> =>
-    ipcRenderer.invoke('spool:get-theme'),
+  getTheme: (): Promise<'system' | 'light' | 'dark'> => ipcRenderer.invoke('spool:get-theme'),
 
   setTheme: (theme: 'system' | 'light' | 'dark'): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('spool:set-theme', { theme }),
@@ -259,17 +293,28 @@ const api = {
     ipcRenderer.invoke('spool:set-theme-editor-state', { state }),
 
   // Auto-update
-  onUpdateStatus: (cb: (data: { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as { status: 'available' | 'downloading' | 'ready' | 'error'; version?: string; percent?: number })
+  onUpdateStatus: (
+    cb: (data: {
+      status: 'available' | 'downloading' | 'ready' | 'error'
+      version?: string
+      percent?: number
+    }) => void,
+  ) => {
+    const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+      cb(
+        data as {
+          status: 'available' | 'downloading' | 'ready' | 'error'
+          version?: string
+          percent?: number
+        },
+      )
     ipcRenderer.on('spool:update-status', handler)
     return () => ipcRenderer.removeListener('spool:update-status', handler)
   },
 
-  downloadUpdate: (): Promise<void> =>
-    ipcRenderer.invoke('spool:download-update'),
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('spool:download-update'),
 
-  installUpdate: (): Promise<void> =>
-    ipcRenderer.invoke('spool:install-update'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('spool:install-update'),
 
   printToPdf: (html: string, widthPx: number, heightPx: number): Promise<Uint8Array> =>
     ipcRenderer.invoke('spool:print-to-pdf', { html, widthPx, heightPx }),
@@ -282,11 +327,16 @@ const api = {
       ipcRenderer.invoke('security:list-findings-page', filter),
     listSessionsWithFindings: (filter: SessionFindingFilter): Promise<SessionWithFindingCounts[]> =>
       ipcRenderer.invoke('security:list-sessions-with-findings', filter),
-    listSessionsWithFindingsPage: (filter: SessionFindingFilter): Promise<Page<SessionWithFindingCounts>> =>
+    listSessionsWithFindingsPage: (
+      filter: SessionFindingFilter,
+    ): Promise<Page<SessionWithFindingCounts>> =>
       ipcRenderer.invoke('security:list-sessions-with-findings-page', filter),
     countSessionsWithFindings: (filter: SessionFindingFilter): Promise<number> =>
       ipcRenderer.invoke('security:count-sessions-with-findings', filter),
-    occurrencesByValueHash: (kind: SensitiveKind, valueHash: string): Promise<OccurrenceBySession[]> =>
+    occurrencesByValueHash: (
+      kind: SensitiveKind,
+      valueHash: string,
+    ): Promise<OccurrenceBySession[]> =>
       ipcRenderer.invoke('security:occurrences-by-value-hash', { kind, valueHash }),
     riskByCategory: (): Promise<RiskByCategoryRow[]> =>
       ipcRenderer.invoke('security:risk-by-category'),
@@ -296,22 +346,31 @@ const api = {
       ipcRenderer.invoke('security:get-finding-value', findingId),
     getFindingValues: (ids: number[]): Promise<Record<number, string | null>> =>
       ipcRenderer.invoke('security:get-finding-values', ids),
-    getScanStatus: (): Promise<ScanStatus> =>
-      ipcRenderer.invoke('security:get-scan-status'),
+    getScanStatus: (): Promise<ScanStatus> => ipcRenderer.invoke('security:get-scan-status'),
     dismissFinding: (findingId: number, scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:dismiss-finding', { findingId, scope }),
-    dismissFindings: (findingIds: number[], scope: 'session' | 'global'): Promise<{ ok: boolean }> =>
+    dismissFindings: (
+      findingIds: number[],
+      scope: 'session' | 'global',
+    ): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:dismiss-findings', { findingIds, scope }),
     undismissFinding: (findingId: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:undismiss-finding', { findingId }),
-    purgeFinding: (findingId: number): Promise<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }> =>
+    purgeFinding: (
+      findingId: number,
+    ): Promise<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }> =>
       ipcRenderer.invoke('security:purge-finding', findingId),
-    purgeFindings: (findingIds: number[]): Promise<Array<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }>> =>
-      ipcRenderer.invoke('security:purge-findings', findingIds),
-    purgeEverywhere: (kind: SensitiveKind, valueHash: string): Promise<{ count: number; sessionIds: number[] }> =>
+    purgeFindings: (
+      findingIds: number[],
+    ): Promise<
+      Array<{ findingId: number; sessionId: number; maskUsed: string; purgedAt: string }>
+    > => ipcRenderer.invoke('security:purge-findings', findingIds),
+    purgeEverywhere: (
+      kind: SensitiveKind,
+      valueHash: string,
+    ): Promise<{ count: number; sessionIds: number[] }> =>
       ipcRenderer.invoke('security:purge-everywhere', { kind, valueHash }),
-    rescanAll: (): Promise<{ count: number }> =>
-      ipcRenderer.invoke('security:rescan-all'),
+    rescanAll: (): Promise<{ count: number }> => ipcRenderer.invoke('security:rescan-all'),
     rescanSession: (sessionId: number): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('security:rescan-session', sessionId),
     onFindingsChanged: (cb: (change: FindingsChange) => void) => {
@@ -325,12 +384,12 @@ const api = {
       return () => ipcRenderer.removeListener('security:evt-scan-status', handler)
     },
 
-    getPrefs: (): Promise<SecurityPreferences> =>
-      ipcRenderer.invoke('security:get-prefs'),
+    getPrefs: (): Promise<SecurityPreferences> => ipcRenderer.invoke('security:get-prefs'),
     setPrefs: (next: Partial<SecurityPreferences>): Promise<SecurityPreferences> =>
       ipcRenderer.invoke('security:set-prefs', next),
     onPrefsChanged: (cb: (prefs: SecurityPreferences) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as SecurityPreferences)
+      const handler = (_: Electron.IpcRendererEvent, data: unknown) =>
+        cb(data as SecurityPreferences)
       ipcRenderer.on('security:evt-prefs-changed', handler)
       return () => ipcRenderer.removeListener('security:evt-prefs-changed', handler)
     },
@@ -344,16 +403,13 @@ const api = {
       kind: SensitiveKind
       valueHash: string
       sessionUuid?: string
-    }): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('security:remove-allowlist-entry', args),
+    }): Promise<{ ok: boolean }> => ipcRenderer.invoke('security:remove-allowlist-entry', args),
 
-    listBackups: (): Promise<BackupFileInfo[]> =>
-      ipcRenderer.invoke('security:list-backups'),
+    listBackups: (): Promise<BackupFileInfo[]> => ipcRenderer.invoke('security:list-backups'),
     deleteBackups: (args: { names: string[] }): Promise<DeleteBackupsResult> =>
       ipcRenderer.invoke('security:delete-backups', args),
 
-    pfGetState: (): Promise<PfDownloadState> =>
-      ipcRenderer.invoke('security:pf-get-state'),
+    pfGetState: (): Promise<PfDownloadState> => ipcRenderer.invoke('security:pf-get-state'),
     pfDownloadStart: (): Promise<{ ok: boolean; reason?: string }> =>
       ipcRenderer.invoke('security:pf-download-start'),
     pfDownloadCancel: (): Promise<{ ok: boolean }> =>
@@ -366,8 +422,7 @@ const api = {
       return () => ipcRenderer.removeListener('security:evt-pf-state', handler)
     },
 
-    getReadiness: (): Promise<SecurityReadiness> =>
-      ipcRenderer.invoke('security:get-readiness'),
+    getReadiness: (): Promise<SecurityReadiness> => ipcRenderer.invoke('security:get-readiness'),
     onReadinessChanged: (cb: (state: SecurityReadiness) => void) => {
       const handler = (_: Electron.IpcRendererEvent, data: unknown) => cb(data as SecurityReadiness)
       ipcRenderer.on('security:evt-readiness-changed', handler)
@@ -387,26 +442,20 @@ export interface ShareAuthUser {
 }
 
 const spoolShare = {
-  authAvailable: (): Promise<boolean> =>
-    ipcRenderer.invoke('share-auth:available'),
+  authAvailable: (): Promise<boolean> => ipcRenderer.invoke('share-auth:available'),
   // Single sign-in path: WorkOS AuthKit via the system browser (PKCE +
   // spool:// callback). Method choice (Google, email, ...) happens on
   // the hosted AuthKit page, not here.
-  signIn: (): Promise<ShareAuthUser> =>
-    ipcRenderer.invoke('share-auth:signin'),
-  me: (): Promise<ShareAuthUser | null> =>
-    ipcRenderer.invoke('share-auth:me'),
-  signOut: (): Promise<{ ok: boolean }> =>
-    ipcRenderer.invoke('share-auth:signout'),
+  signIn: (): Promise<ShareAuthUser> => ipcRenderer.invoke('share-auth:signin'),
+  me: (): Promise<ShareAuthUser | null> => ipcRenderer.invoke('share-auth:me'),
+  signOut: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('share-auth:signout'),
 
   publish: (body: PublishRequestBody): Promise<PublishResult> =>
     ipcRenderer.invoke('share-publish:publish', body),
-  revoke: (id: string): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('share-publish:revoke', id),
+  revoke: (id: string): Promise<{ ok: true }> => ipcRenderer.invoke('share-publish:revoke', id),
   setVisibility: (id: string, visibility: Visibility): Promise<SetVisibilityResult> =>
     ipcRenderer.invoke('share-publish:set-visibility', id, visibility),
-  myShares: (): Promise<MySharesResponse> =>
-    ipcRenderer.invoke('share-publish:my-shares'),
+  myShares: (): Promise<MySharesResponse> => ipcRenderer.invoke('share-publish:my-shares'),
   claimHandle: (handle: string): Promise<HandleClaimResponse> =>
     ipcRenderer.invoke('share-publish:claim-handle', handle),
   checkHandle: (handle: string): Promise<HandleCheckResponse> =>
@@ -421,8 +470,7 @@ const spoolShare = {
 
   scheduleDelete: (): Promise<ScheduleDeleteResponse> =>
     ipcRenderer.invoke('share-publish:schedule-delete'),
-  cancelDelete: (): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('share-publish:cancel-delete'),
+  cancelDelete: (): Promise<{ ok: true }> => ipcRenderer.invoke('share-publish:cancel-delete'),
 
   updateDisplayName: (value: string | null): Promise<{ ok: true; changed: number }> =>
     ipcRenderer.invoke('share-profile:update-display-name', value),
@@ -430,8 +478,7 @@ const spoolShare = {
     ipcRenderer.invoke('share-profile:set-avatar-visible', visible),
   uploadAvatar: (bytes: ArrayBuffer, mime: string): Promise<{ avatar_id: string; url: string }> =>
     ipcRenderer.invoke('share-profile:upload-avatar', bytes, mime),
-  deleteAvatar: (): Promise<{ ok: true }> =>
-    ipcRenderer.invoke('share-profile:delete-avatar'),
+  deleteAvatar: (): Promise<{ ok: true }> => ipcRenderer.invoke('share-profile:delete-avatar'),
 
   // v2 hub share (records, not styled snapshots) — one-click publish.
   hubSharePrepare: (sessionUuid: string): Promise<HubSharePrepareResult> =>

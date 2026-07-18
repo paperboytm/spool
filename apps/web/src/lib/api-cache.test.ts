@@ -3,7 +3,7 @@
 // memo invalidation that keeps the Header from painting a stale
 // signed-in state after sign-out.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { fetchMe, signOut } from './api'
 import { getCachedAuth, setCachedAuth } from './auth-cache'

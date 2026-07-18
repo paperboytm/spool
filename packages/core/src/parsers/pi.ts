@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
+
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -84,9 +85,10 @@ export function loadPiSession(filePath: string): ParseSessionResult {
     }
 
     messages.push({
-      uuid: typeof record.id === 'string' && record.id
-        ? record.id
-        : `pi-${sessionUuid || basename(filePath)}-${messages.length}`,
+      uuid:
+        typeof record.id === 'string' && record.id
+          ? record.id
+          : `pi-${sessionUuid || basename(filePath)}-${messages.length}`,
       parentUuid: typeof record.parentId === 'string' ? record.parentId : null,
       role,
       contentText,
@@ -99,7 +101,9 @@ export function loadPiSession(filePath: string): ParseSessionResult {
 
   if (messages.length === 0) return { kind: 'skipped' }
 
-  const firstUserMessage = messages.find(message => message.role === 'user' && message.contentText.trim().length > 0)
+  const firstUserMessage = messages.find(
+    (message) => message.role === 'user' && message.contentText.trim().length > 0,
+  )
   const title = firstUserMessage?.contentText.trim().slice(0, 120) || '(no title)'
 
   return {
@@ -131,27 +135,34 @@ function extractText(content: unknown): string {
   if (typeof content === 'string') return stripSpoolSystemPrelude(content).trim()
   if (!Array.isArray(content)) return ''
 
-  return stripSpoolSystemPrelude(content
-    .map(block => {
-      if (!block || typeof block !== 'object') return ''
-      const { type, text } = block as PiContentBlock
-      return type === 'text' && typeof text === 'string' ? text : ''
-    })
-    .filter(Boolean)
-    .join('\n'))
-    .trim()
+  return stripSpoolSystemPrelude(
+    content
+      .map((block) => {
+        if (!block || typeof block !== 'object') return ''
+        const { type, text } = block as PiContentBlock
+        return type === 'text' && typeof text === 'string' ? text : ''
+      })
+      .filter(Boolean)
+      .join('\n'),
+  ).trim()
 }
 
 function extractToolNames(content: unknown): string[] {
   if (!Array.isArray(content)) return []
 
-  return Array.from(new Set(content
-    .map(block => {
-      if (!block || typeof block !== 'object') return undefined
-      const { type, name } = block as PiContentBlock
-      return type === 'toolCall' && typeof name === 'string' && name.trim().length > 0 ? name : undefined
-    })
-    .filter((name): name is string => typeof name === 'string')))
+  return Array.from(
+    new Set(
+      content
+        .map((block) => {
+          if (!block || typeof block !== 'object') return undefined
+          const { type, name } = block as PiContentBlock
+          return type === 'toolCall' && typeof name === 'string' && name.trim().length > 0
+            ? name
+            : undefined
+        })
+        .filter((name): name is string => typeof name === 'string'),
+    ),
+  )
 }
 
 /** Decode a pi session directory slug to a display path.

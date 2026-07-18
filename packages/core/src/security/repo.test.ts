@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from '../db/db.js'
 import {
   insertFindings,
@@ -53,23 +54,67 @@ function setupDb(): Database.Database {
 
 describe('repo: insert + count + delete cycle', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('insertFindings + updateSessionCounts roundtrip', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 50, endOffset: 57, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'email',
+        valueHash: 'h2',
+        confidence: 0.8,
+        provider: 'regex',
+        startOffset: 50,
+        endOffset: 57,
+        state: 'active',
+      },
     ])
     updateSessionCounts(db, 1)
-    const row = db.prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number; scan_high_count: number }
+    const row = db
+      .prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1')
+      .get() as { scan_finding_count: number; scan_high_count: number }
     expect(row.scan_finding_count).toBe(2)
     expect(row.scan_high_count).toBe(1) // api-key is high; email is low
   })
 
   it('deleteRefreshableFindings respects the providers filter', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'person-name', valueHash: 'h2', confidence: 0.7, provider: 'pf', startOffset: 0, endOffset: 5, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'person-name',
+        valueHash: 'h2',
+        confidence: 0.7,
+        provider: 'pf',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
     ])
     deleteActiveFindings(db, 1, ['regex'])
     const rows = listFindings(db, { sessionId: 1, state: 'any' })
@@ -79,8 +124,28 @@ describe('repo: insert + count + delete cycle', () => {
 
   it('deleteRefreshableFindings wipes BOTH active and dismissed for the providers — needed to avoid phantom-dismissed accumulation across mute/unmute cycles', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 50, endOffset: 57, state: 'dismissed' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'email',
+        valueHash: 'h2',
+        confidence: 0.8,
+        provider: 'regex',
+        startOffset: 50,
+        endOffset: 57,
+        state: 'dismissed',
+      },
     ])
     deleteActiveFindings(db, 1, ['regex'])
     const rows = listFindings(db, { sessionId: 1, state: 'any' })
@@ -89,7 +154,17 @@ describe('repo: insert + count + delete cycle', () => {
 
   it('deleteRefreshableFindings preserves purged rows (audit trail for destructive actions)', () => {
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'purged' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'purged',
+      },
     ])
     deleteActiveFindings(db, 1, ['regex'])
     const rows = listFindings(db, { sessionId: 1, state: 'any' })
@@ -103,10 +178,50 @@ describe('repo: list + filter', () => {
   beforeEach(() => {
     db = setupDb()
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 50, endOffset: 57, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'phone', valueHash: 'h3', confidence: 0.6, provider: 'regex', startOffset: 60, endOffset: 70, state: 'dismissed' },
-      { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: 'h4', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'email',
+        valueHash: 'h2',
+        confidence: 0.8,
+        provider: 'regex',
+        startOffset: 50,
+        endOffset: 57,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'phone',
+        valueHash: 'h3',
+        confidence: 0.6,
+        provider: 'regex',
+        startOffset: 60,
+        endOffset: 70,
+        state: 'dismissed',
+      },
+      {
+        sessionId: 2,
+        messageId: 20,
+        kind: 'api-key',
+        valueHash: 'h4',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 0,
+        endOffset: 5,
+        state: 'active',
+      },
     ])
     updateSessionCounts(db, 1)
     updateSessionCounts(db, 2)
@@ -120,34 +235,35 @@ describe('repo: list + filter', () => {
   })
   it('listFindings filters by kind', () => {
     const rows = listFindings(db, { kind: 'api-key' })
-    expect(rows.map(r => r.sessionId).sort()).toEqual([1, 2])
+    expect(rows.map((r) => r.sessionId).sort()).toEqual([1, 2])
   })
   it('listFindings filters by severity', () => {
-    expect(listFindings(db, { severity: 'high' }).map(r => r.kind))
-      .toEqual(['api-key', 'api-key'])
-    expect(listFindings(db, { severity: 'low' }).map(r => r.kind))
-      .toEqual(['email'])
+    expect(listFindings(db, { severity: 'high' }).map((r) => r.kind)).toEqual([
+      'api-key',
+      'api-key',
+    ])
+    expect(listFindings(db, { severity: 'low' }).map((r) => r.kind)).toEqual(['email'])
   })
 
   it('riskByCategory excludes dismissed, orders by count, and reports distinct sessions', () => {
     const cats = riskByCategory(db)
     expect(cats).toEqual([
       { kind: 'api-key', severity: 'high', count: 2, sessions: 2 },
-      { kind: 'email',   severity: 'low',  count: 1, sessions: 1 },
+      { kind: 'email', severity: 'low', count: 1, sessions: 1 },
     ])
   })
 
   it('listSessionsWithFindings excludes sessions with zero active findings', () => {
     const rows = listSessionsWithFindings(db, {})
-    expect(rows.map(r => r.sessionUuid).sort()).toEqual(['s-1', 's-2'])
-    const s1 = rows.find(r => r.sessionUuid === 's-1')!
+    expect(rows.map((r) => r.sessionUuid).sort()).toEqual(['s-1', 's-2'])
+    const s1 = rows.find((r) => r.sessionUuid === 's-1')!
     expect(s1.findingCount).toBe(2)
     expect(s1.highCount).toBe(1)
   })
 
   it('listSessionsWithFindings filters by kind', () => {
     const rows = listSessionsWithFindings(db, { kind: 'email' })
-    expect(rows.map(r => r.sessionUuid)).toEqual(['s-1'])
+    expect(rows.map((r) => r.sessionUuid)).toEqual(['s-1'])
   })
 
   it('listSessionsWithFindings excludes sessions whose message_count dropped to 0 — stale finding rows from emptied/pruned sessions must not surface', () => {
@@ -157,11 +273,13 @@ describe('repo: list + filter', () => {
     // already exist).
     db.prepare(`UPDATE sessions SET message_count = 0 WHERE id = 2`).run()
     const rows = listSessionsWithFindings(db, {})
-    expect(rows.map(r => r.sessionUuid)).toEqual(['s-1'])
+    expect(rows.map((r) => r.sessionUuid)).toEqual(['s-1'])
   })
 
   it('listSessionsWithFindings free-text matches session title', () => {
-    expect(listSessionsWithFindings(db, { text: 'Other' }).map(r => r.sessionUuid)).toEqual(['s-2'])
+    expect(listSessionsWithFindings(db, { text: 'Other' }).map((r) => r.sessionUuid)).toEqual([
+      's-2',
+    ])
     expect(listSessionsWithFindings(db, { text: 'nope' })).toHaveLength(0)
   })
 
@@ -198,9 +316,10 @@ describe('repo: pagination', () => {
     // assigns the same timestamp to every row, which leaves only `id
     // DESC` as the tiebreaker. We want to exercise BOTH clauses.
     for (let i = 0; i < 12; i++) {
-      db.prepare(
-        `UPDATE findings SET detected_at = ? WHERE value_hash = ?`,
-      ).run(`2026-01-01T00:00:${(10 + i).toString().padStart(2, '0')}Z`, `h-${i}`)
+      db.prepare(`UPDATE findings SET detected_at = ? WHERE value_hash = ?`).run(
+        `2026-01-01T00:00:${(10 + i).toString().padStart(2, '0')}Z`,
+        `h-${i}`,
+      )
     }
     updateSessionCounts(db, 1)
   })
@@ -215,8 +334,8 @@ describe('repo: pagination', () => {
     expect(all).toHaveLength(12)
     const first = listFindings(db, { sessionId: 1, limit: 5, offset: 0 })
     const second = listFindings(db, { sessionId: 1, limit: 5, offset: 5 })
-    expect(first.map(r => r.valueHash)).toEqual(all.slice(0, 5).map(r => r.valueHash))
-    expect(second.map(r => r.valueHash)).toEqual(all.slice(5, 10).map(r => r.valueHash))
+    expect(first.map((r) => r.valueHash)).toEqual(all.slice(0, 5).map((r) => r.valueHash))
+    expect(second.map((r) => r.valueHash)).toEqual(all.slice(5, 10).map((r) => r.valueHash))
   })
 
   it('listFindings filter semantics unchanged when limit absent', () => {
@@ -226,7 +345,7 @@ describe('repo: pagination', () => {
                 VALUES (1, 10, 'email', 'h-dismissed', 0.5, 'regex', 0, 1, 'dismissed')`).run()
     const def = listFindings(db, { sessionId: 1 })
     expect(def).toHaveLength(12) // dismissed row excluded
-    expect(def.every(r => r.state === 'active')).toBe(true)
+    expect(def.every((r) => r.state === 'active')).toBe(true)
   })
 
   it('listFindings stable ordering across pages — no dup, no skip', () => {
@@ -237,8 +356,8 @@ describe('repo: pagination', () => {
     const p2 = listFindings(db, { sessionId: 1, limit: 5, offset: 5 })
     const p3 = listFindings(db, { sessionId: 1, limit: 5, offset: 10 })
     const concat = [...p1, ...p2, ...p3]
-    expect(concat.map(r => r.id)).toEqual(all.map(r => r.id))
-    expect(new Set(concat.map(r => r.id)).size).toBe(12)
+    expect(concat.map((r) => r.id)).toEqual(all.map((r) => r.id))
+    expect(new Set(concat.map((r) => r.id)).size).toBe(12)
   })
 
   it('listFindingsPage sets hasMore=true when more rows exist', () => {
@@ -265,32 +384,48 @@ describe('repo: pagination', () => {
       db.prepare(
         `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
          VALUES (?, 1, 1, ?, ?, ?, ?, ?, 1)`,
-      ).run(i, `s-${i}`, `/p/s-${i}`, `S${i}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`)
+      ).run(
+        i,
+        `s-${i}`,
+        `/p/s-${i}`,
+        `S${i}`,
+        `2026-01-${(i + 1).toString().padStart(2, '0')}`,
+        `2026-01-${(i + 1).toString().padStart(2, '0')}`,
+      )
       db.prepare(
         `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
       ).run(100 + i, i)
-      insertFindings(db, [{
-        sessionId: i, messageId: 100 + i, kind: 'api-key', valueHash: `gh-${i}`,
-        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
-      }])
+      insertFindings(db, [
+        {
+          sessionId: i,
+          messageId: 100 + i,
+          kind: 'api-key',
+          valueHash: `gh-${i}`,
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 1,
+          state: 'active',
+        },
+      ])
       updateSessionCounts(db, i)
     }
     const all = listSessionsWithFindings(db, {})
     expect(all.length).toBeGreaterThanOrEqual(7)
     const p1 = listSessionsWithFindings(db, { limit: 3, offset: 0 })
     const p2 = listSessionsWithFindings(db, { limit: 3, offset: 3 })
-    expect(p1.map(r => r.id)).toEqual(all.slice(0, 3).map(r => r.id))
-    expect(p2.map(r => r.id)).toEqual(all.slice(3, 6).map(r => r.id))
+    expect(p1.map((r) => r.id)).toEqual(all.slice(0, 3).map((r) => r.id))
+    expect(p2.map((r) => r.id)).toEqual(all.slice(3, 6).map((r) => r.id))
     // No overlap between adjacent pages.
-    const p1Ids = new Set(p1.map(r => r.id))
-    expect(p2.some(r => p1Ids.has(r.id))).toBe(false)
+    const p1Ids = new Set(p1.map((r) => r.id))
+    expect(p2.some((r) => p1Ids.has(r.id))).toBe(false)
   })
 
   it('listSessionsWithFindings semantics unchanged when limit absent', () => {
     // Filter by kind should still work normally — pagination is opt-in.
     const rows = listSessionsWithFindings(db, { kind: 'api-key' })
-    expect(rows.map(r => r.sessionUuid).sort()).toContain('s-1')
+    expect(rows.map((r) => r.sessionUuid).sort()).toContain('s-1')
   })
 
   it('listSessionsWithFindingsPage sets hasMore correctly', () => {
@@ -299,15 +434,31 @@ describe('repo: pagination', () => {
       db.prepare(
         `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
          VALUES (?, 1, 1, ?, ?, ?, ?, ?, 1)`,
-      ).run(i, `s-${i}`, `/p/s-${i}`, `S${i}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`, `2026-01-${(i + 1).toString().padStart(2, '0')}`)
+      ).run(
+        i,
+        `s-${i}`,
+        `/p/s-${i}`,
+        `S${i}`,
+        `2026-01-${(i + 1).toString().padStart(2, '0')}`,
+        `2026-01-${(i + 1).toString().padStart(2, '0')}`,
+      )
       db.prepare(
         `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
       ).run(100 + i, i)
-      insertFindings(db, [{
-        sessionId: i, messageId: 100 + i, kind: 'api-key', valueHash: `gh-${i}`,
-        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
-      }])
+      insertFindings(db, [
+        {
+          sessionId: i,
+          messageId: 100 + i,
+          kind: 'api-key',
+          valueHash: `gh-${i}`,
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 1,
+          state: 'active',
+        },
+      ])
       updateSessionCounts(db, i)
     }
     const total = listSessionsWithFindings(db, {}).length
@@ -330,15 +481,25 @@ describe('repo: pagination', () => {
         `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
       ).run(200 + i, i)
-      insertFindings(db, [{
-        sessionId: i, messageId: 200 + i, kind: i <= 5 ? 'api-key' : 'email', valueHash: `c-${i}`,
-        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
-      }])
+      insertFindings(db, [
+        {
+          sessionId: i,
+          messageId: 200 + i,
+          kind: i <= 5 ? 'api-key' : 'email',
+          valueHash: `c-${i}`,
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 1,
+          state: 'active',
+        },
+      ])
       updateSessionCounts(db, i)
     }
     expect(countSessionsWithFindings(db, {})).toBe(listSessionsWithFindings(db, {}).length)
-    expect(countSessionsWithFindings(db, { kind: 'api-key' }))
-      .toBe(listSessionsWithFindings(db, { kind: 'api-key' }).length)
+    expect(countSessionsWithFindings(db, { kind: 'api-key' })).toBe(
+      listSessionsWithFindings(db, { kind: 'api-key' }).length,
+    )
   })
 
   it('countSessionsWithFindings is independent of limit/offset on the same filter', () => {
@@ -352,10 +513,19 @@ describe('repo: pagination', () => {
         `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (?, ?, 1, 'user', 'x', '2026-01-01', 0)`,
       ).run(300 + i, i)
-      insertFindings(db, [{
-        sessionId: i, messageId: 300 + i, kind: 'api-key', valueHash: `d-${i}`,
-        confidence: 0.9, provider: 'regex', startOffset: 0, endOffset: 1, state: 'active',
-      }])
+      insertFindings(db, [
+        {
+          sessionId: i,
+          messageId: 300 + i,
+          kind: 'api-key',
+          valueHash: `d-${i}`,
+          confidence: 0.9,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 1,
+          state: 'active',
+        },
+      ])
       updateSessionCounts(db, i)
     }
     const total = countSessionsWithFindings(db, {})
@@ -367,11 +537,15 @@ describe('repo: pagination', () => {
 
 describe('repo: scan_profile lifecycle', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('setSessionScanProfile persists profile + completedAt', () => {
     setSessionScanProfile(db, 1, 'regex@3', '2026-01-10T00:00:00Z')
-    const row = db.prepare('SELECT scan_profile, scan_completed_at FROM sessions WHERE id = 1').get() as { scan_profile: string; scan_completed_at: string }
+    const row = db
+      .prepare('SELECT scan_profile, scan_completed_at FROM sessions WHERE id = 1')
+      .get() as { scan_profile: string; scan_completed_at: string }
     expect(row.scan_profile).toBe('regex@3')
     expect(row.scan_completed_at).toBe('2026-01-10T00:00:00Z')
   })
@@ -379,7 +553,9 @@ describe('repo: scan_profile lifecycle', () => {
   it('invalidateSessionScanProfile clears both fields', () => {
     setSessionScanProfile(db, 1, 'regex@3', '2026-01-10T00:00:00Z')
     invalidateSessionScanProfile(db, 1)
-    const row = db.prepare('SELECT scan_profile, scan_completed_at FROM sessions WHERE id = 1').get() as { scan_profile: string | null; scan_completed_at: string | null }
+    const row = db
+      .prepare('SELECT scan_profile, scan_completed_at FROM sessions WHERE id = 1')
+      .get() as { scan_profile: string | null; scan_completed_at: string | null }
     expect(row.scan_profile).toBeNull()
     expect(row.scan_completed_at).toBeNull()
   })
@@ -388,8 +564,10 @@ describe('repo: scan_profile lifecycle', () => {
     setSessionScanProfile(db, 1, 'regex@3', '2026-01-10')
     setSessionScanProfile(db, 2, 'regex@3', '2026-01-11')
     expect(invalidateAllScanProfiles(db)).toBe(2)
-    const rows = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{ scan_profile: string | null }>
-    expect(rows.map(r => r.scan_profile)).toEqual([null, null])
+    const rows = db.prepare('SELECT scan_profile FROM sessions ORDER BY id').all() as Array<{
+      scan_profile: string | null
+    }>
+    expect(rows.map((r) => r.scan_profile)).toEqual([null, null])
   })
 
   it('listSessionsNeedingScan returns NULL-profile sessions first', () => {
@@ -407,7 +585,9 @@ describe('repo: scan_profile lifecycle', () => {
 
 describe('repo: lastScanCompletedAt', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('returns null when nothing has been scanned', () => {
     expect(lastScanCompletedAt(db)).toBeNull()
@@ -424,7 +604,17 @@ describe('repo: lastScanCompletedAt', () => {
     // only contributor to a findings-list-derived timestamp).
     setSessionScanProfile(db, 1, 'regex@3', '2026-01-10T00:00:00Z')
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
     ])
     // Session 2: newer scan, came back clean (zero findings) so it
     // drops off listSessionsWithFindings entirely.
@@ -437,7 +627,9 @@ describe('repo: lastScanCompletedAt', () => {
 
 describe('repo: allowlist', () => {
   let db: Database.Database
-  beforeEach(() => { db = setupDb() })
+  beforeEach(() => {
+    db = setupDb()
+  })
 
   it('addAllowlistSession is idempotent + getAllowlists reflects it', () => {
     addAllowlistSession(db, 1, 'email', 'hX')
@@ -485,8 +677,28 @@ describe('repo: dismiss/undismiss flow', () => {
   beforeEach(() => {
     db = setupDb()
     insertFindings(db, [
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
-      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 50, endOffset: 57, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'email',
+        valueHash: 'h2',
+        confidence: 0.8,
+        provider: 'regex',
+        startOffset: 50,
+        endOffset: 57,
+        state: 'active',
+      },
     ])
     updateSessionCounts(db, 1)
   })
@@ -494,12 +706,16 @@ describe('repo: dismiss/undismiss flow', () => {
   it('dismiss session-scope flips state + writes allowlist + updates counts', () => {
     const f = listFindings(db, { kind: 'email' })[0]!
     dismissFinding(db, f.id, 'session')
-    const after = db.prepare('SELECT state FROM findings WHERE id = ?').get(f.id) as { state: string }
+    const after = db.prepare('SELECT state FROM findings WHERE id = ?').get(f.id) as {
+      state: string
+    }
     expect(after.state).toBe('dismissed')
     const snap = getAllowlists(db, 1)
     expect(snap.session.size).toBe(1)
     expect(snap.global.size).toBe(0)
-    const counts = db.prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number; scan_high_count: number }
+    const counts = db
+      .prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1')
+      .get() as { scan_finding_count: number; scan_high_count: number }
     expect(counts.scan_finding_count).toBe(1)
     expect(counts.scan_high_count).toBe(1)
   })
@@ -517,11 +733,15 @@ describe('repo: dismiss/undismiss flow', () => {
     expect(ids.length).toBe(2)
     const touched = dismissFindings(db, ids, 'session')
     expect(touched).toEqual([1])
-    const states = db.prepare('SELECT state FROM findings WHERE id IN (?, ?)').all(...ids) as Array<{ state: string }>
+    const states = db
+      .prepare('SELECT state FROM findings WHERE id IN (?, ?)')
+      .all(...ids) as Array<{ state: string }>
     expect(states.every((s) => s.state === 'dismissed')).toBe(true)
     const snap = getAllowlists(db, 1)
     expect(snap.session.size).toBe(2)
-    const counts = db.prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number; scan_high_count: number }
+    const counts = db
+      .prepare('SELECT scan_finding_count, scan_high_count FROM sessions WHERE id = 1')
+      .get() as { scan_finding_count: number; scan_high_count: number }
     expect(counts.scan_finding_count).toBe(0)
     expect(counts.scan_high_count).toBe(0)
   })
@@ -537,7 +757,9 @@ describe('repo: dismiss/undismiss flow', () => {
 
   it('dismissFindings on empty input is a no-op', () => {
     expect(dismissFindings(db, [], 'session')).toEqual([])
-    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
+    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as {
+      scan_finding_count: number
+    }
     expect(counts.scan_finding_count).toBe(2)
   })
 
@@ -545,11 +767,15 @@ describe('repo: dismiss/undismiss flow', () => {
     const f = listFindings(db, { kind: 'email' })[0]!
     dismissFinding(db, f.id, 'session')
     undismissFinding(db, f.id)
-    const after = db.prepare('SELECT state FROM findings WHERE id = ?').get(f.id) as { state: string }
+    const after = db.prepare('SELECT state FROM findings WHERE id = ?').get(f.id) as {
+      state: string
+    }
     expect(after.state).toBe('active')
     const snap = getAllowlists(db, 1)
     expect(snap.session.size).toBe(0)
-    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as { scan_finding_count: number }
+    const counts = db.prepare('SELECT scan_finding_count FROM sessions WHERE id = 1').get() as {
+      scan_finding_count: number
+    }
     expect(counts.scan_finding_count).toBe(2)
   })
 })
@@ -560,16 +786,38 @@ describe('repo: allowlist live value reconstruction', () => {
     db = setupDb()
     insertFindings(db, [
       // AKIAIOSFODNN7EXAMPLE at [14,34].
-      { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 14, endOffset: 34, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'api-key',
+        valueHash: 'h1',
+        confidence: 0.95,
+        provider: 'regex',
+        startOffset: 14,
+        endOffset: 34,
+        state: 'active',
+      },
       // a@b.com at [51,58].
-      { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 51, endOffset: 58, state: 'active' },
+      {
+        sessionId: 1,
+        messageId: 10,
+        kind: 'email',
+        valueHash: 'h2',
+        confidence: 0.8,
+        provider: 'regex',
+        startOffset: 51,
+        endOffset: 58,
+        state: 'active',
+      },
     ])
     updateSessionCounts(db, 1)
   })
 
   it('allowlist tables carry no preview/reason columns', () => {
     for (const table of ['allowlist_session', 'allowlist_global']) {
-      const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(c => c.name)
+      const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+        (c) => c.name,
+      )
       expect(cols).not.toContain('preview')
       expect(cols).not.toContain('reason')
     }
@@ -578,14 +826,16 @@ describe('repo: allowlist live value reconstruction', () => {
   it('session dismiss → listAllowlistEntries reconstructs the live value from the message', () => {
     const f = listFindings(db, { kind: 'api-key' })[0]!
     dismissFinding(db, f.id, 'session')
-    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'api-key')!
+    const entry = listAllowlistEntries(db).find(
+      (e) => e.scope === 'session' && e.kind === 'api-key',
+    )!
     expect(entry.value).toBe('AKIAIOSFODNN7EXAMPLE')
   })
 
   it('global dismiss → listAllowlistEntries reconstructs the live value (no session filter)', () => {
     const f = listFindings(db, { kind: 'email' })[0]!
     dismissFinding(db, f.id, 'global')
-    const entry = listAllowlistEntries(db).find(e => e.scope === 'global' && e.kind === 'email')!
+    const entry = listAllowlistEntries(db).find((e) => e.scope === 'global' && e.kind === 'email')!
     expect(entry.value).toBe('a@b.com')
   })
 
@@ -594,14 +844,16 @@ describe('repo: allowlist live value reconstruction', () => {
     dismissFinding(db, f.id, 'session')
     // Purge the finding the allowlist value would be reconstructed from.
     db.prepare(`UPDATE findings SET state = 'purged' WHERE id = ?`).run(f.id)
-    const entry = listAllowlistEntries(db).find(e => e.scope === 'session' && e.kind === 'api-key')!
+    const entry = listAllowlistEntries(db).find(
+      (e) => e.scope === 'session' && e.kind === 'api-key',
+    )!
     expect(entry.value).toBeNull()
   })
 
   it('value is null when no matching finding exists (orphaned allowlist row)', () => {
     // An allowlist row whose (kind, value_hash) has no surviving finding.
     addAllowlistGlobal(db, 'phone', 'orphan-hash')
-    const entry = listAllowlistEntries(db).find(e => e.valueHash === 'orphan-hash')!
+    const entry = listAllowlistEntries(db).find((e) => e.valueHash === 'orphan-hash')!
     expect(entry.value).toBeNull()
   })
 })

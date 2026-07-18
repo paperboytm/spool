@@ -10,11 +10,11 @@
 //     sanitised, the file is round-trippable (still valid .spool) but
 //     the original text is irrecoverable from the file alone.
 
-import type { Conversation, EditorOpts, SpoolDocument, Turn } from '../types'
+import { collectRedactList } from '../../templates/redact'
 import { saveBlob } from '../export'
 import { sanitizeFilename } from '../filename'
-import { collectRedactList } from '../../templates/redact'
 import { parseSpoolDocument } from '../spool-document'
+import type { Conversation, EditorOpts, SpoolDocument, Turn } from '../types'
 
 const MIME = 'application/spool+json'
 
@@ -32,20 +32,19 @@ export function buildSpoolDocument(
   options: BuildSpoolOptions = {},
 ): SpoolDocument {
   const willSanitize = options.sanitize && opts.redact
-  const conv = willSanitize
-    ? redactConversation(conversation, opts).conversation
-    : conversation
+  const conv = willSanitize ? redactConversation(conversation, opts).conversation : conversation
   // When sanitising for download, drop `redactExclude` from the
   // embedded opts. The recipient already sees `[redacted]` markers
   // in the body — they don't need to know which categories or
   // specific items the source user opted out of. That metadata
   // would be pure leak (mild, but unnecessary).
-  const exportedOpts = willSanitize && opts.redactExclude
-    ? (() => {
-        const { redactExclude: _drop, ...rest } = opts
-        return rest as EditorOpts
-      })()
-    : opts
+  const exportedOpts =
+    willSanitize && opts.redactExclude
+      ? (() => {
+          const { redactExclude: _drop, ...rest } = opts
+          return rest as EditorOpts
+        })()
+      : opts
   return {
     version: 2,
     conversation: conv,

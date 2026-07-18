@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext

@@ -1,10 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import {
-  applySet,
-  applyUndo,
-  applyRedo,
-  type UndoSnapshot,
-} from './useUndoableState.js'
+import { describe, it, expect } from 'vite-plus/test'
+
+import { applySet, applyUndo, applyRedo, type UndoSnapshot } from './useUndoableState.js'
 
 const opts = { coalesceMs: 500, maxHistory: 5 }
 
@@ -111,12 +107,14 @@ describe('integration: edit -> undo -> redo -> edit clears redo', () => {
     let s = snap('initial')
     let last = 0
     let result = applySet(s, 'a', last, 1_000, opts)
-    s = result.snap; last = result.lastSetAt
+    s = result.snap
+    last = result.lastSetAt
     result = applySet(s, 'b', last, 2_000, opts)
-    s = result.snap; last = result.lastSetAt
+    s = result.snap
+    last = result.lastSetAt
     // Two undos take us back past 'a' to 'initial'.
-    s = applyUndo(s)            // present 'a', future ['b']
-    s = applyUndo(s)            // present 'initial', future ['b', 'a']
+    s = applyUndo(s) // present 'a', future ['b']
+    s = applyUndo(s) // present 'initial', future ['b', 'a']
     expect(s.present).toBe('initial')
     expect(s.future).toEqual(['b', 'a'])
     // A new edit clears the redo branch (lastSetAt reset to 0 means no

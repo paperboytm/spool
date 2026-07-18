@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { decodeSnapshot } from './snapshot-to-conversation'
+import { describe, it, expect, vi } from 'vite-plus/test'
+
 import type { Snapshot } from '../lib/types'
+import { decodeSnapshot } from './snapshot-to-conversation'
 
 function snapshot(over: Partial<Snapshot> = {}): Snapshot {
   return {

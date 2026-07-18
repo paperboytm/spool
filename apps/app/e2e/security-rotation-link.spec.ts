@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Layer 1 — one-click rotate deep-links.
 //
@@ -20,23 +22,55 @@ let ctx: AppContext
 test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
-      writeFileSync(join(claudeDir, 'test-project', 'rotation-link.jsonl'), [
-        JSON.stringify({ type: 'user', sessionId: SID, cwd: '/tmp/test-project', uuid: 'rl-1', timestamp: '2026-05-21T10:00:00Z', message: { role: 'user', content: `my token is ${FAKE_GHP} and email dev@fly.io` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'rl-2', timestamp: '2026-05-21T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' } }),
-      ].join('\n'))
+      writeFileSync(
+        join(claudeDir, 'test-project', 'rotation-link.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'rl-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `my token is ${FAKE_GHP} and email dev@fly.io` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'rl-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 // Worker-idle alone can be a FALSE idle: status can read queued=0 in the
@@ -45,19 +79,27 @@ async function waitForWorkerIdle(window: Page): Promise<void> {
 // openStrip's pill wait times out on a cold launch. Wait until findings
 // have actually been produced before driving the UI.
 async function waitForFindings(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { riskByCategory: () => Promise<unknown[]> } } }).spool
-    if (!api?.security) return false
-    const cats = await api.security.riskByCategory()
-    return Array.isArray(cats) && cats.length > 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as { spool?: { security?: { riskByCategory: () => Promise<unknown[]> } } }
+      ).spool
+      if (!api?.security) return false
+      const cats = await api.security.riskByCategory()
+      return Array.isArray(cats) && cats.length > 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 async function openStrip(window: Page): Promise<void> {
   await window.locator('[data-testid="sidebar-library"]').click()
   // The fixture session lives under the "test-project" Claude project,
   // not the alphabetically-first row, so target it explicitly.
-  await window.locator('[data-testid="sidebar-project-row"]', { hasText: 'test-project' }).first().click()
+  await window
+    .locator('[data-testid="sidebar-project-row"]', { hasText: 'test-project' })
+    .first()
+    .click()
   await window.locator(`[data-testid="session-row"][data-session-uuid="${SID}"]`).first().click()
   const riskPill = window.locator('[data-testid="session-risk-pill"]').first()
   await expect(riskPill).toBeVisible({ timeout: 10_000 })

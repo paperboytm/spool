@@ -52,10 +52,14 @@ export function normalizeThemeSide(
     foreground: typeof partial.foreground === 'string' ? partial.foreground : fallback.foreground,
     uiFont: typeof partial.uiFont === 'string' ? partial.uiFont : fallback.uiFont,
     codeFont: typeof partial.codeFont === 'string' ? partial.codeFont : fallback.codeFont,
-    translucentChrome: typeof partial.translucentChrome === 'boolean' ? partial.translucentChrome : fallback.translucentChrome,
-    contrast: typeof partial.contrast === 'number' && Number.isFinite(partial.contrast)
-      ? Math.max(0, Math.min(100, Math.round(partial.contrast)))
-      : fallback.contrast,
+    translucentChrome:
+      typeof partial.translucentChrome === 'boolean'
+        ? partial.translucentChrome
+        : fallback.translucentChrome,
+    contrast:
+      typeof partial.contrast === 'number' && Number.isFinite(partial.contrast)
+        ? Math.max(0, Math.min(100, Math.round(partial.contrast)))
+        : fallback.contrast,
   }
 }
 
@@ -67,7 +71,10 @@ export function normalizeThemeEditorState(raw: unknown): ThemeEditorStateV1 | nu
   const defaults = defaultThemeEditorState()
   return {
     v: 1,
-    light: normalizeThemeSide(record['light'] as Partial<ThemeSideConfig> | undefined, defaults.light),
+    light: normalizeThemeSide(
+      record['light'] as Partial<ThemeSideConfig> | undefined,
+      defaults.light,
+    ),
     dark: normalizeThemeSide(record['dark'] as Partial<ThemeSideConfig> | undefined, defaults.dark),
   }
 }

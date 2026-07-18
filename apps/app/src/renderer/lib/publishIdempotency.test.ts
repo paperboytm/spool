@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { computePublishIdempotencyKey, stableStringify } from './publishIdempotency.js'
+import { describe, expect, it } from 'vite-plus/test'
+
 import type { Snapshot, Visibility } from '../../shared/share-publish.js'
+import { computePublishIdempotencyKey, stableStringify } from './publishIdempotency.js'
 
 function snap(over?: Partial<Snapshot['conversation']>): Snapshot {
   return {
@@ -91,9 +92,7 @@ describe('stableStringify', () => {
     // Without recursive sort, an object built by a different code path
     // (e.g. an editor that adds opts in a different order) would hash
     // to a different idempotency key for the same logical intent.
-    expect(stableStringify({ b: 1, a: { z: 1, y: 2 } })).toBe(
-      '{"a":{"y":2,"z":1},"b":1}',
-    )
+    expect(stableStringify({ b: 1, a: { z: 1, y: 2 } })).toBe('{"a":{"y":2,"z":1},"b":1}')
   })
 
   it('preserves array order', () => {
@@ -101,7 +100,12 @@ describe('stableStringify', () => {
   })
 
   it('round-trips through arbitrary nested objects', () => {
-    const value = { x: [{ b: 1, a: 2 }, { d: 3, c: 4 }] }
+    const value = {
+      x: [
+        { b: 1, a: 2 },
+        { d: 3, c: 4 },
+      ],
+    }
     expect(stableStringify(value)).toBe('{"x":[{"a":2,"b":1},{"c":4,"d":3}]}')
   })
 })

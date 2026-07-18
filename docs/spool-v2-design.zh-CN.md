@@ -106,12 +106,12 @@ note 可选：`-m`、`--no-edit`，或编辑器里什么都不写直接保存退
 
 从 records 里抽取编辑事件，构建每个文件的版本链。归因分四档：
 
-| 档位 | 来源 | 含义 |
-| --- | --- | --- |
-| exact | Edit/Write 事件 | 内容出自 log，可证明 |
-| inferred | 变更窗口只与一个跑过 shell 的 session 重叠 | 大概率是它（sed、codegen） |
-| suspected | 与 chat 消息里的代码块模糊指纹匹配 | 用户从对话里复制粘贴 |
-| external | 无候选 | 人手改的 / git pull 进来的 |
+| 档位      | 来源                                       | 含义                       |
+| --------- | ------------------------------------------ | -------------------------- |
+| exact     | Edit/Write 事件                            | 内容出自 log，可证明       |
+| inferred  | 变更窗口只与一个跑过 shell 的 session 重叠 | 大概率是它（sed、codegen） |
+| suspected | 与 chat 消息里的代码块模糊指纹匹配         | 用户从对话里复制粘贴       |
+| external  | 无候选                                     | 人手改的 / git pull 进来的 |
 
 实现分四层。
 

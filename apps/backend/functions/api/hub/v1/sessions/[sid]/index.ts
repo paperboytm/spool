@@ -1,9 +1,9 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
 import { getHubAuthor } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
-import { jsonError, jsonOk } from '../../../../../../src/errors'
 
 // Public head meta. Deliberately uncached (middleware defaults /api/ to
 // no-store): a withdraw must take effect on the next load. The bulky,

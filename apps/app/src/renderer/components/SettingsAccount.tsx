@@ -1,11 +1,12 @@
+import { Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Check } from 'lucide-react'
-import { ConnectCard } from './share-editor/ConnectCard.js'
+
+import { useShareAuth } from '../hooks/useShareAuth.js'
 import { DeleteAccountConfirmModal } from './DeleteAccountConfirmModal.js'
 import ProfileEditor from './ProfileEditor.js'
-import { useShareAuth } from '../hooks/useShareAuth.js'
+import { ConnectCard } from './share-editor/ConnectCard.js'
 
 // Public profiles (/@handle pages) are cut from the launch scope —
 // this hides the claim section below, the backend 404s the claim/check
@@ -20,15 +21,15 @@ const PROFILES_ENABLED = false
 // 'taken' when the user is typing fast.
 const HANDLE_CHECK_DEBOUNCE_MS = 320
 
-type DeletionStatus =
-  | { kind: 'idle' }
-  | { kind: 'pending'; executeAt: number }
+type DeletionStatus = { kind: 'idle' } | { kind: 'pending'; executeAt: number }
 
 export default function SettingsAccount() {
   const { t } = useTranslation()
   const { user, loading, signOut, refresh } = useShareAuth()
   const [handleDraft, setHandleDraft] = useState('')
-  const [handleStatus, setHandleStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+  const [handleStatus, setHandleStatus] = useState<
+    'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  >('idle')
   const [claiming, setClaiming] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletionStatus, setDeletionStatus] = useState<DeletionStatus>({ kind: 'idle' })
@@ -75,7 +76,10 @@ export default function SettingsAccount() {
   }
 
   const onHandleChange = (v: string) => {
-    const normalized = v.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase().slice(0, 24)
+    const normalized = v
+      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .toLowerCase()
+      .slice(0, 24)
     setHandleDraft(normalized)
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current)
@@ -155,30 +159,35 @@ export default function SettingsAccount() {
       {/* Handle claim */}
       {PROFILES_ENABLED && !user.handle && (
         <div>
-          <h4 className="text-[12px] font-medium text-warm-text dark:text-dark-text mb-2">
+          <h4 className="text-warm-text dark:text-dark-text mb-2 text-[12px] font-medium">
             {t('settings.account.handle_title')}
           </h4>
-          <p className="text-[12px] text-warm-muted dark:text-dark-muted mb-2">
-            {t('settings.account.handle_help')} <span className="font-mono">spool.pro/@your-handle</span>.
+          <p className="text-warm-muted dark:text-dark-muted mb-2 text-[12px]">
+            {t('settings.account.handle_help')}{' '}
+            <span className="font-mono">spool.pro/@your-handle</span>.
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 inline-flex items-center h-9 rounded-[6px] border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface focus-within:border-accent dark:focus-within:border-accent-dark transition-colors">
-              <span className="pl-3 pr-1 text-[12px] font-mono text-warm-faint dark:text-dark-muted">@</span>
+            <div className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface focus-within:border-accent dark:focus-within:border-accent-dark inline-flex h-9 flex-1 items-center rounded-[6px] border transition-colors">
+              <span className="text-warm-faint dark:text-dark-muted pr-1 pl-3 font-mono text-[12px]">
+                @
+              </span>
               <input
                 type="text"
                 value={handleDraft}
                 onChange={(e) => onHandleChange(e.target.value)}
                 placeholder={t('settings.account.handle_placeholder')}
-                className="flex-1 bg-transparent outline-none text-[12px] font-mono text-warm-text dark:text-dark-text"
+                className="text-warm-text dark:text-dark-text flex-1 bg-transparent font-mono text-[12px] outline-none"
                 data-testid="settings-account-handle-input"
               />
               <HandleStatusIndicator status={handleStatus} t={t} />
             </div>
             <button
               type="button"
-              onClick={() => { void onClaim() }}
+              onClick={() => {
+                void onClaim()
+              }}
               disabled={claiming || handleStatus !== 'available'}
-              className="h-9 px-3 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              className="bg-accent dark:bg-accent-dark h-9 rounded-[6px] px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {claiming ? t('settings.account.handle_saving') : t('settings.account.handle_save')}
             </button>
@@ -187,12 +196,12 @@ export default function SettingsAccount() {
            *  fight the inline status pill for vertical space. Only
            *  shown for non-neutral states. */}
           {handleStatus === 'taken' && (
-            <p className="mt-1.5 text-[11px] text-warm-muted dark:text-dark-muted">
+            <p className="text-warm-muted dark:text-dark-muted mt-1.5 text-[11px]">
               {t('settings.account.handle_hint_taken')}
             </p>
           )}
           {handleStatus === 'invalid' && (
-            <p className="mt-1.5 text-[11px] text-warm-muted dark:text-dark-muted">
+            <p className="text-warm-muted dark:text-dark-muted mt-1.5 text-[11px]">
               {t('settings.account.handle_hint_invalid')}
             </p>
           )}
@@ -213,19 +222,21 @@ export default function SettingsAccount() {
       <div className="space-y-5">
         {/* Sign out — labeled row, no card. */}
         <div className="flex items-center justify-between gap-6">
-          <div className="flex-1 min-w-0">
-            <div className="text-[12.5px] font-medium text-warm-text dark:text-dark-text">
+          <div className="min-w-0 flex-1">
+            <div className="text-warm-text dark:text-dark-text text-[12.5px] font-medium">
               {t('settings.account.signOut_title')}
             </div>
-            <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
+            <div className="text-warm-muted dark:text-dark-muted mt-0.5 text-[11.5px]">
               {t('settings.account.signOut_body')}
             </div>
           </div>
           <button
             type="button"
             data-testid="settings-account-signout"
-            onClick={() => { void signOut() }}
-            className="flex-none h-8 px-3 rounded-md border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-[12px] text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 transition-colors"
+            onClick={() => {
+              void signOut()
+            }}
+            className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 h-8 flex-none rounded-md border px-3 text-[12px] transition-colors"
           >
             {t('settings.account.signOut_title')}
           </button>
@@ -239,12 +250,14 @@ export default function SettingsAccount() {
             <div className="text-[12.5px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]">
               {t('settings.account.deletionScheduled_title')}
             </div>
-            <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
+            <div className="text-warm-muted dark:text-dark-muted mt-0.5 text-[11.5px]">
               {(() => {
                 // Split the localized string around the {{when}} marker so the
                 // monospace timestamp can be inlined while keeping a single
                 // translatable sentence.
-                const parts = t('settings.account.deletionScheduled_body', { when: ' WHEN ' }).split(' WHEN ')
+                const parts = t('settings.account.deletionScheduled_body', {
+                  when: ' WHEN ',
+                }).split(' WHEN ')
                 const when = new Date(deletionStatus.executeAt).toLocaleString()
                 return (
                   <>
@@ -257,20 +270,24 @@ export default function SettingsAccount() {
             </div>
             <button
               type="button"
-              onClick={() => { void onCancelDelete() }}
+              onClick={() => {
+                void onCancelDelete()
+              }}
               disabled={cancellingDelete}
-              className="mt-2 h-8 px-3 rounded-md text-[12px] font-medium border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text hover:border-warm-border2 dark:hover:border-dark-border2 mt-2 h-8 rounded-md border px-3 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {cancellingDelete ? t('settings.account.deletionScheduled_cancelling') : t('settings.account.deletionScheduled_cancel')}
+              {cancellingDelete
+                ? t('settings.account.deletionScheduled_cancelling')
+                : t('settings.account.deletionScheduled_cancel')}
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-6">
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-[12.5px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)]">
                 {t('settings.account.deleteAccount_title')}
               </div>
-              <div className="mt-0.5 text-[11.5px] text-warm-muted dark:text-dark-muted">
+              <div className="text-warm-muted dark:text-dark-muted mt-0.5 text-[11.5px]">
                 {t('settings.account.deleteAccount_body')}
               </div>
             </div>
@@ -278,7 +295,7 @@ export default function SettingsAccount() {
               type="button"
               data-testid="settings-account-delete"
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex-none h-8 px-3 rounded-md border border-[color:var(--color-status-error)]/30 dark:border-[color:var(--color-status-error-dark)]/30 text-[12px] font-medium text-[color:var(--color-status-error)] dark:text-[color:var(--color-status-error-dark)] hover:bg-[color:var(--color-status-error)]/8 dark:hover:bg-[color:var(--color-status-error-dark)]/8 transition-colors whitespace-nowrap"
+              className="h-8 flex-none rounded-md border border-[color:var(--color-status-error)]/30 px-3 text-[12px] font-medium whitespace-nowrap text-[color:var(--color-status-error)] transition-colors hover:bg-[color:var(--color-status-error)]/8 dark:border-[color:var(--color-status-error-dark)]/30 dark:text-[color:var(--color-status-error-dark)] dark:hover:bg-[color:var(--color-status-error-dark)]/8"
             >
               {t('settings.account.deleteAccount_title')}
             </button>
@@ -293,7 +310,9 @@ export default function SettingsAccount() {
         onClose={() => {
           if (!scheduling) setShowDeleteConfirm(false)
         }}
-        onConfirm={() => { void onScheduleDelete() }}
+        onConfirm={() => {
+          void onScheduleDelete()
+        }}
       />
     </div>
   )
@@ -316,17 +335,17 @@ function HandleStatusIndicator({
   if (status === 'checking') {
     return (
       <span
-        className="px-2 inline-flex items-center gap-1 text-[10px] font-medium text-warm-faint dark:text-dark-muted"
+        className="text-warm-faint dark:text-dark-muted inline-flex items-center gap-1 px-2 text-[10px] font-medium"
         aria-label={t('settings.account.handle_status_checking_aria')}
       >
-        <span className="inline-block w-2.5 h-2.5 rounded-full border-[1.5px] border-current border-t-transparent animate-spin" />
+        <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
         {t('settings.account.handle_status_checking')}
       </span>
     )
   }
   if (status === 'available') {
     return (
-      <span className="px-2 inline-flex items-center gap-1 text-[10px] font-medium text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
+      <span className="inline-flex items-center gap-1 px-2 text-[10px] font-medium text-[color:var(--color-status-success,#3E7D52)] dark:text-[color:var(--color-status-success-dark,#6FB286)]">
         <Check size={10} strokeWidth={2.5} aria-hidden />
         {t('settings.account.handle_status_available')}
       </span>
@@ -340,7 +359,7 @@ function HandleStatusIndicator({
     )
   }
   return (
-    <span className="px-2 text-[10px] font-medium text-warm-muted dark:text-dark-muted">
+    <span className="text-warm-muted dark:text-dark-muted px-2 text-[10px] font-medium">
       {t('settings.account.handle_status_invalid')}
     </span>
   )

@@ -1,15 +1,16 @@
 import { watch as fsWatch, statSync, type FSWatcher } from 'node:fs'
 import { resolve as resolvePath } from 'node:path'
-import type { Syncer } from './syncer.js'
+
+import { normalizeOpenCodeWatchPath } from '../parsers/opencode.js'
 import type { SessionSource } from '../types.js'
 import { detectSessionSource, getSessionRoots } from './source-paths.js'
-import { normalizeOpenCodeWatchPath } from '../parsers/opencode.js'
+import type { Syncer } from './syncer.js'
 
 export type WatcherEvent = 'new-sessions' | 'error'
 
 export interface WatcherEventDataMap {
   'new-sessions': { count: number }
-  'error': { error: Error; root?: string }
+  error: { error: Error; root?: string }
 }
 
 export type WatcherEventData = WatcherEventDataMap[WatcherEvent]
@@ -46,14 +47,23 @@ export class SpoolWatcher {
   private pending: Map<string, PendingEntry> = new Map()
   private pendingNew = 0
   private flushTimer: ReturnType<typeof setTimeout> | null = null
-  private sourceRoots: Record<SessionSource, string[]> = { claude: [], codex: [], gemini: [], opencode: [], pi: [] }
+  private sourceRoots: Record<SessionSource, string[]> = {
+    claude: [],
+    codex: [],
+    gemini: [],
+    opencode: [],
+    pi: [],
+  }
   private stopped = false
   private readonly stabilityMs: number
   private readonly pollMs: number
   private readonly flushMs: number
   private readonly watchFn: typeof fsWatch
 
-  constructor(private syncer: Syncer, opts: SpoolWatcherOptions = {}) {
+  constructor(
+    private syncer: Syncer,
+    opts: SpoolWatcherOptions = {},
+  ) {
     this.stabilityMs = opts.stabilityMs ?? DEFAULT_STABILITY_MS
     this.pollMs = opts.pollMs ?? DEFAULT_POLL_MS
     this.flushMs = opts.flushMs ?? DEFAULT_FLUSH_MS
@@ -82,7 +92,11 @@ export class SpoolWatcher {
   stop(): void {
     this.stopped = true
     for (const w of this.watchers) {
-      try { w.close() } catch { /* ignore */ }
+      try {
+        w.close()
+      } catch {
+        /* ignore */
+      }
     }
     this.watchers = []
     for (const entry of this.pending.values()) clearTimeout(entry.timer)
@@ -213,7 +227,11 @@ export class SpoolWatcher {
     const list = this.listeners.get(event)
     if (!list) return
     for (const cb of list) {
-      try { (cb as WatcherEventCallback<E>)(event, data) } catch { /* listener errors shouldn't break the watcher */ }
+      try {
+        ;(cb as WatcherEventCallback<E>)(event, data)
+      } catch {
+        /* listener errors shouldn't break the watcher */
+      }
     }
   }
 }

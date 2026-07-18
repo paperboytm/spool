@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
 import { Worker } from 'node:worker_threads'
+
+import { describe, expect, it } from 'vite-plus/test'
 
 /**
  * Regression test for the SIGTRAP startup crash reported on macOS 26.4.1

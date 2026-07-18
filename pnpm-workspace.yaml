@@ -1,4 +1,48 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "workers/*"
+  - 'apps/*'
+  - 'packages/*'
+  - 'workers/*'
+
+allowBuilds:
+  better-sqlite3: true
+  electron: true
+  esbuild: true
+  workerd: true
+  acp-extension-codex-linux-x64: true
+  acp-extension-codex-darwin-arm64: true
+  electron-winstaller: false
+  msgpackr-extract: false
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
+
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+  allowedVersions:
+    vite: '*'
+    vitest: '*'
+
+overrides:
+  '@cloudflare/workers-types': '^5.20260718.1'
+  'pathe@catalog:': '^2.0.3'
+  'wrangler@catalog:': '^4.0.0'
+  vite: 'catalog:'
+  vitest: 'catalog:'
+
+minimumReleaseAgeExclude:
+  - '@cloudflare/workers-types@5.20260718.1'
+  - '@tanstack/react-start-rsc@0.1.29'
+  - '@tanstack/react-start@1.168.30'
+  - '@tanstack/router-generator@1.167.21'
+  - '@tanstack/router-plugin@1.168.22'
+  - '@tanstack/start-plugin-core@1.171.22'
+  - lucide-react@1.25.0
+  - miniflare@4.20260714.0
+  - react-virtuoso@4.18.11
+  - wrangler@4.112.0
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.5
+  vitest: 4.1.10
+  vite-plus: 0.2.5

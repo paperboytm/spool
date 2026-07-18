@@ -1,5 +1,11 @@
 import { useEffect } from 'react'
-import { applyLanguage, resolveLocale, type LanguagePreference, type SupportedLocale } from './index.js'
+
+import {
+  applyLanguage,
+  resolveLocale,
+  type LanguagePreference,
+  type SupportedLocale,
+} from './index.js'
 
 /**
  * Resolves the effective UI language on mount and whenever the user changes
@@ -29,6 +35,8 @@ export function useLanguageBootstrap(preference: LanguagePreference | undefined)
       applyLanguage(resolveLocale(preference, systemLocale))
     }
     void apply()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [preference])
 }

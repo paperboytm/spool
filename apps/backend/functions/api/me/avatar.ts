@@ -89,7 +89,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     }
 
     const ab = await (file as File).arrayBuffer()
-    console.log(`[avatar-upload] file bytes=${ab.byteLength} name=${(file as File).name} type=${(file as File).type}`)
+    console.log(
+      `[avatar-upload] file bytes=${ab.byteLength} name=${(file as File).name} type=${(file as File).type}`,
+    )
     if (ab.byteLength === 0) throw new ApiError('UNPROCESSABLE', 'empty upload')
     if (ab.byteLength > MAX_AVATAR_BYTES) {
       throw new ApiError('UNPROCESSABLE', 'avatar too large (max 2 MB)')
@@ -98,7 +100,11 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
 
     // 1. Sniff MIME from bytes (not Content-Type header).
     const mime = sniffMime(raw)
-    console.log(`[avatar-upload] sniffMime=${mime ?? 'null'} first4=${Array.from(raw.slice(0, 4)).map((b) => b.toString(16).padStart(2, '0')).join(' ')}`)
+    console.log(
+      `[avatar-upload] sniffMime=${mime ?? 'null'} first4=${Array.from(raw.slice(0, 4))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' ')}`,
+    )
     if (!mime) {
       throw new ApiError('UNPROCESSABLE', 'unsupported image format (PNG/JPEG/WebP only)')
     }
@@ -111,10 +117,16 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     console.log(`[avatar-upload] dims=${dims ? `${dims.width}x${dims.height}` : 'null'}`)
     if (!dims) throw new ApiError('UNPROCESSABLE', 'malformed image header')
     if (dims.width < MIN_AVATAR_DIM || dims.height < MIN_AVATAR_DIM) {
-      throw new ApiError('UNPROCESSABLE', `avatar too small (min ${MIN_AVATAR_DIM}x${MIN_AVATAR_DIM})`)
+      throw new ApiError(
+        'UNPROCESSABLE',
+        `avatar too small (min ${MIN_AVATAR_DIM}x${MIN_AVATAR_DIM})`,
+      )
     }
     if (dims.width > MAX_AVATAR_DIM || dims.height > MAX_AVATAR_DIM) {
-      throw new ApiError('UNPROCESSABLE', `avatar too large (max ${MAX_AVATAR_DIM}x${MAX_AVATAR_DIM})`)
+      throw new ApiError(
+        'UNPROCESSABLE',
+        `avatar too large (max ${MAX_AVATAR_DIM}x${MAX_AVATAR_DIM})`,
+      )
     }
 
     // 3. Strip metadata — drops EXIF GPS, capture timestamps, ICC
@@ -126,8 +138,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     //    lands. Order: new R2 → D1 row → old R2 cleanup. If anything
     //    fails before the D1 row update, the new R2 object is
     //    orphaned but the user still sees their old avatar.
-    const existing = await ctx.env.DB
-      .prepare('SELECT custom_avatar_id FROM users WHERE id=?')
+    const existing = await ctx.env.DB.prepare('SELECT custom_avatar_id FROM users WHERE id=?')
       .bind(user.id)
       .first<{ custom_avatar_id: string | null }>()
 
@@ -139,8 +150,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       httpMetadata: { contentType: mime },
     })
 
-    await ctx.env.DB
-      .prepare('UPDATE users SET custom_avatar_id=?, avatar_visible=1 WHERE id=?')
+    await ctx.env.DB.prepare('UPDATE users SET custom_avatar_id=?, avatar_visible=1 WHERE id=?')
       .bind(`${id}.${ext}`, user.id)
       .run()
 
@@ -164,7 +174,9 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     if (e instanceof ApiError) {
       console.log(`[avatar-upload] reject: code=${e.code} detail=${e.detail ?? ''}`)
     } else {
-      console.log(`[avatar-upload] uncaught: ${e instanceof Error ? e.stack ?? e.message : String(e)}`)
+      console.log(
+        `[avatar-upload] uncaught: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`,
+      )
     }
     return jsonError(e)
   }
@@ -174,8 +186,7 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
 
-    const existing = await ctx.env.DB
-      .prepare('SELECT custom_avatar_id FROM users WHERE id=?')
+    const existing = await ctx.env.DB.prepare('SELECT custom_avatar_id FROM users WHERE id=?')
       .bind(user.id)
       .first<{ custom_avatar_id: string | null }>()
 
@@ -189,8 +200,7 @@ export const onRequestDelete: PagesFunction<Env> = async (ctx) => {
     // reverts to "show the provider photo if any, else initials" —
     // otherwise a previously-hidden provider stays hidden and the user
     // ends up with initials when they expected their Google photo back.
-    await ctx.env.DB
-      .prepare('UPDATE users SET custom_avatar_id=NULL, avatar_visible=1 WHERE id=?')
+    await ctx.env.DB.prepare('UPDATE users SET custom_avatar_id=NULL, avatar_visible=1 WHERE id=?')
       .bind(user.id)
       .run()
 

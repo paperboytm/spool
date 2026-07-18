@@ -25,8 +25,9 @@
 // eslint-disable-next-line no-restricted-imports
 import { execSync, spawn } from 'node:child_process'
 import { existsSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { join } from 'node:path'
+
 import { shell } from 'electron'
 
 const IS_LINUX = process.platform === 'linux'
@@ -35,13 +36,28 @@ const IS_LINUX = process.platform === 'linux'
  * Terminal identifiers. These double as the display names shown in settings
  * and the keys used in the runners map.
  */
-export const SUPPORTED_TERMINALS = ['Terminal', 'iTerm2', 'Warp', 'Ghostty', 'kitty', 'Alacritty', 'WezTerm'] as const
+export const SUPPORTED_TERMINALS = [
+  'Terminal',
+  'iTerm2',
+  'Warp',
+  'Ghostty',
+  'kitty',
+  'Alacritty',
+  'WezTerm',
+] as const
 export type SupportedTerminal = (typeof SUPPORTED_TERMINALS)[number]
 
 // Third-party terminals to probe, in order of popularity. New entries are
 // appended at the end so adding a terminal never changes which one an
 // existing user (with several running and no explicit preference) auto-detects.
-const THIRD_PARTY: SupportedTerminal[] = ['iTerm2', 'Warp', 'kitty', 'Alacritty', 'WezTerm', 'Ghostty']
+const THIRD_PARTY: SupportedTerminal[] = [
+  'iTerm2',
+  'Warp',
+  'kitty',
+  'Alacritty',
+  'WezTerm',
+  'Ghostty',
+]
 
 let autoDetectedTerminal: SupportedTerminal | undefined
 
@@ -55,15 +71,16 @@ function autoDetect(): SupportedTerminal {
 
   for (const name of THIRD_PARTY) {
     try {
-      const running = execSync(
-        `osascript -e 'application "${name}" is running'`,
-        { timeout: 2000 },
-      ).toString().trim()
+      const running = execSync(`osascript -e 'application "${name}" is running'`, { timeout: 2000 })
+        .toString()
+        .trim()
       if (running === 'true') {
         autoDetectedTerminal = name
         return autoDetectedTerminal
       }
-    } catch { /* app not installed or osascript failed — skip */ }
+    } catch {
+      /* app not installed or osascript failed — skip */
+    }
   }
 
   autoDetectedTerminal = 'Terminal'
@@ -95,12 +112,12 @@ import { shellQuote } from '../shared/resumeCommand.js'
  */
 const runners: Record<SupportedTerminal, (cmd: string, cwd?: string) => void> = {
   // Terminal.app — AppleScript `do script`
-  'Terminal': (cmd, cwd) => {
+  Terminal: (cmd, cwd) => {
     execSync(`osascript -e 'tell application "Terminal" to do script "${withCwd(cmd, cwd)}"'`)
   },
 
   // iTerm2 — AppleScript `create window with default profile command`
-  'iTerm2': (cmd, cwd) => {
+  iTerm2: (cmd, cwd) => {
     const full = withCwd(cmd, cwd)
     const script = `tell application "iTerm2"
       activate
@@ -112,7 +129,7 @@ const runners: Record<SupportedTerminal, (cmd: string, cwd?: string) => void> = 
   // Warp — uses Launch Configurations (official API). We write a fixed-name YAML
   // config to ~/.warp/launch_configurations/ and open it via warp:// URI scheme.
   // Docs: https://docs.warp.dev/terminal/sessions/launch-configurations
-  'Warp': (cmd, cwd) => {
+  Warp: (cmd, cwd) => {
     const configDir = join(homedir(), '.warp', 'launch_configurations')
     const configName = `spool-resume-${Date.now()}`
     const configPath = join(configDir, `${configName}.yaml`)
@@ -122,11 +139,15 @@ const runners: Record<SupportedTerminal, (cmd: string, cwd?: string) => void> = 
     // Clean up stale spool-resume-* configs from previous runs
     for (const f of readdirSync(configDir)) {
       if (f.startsWith('spool-resume-')) {
-        try { unlinkSync(join(configDir, f)) } catch {}
+        try {
+          unlinkSync(join(configDir, f))
+        } catch {}
       }
     }
 
-    writeFileSync(configPath, `---
+    writeFileSync(
+      configPath,
+      `---
 name: ${configName}
 windows:
   - tabs:
@@ -135,7 +156,8 @@ windows:
           cwd: "${cwd || homedir()}"
           commands:
             - exec: ${cmd}
-`)
+`,
+    )
     void shell.openExternal(`warp://launch/${configName}`).catch((error) => {
       console.error('[terminal] failed to open Warp launch configuration:', error)
     })
@@ -143,35 +165,35 @@ windows:
 
   // Ghostty — macOS has no direct CLI, so pass args through `open --args`.
   // `-e` runs the command; `exec $SHELL` keeps the window alive afterwards.
-  'Ghostty': (cmd, cwd) => {
+  Ghostty: (cmd, cwd) => {
     execSync(`open -a Ghostty --args -e sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // Kitty — `open --args`; `exec $SHELL` keeps the window alive
-  'kitty': (cmd, cwd) => {
+  kitty: (cmd, cwd) => {
     execSync(`open -a kitty --args sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // Alacritty — uses `-e` flag for command execution
-  'Alacritty': (cmd, cwd) => {
+  Alacritty: (cmd, cwd) => {
     execSync(`open -a Alacritty --args -e sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 
   // WezTerm — `start --` separates wezterm args from the spawned command
-  'WezTerm': (cmd, cwd) => {
+  WezTerm: (cmd, cwd) => {
     execSync(`open -a WezTerm --args start -- sh -c ${keepAliveArg(cmd, cwd)}`)
   },
 }
 
 /** App bundle paths for installation checks. Terminal.app is always present. */
 const APP_PATHS: Record<SupportedTerminal, string> = {
-  'Terminal': '/System/Applications/Utilities/Terminal.app',
-  'iTerm2': '/Applications/iTerm.app',
-  'Warp': '/Applications/Warp.app',
-  'Ghostty': '/Applications/Ghostty.app',
-  'kitty': '/Applications/kitty.app',
-  'Alacritty': '/Applications/Alacritty.app',
-  'WezTerm': '/Applications/WezTerm.app',
+  Terminal: '/System/Applications/Utilities/Terminal.app',
+  iTerm2: '/Applications/iTerm.app',
+  Warp: '/Applications/Warp.app',
+  Ghostty: '/Applications/Ghostty.app',
+  kitty: '/Applications/kitty.app',
+  Alacritty: '/Applications/Alacritty.app',
+  WezTerm: '/Applications/WezTerm.app',
 }
 
 function isInstalled(terminal: SupportedTerminal): boolean {

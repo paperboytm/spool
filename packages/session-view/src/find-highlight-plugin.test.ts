@@ -1,10 +1,16 @@
-import { describe, it, expect } from 'vitest'
+import { toString } from 'mdast-util-to-string'
 import { remark } from 'remark'
 import remarkGfm from 'remark-gfm'
-import { toString } from 'mdast-util-to-string'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { findHighlightPlugin } from './find-highlight-plugin.js'
 
-function buildTree(markdown: string, ranges: Array<{ start: number; end: number }>, offset = 0, active = -1) {
+function buildTree(
+  markdown: string,
+  ranges: Array<{ start: number; end: number }>,
+  offset = 0,
+  active = -1,
+) {
   const processor = remark().use(remarkGfm).use(findHighlightPlugin, {
     ranges,
     matchIndexOffset: offset,
@@ -13,8 +19,11 @@ function buildTree(markdown: string, ranges: Array<{ start: number; end: number 
   return processor.runSync(processor.parse(markdown))
 }
 
-function collectMatches(tree: any): Array<{ value: string; matchIndex: number; isActive: boolean; dataActive: string }> {
-  const out: Array<{ value: string; matchIndex: number; isActive: boolean; dataActive: string }> = []
+function collectMatches(
+  tree: any,
+): Array<{ value: string; matchIndex: number; isActive: boolean; dataActive: string }> {
+  const out: Array<{ value: string; matchIndex: number; isActive: boolean; dataActive: string }> =
+    []
   const walk = (node: any) => {
     if (node.type === 'findMatch') {
       out.push({
@@ -38,7 +47,12 @@ describe('findHighlightPlugin', () => {
     const tree = buildTree(md, [{ start, end: start + 5 }])
     const matches = collectMatches(tree)
     expect(matches).toHaveLength(1)
-    expect(matches[0]).toMatchObject({ value: 'world', matchIndex: 0, isActive: false, dataActive: 'false' })
+    expect(matches[0]).toMatchObject({
+      value: 'world',
+      matchIndex: 0,
+      isActive: false,
+      dataActive: 'false',
+    })
   })
 
   it('marks active match via isActive and data-active', () => {
@@ -65,7 +79,7 @@ describe('findHighlightPlugin', () => {
     const text = toString(remark().use(remarkGfm).parse(md))
     const start = text.indexOf('foo()')
     const tree = buildTree(md, [{ start, end: start + 5 }])
-    expect(collectMatches(tree).map(m => m.value)).toEqual(['foo()'])
+    expect(collectMatches(tree).map((m) => m.value)).toEqual(['foo()'])
   })
 
   it('matches inside fenced code blocks', () => {
@@ -73,7 +87,7 @@ describe('findHighlightPlugin', () => {
     const text = toString(remark().use(remarkGfm).parse(md))
     const start = text.indexOf('foo')
     const tree = buildTree(md, [{ start, end: start + 3 }])
-    expect(collectMatches(tree).map(m => m.value)).toEqual(['foo'])
+    expect(collectMatches(tree).map((m) => m.value)).toEqual(['foo'])
   })
 
   it('handles match spanning two text segments (across emphasis)', () => {
@@ -83,8 +97,8 @@ describe('findHighlightPlugin', () => {
     expect(text).toBe('abc')
     const tree = buildTree(md, [{ start: 0, end: 3 }])
     const matches = collectMatches(tree)
-    expect(matches.map(m => m.value).join('')).toBe('abc')
-    expect(matches.every(m => m.matchIndex === 0)).toBe(true)
+    expect(matches.map((m) => m.value).join('')).toBe('abc')
+    expect(matches.every((m) => m.matchIndex === 0)).toBe(true)
   })
 
   it('is a no-op when ranges is empty', () => {
@@ -102,7 +116,7 @@ describe('findHighlightPlugin', () => {
     expect(start).toBeGreaterThanOrEqual(0)
     const tree = buildTree(md, [{ start, end: start + 5 }])
     const matches = collectMatches(tree)
-    expect(matches.map(m => m.value)).toEqual(['match'])
+    expect(matches.map((m) => m.value)).toEqual(['match'])
   })
 
   it('advances cursor past image alt text', () => {
@@ -112,14 +126,14 @@ describe('findHighlightPlugin', () => {
     expect(start).toBeGreaterThanOrEqual(0)
     const tree = buildTree(md, [{ start, end: start + 5 }])
     const matches = collectMatches(tree)
-    expect(matches.map(m => m.value)).toEqual(['below'])
+    expect(matches.map((m) => m.value)).toEqual(['below'])
   })
 
   it('handles a range that exactly equals a text node', () => {
     // Range covers the entire 'hello' text node — boundary condition.
     const tree = buildTree('hello', [{ start: 0, end: 5 }])
     const matches = collectMatches(tree)
-    expect(matches.map(m => m.value)).toEqual(['hello'])
+    expect(matches.map((m) => m.value)).toEqual(['hello'])
   })
 
   it('emits hChildren so <mark> renders with visible text after hast conversion', () => {
@@ -128,10 +142,11 @@ describe('findHighlightPlugin', () => {
     const tree = buildTree('hello world', [{ start: 6, end: 11 }])
     const findMatch = (node: any): any => {
       if (node.type === 'findMatch') return node
-      if (node.children) for (const c of node.children) {
-        const found = findMatch(c)
-        if (found) return found
-      }
+      if (node.children)
+        for (const c of node.children) {
+          const found = findMatch(c)
+          if (found) return found
+        }
       return null
     }
     const node = findMatch(tree)

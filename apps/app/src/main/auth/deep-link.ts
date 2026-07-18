@@ -16,8 +16,9 @@
 // index.ts owns wiring those events to dispatchDeepLink; this module is
 // electron-event-free so tests can drive it directly.
 
-import { app } from 'electron'
 import { resolve } from 'node:path'
+
+import { app } from 'electron'
 
 export const DEEP_LINK_SCHEME = 'spool'
 

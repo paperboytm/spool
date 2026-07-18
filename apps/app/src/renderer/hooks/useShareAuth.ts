@@ -38,8 +38,7 @@ export type ShareAuthUser = {
 //
 // Kept in this module (not a global file) because the event channel
 // is exclusively an implementation detail of this hook.
-const authBus =
-  typeof window !== 'undefined' ? new EventTarget() : null
+const authBus = typeof window !== 'undefined' ? new EventTarget() : null
 const AUTH_CHANGE_EVENT = 'spool:share-auth-change'
 
 export function useShareAuth() {
@@ -64,7 +63,9 @@ export function useShareAuth() {
     })
     // Listen for sign-in / sign-out events from other instances of
     // this hook so all surfaces stay in sync without a route change.
-    const onChange = () => { void fetchAndStore() }
+    const onChange = () => {
+      void fetchAndStore()
+    }
     authBus?.addEventListener(AUTH_CHANGE_EVENT, onChange)
     return () => {
       cancelled = true

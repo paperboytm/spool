@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import {
   SPOOL_DIR,
   cachedResolveAsync,
@@ -58,7 +59,10 @@ export function hydrateBinaryCache(): void {
 
 /** Resolve a binary, persisting the result to disk after a successful
  *  miss-then-resolve so the next process start can read it back. */
-export async function cachedResolveAsyncPersistent(name: string, extras: string[] = []): Promise<string | null> {
+export async function cachedResolveAsyncPersistent(
+  name: string,
+  extras: string[] = [],
+): Promise<string | null> {
   const before = getResolveCacheSnapshot()
   const p = await cachedResolveAsync(name, extras)
   const after = getResolveCacheSnapshot()

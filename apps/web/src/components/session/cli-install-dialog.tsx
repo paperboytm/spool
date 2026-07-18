@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, SquareTerminal, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 export const CLI_INSTALL_COMMAND = 'npm install -g @spool-lab/cli'
 
@@ -19,9 +19,8 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
   useEffect(() => {
     if (!open) return
 
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
 
     setCopiedCommand(null)
@@ -79,7 +78,7 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-[520px] rounded-[10px] border border-[var(--border)] bg-[var(--card-2)] p-4 shadow-[var(--shadow-card)] [[data-theme=dark]_&]:bg-[var(--card)] sm:p-6"
+        className="w-full max-w-[520px] rounded-[10px] border border-[var(--border)] bg-[var(--card-2)] p-4 shadow-[var(--shadow-card)] sm:p-6 [[data-theme=dark]_&]:bg-[var(--card)]"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -91,7 +90,7 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
             />
             <h2
               id="cli-install-title"
-              className="m-0 text-xl font-semibold leading-8 tracking-[-0.02em] text-[var(--text)]"
+              className="m-0 text-xl leading-8 font-semibold tracking-[-0.02em] text-[var(--text)]"
             >
               Install the Spool CLI
             </h2>
@@ -109,12 +108,12 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
 
         <p
           id="cli-install-description"
-          className="mb-0 mt-3 text-[13px] leading-5 text-[var(--muted)]"
+          className="mt-3 mb-0 text-[13px] leading-5 text-[var(--muted)]"
         >
           Two terminal commands are all you need to continue this shared session locally.
         </p>
 
-        <ol className="mb-0 mt-6 flex list-none flex-col gap-6 p-0">
+        <ol className="mt-6 mb-0 flex list-none flex-col gap-6 p-0">
           <li className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
             <StepNumber>1</StepNumber>
             <div className="min-w-0">
@@ -146,7 +145,7 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
           </li>
         </ol>
 
-        <p className="mb-0 mt-6 border-t border-[var(--border)] pt-4 text-[11px] leading-4 text-[var(--muted)]">
+        <p className="mt-6 mb-0 border-t border-[var(--border)] pt-4 text-[11px] leading-4 text-[var(--muted)]">
           Spool downloads the shared session locally, then opens it in Claude Code or Codex CLI.
         </p>
       </div>
@@ -157,7 +156,7 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
 function StepNumber({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-strong)] bg-[var(--card-2)] font-mono text-[11px] font-medium tabular-nums text-[var(--muted)]"
+      className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-strong)] bg-[var(--card-2)] font-mono text-[11px] font-medium text-[var(--muted)] tabular-nums"
       aria-hidden="true"
     >
       {children}
@@ -179,7 +178,7 @@ function CommandRow({
   return (
     <div className="mt-3 flex h-8 min-w-0" aria-label={label}>
       <code
-        className="flex h-8 min-w-0 flex-1 items-center overflow-x-auto whitespace-nowrap rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--bg)] px-3 font-mono text-[11px] text-[var(--text)]"
+        className="flex h-8 min-w-0 flex-1 items-center overflow-x-auto rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--bg)] px-3 font-mono text-[11px] whitespace-nowrap text-[var(--text)]"
         title={command}
       >
         {command}
@@ -191,9 +190,11 @@ function CommandRow({
         aria-label={copied ? `${label} copied` : `Copy ${label.toLowerCase()}`}
         onClick={onCopy}
       >
-        {copied
-          ? <Check size={14} strokeWidth={1.8} aria-hidden="true" />
-          : <Copy size={14} strokeWidth={1.8} aria-hidden="true" />}
+        {copied ? (
+          <Check size={14} strokeWidth={1.8} aria-hidden="true" />
+        ) : (
+          <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
+        )}
       </button>
     </div>
   )

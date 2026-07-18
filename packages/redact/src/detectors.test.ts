@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import {
   detectSensitiveSpans,
   groupBySensitiveKind,
@@ -11,8 +12,7 @@ import {
 } from './index.js'
 import type { SensitiveKind } from './types.js'
 
-const kindsOf = (text: string): SensitiveKind[] =>
-  detectSensitiveSpans(text).map((m) => m.kind)
+const kindsOf = (text: string): SensitiveKind[] => detectSensitiveSpans(text).map((m) => m.kind)
 
 describe('identity', () => {
   it('finds an email and reports its span', () => {
@@ -43,7 +43,9 @@ describe('identity', () => {
     // `5227687358856201` happens to be 16 digits, start with 5
     // (Mastercard prefix), and pass Luhn — but it's the fractional
     // part of a `confidence` float, not a card number.
-    expect(kindsOf("[{'label': 'silence', 'confidence': 0.5227687358856201}]")).not.toContain('credit-card')
+    expect(kindsOf("[{'label': 'silence', 'confidence': 0.5227687358856201}]")).not.toContain(
+      'credit-card',
+    )
     expect(kindsOf('score=0.5227687358856201 next')).not.toContain('credit-card')
     // Sanity: a real-looking card right after a period (non-decimal
     // context) is still caught.
@@ -78,15 +80,20 @@ const tok = (...parts: string[]) => parts.join('')
 
 describe('credentials — vendor api keys', () => {
   it('finds an OpenAI-style api key', () => {
-    expect(kindsOf(`use ${tok('sk-', 'abcdef0123456789ABCDEFGHabcdef0123456789')}`)).toContain('api-key')
+    expect(kindsOf(`use ${tok('sk-', 'abcdef0123456789ABCDEFGHabcdef0123456789')}`)).toContain(
+      'api-key',
+    )
   })
   it('finds an Anthropic api key without colliding with OpenAI rule', () => {
-    const m = detectSensitiveSpans(tok('sk-', 'ant-', 'api03-abcdef0123456789ABCDEFGHabcdef0123456789-XYZ'))
-      .find((x) => x.kind === 'api-key')
+    const m = detectSensitiveSpans(
+      tok('sk-', 'ant-', 'api03-abcdef0123456789ABCDEFGHabcdef0123456789-XYZ'),
+    ).find((x) => x.kind === 'api-key')
     expect(m?.value.startsWith('sk-ant-')).toBe(true)
   })
   it('finds a GitHub PAT', () => {
-    expect(kindsOf(`GH_TOKEN=${tok('ghp_', 'abcdefghijklmnopqrstuvwxyz0123456789')}`)).toContain('api-key')
+    expect(kindsOf(`GH_TOKEN=${tok('ghp_', 'abcdefghijklmnopqrstuvwxyz0123456789')}`)).toContain(
+      'api-key',
+    )
   })
   it('finds an AWS access key id', () => {
     // Real-shape (no EXAMPLE / SAMPLE suffix — those are vendor-doc
@@ -99,16 +106,22 @@ describe('credentials — vendor api keys', () => {
     expect(kindsOf(`cred=${tok('ASIA', '1234567890ABCDEF')}`)).toContain('api-key')
   })
   it('finds a Google API key', () => {
-    expect(kindsOf(`key=${tok('AIza', 'SyA-1234567890abcdefghijklmnopqrstu')}`)).toContain('api-key')
+    expect(kindsOf(`key=${tok('AIza', 'SyA-1234567890abcdefghijklmnopqrstu')}`)).toContain(
+      'api-key',
+    )
   })
   it('finds a gcloud access token (ya29.)', () => {
-    expect(kindsOf(`export TOK=${tok('ya29.', 'a0ARrdaM_abcdefghijklmnopqrstuvwxyz0123456789')}`)).toContain('api-key')
+    expect(
+      kindsOf(`export TOK=${tok('ya29.', 'a0ARrdaM_abcdefghijklmnopqrstuvwxyz0123456789')}`),
+    ).toContain('api-key')
   })
   it('finds a Slack token', () => {
     expect(kindsOf(tok('xox', 'b-0000000000-zzzzzzzzzzzzzzzzzzzz'))).toContain('api-key')
   })
   it('finds a HuggingFace token', () => {
-    expect(kindsOf(`export HF=${tok('hf_', 'abcdefghijklmnopqrstuvwxyzABCDEF')}`)).toContain('api-key')
+    expect(kindsOf(`export HF=${tok('hf_', 'abcdefghijklmnopqrstuvwxyzABCDEF')}`)).toContain(
+      'api-key',
+    )
   })
   it('finds a Stripe live key', () => {
     const tok = 'sk_' + 'live_' + 'x'.repeat(30)
@@ -128,7 +141,8 @@ describe('credentials — vendor api keys', () => {
 
 describe('credentials — composite blocks', () => {
   it('finds a PEM private key block end-to-end', () => {
-    const key = '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAxxxx\nyyyy\n-----END RSA PRIVATE KEY-----'
+    const key =
+      '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAxxxx\nyyyy\n-----END RSA PRIVATE KEY-----'
     const matches = detectSensitiveSpans(`here:\n${key}\nthanks`)
     expect(matches[0]?.kind).toBe('private-key')
     expect(matches[0]?.value).toBe(key)
@@ -151,37 +165,37 @@ describe('credentials — composite blocks', () => {
     // Random-shape body via tok so the source doesn't read as a real
     // secret. Entropy clears the validator floor (≥ 3.0).
     const t = tok('j82H1xK9pQrSt7Vw', 'YzA3bC5dF8gJkL2', 'mNoPqRsT')
-    expect(kindsOf(`users:\n- name: admin\n  user:\n    token: ${t}`))
-      .toContain('kubeconfig-token')
+    expect(kindsOf(`users:\n- name: admin\n  user:\n    token: ${t}`)).toContain('kubeconfig-token')
   })
   it('finds a .netrc line', () => {
     // Avoid `example.com` (reserved domain on emails — same string
     // would slip credentialBlockLooksReal but we still want a
     // realistic shape) and avoid `hunter2` (placeholder).
     const pw = tok('j82H1xK9', 'pQrSt7VwYzA3bC5dF8gJ')
-    expect(kindsOf(`machine api.spoollab.io login chen password ${pw}`))
-      .toContain('netrc')
+    expect(kindsOf(`machine api.spoollab.io login chen password ${pw}`)).toContain('netrc')
   })
   it('finds a gcloud application_default_credentials field', () => {
-    expect(kindsOf('"refresh_token": "1//abcdefghijklmnopqrstuvwxyz"'))
-      .toContain('cloud-cred-ini')
+    expect(kindsOf('"refresh_token": "1//abcdefghijklmnopqrstuvwxyz"')).toContain('cloud-cred-ini')
   })
 })
 
 describe('credentials — connection strings', () => {
   it('finds postgres connection string', () => {
-    expect(kindsOf('psql "postgresql://user:pass@db.host:5432/main"'))
-      .toContain('connection-string')
+    expect(kindsOf('psql "postgresql://user:pass@db.host:5432/main"')).toContain(
+      'connection-string',
+    )
   })
   it('finds mongodb+srv URI', () => {
     // Drop `test` and `example`-named hosts — both trigger the
     // placeholder filter on the credentialBlockLooksReal validator.
-    expect(kindsOf('client = MongoClient("mongodb+srv://u:p@cluster.mongodb.net/main")'))
-      .toContain('connection-string')
+    expect(kindsOf('client = MongoClient("mongodb+srv://u:p@cluster.mongodb.net/main")')).toContain(
+      'connection-string',
+    )
   })
   it('finds redis URI', () => {
-    expect(kindsOf('REDIS_URL=rediss://user:pass@redis.spoollab.io:6380'))
-      .toContain('connection-string')
+    expect(kindsOf('REDIS_URL=rediss://user:pass@redis.spoollab.io:6380')).toContain(
+      'connection-string',
+    )
   })
 })
 
@@ -200,7 +214,9 @@ describe('credentials — context wrappers', () => {
   it('finds URL-embedded credentials', () => {
     // Avoid `hunter2` (placeholder) and `example.com` (reserved).
     const pw = tok('j82H1xK9', 'pQrSt7VwYzA3')
-    expect(kindsOf(`connect to https://admin:${pw}@db.spoollab.io:5432/main`)).toContain('url-creds')
+    expect(kindsOf(`connect to https://admin:${pw}@db.spoollab.io:5432/main`)).toContain(
+      'url-creds',
+    )
   })
   it('finds an env-var-style assignment', () => {
     // Value must not look like a JS storage-key identifier (pure
@@ -219,7 +235,9 @@ describe('credentials — context wrappers', () => {
 
 describe('location / infra', () => {
   it('finds an absolute Unix home path', () => {
-    expect(detectSensitiveSpans('check /Users/chen/secrets/keys.txt')[0]?.kind).toBe('absolute-path')
+    expect(detectSensitiveSpans('check /Users/chen/secrets/keys.txt')[0]?.kind).toBe(
+      'absolute-path',
+    )
   })
   it('finds a Windows user path', () => {
     expect(kindsOf('open C:\\Users\\chen\\Documents\\notes.md')).toContain('absolute-path')
@@ -240,7 +258,9 @@ describe('location / infra', () => {
   it('does not flag PascalCase property chains ending in `.internal` (issue #340)', () => {
     // `SqlParser.internal` is a class/property access in code, not a
     // hostname. The case-sensitive regex (no `/i` flag) rejects it.
-    expect(kindsOf('throw new SqlParser.internal.UnexpectedTokenError()')).not.toContain('internal-host')
+    expect(kindsOf('throw new SqlParser.internal.UnexpectedTokenError()')).not.toContain(
+      'internal-host',
+    )
     expect(kindsOf('AppRouter.internal handles the redirect')).not.toContain('internal-host')
   })
   it('does not flag bundler output filenames like `*.prod.js` (issue #340)', () => {
@@ -327,8 +347,12 @@ describe('false-positive filters (precision tuning)', () => {
 
   describe('reserved / example domains in emails', () => {
     for (const e of [
-      'user@example.com', 'a@example.net', 'b@test.com',
-      'c@yourcompany.com', 'd@mydomain.com', 'e@localhost',
+      'user@example.com',
+      'a@example.net',
+      'b@test.com',
+      'c@yourcompany.com',
+      'd@mydomain.com',
+      'e@localhost',
     ]) {
       it(`drops ${e}`, () => {
         expect(kindsOf(`mail ${e}`)).not.toContain('email')
@@ -346,9 +370,13 @@ describe('false-positive filters (precision tuning)', () => {
 
   describe('reserved IP ranges', () => {
     for (const ip of [
-      '127.0.0.1', '127.5.6.7',
-      '192.0.2.42', '198.51.100.99', '203.0.113.1',
-      '0.0.0.0', '169.254.1.1',
+      '127.0.0.1',
+      '127.5.6.7',
+      '192.0.2.42',
+      '198.51.100.99',
+      '203.0.113.1',
+      '0.0.0.0',
+      '169.254.1.1',
       '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
     ]) {
       it(`drops ${ip} (loopback / docs / link-local)`, () => {
@@ -396,8 +424,7 @@ describe('false-positive filters (precision tuning)', () => {
 
   describe('kubeconfig token is a low-entropy placeholder', () => {
     it('drops alphabet-sequence token', () => {
-      expect(kindsOf('token: abcdefghijklmnopqrstuvwxyz'))
-        .not.toContain('kubeconfig-token')
+      expect(kindsOf('token: abcdefghijklmnopqrstuvwxyz')).not.toContain('kubeconfig-token')
     })
   })
 })
@@ -408,9 +435,7 @@ describe('general behaviour', () => {
   })
   it('orders matches by start position', () => {
     const apiKey = tok('sk-', '12abcdefghij1234567890', 'ABCDEFGHIJklmnopqr')
-    const matches = detectSensitiveSpans(
-      `first: maya@hogwarts.edu, then key ${apiKey}`,
-    )
+    const matches = detectSensitiveSpans(`first: maya@hogwarts.edu, then key ${apiKey}`)
     expect(matches.length).toBeGreaterThanOrEqual(2)
     for (let i = 1; i < matches.length; i++) {
       expect(matches[i]!.start).toBeGreaterThanOrEqual(matches[i - 1]!.start)
@@ -435,14 +460,15 @@ describe('general behaviour', () => {
 describe('groupBySensitiveKind', () => {
   it('groups matches by kind with distinct values in detection order', () => {
     const k = tok('AKIA', 'V3QFKW72ZDLNP4XR')
-    const text = [
-      'a@one.io', 'b@two.io', 'c@three.io', 'd@four.io', k,
-    ].join(' ')
+    const text = ['a@one.io', 'b@two.io', 'c@three.io', 'd@four.io', k].join(' ')
     const groups = groupBySensitiveKind(detectSensitiveSpans(text))
     const emailGroup = groups.find((g) => g.kind === 'email')
     expect(emailGroup?.count).toBe(4)
     expect(emailGroup?.values.map((v) => v.value)).toEqual([
-      'a@one.io', 'b@two.io', 'c@three.io', 'd@four.io',
+      'a@one.io',
+      'b@two.io',
+      'c@three.io',
+      'd@four.io',
     ])
     expect(emailGroup?.values.every((v) => v.count === 1)).toBe(true)
     expect(groups.find((g) => g.kind === 'api-key')?.count).toBe(1)
@@ -461,10 +487,25 @@ describe('groupBySensitiveKind', () => {
   })
   it('exposes a human label for every kind', () => {
     const allKinds: SensitiveKind[] = [
-      'private-key', 'ssh-key', 'cloud-cred-ini', 'kubeconfig-token',
-      'connection-string', 'api-key', 'netrc', 'jwt', 'bearer',
-      'basic-auth', 'env-var', 'generic-secret', 'url-creds',
-      'credit-card', 'ssn', 'email', 'phone', 'ip', 'absolute-path',
+      'private-key',
+      'ssh-key',
+      'cloud-cred-ini',
+      'kubeconfig-token',
+      'connection-string',
+      'api-key',
+      'netrc',
+      'jwt',
+      'bearer',
+      'basic-auth',
+      'env-var',
+      'generic-secret',
+      'url-creds',
+      'credit-card',
+      'ssn',
+      'email',
+      'phone',
+      'ip',
+      'absolute-path',
       'internal-host',
     ]
     for (const k of allKinds) {
@@ -485,7 +526,14 @@ describe('providers', () => {
       displayName: 'Fake',
       available: () => true,
       analyze: async () => [
-        { kind: 'email' as const, value: 'maya@example.com', start: 9, end: 25, confidence: 0.9, provider: 'fake' },
+        {
+          kind: 'email' as const,
+          value: 'maya@example.com',
+          start: 9,
+          end: 25,
+          confidence: 0.9,
+          provider: 'fake',
+        },
       ],
     }
     // fake first, then regex. Fake wins the overlap.

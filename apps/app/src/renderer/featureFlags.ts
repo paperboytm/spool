@@ -22,14 +22,10 @@
  * helper is removed) — single source of truth, no scattered
  * envEnabled calls.
  */
-export function resolveSharePublish(
-  env: Record<string, string | undefined>,
-): boolean {
+export function resolveSharePublish(env: Record<string, string | undefined>): boolean {
   return env['VITE_FEATURE_SHAREPUBLISH'] === '1'
 }
 
 export function useSharePublish(): boolean {
-  return resolveSharePublish(
-    import.meta.env as Record<string, string | undefined>,
-  )
+  return resolveSharePublish(import.meta.env as Record<string, string | undefined>)
 }

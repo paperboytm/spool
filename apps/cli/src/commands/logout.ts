@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
 import {
   clearHubCredentials,
@@ -47,8 +48,8 @@ export async function handleLogoutCommand(
         log('The hub had already invalidated this token.')
       } else {
         error(
-          `Warning: could not revoke the token on ${stored.hubUrl} (${errorMessage(cause)}). `
-          + 'Removing local credentials anyway — revoke it from your account page if needed.',
+          `Warning: could not revoke the token on ${stored.hubUrl} (${errorMessage(cause)}). ` +
+            'Removing local credentials anyway — revoke it from your account page if needed.',
         )
       }
     }
@@ -58,7 +59,9 @@ export async function handleLogoutCommand(
 
     const env = credentialOptions.env ?? process.env
     if (env['SPOOL_HUB_TOKEN']?.trim()) {
-      log('Note: SPOOL_HUB_TOKEN is set in your environment and still wins — unset it to fully sign out.')
+      log(
+        'Note: SPOOL_HUB_TOKEN is set in your environment and still wins — unset it to fully sign out.',
+      )
     }
     return 0
   } catch (cause) {
@@ -68,15 +71,15 @@ export async function handleLogoutCommand(
 }
 
 export const logoutCommand = new Command('logout')
-  .description('Sign out of the Spool hub: revoke this machine\'s token and delete local credentials')
+  .description(
+    "Sign out of the Spool hub: revoke this machine's token and delete local credentials",
+  )
   .action(async () => {
     const exitCode = await handleLogoutCommand()
     if (exitCode !== 0) process.exitCode = exitCode
   })
 
-function pickCredentialOptions(
-  dependencies: HubCredentialOptions,
-): HubCredentialOptions {
+function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentialOptions {
   return {
     ...(dependencies.homeDir === undefined ? {} : { homeDir: dependencies.homeDir }),
     ...(dependencies.env === undefined ? {} : { env: dependencies.env }),

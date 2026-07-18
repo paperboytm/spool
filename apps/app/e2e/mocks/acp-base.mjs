@@ -34,25 +34,41 @@ export function runMockAgent(promptHandler) {
 
   let pending = 0
   let stdinClosed = false
-  function maybeExit() { if (stdinClosed && pending === 0) process.exit(0) }
+  function maybeExit() {
+    if (stdinClosed && pending === 0) process.exit(0)
+  }
 
   const rl = createInterface({ input: process.stdin })
 
   rl.on('line', (line) => {
     let msg
-    try { msg = JSON.parse(line) } catch { return }
+    try {
+      msg = JSON.parse(line)
+    } catch {
+      return
+    }
 
     const handler = handlers[msg.method]
     if (handler) {
       const result = handler(msg.id, msg.params ?? {})
       if (result && typeof result.then === 'function') {
         pending++
-        result.finally(() => { pending--; maybeExit() })
+        result.finally(() => {
+          pending--
+          maybeExit()
+        })
       }
     } else if (msg.id !== undefined) {
-      send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } })
+      send({
+        jsonrpc: '2.0',
+        id: msg.id,
+        error: { code: -32601, message: `Method not found: ${msg.method}` },
+      })
     }
   })
 
-  rl.on('close', () => { stdinClosed = true; maybeExit() })
+  rl.on('close', () => {
+    stdinClosed = true
+    maybeExit()
+  })
 }

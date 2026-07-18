@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequestGet as profileGet } from '../functions/api/profiles/[handle]'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 

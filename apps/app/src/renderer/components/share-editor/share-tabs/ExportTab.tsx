@@ -1,13 +1,6 @@
+import { Check, Code2, Download, FileImage, FileText, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Check,
-  Code2,
-  Download,
-  FileImage,
-  FileText,
-  Loader2,
-} from 'lucide-react'
 
 /** Canonical Spool brand mark — used here as the .spool format icon
  *  so the file type reads as our own format, not a generic package.
@@ -110,7 +103,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
   return (
     <div className="flex flex-col">
       <fieldset disabled={exporting} className="px-4 pb-3">
-        <legend className="text-[11.5px] font-medium text-warm-muted dark:text-dark-muted">
+        <legend className="text-warm-muted dark:text-dark-muted text-[11.5px] font-medium">
           {t('shareEditor.exportTab.format_legend')}
         </legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -124,7 +117,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
                 aria-checked={active}
                 data-testid={`share-menu-export-${f.k}`}
                 onClick={() => setSelected(f.k)}
-                className={`relative text-left rounded-md p-2.5 border transition-colors ${
+                className={`relative rounded-md border p-2.5 text-left transition-colors ${
                   active
                     ? 'border-accent dark:border-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
                     : 'border-warm-border dark:border-dark-border hover:border-warm-border2 dark:hover:border-dark-border2'
@@ -132,16 +125,16 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <span
-                    className={`inline-flex w-7 h-7 items-center justify-center rounded-md ${
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${
                       active
-                        ? 'bg-accent text-white dark:bg-accent-dark'
+                        ? 'bg-accent dark:bg-accent-dark text-white'
                         : 'bg-warm-surface dark:bg-dark-surface text-warm-muted dark:text-dark-muted'
                     }`}
                   >
                     {f.icon}
                   </span>
                   <span
-                    className={`inline-flex w-4 h-4 items-center justify-center rounded-full border ${
+                    className={`inline-flex h-4 w-4 items-center justify-center rounded-full border ${
                       active
                         ? 'bg-accent dark:bg-accent-dark border-accent dark:border-accent-dark'
                         : 'border-warm-border2 dark:border-dark-border2 bg-transparent'
@@ -152,7 +145,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
                     )}
                   </span>
                 </div>
-                <div className="mt-2 text-[12.5px] font-semibold text-warm-text dark:text-dark-text">
+                <div className="text-warm-text dark:text-dark-text mt-2 text-[12.5px] font-semibold">
                   {t(f.labelKey)}
                 </div>
                 {/* Reserve two text lines on every card so a single-line
@@ -160,7 +153,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
                  * collapse the card to a shorter height than its 2-line
                  * neighbours. `line-clamp-2 min-h-[2.6em]` pins both
                  * the floor and the ceiling. */}
-                <div className="mt-0.5 text-[11px] leading-snug text-warm-muted dark:text-dark-muted line-clamp-2 min-h-[2.6em]">
+                <div className="text-warm-muted dark:text-dark-muted mt-0.5 line-clamp-2 min-h-[2.6em] text-[11px] leading-snug">
                   {t(f.subKey)}
                 </div>
               </button>
@@ -169,8 +162,8 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
         </div>
       </fieldset>
 
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40">
-        <p className="flex-1 min-w-0 text-[11px] text-warm-muted dark:text-dark-muted leading-snug">
+      <div className="border-warm-border/60 dark:border-dark-border/60 bg-warm-surface/40 dark:bg-dark-surface/40 flex items-center justify-between gap-3 border-t px-4 py-3">
+        <p className="text-warm-muted dark:text-dark-muted min-w-0 flex-1 text-[11px] leading-snug">
           {t('shareEditor.exportTab.footerHint')}
         </p>
         <button
@@ -178,7 +171,7 @@ export function ExportTab({ exporting, onExport, onClose }: Props) {
           data-testid="share-menu-download"
           onClick={handleDownload}
           disabled={exporting}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+          className="bg-accent dark:bg-accent-dark inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {exporting ? (
             <Loader2 size={12} strokeWidth={1.8} className="animate-spin" aria-hidden />

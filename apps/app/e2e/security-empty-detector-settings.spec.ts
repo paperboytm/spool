@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Regression for the "Detector settings" button on the Security page's
@@ -15,7 +16,9 @@ test.beforeAll(async () => {
   ctx = await launchApp()
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 test('Empty Security page exposes a working Detector settings shortcut', async () => {
   const { window } = ctx
@@ -35,5 +38,7 @@ test('Empty Security page exposes a working Detector settings shortcut', async (
   // The opened tab must be Security — verify by the presence of the
   // pane-specific rescan button (a unique testid only present inside
   // the Security pane).
-  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({ timeout: 5_000 })
+  await expect(window.locator('[data-testid="settings-rescan-all"]')).toBeVisible({
+    timeout: 5_000,
+  })
 })

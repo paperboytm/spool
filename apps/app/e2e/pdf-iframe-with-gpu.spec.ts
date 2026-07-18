@@ -1,9 +1,11 @@
-import { test, expect } from '@playwright/test'
-import { launchAppWithGpu, type AppContext } from './helpers/launch-with-gpu'
-import { openShareEditorFromSessionDetail } from './helpers/share'
-import { waitForSync } from './helpers/launch'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { waitForSync } from './helpers/launch'
+import { launchAppWithGpu, type AppContext } from './helpers/launch-with-gpu'
+import { openShareEditorFromSessionDetail } from './helpers/share'
 
 // Diagnostic for the PDF preview iframe path with full GPU enabled.
 // Chromium's built-in PDF viewer needs GPU rasterisation; the regular
@@ -48,7 +50,5 @@ test('PDF iframe renders with GPU enabled', async () => {
   await window.waitForTimeout(5000)
 
   mkdirSync(dirname(ARTIFACT_PATH), { recursive: true })
-  await window
-    .locator('.fixed.inset-0.z-50')
-    .screenshot({ path: ARTIFACT_PATH })
+  await window.locator('.fixed.inset-0.z-50').screenshot({ path: ARTIFACT_PATH })
 })

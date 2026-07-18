@@ -9,8 +9,9 @@
 // across both share-web and the reader path.
 
 import { useMemo } from 'react'
-import { TemplateRender } from '../templates'
+
 import type { Snapshot } from '../lib/types'
+import { TemplateRender } from '../templates'
 import { decodeSnapshot } from './snapshot-to-conversation'
 import { useProgressiveTurns } from './use-progressive-turns'
 

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
 import type { ScanStatus } from '@spool-lab/core'
+import { describe, it, expect } from 'vite-plus/test'
+
 import {
   AMBIENT_BANNER_THRESHOLD,
   compactModel,
@@ -125,7 +126,15 @@ describe('isHighKind / isInfoKind', () => {
   })
 
   it('classifies identity-tier kinds as neither (low by elimination)', () => {
-    for (const k of ['email', 'phone', 'person-name', 'street-address', 'credit-card', 'ssn', 'date-of-birth']) {
+    for (const k of [
+      'email',
+      'phone',
+      'person-name',
+      'street-address',
+      'credit-card',
+      'ssn',
+      'date-of-birth',
+    ]) {
       expect(isHighKind(k), `${k} should not be high`).toBe(false)
       expect(isInfoKind(k), `${k} should not be info`).toBe(false)
     }
@@ -188,19 +197,27 @@ describe('shouldShowScanBanner', () => {
   })
 
   it('hides for sub-threshold auto bursts so single-session sync ticks stay ambient', () => {
-    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 1, backfillRemaining: 1 }), true)).toBe(false)
-    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 4, backfillRemaining: 4 }), true)).toBe(false)
+    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 1, backfillRemaining: 1 }), true)).toBe(
+      false,
+    )
+    expect(shouldShowScanBanner(makeStatus({ backfillTotal: 4, backfillRemaining: 4 }), true)).toBe(
+      false,
+    )
   })
 
   it('shows once a burst hits the threshold', () => {
-    expect(shouldShowScanBanner(
-      makeStatus({ backfillTotal: AMBIENT_BANNER_THRESHOLD, backfillRemaining: AMBIENT_BANNER_THRESHOLD }),
-      true,
-    )).toBe(true)
-    expect(shouldShowScanBanner(
-      makeStatus({ backfillTotal: 100, backfillRemaining: 80 }),
-      true,
-    )).toBe(true)
+    expect(
+      shouldShowScanBanner(
+        makeStatus({
+          backfillTotal: AMBIENT_BANNER_THRESHOLD,
+          backfillRemaining: AMBIENT_BANNER_THRESHOLD,
+        }),
+        true,
+      ),
+    ).toBe(true)
+    expect(
+      shouldShowScanBanner(makeStatus({ backfillTotal: 100, backfillRemaining: 80 }), true),
+    ).toBe(true)
   })
 
   it('null status is treated as no banner — guards renderer mounts that race ahead of the first push', () => {
@@ -216,7 +233,9 @@ describe('scanInFlightCount', () => {
   it('returns ONLY backfillRemaining; does not add the scanning slot', () => {
     expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: null }))).toBe(50)
     expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: 7 }))).toBe(50)
-    expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: 7, queued: 30 }))).toBe(50)
+    expect(scanInFlightCount(makeStatus({ backfillRemaining: 50, scanning: 7, queued: 30 }))).toBe(
+      50,
+    )
   })
 
   it('rendered progress between two adjacent transitions (scanning=null → scanning=id) does not step backwards', () => {

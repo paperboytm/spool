@@ -8,8 +8,10 @@
 // See scan-worker-thread.ts for the worker side of the protocol.
 
 import { Worker } from 'node:worker_threads'
-import { Effect, PubSub, Stream } from 'effect'
+
 import type { FindingsChange, ScanStatus, ScanWorker } from '@spool-lab/core'
+import { Effect, PubSub, Stream } from 'effect'
+
 import type { FromWorker, ScanCommand, ToWorker } from './scan-worker-thread.js'
 
 export interface ScanWorkerProxy extends ScanWorker {
@@ -25,7 +27,9 @@ export interface PfAnalyzeBridge {
   /** Run the inference round-trip for one chunk of text. Returning []
    *  is fine — the worker will treat it as "no PF matches". Errors get
    *  bubbled back to the worker as pf-analyze-res ok:false. */
-  analyze: (text: string) => Promise<Array<{ class: string; value: string; start: number; end: number; score: number }>>
+  analyze: (
+    text: string,
+  ) => Promise<Array<{ class: string; value: string; start: number; end: number; score: number }>>
 }
 
 interface PendingCommand {
@@ -68,7 +72,11 @@ export async function spawnScanWorker(
   // postMessage throws synchronously when the worker's MessagePort has
   // closed. Swallow it — caller is post-shutdown territory.
   function postSafe(msg: ToWorker): void {
-    try { worker.postMessage(msg) } catch { /* worker gone */ }
+    try {
+      worker.postMessage(msg)
+    } catch {
+      /* worker gone */
+    }
   }
 
   function send<T>(payload: ScanCommand): Promise<T> {
@@ -95,7 +103,9 @@ export async function spawnScanWorker(
       worker.off('message', onMessage)
       worker.off('error', onError)
       // Best-effort terminate; if it's already dead this is a no-op.
-      worker.terminate().catch(() => { /* nothing to do */ })
+      worker.terminate().catch(() => {
+        /* nothing to do */
+      })
       reject(new Error(`scan worker did not report ready within ${BOOT_TIMEOUT_MS}ms`))
     }, BOOT_TIMEOUT_MS)
     function clear(): void {
@@ -162,7 +172,8 @@ export async function spawnScanWorker(
           postSafe({ type: 'pf-analyze-res', reqId, ok: true, matches: [] })
           return
         }
-        pfBridge.analyze(text)
+        pfBridge
+          .analyze(text)
           .then((matches) => postSafe({ type: 'pf-analyze-res', reqId, ok: true, matches }))
           .catch((err: unknown) => {
             const message = err instanceof Error ? err.message : String(err)
@@ -192,7 +203,10 @@ export async function spawnScanWorker(
   return {
     enqueue: (sessionId) => Effect.promise(() => send<void>({ cmd: 'enqueue', sessionId })),
     rescanAll: () => Effect.promise(() => send<number>({ cmd: 'rescanAll' })),
-    backfill: (opts) => Effect.promise(() => send<number>({ cmd: 'backfill', userInitiated: opts?.userInitiated === true })),
+    backfill: (opts) =>
+      Effect.promise(() =>
+        send<number>({ cmd: 'backfill', userInitiated: opts?.userInitiated === true }),
+      ),
     // getStatus uses the last pushed status when available — saves a
     // round-trip on every renderer mount. Falls back to a real call
     // before the first push lands (boolean sentinel because an empty

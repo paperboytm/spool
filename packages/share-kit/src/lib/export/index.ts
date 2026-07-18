@@ -15,8 +15,9 @@
 // UX via the browser's Save-as-PDF dialog inside window.print().
 
 import { toBlob } from 'html-to-image'
-import type { Conversation, Template } from '../types'
+
 import { sanitizeFilename } from '../filename'
+import type { Conversation, Template } from '../types'
 
 export type ExportFormat = 'png' | 'pdf'
 
@@ -332,12 +333,19 @@ export async function saveBlob(
   suggestedName: string,
   accept: { description: string; mime: string; ext: string },
 ): Promise<void> {
-  const picker = (window as unknown as {
-    showSaveFilePicker?: (opts: {
-      suggestedName: string
-      types: Array<{ description: string; accept: Record<string, string[]> }>
-    }) => Promise<{ createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }> }>
-  }).showSaveFilePicker
+  const picker = (
+    window as unknown as {
+      showSaveFilePicker?: (opts: {
+        suggestedName: string
+        types: Array<{ description: string; accept: Record<string, string[]> }>
+      }) => Promise<{
+        createWritable: () => Promise<{
+          write: (data: Blob) => Promise<void>
+          close: () => Promise<void>
+        }>
+      }>
+    }
+  ).showSaveFilePicker
 
   if (picker) {
     try {
@@ -386,7 +394,11 @@ function filenameFor(c: Conversation, template: Template, ext: Ext): string {
   return `${safe || 'spool'}${templateTag} · ${date}.${ext}`
 }
 
-export function filenameForExport(c: Conversation, template: Template, ext: 'png' | 'pdf' | 'spool'): string {
+export function filenameForExport(
+  c: Conversation,
+  template: Template,
+  ext: 'png' | 'pdf' | 'spool',
+): string {
   return filenameFor(c, template, ext)
 }
 
@@ -415,12 +427,14 @@ export async function openSaveSlot(
   filename: string,
   accept: { description: string; mime: string; ext: string },
 ): Promise<SaveSlot> {
-  const picker = (window as unknown as {
-    showSaveFilePicker?: (opts: {
-      suggestedName: string
-      types: Array<{ description: string; accept: Record<string, string[]> }>
-    }) => Promise<FileSystemFileHandle>
-  }).showSaveFilePicker
+  const picker = (
+    window as unknown as {
+      showSaveFilePicker?: (opts: {
+        suggestedName: string
+        types: Array<{ description: string; accept: Record<string, string[]> }>
+      }) => Promise<FileSystemFileHandle>
+    }
+  ).showSaveFilePicker
   if (!picker) return { kind: 'fallback' }
   try {
     const handle = await picker({

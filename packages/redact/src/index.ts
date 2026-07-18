@@ -9,24 +9,13 @@
 // Everything here runs locally, with no network access of any kind.
 // See `providers.ts` for the pluggable boundary.
 
-export type {
-  SensitiveKind,
-  SensitiveMatch,
-  SensitiveGroup,
-  SensitiveValue,
-} from './types.js'
+export type { SensitiveKind, SensitiveMatch, SensitiveGroup, SensitiveValue } from './types.js'
 
-export {
-  SENSITIVE_KIND_LABEL,
-  SENSITIVE_KIND_ORDER,
-} from './types.js'
+export { SENSITIVE_KIND_LABEL, SENSITIVE_KIND_ORDER } from './types.js'
 
 export { detectWithRegex } from './detectors.js'
 
-export {
-  regexProvider,
-  analyzeWith,
-} from './providers.js'
+export { regexProvider, analyzeWith } from './providers.js'
 
 export type { RedactProvider } from './providers.js'
 

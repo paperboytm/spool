@@ -11,9 +11,7 @@ name = "spool-pro-router"
 main = "src/worker.ts"
 compatibility_date = "2026-05-01"
 
-routes = [
-  { pattern = "spool.pro/*", zone_name = "spool.pro" },
-]
+routes = [{ pattern = "spool.pro/*", zone_name = "spool.pro" }]
 
 # ORIGIN_WEB points at the merged web app (apps/web, @spool/web). The
 # void project kept the historical `spool-landing` resource name so the
@@ -24,9 +22,7 @@ ORIGIN_BACKEND = "spool-share-backend.pages.dev"
 ORIGIN_WEB = "spool-landing.pages.dev"
 
 [env.staging]
-routes = [
-  { pattern = "staging.spool.pro/*", zone_name = "spool.pro" },
-]
+routes = [{ pattern = "staging.spool.pro/*", zone_name = "spool.pro" }]
 
 # Staging has no dedicated web deploy (the old spool-share-web-staging
 # Pages project predates the merge); staging web routes serve the prod

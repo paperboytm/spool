@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
+
 import { runMigrations } from './db.js'
 import {
   getOrCreateProject,
@@ -22,7 +23,8 @@ describe('getOrCreateProject (with identity)', () => {
       identityKind: 'git_remote',
       identityKey: 'github.com/spool-lab/spool',
     })
-    const row = db.prepare(`SELECT identity_kind, identity_key FROM projects WHERE slug = ?`)
+    const row = db
+      .prepare(`SELECT identity_kind, identity_key FROM projects WHERE slug = ?`)
       .get('spool-c') as { identity_kind: string; identity_key: string }
     expect(row.identity_kind).toBe('git_remote')
     expect(row.identity_key).toBe('github.com/spool-lab/spool')
@@ -30,27 +32,35 @@ describe('getOrCreateProject (with identity)', () => {
 
   it('does not duplicate on second call (same source_id, slug)', () => {
     const id1 = getOrCreateProject(db, 1, 'spool-c', '/Users/chen/Code/spool', 'spool', {
-      identityKind: 'git_remote', identityKey: 'github.com/spool-lab/spool',
+      identityKind: 'git_remote',
+      identityKey: 'github.com/spool-lab/spool',
     })
     const id2 = getOrCreateProject(db, 1, 'spool-c', '/Users/chen/Code/spool', 'spool', {
-      identityKind: 'git_remote', identityKey: 'github.com/spool-lab/spool',
+      identityKind: 'git_remote',
+      identityKey: 'github.com/spool-lab/spool',
     })
     expect(id1).toBe(id2)
   })
 
   it('upgrades an existing path fallback when the worktree becomes resolvable', () => {
     const id = getOrCreateProject(db, 1, 'paperboy-wt', '/dead/paperboy-wt', 'paperboy-wt', {
-      identityKind: 'path', identityKey: '/dead/paperboy-wt',
+      identityKind: 'path',
+      identityKey: '/dead/paperboy-wt',
     })
 
-    expect(getOrCreateProject(db, 1, 'paperboy-wt', '/live/paperboy-wt', 'paperboy', {
-      identityKind: 'git_remote', identityKey: 'github.com/paperboytm/paperboy',
-    })).toBe(id)
+    expect(
+      getOrCreateProject(db, 1, 'paperboy-wt', '/live/paperboy-wt', 'paperboy', {
+        identityKind: 'git_remote',
+        identityKey: 'github.com/paperboytm/paperboy',
+      }),
+    ).toBe(id)
 
-    const row = db.prepare(`
+    const row = db
+      .prepare(`
       SELECT display_path, display_name, identity_kind, identity_key
       FROM projects WHERE id = ?
-    `).get(id) as Record<string, unknown>
+    `)
+      .get(id) as Record<string, unknown>
     expect(row).toMatchObject({
       display_path: '/live/paperboy-wt',
       display_name: 'paperboy',
@@ -61,10 +71,12 @@ describe('getOrCreateProject (with identity)', () => {
 
   it('does not downgrade a stable git identity when a checkout is temporarily missing', () => {
     const id = getOrCreateProject(db, 1, 'paperboy-wt', '/live/paperboy-wt', 'paperboy', {
-      identityKind: 'git_remote', identityKey: 'github.com/paperboytm/paperboy',
+      identityKind: 'git_remote',
+      identityKey: 'github.com/paperboytm/paperboy',
     })
     getOrCreateProject(db, 1, 'paperboy-wt', '/dead/paperboy-wt', 'paperboy-wt', {
-      identityKind: 'path', identityKey: '/dead/paperboy-wt',
+      identityKind: 'path',
+      identityKey: '/dead/paperboy-wt',
     })
 
     const row = db.prepare(`SELECT identity_kind, identity_key FROM projects WHERE id = ?`).get(id)
@@ -82,18 +94,25 @@ describe('upsertSession (title_source authority)', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     runMigrations(db)
-    projectId = getOrCreateProject(db, 1, 'p', '/p', 'p', { identityKind: 'path', identityKey: '/p' })
+    projectId = getOrCreateProject(db, 1, 'p', '/p', 'p', {
+      identityKind: 'path',
+      identityKey: '/p',
+    })
   })
 
   function baseOpts(overrides: Partial<Parameters<typeof upsertSession>[1]> = {}) {
     return {
-      projectId, sourceId: 1,
+      projectId,
+      sourceId: 1,
       sessionUuid: 'sess-1',
       filePath: '/fake.jsonl',
       title: 'derived title',
-      startedAt: '2026-05-09', endedAt: '2026-05-09',
-      messageCount: 1, hasToolUse: false,
-      cwd: '/', model: 'claude',
+      startedAt: '2026-05-09',
+      endedAt: '2026-05-09',
+      messageCount: 1,
+      hasToolUse: false,
+      cwd: '/',
+      model: 'claude',
       rawFileMtime: '2026-05-09',
       ...overrides,
     }
@@ -102,7 +121,9 @@ describe('upsertSession (title_source authority)', () => {
   it('updates title on re-upsert when title_source is derived (default)', () => {
     upsertSession(db, baseOpts({ title: 'first' }))
     upsertSession(db, baseOpts({ title: 'second' }))
-    const row = db.prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?').get('sess-1') as { title: string; title_source: string }
+    const row = db
+      .prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { title: string; title_source: string }
     expect(row.title).toBe('second')
     expect(row.title_source).toBe('derived')
   })
@@ -113,18 +134,24 @@ describe('upsertSession (title_source authority)', () => {
 
     upsertSession(db, baseOpts({ title: 'derived from sync' }))
 
-    const row = db.prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?').get('sess-1') as { title: string; title_source: string }
+    const row = db
+      .prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { title: string; title_source: string }
     expect(row.title).toBe('spool-set')
     expect(row.title_source).toBe('spool')
   })
 
   it('preserves title on re-upsert when title_source is "user"', () => {
     upsertSession(db, baseOpts({ title: 'placeholder' }))
-    db.prepare(`UPDATE sessions SET title = 'user-renamed', title_source = 'user' WHERE session_uuid = 'sess-1'`).run()
+    db.prepare(
+      `UPDATE sessions SET title = 'user-renamed', title_source = 'user' WHERE session_uuid = 'sess-1'`,
+    ).run()
 
     upsertSession(db, baseOpts({ title: 'derived overwrite' }))
 
-    const row = db.prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?').get('sess-1') as { title: string; title_source: string }
+    const row = db
+      .prepare('SELECT title, title_source FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { title: string; title_source: string }
     expect(row.title).toBe('user-renamed')
     expect(row.title_source).toBe('user')
   })
@@ -133,7 +160,9 @@ describe('upsertSession (title_source authority)', () => {
     upsertSession(db, baseOpts({ filePath: 'spool:pending:sess-1' }))
     upsertSession(db, baseOpts({ filePath: '/real/path.jsonl' }))
 
-    const row = db.prepare('SELECT file_path FROM sessions WHERE session_uuid = ?').get('sess-1') as { file_path: string }
+    const row = db
+      .prepare('SELECT file_path FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { file_path: string }
     expect(row.file_path).toBe('/real/path.jsonl')
   })
 })
@@ -147,8 +176,13 @@ describe('getOrCreateAskProject', () => {
 
   it('creates an Ask project per source on first call', () => {
     const id = getOrCreateAskProject(db, 'claude')
-    const row = db.prepare(`SELECT slug, display_name, identity_kind, identity_key FROM projects WHERE id = ?`).get(id) as {
-      slug: string; display_name: string; identity_kind: string; identity_key: string
+    const row = db
+      .prepare(`SELECT slug, display_name, identity_kind, identity_key FROM projects WHERE id = ?`)
+      .get(id) as {
+      slug: string
+      display_name: string
+      identity_kind: string
+      identity_key: string
     }
     expect(row.slug).toBe('__spool_ask__')
     expect(row.display_name).toBe('Asks')
@@ -171,7 +205,11 @@ describe('getOrCreateAskProject', () => {
   it('groups all per-source Ask projects under one identity in project_groups_v', () => {
     getOrCreateAskProject(db, 'claude')
     getOrCreateAskProject(db, 'codex')
-    const groups = db.prepare(`SELECT identity_kind, identity_key, sources_csv FROM project_groups_v WHERE identity_kind = 'spool_internal'`).all() as Array<{ identity_kind: string; identity_key: string; sources_csv: string | null }>
+    const groups = db
+      .prepare(
+        `SELECT identity_kind, identity_key, sources_csv FROM project_groups_v WHERE identity_kind = 'spool_internal'`,
+      )
+      .all() as Array<{ identity_kind: string; identity_key: string; sources_csv: string | null }>
     expect(groups).toHaveLength(1)
     expect(groups[0]?.identity_key).toBe('ask')
     const sources = (groups[0]?.sources_csv ?? '').split(',').sort()
@@ -190,13 +228,19 @@ describe('insertSpoolAuthoredSession', () => {
 
   it('inserts a row with title_source="spool" and a sentinel file_path', () => {
     const id = insertSpoolAuthoredSession(db, {
-      projectId, sourceId: 1,
+      projectId,
+      sourceId: 1,
       sessionUuid: 'ask-uuid-1',
       title: 'what did I do yesterday?',
       cwd: '/Users/x/.spool/agent-search-sessions',
     })
-    const row = db.prepare(`SELECT title, title_source, file_path, message_count FROM sessions WHERE id = ?`).get(id) as {
-      title: string; title_source: string; file_path: string; message_count: number
+    const row = db
+      .prepare(`SELECT title, title_source, file_path, message_count FROM sessions WHERE id = ?`)
+      .get(id) as {
+      title: string
+      title_source: string
+      file_path: string
+      message_count: number
     }
     expect(row.title).toBe('what did I do yesterday?')
     expect(row.title_source).toBe('spool')
@@ -206,39 +250,63 @@ describe('insertSpoolAuthoredSession', () => {
 
   it('is idempotent: returns existing id without modifying the row', () => {
     const a = insertSpoolAuthoredSession(db, {
-      projectId, sourceId: 1, sessionUuid: 'ask-uuid-2',
-      title: 'first', cwd: '/x',
+      projectId,
+      sourceId: 1,
+      sessionUuid: 'ask-uuid-2',
+      title: 'first',
+      cwd: '/x',
     })
     const b = insertSpoolAuthoredSession(db, {
-      projectId, sourceId: 1, sessionUuid: 'ask-uuid-2',
-      title: 'second', cwd: '/y',
+      projectId,
+      sourceId: 1,
+      sessionUuid: 'ask-uuid-2',
+      title: 'second',
+      cwd: '/y',
     })
     expect(a).toBe(b)
-    const row = db.prepare(`SELECT title, cwd FROM sessions WHERE id = ?`).get(a) as { title: string; cwd: string }
+    const row = db.prepare(`SELECT title, cwd FROM sessions WHERE id = ?`).get(a) as {
+      title: string
+      cwd: string
+    }
     expect(row.title).toBe('first')
     expect(row.cwd).toBe('/x')
   })
 
   it('survives a subsequent sync-style upsertSession call: title locked, file_path rebound', () => {
     const id = insertSpoolAuthoredSession(db, {
-      projectId, sourceId: 1, sessionUuid: 'ask-uuid-3',
-      title: 'real query', cwd: '/x',
+      projectId,
+      sourceId: 1,
+      sessionUuid: 'ask-uuid-3',
+      title: 'real query',
+      cwd: '/x',
     })
     upsertSession(db, {
-      projectId, sourceId: 1,
+      projectId,
+      sourceId: 1,
       sessionUuid: 'ask-uuid-3',
       filePath: '/Users/x/.claude/projects/-Users-x--spool-agent-search-sessions/ask-uuid-3.jsonl',
       title: 'Caveat: The messages below were generated by the user…',
-      startedAt: '2026-05-09', endedAt: '2026-05-09',
-      messageCount: 5, hasToolUse: false,
-      cwd: '/x', model: 'claude', rawFileMtime: '2026-05-09',
+      startedAt: '2026-05-09',
+      endedAt: '2026-05-09',
+      messageCount: 5,
+      hasToolUse: false,
+      cwd: '/x',
+      model: 'claude',
+      rawFileMtime: '2026-05-09',
     })
-    const row = db.prepare(`SELECT title, title_source, file_path, message_count FROM sessions WHERE id = ?`).get(id) as {
-      title: string; title_source: string; file_path: string; message_count: number
+    const row = db
+      .prepare(`SELECT title, title_source, file_path, message_count FROM sessions WHERE id = ?`)
+      .get(id) as {
+      title: string
+      title_source: string
+      file_path: string
+      message_count: number
     }
     expect(row.title).toBe('real query')
     expect(row.title_source).toBe('spool')
-    expect(row.file_path).toBe('/Users/x/.claude/projects/-Users-x--spool-agent-search-sessions/ask-uuid-3.jsonl')
+    expect(row.file_path).toBe(
+      '/Users/x/.claude/projects/-Users-x--spool-agent-search-sessions/ask-uuid-3.jsonl',
+    )
     // upsertSession deliberately no longer touches message_count —
     // the syncer recomputes it from the actual DB row count after
     // insertMessages so the count tracks INSERT-OR-IGNORE-deduped

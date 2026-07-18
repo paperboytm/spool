@@ -7,14 +7,14 @@
 
 v2 三部件(Store / Hub / Trace)在现有代码里的对应物:
 
-| v2 部件 | 现状 | 可复用 |
-| --- | --- | --- |
-| Store(内容寻址对象库、sequence、head、lineage) | **不存在**。core 是关系型 FTS 索引(`~/.spool/spool.db`,schema v15) | `Syncer` 的目录扫描、增量游标、append/rewrite 分类器(`core/src/sync/syncer.ts`);workspace 识别(`core/src/projects/`) |
-| Hub(对象存储 + refs + ACL + 墓碑) | **不存在**。share-backend 是 v1 快照发布(D1/KV/R2,styled snapshot) | 全套 Cloudflare 基建:Google OAuth(loopback PKCE + web)、D1 迁移、R2、hermetic 测试 fakes、`spool-pro-router` 路由 |
-| Trace(版本链、blame/why) | **不存在**。且 v1 parsers 丢弃 tool_use 输入(只留 `contentText` + 工具名) | 无直接可复用;但 store 落地后 trace 只依赖 store 的 canonical records,**不需要**改 v1 parsers |
-| CLI(v2 命令表) | `search/sync/list/show/status/pin/projects/doctor`(v1 检索工具) | commander 骨架;`show` 可升级 |
-| Web(session 页三层结构) | share-web 渲染 v1 快照(`/s/:id`) | SPA 骨架、OG SSR Function、reader 组件模式 |
-| Resume 物化 | 只有「跳转原生 CLI」(`app/src/main/sessionResume.ts`) | `insertSpoolAuthoredSession` + `spool-prelude.ts` 是「Spool 写 provider 原生 session 文件」的既有先例 |
+| v2 部件                                        | 现状                                                                      | 可复用                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Store(内容寻址对象库、sequence、head、lineage) | **不存在**。core 是关系型 FTS 索引(`~/.spool/spool.db`,schema v15)        | `Syncer` 的目录扫描、增量游标、append/rewrite 分类器(`core/src/sync/syncer.ts`);workspace 识别(`core/src/projects/`) |
+| Hub(对象存储 + refs + ACL + 墓碑)              | **不存在**。share-backend 是 v1 快照发布(D1/KV/R2,styled snapshot)        | 全套 Cloudflare 基建:Google OAuth(loopback PKCE + web)、D1 迁移、R2、hermetic 测试 fakes、`spool-pro-router` 路由    |
+| Trace(版本链、blame/why)                       | **不存在**。且 v1 parsers 丢弃 tool_use 输入(只留 `contentText` + 工具名) | 无直接可复用;但 store 落地后 trace 只依赖 store 的 canonical records,**不需要**改 v1 parsers                         |
+| CLI(v2 命令表)                                 | `search/sync/list/show/status/pin/projects/doctor`(v1 检索工具)           | commander 骨架;`show` 可升级                                                                                         |
+| Web(session 页三层结构)                        | share-web 渲染 v1 快照(`/s/:id`)                                          | SPA 骨架、OG SSR Function、reader 组件模式                                                                           |
+| Resume 物化                                    | 只有「跳转原生 CLI」(`app/src/main/sessionResume.ts`)                     | `insertSpoolAuthoredSession` + `spool-prelude.ts` 是「Spool 写 provider 原生 session 文件」的既有先例                |
 
 v1 产品(Electron 检索 app、快照分享)继续照常运行,v2 全部是**增量**,不动存量。
 
@@ -154,18 +154,18 @@ Phase 4 ── Web(依赖 Phase 2)
   P4.2  reader 三层 + #r 深链 + OG
 ```
 
-每个 P 项对应一个(或一组 stacked)PR,遵循仓库测试纪律:typecheck → 新测试 → 相邻套件 → 抖动测试压测。粗量级:P0 数天;P1 一~两周;P2、P3 各两~三周(可并行);P4 一~两周。
+每个 P 项对应一个(或一组 stacked)PR,遵循仓库测试纪律:typecheck → 新测试 → 相邻套件 → 抖动测试压测。粗量级:P0 数天;P1 一~~两周;P2、P3 各两~~三周(可并行);P4 一~两周。
 
 ## 8. 风险清单
 
-| # | 风险 | 对策 |
-| --- | --- | --- |
-| R1 | provider 格式漂移;物化 session 不被原生 CLI 接受 | Phase 0 spike 前置;版本钉住 golden round-trip 测试;adapter 带版本号 |
-| R2 | 路径重写 vs OID 稳定性冲突(share 时改写会变哈希) | 摄入时 canonical 化(D1 决策),record 从一开始就不含绝对路径 |
-| R3 | store 体积 ≈ 再存一份全量 transcript | zstd + S0.3 实测;必要时 Read 输出类 record 单独压缩策略 |
-| R4 | provider 重写历史破坏前缀/单写者假设 | 分叉点重算链;对象库无损保留旧 records |
-| R5 | native 依赖(better-sqlite3)混入浏览器路径 | session-kit 零依赖硬边界;CI 加 browser build 检查 |
-| R6 | 分享全文泄密 | share 命令内嵌 redact 扫描闸;withdraw 墓碑兜底 |
+| #   | 风险                                             | 对策                                                                |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| R1  | provider 格式漂移;物化 session 不被原生 CLI 接受 | Phase 0 spike 前置;版本钉住 golden round-trip 测试;adapter 带版本号 |
+| R2  | 路径重写 vs OID 稳定性冲突(share 时改写会变哈希) | 摄入时 canonical 化(D1 决策),record 从一开始就不含绝对路径          |
+| R3  | store 体积 ≈ 再存一份全量 transcript             | zstd + S0.3 实测;必要时 Read 输出类 record 单独压缩策略             |
+| R4  | provider 重写历史破坏前缀/单写者假设             | 分叉点重算链;对象库无损保留旧 records                               |
+| R5  | native 依赖(better-sqlite3)混入浏览器路径        | session-kit 零依赖硬边界;CI 加 browser build 检查                   |
+| R6  | 分享全文泄密                                     | share 命令内嵌 redact 扫描闸;withdraw 墓碑兜底                      |
 
 ## 9. 开放决策(建议值,确认后动工)
 

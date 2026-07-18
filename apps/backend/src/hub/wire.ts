@@ -21,10 +21,9 @@ export const MAX_READ_BYTES = 8 * 1024 * 1024
 export const USER_QUOTA_BYTES = 1024 * 1024 * 1024
 
 const boundedText = (maxBytes: number) =>
-  z.string().refine(
-    (value) => new TextEncoder().encode(value).byteLength <= maxBytes,
-    { message: `must be at most ${maxBytes} bytes` },
-  )
+  z.string().refine((value) => new TextEncoder().encode(value).byteLength <= maxBytes, {
+    message: `must be at most ${maxBytes} bytes`,
+  })
 
 export const HeadBody = z.object({
   root: z.string().regex(OID_RE),

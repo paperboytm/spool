@@ -1,5 +1,5 @@
-import { Command } from 'commander'
 import { readFileSync } from 'node:fs'
+
 import { getDB, getSessionWithMessages } from '@spool-lab/core'
 import {
   composeSessionDiff,
@@ -10,10 +10,11 @@ import {
   type SessionProvider,
   type SessionViewV1,
 } from '@spool-lab/session-kit'
+import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
-import { fetchRecordsByIndices, fetchRecordsExact } from '../hub/records.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
+import { fetchRecordsByIndices, fetchRecordsExact } from '../hub/records.js'
 import { resolveSessionRef, type ResolvedSessionRef } from '../hub/ref.js'
 import { expandLocalSessionUuid } from '../local-session-ref.js'
 
@@ -98,9 +99,16 @@ async function showHub(
 
   if (parsed.recordIndex !== undefined) {
     if (parsed.recordIndex >= meta.count) {
-      throw new Error(`Record ${parsed.recordIndex} is outside the shared range (0..${meta.count - 1})`)
+      throw new Error(
+        `Record ${parsed.recordIndex} is outside the shared range (0..${meta.count - 1})`,
+      )
     }
-    const records = await fetchRecordsExact(client, ref.sid, parsed.recordIndex, parsed.recordIndex + 1)
+    const records = await fetchRecordsExact(
+      client,
+      ref.sid,
+      parsed.recordIndex,
+      parsed.recordIndex + 1,
+    )
     const record = records[0]
     if (!record) throw new Error(`Record ${parsed.recordIndex} could not be fetched`)
     log(prettyRecord(record.data))
@@ -126,7 +134,9 @@ async function showHub(
   }
 
   // Default: the first screen (design §5) as text.
-  const author = meta.author.handle ? `@${meta.author.handle}` : meta.author.displayName ?? 'unknown'
+  const author = meta.author.handle
+    ? `@${meta.author.handle}`
+    : (meta.author.displayName ?? 'unknown')
   log(`Session: ${meta.sid}`)
   log(`Author:  ${author} · ${meta.count} records`)
   if (meta.noteMd) {
@@ -186,7 +196,8 @@ function showLocal(
     return 1
   }
 
-  const needsRecords = options.diff === true || options.log === true || parsed.recordIndex !== undefined
+  const needsRecords =
+    options.diff === true || options.log === true || parsed.recordIndex !== undefined
   if (!needsRecords) {
     target.print(options.json === true)
     return 0
@@ -269,7 +280,9 @@ function printTimeline(view: SessionViewV1, log: (message: string) => void): voi
     const kind = entry.kind.padEnd(9)
     const detail = entry.file ?? entry.tool ?? ''
     const excerpt = entry.excerpt ? firstLine(entry.excerpt) : ''
-    log(`#${String(entry.i).padStart(4)}  ${kind} ${[detail, excerpt].filter(Boolean).join('  ')}`.trimEnd())
+    log(
+      `#${String(entry.i).padStart(4)}  ${kind} ${[detail, excerpt].filter(Boolean).join('  ')}`.trimEnd(),
+    )
   }
 }
 
@@ -283,7 +296,9 @@ function printDiff(diff: SessionDiff, log: (message: string) => void): void {
     log('')
     log(`── ${file.path}  +${file.adds} -${file.dels}`)
     for (const hunk of file.hunks) {
-      log(`@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@  records ${hunk.recordIndices.map((index) => `#${index}`).join(' ')}`)
+      log(
+        `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@  records ${hunk.recordIndices.map((index) => `#${index}`).join(' ')}`,
+      )
       for (const line of hunk.lines) {
         const sign = line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '
         log(`${sign}${line.text}`)
@@ -314,7 +329,11 @@ function safeParse(value: string): unknown {
 }
 
 function formatDate(iso: string): string {
-  try { return new Date(iso).toLocaleString() } catch { return iso }
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return iso
+  }
 }
 
 /** `<uuid|sid|url>` with an optional `@r<n>` record anchor. */
@@ -340,8 +359,13 @@ function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentia
 }
 
 export const showCommand = new Command('show')
-  .description('Show a session: transcript/summary by default, --log for the timeline, --diff for the net change')
-  .argument('<session>', 'Local UUID, hub sid, or share URL — optionally with @r<n> to land on a record')
+  .description(
+    'Show a session: transcript/summary by default, --log for the timeline, --diff for the net change',
+  )
+  .argument(
+    '<session>',
+    'Local UUID, hub sid, or share URL — optionally with @r<n> to land on a record',
+  )
   .option('--json', 'Output as JSON')
   .option('--log', 'Print the record timeline')
   .option('--diff', 'Print the composed net diff')

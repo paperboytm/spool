@@ -106,6 +106,7 @@ spool doctor --fix --force     # Also apply destructive fixes
 ## Data location
 
 All data is stored locally in `~/.spool/`:
+
 - `spool.db` — SQLite database with sessions and messages
 - `hub-credentials.json` — hub URL + API token from `spool login`
 

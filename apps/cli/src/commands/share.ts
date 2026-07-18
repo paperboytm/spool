@@ -1,16 +1,17 @@
-import { Command } from 'commander'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { createInterface } from 'node:readline/promises'
+
 import { getDB, getSessionWithMessages } from '@spool-lab/core'
 import { canonicalizeRecord, type SessionProvider } from '@spool-lab/session-kit'
+import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch, type HubObjectUpload } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { editNote } from '../hub/note-editor.js'
 import { buildNotePrefill } from '../hub/note.js'
-import { UPLOAD_MAX_LINES, chunkUploads, prepareShare } from '../hub/share-pipeline.js'
 import { formatRedactSummary, scanRecordsForSecrets } from '../hub/redact-gate.js'
+import { UPLOAD_MAX_LINES, chunkUploads, prepareShare } from '../hub/share-pipeline.js'
 import { buildWorkspaceCard, detectWorkspaceRoot } from '../hub/workspace.js'
 import { expandLocalSessionUuid } from '../local-session-ref.js'
 
@@ -100,9 +101,8 @@ export async function handleShareCommand(
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
 
-    const spoolFile = options.spoolFile === undefined
-      ? null
-      : await readSpoolFileObject(options.spoolFile)
+    const spoolFile =
+      options.spoolFile === undefined ? null : await readSpoolFileObject(options.spoolFile)
 
     const head = {
       root: prepared.root,
@@ -148,21 +148,29 @@ export async function handleShareCommand(
 
 export const shareCommand = new Command('share')
   .description('Share a session to the Spool hub and get a URL')
-  .argument('[session]', 'Session UUID, optionally with @<n> for a prefix share; defaults to the latest session in the current directory')
+  .argument(
+    '[session]',
+    'Session UUID, optionally with @<n> for a prefix share; defaults to the latest session in the current directory',
+  )
   .option('-m, --message <note>', 'Note text (skips the editor)')
   .option('--no-edit', 'Publish the prefilled draft without opening the editor')
   .option('--yes', 'Skip the secret-findings confirmation')
   .option('--spool-file <path>', 'Attach a .spool document to the share')
-  .action(async (session: string | undefined, opts: { message?: string; edit?: boolean; yes?: boolean; spoolFile?: string }) => {
-    const exitCode = await handleShareCommand(session, {
-      ...(opts.message === undefined ? {} : { message: opts.message }),
-      // commander maps --no-edit to edit:false.
-      ...(opts.edit === false ? { noEdit: true } : {}),
-      ...(opts.yes === undefined ? {} : { yes: opts.yes }),
-      ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
-    })
-    if (exitCode !== 0) process.exitCode = exitCode
-  })
+  .action(
+    async (
+      session: string | undefined,
+      opts: { message?: string; edit?: boolean; yes?: boolean; spoolFile?: string },
+    ) => {
+      const exitCode = await handleShareCommand(session, {
+        ...(opts.message === undefined ? {} : { message: opts.message }),
+        // commander maps --no-edit to edit:false.
+        ...(opts.edit === false ? { noEdit: true } : {}),
+        ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+        ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
+      })
+      if (exitCode !== 0) process.exitCode = exitCode
+    },
+  )
 
 /** Read + canonicalize a .spool document for attachment. Shape-checked
  *  only (version + conversation) — the document is a display artifact,
@@ -176,7 +184,11 @@ async function readSpoolFileObject(path: string): Promise<{ oid: string; data: s
     throw new Error(`Not a valid .spool file (malformed JSON): ${path}`)
   }
   const doc = parsed as { version?: unknown; conversation?: unknown }
-  if ((doc.version !== 1 && doc.version !== 2) || typeof doc.conversation !== 'object' || doc.conversation === null) {
+  if (
+    (doc.version !== 1 && doc.version !== 2) ||
+    typeof doc.conversation !== 'object' ||
+    doc.conversation === null
+  ) {
     throw new Error(`Not a valid .spool file (unrecognized shape): ${path}`)
   }
   return canonicalizeRecord(raw)
@@ -184,7 +196,9 @@ async function readSpoolFileObject(path: string): Promise<{ oid: string; data: s
 
 function parseShareRef(input: string | undefined): { sessionUuid?: string; position?: number } {
   if (input === undefined) return {}
-  const match = input.trim().match(/^(?:(?:claude|codex)_)?([0-9a-fA-F-]{8,64})(?:@([1-9][0-9]*))?$/)
+  const match = input
+    .trim()
+    .match(/^(?:(?:claude|codex)_)?([0-9a-fA-F-]{8,64})(?:@([1-9][0-9]*))?$/)
   if (!match?.[1]) {
     throw new Error(`Invalid session reference: ${input}. Expected <uuid> or <uuid>@<n>.`)
   }
@@ -196,14 +210,17 @@ function parseShareRef(input: string | undefined): { sessionUuid?: string; posit
 
 function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): ShareTarget {
   const db = getDB(true)
-  const uuid = sessionUuid === undefined
-    ? latestSessionUuidFor(db, cwd)
-    : expandLocalSessionUuid(db, sessionUuid)
+  const uuid =
+    sessionUuid === undefined
+      ? latestSessionUuidFor(db, cwd)
+      : expandLocalSessionUuid(db, sessionUuid)
   const found = getSessionWithMessages(db, uuid)
   if (!found) throw new Error(`Session not found in the local index: ${uuid} (run \`spool sync\`?)`)
   const { session } = found
   if (session.source !== 'claude' && session.source !== 'codex') {
-    throw new Error(`Sharing ${session.source} sessions is not supported yet (claude and codex only)`)
+    throw new Error(
+      `Sharing ${session.source} sessions is not supported yet (claude and codex only)`,
+    )
   }
   if (session.filePath.startsWith('spool:')) {
     throw new Error('This session has no provider file on disk yet')
@@ -217,9 +234,9 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
 }
 
 function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string): string {
-  const row = db.prepare(
-    'SELECT session_uuid FROM sessions WHERE cwd = ? ORDER BY ended_at DESC LIMIT 1',
-  ).get(cwd) as { session_uuid: string } | undefined
+  const row = db
+    .prepare('SELECT session_uuid FROM sessions WHERE cwd = ? ORDER BY ended_at DESC LIMIT 1')
+    .get(cwd) as { session_uuid: string } | undefined
   if (!row) {
     throw new Error(`No indexed sessions for ${cwd}. Pass a session UUID or run \`spool sync\`.`)
   }

@@ -1,9 +1,10 @@
 import { homedir } from 'node:os'
 import { dirname, join, isAbsolute, resolve } from 'node:path'
+
 import type { ProjectIdentity, ProjectIdentityKind } from '../types.js'
 import { fallbackDisplayName } from './display-name.js'
-import { DEFAULT_RESOLVERS, type WorktreeUpstreamResolver } from './worktree-resolvers.js'
 import { DEFAULT_SYNTHESIZERS, type IdentitySynthesizer } from './identity-synthesizers.js'
+import { DEFAULT_RESOLVERS, type WorktreeUpstreamResolver } from './worktree-resolvers.js'
 
 export interface IdentityFs {
   exists(path: string): boolean
@@ -12,17 +13,18 @@ export interface IdentityFs {
 }
 
 const MANIFESTS = [
-  'package.json', 'Cargo.toml', 'pyproject.toml',
-  'go.mod', 'Gemfile', 'pom.xml', 'build.gradle',
+  'package.json',
+  'Cargo.toml',
+  'pyproject.toml',
+  'go.mod',
+  'Gemfile',
+  'pom.xml',
+  'build.gradle',
 ] as const
 
-const PARSEABLE_MANIFESTS = [
-  'package.json', 'Cargo.toml', 'pyproject.toml',
-] as const
+const PARSEABLE_MANIFESTS = ['package.json', 'Cargo.toml', 'pyproject.toml'] as const
 
-const LOOSE_DIRS = new Set([
-  '/tmp', '/private/tmp',
-])
+const LOOSE_DIRS = new Set(['/tmp', '/private/tmp'])
 const LOOSE_HOME_DIRS = ['Desktop', 'Downloads', 'Documents']
 
 export function normalizeGitRemote(url: string): string | null {
@@ -60,7 +62,7 @@ export function computeIdentity(
 
   const home = homedir()
   if (cwd === home || LOOSE_DIRS.has(cwd)) return loose()
-  if (LOOSE_HOME_DIRS.some(d => cwd === join(home, d))) return loose()
+  if (LOOSE_HOME_DIRS.some((d) => cwd === join(home, d))) return loose()
 
   // 1. git
   const gitRoot = findGitRoot(cwd, fs)
@@ -195,9 +197,7 @@ function parseManifestName(file: string, text: string): string | null {
   if (!text) return null
   if (file === 'package.json' || file === 'Cargo.toml' || file === 'pyproject.toml') {
     // Cheap regex: find name = "x" or "name": "x"
-    const m =
-      text.match(/"name"\s*:\s*"([^"]+)"/) ||
-      text.match(/^\s*name\s*=\s*"([^"]+)"/m)
+    const m = text.match(/"name"\s*:\s*"([^"]+)"/) || text.match(/^\s*name\s*=\s*"([^"]+)"/m)
     if (m && m[1]) return m[1]
   }
   return null

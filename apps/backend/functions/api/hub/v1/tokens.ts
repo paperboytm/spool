@@ -2,10 +2,10 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../src/audit'
 import { requireUser } from '../../../../src/auth/require'
+import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
 import { sha256Hex } from '../../../../src/hub/auth'
 import type { HubEnv } from '../../../../src/hub/head'
 import { TOKEN_MINT_RATE, mintApiToken } from '../../../../src/hub/tokens'
-import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
 import { checkRate } from '../../../../src/rate-limit'
 
 // Mint a long-lived CLI token. Session-auth only (requireUser, not
@@ -55,16 +55,12 @@ export const onRequestDelete: PagesFunction<HubEnv> = async (ctx) => {
     }
 
     const hash = await sha256Hex(bearer)
-    const row = await ctx.env.DB
-      .prepare('SELECT id, user_id FROM api_tokens WHERE token_hash=?')
+    const row = await ctx.env.DB.prepare('SELECT id, user_id FROM api_tokens WHERE token_hash=?')
       .bind(hash)
       .first<{ id: string; user_id: string }>()
     if (!row) throw new ApiError('UNAUTHENTICATED')
 
-    await ctx.env.DB
-      .prepare('DELETE FROM api_tokens WHERE token_hash=?')
-      .bind(hash)
-      .run()
+    await ctx.env.DB.prepare('DELETE FROM api_tokens WHERE token_hash=?').bind(hash).run()
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: row.user_id,

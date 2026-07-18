@@ -1,6 +1,6 @@
-import { Command } from 'commander'
 import { getDB, searchFragments } from '@spool-lab/core'
 import type { FragmentResult, SessionSource } from '@spool-lab/core'
+import { Command } from 'commander'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode', 'pi'])
 
@@ -11,32 +11,38 @@ export const searchCommand = new Command('search')
   .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|opencode|pi')
   .option('--since <date>', 'Only search sessions after this date (ISO or relative like "7d")')
   .option('--json', 'Output as JSON')
-  .action(async (query: string, opts: { limit: string; source?: string; since?: string; json?: boolean }) => {
-    const db = getDB(true)
+  .action(
+    async (
+      query: string,
+      opts: { limit: string; source?: string; since?: string; json?: boolean },
+    ) => {
+      const db = getDB(true)
 
-    const since = opts.since ? resolveSince(opts.since) : undefined
-    const source = opts.source && SESSION_SOURCES.has(opts.source) ? opts.source as SessionSource : undefined
-    const results = searchFragments(db, query, {
-      limit: parseInt(opts.limit, 10),
-      ...(source !== undefined && { source }),
-      ...(since !== undefined && { since }),
-    })
+      const since = opts.since ? resolveSince(opts.since) : undefined
+      const source =
+        opts.source && SESSION_SOURCES.has(opts.source) ? (opts.source as SessionSource) : undefined
+      const results = searchFragments(db, query, {
+        limit: parseInt(opts.limit, 10),
+        ...(source !== undefined && { source }),
+        ...(since !== undefined && { since }),
+      })
 
-    if (opts.json) {
-      console.log(JSON.stringify(results, null, 2))
-      return
-    }
+      if (opts.json) {
+        console.log(JSON.stringify(results, null, 2))
+        return
+      }
 
-    if (results.length === 0) {
-      console.log('No results found.')
-      console.log('Tip: run `spool sync` to index new sessions, or try broader search terms.')
-      return
-    }
+      if (results.length === 0) {
+        console.log('No results found.')
+        console.log('Tip: run `spool sync` to index new sessions, or try broader search terms.')
+        return
+      }
 
-    for (const result of results) {
-      printResult(result, results.indexOf(result) + 1, results.length)
-    }
-  })
+      for (const result of results) {
+        printResult(result, results.indexOf(result) + 1, results.length)
+      }
+    },
+  )
 
 function printResult(r: FragmentResult, n: number, total: number): void {
   const divider = '─'.repeat(60)
@@ -53,9 +59,7 @@ function printResult(r: FragmentResult, n: number, total: number): void {
   if (resumeCmd) console.log(`Resume:  ${resumeCmd}`)
 
   console.log(``)
-  const snippet = r.snippet
-    .replace(/<mark>/g, '\x1b[1m\x1b[33m')
-    .replace(/<\/mark>/g, '\x1b[0m')
+  const snippet = r.snippet.replace(/<mark>/g, '\x1b[1m\x1b[33m').replace(/<\/mark>/g, '\x1b[0m')
   console.log(`  ${snippet}`)
 }
 

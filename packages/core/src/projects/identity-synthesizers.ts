@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+
 import type { ProjectIdentity } from '../types.js'
 
 // Resolved at call time so process.env.HOME overrides take effect in tests.

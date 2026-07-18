@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -85,12 +86,16 @@ test('scope popover lists projects and can be selected', async () => {
   const popover = ctx.window.locator('[data-testid="search-overlay-scope-popover"]')
   await expect(popover).toBeVisible({ timeout: 2000 })
   const projectOption = popover
-    .locator('[data-testid="search-overlay-scope-option"][data-identity-key]:not([data-identity-key=""])')
+    .locator(
+      '[data-testid="search-overlay-scope-option"][data-identity-key]:not([data-identity-key=""])',
+    )
     .first()
   await expect(projectOption).toBeVisible()
   await projectOption.click()
   await expect(popover).toBeHidden({ timeout: 2000 })
-  await expect(ctx.window.locator('[data-testid="search-overlay-scope-trigger"]')).not.toContainText(/Any project/i)
+  await expect(
+    ctx.window.locator('[data-testid="search-overlay-scope-trigger"]'),
+  ).not.toContainText(/Any project/i)
   await expect(ctx.window.locator('[data-testid="search-overlay-scope-clear"]')).toBeVisible()
   await closeOverlay()
 })
@@ -108,11 +113,14 @@ test('after popover close, focus returns to the search input', async () => {
   await ctx.window.locator('[data-testid="search-overlay-scope-trigger"]').click()
   await expect(popover).toBeVisible({ timeout: 2000 })
   await popover
-    .locator('[data-testid="search-overlay-scope-option"][data-identity-key]:not([data-identity-key=""])')
-    .first().click()
+    .locator(
+      '[data-testid="search-overlay-scope-option"][data-identity-key]:not([data-identity-key=""])',
+    )
+    .first()
+    .click()
   await expect(popover).toBeHidden({ timeout: 2000 })
-  let focused = await ctx.window.evaluate(() =>
-    (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
+  let focused = await ctx.window.evaluate(
+    () => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
   )
   expect(focused).toBe('search-overlay-input')
 
@@ -121,8 +129,8 @@ test('after popover close, focus returns to the search input', async () => {
   await expect(popover).toBeVisible({ timeout: 2000 })
   await ctx.window.keyboard.press('Escape')
   await expect(popover).toBeHidden({ timeout: 2000 })
-  focused = await ctx.window.evaluate(() =>
-    (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
+  focused = await ctx.window.evaluate(
+    () => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
   )
   expect(focused).toBe('search-overlay-input')
 
@@ -154,8 +162,9 @@ test('options toggle: clicking with scope set keeps scope active even when row h
   // options row back open should reveal the same label.
   await ctx.window.locator('[data-testid="search-overlay-options-toggle"]').click()
   await expect(ctx.window.locator('[data-testid="search-overlay-options-row"]')).toBeVisible()
-  await expect(ctx.window.locator('[data-testid="search-overlay-scope-trigger"]'))
-    .toHaveText(scopeLabelBefore ?? '')
+  await expect(ctx.window.locator('[data-testid="search-overlay-scope-trigger"]')).toHaveText(
+    scopeLabelBefore ?? '',
+  )
   await closeOverlay()
 })
 
@@ -168,7 +177,9 @@ test('Shift+Enter from FTS results commits to results page', async () => {
   await expect(firstResult).toBeVisible({ timeout: 3000 })
   await input.press('Shift+Enter')
   await expect(ctx.window.locator('[data-testid="search-overlay"]')).toBeHidden({ timeout: 2000 })
-  await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({ timeout: 3000 })
+  await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({
+    timeout: 3000,
+  })
 })
 
 test('clicking the results-total badge commits to results page', async () => {
@@ -180,7 +191,9 @@ test('clicking the results-total badge commits to results page', async () => {
   await expect(badge).toBeVisible({ timeout: 3000 })
   await badge.click()
   await expect(ctx.window.locator('[data-testid="search-overlay"]')).toBeHidden({ timeout: 2000 })
-  await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({ timeout: 3000 })
+  await expect(ctx.window.locator('[data-testid="results-scope-chip"]')).toBeVisible({
+    timeout: 3000,
+  })
 })
 
 test('results-total badge is hidden in recents mode and appears in search mode', async () => {
@@ -191,7 +204,9 @@ test('results-total badge is hidden in recents mode and appears in search mode',
   await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toHaveCount(0)
   const input = ctx.window.locator('[data-testid="search-overlay-input"]')
   await input.fill('XYLOPHONE_CANARY_42')
-  await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toBeVisible({ timeout: 3000 })
+  await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toBeVisible({
+    timeout: 3000,
+  })
   // Clearing the query reverts to recents — badge disappears again.
   await input.fill('')
   await expect(ctx.window.locator('[data-testid="search-overlay-results-total"]')).toHaveCount(0)

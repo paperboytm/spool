@@ -1,7 +1,9 @@
-import { test, expect } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // Per-iter AKIA-shaped fixtures (5 sessions, 5 distinct keys). Each
 // is exactly `AKIA + 16 [A-Z0-9]` so the regex matches and the new
@@ -69,15 +71,35 @@ test.beforeAll(async () => {
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: AppContext['window']): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number; manualBurstInFlight: boolean }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && !s.manualBurstInFlight
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+                manualBurstInFlight: boolean
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return (
+        s.queued === 0 && s.scanning === null && s.backfillRemaining === 0 && !s.manualBurstInFlight
+      )
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Rescan all surfaces a Scan-complete banner that survives a follow-up auto burst', async () => {
@@ -97,9 +119,9 @@ test('Rescan all surfaces a Scan-complete banner that survives a follow-up auto 
   // Result banner must show — this is the regression site. Generous
   // timeout because the manual ACK needs the busy→idle event to land
   // and the React state to flush.
-  await expect(
-    window.locator('[data-testid="security-scan-result-banner"]'),
-  ).toBeVisible({ timeout: 10_000 })
+  await expect(window.locator('[data-testid="security-scan-result-banner"]')).toBeVisible({
+    timeout: 10_000,
+  })
 
   // The reported scanned count matches the worker's reported high-water
   // mark — at LEAST the fixture count (the boot backfill might have
@@ -117,7 +139,9 @@ test('Rescan all surfaces a Scan-complete banner that survives a follow-up auto 
   // take on a live archive. Before the fix, this would silently
   // clear `scanResult` via the renderer's idle→busy edge handler.
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: { rescanSession: (id: number) => Promise<unknown> } } }).spool
+    const api = (
+      globalThis as { spool?: { security?: { rescanSession: (id: number) => Promise<unknown> } } }
+    ).spool
     await api!.security!.rescanSession(1)
   })
 
@@ -127,15 +151,11 @@ test('Rescan all surfaces a Scan-complete banner that survives a follow-up auto 
 
   // Banner stays — the auto burst's busy→idle does not consume the
   // manual ACK.
-  await expect(
-    window.locator('[data-testid="security-scan-result-banner"]'),
-  ).toBeVisible()
+  await expect(window.locator('[data-testid="security-scan-result-banner"]')).toBeVisible()
 
   // The × dismisses it (and only the ×).
   await window.locator('[data-testid="security-scan-result-dismiss"]').click()
-  await expect(
-    window.locator('[data-testid="security-scan-result-banner"]'),
-  ).toBeHidden()
+  await expect(window.locator('[data-testid="security-scan-result-banner"]')).toBeHidden()
 })
 
 // Companion test for the opposite half of the contract: a purely
@@ -164,7 +184,9 @@ test('A purely background scan never surfaces the Scan-complete banner', async (
   // Syncer uses for sync-driven enqueues) — bypasses the click
   // handler entirely.
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: { rescanSession: (id: number) => Promise<unknown> } } }).spool
+    const api = (
+      globalThis as { spool?: { security?: { rescanSession: (id: number) => Promise<unknown> } } }
+    ).spool
     await api!.security!.rescanSession(1)
   })
 

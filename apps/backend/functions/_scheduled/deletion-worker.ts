@@ -7,12 +7,7 @@
 // for documentation; the actual cron registration happens on the
 // companion Worker.
 
-import type {
-  D1Database,
-  KVNamespace,
-  R2Bucket,
-  ScheduledEvent,
-} from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace, R2Bucket, ScheduledEvent } from '@cloudflare/workers-types'
 
 export type DeletionEnv = {
   DB: D1Database
@@ -70,9 +65,7 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         .first()
       if (!stillDue) continue
 
-      const shares = await env.DB.prepare(
-        'SELECT id FROM published_shares WHERE user_id=?',
-      )
+      const shares = await env.DB.prepare('SELECT id FROM published_shares WHERE user_id=?')
         .bind(row.user_id)
         .all<{ id: string }>()
 
@@ -98,27 +91,21 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         )
           .bind(now, row.user_id)
           .run(),
-        env.DB.prepare(
-          'UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL',
-        )
+        env.DB.prepare('UPDATE handles SET released_at=? WHERE user_id=? AND released_at IS NULL')
           .bind(now, row.user_id)
           .run(),
         // Drop every (provider, sub) link this user had. A fresh sign-in
         // from the same Google / GitHub / … account then finds no
         // identity row → upsertUserByIdentity creates a brand-new user
         // row, no permanent ban from the soft-deleted tombstone.
-        env.DB.prepare('DELETE FROM user_identities WHERE user_id=?')
-          .bind(row.user_id)
-          .run(),
+        env.DB.prepare('DELETE FROM user_identities WHERE user_id=?').bind(row.user_id).run(),
         env.DB.prepare(
           "UPDATE users SET email='[deleted]', name=NULL, avatar_url=NULL, " +
             'display_name=NULL, custom_avatar_id=NULL, deleted_at=? WHERE id=?',
         )
           .bind(now, row.user_id)
           .run(),
-        env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?')
-          .bind(row.user_id)
-          .run(),
+        env.DB.prepare('DELETE FROM deletion_queue WHERE user_id=?').bind(row.user_id).run(),
         // R2 avatars/ prefix sweep. R2 list+delete must be paged for
         // very large prefixes; per-user the count is at most the upload
         // history (capped at 10/h via rate-limit), so one or two pages
@@ -169,9 +156,7 @@ async function deleteAvatarPrefix(env: DeletionEnv, userId: string): Promise<voi
     // exactOptionalPropertyTypes, R2ListOptions doesn't accept an
     // explicit `cursor: undefined`.
     const listing = await env.AVATARS.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) })
-    await Promise.all(
-      listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)),
-    )
+    await Promise.all(listing.objects.map((o) => env.AVATARS.delete(o.key).catch(() => undefined)))
     if (!listing.truncated) return
     cursor = listing.cursor
     if (!cursor) return

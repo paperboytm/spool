@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { decideCliAuth, fetchCliAuthInfo } from './cli-auth'
 
@@ -17,36 +17,47 @@ describe('fetchCliAuthInfo', () => {
   it('ok on 200 with the request metadata', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        jsonResponse({ user_code: 'XKCD-2941', label: 'devbox', created: 5 }),
-      ),
+      vi.fn(async () => jsonResponse({ user_code: 'XKCD-2941', label: 'devbox', created: 5 })),
     )
     const r = await fetchCliAuthInfo('XKCD-2941')
     expect(r).toEqual({
       kind: 'ok',
       info: { user_code: 'XKCD-2941', label: 'devbox', created: 5 },
     })
-    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe(
-      '/api/cli-auth/approve?code=XKCD-2941',
-    )
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('/api/cli-auth/approve?code=XKCD-2941')
   })
 
   it('unauthenticated on 401 (page bounces to /sign-in)', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'UNAUTHENTICATED' }, 401)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'UNAUTHENTICATED' }, 401)),
+    )
     expect(await fetchCliAuthInfo('XKCD-2941')).toEqual({ kind: 'unauthenticated' })
   })
 
   it('gone on 404 and on 400', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'NOT_FOUND' }, 404)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'NOT_FOUND' }, 404)),
+    )
     expect(await fetchCliAuthInfo('XKCD-2941')).toEqual({ kind: 'gone' })
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'BAD_REQUEST' }, 400)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'BAD_REQUEST' }, 400)),
+    )
     expect(await fetchCliAuthInfo('junk')).toEqual({ kind: 'gone' })
   })
 
   it('error on network failure and 5xx', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('offline'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new Error('offline'))),
+    )
     expect(await fetchCliAuthInfo('XKCD-2941')).toEqual({ kind: 'error' })
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({}, 500)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({}, 500)),
+    )
     expect(await fetchCliAuthInfo('XKCD-2941')).toEqual({ kind: 'error' })
   })
 })
@@ -65,7 +76,10 @@ describe('decideCliAuth', () => {
   })
 
   it('gone when the request has expired underneath the page', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'NOT_FOUND' }, 404)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ error: 'NOT_FOUND' }, 404)),
+    )
     expect(await decideCliAuth('XKCD-2941', 'deny')).toEqual({ kind: 'gone' })
   })
 })

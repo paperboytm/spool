@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { makePfCoordinator, type PfDownloadState } from './pf-coordinator.js'
+
+import { describe, it, expect, beforeEach, afterEach } from 'vite-plus/test'
+
 import { MODEL_MANIFEST } from './model-manifest.js'
+import { makePfCoordinator, type PfDownloadState } from './pf-coordinator.js'
 
 const sha256 = (buf: Buffer) => createHash('sha256').update(buf).digest('hex')
 
@@ -28,7 +30,9 @@ function patchManifest(body: Buffer) {
 
 let tmp: string
 let restore: () => void
-beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'spool-pf-coord-')) })
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), 'spool-pf-coord-'))
+})
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true })
   restore?.()
@@ -52,7 +56,7 @@ describe('PfCoordinator', () => {
     c.subscribe((s) => events.push({ ...s }))
     await c.startDownload()
     expect(c.getState().phase).toBe('installed')
-    expect(events.some(e => e.phase === 'downloading')).toBe(true)
+    expect(events.some((e) => e.phase === 'downloading')).toBe(true)
     expect(events.at(-1)?.phase).toBe('installed')
   })
 
@@ -76,12 +80,14 @@ describe('PfCoordinator', () => {
       modelDir: tmp,
       fetch: ((_url: RequestInfo | URL, init?: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          )
         })) as typeof globalThis.fetch,
     })
     const pending = c.startDownload()
     // Let the start phase publish first.
-    await new Promise(r => setTimeout(r, 5))
+    await new Promise((r) => setTimeout(r, 5))
     c.cancelDownload()
     await pending
     expect(c.getState().phase).toBe('not-installed')
@@ -101,12 +107,12 @@ describe('PfCoordinator', () => {
       modelDir: tmp,
       fetch: (async () => {
         calls++
-        await new Promise(r => setTimeout(r, 20))
+        await new Promise((r) => setTimeout(r, 20))
         return new Response(body, { status: 200 })
       }) as typeof globalThis.fetch,
     })
     const p1 = c.startDownload()
-    const p2 = c.startDownload()  // should be a no-op
+    const p2 = c.startDownload() // should be a no-op
     await Promise.all([p1, p2])
     expect(c.getState().phase).toBe('installed')
     // Only the first download hit fetch once per manifest file.

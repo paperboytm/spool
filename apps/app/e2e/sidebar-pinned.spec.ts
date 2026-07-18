@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 let ctx: AppContext
@@ -34,7 +35,9 @@ test('sidebar pinned section appears after pinning and lists the session', async
   const pinnedToggle = window.locator('[data-testid="sidebar-pinned-toggle"]')
   await expect(pinnedToggle).toBeVisible({ timeout: 5000 })
 
-  const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
+  const pinnedRow = window.locator(
+    `[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`,
+  )
   await expect(pinnedRow).toBeVisible({ timeout: 5000 })
 
   // Cleanup
@@ -51,7 +54,9 @@ test('clicking a sidebar pinned row opens the session detail', async () => {
 
   await window.locator('[data-testid="sidebar-library"]').click()
 
-  const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
+  const pinnedRow = window.locator(
+    `[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`,
+  )
   await expect(pinnedRow).toBeVisible({ timeout: 5000 })
   await pinnedRow.click()
 
@@ -79,7 +84,9 @@ test('unpinning from sidebar also clears the Library pinned segment', async () =
   ).toBeVisible()
 
   // Unpin from sidebar
-  const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
+  const pinnedRow = window.locator(
+    `[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`,
+  )
   await pinnedRow.hover()
   await pinnedRow.locator('[data-testid="sidebar-pinned-unpin"]').click()
 
@@ -102,7 +109,9 @@ test('sidebar pinned kebab menu exposes Resume and Copy actions', async () => {
 
   const uuid = await pinFirstSessionInProject(window)
 
-  const pinnedRow = window.locator(`[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`)
+  const pinnedRow = window.locator(
+    `[data-testid="sidebar-pinned-row"][data-session-uuid="${uuid}"]`,
+  )
   await expect(pinnedRow).toBeVisible({ timeout: 5000 })
   await pinnedRow.hover()
   await pinnedRow.locator('[data-testid="sidebar-pinned-menu-trigger"]').click()
@@ -138,20 +147,22 @@ test('sidebar pinned sort menu changes the visible order', async () => {
   await rowB.hover()
   await rowB.locator('[data-testid="pin-button"]').click()
 
-  await expect(window.locator('[data-testid="sidebar-pinned-row"]')).toHaveCount(2, { timeout: 5000 })
+  await expect(window.locator('[data-testid="sidebar-pinned-row"]')).toHaveCount(2, {
+    timeout: 5000,
+  })
 
   const sidebar = window.locator('[data-testid="sidebar"]')
-  const orderRecentPinned = await sidebar.locator('[data-testid="sidebar-pinned-row"]').evaluateAll(
-    nodes => nodes.map(n => n.getAttribute('data-session-uuid')),
-  )
+  const orderRecentPinned = await sidebar
+    .locator('[data-testid="sidebar-pinned-row"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-session-uuid')))
 
   // Switch sort order to Name (A–Z) and confirm visible order changes (or stays consistent)
   await sidebar.locator('[data-testid="sidebar-pinned-sort-trigger"]').click()
   await window.getByRole('menuitem', { name: /Name \(A.{1,3}Z\)/ }).click()
 
-  const orderByName = await sidebar.locator('[data-testid="sidebar-pinned-row"]').evaluateAll(
-    nodes => nodes.map(n => n.getAttribute('data-session-uuid')),
-  )
+  const orderByName = await sidebar
+    .locator('[data-testid="sidebar-pinned-row"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-session-uuid')))
 
   expect(orderByName).toHaveLength(2)
   // Both sets contain the same two uuids, but the array shapes should be valid
@@ -163,5 +174,7 @@ test('sidebar pinned sort menu changes the visible order', async () => {
     await row.hover()
     await row.locator('[data-testid="sidebar-pinned-unpin"]').click()
   }
-  await expect(window.locator('[data-testid="sidebar-pinned-row"]')).toHaveCount(0, { timeout: 5000 })
+  await expect(window.locator('[data-testid="sidebar-pinned-row"]')).toHaveCount(0, {
+    timeout: 5000,
+  })
 })

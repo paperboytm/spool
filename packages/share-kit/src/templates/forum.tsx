@@ -7,11 +7,17 @@
 
 import type { Conversation, EditorOpts } from '../lib/types'
 import { typefaceFamily } from '../lib/types'
-import { accentBgFor, templateTokens, bodyStyleVars, BODY_VAR_PROPS, BODY_VAR_BLOCK_BORDER } from './tokens'
+import { Body } from './body'
+import { GapMarker } from './gap-marker'
 import { useResolvedRedactList, type RedactReplacement } from './redact'
 import { selectSegments } from './selection'
-import { GapMarker } from './gap-marker'
-import { Body } from './body'
+import {
+  accentBgFor,
+  templateTokens,
+  bodyStyleVars,
+  BODY_VAR_PROPS,
+  BODY_VAR_BLOCK_BORDER,
+} from './tokens'
 
 interface Props {
   convo: Conversation
@@ -103,9 +109,13 @@ export function Forum({ convo, opts, redactList: injectedRedactList }: Props) {
           }}
         />
         <span>started {convo.createdAt}</span>
-        <span aria-hidden style={{ color: t.faint }}>·</span>
+        <span aria-hidden style={{ color: t.faint }}>
+          ·
+        </span>
         <span>{convo.wordCount.toLocaleString()} words</span>
-        <span aria-hidden style={{ color: t.faint }}>·</span>
+        <span aria-hidden style={{ color: t.faint }}>
+          ·
+        </span>
         <span>~{convo.readMin} min read</span>
       </div>
       <div style={{ height: 22 }} />
@@ -118,7 +128,9 @@ export function Forum({ convo, opts, redactList: injectedRedactList }: Props) {
             : convo.sourceLabel
           const initials = initialsFor(displayName)
           const showGap = opts.showGaps && segments.gapBefore[i]! > 0
-          const timestampLabel = turn.timestamp ? formatRelativeTimestamp(turn.timestamp) : undefined
+          const timestampLabel = turn.timestamp
+            ? formatRelativeTimestamp(turn.timestamp)
+            : undefined
           return (
             <div
               key={turn.origIndex}
@@ -165,7 +177,15 @@ export function Forum({ convo, opts, redactList: injectedRedactList }: Props) {
                       marginBottom: 6,
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: 8,
+                      }}
+                    >
                       <span
                         style={{
                           fontFamily: tf,
@@ -179,7 +199,9 @@ export function Forum({ convo, opts, redactList: injectedRedactList }: Props) {
                       </span>
                       {timestampLabel && (
                         <>
-                          <span aria-hidden style={{ color: t.faint, fontSize: 10 }}>·</span>
+                          <span aria-hidden style={{ color: t.faint, fontSize: 10 }}>
+                            ·
+                          </span>
                           <span
                             style={{
                               fontFamily: 'Geist Mono, monospace',
@@ -266,13 +288,18 @@ function formatRelativeTimestamp(iso: string): string {
     const hhmm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
     if (dayDiff <= 0) return hhmmss
     if (dayDiff === 1) return `yesterday, ${hhmm}`
-    const locale = typeof document !== 'undefined' && document.documentElement.lang
-      ? document.documentElement.lang
-      : undefined
+    const locale =
+      typeof document !== 'undefined' && document.documentElement.lang
+        ? document.documentElement.lang
+        : undefined
     if (d.getFullYear() === now.getFullYear()) {
       return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(d)
     }
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' }).format(d)
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(d)
   } catch {
     return iso.slice(0, 10)
   }

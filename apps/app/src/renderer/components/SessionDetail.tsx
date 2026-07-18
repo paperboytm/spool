@@ -1,23 +1,33 @@
+import type { Session, Message } from '@spool-lab/core'
+import { MessageList, type FindRange, type MessageListHandle } from '@spool-lab/session-view'
+import {
+  SquareTerminal,
+  SquarePen,
+  MoreHorizontal,
+  Copy,
+  ShieldAlert,
+  Check,
+  RotateCcw,
+  Globe,
+} from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { SquareTerminal, SquarePen, MoreHorizontal, Copy, ShieldAlert, Check, RotateCcw, Globe } from 'lucide-react'
-import type { Session, Message } from '@spool-lab/core'
-import { MessageList, type FindRange, type MessageListHandle } from '@spool-lab/session-view'
-import SessionFindBar from './SessionFindBar.js'
-import FindingsStrip from './security/FindingsStrip.js'
-import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
-import HubShareDialog from './hub-share-dialog.js'
-import { securityApi } from '../api/security.js'
-import PinButton from './PinButton.js'
-import Menu from './Menu.js'
+
+import { formatRelativeDate } from '../../shared/formatDate.js'
 import { getSessionResumeCommand } from '../../shared/resumeCommand.js'
 import { getSessionSourceColor, getSessionSourceShortLabel } from '../../shared/sessionSources.js'
-import { formatRelativeDate } from '../../shared/formatDate.js'
-import { useIsDark } from '../hooks/useIsDark.js'
+import { securityApi } from '../api/security.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
+import { useIsDark } from '../hooks/useIsDark.js'
 import { useDraftCountForSession } from '../hooks/useShareDrafts.js'
 import { extractRenderedText } from '../markdown/extractRenderedText.js'
+import HubShareDialog from './hub-share-dialog.js'
+import Menu from './Menu.js'
+import PinButton from './PinButton.js'
+import FindingsStrip from './security/FindingsStrip.js'
+import RefreshFromSourceDialog from './session/RefreshFromSourceDialog.js'
+import SessionFindBar from './SessionFindBar.js'
 
 type Props = {
   sessionUuid: string
@@ -31,7 +41,13 @@ type Props = {
 // projection re-parses every message's markdown, so it must not run per key.
 const FIND_DEBOUNCE_MS = 120
 
-export default function SessionDetail({ sessionUuid, targetMessageId, onCopySessionId, onBack, onShare }: Props) {
+export default function SessionDetail({
+  sessionUuid,
+  targetMessageId,
+  onCopySessionId,
+  onBack,
+  onShare,
+}: Props) {
   const { t, i18n } = useTranslation()
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -42,7 +58,9 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   // × button puts it away again. Reset on session change so opening
   // session A's strip doesn't leak into B.
   const [stripOpen, setStripOpen] = useState(false)
-  useEffect(() => { setStripOpen(false) }, [sessionUuid])
+  useEffect(() => {
+    setStripOpen(false)
+  }, [sessionUuid])
   const [resuming, setResuming] = useState(false)
   const [commandCopied, setCommandCopied] = useState(false)
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false)
@@ -79,10 +97,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     return () => window.clearTimeout(timer)
   }, [findQuery, normalizedFindQuery])
 
-  const {
-    messageFindRanges,
-    totalFindMatches,
-  } = useMemo(() => {
+  const { messageFindRanges, totalFindMatches } = useMemo(() => {
     let offset = 0
     const rangesByMessage = new Map<number, { ranges: FindRange[]; offset: number }>()
 
@@ -136,13 +151,16 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   useEffect(() => {
     setLoading(true)
-    window.spool.getSession(sessionUuid).then((result) => {
-      if (result) {
-        setSession(result.session)
-        setMessages(result.messages)
-      }
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    window.spool
+      .getSession(sessionUuid)
+      .then((result) => {
+        if (result) {
+          setSession(result.session)
+          setMessages(result.messages)
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
   }, [sessionUuid])
 
   // Re-fetch the session record on security mutations so the
@@ -161,9 +179,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         timer = null
-        window.spool.getSession(sessionUuid).then((result) => {
-          if (result) setSession(result.session)
-        }).catch(() => {})
+        window.spool
+          .getSession(sessionUuid)
+          .then((result) => {
+            if (result) setSession(result.session)
+          })
+          .catch(() => {})
       }, 300)
     })
     return () => {
@@ -175,9 +196,14 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
   useEffect(() => {
     let cancelled = false
     function refresh() {
-      window.spool.getPinnedUuids()
-        .then(uuids => { if (!cancelled) setPinned(uuids.includes(sessionUuid)) })
-        .catch(() => { if (!cancelled) setPinned(false) })
+      window.spool
+        .getPinnedUuids()
+        .then((uuids) => {
+          if (!cancelled) setPinned(uuids.includes(sessionUuid))
+        })
+        .catch(() => {
+          if (!cancelled) setPinned(false)
+        })
     }
     refresh()
     window.addEventListener('spool:pin-change', refresh)
@@ -225,16 +251,22 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     },
   })
 
-  useHotkeys({
-    Escape: closeFindBar,
-    'mod+arrowleft': findPrevious,
-    'mod+arrowright': findNext,
-  }, { active: showFindBar })
+  useHotkeys(
+    {
+      Escape: closeFindBar,
+      'mod+arrowleft': findPrevious,
+      'mod+arrowright': findNext,
+    },
+    { active: showFindBar },
+  )
 
   useEffect(() => {
     if (!showFindBar || totalFindMatches === 0) return
     for (const [messageId, state] of messageFindRanges) {
-      if (activeMatchIndex >= state.offset && activeMatchIndex < state.offset + state.ranges.length) {
+      if (
+        activeMatchIndex >= state.offset &&
+        activeMatchIndex < state.offset + state.ranges.length
+      ) {
         listRef.current?.scrollToMessageId(messageId)
         // Tall messages: row centering isn't enough — wait for the row to mount,
         // then nudge the active mark itself into view.
@@ -254,7 +286,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-warm-faint dark:text-dark-muted">
+      <div className="text-warm-faint dark:text-dark-muted flex h-full items-center justify-center">
         <p className="text-sm">Loading…</p>
       </div>
     )
@@ -262,7 +294,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center h-full text-warm-faint dark:text-dark-muted">
+      <div className="text-warm-faint dark:text-dark-muted flex h-full items-center justify-center">
         <p className="text-sm">Session not found.</p>
       </div>
     )
@@ -318,56 +350,71 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
     }
   }
 
-  const resumeCommandAvailable = Boolean(session && getSessionResumeCommand(session.source, session.sessionUuid))
+  const resumeCommandAvailable = Boolean(
+    session && getSessionResumeCommand(session.source, session.sessionUuid),
+  )
 
   return (
-    <div className="relative flex flex-col h-full" data-testid="session-detail">
+    <div className="relative flex h-full flex-col" data-testid="session-detail">
       {/* Session header */}
-      <div className="flex-none flex items-start gap-3 px-6 pt-1.5 pb-3">
+      <div className="flex flex-none items-start gap-3 px-6 pt-1.5 pb-3">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
             aria-label={t('common.back')}
             title={t('common.back')}
-            className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text transition-colors"
+            className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface hover:text-warm-text dark:hover:text-dark-text flex h-5 w-5 flex-none items-center justify-center rounded transition-colors"
           >
             <svg width="11" height="11" viewBox="0 0 13 13" fill="none">
-              <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path
+                d="M8 3L4 6.5L8 10"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         )}
 
-        <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-medium text-warm-text dark:text-dark-text truncate" title={session.title ?? undefined}>
+        <div className="min-w-0 flex-1">
+          <h2
+            className="text-warm-text dark:text-dark-text truncate text-sm font-medium"
+            title={session.title ?? undefined}
+          >
             {session.title ?? t('common.noTitle')}
           </h2>
 
-          <p className="mt-1 flex items-center gap-1.5 text-[11px] text-warm-faint dark:text-dark-muted min-w-0">
-            <span className="inline-flex items-center gap-1 flex-none">
+          <p className="text-warm-faint dark:text-dark-muted mt-1 flex min-w-0 items-center gap-1.5 text-[11px]">
+            <span className="inline-flex flex-none items-center gap-1">
               <span
                 aria-hidden
-                className="block w-1.5 h-1.5 rounded-full"
+                className="block h-1.5 w-1.5 rounded-full"
                 style={{ background: getSessionSourceColor(session.source) }}
               />
               <span className="font-mono">{getSessionSourceShortLabel(session.source)}</span>
             </span>
             <span aria-hidden>·</span>
-            <span className="font-mono truncate" title={session.projectDisplayPath}>{session.projectDisplayPath}</span>
+            <span className="truncate font-mono" title={session.projectDisplayPath}>
+              {session.projectDisplayPath}
+            </span>
             <span aria-hidden>·</span>
-            <span className="flex-none">{formatRelativeDate(session.startedAt, { t: t as unknown as (k: string, o?: Record<string, unknown>) => string })}</span>
+            <span className="flex-none">
+              {formatRelativeDate(session.startedAt, {
+                t: t as unknown as (k: string, o?: Record<string, unknown>) => string,
+              })}
+            </span>
             <span aria-hidden>·</span>
-            <span className="flex-none">{t('session.messages_other', { count: session.messageCount })}</span>
-            <RiskPill session={session} open={stripOpen} onToggle={() => setStripOpen(v => !v)} />
+            <span className="flex-none">
+              {t('session.messages_other', { count: session.messageCount })}
+            </span>
+            <RiskPill session={session} open={stripOpen} onToggle={() => setStripOpen((v) => !v)} />
           </p>
         </div>
 
-        <div className="flex-none self-end flex items-center gap-0.5">
-          <PinButton
-            sessionUuid={session.sessionUuid}
-            pinned={pinned}
-            onChange={setPinned}
-          />
+        <div className="flex flex-none items-center gap-0.5 self-end">
+          <PinButton sessionUuid={session.sessionUuid} pinned={pinned} onChange={setPinned} />
 
           {session && (
             <button
@@ -375,7 +422,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               onClick={() => onShare(session, messages)}
               title={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
               aria-label={hasDraft ? t('shareEditor.openExisting') : t('shareEditor.openNew')}
-              className={`inline-flex items-center justify-center w-5 h-5 rounded transition-colors ${
+              className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
                 hasDraft
                   ? 'text-accent dark:text-accent-dark hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
                   : 'text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
@@ -391,7 +438,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
             disabled={resuming}
             title={resuming ? t('common.loading') : t('session.resume_inTerminal')}
             aria-label={resuming ? t('common.loading') : t('session.resume_inTerminal')}
-            className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <SquareTerminal size={13} strokeWidth={1.6} aria-hidden />
           </button>
@@ -404,7 +451,7 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
                 type="button"
                 onClick={toggle}
                 aria-label={t('common.more')}
-                className="inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+                className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 items-center justify-center rounded transition-colors"
               >
                 <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
               </button>
@@ -413,22 +460,40 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
               {
                 label: t('sidebar.copySessionId'),
                 icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleCopySessionId() },
+                onSelect: () => {
+                  void handleCopySessionId()
+                },
               },
-              ...(resumeCommandAvailable ? [{
-                label: commandCopied ? t('common.copiedResumeCommand') : t('common.copyResumeCommand'),
-                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { void handleCopyCommand() },
-              }] : []),
-              ...(session.source === 'claude' || session.source === 'codex' ? [{
-                label: t('hubShare.menuLabel'),
-                icon: <Globe size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { setHubShareOpen(true) },
-              }] : []),
+              ...(resumeCommandAvailable
+                ? [
+                    {
+                      label: commandCopied
+                        ? t('common.copiedResumeCommand')
+                        : t('common.copyResumeCommand'),
+                      icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => {
+                        void handleCopyCommand()
+                      },
+                    },
+                  ]
+                : []),
+              ...(session.source === 'claude' || session.source === 'codex'
+                ? [
+                    {
+                      label: t('hubShare.menuLabel'),
+                      icon: <Globe size={14} strokeWidth={1.6} aria-hidden />,
+                      onSelect: () => {
+                        setHubShareOpen(true)
+                      },
+                    },
+                  ]
+                : []),
               {
                 label: t('session.refreshFromSource'),
                 icon: <RotateCcw size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => { setRefreshDialogOpen(true) },
+                onSelect: () => {
+                  setRefreshDialogOpen(true)
+                },
               },
             ]}
           />
@@ -454,8 +519,12 @@ export default function SessionDetail({ sessionUuid, targetMessageId, onCopySess
       <RefreshFromSourceDialog
         open={refreshDialogOpen}
         busy={refreshing}
-        onConfirm={() => { void handleRefreshFromSource() }}
-        onCancel={() => { if (!refreshing) setRefreshDialogOpen(false) }}
+        onConfirm={() => {
+          void handleRefreshFromSource()
+        }}
+        onCancel={() => {
+          if (!refreshing) setRefreshDialogOpen(false)
+        }}
       />
 
       <HubShareDialog
@@ -532,20 +601,26 @@ function RiskPill({
     const low = Math.max(0, total - high)
     icon = <ShieldAlert size={12} strokeWidth={1.75} aria-hidden />
     label = total
-    tone = high > 0
-      ? 'text-accent dark:text-accent-dark'
-      : 'text-warm-muted dark:text-dark-muted'
-    title = high > 0 && low > 0
-      ? t('security.pill_tooltip_mixed', { high, low, defaultValue: '{{high}} high-risk · {{low}} low' })
-      : high > 0
-      ? t('security.pill_tooltip_high', { count: high, defaultValue: '{{count}} high-risk' })
-      : t('security.pill_tooltip_low', { count: low, defaultValue: '{{count}} low' })
+    tone = high > 0 ? 'text-accent dark:text-accent-dark' : 'text-warm-muted dark:text-dark-muted'
+    title =
+      high > 0 && low > 0
+        ? t('security.pill_tooltip_mixed', {
+            high,
+            low,
+            defaultValue: '{{high}} high-risk · {{low}} low',
+          })
+        : high > 0
+          ? t('security.pill_tooltip_high', { count: high, defaultValue: '{{count}} high-risk' })
+          : t('security.pill_tooltip_low', { count: low, defaultValue: '{{count}} low' })
   } else if (completed && purged > 0) {
     // Cleared: scan ran, was once dirty, now empty.
     icon = <ShieldAlert size={12} strokeWidth={1.75} aria-hidden />
     label = <Check size={12} strokeWidth={1.9} aria-hidden />
     tone = 'text-warm-muted dark:text-dark-muted'
-    title = t('security.pill_tooltip_resolved', { count: purged, defaultValue: '{{count}} resolved' })
+    title = t('security.pill_tooltip_resolved', {
+      count: purged,
+      defaultValue: '{{count}} resolved',
+    })
     // No strip to drop — the pill is a status indicator only.
     clickable = false
   } else {

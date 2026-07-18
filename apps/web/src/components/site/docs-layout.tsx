@@ -1,36 +1,36 @@
-import { Link } from "@tanstack/react-router";
+import { Link } from '@tanstack/react-router'
 
-type NavItem = { slug: string; title: string };
-type NavGroup = { label: string; items: NavItem[] };
+type NavItem = { slug: string; title: string }
+type NavGroup = { label: string; items: NavItem[] }
 
 const DOCS_NAV: NavGroup[] = [
   {
-    label: "Getting Started",
+    label: 'Getting Started',
     items: [
-      { slug: "/docs/installation", title: "Installation" },
-      { slug: "/docs/quick-start", title: "Quick Start" },
+      { slug: '/docs/installation', title: 'Installation' },
+      { slug: '/docs/quick-start', title: 'Quick Start' },
     ],
   },
   {
-    label: "Guides",
+    label: 'Guides',
     items: [
-      { slug: "/docs/guides/agent-integration", title: "Agent Integration" },
-      { slug: "/docs/guides/data-sources", title: "Data Sources" },
+      { slug: '/docs/guides/agent-integration', title: 'Agent Integration' },
+      { slug: '/docs/guides/data-sources', title: 'Data Sources' },
     ],
   },
   {
-    label: "Reference",
+    label: 'Reference',
     items: [
-      { slug: "/docs/reference/cli", title: "CLI Commands" },
-      { slug: "/docs/reference/configuration", title: "Configuration" },
+      { slug: '/docs/reference/cli', title: 'CLI Commands' },
+      { slug: '/docs/reference/configuration', title: 'Configuration' },
     ],
   },
-];
+]
 
-const FLAT_NAV: NavItem[] = DOCS_NAV.flatMap((g) => g.items);
+const FLAT_NAV: NavItem[] = DOCS_NAV.flatMap((g) => g.items)
 
 function splatOf(slug: string): string {
-  return slug.replace(/^\/docs\//, "");
+  return slug.replace(/^\/docs\//, '')
 }
 
 function DocsLink({ item, className }: { item: NavItem; className?: string }) {
@@ -38,7 +38,7 @@ function DocsLink({ item, className }: { item: NavItem; className?: string }) {
     <Link to="/docs/$" params={{ _splat: splatOf(item.slug) }} className={className}>
       {item.title}
     </Link>
-  );
+  )
 }
 
 export default function DocsLayout({
@@ -46,15 +46,15 @@ export default function DocsLayout({
   frontmatter,
   children,
 }: {
-  currentPath: string;
-  frontmatter: Record<string, unknown>;
-  children: React.ReactNode;
+  currentPath: string
+  frontmatter: Record<string, unknown>
+  children: React.ReactNode
 }) {
-  const normalized = currentPath.replace(/\/$/, "");
-  const currentIndex = FLAT_NAV.findIndex((i) => i.slug === normalized);
-  const prev = currentIndex > 0 ? FLAT_NAV[currentIndex - 1] : null;
+  const normalized = currentPath.replace(/\/$/, '')
+  const currentIndex = FLAT_NAV.findIndex((i) => i.slug === normalized)
+  const prev = currentIndex > 0 ? FLAT_NAV[currentIndex - 1] : null
   const next =
-    currentIndex >= 0 && currentIndex < FLAT_NAV.length - 1 ? FLAT_NAV[currentIndex + 1] : null;
+    currentIndex >= 0 && currentIndex < FLAT_NAV.length - 1 ? FLAT_NAV[currentIndex + 1] : null
 
   return (
     <div className="docs">
@@ -66,16 +66,16 @@ export default function DocsLayout({
               <DocsLink
                 key={item.slug}
                 item={item}
-                className={item.slug === normalized ? "active" : ""}
+                className={item.slug === normalized ? 'active' : ''}
               />
             ))}
           </div>
         ))}
       </aside>
       <main className="docs-main">
-        <h1>{frontmatter["title"] as string}</h1>
-        {typeof frontmatter["description"] === "string" && frontmatter["description"] && (
-          <p className="docs-description">{frontmatter["description"]}</p>
+        <h1>{frontmatter['title'] as string}</h1>
+        {typeof frontmatter['description'] === 'string' && frontmatter['description'] && (
+          <p className="docs-description">{frontmatter['description']}</p>
         )}
         <div className="void-md">{children}</div>
         <nav className="docs-pager" aria-label="Pagination">
@@ -98,5 +98,5 @@ export default function DocsLayout({
         </nav>
       </main>
     </div>
-  );
+  )
 }

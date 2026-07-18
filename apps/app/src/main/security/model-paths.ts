@@ -6,8 +6,10 @@
 // can read them without dragging this file's `electron` import into the
 // worker chunk.
 
-import { app } from 'electron'
 import { join } from 'node:path'
+
+import { app } from 'electron'
+
 import { PF_MODEL_ID } from './pf-version.js'
 
 export { PF_MODEL_ID, PF_MODEL_VERSION, PF_HF_REPO, PF_PROFILE_VERSION } from './pf-version.js'

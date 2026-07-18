@@ -1,7 +1,25 @@
 import type Database from 'better-sqlite3'
-import type { Session, Message, FragmentResult, StatusInfo, SearchMatchType, SessionSource, ProjectIdentityKind } from '../types.js'
+
+import type {
+  Session,
+  Message,
+  FragmentResult,
+  StatusInfo,
+  SearchMatchType,
+  SessionSource,
+  ProjectIdentityKind,
+} from '../types.js'
 import { DB_PATH, getDBSize } from './db.js'
-import { buildPreviewFtsPlan, buildSearchPlan, canUseSessionSearchFts, containsCjk, getNaturalSearchPhrase, getNaturalSearchTerms, selectFtsTableKind, shouldUseSessionFallback } from './search-query.js'
+import {
+  buildPreviewFtsPlan,
+  buildSearchPlan,
+  canUseSessionSearchFts,
+  containsCjk,
+  getNaturalSearchPhrase,
+  getNaturalSearchTerms,
+  selectFtsTableKind,
+  shouldUseSessionFallback,
+} from './search-query.js'
 
 export function getOrCreateProject(
   db: Database.Database,
@@ -26,9 +44,7 @@ export function getOrCreateProject(
         UPDATE projects
         SET display_path = ?, display_name = ?, identity_kind = ?, identity_key = ?
         WHERE id = ?
-      `).run(
-        displayPath, displayName, identity.identityKind, identity.identityKey, existing.id,
-      )
+      `).run(displayPath, displayName, identity.identityKind, identity.identityKey, existing.id)
     }
     return existing.id
   }
@@ -44,14 +60,20 @@ export function getOrCreateProject(
 
 function identityRank(kind: ProjectIdentityKind | null): number {
   switch (kind) {
-    case 'git_remote': return 5
-    case 'git_common_dir': return 4
-    case 'manifest_path': return 3
+    case 'git_remote':
+      return 5
+    case 'git_common_dir':
+      return 4
+    case 'manifest_path':
+      return 3
     case 'synthetic':
-    case 'spool_internal': return 2
-    case 'loose': return 1
+    case 'spool_internal':
+      return 2
+    case 'loose':
+      return 1
     case 'path':
-    case null: return 0
+    case null:
+      return 0
   }
 }
 
@@ -70,13 +92,10 @@ export function getSourceId(db: Database.Database, name: SessionSource): number 
  */
 export function getOrCreateAskProject(db: Database.Database, source: SessionSource): number {
   const sourceId = getSourceId(db, source)
-  return getOrCreateProject(
-    db, sourceId,
-    '__spool_ask__',
-    '<spool:ask>',
-    'Asks',
-    { identityKind: 'spool_internal', identityKey: 'ask' },
-  )
+  return getOrCreateProject(db, sourceId, '__spool_ask__', '<spool:ask>', 'Asks', {
+    identityKind: 'spool_internal',
+    identityKey: 'ask',
+  })
 }
 
 /**
@@ -99,21 +118,21 @@ export function insertSpoolAuthoredSession(
     cwd: string
   },
 ): number {
-  const existing = db.prepare('SELECT id FROM sessions WHERE session_uuid = ?')
+  const existing = db
+    .prepare('SELECT id FROM sessions WHERE session_uuid = ?')
     .get(opts.sessionUuid) as { id: number } | undefined
   if (existing) return existing.id
 
   const now = new Date().toISOString()
   const sentinel = `spool:pending:${opts.sessionUuid}`
-  const result = db.prepare(`
+  const result = db
+    .prepare(`
     INSERT INTO sessions
       (project_id, source_id, session_uuid, file_path, title, title_source,
        started_at, ended_at, message_count, has_tool_use, cwd, model, raw_file_mtime)
     VALUES (?, ?, ?, ?, ?, 'spool', ?, ?, 0, 0, ?, '', '')
-  `).run(
-    opts.projectId, opts.sourceId, opts.sessionUuid, sentinel, opts.title,
-    now, now, opts.cwd,
-  )
+  `)
+    .run(opts.projectId, opts.sourceId, opts.sessionUuid, sentinel, opts.title, now, now, opts.cwd)
   return Number(result.lastInsertRowid)
 }
 
@@ -130,10 +149,11 @@ export function deleteSessionByFilePath(db: Database.Database, filePath: string)
 }
 
 export function getAllSessionMtimes(db: Database.Database): Map<string, string> {
-  const rows = db
-    .prepare('SELECT file_path, raw_file_mtime FROM sessions')
-    .all() as Array<{ file_path: string; raw_file_mtime: string }>
-  return new Map(rows.map(r => [r.file_path, r.raw_file_mtime]))
+  const rows = db.prepare('SELECT file_path, raw_file_mtime FROM sessions').all() as Array<{
+    file_path: string
+    raw_file_mtime: string
+  }>
+  return new Map(rows.map((r) => [r.file_path, r.raw_file_mtime]))
 }
 
 /** Sync mode for {@link upsertSession}.
@@ -179,13 +199,10 @@ export function upsertSession(
     // means we're about to silently overwrite a session row — historically this
     // happened when subagent jsonls under <slug>/<uuid>/subagents/ got indexed
     // and clobbered the parent row.
-    if (
-      existing.file_path !== opts.filePath
-      && !existing.file_path.startsWith('spool:pending:')
-    ) {
+    if (existing.file_path !== opts.filePath && !existing.file_path.startsWith('spool:pending:')) {
       console.warn(
-        `[upsertSession] session_uuid ${opts.sessionUuid} switching file_path: `
-        + `${existing.file_path} → ${opts.filePath}`,
+        `[upsertSession] session_uuid ${opts.sessionUuid} switching file_path: ` +
+          `${existing.file_path} → ${opts.filePath}`,
       )
     }
     if (mode === 'rewrite') {
@@ -209,23 +226,40 @@ export function upsertSession(
         has_tool_use = ?, cwd = ?, model = ?, raw_file_mtime = ?
       WHERE id = ?
     `).run(
-      opts.title, opts.filePath, opts.startedAt, opts.endedAt,
-      opts.hasToolUse ? 1 : 0, opts.cwd, opts.model, opts.rawFileMtime,
+      opts.title,
+      opts.filePath,
+      opts.startedAt,
+      opts.endedAt,
+      opts.hasToolUse ? 1 : 0,
+      opts.cwd,
+      opts.model,
+      opts.rawFileMtime,
       existing.id,
     )
     return existing.id
   }
 
-  const result = db.prepare(`
+  const result = db
+    .prepare(`
     INSERT INTO sessions
       (project_id, source_id, session_uuid, file_path, title,
        started_at, ended_at, message_count, has_tool_use, cwd, model, raw_file_mtime)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    opts.projectId, opts.sourceId, opts.sessionUuid, opts.filePath, opts.title,
-    opts.startedAt, opts.endedAt, opts.messageCount, opts.hasToolUse ? 1 : 0,
-    opts.cwd, opts.model, opts.rawFileMtime,
-  )
+  `)
+    .run(
+      opts.projectId,
+      opts.sourceId,
+      opts.sessionUuid,
+      opts.filePath,
+      opts.title,
+      opts.startedAt,
+      opts.endedAt,
+      opts.messageCount,
+      opts.hasToolUse ? 1 : 0,
+      opts.cwd,
+      opts.model,
+      opts.rawFileMtime,
+    )
 
   return Number(result.lastInsertRowid)
 }
@@ -247,33 +281,28 @@ export function upsertSessionSearch(
       user_text = excluded.user_text,
       assistant_text = excluded.assistant_text,
       updated_at = datetime('now')
-  `).run(
-    opts.sessionId,
-    opts.title,
-    opts.userText,
-    opts.assistantText,
-  )
+  `).run(opts.sessionId, opts.title, opts.userText, opts.assistantText)
 }
 
 /** Rebuild the denormalized session-level search document from the authoritative
  * session title and current message rows. Security purge calls this inside its
  * transaction so raw values cannot survive in either session-level FTS index. */
-export function refreshSessionSearchFromMessages(
-  db: Database.Database,
-  sessionId: number,
-): void {
-  const session = db.prepare('SELECT title FROM sessions WHERE id = ?')
-    .get(sessionId) as { title: string | null } | undefined
+export function refreshSessionSearchFromMessages(db: Database.Database, sessionId: number): void {
+  const session = db.prepare('SELECT title FROM sessions WHERE id = ?').get(sessionId) as
+    | { title: string | null }
+    | undefined
   if (!session) return
 
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     SELECT role, content_text AS contentText
     FROM messages
     WHERE session_id = ?
       AND is_sidechain = 0
       AND role IN ('user', 'assistant')
     ORDER BY seq, id
-  `).all(sessionId) as Array<{ role: 'user' | 'assistant'; contentText: string }>
+  `)
+    .all(sessionId) as Array<{ role: 'user' | 'assistant'; contentText: string }>
   const byRole = { user: [] as string[], assistant: [] as string[] }
   for (const row of rows) {
     const text = row.contentText.trim()
@@ -324,9 +353,16 @@ export function insertMessages(
   let inserted = 0
   for (const m of messages) {
     const info = stmt.run(
-      sessionId, sourceId, m.uuid, m.parentUuid, m.role,
-      m.contentText, m.timestamp, m.isSidechain ? 1 : 0,
-      JSON.stringify(m.toolNames), m.seq,
+      sessionId,
+      sourceId,
+      m.uuid,
+      m.parentUuid,
+      m.role,
+      m.contentText,
+      m.timestamp,
+      m.isSidechain ? 1 : 0,
+      JSON.stringify(m.toolNames),
+      m.seq,
     )
     if (info.changes > 0) inserted++
   }
@@ -358,8 +394,9 @@ export function getMessageSnapshot(
   // returns the smallest-seq row; `COUNT(*) OVER ()` / `LAST_VALUE`
   // annotate it with the partition-wide total and tail (no GROUP BY
   // needed since the WHERE already scopes to one session).
-  const row = db.prepare(
-    `SELECT m.msg_uuid AS msg_uuid,
+  const row = db
+    .prepare(
+      `SELECT m.msg_uuid AS msg_uuid,
             COUNT(*) OVER () AS total,
             LAST_VALUE(m.msg_uuid) OVER (
               ORDER BY m.seq, m.id
@@ -369,7 +406,8 @@ export function getMessageSnapshot(
        JOIN sessions s ON s.id = m.session_id
       WHERE s.session_uuid = ? AND m.msg_uuid IS NOT NULL
       ORDER BY m.seq, m.id LIMIT 1`,
-  ).get(sessionUuid) as { msg_uuid: string; last_uuid: string; total: number } | undefined
+    )
+    .get(sessionUuid) as { msg_uuid: string; last_uuid: string; total: number } | undefined
   if (!row) return { firstUuid: null, lastUuid: null, total: 0 }
   return { firstUuid: row.msg_uuid, lastUuid: row.last_uuid, total: row.total }
 }
@@ -380,10 +418,7 @@ export function getMessageSnapshot(
  *  parser's `parsed.messages.length` would re-introduce the v14-fixed
  *  inflation for source formats (claude) that emit some records
  *  twice. */
-export function recomputeMessageCount(
-  db: Database.Database,
-  sessionId: number,
-): void {
+export function recomputeMessageCount(db: Database.Database, sessionId: number): void {
   db.prepare(
     `UPDATE sessions SET message_count = (
         SELECT COUNT(*) FROM messages
@@ -410,20 +445,22 @@ export const SESSION_SELECT = `
   JOIN sources src ON src.id = s.source_id
   JOIN projects p ON p.id = s.project_id`
 
-
 export function getSessionWithMessages(
   db: Database.Database,
   sessionUuid: string,
 ): { session: Session; messages: Message[] } | null {
-  const sessionRow = db.prepare(`
+  const sessionRow = db
+    .prepare(`
     ${SESSION_SELECT}
     WHERE s.session_uuid = ?
-  `).get(sessionUuid) as Record<string, unknown> | undefined
+  `)
+    .get(sessionUuid) as Record<string, unknown> | undefined
 
   if (!sessionRow) return null
 
   const session = rowToSession(sessionRow)
-  const msgRows = db.prepare(`
+  const msgRows = db
+    .prepare(`
     SELECT id, session_id AS sessionId, msg_uuid AS msgUuid,
            parent_uuid AS parentUuid, role, content_text AS contentText,
            timestamp, is_sidechain AS isSidechain, tool_names AS toolNames, seq
@@ -431,9 +468,10 @@ export function getSessionWithMessages(
     WHERE session_id = ?
       AND (is_sidechain = 0 OR parent_uuid LIKE 'opencode-subagent:%')
     ORDER BY seq
-  `).all(session.id) as Array<Record<string, unknown>>
+  `)
+    .all(session.id) as Array<Record<string, unknown>>
 
-  const messages: Message[] = msgRows.map(r => ({
+  const messages: Message[] = msgRows.map((r) => ({
     id: r['id'] as number,
     sessionId: r['sessionId'] as number,
     msgUuid: r['msgUuid'] as string | null,
@@ -452,7 +490,13 @@ export function getSessionWithMessages(
 export function searchFragments(
   db: Database.Database,
   query: string,
-  opts: { limit?: number; source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
+  opts: {
+    limit?: number
+    source?: SessionSource
+    since?: string
+    onlyPinned?: boolean
+    identityKey?: string
+  } = {},
 ): FragmentResult[] {
   const { limit = 10, source, since, onlyPinned, identityKey } = opts
 
@@ -469,15 +513,33 @@ export function searchFragments(
   }
 
   if (naturalTerms.length === 1) {
-    return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, 'fts', sharedOpts).slice(0, limit)
+    return searchFragmentSessionFallback(
+      db,
+      naturalTerms,
+      naturalPhrase,
+      rowLimit,
+      'fts',
+      sharedOpts,
+    ).slice(0, limit)
   }
 
-  const groups = buildSearchPlan(query).map(step => {
-    if (naturalTerms.length > 1 && (step.matchType === 'phrase' || step.matchType === 'all_terms')) {
-      return searchFragmentSessionFallback(db, naturalTerms, naturalPhrase, rowLimit, step.matchType, sharedOpts)
+  const groups = buildSearchPlan(query).map((step) => {
+    if (
+      naturalTerms.length > 1 &&
+      (step.matchType === 'phrase' || step.matchType === 'all_terms')
+    ) {
+      return searchFragmentSessionFallback(
+        db,
+        naturalTerms,
+        naturalPhrase,
+        rowLimit,
+        step.matchType,
+        sharedOpts,
+      )
     }
 
-    const ftsTable = selectFtsTableKind(query) === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'
+    const ftsTable =
+      selectFtsTableKind(query) === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'
     const rows = searchFragmentRows(db, ftsTable, step.query, rowLimit, sharedOpts)
     return collapseFragmentRows(rows, step.matchType)
   })
@@ -505,7 +567,7 @@ export function searchSessionPreview(
   })
   const snippetRows = selectBestSessionSnippets(
     db,
-    rows.map(row => row['sessionId'] as number),
+    rows.map((row) => row['sessionId'] as number),
     previewTerms,
     buildPreviewFtsPlan(normalizedQuery),
   )
@@ -556,7 +618,7 @@ function searchFragmentRows(
     params.push(since)
   }
   if (onlyPinned) {
-    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+    conditions.push('EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)')
   }
   if (identityKey) {
     conditions.push('p.identity_key = ?')
@@ -615,9 +677,8 @@ function searchPreviewRowsByFts(
   opts: { source?: SessionSource; since?: string } = {},
 ): Array<Record<string, unknown>> {
   const { source, since } = opts
-  const ftsTable = plan.tableKind === 'trigram'
-    ? 'session_search_fts_trigram'
-    : 'session_search_fts'
+  const ftsTable =
+    plan.tableKind === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
   const conditions = [`${ftsTable} MATCH ?`]
   const filterParams: Array<string | number> = [plan.query]
 
@@ -652,11 +713,9 @@ function searchPreviewRowsByFts(
     LIMIT ?
   `
 
-  return db.prepare(sql).all(
-    `${escapeLike(query)}%`,
-    ...filterParams,
-    limit,
-  ) as Array<Record<string, unknown>>
+  return db.prepare(sql).all(`${escapeLike(query)}%`, ...filterParams, limit) as Array<
+    Record<string, unknown>
+  >
 }
 
 function searchPreviewRowsByLike(
@@ -728,7 +787,10 @@ function searchPreviewRowsByLike(
   return db.prepare(sql).all(...params) as Array<Record<string, unknown>>
 }
 
-function collapseFragmentRows(rows: Array<Record<string, unknown>>, matchType: SearchMatchType): FragmentResult[] {
+function collapseFragmentRows(
+  rows: Array<Record<string, unknown>>,
+  matchType: SearchMatchType,
+): FragmentResult[] {
   const seen = new Map<string, FragmentResult>()
   const ordered: FragmentResult[] = []
 
@@ -805,7 +867,7 @@ function searchFragmentSessionFallback(
   const rows = searchSessionRowsByTerms(db, terms, phrase, limit, matchType, opts)
   const snippetRows = selectBestSessionSnippets(
     db,
-    rows.map(row => row['sessionId'] as number),
+    rows.map((row) => row['sessionId'] as number),
     terms,
   )
   type RankedFallbackRow = Omit<FragmentResult, 'rank'> & {
@@ -931,7 +993,7 @@ function searchSessionRowsByLike(
     params.push(since)
   }
   if (onlyPinned) {
-    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+    conditions.push('EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)')
   }
   if (identityKey) {
     conditions.push('p.identity_key = ?')
@@ -976,10 +1038,12 @@ function searchSessionRowsByFts(
   opts: { source?: SessionSource; since?: string; onlyPinned?: boolean; identityKey?: string } = {},
 ): Array<Record<string, unknown>> {
   const { source, since, onlyPinned, identityKey } = opts
-  const ftsTable = selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
-  const ftsQuery = matchType === 'phrase'
-    ? `"${phrase.replace(/"/g, '""')}"`
-    : terms.map(term => `"${term.replace(/"/g, '""')}"`).join(' AND ')
+  const ftsTable =
+    selectFtsTableKind(phrase) === 'trigram' ? 'session_search_fts_trigram' : 'session_search_fts'
+  const ftsQuery =
+    matchType === 'phrase'
+      ? `"${phrase.replace(/"/g, '""')}"`
+      : terms.map((term) => `"${term.replace(/"/g, '""')}"`).join(' AND ')
 
   const titleScoreParts: string[] = []
   const scoreParams: string[] = []
@@ -1007,7 +1071,7 @@ function searchSessionRowsByFts(
     params.push(since)
   }
   if (onlyPinned) {
-    conditions.push("EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)")
+    conditions.push('EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = sess.session_uuid)')
   }
   if (identityKey) {
     conditions.push('p.identity_key = ?')
@@ -1061,8 +1125,10 @@ function selectBestSessionSnippets(
     matchingMessageCount?: number
   }
   if (sessionIds.length === 0) return new Map<number, SessionSnippetRow>()
-  const coverageExpr = terms.map(() => `CASE WHEN m.content_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`).join(' + ')
-  const anyClauses = terms.map(() => 'm.content_text LIKE ? ESCAPE \'\\\'').join(' OR ')
+  const coverageExpr = terms
+    .map(() => `CASE WHEN m.content_text LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END`)
+    .join(' + ')
+  const anyClauses = terms.map(() => "m.content_text LIKE ? ESCAPE '\\'").join(' OR ')
   const allPatterns = terms.map(toLikePattern)
   const anyPatterns = terms.map(toLikePattern)
   const sessionPlaceholders = sessionIds.map(() => '?').join(', ')
@@ -1070,9 +1136,7 @@ function selectBestSessionSnippets(
     ? `${ftsPlan.tableKind === 'trigram' ? 'messages_fts_trigram' : 'messages_fts'} AS message_matches
       JOIN messages AS m ON m.id = message_matches.rowid`
     : 'messages AS m'
-  const matchCondition = ftsPlan
-    ? 'message_matches.content_text MATCH ?'
-    : `(${anyClauses})`
+  const matchCondition = ftsPlan ? 'message_matches.content_text MATCH ?' : `(${anyClauses})`
   const matchParams = ftsPlan ? [ftsPlan.anyTermQuery] : anyPatterns
 
   const matchSql = `
@@ -1117,8 +1181,10 @@ function selectBestSessionSnippets(
     WHERE rn = 1
   `
 
-  const rows = db.prepare(matchSql).all(...allPatterns, ...sessionIds, ...matchParams) as SessionSnippetRow[]
-  return new Map(rows.map(row => [row.sessionId, row]))
+  const rows = db
+    .prepare(matchSql)
+    .all(...allPatterns, ...sessionIds, ...matchParams) as SessionSnippetRow[]
+  return new Map(rows.map((row) => [row.sessionId, row]))
 }
 
 export function buildLikeSnippet(text: string, terms: string[]): string {
@@ -1129,10 +1195,11 @@ export function buildLikeSnippet(text: string, terms: string[]): string {
   // case-insensitive, so the matched content may differ in case from the
   // query terms (e.g. user typed "dark fantasy", text has "Dark Fantasy").
   const lowerText = normalizedText.toLowerCase()
-  const firstHit = terms
-    .map(term => lowerText.indexOf(term.toLowerCase()))
-    .filter(index => index >= 0)
-    .sort((a, b) => a - b)[0] ?? 0
+  const firstHit =
+    terms
+      .map((term) => lowerText.indexOf(term.toLowerCase()))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)[0] ?? 0
 
   const start = Math.max(0, firstHit - 60)
   const end = Math.min(normalizedText.length, firstHit + 140)
@@ -1146,7 +1213,7 @@ export function buildLikeSnippet(text: string, terms: string[]): string {
   for (const term of uniqueTerms) {
     if (!term) continue
     const pattern = new RegExp(escapeRegex(term), 'gi')
-    snippet = snippet.replace(pattern, m => `<mark>${m}</mark>`)
+    snippet = snippet.replace(pattern, (m) => `<mark>${m}</mark>`)
   }
 
   return snippet
@@ -1161,18 +1228,13 @@ function toLikePattern(term: string): string {
 }
 
 function escapeLike(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
 
 // ── Pins (sessions) ─────────────────────────────────────────────────────────
 
 export function pinSession(db: Database.Database, sessionUuid: string): void {
-  db.prepare(
-    'INSERT OR IGNORE INTO pins (session_uuid) VALUES (?)',
-  ).run(sessionUuid)
+  db.prepare('INSERT OR IGNORE INTO pins (session_uuid) VALUES (?)').run(sessionUuid)
 }
 
 export function unpinSession(db: Database.Database, sessionUuid: string): void {
@@ -1180,28 +1242,32 @@ export function unpinSession(db: Database.Database, sessionUuid: string): void {
 }
 
 export function isPinned(db: Database.Database, sessionUuid: string): boolean {
-  const row = db
-    .prepare('SELECT 1 AS hit FROM pins WHERE session_uuid = ?')
-    .get(sessionUuid) as { hit: number } | undefined
+  const row = db.prepare('SELECT 1 AS hit FROM pins WHERE session_uuid = ?').get(sessionUuid) as
+    | { hit: number }
+    | undefined
   return row !== undefined
 }
 
 export function getPinnedUuids(db: Database.Database): string[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     SELECT session_uuid AS uuid
     FROM pins
     WHERE EXISTS (SELECT 1 FROM sessions WHERE session_uuid = pins.session_uuid)
-  `).all() as Array<{ uuid: string }>
-  return rows.map(r => r.uuid)
+  `)
+    .all() as Array<{ uuid: string }>
+  return rows.map((r) => r.uuid)
 }
 
 export function listPinnedSessions(db: Database.Database): Session[] {
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(`
     ${SESSION_SELECT}
     JOIN pins ON pins.session_uuid = s.session_uuid
     WHERE s.message_count > 0
     ORDER BY pins.pinned_at DESC
-  `).all() as Array<Record<string, unknown>>
+  `)
+    .all() as Array<Record<string, unknown>>
   return rows.map(rowToSession)
 }
 
@@ -1209,23 +1275,27 @@ export function getStatus(db: Database.Database): StatusInfo {
   // Filter empty sessions so this matches every user-facing list, which
   // all gate on message_count > 0 (aborted starts and crash files have
   // zero messages but still occupy a row in the sessions table).
-  const counts = db.prepare(`
+  const counts = db
+    .prepare(`
     SELECT src.name, COUNT(*) AS cnt
     FROM sessions s JOIN sources src ON src.id = s.source_id
     WHERE s.message_count > 0
     GROUP BY src.name
-  `).all() as Array<{ name: string; cnt: number }>
+  `)
+    .all() as Array<{ name: string; cnt: number }>
 
-  const lastSync = db.prepare(`
+  const lastSync = db
+    .prepare(`
     SELECT MAX(synced_at) AS last FROM sync_log WHERE status = 'ok'
-  `).get() as { last: string | null }
+  `)
+    .get() as { last: string | null }
 
   const totalSessions = counts.reduce((sum, r) => sum + r.cnt, 0)
-  const claudeRow = counts.find(r => r.name === 'claude')
-  const codexRow = counts.find(r => r.name === 'codex')
-  const geminiRow = counts.find(r => r.name === 'gemini')
-  const opencodeRow = counts.find(r => r.name === 'opencode')
-  const piRow = counts.find(r => r.name === 'pi')
+  const claudeRow = counts.find((r) => r.name === 'claude')
+  const codexRow = counts.find((r) => r.name === 'codex')
+  const geminiRow = counts.find((r) => r.name === 'gemini')
+  const opencodeRow = counts.find((r) => r.name === 'opencode')
+  const piRow = counts.find((r) => r.name === 'pi')
 
   return {
     dbPath: DB_PATH,

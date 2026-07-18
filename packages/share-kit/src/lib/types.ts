@@ -393,7 +393,9 @@ export function normalizeOpts(raw: unknown): EditorOpts {
   if (merged.redactExclude) {
     const re = merged.redactExclude
     merged.redactExclude = {
-      kinds: Array.isArray(re.kinds) ? re.kinds.filter((k): k is string => typeof k === 'string') : [],
+      kinds: Array.isArray(re.kinds)
+        ? re.kinds.filter((k): k is string => typeof k === 'string')
+        : [],
       valueHashes: Array.isArray(re.valueHashes)
         ? re.valueHashes.filter((h): h is string => typeof h === 'string')
         : [],

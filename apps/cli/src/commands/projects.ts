@@ -1,6 +1,7 @@
-import { Command } from 'commander'
 import { getDB, listProjectGroups, listSessionsByIdentity } from '@spool-lab/core'
 import type { ProjectGroup, ProjectGroupWithPaths } from '@spool-lab/core'
+import { Command } from 'commander'
+
 import { formatDate, printSession } from '../format.js'
 
 export type ProjectResolution =
@@ -18,17 +19,22 @@ export type ProjectResolution =
  * Otherwise fall back to substring matching by field priority, reporting
  * ambiguity when more than one group matches at the winning priority.
  */
-export function resolveProjectQuery(groups: ProjectGroupWithPaths[], query: string): ProjectResolution {
+export function resolveProjectQuery(
+  groups: ProjectGroupWithPaths[],
+  query: string,
+): ProjectResolution {
   const q = query.toLowerCase()
 
-  const exact = groups.filter(g => allSearchableProjectFields(g).some(v => v === q))
+  const exact = groups.filter((g) => allSearchableProjectFields(g).some((v) => v === q))
   if (exact.length > 0) return pick(exact)
 
-  const exactBasename = groups.filter(g => basenameSearchableProjectFields(g).some(v => v === q))
+  const exactBasename = groups.filter((g) =>
+    basenameSearchableProjectFields(g).some((v) => v === q),
+  )
   if (exactBasename.length > 0) return pick(exactBasename)
 
   for (const tier of partialSearchableProjectFieldTiers) {
-    const matches = groups.filter(g => tier(g).some(v => v.includes(q)))
+    const matches = groups.filter((g) => tier(g).some((v) => v.includes(q)))
     if (matches.length > 0) return pick(matches)
   }
 
@@ -36,19 +42,15 @@ export function resolveProjectQuery(groups: ProjectGroupWithPaths[], query: stri
 }
 
 function allSearchableProjectFields(group: ProjectGroupWithPaths): string[] {
-  return [
-    group.displayName,
-    group.identityKey,
-    ...group.displayPaths,
-    ...group.cwds,
-  ].map(v => v.toLowerCase())
+  return [group.displayName, group.identityKey, ...group.displayPaths, ...group.cwds].map((v) =>
+    v.toLowerCase(),
+  )
 }
 
 function basenameSearchableProjectFields(group: ProjectGroupWithPaths): string[] {
-  return [
-    group.identityKey,
-    ...group.displayPaths,
-  ].map(v => basename(v).toLowerCase()).filter(Boolean)
+  return [group.identityKey, ...group.displayPaths]
+    .map((v) => basename(v).toLowerCase())
+    .filter(Boolean)
 }
 
 function basename(value: string): string {
@@ -58,9 +60,9 @@ function basename(value: string): string {
 }
 
 const partialSearchableProjectFieldTiers: Array<(group: ProjectGroupWithPaths) => string[]> = [
-  group => [group.displayName, group.identityKey].map(v => v.toLowerCase()),
-  group => group.displayPaths.map(v => v.toLowerCase()),
-  group => group.cwds.map(v => v.toLowerCase()),
+  (group) => [group.displayName, group.identityKey].map((v) => v.toLowerCase()),
+  (group) => group.displayPaths.map((v) => v.toLowerCase()),
+  (group) => group.cwds.map((v) => v.toLowerCase()),
 ]
 
 function pick(matches: ProjectGroupWithPaths[]): ProjectResolution {
@@ -71,7 +73,10 @@ function pick(matches: ProjectGroupWithPaths[]): ProjectResolution {
 
 export const projectsCommand = new Command('projects')
   .description('List your projects, or the sessions in one')
-  .argument('[query]', 'Show sessions in the project matching this name, identity key, project path, or cwd')
+  .argument(
+    '[query]',
+    'Show sessions in the project matching this name, identity key, project path, or cwd',
+  )
   .option('-n, --limit <n>', 'Max sessions to show (with a query)', '20')
   .option('--json', 'Output as JSON')
   .action((query: string | undefined, opts: { limit: string; json?: boolean }) => {

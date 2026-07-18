@@ -39,8 +39,7 @@ import { backendUrl, DEFAULT_BACKEND } from '../share/backend-url.js'
 // local wrangler at :8788; in prod it's spool.pro. Without these
 // origins in img-src Chromium silently drops the request — the
 // network tab shows nothing and the <img> renders as broken.
-const IMG_ALLOW_DEV =
-  "'self' data: blob: https://lh3.googleusercontent.com http://localhost:8788"
+const IMG_ALLOW_DEV = "'self' data: blob: https://lh3.googleusercontent.com http://localhost:8788"
 const IMG_ALLOW_PROD =
   "'self' data: blob: https://lh3.googleusercontent.com https://spool.pro https://*.spool.pro"
 
@@ -166,42 +165,40 @@ export function installRendererCsp(opts: { dev: boolean }): void {
   if (process.env['SPOOL_DISABLE_CSP'] === '1') return
   const policy = buildCsp({ dev: opts.dev, backendOrigin: overrideBackendOrigin() })
   const pfPolicy = opts.dev ? PF_DEV_CSP : PF_PROD_CSP
-  electronSession.defaultSession.webRequest.onHeadersReceived(
-    (details, callback) => {
-      // Only inject CSP into responses for the documents we actually
-      // ship. Chromium's built-in PDF viewer extension serves its UI
-      // off `chrome-extension://`; if we replace that response's CSP
-      // with ours the viewer can't load its own internal scripts /
-      // styles / embeds and the iframe paints blank grey. Extensions
-      // and Chromium-internal pages have their own appropriate CSPs;
-      // we should not impose ours on top of them. `data:` URLs are
-      // omitted deliberately — they're untrusted inline content, not
-      // documents we author, and Electron doesn't fire
-      // onHeadersReceived for them at the document level anyway.
-      const url = details.url || ''
-      const isAppDoc =
-        url.startsWith('http://') ||
-        url.startsWith('https://') ||
-        url.startsWith('file://') ||
-        url.startsWith('blob:')
-      if (!isAppDoc) {
-        // No header changes — let Electron pass the response through.
-        callback({})
-        return
+  electronSession.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Only inject CSP into responses for the documents we actually
+    // ship. Chromium's built-in PDF viewer extension serves its UI
+    // off `chrome-extension://`; if we replace that response's CSP
+    // with ours the viewer can't load its own internal scripts /
+    // styles / embeds and the iframe paints blank grey. Extensions
+    // and Chromium-internal pages have their own appropriate CSPs;
+    // we should not impose ours on top of them. `data:` URLs are
+    // omitted deliberately — they're untrusted inline content, not
+    // documents we author, and Electron doesn't fire
+    // onHeadersReceived for them at the document level anyway.
+    const url = details.url || ''
+    const isAppDoc =
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('file://') ||
+      url.startsWith('blob:')
+    if (!isAppDoc) {
+      // No header changes — let Electron pass the response through.
+      callback({})
+      return
+    }
+    const responseHeaders = { ...details.responseHeaders }
+    // Strip any inbound CSP — Vite dev server in particular sends a
+    // permissive header and Electron will pick whichever is most
+    // restrictive; replacing avoids any union surprises.
+    for (const key of Object.keys(responseHeaders)) {
+      if (key.toLowerCase() === 'content-security-policy') {
+        delete responseHeaders[key]
       }
-      const responseHeaders = { ...details.responseHeaders }
-      // Strip any inbound CSP — Vite dev server in particular sends a
-      // permissive header and Electron will pick whichever is most
-      // restrictive; replacing avoids any union surprises.
-      for (const key of Object.keys(responseHeaders)) {
-        if (key.toLowerCase() === 'content-security-policy') {
-          delete responseHeaders[key]
-        }
-      }
-      responseHeaders['Content-Security-Policy'] = [isPfInferenceDocument(url) ? pfPolicy : policy]
-      callback({ responseHeaders })
-    },
-  )
+    }
+    responseHeaders['Content-Security-Policy'] = [isPfInferenceDocument(url) ? pfPolicy : policy]
+    callback({ responseHeaders })
+  })
 }
 
 // Exported for snapshot tests so policy drift gets caught in CI without

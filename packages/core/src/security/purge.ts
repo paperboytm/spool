@@ -16,12 +16,13 @@
 // message, apply them in DESCENDING start_offset order so earlier
 // offsets stay valid as the string shifts.
 
-import { Data, Effect } from 'effect'
-import type Database from 'better-sqlite3'
 import type { SensitiveKind } from '@spool-lab/redact'
 import { maskValueByKind } from '@spool-lab/redact'
-import { updateSessionCounts } from './repo.js'
+import type Database from 'better-sqlite3'
+import { Data, Effect } from 'effect'
+
 import { refreshSessionSearchFromMessages } from '../db/queries.js'
+import { updateSessionCounts } from './repo.js'
 import type { FindingsChange, FindingState } from './types.js'
 
 export class PurgeError extends Data.TaggedError('PurgeError')<{
@@ -62,10 +63,12 @@ export function purgeFinding(
   return Effect.gen(function* () {
     const row = yield* Effect.try({
       try: () =>
-        deps.db.prepare(
-          `SELECT id, session_id, message_id, kind, start_offset, end_offset, state
+        deps.db
+          .prepare(
+            `SELECT id, session_id, message_id, kind, start_offset, end_offset, state
              FROM findings WHERE id = ?`,
-        ).get(findingId) as FindingForPurge | undefined,
+          )
+          .get(findingId) as FindingForPurge | undefined,
       catch: (cause) => new PurgeError({ findingId, reason: 'db-failed', cause }),
     })
     if (!row) {
@@ -93,9 +96,7 @@ export function purgeFinding(
     })
 
     return result
-  }).pipe(
-    Effect.withSpan('security.purge.single', { attributes: { findingId } }),
-  )
+  }).pipe(Effect.withSpan('security.purge.single', { attributes: { findingId } }))
 }
 
 /** Bulk purge across many findings.
@@ -167,9 +168,7 @@ export function purgeFindings(
 
     yield* Effect.annotateCurrentSpan('purged', results.length)
     return results
-  }).pipe(
-    Effect.withSpan('security.purge.bulk', { attributes: { requested: findingIds.length } }),
-  )
+  }).pipe(Effect.withSpan('security.purge.bulk', { attributes: { requested: findingIds.length } }))
 }
 
 /** Purge EVERY active occurrence of one leaked value — the
@@ -194,22 +193,27 @@ export function purgeEverywhere(
   return Effect.gen(function* () {
     const ids = yield* Effect.try({
       try: () =>
-        (deps.db.prepare(
-          `SELECT id FROM findings
+        (
+          deps.db
+            .prepare(
+              `SELECT id FROM findings
             WHERE kind = ? AND value_hash = ? AND state = 'active'`,
-        ).all(kind, valueHash) as Array<{ id: number }>).map(r => r.id),
+            )
+            .all(kind, valueHash) as Array<{ id: number }>
+        ).map((r) => r.id),
       catch: (cause) => new PurgeError({ findingId: -1, reason: 'db-failed', cause }),
     })
     const results = yield* purgeFindings(ids, deps)
     const seen = new Set<number>()
     const sessionIds: number[] = []
     for (const r of results) {
-      if (!seen.has(r.sessionId)) { seen.add(r.sessionId); sessionIds.push(r.sessionId) }
+      if (!seen.has(r.sessionId)) {
+        seen.add(r.sessionId)
+        sessionIds.push(r.sessionId)
+      }
     }
     return { results, sessionIds }
-  }).pipe(
-    Effect.withSpan('security.purge.everywhere', { attributes: { kind } }),
-  )
+  }).pipe(Effect.withSpan('security.purge.everywhere', { attributes: { kind } }))
 }
 
 /** Produce a purge order that's safe against offset drift. Findings
@@ -218,23 +222,25 @@ export function purgeEverywhere(
  *  interfere with message-grouped batches.
  *
  *  Exported only for tests. */
-export function orderForBulkPurge(
-  db: Database.Database,
-  findingIds: readonly number[],
-): number[] {
+export function orderForBulkPurge(db: Database.Database, findingIds: readonly number[]): number[] {
   if (findingIds.length === 0) return []
   const placeholders = findingIds.map(() => '?').join(',')
-  const rows = db.prepare(
-    `SELECT id, message_id, start_offset
+  const rows = db
+    .prepare(
+      `SELECT id, message_id, start_offset
        FROM findings
       WHERE id IN (${placeholders})`,
-  ).all(...findingIds) as Array<{ id: number; message_id: number | null; start_offset: number }>
+    )
+    .all(...findingIds) as Array<{ id: number; message_id: number | null; start_offset: number }>
 
   const byMessage = new Map<number | null, Array<{ id: number; start_offset: number }>>()
   for (const r of rows) {
     const key = r.message_id
     let bucket = byMessage.get(key)
-    if (!bucket) { bucket = []; byMessage.set(key, bucket) }
+    if (!bucket) {
+      bucket = []
+      byMessage.set(key, bucket)
+    }
     bucket.push({ id: r.id, start_offset: r.start_offset })
   }
   for (const bucket of byMessage.values()) {
@@ -269,10 +275,12 @@ function loadFindingsForBulkPurge(
   for (let i = 0; i < findingIds.length; i += CHUNK) {
     const slice = findingIds.slice(i, i + CHUNK)
     const placeholders = slice.map(() => '?').join(',')
-    const rows = db.prepare(
-      `SELECT id, session_id, message_id, kind, start_offset, end_offset, state
+    const rows = db
+      .prepare(
+        `SELECT id, session_id, message_id, kind, start_offset, end_offset, state
          FROM findings WHERE id IN (${placeholders})`,
-    ).all(...slice) as FindingForPurge[]
+      )
+      .all(...slice) as FindingForPurge[]
     for (const r of rows) out.set(r.id, r)
   }
   return out
@@ -296,7 +304,10 @@ function applyBulkPurgeTxn(
   for (const row of active) {
     const key = row.message_id as number
     let bucket = byMessage.get(key)
-    if (!bucket) { bucket = []; byMessage.set(key, bucket) }
+    if (!bucket) {
+      bucket = []
+      byMessage.set(key, bucket)
+    }
     bucket.push(row)
   }
   // Descending offset within each message — earlier offsets stay
@@ -311,12 +322,8 @@ function applyBulkPurgeTxn(
   const sessionIds: number[] = []
   const sessionsToRecount = new Set<number>()
 
-  const selectMessage = db.prepare(
-    'SELECT content_text FROM messages WHERE id = ?',
-  )
-  const updateMessage = db.prepare(
-    'UPDATE messages SET content_text = ? WHERE id = ?',
-  )
+  const selectMessage = db.prepare('SELECT content_text FROM messages WHERE id = ?')
+  const updateMessage = db.prepare('UPDATE messages SET content_text = ? WHERE id = ?')
   const updateFinding = db.prepare(
     `UPDATE findings
         SET state = 'purged', state_changed_at = ?
@@ -346,10 +353,7 @@ function applyBulkPurgeTxn(
       for (const finding of bucket) {
         const original = text.slice(finding.start_offset, finding.end_offset)
         const mask = maskValueByKind(original, finding.kind as SensitiveKind)
-        text =
-          text.slice(0, finding.start_offset) +
-          mask +
-          text.slice(finding.end_offset)
+        text = text.slice(0, finding.start_offset) + mask + text.slice(finding.end_offset)
         updateFinding.run(purgedAt, finding.id)
         maskSessionTitle.run(original, mask, finding.session_id, original)
         results.push({
@@ -386,9 +390,9 @@ function applyPurgeTxn(
   messageId: number,
   kind: SensitiveKind,
 ): PurgeResult {
-  const msg = db.prepare(
-    'SELECT content_text FROM messages WHERE id = ?',
-  ).get(messageId) as { content_text: string } | undefined
+  const msg = db.prepare('SELECT content_text FROM messages WHERE id = ?').get(messageId) as
+    | { content_text: string }
+    | undefined
   if (!msg) {
     throw new Error(`Message ${messageId} disappeared between read and purge`)
   }
@@ -402,8 +406,7 @@ function applyPurgeTxn(
       msg.content_text.slice(0, finding.start_offset) +
       mask +
       msg.content_text.slice(finding.end_offset)
-    db.prepare('UPDATE messages SET content_text = ? WHERE id = ?')
-      .run(newText, messageId)
+    db.prepare('UPDATE messages SET content_text = ? WHERE id = ?').run(newText, messageId)
     db.prepare(
       `UPDATE findings
           SET state = 'purged',

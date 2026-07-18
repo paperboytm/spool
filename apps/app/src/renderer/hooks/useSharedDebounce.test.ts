@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { createSharedDebounce } from './useSharedDebounce.js'
 
 /** Minimal manual timer host — fire() runs the pending callback. */

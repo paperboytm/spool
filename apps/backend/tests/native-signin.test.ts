@@ -2,14 +2,13 @@
 // the app's authorization code via the provider's public-client
 // exchange, links legacy accounts, mints a KV session.
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   SIGNIN_RATE_MAX,
   SIGNIN_RATE_WINDOW_SEC,
   onRequestPost as signInPost,
 } from '../functions/api/auth/sign-in-with-code'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 

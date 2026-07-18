@@ -23,5 +23,8 @@ export function filterIgnoredEntries(
       (e.sessionTitle ?? '').toLowerCase().includes(q)
     )
   }
-  return entries.filter(match).slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+  return entries
+    .filter(match)
+    .slice()
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }

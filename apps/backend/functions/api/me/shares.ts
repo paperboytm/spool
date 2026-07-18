@@ -9,17 +9,13 @@ type Env = { DB: D1Database; SESSIONS: KVNamespace }
 export const onRequestGet: PagesFunction<Env> = async (ctx) => {
   try {
     const user = await requireUser(ctx.request, ctx.env)
-    const rows = await ctx.env.DB
-      .prepare(
-        'SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id ' +
-          'FROM published_shares WHERE user_id=? ORDER BY published_at DESC',
-      )
+    const rows = await ctx.env.DB.prepare(
+      'SELECT id, title, visibility, version, published_at, republished_at, revoked_at, draft_id, client_request_id ' +
+        'FROM published_shares WHERE user_id=? ORDER BY published_at DESC',
+    )
       .bind(user.id)
       .all()
-    return jsonOk(
-      { items: rows.results },
-      { headers: { 'cache-control': CC_PRIVATE_NO_CACHE } },
-    )
+    return jsonOk({ items: rows.results }, { headers: { 'cache-control': CC_PRIVATE_NO_CACHE } })
   } catch (e) {
     return jsonError(e)
   }

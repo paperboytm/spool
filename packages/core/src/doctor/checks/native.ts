@@ -1,5 +1,5 @@
-import type { Check, CheckResult } from '../types.js'
 import { probeSqlite } from '../preflight.js'
+import type { Check, CheckResult } from '../types.js'
 
 export const nativeChecks: Check[] = [
   {

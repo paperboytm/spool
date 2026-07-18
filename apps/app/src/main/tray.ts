@@ -1,12 +1,10 @@
-import { Tray, Menu, nativeImage, app } from 'electron'
 import { join } from 'node:path'
+
+import { Tray, Menu, nativeImage, app } from 'electron'
 
 let tray: Tray | null = null
 
-export function setupTray(
-  onShow: () => void,
-  onSync: () => void,
-): void {
+export function setupTray(onShow: () => void, onSync: () => void): void {
   // Template image — macOS auto-handles light/dark tint.
   // File named *Template* so Electron marks it as template automatically.
   const iconPath = join(__dirname, '../../resources/tray-iconTemplate.png')

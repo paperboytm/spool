@@ -21,11 +21,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import '../styles/app.css'
 
 import { fetchMe } from '../lib/api'
-import {
-  type AuthIdentity,
-  getCachedAuth,
-  setCachedAuth,
-} from '../lib/auth-cache'
+import { type AuthIdentity, getCachedAuth, setCachedAuth } from '../lib/auth-cache'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 
@@ -306,9 +302,7 @@ export function Header({
     // happens in the browser.
     if (typeof window === 'undefined') return 'out'
     const cached = readCachedMe()
-    return cached
-      ? ({ name: cached.name, src: cached.avatar_url } as AuthState)
-      : 'out'
+    return cached ? ({ name: cached.name, src: cached.avatar_url } as AuthState) : 'out'
   })
 
   useEffect(() => {
@@ -351,13 +345,7 @@ export function Header({
  * redundant with the Wordmark in the header (both link to the landing
  * site).
  */
-export function Footer({
-  report,
-  reportHref,
-}: {
-  report?: boolean
-  reportHref?: string
-}) {
+export function Footer({ report, reportHref }: { report?: boolean; reportHref?: string }) {
   return (
     <footer className="sw-footer">
       {report && reportHref && (
@@ -394,17 +382,11 @@ export function SpoolMark({
       <ellipse cx="16" cy="9" rx="12" ry="4.5" strokeWidth="1.8" />
       <line x1="4" y1="9" x2="4" y2="22" strokeWidth="1.8" />
       <line x1="28" y1="9" x2="28" y2="22" strokeWidth="1.8" />
-      <path
-        d="M4 22 C4 24.5 9 27 16 27 C23 27 28 24.5 28 22"
-        strokeWidth="1.8"
-      />
+      <path d="M4 22 C4 24.5 9 27 16 27 C23 27 28 24.5 28 22" strokeWidth="1.8" />
       <ellipse cx="16" cy="11" rx="7" ry="2.5" strokeWidth="1.2" />
       <line x1="9" y1="11" x2="9" y2="20" strokeWidth="1.2" />
       <line x1="23" y1="11" x2="23" y2="20" strokeWidth="1.2" />
-      <path
-        d="M9 20 C9 21.5 12 23 16 23 C20 23 23 21.5 23 20"
-        strokeWidth="1.2"
-      />
+      <path d="M9 20 C9 21.5 12 23 16 23 C20 23 23 21.5 23 20" strokeWidth="1.2" />
       <ellipse cx="16" cy="11" rx="3" ry="1.2" fill={color} stroke="none" />
     </svg>
   )

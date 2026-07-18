@@ -10,12 +10,12 @@
 // WorkOS tokens never land on this machine — the app stores exactly one
 // credential (the spool session token, in the OS keychain).
 
-import { shell } from 'electron'
 import crypto from 'node:crypto'
+
+import { shell } from 'electron'
 
 import { fetchOnce } from '../net/robust-fetch.js'
 import { backendUrl } from '../share/backend-url.js'
-
 import { onDeepLink } from './deep-link.js'
 
 const AUTHORIZE_URL = 'https://api.workos.com/user_management/authorize'
@@ -69,9 +69,7 @@ function awaitAuthCallback(state: string): Promise<{ code: string }> {
       off()
       const error = url.searchParams.get('error')
       if (error) {
-        reject(
-          new Error(url.searchParams.get('error_description') ?? `sign-in failed: ${error}`),
-        )
+        reject(new Error(url.searchParams.get('error_description') ?? `sign-in failed: ${error}`))
         return true
       }
       const code = url.searchParams.get('code')

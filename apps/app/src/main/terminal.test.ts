@@ -3,8 +3,9 @@
 // can be exercised without opening real terminal windows, then assert
 // on the exact command each runner emits.
 
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
+
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vite-plus/test'
 
 const execSync = vi.fn()
 const spawn = vi.fn(() => ({ unref: () => {} }))

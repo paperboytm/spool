@@ -2,7 +2,6 @@ import type { D1Database, KVNamespace, R2Bucket } from '@cloudflare/workers-type
 import { sequenceRoot } from '@spool-lab/session-kit'
 
 import { ApiError } from '../errors'
-
 import { getHubSession, presentOids, type HubSessionRow } from './store'
 import type { HeadBodyT } from './wire'
 
@@ -38,20 +37,19 @@ export async function validateHead(
     throw new ApiError('UNPROCESSABLE', 'manifest does not fold to root')
   }
 
-  const wanted = [...new Set([
-    ...body.manifest,
-    body.viewOid,
-    ...(body.spoolFileOid === null ? [] : [body.spoolFileOid]),
-  ])]
+  const wanted = [
+    ...new Set([
+      ...body.manifest,
+      body.viewOid,
+      ...(body.spoolFileOid === null ? [] : [body.spoolFileOid]),
+    ]),
+  ]
   const present = await presentOids(db, userId, wanted)
   return { missing: wanted.filter((oid) => !present.has(oid)) }
 }
 
 /** Read-path gate: 404 unknown or private, 410 withdrawn. */
-export async function requireReadableSession(
-  db: D1Database,
-  sid: string,
-): Promise<HubSessionRow> {
+export async function requireReadableSession(db: D1Database, sid: string): Promise<HubSessionRow> {
   const row = await getHubSession(db, sid)
   if (!row) throw new ApiError('NOT_FOUND')
   if (row.withdrawn_at !== null) {

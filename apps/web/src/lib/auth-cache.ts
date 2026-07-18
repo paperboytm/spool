@@ -4,9 +4,7 @@
 // `resolveAuthState` wrapper that actually calls `fetchMe` lives in
 // `components/Chrome.tsx`.
 
-export type AuthIdentity =
-  | 'out'
-  | { name: string | null; src: string | null }
+export type AuthIdentity = 'out' | { name: string | null; src: string | null }
 
 let cached: Promise<AuthIdentity> | null = null
 

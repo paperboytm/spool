@@ -1,8 +1,9 @@
-import { _electron as electron } from '@playwright/test'
-import type { ElectronApplication, Page } from '@playwright/test'
 import { mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { _electron as electron } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
 
 /**
  * Variant of `launchApp` that does NOT set `ELECTRON_DISABLE_GPU=1`.
@@ -42,7 +43,7 @@ export async function launchAppWithGpu(): Promise<AppContext> {
   writeFileSync(join(spoolHome, 'agents.json'), JSON.stringify({}), 'utf8')
 
   const env: Record<string, string> = {
-    ...process.env as Record<string, string>,
+    ...(process.env as Record<string, string>),
     SPOOL_DATA_DIR: join(tmpDir, 'data'),
     SPOOL_ELECTRON_USER_DATA_DIR: join(tmpDir, 'electron-user-data'),
     SPOOL_HOME: spoolHome,
@@ -57,7 +58,7 @@ export async function launchAppWithGpu(): Promise<AppContext> {
     // viewer needs GPU rasterisation to paint.
   }
 
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   args.unshift('--force-prefers-reduced-motion')
 

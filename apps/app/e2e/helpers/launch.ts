@@ -1,8 +1,9 @@
-import { _electron as electron, expect } from '@playwright/test'
-import type { ElectronApplication, Page } from '@playwright/test'
 import { mkdtempSync, mkdirSync, cpSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { _electron as electron, expect } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
 
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures')
 const MOCKS_DIR = join(__dirname, '..', 'mocks')
@@ -21,17 +22,25 @@ export interface AppContext {
   cleanup: () => Promise<void>
 }
 
-export async function launchApp(opts: {
-  mockAgent?: 'success' | 'error'
-  /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
-   * have been copied and before Electron starts. Receives the resolved dirs. */
-  extraFixtures?: (dirs: { claudeDir: string; codexDir: string; geminiCliHome: string; opencodeDir: string; piDir: string }) => void
-  /** Extra env to merge into the Electron child process env. Used by the
-   * share-publish e2e to point SPOOL_SHARE_BACKEND at the in-process
-   * mock backend, which binds to a random port per test run and so
-   * can't be expressed via static playwright.config.ts env. */
-  extraEnv?: Record<string, string>
-} = {}): Promise<AppContext> {
+export async function launchApp(
+  opts: {
+    mockAgent?: 'success' | 'error'
+    /** Mutate fixture dirs (e.g. inject extra sessions) after the base fixtures
+     * have been copied and before Electron starts. Receives the resolved dirs. */
+    extraFixtures?: (dirs: {
+      claudeDir: string
+      codexDir: string
+      geminiCliHome: string
+      opencodeDir: string
+      piDir: string
+    }) => void
+    /** Extra env to merge into the Electron child process env. Used by the
+     * share-publish e2e to point SPOOL_SHARE_BACKEND at the in-process
+     * mock backend, which binds to a random port per test run and so
+     * can't be expressed via static playwright.config.ts env. */
+    extraEnv?: Record<string, string>
+  } = {},
+): Promise<AppContext> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'spool-e2e-'))
 
   const claudeDir = join(tmpDir, 'claude', 'projects')
@@ -60,7 +69,7 @@ export async function launchApp(opts: {
   opts.extraFixtures?.({ claudeDir, codexDir, geminiCliHome, opencodeDir, piDir })
 
   const env: Record<string, string> = {
-    ...process.env as Record<string, string>,
+    ...(process.env as Record<string, string>),
     SPOOL_DATA_DIR: join(tmpDir, 'data'),
     SPOOL_ELECTRON_USER_DATA_DIR: join(tmpDir, 'electron-user-data'),
     SPOOL_HOME: join(tmpDir, 'spool-home'),
@@ -78,9 +87,10 @@ export async function launchApp(opts: {
     // Fake `claude` binary on PATH so detectAgents() finds an agent
     env['PATH'] = `${MOCKS_DIR}:${env['PATH'] ?? ''}`
     // Point ACP extension resolution to our mock script
-    const mockScript = opts.mockAgent === 'error'
-      ? join(MOCKS_DIR, 'acp-mock-agent-error.mjs')
-      : join(MOCKS_DIR, 'acp-mock-agent.mjs')
+    const mockScript =
+      opts.mockAgent === 'error'
+        ? join(MOCKS_DIR, 'acp-mock-agent-error.mjs')
+        : join(MOCKS_DIR, 'acp-mock-agent.mjs')
     env['SPOOL_ACP_AGENT_BIN'] = mockScript
   }
 
@@ -93,7 +103,7 @@ export async function launchApp(opts: {
   const spoolHome = join(tmpDir, 'spool-home')
   mkdirSync(spoolHome, { recursive: true })
 
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   // Force prefers-reduced-motion at the Chromium level so transitions /
   // animations resolve instantly — Playwright's "wait for element to be
@@ -101,6 +111,11 @@ export async function launchApp(opts: {
   // contention. Only affects the Electron instance launched here, not
   // the production app.
   args.unshift('--force-prefers-reduced-motion')
+  // The product follows the user's OS language, but the E2E copy
+  // assertions are written against the English catalogue. Pin the
+  // launched Electron instance so developer-machine locale cannot
+  // turn semantic assertions into translation-dependent failures.
+  args.unshift('--lang=en-US')
 
   const app = await electron.launch({ args, cwd: APP_DIR, env })
 
@@ -127,9 +142,10 @@ export async function launchApp(opts: {
  */
 export async function restartApp(ctx: AppContext): Promise<AppContext> {
   await ctx.app.close()
-  const args = [join(APP_DIR, 'out', 'main', 'index.js')]
+  const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   args.unshift('--force-prefers-reduced-motion')
+  args.unshift('--lang=en-US')
   const app = await electron.launch({ args, cwd: APP_DIR, env: ctx.env })
   const window = await app.firstWindow()
   return {
@@ -150,7 +166,9 @@ export async function restartApp(ctx: AppContext): Promise<AppContext> {
 }
 
 export async function waitForSync(window: Page) {
-  await expect(window.locator('[data-testid="status-text"]')).toContainText(/[1-9]\d*\s+session/, { timeout: 15000 })
+  await expect(window.locator('[data-testid="status-text"]')).toContainText(/[1-9]\d*\s+session/, {
+    timeout: 15000,
+  })
 }
 
 export async function search(window: Page, query: string) {

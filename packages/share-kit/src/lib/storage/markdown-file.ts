@@ -10,11 +10,11 @@
 // each match swapped for a backticked `[redacted]` so it reads as a
 // chip in any markdown renderer.
 
-import type { Conversation, EditorOpts } from '../types'
-import { selectSegments } from '../../templates/selection'
 import { collectRedactList } from '../../templates/redact'
+import { selectSegments } from '../../templates/selection'
 import { saveBlob } from '../export'
 import { sanitizeFilename } from '../filename'
+import type { Conversation, EditorOpts } from '../types'
 
 const MIME = 'text/markdown'
 
@@ -65,9 +65,10 @@ export function buildMarkdownDocument(conversation: Conversation, opts: EditorOp
       lines.push('---')
       lines.push('')
     }
-    const name = turn.role === 'user'
-      ? (turn.author?.replace(/^\[|\]$/g, '').trim() || 'User')
-      : conversation.sourceLabel
+    const name =
+      turn.role === 'user'
+        ? turn.author?.replace(/^\[|\]$/g, '').trim() || 'User'
+        : conversation.sourceLabel
     lines.push(`**${name}:**`)
     lines.push('')
     lines.push(substitute(turn.body))

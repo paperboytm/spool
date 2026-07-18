@@ -1,5 +1,5 @@
-import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base'
 import { SpanStatusCode } from '@opentelemetry/api'
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base'
 
 // Minimal shape of @opentelemetry/core's ExportResult — avoids pulling
 // in the package just for two fields. The OTel SDK only ever calls back
@@ -46,8 +46,12 @@ export class PrettyConsoleSpanExporter implements SpanExporter {
     resultCallback({ code: 0 })
   }
 
-  shutdown(): Promise<void> { return Promise.resolve() }
-  forceFlush(): Promise<void> { return Promise.resolve() }
+  shutdown(): Promise<void> {
+    return Promise.resolve()
+  }
+  forceFlush(): Promise<void> {
+    return Promise.resolve()
+  }
 
   private format(span: ReadableSpan): string {
     const ts = formatTimestamp(span.endTime)
@@ -57,9 +61,10 @@ export class PrettyConsoleSpanExporter implements SpanExporter {
     const dur = this.tint(`(${formatDuration(durMs)})`, ANSI.gray)
     const attrs = formatAttributes(span.attributes)
     const attrsTinted = attrs ? '  ' + this.tint(attrs, ANSI.yellow) : ''
-    const statusSuffix = isError && span.status.message
-      ? '  ' + this.tint(`error: ${span.status.message}`, ANSI.red)
-      : ''
+    const statusSuffix =
+      isError && span.status.message
+        ? '  ' + this.tint(`error: ${span.status.message}`, ANSI.red)
+        : ''
     return `${this.tint(ts, ANSI.dim)}  [${name}]  ${dur}${attrsTinted}${statusSuffix}`
   }
 
@@ -68,8 +73,12 @@ export class PrettyConsoleSpanExporter implements SpanExporter {
   }
 }
 
-function pad2(n: number): string { return n < 10 ? `0${n}` : `${n}` }
-function pad3(n: number): string { return n < 10 ? `00${n}` : n < 100 ? `0${n}` : `${n}` }
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`
+}
+function pad3(n: number): string {
+  return n < 10 ? `00${n}` : n < 100 ? `0${n}` : `${n}`
+}
 
 function formatTimestamp(hr: [number, number]): string {
   const ms = hr[0] * 1000 + Math.floor(hr[1] / 1_000_000)
@@ -90,9 +99,7 @@ function formatDuration(ms: number): string {
 function formatAttributes(attrs: Record<string, unknown>): string {
   const entries = Object.entries(attrs)
   if (entries.length === 0) return ''
-  return entries
-    .map(([k, v]) => `${k}=${formatValue(v)}`)
-    .join(' ')
+  return entries.map(([k, v]) => `${k}=${formatValue(v)}`).join(' ')
 }
 
 function formatValue(v: unknown): string {

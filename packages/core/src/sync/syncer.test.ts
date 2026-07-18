@@ -1,15 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import Database from 'better-sqlite3'
-import { join } from 'node:path'
+import { appendFileSync, mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import {
-  appendFileSync,
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs'
+import { join } from 'node:path'
+
+import Database from 'better-sqlite3'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 const tempDirs: string[] = []
 const openDbs: Array<{ close: () => void }> = []
@@ -41,28 +35,31 @@ describe('Syncer', () => {
     vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
 
     const filePath = join(chatsDir, 'session-2026-04-08T00-00-deadbeef.json')
-    writeFileSync(filePath, JSON.stringify({
-      sessionId: 'deadbeef-1234-5678-90ab-cdef12345678',
-      startTime: '2026-04-08T00:00:00Z',
-      lastUpdated: '2026-04-08T00:01:00Z',
-      kind: 'main',
-      summary: 'Debug the OAuth callback bug',
-      messages: [
-        {
-          id: 'u1',
-          timestamp: '2026-04-08T00:00:00Z',
-          type: 'user',
-          content: [{ text: 'Help me debug the OAuth callback bug' }],
-        },
-        {
-          id: 'a1',
-          timestamp: '2026-04-08T00:00:30Z',
-          type: 'gemini',
-          content: 'I will inspect the auth flow and callback handlers.',
-          model: 'gemini-2.5-pro',
-        },
-      ],
-    }))
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        sessionId: 'deadbeef-1234-5678-90ab-cdef12345678',
+        startTime: '2026-04-08T00:00:00Z',
+        lastUpdated: '2026-04-08T00:01:00Z',
+        kind: 'main',
+        summary: 'Debug the OAuth callback bug',
+        messages: [
+          {
+            id: 'u1',
+            timestamp: '2026-04-08T00:00:00Z',
+            type: 'user',
+            content: [{ text: 'Help me debug the OAuth callback bug' }],
+          },
+          {
+            id: 'a1',
+            timestamp: '2026-04-08T00:00:30Z',
+            type: 'gemini',
+            content: 'I will inspect the auth flow and callback handlers.',
+            model: 'gemini-2.5-pro',
+          },
+        ],
+      }),
+    )
 
     const { getDB, Syncer, getStatus, searchFragments } = await loadCoreModules()
     const db = getDB()
@@ -91,29 +88,32 @@ describe('Syncer', () => {
 
     const tailKeyword = 'UNIQUE_NEEDLE_987654'
     const filePath = join(sessionDir, 'session.jsonl')
-    writeFileSync(filePath, [
-      JSON.stringify({
-        type: 'user',
-        sessionId: 'claude-session-1',
-        cwd: '/tmp/test-project',
-        uuid: 'u1',
-        timestamp: '2026-04-08T00:00:00Z',
-        message: {
-          role: 'user',
-          content: `${'a'.repeat(70000)} ${tailKeyword}`,
-        },
-      }),
-      JSON.stringify({
-        type: 'assistant',
-        uuid: 'a1',
-        timestamp: '2026-04-08T00:00:05Z',
-        message: {
-          role: 'assistant',
-          model: 'claude-sonnet-4',
-          content: 'Acknowledged.',
-        },
-      }),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          type: 'user',
+          sessionId: 'claude-session-1',
+          cwd: '/tmp/test-project',
+          uuid: 'u1',
+          timestamp: '2026-04-08T00:00:00Z',
+          message: {
+            role: 'user',
+            content: `${'a'.repeat(70000)} ${tailKeyword}`,
+          },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          uuid: 'a1',
+          timestamp: '2026-04-08T00:00:05Z',
+          message: {
+            role: 'assistant',
+            model: 'claude-sonnet-4',
+            content: 'Acknowledged.',
+          },
+        }),
+      ].join('\n'),
+    )
 
     const { getDB, Syncer, searchFragments } = await loadCoreModules()
     const db = getDB()
@@ -145,28 +145,31 @@ describe('Syncer', () => {
 
     function writeCodexSession(name: string, sessionId: string, cwd: string): string {
       const fp = join(sessionsDir, name)
-      writeFileSync(fp, [
-        JSON.stringify({
-          timestamp: '2026-05-11T12:00:00Z',
-          type: 'session_meta',
-          payload: { id: sessionId, cwd },
-        }),
-        JSON.stringify({
-          timestamp: '2026-05-11T12:00:01Z',
-          type: 'turn_context',
-          payload: { model: 'gpt-5.4', cwd },
-        }),
-        JSON.stringify({
-          timestamp: '2026-05-11T12:00:02Z',
-          type: 'event_msg',
-          payload: { type: 'user_message', message: 'hello' },
-        }),
-        JSON.stringify({
-          timestamp: '2026-05-11T12:00:03Z',
-          type: 'event_msg',
-          payload: { type: 'agent_message', message: 'hi' },
-        }),
-      ].join('\n'))
+      writeFileSync(
+        fp,
+        [
+          JSON.stringify({
+            timestamp: '2026-05-11T12:00:00Z',
+            type: 'session_meta',
+            payload: { id: sessionId, cwd },
+          }),
+          JSON.stringify({
+            timestamp: '2026-05-11T12:00:01Z',
+            type: 'turn_context',
+            payload: { model: 'gpt-5.4', cwd },
+          }),
+          JSON.stringify({
+            timestamp: '2026-05-11T12:00:02Z',
+            type: 'event_msg',
+            payload: { type: 'user_message', message: 'hello' },
+          }),
+          JSON.stringify({
+            timestamp: '2026-05-11T12:00:03Z',
+            type: 'event_msg',
+            payload: { type: 'agent_message', message: 'hi' },
+          }),
+        ].join('\n'),
+      )
       return fp
     }
 
@@ -189,10 +192,12 @@ describe('Syncer', () => {
     expect(syncer.syncFile(fileA, 'codex')).toBe('added')
     expect(syncer.syncFile(fileB, 'codex')).toBe('added')
 
-    const rows = db.prepare(
-      `SELECT id, slug, display_path, display_name, identity_kind, identity_key
+    const rows = db
+      .prepare(
+        `SELECT id, slug, display_path, display_name, identity_kind, identity_key
        FROM projects WHERE identity_kind = 'synthetic'`,
-    ).all() as Array<{
+      )
+      .all() as Array<{
       id: number
       slug: string
       display_path: string
@@ -209,9 +214,9 @@ describe('Syncer', () => {
       identity_key: 'codex:scratch',
     })
 
-    const sessionCount = db.prepare(
-      `SELECT COUNT(*) AS n FROM sessions WHERE project_id = ?`,
-    ).get(rows[0]!.id) as { n: number }
+    const sessionCount = db
+      .prepare(`SELECT COUNT(*) AS n FROM sessions WHERE project_id = ?`)
+      .get(rows[0]!.id) as { n: number }
     expect(sessionCount.n).toBe(2)
   })
 
@@ -231,14 +236,15 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'cascade.jsonl')
-    const record = (uuid: string, content: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'cascade-session-1',
-      cwd: '/tmp/test-project',
-      uuid,
-      timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
-      message: { role: 'user', content },
-    })
+    const record = (uuid: string, content: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'cascade-session-1',
+        cwd: '/tmp/test-project',
+        uuid,
+        timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
+        message: { role: 'user', content },
+      })
     writeFileSync(filePath, record('u1', 'hello first'))
 
     const { getDB, Syncer } = await loadCoreModules()
@@ -248,24 +254,31 @@ describe('Syncer', () => {
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
 
     // Pretend the scan worker has finished a scan, so scan_profile is set.
-    db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE session_uuid = ?")
-      .run('cascade-session-1')
+    db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE session_uuid = ?").run(
+      'cascade-session-1',
+    )
 
     // Append a brand-new message — this is the path that should
     // invalidate scan_profile and notify subscribers.
-    writeFileSync(filePath, [
-      record('u1', 'hello first'),
-      record('u2', 'hello — new turn'),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [record('u1', 'hello first'), record('u2', 'hello — new turn')].join('\n'),
+    )
     touchFile(filePath)
 
     const changed: number[] = []
-    const cascadingSyncer = new Syncer(db, undefined, (id) => { changed.push(id) })
+    const cascadingSyncer = new Syncer(db, undefined, (id) => {
+      changed.push(id)
+    })
     expect(cascadingSyncer.syncFile(filePath, 'claude')).toBe('updated')
 
-    const row = db.prepare(
-      'SELECT id, scan_profile, scan_completed_at FROM sessions WHERE session_uuid = ?',
-    ).get('cascade-session-1') as { id: number; scan_profile: string | null; scan_completed_at: string | null }
+    const row = db
+      .prepare('SELECT id, scan_profile, scan_completed_at FROM sessions WHERE session_uuid = ?')
+      .get('cascade-session-1') as {
+      id: number
+      scan_profile: string | null
+      scan_completed_at: string | null
+    }
     expect(row.scan_profile).toBeNull()
     expect(row.scan_completed_at).toBeNull()
     expect(changed).toEqual([row.id])
@@ -343,11 +356,39 @@ describe('Syncer', () => {
 
     const sessionUuid = 'f41a7803-b075-4b88-8d74-f46a3a06f67d'
     const filePath = join(slugDir, `2026-04-02T09-05-13-662Z_${sessionUuid}.jsonl`)
-    writeFileSync(filePath, [
-      JSON.stringify({ type: 'session', version: 3, id: sessionUuid, timestamp: '2026-04-02T09:05:13.662Z', cwd: '/tmp/pi-project' }),
-      JSON.stringify({ type: 'message', id: 'u1', parentId: null, timestamp: '2026-04-02T09:05:20.000Z', message: { role: 'user', content: [{ type: 'text', text: 'Evaluate the database sharding tradeoffs' }] } }),
-      JSON.stringify({ type: 'message', id: 'a1', parentId: 'u1', timestamp: '2026-04-02T09:05:30.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'Range sharding keeps scans cheap.' }], model: 'claude-opus-4-6' } }),
-    ].join('\n') + '\n')
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          type: 'session',
+          version: 3,
+          id: sessionUuid,
+          timestamp: '2026-04-02T09:05:13.662Z',
+          cwd: '/tmp/pi-project',
+        }),
+        JSON.stringify({
+          type: 'message',
+          id: 'u1',
+          parentId: null,
+          timestamp: '2026-04-02T09:05:20.000Z',
+          message: {
+            role: 'user',
+            content: [{ type: 'text', text: 'Evaluate the database sharding tradeoffs' }],
+          },
+        }),
+        JSON.stringify({
+          type: 'message',
+          id: 'a1',
+          parentId: 'u1',
+          timestamp: '2026-04-02T09:05:30.000Z',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Range sharding keeps scans cheap.' }],
+            model: 'claude-opus-4-6',
+          },
+        }),
+      ].join('\n') + '\n',
+    )
 
     const { getDB, Syncer, searchFragments } = await loadCoreModules()
     const db = getDB()
@@ -363,7 +404,19 @@ describe('Syncer', () => {
       }),
     ])
 
-    appendFileSync(filePath, JSON.stringify({ type: 'message', id: 'u2', parentId: 'a1', timestamp: '2026-04-02T09:06:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'What about resharding hotspots?' }] } }) + '\n')
+    appendFileSync(
+      filePath,
+      JSON.stringify({
+        type: 'message',
+        id: 'u2',
+        parentId: 'a1',
+        timestamp: '2026-04-02T09:06:00.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'What about resharding hotspots?' }],
+        },
+      }) + '\n',
+    )
     touchFile(filePath)
 
     expect(syncer.syncFile(filePath, 'pi')).toBe('updated')
@@ -406,7 +459,8 @@ describe('Syncer', () => {
       agent: 'explore',
     })
 
-    const { getDB, Syncer, searchFragments, getSessionWithMessages, makeOpenCodeSessionFilePath } = await loadCoreModules()
+    const { getDB, Syncer, searchFragments, getSessionWithMessages, makeOpenCodeSessionFilePath } =
+      await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
     const syncer = new Syncer(db)
@@ -417,18 +471,23 @@ describe('Syncer', () => {
 
     const parent = getSessionWithMessages(db, 'ses_parent_1')
     expect(parent?.session.messageCount).toBe(2)
-    expect(parent?.messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        contentText: 'CHILD_ONLY_SUBAGENT_NEEDLE',
-        isSidechain: true,
-      }),
-    ]))
-    expect(db.prepare('SELECT session_uuid FROM sessions ORDER BY session_uuid').all())
-      .toEqual([{ session_uuid: 'ses_parent_1' }])
+    expect(parent?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          contentText: 'CHILD_ONLY_SUBAGENT_NEEDLE',
+          isSidechain: true,
+        }),
+      ]),
+    )
+    expect(db.prepare('SELECT session_uuid FROM sessions ORDER BY session_uuid').all()).toEqual([
+      { session_uuid: 'ses_parent_1' },
+    ])
 
-    const parentRow = db.prepare(
-      'SELECT project_id AS projectId, source_id AS sourceId FROM sessions WHERE session_uuid = ?',
-    ).get('ses_parent_1') as { projectId: number; sourceId: number }
+    const parentRow = db
+      .prepare(
+        'SELECT project_id AS projectId, source_id AS sourceId FROM sessions WHERE session_uuid = ?',
+      )
+      .get('ses_parent_1') as { projectId: number; sourceId: number }
     const staleChildPath = makeOpenCodeSessionFilePath(dbPath, 'ses_child_1')
     db.prepare(`
       INSERT INTO sessions
@@ -439,9 +498,13 @@ describe('Syncer', () => {
               1, 0, '/tmp/opencode-project', 'opencode/gpt-5.4', 'old')
     `).run(parentRow.projectId, parentRow.sourceId, staleChildPath)
 
-    expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeTruthy()
+    expect(
+      db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath),
+    ).toBeTruthy()
     expect(syncer.syncFile(dbPath, 'opencode')).toBe('updated')
-    expect(db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath)).toBeUndefined()
+    expect(
+      db.prepare('SELECT 1 FROM sessions WHERE file_path = ?').get(staleChildPath),
+    ).toBeUndefined()
   })
 
   // ─── Append-only sync (schema v14 follow-up) ────────────────────────
@@ -480,31 +543,39 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'session-search-mask.jsonl')
-    const userRecord = (uuid: string, ts: string, content: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'session-search-mask-session',
-      cwd: '/tmp/test-project',
-      uuid,
-      timestamp: ts,
-      message: { role: 'user', content },
-    })
+    const userRecord = (uuid: string, ts: string, content: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'session-search-mask-session',
+        cwd: '/tmp/test-project',
+        uuid,
+        timestamp: ts,
+        message: { role: 'user', content },
+      })
     const SECRET = 'AKIAIOSFODNN7EXAMPLE'
-    writeFileSync(filePath, [
-      userRecord('m0', '2026-05-01T00:00:00Z', `credential ${SECRET} needs rotation`),
-      userRecord('m1', '2026-05-01T00:01:00Z', 'please continue'),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        userRecord('m0', '2026-05-01T00:00:00Z', `credential ${SECRET} needs rotation`),
+        userRecord('m1', '2026-05-01T00:01:00Z', 'please continue'),
+      ].join('\n'),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
 
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'session-search-mask-session'"
-    ).get() as { id: number }).id
-    const messageId = (db.prepare(
-      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm0'"
-    ).get(sessionId) as { id: number }).id
+    const sessionId = (
+      db
+        .prepare("SELECT id FROM sessions WHERE session_uuid = 'session-search-mask-session'")
+        .get() as { id: number }
+    ).id
+    const messageId = (
+      db
+        .prepare("SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm0'")
+        .get(sessionId) as { id: number }
+    ).id
 
     // Simulate the persisted result of Security Scan purge. Its own unit test
     // verifies that this update is atomic; here the source JSONL deliberately
@@ -520,33 +591,36 @@ describe('Syncer', () => {
     ).run(sessionId)
 
     // A real append at the source (claude session keeps growing).
-    writeFileSync(filePath, [
-      userRecord('m0', '2026-05-01T00:00:00Z', `credential ${SECRET} needs rotation`),
-      userRecord('m1', '2026-05-01T00:01:00Z', 'please continue'),
-      userRecord('m2', '2026-05-01T00:02:00Z', 'a follow-up'),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        userRecord('m0', '2026-05-01T00:00:00Z', `credential ${SECRET} needs rotation`),
+        userRecord('m1', '2026-05-01T00:01:00Z', 'please continue'),
+        userRecord('m2', '2026-05-01T00:02:00Z', 'a follow-up'),
+      ].join('\n'),
+    )
     touchFile(filePath)
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('updated')
 
-    const session = db.prepare(
-      'SELECT title, title_source AS titleSource FROM sessions WHERE id = ?',
-    ).get(sessionId) as { title: string; titleSource: string }
+    const session = db
+      .prepare('SELECT title, title_source AS titleSource FROM sessions WHERE id = ?')
+      .get(sessionId) as { title: string; titleSource: string }
     expect(session).toEqual({
       title: 'credential [redacted: AWS key] needs rotation',
       titleSource: 'security',
     })
 
-    const search = db.prepare(
-      'SELECT title, user_text FROM session_search WHERE session_id = ?'
-    ).get(sessionId) as { title: string; user_text: string }
+    const search = db
+      .prepare('SELECT title, user_text FROM session_search WHERE session_id = ?')
+      .get(sessionId) as { title: string; user_text: string }
     expect(search.title).toBe(session.title)
     expect(search.user_text.includes(SECRET)).toBe(false)
     expect(search.user_text.includes('[redacted: AWS key]')).toBe(true)
 
     for (const table of ['session_search_fts', 'session_search_fts_trigram']) {
-      const ftsHits = db.prepare(
-        `SELECT COUNT(*) AS n FROM ${table} WHERE ${table} MATCH ?`
-      ).get(`"${SECRET}"`) as { n: number }
+      const ftsHits = db
+        .prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${table} MATCH ?`)
+        .get(`"${SECRET}"`) as { n: number }
       expect(ftsHits.n).toBe(0)
     }
   })
@@ -559,14 +633,17 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'purge-survives.jsonl')
-    writeFileSync(filePath, JSON.stringify({
-      type: 'user',
-      sessionId: 'purge-survives-session',
-      cwd: '/tmp/test-project',
-      uuid: 'm1',
-      timestamp: '2026-05-01T00:00:00Z',
-      message: { role: 'user', content: 'leaked: AKIAIOSFODNN7EXAMPLE here' },
-    }))
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'purge-survives-session',
+        cwd: '/tmp/test-project',
+        uuid: 'm1',
+        timestamp: '2026-05-01T00:00:00Z',
+        message: { role: 'user', content: 'leaked: AKIAIOSFODNN7EXAMPLE here' },
+      }),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
@@ -577,12 +654,16 @@ describe('Syncer', () => {
     // Simulate a Security Scan run: a finding lands in the DB and the
     // user purges it. content_text gets the mask, the finding flips
     // to state='purged', scan_profile is filled.
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'purge-survives-session'"
-    ).get() as { id: number }).id
-    const messageId = (db.prepare(
-      'SELECT id FROM messages WHERE session_id = ? ORDER BY id LIMIT 1'
-    ).get(sessionId) as { id: number }).id
+    const sessionId = (
+      db.prepare("SELECT id FROM sessions WHERE session_uuid = 'purge-survives-session'").get() as {
+        id: number
+      }
+    ).id
+    const messageId = (
+      db
+        .prepare('SELECT id FROM messages WHERE session_id = ? ORDER BY id LIMIT 1')
+        .get(sessionId) as { id: number }
+    ).id
     db.prepare(
       `INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state, state_changed_at)
        VALUES (?, ?, 'api-key', 'h-aws', 0.95, 'regex', 8, 28, 'purged', datetime('now'))`,
@@ -599,26 +680,28 @@ describe('Syncer', () => {
     // weaponise into a purge-undo.
     touchFile(filePath)
     const changedIds: number[] = []
-    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    const reSyncer = new Syncer(db, undefined, (id) => {
+      changedIds.push(id)
+    })
     reSyncer.syncFile(filePath, 'claude')
 
     // Purge state must still be there.
-    const finding = db.prepare(
-      'SELECT state FROM findings WHERE session_id = ?'
-    ).get(sessionId) as { state: string } | undefined
+    const finding = db.prepare('SELECT state FROM findings WHERE session_id = ?').get(sessionId) as
+      | { state: string }
+      | undefined
     expect(finding?.state).toBe('purged')
 
     // Masked content must still be there.
-    const msg = db.prepare(
-      'SELECT content_text FROM messages WHERE id = ?'
-    ).get(messageId) as { content_text: string } | undefined
+    const msg = db.prepare('SELECT content_text FROM messages WHERE id = ?').get(messageId) as
+      | { content_text: string }
+      | undefined
     expect(msg?.content_text).toBe('leaked: [redacted: AWS key] here')
 
     // scan_profile must NOT have been cleared — nothing changed, so
     // the scan worker should not be asked to redo the session.
-    const sess = db.prepare(
-      'SELECT scan_profile FROM sessions WHERE id = ?'
-    ).get(sessionId) as { scan_profile: string | null }
+    const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = ?').get(sessionId) as {
+      scan_profile: string | null
+    }
     expect(sess.scan_profile).toBe('regex@3')
 
     // onSessionChanged must not have fired for the no-op re-sync.
@@ -633,35 +716,43 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'append-grows.jsonl')
-    const userRecord = (uuid: string, ts: string, content: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'append-grows-session',
-      cwd: '/tmp/test-project',
-      uuid,
-      timestamp: ts,
-      message: { role: 'user', content },
-    })
-    writeFileSync(filePath, [
-      userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
-      userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
-    ].join('\n'))
+    const userRecord = (uuid: string, ts: string, content: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'append-grows-session',
+        cwd: '/tmp/test-project',
+        uuid,
+        timestamp: ts,
+        message: { role: 'user', content },
+      })
+    writeFileSync(
+      filePath,
+      [
+        userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
+        userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
+      ].join('\n'),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
 
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'append-grows-session'"
-    ).get() as { id: number }).id
+    const sessionId = (
+      db.prepare("SELECT id FROM sessions WHERE session_uuid = 'append-grows-session'").get() as {
+        id: number
+      }
+    ).id
 
     // Stand in for "scan worker has finished": set scan_profile so
     // the cascade is observable. Also park a finding row that should
     // survive (it's tied to m1 by message_id, which append-only sync
     // must not DELETE).
-    const m1Id = (db.prepare(
-      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'"
-    ).get(sessionId) as { id: number }).id
+    const m1Id = (
+      db
+        .prepare("SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'")
+        .get(sessionId) as { id: number }
+    ).id
     db.prepare("UPDATE sessions SET scan_profile = 'regex@3' WHERE id = ?").run(sessionId)
     db.prepare(
       `INSERT INTO findings (session_id, message_id, kind, value_hash, confidence, provider, start_offset, end_offset, state)
@@ -669,39 +760,46 @@ describe('Syncer', () => {
     ).run(sessionId, m1Id)
 
     // Append a third message at the source.
-    writeFileSync(filePath, [
-      userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
-      userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
-      userRecord('m3', '2026-05-01T00:02:00Z', 'third — brand new'),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        userRecord('m1', '2026-05-01T00:00:00Z', 'first message'),
+        userRecord('m2', '2026-05-01T00:01:00Z', 'second message'),
+        userRecord('m3', '2026-05-01T00:02:00Z', 'third — brand new'),
+      ].join('\n'),
+    )
     touchFile(filePath)
 
     const changedIds: number[] = []
-    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    const reSyncer = new Syncer(db, undefined, (id) => {
+      changedIds.push(id)
+    })
     expect(reSyncer.syncFile(filePath, 'claude')).toBe('updated')
 
     // m1 row id stable → finding still pointing at the right row.
-    const m1RowAfter = db.prepare(
-      "SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'"
-    ).get(sessionId) as { id: number }
+    const m1RowAfter = db
+      .prepare("SELECT id FROM messages WHERE session_id = ? AND msg_uuid = 'm1'")
+      .get(sessionId) as { id: number }
     expect(m1RowAfter.id).toBe(m1Id)
 
     // The pre-existing finding survives the re-sync.
-    const finding = db.prepare(
-      'SELECT message_id, state FROM findings WHERE session_id = ?'
-    ).get(sessionId) as { message_id: number; state: string }
+    const finding = db
+      .prepare('SELECT message_id, state FROM findings WHERE session_id = ?')
+      .get(sessionId) as { message_id: number; state: string }
     expect(finding).toEqual({ message_id: m1Id, state: 'active' })
 
     // m3 actually landed.
-    const newCount = (db.prepare(
-      'SELECT COUNT(*) AS c FROM messages WHERE session_id = ?'
-    ).get(sessionId) as { c: number }).c
+    const newCount = (
+      db.prepare('SELECT COUNT(*) AS c FROM messages WHERE session_id = ?').get(sessionId) as {
+        c: number
+      }
+    ).c
     expect(newCount).toBe(3)
 
     // Cascade DID fire — new content arrived.
-    const sess = db.prepare(
-      'SELECT scan_profile FROM sessions WHERE id = ?'
-    ).get(sessionId) as { scan_profile: string | null }
+    const sess = db.prepare('SELECT scan_profile FROM sessions WHERE id = ?').get(sessionId) as {
+      scan_profile: string | null
+    }
     expect(sess.scan_profile).toBeNull()
     expect(changedIds).toEqual([sessionId])
   })
@@ -725,14 +823,15 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'manual-edit.jsonl')
-    const record = (text: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'manual-edit-session',
-      cwd: '/tmp/test-project',
-      uuid: 'u1',
-      timestamp: '2026-05-01T00:00:00Z',
-      message: { role: 'user', content: text },
-    })
+    const record = (text: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'manual-edit-session',
+        cwd: '/tmp/test-project',
+        uuid: 'u1',
+        timestamp: '2026-05-01T00:00:00Z',
+        message: { role: 'user', content: text },
+      })
     writeFileSync(filePath, record('original content'))
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
@@ -743,14 +842,16 @@ describe('Syncer', () => {
     writeFileSync(filePath, record('rewritten content'))
     touchFile(filePath)
     const changedIds: number[] = []
-    const reSyncer = new Syncer(db, undefined, (id) => { changedIds.push(id) })
+    const reSyncer = new Syncer(db, undefined, (id) => {
+      changedIds.push(id)
+    })
     reSyncer.syncFile(filePath, 'claude')
 
     // DB intentionally keeps the original content — INSERT OR IGNORE
     // saw the existing uuid and skipped the new row.
-    const msg = db.prepare(
-      "SELECT content_text FROM messages WHERE msg_uuid = 'u1'"
-    ).get() as { content_text: string }
+    const msg = db.prepare("SELECT content_text FROM messages WHERE msg_uuid = 'u1'").get() as {
+      content_text: string
+    }
     expect(msg.content_text).toBe('original content')
 
     // And no cascade fired — append path with 0 inserted is a no-op.
@@ -771,14 +872,15 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'force-rewrite.jsonl')
-    const record = (uuid: string, ts: string, content: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'force-rewrite-session',
-      cwd: '/tmp/test-project',
-      uuid,
-      timestamp: ts,
-      message: { role: 'user', content },
-    })
+    const record = (uuid: string, ts: string, content: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'force-rewrite-session',
+        cwd: '/tmp/test-project',
+        uuid,
+        timestamp: ts,
+        message: { role: 'user', content },
+      })
     writeFileSync(filePath, record('m1', '2026-05-01T00:00:00Z', 'original'))
 
     const { getDB, Syncer } = await loadCoreModules()
@@ -786,12 +888,14 @@ describe('Syncer', () => {
     openDbs.push(db)
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
 
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'force-rewrite-session'"
-    ).get() as { id: number }).id
-    const m1Id = (db.prepare(
-      "SELECT id FROM messages WHERE session_id = ?"
-    ).get(sessionId) as { id: number }).id
+    const sessionId = (
+      db.prepare("SELECT id FROM sessions WHERE session_uuid = 'force-rewrite-session'").get() as {
+        id: number
+      }
+    ).id
+    const m1Id = (
+      db.prepare('SELECT id FROM messages WHERE session_id = ?').get(sessionId) as { id: number }
+    ).id
 
     // Park scan state + a finding to verify the rewrite cascade
     // actually fires (in append mode with insertedCount=0 it would
@@ -806,19 +910,25 @@ describe('Syncer', () => {
     // append. Confirm that's what would happen WITHOUT the force.
     const baselineChanged: number[] = []
     expect(
-      new Syncer(db, undefined, (id) => { baselineChanged.push(id) })
-        .syncFile(filePath, 'claude'),
+      new Syncer(db, undefined, (id) => {
+        baselineChanged.push(id)
+      }).syncFile(filePath, 'claude'),
     ).toBe('skipped')
     expect(baselineChanged).toEqual([])
-    expect((db.prepare(
-      "SELECT scan_profile FROM sessions WHERE id = ?"
-    ).get(sessionId) as { scan_profile: string | null }).scan_profile).toBe('regex@3')
+    expect(
+      (
+        db.prepare('SELECT scan_profile FROM sessions WHERE id = ?').get(sessionId) as {
+          scan_profile: string | null
+        }
+      ).scan_profile,
+    ).toBe('regex@3')
 
     // Force=rewrite must skip the mtime gate AND run the rewrite
     // path. mtime is identical, classify would say append.
     const forced: number[] = []
-    const forceResult = new Syncer(db, undefined, (id) => { forced.push(id) })
-      .syncFile(filePath, 'claude', undefined, undefined, { forceMode: 'rewrite' })
+    const forceResult = new Syncer(db, undefined, (id) => {
+      forced.push(id)
+    }).syncFile(filePath, 'claude', undefined, undefined, { forceMode: 'rewrite' })
     expect(forceResult).toBe('updated')
     expect(forced).toEqual([sessionId])
 
@@ -827,15 +937,19 @@ describe('Syncer', () => {
     // (SQLite reuses INTEGER PRIMARY KEY rowids on DELETE+INSERT in
     // a single transaction, so the new message id may match the
     // old; the cascade is the meaningful proof, not the rowid.)
-    const cleared = db.prepare(
-      'SELECT COUNT(*) AS c FROM findings WHERE session_id = ?'
-    ).get(sessionId) as { c: number }
+    const cleared = db
+      .prepare('SELECT COUNT(*) AS c FROM findings WHERE session_id = ?')
+      .get(sessionId) as { c: number }
     expect(cleared.c).toBe(0)
 
     // scan_profile must be NULLed so the worker re-scans.
-    expect((db.prepare(
-      "SELECT scan_profile FROM sessions WHERE id = ?"
-    ).get(sessionId) as { scan_profile: string | null }).scan_profile).toBeNull()
+    expect(
+      (
+        db.prepare('SELECT scan_profile FROM sessions WHERE id = ?').get(sessionId) as {
+          scan_profile: string | null
+        }
+      ).scan_profile,
+    ).toBeNull()
   })
 
   it('forceMode does not silently delete a session when its source parse returns filtered', async () => {
@@ -861,47 +975,51 @@ describe('Syncer', () => {
 
     // First sync — a normal gemini session lands in the DB.
     const filePath = join(chatsDir, 'session-1.json')
-    writeFileSync(filePath, JSON.stringify({
-      sessionId: 'force-filtered-session',
-      startTime: '2026-05-01T00:00:00Z',
-      lastUpdated: '2026-05-01T00:00:00Z',
-      messages: [
-        { id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' },
-      ],
-    }))
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        sessionId: 'force-filtered-session',
+        startTime: '2026-05-01T00:00:00Z',
+        lastUpdated: '2026-05-01T00:00:00Z',
+        messages: [{ id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' }],
+      }),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
     expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('added')
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'force-filtered-session'"
-    ).get() as { id: number }).id
+    const sessionId = (
+      db.prepare("SELECT id FROM sessions WHERE session_uuid = 'force-filtered-session'").get() as {
+        id: number
+      }
+    ).id
 
     // Now mutate the source so the parser returns kind: 'filtered'
     // (gemini does this when record.kind === 'subagent'). Without
     // force, the destructive cleanup runs.
-    writeFileSync(filePath, JSON.stringify({
-      sessionId: 'force-filtered-session',
-      kind: 'subagent',
-      startTime: '2026-05-01T00:00:00Z',
-      lastUpdated: '2026-05-01T00:01:00Z',
-      messages: [
-        { id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' },
-      ],
-    }))
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        sessionId: 'force-filtered-session',
+        kind: 'subagent',
+        startTime: '2026-05-01T00:00:00Z',
+        lastUpdated: '2026-05-01T00:01:00Z',
+        messages: [{ id: 'm1', type: 'user', timestamp: '2026-05-01T00:00:00Z', content: 'hi' }],
+      }),
+    )
     touchFile(filePath)
 
     // Force=rewrite must NOT delete the session — that would be the
     // exact regression the self-review caught. The action should
     // be a no-op for unreachable sources and return 'skipped'.
-    const force = new Syncer(db).syncFile(
-      filePath, 'gemini', undefined, undefined, { forceMode: 'rewrite' },
-    )
+    const force = new Syncer(db).syncFile(filePath, 'gemini', undefined, undefined, {
+      forceMode: 'rewrite',
+    })
     expect(force).toBe('skipped')
-    const stillThere = db.prepare(
-      'SELECT COUNT(*) AS c FROM sessions WHERE id = ?'
-    ).get(sessionId) as { c: number }
+    const stillThere = db
+      .prepare('SELECT COUNT(*) AS c FROM sessions WHERE id = ?')
+      .get(sessionId) as { c: number }
     expect(stillThere.c).toBe(1)
   })
 
@@ -913,31 +1031,37 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
 
     const filePath = join(claudeDir, 'rewrite-on-shrink.jsonl')
-    const userRecord = (uuid: string, content: string) => JSON.stringify({
-      type: 'user',
-      sessionId: 'rewrite-on-shrink-session',
-      cwd: '/tmp/test-project',
-      uuid,
-      timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
-      message: { role: 'user', content },
-    })
-    writeFileSync(filePath, [
-      userRecord('m1', 'first'),
-      userRecord('m2', 'second'),
-      userRecord('m3', 'third'),
-    ].join('\n'))
+    const userRecord = (uuid: string, content: string) =>
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'rewrite-on-shrink-session',
+        cwd: '/tmp/test-project',
+        uuid,
+        timestamp: `2026-05-01T00:0${uuid.slice(-1)}:00Z`,
+        message: { role: 'user', content },
+      })
+    writeFileSync(
+      filePath,
+      [userRecord('m1', 'first'), userRecord('m2', 'second'), userRecord('m3', 'third')].join('\n'),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
     expect(new Syncer(db).syncFile(filePath, 'claude')).toBe('added')
 
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'rewrite-on-shrink-session'"
-    ).get() as { id: number }).id
-    expect((db.prepare(
-      'SELECT COUNT(*) AS c FROM messages WHERE session_id = ?'
-    ).get(sessionId) as { c: number }).c).toBe(3)
+    const sessionId = (
+      db
+        .prepare("SELECT id FROM sessions WHERE session_uuid = 'rewrite-on-shrink-session'")
+        .get() as { id: number }
+    ).id
+    expect(
+      (
+        db.prepare('SELECT COUNT(*) AS c FROM messages WHERE session_id = ?').get(sessionId) as {
+          c: number
+        }
+      ).c,
+    ).toBe(3)
 
     // Source loses its tail.
     writeFileSync(filePath, userRecord('m1', 'first'))
@@ -946,10 +1070,10 @@ describe('Syncer', () => {
 
     // Stale m2/m3 are gone (rewrite path ran DELETE+INSERT) and m1
     // remains.
-    const after = db.prepare(
-      'SELECT msg_uuid FROM messages WHERE session_id = ? ORDER BY msg_uuid'
-    ).all(sessionId) as Array<{ msg_uuid: string }>
-    expect(after.map(r => r.msg_uuid)).toEqual(['m1'])
+    const after = db
+      .prepare('SELECT msg_uuid FROM messages WHERE session_id = ? ORDER BY msg_uuid')
+      .all(sessionId) as Array<{ msg_uuid: string }>
+    expect(after.map((r) => r.msg_uuid)).toEqual(['m1'])
   })
 
   it('rewrites a Gemini session when a rewind plus new turns keeps the count from shrinking', async () => {
@@ -967,40 +1091,56 @@ describe('Syncer', () => {
     vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
 
     const filePath = join(chatsDir, 'session-2026-04-08T00-00-rewind.jsonl')
-    const meta = JSON.stringify({ sessionId: 'gemini-rewind-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' })
-    const msg = (id: string, text: string) => JSON.stringify({
-      id,
-      timestamp: '2026-04-08T00:00:00Z',
-      type: 'user',
-      content: [{ text }],
+    const meta = JSON.stringify({
+      sessionId: 'gemini-rewind-session',
+      startTime: '2026-04-08T00:00:00Z',
+      kind: 'main',
     })
-    writeFileSync(filePath, [meta, msg('m1', 'first'), msg('m2', 'second'), msg('m3', 'third')].join('\n'))
+    const msg = (id: string, text: string) =>
+      JSON.stringify({
+        id,
+        timestamp: '2026-04-08T00:00:00Z',
+        type: 'user',
+        content: [{ text }],
+      })
+    writeFileSync(
+      filePath,
+      [meta, msg('m1', 'first'), msg('m2', 'second'), msg('m3', 'third')].join('\n'),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
     openDbs.push(db)
     expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('added')
 
-    const sessionId = (db.prepare(
-      "SELECT id FROM sessions WHERE session_uuid = 'gemini-rewind-session'"
-    ).get() as { id: number }).id
+    const sessionId = (
+      db.prepare("SELECT id FROM sessions WHERE session_uuid = 'gemini-rewind-session'").get() as {
+        id: number
+      }
+    ).id
 
     // User rewinds to m2 and sends two new turns: replay is [m1, m4, m5] —
     // same length as the stored rows, same head, different tail.
-    writeFileSync(filePath, [
-      meta,
-      msg('m1', 'first'), msg('m2', 'second'), msg('m3', 'third'),
-      JSON.stringify({ $rewindTo: 'm2' }),
-      msg('m4', 'new prompt'), msg('m5', 'newer prompt'),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        meta,
+        msg('m1', 'first'),
+        msg('m2', 'second'),
+        msg('m3', 'third'),
+        JSON.stringify({ $rewindTo: 'm2' }),
+        msg('m4', 'new prompt'),
+        msg('m5', 'newer prompt'),
+      ].join('\n'),
+    )
     touchFile(filePath)
     expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('updated')
 
-    const after = db.prepare(
-      'SELECT msg_uuid, seq FROM messages WHERE session_id = ? ORDER BY seq, id'
-    ).all(sessionId) as Array<{ msg_uuid: string; seq: number }>
-    expect(after.map(r => r.msg_uuid)).toEqual(['m1', 'm4', 'm5'])
-    expect(after.map(r => r.seq)).toEqual([0, 1, 2])
+    const after = db
+      .prepare('SELECT msg_uuid, seq FROM messages WHERE session_id = ? ORDER BY seq, id')
+      .all(sessionId) as Array<{ msg_uuid: string; seq: number }>
+    expect(after.map((r) => r.msg_uuid)).toEqual(['m1', 'm4', 'm5'])
+    expect(after.map((r) => r.seq)).toEqual([0, 1, 2])
   })
 
   it('rewrites message rows when the stored index version differs from the current one', async () => {
@@ -1017,10 +1157,22 @@ describe('Syncer', () => {
     vi.stubEnv('GEMINI_CLI_HOME', geminiCliHome)
 
     const filePath = join(chatsDir, 'session-2026-04-08T00-00-version.jsonl')
-    writeFileSync(filePath, [
-      JSON.stringify({ sessionId: 'gemini-version-session', startTime: '2026-04-08T00:00:00Z', kind: 'main' }),
-      JSON.stringify({ id: 'm1', timestamp: '2026-04-08T00:00:00Z', type: 'user', content: [{ text: 'derived from source' }] }),
-    ].join('\n'))
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          sessionId: 'gemini-version-session',
+          startTime: '2026-04-08T00:00:00Z',
+          kind: 'main',
+        }),
+        JSON.stringify({
+          id: 'm1',
+          timestamp: '2026-04-08T00:00:00Z',
+          type: 'user',
+          content: [{ text: 'derived from source' }],
+        }),
+      ].join('\n'),
+    )
 
     const { getDB, Syncer } = await loadCoreModules()
     const db = getDB()
@@ -1030,7 +1182,7 @@ describe('Syncer', () => {
     // Simulate rows indexed under a previous parser version: stale derived
     // content plus the old version suffix in the stored mtime.
     db.prepare(
-      "UPDATE messages SET content_text = 'stale v1 derivation' WHERE msg_uuid = 'm1'"
+      "UPDATE messages SET content_text = 'stale v1 derivation' WHERE msg_uuid = 'm1'",
     ).run()
     db.prepare(
       `UPDATE sessions
@@ -1040,9 +1192,9 @@ describe('Syncer', () => {
 
     // File itself unchanged on disk — only the version suffix differs.
     expect(new Syncer(db).syncFile(filePath, 'gemini')).toBe('updated')
-    const msg = db.prepare(
-      "SELECT content_text FROM messages WHERE msg_uuid = 'm1'"
-    ).get() as { content_text: string }
+    const msg = db.prepare("SELECT content_text FROM messages WHERE msg_uuid = 'm1'").get() as {
+      content_text: string
+    }
     expect(msg.content_text).toBe('derived from source')
   })
 })
@@ -1126,23 +1278,58 @@ function seedOpenCodeSession(
   db.prepare(`
     INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, time_created, time_updated, model, agent)
     VALUES (?, 'proj_1', ?, ?, ?, ?, '1.0.0', ?, ?, 'opencode/gpt-5.4', ?)
-  `).run(input.id, input.parentId ?? null, input.id, input.directory, input.title, created, created + 3000, input.agent ?? 'build')
+  `).run(
+    input.id,
+    input.parentId ?? null,
+    input.id,
+    input.directory,
+    input.title,
+    created,
+    created + 3000,
+    input.agent ?? 'build',
+  )
 
   db.prepare(`
     INSERT INTO message (id, session_id, time_created, time_updated, data)
     VALUES (?, ?, ?, ?, ?)
-  `).run(`${input.id}_user`, input.id, created + 1000, created + 1000, JSON.stringify({ role: 'user' }))
+  `).run(
+    `${input.id}_user`,
+    input.id,
+    created + 1000,
+    created + 1000,
+    JSON.stringify({ role: 'user' }),
+  )
   db.prepare(`
     INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(`${input.id}_user_text`, `${input.id}_user`, input.id, created + 1000, created + 1000, JSON.stringify({ type: 'text', text: input.userText }))
+  `).run(
+    `${input.id}_user_text`,
+    `${input.id}_user`,
+    input.id,
+    created + 1000,
+    created + 1000,
+    JSON.stringify({ type: 'text', text: input.userText }),
+  )
 
   db.prepare(`
     INSERT INTO message (id, session_id, time_created, time_updated, data)
     VALUES (?, ?, ?, ?, ?)
-  `).run(`${input.id}_assistant`, input.id, created + 2000, created + 2000, JSON.stringify({ role: 'assistant' }))
+  `).run(
+    `${input.id}_assistant`,
+    input.id,
+    created + 2000,
+    created + 2000,
+    JSON.stringify({ role: 'assistant' }),
+  )
   db.prepare(`
     INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(`${input.id}_assistant_text`, `${input.id}_assistant`, input.id, created + 2000, created + 2000, JSON.stringify({ type: 'text', text: input.assistantText }))
+  `).run(
+    `${input.id}_assistant_text`,
+    `${input.id}_assistant`,
+    input.id,
+    created + 2000,
+    created + 2000,
+    JSON.stringify({ type: 'text', text: input.assistantText }),
+  )
 }

@@ -1,8 +1,11 @@
 import { lstat, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+
 import { getRawHeader } from '@electron/asar'
 
-const appPath = resolve(process.argv.slice(2).find(arg => !arg.startsWith('-')) ?? 'dist/mac-arm64/Spool.app')
+const appPath = resolve(
+  process.argv.slice(2).find((arg) => !arg.startsWith('-')) ?? 'dist/mac-arm64/Spool.app',
+)
 const json = process.argv.includes('--json')
 const contents = join(appPath, 'Contents')
 const resources = join(contents, 'Resources')
@@ -35,7 +38,10 @@ if (json) {
   console.log(JSON.stringify(report, null, 2))
 } else {
   console.log(`Package size report: ${appPath}`)
-  printEntries('Totals', Object.entries(report.totals).map(([name, bytes]) => ({ name, bytes })))
+  printEntries(
+    'Totals',
+    Object.entries(report.totals).map(([name, bytes]) => ({ name, bytes })),
+  )
   printEntries('Largest frameworks', report.largestFrameworks)
   printEntries('Largest resources', report.largestResources)
   printEntries('Largest packaged modules', report.largestModules)
@@ -64,10 +70,12 @@ function packageName(path) {
 
 async function largestChildren(path, limit) {
   const entries = await readdir(path, { withFileTypes: true })
-  const sizes = await Promise.all(entries.map(async entry => ({
-    name: entry.name,
-    bytes: await sizeOf(join(path, entry.name)),
-  })))
+  const sizes = await Promise.all(
+    entries.map(async (entry) => ({
+      name: entry.name,
+      bytes: await sizeOf(join(path, entry.name)),
+    })),
+  )
   return sizes.sort((a, b) => b.bytes - a.bytes).slice(0, limit)
 }
 
@@ -79,12 +87,16 @@ async function sizeOf(path, seen = new Set()) {
   seen.add(identity)
   if (!info.isDirectory()) return info.size
   const entries = await readdir(path, { withFileTypes: true })
-  return (await Promise.all(entries.map(entry => sizeOf(join(path, entry.name), seen)))).reduce((sum, size) => sum + size, 0)
+  return (await Promise.all(entries.map((entry) => sizeOf(join(path, entry.name), seen)))).reduce(
+    (sum, size) => sum + size,
+    0,
+  )
 }
 
 function printEntries(title, entries) {
   console.log(`\n${title}`)
-  for (const entry of entries) console.log(`${formatBytes(entry.bytes).padStart(10)}  ${entry.name}`)
+  for (const entry of entries)
+    console.log(`${formatBytes(entry.bytes).padStart(10)}  ${entry.name}`)
 }
 
 function formatBytes(bytes) {

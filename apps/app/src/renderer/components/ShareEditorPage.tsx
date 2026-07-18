@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
-import { flushSync } from 'react-dom'
-import { Download, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import type { ShareDraftSourceKind } from '@spool-lab/core'
+import type { PublishedShareCacheItem } from '@spool-lab/core'
 import {
   TEMPLATE_RATIO,
   buildSpoolDocument,
@@ -16,21 +13,25 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
-import type { ShareDraftSourceKind } from '@spool-lab/core'
-import PageLayout from './PageLayout.js'
-import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
-import { ControlPanel } from './share-editor/ControlPanel.js'
-import { ShareMenu } from './share-editor/ShareMenu.js'
-import type { PublishedShareCacheItem } from '@spool-lab/core'
-import { computePublishIdempotencyKey } from '../lib/publishIdempotency.js'
-import { buildSnapshotFromEditor } from './share-editor/snapshot-adapter.js'
-import Menu from './Menu.js'
 import { buildPreviewDocument } from '@spool/share-kit'
-import { useUndoableState } from '../hooks/useUndoableState.js'
+import { Download, MoreHorizontal, PanelRight, Pencil, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+
+import type { PublishedRow, PublishSuccess, Visibility } from '../../shared/share-publish.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useSharedDebounce } from '../hooks/useSharedDebounce.js'
+import { useUndoableState } from '../hooks/useUndoableState.js'
+import { computePublishIdempotencyKey } from '../lib/publishIdempotency.js'
 import { sharePublicUrl } from '../lib/sharePublicUrl.js'
-import type { PublishedRow, PublishSuccess, Visibility } from '../../shared/share-publish.js'
+import Menu from './Menu.js'
+import PageLayout from './PageLayout.js'
+import { ControlPanel } from './share-editor/ControlPanel.js'
+import { PreviewPane, type Zoom } from './share-editor/PreviewPane.js'
+import { ShareMenu } from './share-editor/ShareMenu.js'
+import { buildSnapshotFromEditor } from './share-editor/snapshot-adapter.js'
 
 type Props = {
   /** Stable id of the share_drafts row to autosave into. */
@@ -91,11 +92,11 @@ export default function ShareEditorPage({
   const opts = editable.state.opts
   const title = editable.state.title
   const setOpts = useCallback(
-    (next: EditorOpts) => editable.set(prev => ({ ...prev, opts: next })),
+    (next: EditorOpts) => editable.set((prev) => ({ ...prev, opts: next })),
     [editable],
   )
   const setTitle = useCallback(
-    (next: string) => editable.set(prev => ({ ...prev, title: next })),
+    (next: string) => editable.set((prev) => ({ ...prev, title: next })),
     [editable],
   )
 
@@ -130,7 +131,9 @@ export default function ShareEditorPage({
   // edits badge). Carrying it through as the single state value keeps
   // those three in lockstep — instead of three separate values that
   // can drift on a partial update.
-  const [publishedRow, setPublishedRow] = useState<PublishedShareCacheItem | null | undefined>(undefined)
+  const [publishedRow, setPublishedRow] = useState<PublishedShareCacheItem | null | undefined>(
+    undefined,
+  )
   const mutationGen = useRef(0)
 
   // Derived: PublishSuccess shape for the manage view; null when no live row.
@@ -144,34 +147,37 @@ export default function ShareEditorPage({
     }
   }, [publishedRow])
 
-  const handlePublishedChange = useCallback((next: PublishSuccess | null, row?: PublishedRow) => {
-    mutationGen.current += 1
-    if (!next) {
-      setPublishedRow(null)
-      return
-    }
-    // Main hands us the freshly-written cache row inside the publish
-    // IPC response, so we can update local state without going through
-    // the cache. Bypasses the race where an in-flight myShares poll's
-    // `replaceAll` would clobber main's write between our publish and
-    // our re-read — the manage view would flash the new version then
-    // revert to the old one. If the caller didn't supply a row (an
-    // older path or a test mock), fall back to a cache re-read.
-    if (row) {
-      setPublishedRow(row)
-      return
-    }
-    const localGen = mutationGen.current
-    void (async () => {
-      try {
-        const cached = await window.spoolShare.getPublishedByDraft(draftId)
-        if (mutationGen.current !== localGen) return
-        if (cached && cached.revoked_at === null) setPublishedRow(cached)
-      } catch (err) {
-        console.warn('Refresh published row from cache after publish failed:', err)
+  const handlePublishedChange = useCallback(
+    (next: PublishSuccess | null, row?: PublishedRow) => {
+      mutationGen.current += 1
+      if (!next) {
+        setPublishedRow(null)
+        return
       }
-    })()
-  }, [draftId])
+      // Main hands us the freshly-written cache row inside the publish
+      // IPC response, so we can update local state without going through
+      // the cache. Bypasses the race where an in-flight myShares poll's
+      // `replaceAll` would clobber main's write between our publish and
+      // our re-read — the manage view would flash the new version then
+      // revert to the old one. If the caller didn't supply a row (an
+      // older path or a test mock), fall back to a cache re-read.
+      if (row) {
+        setPublishedRow(row)
+        return
+      }
+      const localGen = mutationGen.current
+      void (async () => {
+        try {
+          const cached = await window.spoolShare.getPublishedByDraft(draftId)
+          if (mutationGen.current !== localGen) return
+          if (cached && cached.revoked_at === null) setPublishedRow(cached)
+        } catch (err) {
+          console.warn('Refresh published row from cache after publish failed:', err)
+        }
+      })()
+    },
+    [draftId],
+  )
 
   useEffect(() => {
     let alive = true
@@ -230,14 +236,16 @@ export default function ShareEditorPage({
         if (mutationGen.current !== fetchGen) return
         // Only restate when meaningful state changed; avoids re-renders
         // when SWR confirms the same row we already had.
-        setPublishedRow((curr) => publishedRowEqual(curr, refreshed) ? curr : refreshed)
+        setPublishedRow((curr) => (publishedRowEqual(curr, refreshed) ? curr : refreshed))
       } catch {
         // myShares fails when the user is signed out (401), offline, or
         // the share backend is down. The cache result from step 1 is
         // already on screen and stays good — silently drop the SWR.
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [draftId])
   // Draft title state lives in `editable.state.title` above; the rename
   // modal still uses `title` / `setTitle` directly. Empty strings persist
@@ -272,11 +280,14 @@ export default function ShareEditorPage({
   // (Settings, etc.) can swallow them, and so editing a text input — like the
   // rename modal's title field — falls through to the browser's native undo
   // instead of triggering the editor's state undo.
-  useHotkeys({
-    'mod+z': () => editableUndoRef.current(),
-    'mod+shift+z': () => editableRedoRef.current(),
-    'mod+y': () => editableRedoRef.current(),
-  }, { skipInEditable: true })
+  useHotkeys(
+    {
+      'mod+z': () => editableUndoRef.current(),
+      'mod+shift+z': () => editableRedoRef.current(),
+      'mod+y': () => editableRedoRef.current(),
+    },
+    { skipInEditable: true },
+  )
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   // The "live" conversation passed to the preview, exporters, and the
@@ -316,11 +327,7 @@ export default function ShareEditorPage({
 
   const [hasUnpublishedEdits, setHasUnpublishedEdits] = useState(false)
   useEffect(() => {
-    if (
-      !publishedRow ||
-      publishedRow.revoked_at !== null ||
-      !publishedRow.client_request_id
-    ) {
+    if (!publishedRow || publishedRow.revoked_at !== null || !publishedRow.client_request_id) {
       setHasUnpublishedEdits(false)
       return
     }
@@ -398,9 +405,9 @@ export default function ShareEditorPage({
       snapshot_json: JSON.stringify(doc),
       preview_json: JSON.stringify(buildPreviewDocument(doc)),
     }
-    void window.spool?.shareDraft?.upsert(payload).catch((err) =>
-      console.error('Flush share draft autosave failed:', err),
-    )
+    void window.spool?.shareDraft
+      ?.upsert(payload)
+      .catch((err) => console.error('Flush share draft autosave failed:', err))
   }, [])
 
   useEffect(() => {
@@ -409,7 +416,12 @@ export default function ShareEditorPage({
       return
     }
     pendingInputsRef.current = {
-      draftId, sourceKind, sourceOrigin, effectiveTitle, liveConversation, opts,
+      draftId,
+      sourceKind,
+      sourceOrigin,
+      effectiveTitle,
+      liveConversation,
+      opts,
     }
     // Scheduled on the shared follow-up window (see `followUps` above).
     // Re-scheduling on each edit replaces the pending callback, so only
@@ -418,7 +430,16 @@ export default function ShareEditorPage({
     // flushPendingSave returns a no-op when it reads the ref. The
     // unmount flush below is independent of this timer.
     followUps.schedule('autosave', flushPendingSave)
-  }, [opts, liveConversation, draftId, sourceKind, sourceOrigin, effectiveTitle, flushPendingSave, followUps])
+  }, [
+    opts,
+    liveConversation,
+    draftId,
+    sourceKind,
+    sourceOrigin,
+    effectiveTitle,
+    flushPendingSave,
+    followUps,
+  ])
 
   // Flush the pending autosave on component unmount — user clicked
   // Back, navigated away, or the editor was replaced by another view.
@@ -473,7 +494,9 @@ export default function ShareEditorPage({
       // Timed out — the capture proceeds with whatever is committed.
       // Loud breadcrumb so a truncated export is diagnosable instead of
       // silently indistinguishable from success.
-      console.warn('Preview did not reach render-complete within 10s; exporting the committed state.')
+      console.warn(
+        'Preview did not reach render-complete within 10s; exporting the committed state.',
+      )
     }
   }, [])
 
@@ -491,7 +514,9 @@ export default function ShareEditorPage({
     // and the user keeps a clean directory.
     const CANVAS_MAX_AXIS = 16384
     if (Math.max(width, height) > CANVAS_MAX_AXIS) {
-      toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.conversationTooTall') })
+      toast.error(t('shareEditor.couldntExportPng'), {
+        description: t('shareEditor.conversationTooTall'),
+      })
       return
     }
     // PRE-PICK on the live user gesture, before any async work. If we
@@ -534,7 +559,9 @@ export default function ShareEditorPage({
         }
       }
       if (err instanceof PngTooTallError) {
-        toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.conversationTooTall') })
+        toast.error(t('shareEditor.couldntExportPng'), {
+          description: t('shareEditor.conversationTooTall'),
+        })
       } else {
         toast.error(t('shareEditor.couldntExportPng'), { description: t('shareEditor.seeConsole') })
       }
@@ -657,25 +684,31 @@ export default function ShareEditorPage({
   // drag handle — interactive elements must opt out individually.
   const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
   const topBarContent = (
-    <div className="flex-1 min-w-0 flex items-center gap-2 px-3">
+    <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
       <button
         type="button"
         data-testid="share-editor-back"
         onClick={onBack}
         aria-label={t('common.back')}
         title={t('common.back')}
-        className="flex-none flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text flex h-5 w-5 flex-none items-center justify-center rounded transition-colors"
         style={noDragStyle}
       >
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M8 3L4 6.5L8 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          <path
+            d="M8 3L4 6.5L8 10"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
-      <div className="min-w-0 flex items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5">
         <h1
           data-testid="share-editor-title"
           title={title.trim() || t('common.untitled')}
-          className="min-w-0 text-[13px] font-medium text-warm-text dark:text-dark-text truncate"
+          className="text-warm-text dark:text-dark-text min-w-0 truncate text-[13px] font-medium"
         >
           {title.trim() || t('common.untitled')}
         </h1>
@@ -688,7 +721,7 @@ export default function ShareEditorPage({
               onClick={toggle}
               aria-label={t('shareEditor.moreOptions')}
               title={t('shareEditor.moreOptions')}
-              className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+              className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 flex-none items-center justify-center rounded transition-colors"
               style={noDragStyle}
             >
               <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
@@ -730,7 +763,7 @@ export default function ShareEditorPage({
         title={panelOpen ? t('shareEditor.hidePanel') : t('shareEditor.showPanel')}
         aria-label={panelOpen ? t('shareEditor.hidePanel') : t('shareEditor.showPanel')}
         aria-pressed={panelOpen}
-        className="flex-none inline-flex items-center justify-center w-5 h-5 rounded text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 flex-none items-center justify-center rounded transition-colors"
         style={noDragStyle}
       >
         <PanelRight size={13} strokeWidth={1.75} />
@@ -748,33 +781,39 @@ export default function ShareEditorPage({
       rightPanel={<ControlPanel convo={liveConversation} opts={opts} setOpts={setOpts} />}
       rightPanelOpen={panelOpen}
     >
-      <div className="flex flex-col h-full" data-testid="share-editor-page">
+      <div className="flex h-full flex-col" data-testid="share-editor-page">
         {pdfPreview && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             onClick={() => setPdfPreview(null)}
           >
             <div
-              className="w-[80vw] max-w-[820px] h-[88vh] flex flex-col rounded-lg bg-warm-bg dark:bg-dark-bg shadow-2xl overflow-hidden"
+              className="bg-warm-bg dark:bg-dark-bg flex h-[88vh] w-[80vw] max-w-[820px] flex-col overflow-hidden rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex-none flex items-center gap-3 px-4 py-2.5 border-b border-warm-border dark:border-dark-border">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-warm-text dark:text-dark-text truncate">{pdfPreview.filename}</p>
-                  <p className="text-[10.5px] text-warm-faint dark:text-dark-muted">{t('shareEditor.pdfPreviewHint')}</p>
+              <div className="border-warm-border dark:border-dark-border flex flex-none items-center gap-3 border-b px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-warm-text dark:text-dark-text truncate text-[12px] font-medium">
+                    {pdfPreview.filename}
+                  </p>
+                  <p className="text-warm-faint dark:text-dark-muted text-[10.5px]">
+                    {t('shareEditor.pdfPreviewHint')}
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setPdfPreview(null)}
-                  className="h-7 px-2.5 rounded-md text-[12px] text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors"
+                  className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface dark:hover:bg-dark-surface h-7 rounded-md px-2.5 text-[12px] transition-colors"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   data-testid="pdf-preview-save"
-                  onClick={() => { void savePdfFromPreview() }}
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    void savePdfFromPreview()
+                  }}
+                  className="bg-accent dark:bg-accent-dark inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
                 >
                   <Download size={12} strokeWidth={1.8} />
                   {t('shareEditor.savePdf')}
@@ -789,13 +828,13 @@ export default function ShareEditorPage({
               <iframe
                 src={pdfPreview.url}
                 title={t('shareEditor.pdfPreviewTitle')}
-                className="flex-1 w-full border-0 bg-white"
+                className="w-full flex-1 border-0 bg-white"
               />
             </div>
           </div>
         )}
 
-        <div className="flex-1 min-h-0 flex">
+        <div className="flex min-h-0 flex-1">
           <PreviewPane
             ref={previewRef}
             convo={liveConversation}
@@ -891,18 +930,23 @@ function RenameDraftModal({
       aria-modal="true"
       aria-labelledby="rename-draft-title"
       data-testid="rename-draft-modal"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[20vh] animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      className="bg-warm-bg/60 dark:bg-dark-bg/70 animate-in fade-in fixed inset-0 z-50 flex items-start justify-center px-4 pt-[20vh] backdrop-blur-sm duration-150"
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+        className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg flex w-full max-w-[440px] flex-col overflow-hidden rounded-[10px] border shadow-xl"
       >
         <div className="px-5 pt-5 pb-4">
-          <h2 id="rename-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
+          <h2
+            id="rename-draft-title"
+            className="text-warm-text dark:text-dark-text text-base font-semibold"
+          >
             {t('shareEditor.renameDraft')}
           </h2>
-          <p className="mt-1 text-xs text-warm-faint dark:text-dark-muted">
+          <p className="text-warm-faint dark:text-dark-muted mt-1 text-xs">
             {t('shareEditor.renameDraft_subtitle')}
           </p>
         </div>
@@ -920,14 +964,14 @@ function RenameDraftModal({
             }}
             aria-label={t('shareEditor.renameDraft_inputAria')}
             data-testid="rename-draft-input"
-            className="w-full h-9 px-3 rounded border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-sm text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted focus:outline-none focus:ring-1 focus:ring-warm-border2 dark:focus:ring-dark-border2"
+            className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text placeholder:text-warm-faint dark:placeholder:text-dark-muted focus:ring-warm-border2 dark:focus:ring-dark-border2 h-9 w-full rounded border px-3 text-sm focus:ring-1 focus:outline-none"
           />
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-5">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface focus-visible:ring-accent h-8 rounded-[6px] px-3.5 text-[12px] font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
           >
             Cancel
           </button>
@@ -935,7 +979,7 @@ function RenameDraftModal({
             type="button"
             onClick={commit}
             data-testid="rename-draft-save"
-            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="bg-accent dark:bg-accent-dark focus-visible:ring-accent/40 h-8 rounded-[6px] px-3.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
           >
             {t('common.save')}
           </button>
@@ -987,18 +1031,23 @@ function DeleteDraftModal({
       aria-modal="true"
       aria-labelledby="delete-draft-title"
       data-testid="delete-draft-modal"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-warm-bg/60 dark:bg-dark-bg/70 backdrop-blur-sm px-4 pt-[20vh] animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      className="bg-warm-bg/60 dark:bg-dark-bg/70 animate-in fade-in fixed inset-0 z-50 flex items-start justify-center px-4 pt-[20vh] backdrop-blur-sm duration-150"
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] rounded-[10px] border border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg shadow-xl flex flex-col overflow-hidden"
+        className="border-warm-border dark:border-dark-border bg-warm-bg dark:bg-dark-bg flex w-full max-w-[440px] flex-col overflow-hidden rounded-[10px] border shadow-xl"
       >
         <div className="px-5 pt-5 pb-4">
-          <h2 id="delete-draft-title" className="text-base font-semibold text-warm-text dark:text-dark-text">
+          <h2
+            id="delete-draft-title"
+            className="text-warm-text dark:text-dark-text text-base font-semibold"
+          >
             {t('shareEditor.deleteDraft_confirm')}
           </h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-warm-muted dark:text-dark-muted">
+          <p className="text-warm-muted dark:text-dark-muted mt-2 text-[13px] leading-relaxed">
             {t('shareEditor.deleteDraft_body', { title })}
           </p>
         </div>
@@ -1006,7 +1055,7 @@ function DeleteDraftModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface dark:hover:bg-dark-surface focus-visible:ring-accent h-8 rounded-[6px] px-3.5 text-[12px] font-medium transition-colors focus-visible:ring-1 focus-visible:outline-none"
           >
             Cancel
           </button>
@@ -1014,14 +1063,16 @@ function DeleteDraftModal({
             ref={deleteRef}
             type="button"
             data-testid="delete-draft-confirm"
-            onClick={() => { void onConfirm() }}
+            onClick={() => {
+              void onConfirm()
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
                 void onConfirm()
               }
             }}
-            className="px-3.5 h-8 rounded-[6px] text-[12px] font-medium text-white bg-[color:var(--color-status-error)] dark:bg-[color:var(--color-status-error-dark)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-status-error)]/40"
+            className="h-8 rounded-[6px] bg-[color:var(--color-status-error)] px-3.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[color:var(--color-status-error)]/40 focus-visible:outline-none dark:bg-[color:var(--color-status-error-dark)]"
           >
             {t('shareEditor.deleteConfirmBtn')}
           </button>

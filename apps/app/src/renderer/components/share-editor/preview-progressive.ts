@@ -4,10 +4,7 @@
 // to the scheduling/clamp semantics can't drift between surfaces. This
 // module only pins the editor-tuned constants.
 
-import {
-  useProgressiveTurns,
-  nextReaderCount,
-} from '@spool/share-kit/progressive'
+import { useProgressiveTurns, nextReaderCount } from '@spool/share-kit/progressive'
 
 /** First progressive chunk. Must stay comfortably above the e2e
  *  fixtures' turn counts so small documents render whole on the first

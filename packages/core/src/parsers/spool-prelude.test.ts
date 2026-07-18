@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
+
 import { stripSpoolSystemPrelude, wrapSpoolSystemPrelude } from './spool-prelude.js'
 
 describe('wrapSpoolSystemPrelude', () => {
@@ -8,14 +9,18 @@ describe('wrapSpoolSystemPrelude', () => {
   })
 
   it('round-trips through stripSpoolSystemPrelude to leave only the query', () => {
-    const out = wrapSpoolSystemPrelude('a long system instruction\nwith newlines', 'what did I do today?')
+    const out = wrapSpoolSystemPrelude(
+      'a long system instruction\nwith newlines',
+      'what did I do today?',
+    )
     expect(stripSpoolSystemPrelude(out)).toBe('what did I do today?')
   })
 })
 
 describe('stripSpoolSystemPrelude', () => {
   it('removes the prelude block and surrounding whitespace', () => {
-    const input = '<spool-system-prelude>\ninstructions here\n</spool-system-prelude>\n\nactual query'
+    const input =
+      '<spool-system-prelude>\ninstructions here\n</spool-system-prelude>\n\nactual query'
     expect(stripSpoolSystemPrelude(input)).toBe('actual query')
   })
 
@@ -35,12 +40,15 @@ q`
   })
 
   it('handles multiple blocks (defensive — should never happen in practice)', () => {
-    const input = '<spool-system-prelude>a</spool-system-prelude>\n<spool-system-prelude>b</spool-system-prelude>\nq'
+    const input =
+      '<spool-system-prelude>a</spool-system-prelude>\n<spool-system-prelude>b</spool-system-prelude>\nq'
     expect(stripSpoolSystemPrelude(input)).toBe('q')
   })
 
   it('leaves an unterminated marker intact', () => {
-    expect(stripSpoolSystemPrelude('<spool-system-prelude>no close tag')).toBe('<spool-system-prelude>no close tag')
+    expect(stripSpoolSystemPrelude('<spool-system-prelude>no close tag')).toBe(
+      '<spool-system-prelude>no close tag',
+    )
   })
 
   it('stays fast on many unterminated open markers (no quadratic backtracking)', () => {

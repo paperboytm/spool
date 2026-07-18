@@ -61,8 +61,7 @@ export const onRequestPatch: PagesFunction<Env> = async (ctx) => {
     // fixed set above (not user input) so concatenation is safe.
     const set = updates.map((u) => `${u.col}=?`).join(', ')
     const values = updates.map((u) => u.val)
-    await ctx.env.DB
-      .prepare(`UPDATE users SET ${set} WHERE id=?`)
+    await ctx.env.DB.prepare(`UPDATE users SET ${set} WHERE id=?`)
       .bind(...values, user.id)
       .run()
 

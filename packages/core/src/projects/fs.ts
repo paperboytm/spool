@@ -1,11 +1,16 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+
 import type { IdentityFs } from './identity.js'
 
 export const realFs: IdentityFs = {
   exists: existsSync,
   readText: (p) => {
-    try { return readFileSync(p, 'utf8') } catch { return null }
+    try {
+      return readFileSync(p, 'utf8')
+    } catch {
+      return null
+    }
   },
   spawn: (cmd, args, opts) => {
     // 5s timeout: a hung `git config` (e.g. ssh-agent passphrase prompt,

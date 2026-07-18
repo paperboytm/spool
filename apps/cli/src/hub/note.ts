@@ -25,11 +25,18 @@ export function buildNotePrefill(opts: {
     `Diffstat: ${view.diffstat.files} files +${view.diffstat.adds} -${view.diffstat.dels}`,
   ]
   if (view.files.length > 0) {
-    lines.push(`Files: ${view.files.slice(0, 8).map((file) => file.path).join(', ')}${view.files.length > 8 ? ', …' : ''}`)
+    lines.push(
+      `Files: ${view.files
+        .slice(0, 8)
+        .map((file) => file.path)
+        .join(', ')}${view.files.length > 8 ? ', …' : ''}`,
+    )
   }
   if (card) {
     const dirty = card.dirty.length > 0 ? `, ${card.dirty.length} dirty file(s)` : ''
-    lines.push(`Workspace: ${card.branch ?? '(detached)'} @ ${card.head?.slice(0, 7) ?? '?'}${dirty}`)
+    lines.push(
+      `Workspace: ${card.branch ?? '(detached)'} @ ${card.head?.slice(0, 7) ?? '?'}${dirty}`,
+    )
   }
   return lines.join('\n')
 }

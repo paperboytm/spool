@@ -1,12 +1,13 @@
+import type { Conversation, EditorOpts } from '@spool/share-kit'
+import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown } from 'lucide-react'
-import type { Conversation, EditorOpts } from '@spool/share-kit'
-import { useHotkeys } from '../../hooks/useHotkeys.js'
-import { useSharePublish } from '../../featureFlags.js'
+
 import type { PublishedRow, PublishSuccess } from '../../../shared/share-publish.js'
-import { PublishTab, PublishTabSkeleton } from './share-tabs/PublishTab.js'
+import { useSharePublish } from '../../featureFlags.js'
+import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { ExportTab, type ExportFormat } from './share-tabs/ExportTab.js'
+import { PublishTab, PublishTabSkeleton } from './share-tabs/PublishTab.js'
 import { UnpublishConfirmModal } from './UnpublishConfirmModal.js'
 
 type ShareTab = 'publish' | 'export'
@@ -197,7 +198,7 @@ export function ShareMenu({
         onClick={() => (open ? closePopover() : openPopover())}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[13px] font-medium text-white bg-accent dark:bg-accent-dark hover:opacity-90 transition-opacity"
+        className="bg-accent dark:bg-accent-dark inline-flex h-6 items-center gap-1.5 rounded px-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
       >
         <span>{t('shareEditor.shareMenu.trigger')}</span>
         <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
@@ -208,7 +209,7 @@ export function ShareMenu({
           role="dialog"
           aria-label={t('shareEditor.shareMenu.popover_aria')}
           data-testid="share-menu-popover"
-          className="absolute right-0 top-full mt-1.5 w-[380px] rounded-[10px] bg-warm-bg dark:bg-dark-bg border border-warm-border dark:border-dark-border shadow-xl z-20 flex flex-col overflow-hidden"
+          className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border absolute top-full right-0 z-20 mt-1.5 flex w-[380px] flex-col overflow-hidden rounded-[10px] border shadow-xl"
         >
           {/* Tab strip — pill-style. Active tab gets a white card
               background; inactive tabs are flat muted text. Hidden
@@ -218,7 +219,7 @@ export function ShareMenu({
             <div
               role="tablist"
               aria-label={t('shareEditor.shareMenu.tablist_aria')}
-              className="m-3 p-1 flex gap-1 rounded-md bg-warm-surface dark:bg-dark-surface"
+              className="bg-warm-surface dark:bg-dark-surface m-3 flex gap-1 rounded-md p-1"
             >
               {(['publish', 'export'] as const).map((id) => {
                 const active = tab === id
@@ -236,9 +237,9 @@ export function ShareMenu({
                     // browser's default dark focus ring (the black
                     // flash the user was seeing); focus-visible adds a
                     // soft accent ring for keyboard users.
-                    className={`flex-1 h-7 rounded text-[12px] font-medium transition-colors border focus:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:focus-visible:ring-accent-dark ${
+                    className={`focus-visible:ring-accent dark:focus-visible:ring-accent-dark h-7 flex-1 rounded border text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-1 ${
                       active
-                        ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text shadow-[0_1px_2px_rgba(0,0,0,0.04)] border-warm-border/60 dark:border-dark-border/60'
+                        ? 'bg-warm-bg dark:bg-dark-bg text-warm-text dark:text-dark-text border-warm-border/60 dark:border-dark-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
                         : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text border-transparent'
                     }`}
                   >
@@ -292,7 +293,9 @@ export function ShareMenu({
             setConfirmingUnpublish(false)
             setPendingUnpublish(null)
           }}
-          onConfirm={() => { void confirmUnpublish() }}
+          onConfirm={() => {
+            void confirmUnpublish()
+          }}
         />
       )}
     </div>

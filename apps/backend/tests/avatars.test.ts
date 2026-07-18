@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequestGet as avatarGet } from '../functions/api/avatars/[id]'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeR2 } from './_helpers/fakes'
 
@@ -43,12 +42,9 @@ describe('GET /api/avatars/:user_id', () => {
       httpMetadata: { contentType: 'image/png' },
     })
 
-    const res = await invoke(
-      avatarGet,
-      new Request('https://x/api/avatars/user-123abc'),
-      env,
-      { id: 'user-123abc' },
-    )
+    const res = await invoke(avatarGet, new Request('https://x/api/avatars/user-123abc'), env, {
+      id: 'user-123abc',
+    })
 
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('image/png')
@@ -59,12 +55,9 @@ describe('GET /api/avatars/:user_id', () => {
     const env = envFor()
     seedUserWithAvatar(env, { customId: null })
 
-    const res = await invoke(
-      avatarGet,
-      new Request('https://x/api/avatars/user-123abc'),
-      env,
-      { id: 'user-123abc' },
-    )
+    const res = await invoke(avatarGet, new Request('https://x/api/avatars/user-123abc'), env, {
+      id: 'user-123abc',
+    })
     expect(res.status).toBe(404)
   })
 
@@ -78,12 +71,9 @@ describe('GET /api/avatars/:user_id', () => {
       httpMetadata: { contentType: 'image/png' },
     })
 
-    const res = await invoke(
-      avatarGet,
-      new Request('https://x/api/avatars/user-123abc'),
-      env,
-      { id: 'user-123abc' },
-    )
+    const res = await invoke(avatarGet, new Request('https://x/api/avatars/user-123abc'), env, {
+      id: 'user-123abc',
+    })
     expect(res.status).toBe(404)
   })
 

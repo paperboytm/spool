@@ -8,8 +8,8 @@
  *
  * No preflight on purpose: share-web owns its own reset. */
 
-@import "tailwindcss/theme.css";
-@import "tailwindcss/utilities.css";
+@import 'tailwindcss/theme.css';
+@import 'tailwindcss/utilities.css';
 
 @custom-variant dark (&:where(html[data-theme="dark"], html[data-theme="dark"] *));
 
@@ -20,24 +20,24 @@
    * Only the tokens these components reference. If the app palette
    * changes, change it here too (single-source extraction is a later
    * refactor). */
-  --color-warm-bg: #FAFAF8;
-  --color-warm-surface: #F4F4F0;
-  --color-warm-surface2: #EEEEE9;
-  --color-warm-border: #E8E8E2;
-  --color-warm-border2: #D8D8D0;
-  --color-warm-text: #1C1C18;
-  --color-warm-muted: #6B6B60;
-  --color-warm-faint: #ADADAA;
-  --color-accent: #C85A00;
+  --color-warm-bg: #fafaf8;
+  --color-warm-surface: #f4f4f0;
+  --color-warm-surface2: #eeeee9;
+  --color-warm-border: #e8e8e2;
+  --color-warm-border2: #d8d8d0;
+  --color-warm-text: #1c1c18;
+  --color-warm-muted: #6b6b60;
+  --color-warm-faint: #adadaa;
+  --color-accent: #c85a00;
   --color-dark-bg: #141410;
-  --color-dark-surface: #1C1C18;
+  --color-dark-surface: #1c1c18;
   --color-dark-surface2: #242420;
-  --color-dark-border: #2E2E28;
-  --color-dark-border2: #3A3A34;
-  --color-dark-text: #F2F2EC;
-  --color-dark-muted: #9A9A8E;
+  --color-dark-border: #2e2e28;
+  --color-dark-border2: #3a3a34;
+  --color-dark-text: #f2f2ec;
+  --color-dark-muted: #9a9a8e;
   --color-dark-faint: #505048;
-  --color-accent-dark: #F07020;
+  --color-accent-dark: #f07020;
 }
 
 /* Scrollbar plumbing the components rely on (mirrors the app's). */
@@ -46,7 +46,7 @@
   --spool-scrollbar-thumb-hover: rgba(0, 0, 0, 0.16);
 }
 
-html[data-theme="dark"] {
+html[data-theme='dark'] {
   --spool-scrollbar-thumb: rgba(255, 255, 255, 0.1);
   --spool-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
 }

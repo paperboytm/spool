@@ -9,15 +9,15 @@
 
 ## What shipped
 
-| PR | Change |
-|----|--------|
-| [#412](https://github.com/spool-lab/spool/pull/412) | Typecheck across all 9 workspace packages; root `typecheck`/`check` tasks wired into PR CI |
-| [#413](https://github.com/spool-lab/spool/pull/413) | ESLint → oxlint with exact rule parity (main-process sync `child_process` ban preserved) |
-| [#414](https://github.com/spool-lab/spool/pull/414) | TypeScript 7 (native compiler) + type-aware lint; typechecks ~7.5× faster |
-| [#415](https://github.com/spool-lab/spool/pull/415) | Build/package/native-ABI split: `pnpm build` only compiles, `package:*` wraps electron-builder in an ABI flip/restore, app builds are turbo-cached |
-| [#416](https://github.com/spool-lab/spool/pull/416) | Preview search on FTS5 prefix/trigram indexes (single-digit-ms p95 on a 393 MB index, from 100–400 ms LIKE scans), with a LIKE fallback for FTS-unmatchable shapes |
+| PR                                                  | Change                                                                                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#412](https://github.com/spool-lab/spool/pull/412) | Typecheck across all 9 workspace packages; root `typecheck`/`check` tasks wired into PR CI                                                                                     |
+| [#413](https://github.com/spool-lab/spool/pull/413) | ESLint → oxlint with exact rule parity (main-process sync `child_process` ban preserved)                                                                                       |
+| [#414](https://github.com/spool-lab/spool/pull/414) | TypeScript 7 (native compiler) + type-aware lint; typechecks ~7.5× faster                                                                                                      |
+| [#415](https://github.com/spool-lab/spool/pull/415) | Build/package/native-ABI split: `pnpm build` only compiles, `package:*` wraps electron-builder in an ABI flip/restore, app builds are turbo-cached                             |
+| [#416](https://github.com/spool-lab/spool/pull/416) | Preview search on FTS5 prefix/trigram indexes (single-digit-ms p95 on a 393 MB index, from 100–400 ms LIKE scans), with a LIKE fallback for FTS-unmatchable shapes             |
 | [#417](https://github.com/spool-lab/spool/pull/417) | −87 MB macOS package (`onnxruntime-node` proven unused via packaged smoke); purge also masks stored titles and rebuilds session FTS; PF inference gets a dedicated offline CSP |
-| [#418](https://github.com/spool-lab/spool/pull/418) | Dependabot risk-lane grouping; find-in-session debounced with stale-visible semantics |
+| [#418](https://github.com/spool-lab/spool/pull/418) | Dependabot risk-lane grouping; find-in-session debounced with stale-visible semantics                                                                                          |
 
 ## Decisions of record
 

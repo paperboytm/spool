@@ -1,8 +1,9 @@
 import { resolve } from 'path'
+
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import { loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 import type { Plugin } from 'vite'
 
 const coreAlias = {
@@ -10,14 +11,22 @@ const coreAlias = {
   '@spool-lab/redact': resolve(__dirname, '../../packages/redact/dist/index.js'),
 }
 
-// better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
-// It must NOT be bundled — it must stay as a real require() in the output.
-function nativeExternalPlugin(): Plugin {
+// Runtime-owned modules must stay external to the Electron bundles:
+//   - electron is provided by the Electron executable. Bundling the npm
+//     downloader package makes the launched app try to install Electron again.
+//   - better-sqlite3 uses 'bindings' at runtime to locate the .node native addon.
+//     It must stay as a real require() so the addon can be discovered.
+function runtimeExternalPlugin(): Plugin {
   return {
-    name: 'native-external',
+    name: 'runtime-external',
     enforce: 'pre',
     resolveId(id) {
-      if (id === 'better-sqlite3' || id.startsWith('better-sqlite3/')) {
+      if (
+        id === 'electron' ||
+        id.startsWith('electron/') ||
+        id === 'better-sqlite3' ||
+        id.startsWith('better-sqlite3/')
+      ) {
         return { id, external: true }
       }
       return null
@@ -27,7 +36,7 @@ function nativeExternalPlugin(): Plugin {
 
 // Main-process env vars whose values get inlined into the bundle at
 // build time via Rollup `define`. Renderer reads its own env via
-// `import.meta.env.VITE_*`, but the main process bundle is plain CJS —
+// `import.meta.env.VITE_*`, but the main process bundle is plain ESM —
 // it has no equivalent at runtime, so we substitute `process.env.X`
 // references with literal strings before they reach the output.
 //
@@ -118,8 +127,15 @@ function inlineMainEnvPlugin(env: Map<string, string>): Plugin {
         const dotRe = new RegExp(`process\\.env\\.${key}\\b`, 'g')
         // process.env['X'] and process.env["X"]
         const bracketRe = new RegExp(`process\\.env\\[(['"])${key}\\1\\]`, 'g')
-        const replaced = out.replace(dotRe, () => { changed = true; return literal })
-          .replace(bracketRe, () => { changed = true; return literal })
+        const replaced = out
+          .replace(dotRe, () => {
+            changed = true
+            return literal
+          })
+          .replace(bracketRe, () => {
+            changed = true
+            return literal
+          })
         out = replaced
       }
       return changed ? { code: out, map: null } : null
@@ -137,7 +153,7 @@ export default defineConfig(({ mode }) => ({
     // those branches contain) from the output bundle. The test-mode
     // modules under src/main/e2e-mode/ are therefore never loaded — they
     // don't even resolve through Rollup — in any production binary. A
-    // ci unit test grep-asserts this invariant against out/main/index.js.
+    // ci unit test grep-asserts this invariant against out/main/index.mjs.
     define: {
       __SPOOL_E2E__: JSON.stringify(process.env['SPOOL_E2E_TEST'] === '1'),
     },
@@ -163,24 +179,38 @@ export default defineConfig(({ mode }) => ({
           'electron-store',
         ],
       }),
-      nativeExternalPlugin(),
+      runtimeExternalPlugin(),
     ],
     build: {
       rollupOptions: {
+        output: {
+          format: 'es',
+          // electron-vite's generated ESM shim can land inside a retained
+          // third-party JSDoc block after Rolldown combines the main graph.
+          // Define the Node path globals up front so bundled app modules do
+          // not depend on the placement of that generated shim.
+          banner:
+            'globalThis.__filename ??= import.meta.filename;\n' +
+            'globalThis.__dirname ??= import.meta.dirname;',
+        },
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          'sync-worker': resolve(__dirname, 'src/main/sync-worker.ts'),
-          'scan-worker-thread': resolve(__dirname, 'src/main/scan-worker-thread.ts'),
-          'mutation-worker-thread': resolve(__dirname, 'src/main/mutation-worker-thread.ts'),
         },
       },
     },
     resolve: { alias: coreAlias },
   },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ['@spool-lab/core', '@spool-lab/redact'] }),
+      runtimeExternalPlugin(),
+    ],
     build: {
       rollupOptions: {
+        // BrowserWindow renderers stay sandboxed. Electron runs sandboxed
+        // preloads as plain JavaScript without an ESM loader, so these entries
+        // must remain CommonJS and load the Electron bridge via require().
+        output: { format: 'cjs' },
         input: {
           index: resolve(__dirname, 'src/preload/index.ts'),
           // Hidden Privacy Filter inference window has its own preload —

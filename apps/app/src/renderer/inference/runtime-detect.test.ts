@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vite-plus/test'
+
 import { detectRuntime } from './runtime-detect.js'
 
 const fakeGpu = (adapter: unknown) =>
@@ -29,7 +30,12 @@ describe('detectRuntime', () => {
 
   it('falls back to wasm when the adapter request times out', async () => {
     vi.useFakeTimers()
-    const gpu = { requestAdapter: () => new Promise<never>(() => { /* never */ }) }
+    const gpu = {
+      requestAdapter: () =>
+        new Promise<never>(() => {
+          /* never */
+        }),
+    }
     const p = detectRuntime({ gpu, timeoutMs: 50 })
     await vi.advanceTimersByTimeAsync(60)
     const res = await p

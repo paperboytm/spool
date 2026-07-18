@@ -49,25 +49,23 @@ export const onRequestGet: PagesFunction<Env, 'handle'> = async (ctx) => {
     // 404 (not 422) so we never leak which handles are merely invalid vs missing.
     if (!v.ok) throw new ApiError('NOT_FOUND')
 
-    const owner = await ctx.env.DB
-      .prepare(
-        'SELECT u.id AS user_id, u.email AS email, u.name AS name, ' +
-          'u.avatar_url AS avatar_url, u.display_name AS display_name, ' +
-          'u.custom_avatar_id AS custom_avatar_id, ' +
-          'u.avatar_visible AS avatar_visible ' +
-          'FROM handles h JOIN users u ON u.id = h.user_id ' +
-          'WHERE h.handle = ? AND h.released_at IS NULL AND u.deleted_at IS NULL',
-      )
+    const owner = await ctx.env.DB.prepare(
+      'SELECT u.id AS user_id, u.email AS email, u.name AS name, ' +
+        'u.avatar_url AS avatar_url, u.display_name AS display_name, ' +
+        'u.custom_avatar_id AS custom_avatar_id, ' +
+        'u.avatar_visible AS avatar_visible ' +
+        'FROM handles h JOIN users u ON u.id = h.user_id ' +
+        'WHERE h.handle = ? AND h.released_at IS NULL AND u.deleted_at IS NULL',
+    )
       .bind(v.handle)
       .first<OwnerRow>()
     if (!owner) throw new ApiError('NOT_FOUND')
 
-    const shares = await ctx.env.DB
-      .prepare(
-        'SELECT id, title, published_at, version FROM published_shares ' +
-          'WHERE user_id = ? AND visibility = ? AND revoked_at IS NULL ' +
-          'ORDER BY published_at DESC LIMIT ?',
-      )
+    const shares = await ctx.env.DB.prepare(
+      'SELECT id, title, published_at, version FROM published_shares ' +
+        'WHERE user_id = ? AND visibility = ? AND revoked_at IS NULL ' +
+        'ORDER BY published_at DESC LIMIT ?',
+    )
       .bind(owner.user_id, 'profile-listed', SHARE_LIMIT)
       .all<ShareRow>()
 

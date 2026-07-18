@@ -1,7 +1,4 @@
-import {
-  HIGH_SEVERITY_KINDS,
-  detectSensitiveSpans,
-} from '@spool-lab/redact'
+import { HIGH_SEVERITY_KINDS, detectSensitiveSpans } from '@spool-lab/redact'
 
 // Pre-share honesty gate: sharing is sharing the full transcript, and
 // transcripts carry secrets. This never blocks silently — it summarizes

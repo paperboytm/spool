@@ -8,12 +8,10 @@
 // shape, error mapping, and event-publish behaviour without
 // spinning up an actual app.
 
-import { describe, it, expect, beforeAll, beforeEach, vi, afterAll } from 'vitest'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import Database from 'better-sqlite3'
-import { Effect, PubSub, Stream } from 'effect'
+
 import {
   runMigrations,
   insertFindings,
@@ -24,6 +22,10 @@ import {
   type ScanStatus,
   type FindingsChange,
 } from '@spool-lab/core'
+import Database from 'better-sqlite3'
+import { Effect, PubSub, Stream } from 'effect'
+import { describe, it, expect, beforeAll, beforeEach, vi, afterAll } from 'vite-plus/test'
+
 import type { MutationWorkerProxy } from '../mutation-worker-proxy.js'
 
 // ─── electron mock ────────────────────────────────────────────────
@@ -43,9 +45,9 @@ vi.mock('electron', () => ({
 }))
 
 // Imported AFTER vi.mock so the stub is the one electron resolves to.
-let registerSecurityIpc: typeof import('./security.js')['registerSecurityIpc']
-let registerSecurityReadinessIpc: typeof import('./security.js')['registerSecurityReadinessIpc']
-let SECURITY_IPC_CHANNELS: typeof import('./security.js')['SECURITY_IPC_CHANNELS']
+let registerSecurityIpc: (typeof import('./security.js'))['registerSecurityIpc']
+let registerSecurityReadinessIpc: (typeof import('./security.js'))['registerSecurityReadinessIpc']
+let SECURITY_IPC_CHANNELS: (typeof import('./security.js'))['SECURITY_IPC_CHANNELS']
 
 let tmp: string
 
@@ -105,14 +107,35 @@ async function setupFixture(): Promise<Fixture> {
   const searchInvalidations = { count: 0 }
   // PubSub-backed stream so we can assert change-event forwarding.
   const pubsub = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
-  const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
+  const status: ScanStatus = {
+    queued: 0,
+    scanning: null,
+    backfillRemaining: 0,
+    backfillTotal: 0,
+    manualBurstInFlight: false,
+    currentProfile: 'regex@4',
+  }
 
   const worker: ScanWorker = {
-    enqueue: (id) => Effect.sync(() => { workerCalls.enqueue.push(id) }),
-    rescanAll: () => Effect.sync(() => { workerCalls.rescanAll++; return 1 }),
-    backfill: () => Effect.sync(() => { workerCalls.backfill++; return 0 }),
+    enqueue: (id) =>
+      Effect.sync(() => {
+        workerCalls.enqueue.push(id)
+      }),
+    rescanAll: () =>
+      Effect.sync(() => {
+        workerCalls.rescanAll++
+        return 1
+      }),
+    backfill: () =>
+      Effect.sync(() => {
+        workerCalls.backfill++
+        return 0
+      }),
     changes: Stream.fromPubSub(pubsub),
-    getStatus: Effect.sync(() => { workerCalls.getStatus++; return status }),
+    getStatus: Effect.sync(() => {
+      workerCalls.getStatus++
+      return status
+    }),
   }
 
   const fakeWindow = {
@@ -133,15 +156,21 @@ async function setupFixture(): Promise<Fixture> {
   const { dispose } = registerSecurityIpc({
     db,
     worker,
-    runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+    runPromise: <A, E>(eff: Effect.Effect<A, E>) =>
+      Effect.runPromise(eff as unknown as Effect.Effect<A>),
     getMainWindow: () => fakeWindow,
-    onSearchContentChanged: () => { searchInvalidations.count += 1 },
+    onSearchContentChanged: () => {
+      searchInvalidations.count += 1
+    },
   })
 
   return {
     db,
     worker,
-    push: (change) => Effect.runPromise(PubSub.publish(pubsub, change)).then(() => { /* void */ }),
+    push: (change) =>
+      Effect.runPromise(PubSub.publish(pubsub, change)).then(() => {
+        /* void */
+      }),
     dispose,
     workerCalls,
     searchInvalidations,
@@ -194,16 +223,49 @@ describe('registerSecurityIpc', () => {
   describe('queries', () => {
     it('LIST_FINDINGS returns rows matching the filter', async () => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 20, state: 'active' },
-        { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 30, endOffset: 40, state: 'dismissed' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 20,
+          state: 'active',
+        },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'email',
+          valueHash: 'h2',
+          confidence: 0.8,
+          provider: 'regex',
+          startOffset: 30,
+          endOffset: 40,
+          state: 'dismissed',
+        },
       ])
-      const rows = await invoke<unknown[]>(SECURITY_IPC_CHANNELS.LIST_FINDINGS, { sessionId: 1, state: 'active' })
+      const rows = await invoke<unknown[]>(SECURITY_IPC_CHANNELS.LIST_FINDINGS, {
+        sessionId: 1,
+        state: 'active',
+      })
       expect(rows).toHaveLength(1)
     })
 
     it('LIST_SESSIONS_WITH_FINDINGS aggregates per-session counts', async () => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 20, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 20,
+          state: 'active',
+        },
       ])
       updateSessionCounts(fixture.db, 1)
       const rows = await invoke<Array<{ id: number; findingCount: number }>>(
@@ -216,25 +278,58 @@ describe('registerSecurityIpc', () => {
 
     it('OCCURRENCES_BY_VALUE_HASH aggregates the leak across sessions', async () => {
       // Add a second session in the same project sharing one value.
-      fixture.db.prepare(
-        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+      fixture.db
+        .prepare(
+          `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
          VALUES (2, 1, 1, 's-2', '/p/s-2', 'Session 2', '2026-01-02', '2026-01-02', 1)`,
-      ).run()
-      fixture.db.prepare(
-        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+        )
+        .run()
+      fixture.db
+        .prepare(
+          `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (20, 2, 1, 'user', 'same leak AKIAIOSFODNN7EXAMPLE', '2026-01-02', 0)`,
-      ).run()
+        )
+        .run()
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 6, endOffset: 11, state: 'active' },
-        { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'shared',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 5,
+          state: 'active',
+        },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'shared',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 6,
+          endOffset: 11,
+          state: 'active',
+        },
+        {
+          sessionId: 2,
+          messageId: 20,
+          kind: 'api-key',
+          valueHash: 'shared',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 5,
+          state: 'active',
+        },
       ])
-      const rows = await invoke<Array<{ sessionId: number; count: number; project: string | null }>>(
-        SECURITY_IPC_CHANNELS.OCCURRENCES_BY_VALUE_HASH,
-        { kind: 'api-key', valueHash: 'shared' },
-      )
+      const rows = await invoke<
+        Array<{ sessionId: number; count: number; project: string | null }>
+      >(SECURITY_IPC_CHANNELS.OCCURRENCES_BY_VALUE_HASH, { kind: 'api-key', valueHash: 'shared' })
       expect(rows).toHaveLength(2)
-      const bySession = new Map(rows.map(r => [r.sessionId, r]))
+      const bySession = new Map(rows.map((r) => [r.sessionId, r]))
       expect(bySession.get(1)!.count).toBe(2)
       expect(bySession.get(2)!.count).toBe(1)
       expect(bySession.get(1)!.project).toBe('p')
@@ -242,11 +337,21 @@ describe('registerSecurityIpc', () => {
 
     it('RISK_BY_CATEGORY groups by kind with severity + sessions', async () => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 20, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 20,
+          state: 'active',
+        },
       ])
-      const rows = await invoke<Array<{ kind: string; severity: string; count: number; sessions: number }>>(
-        SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY,
-      )
+      const rows = await invoke<
+        Array<{ kind: string; severity: string; count: number; sessions: number }>
+      >(SECURITY_IPC_CHANNELS.RISK_BY_CATEGORY)
       expect(rows[0]).toMatchObject({ kind: 'api-key', severity: 'high', count: 1, sessions: 1 })
     })
 
@@ -260,10 +365,23 @@ describe('registerSecurityIpc', () => {
 
     it('GET_FINDING_VALUE reads the live message text', async () => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 5, endOffset: 25, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 5,
+          endOffset: 25,
+          state: 'active',
+        },
       ])
       const findings = listFindings(fixture.db, { sessionId: 1 })
-      const v = await invoke<string | null>(SECURITY_IPC_CHANNELS.GET_FINDING_VALUE, findings[0]!.id)
+      const v = await invoke<string | null>(
+        SECURITY_IPC_CHANNELS.GET_FINDING_VALUE,
+        findings[0]!.id,
+      )
       // start=5, end=25 against 'leak AKIAIOSFODNN7EXAMPLE plz'.
       expect(v).toBe('AKIAIOSFODNN7EXAMPLE')
     })
@@ -279,16 +397,26 @@ describe('registerSecurityIpc', () => {
     let findingId: number
     beforeEach(() => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'h1', confidence: 0.95, provider: 'regex', startOffset: 5, endOffset: 25, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'h1',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 5,
+          endOffset: 25,
+          state: 'active',
+        },
       ])
       findingId = listFindings(fixture.db, { sessionId: 1 })[0]!.id
     })
 
     it('DISMISS_FINDING flips state and returns { ok: true }', async () => {
-      const result = await invoke<{ ok: boolean }>(
-        SECURITY_IPC_CHANNELS.DISMISS_FINDING,
-        { findingId, scope: 'session' },
-      )
+      const result = await invoke<{ ok: boolean }>(SECURITY_IPC_CHANNELS.DISMISS_FINDING, {
+        findingId,
+        scope: 'session',
+      })
       expect(result).toEqual({ ok: true })
       const after = listFindings(fixture.db, { sessionId: 1, state: 'any' })[0]!
       expect(after.state).toBe('dismissed')
@@ -296,31 +424,52 @@ describe('registerSecurityIpc', () => {
 
     it('DISMISS_FINDINGS dismisses many in one call + emits one event per session', async () => {
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'email', valueHash: 'h2', confidence: 0.8, provider: 'regex', startOffset: 30, endOffset: 40, state: 'active' },
-        { sessionId: 1, messageId: 10, kind: 'phone', valueHash: 'h3', confidence: 0.8, provider: 'regex', startOffset: 45, endOffset: 55, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'email',
+          valueHash: 'h2',
+          confidence: 0.8,
+          provider: 'regex',
+          startOffset: 30,
+          endOffset: 40,
+          state: 'active',
+        },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'phone',
+          valueHash: 'h3',
+          confidence: 0.8,
+          provider: 'regex',
+          startOffset: 45,
+          endOffset: 55,
+          state: 'active',
+        },
       ])
       const ids = listFindings(fixture.db, { sessionId: 1, state: 'active' }).map((r) => r.id)
       expect(ids.length).toBe(3)
       sentEvents.length = 0
-      const result = await invoke<{ ok: boolean }>(
-        SECURITY_IPC_CHANNELS.DISMISS_FINDINGS,
-        { findingIds: ids, scope: 'session' },
-      )
+      const result = await invoke<{ ok: boolean }>(SECURITY_IPC_CHANNELS.DISMISS_FINDINGS, {
+        findingIds: ids,
+        scope: 'session',
+      })
       expect(result).toEqual({ ok: true })
       const after = listFindings(fixture.db, { sessionId: 1, state: 'any' })
       expect(after.every((r) => r.state === 'dismissed')).toBe(true)
       // One consolidated change event for the single affected session.
-      const changes = sentEvents.filter((e) => e.channel === SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED)
+      const changes = sentEvents.filter(
+        (e) => e.channel === SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED,
+      )
       expect(changes).toHaveLength(1)
       expect((changes[0]!.payload as { sessionId: number }).sessionId).toBe(1)
     })
 
     it('UNDISMISS_FINDING flips state back to active', async () => {
       await invoke(SECURITY_IPC_CHANNELS.DISMISS_FINDING, { findingId, scope: 'session' })
-      const result = await invoke<{ ok: boolean }>(
-        SECURITY_IPC_CHANNELS.UNDISMISS_FINDING,
-        { findingId },
-      )
+      const result = await invoke<{ ok: boolean }>(SECURITY_IPC_CHANNELS.UNDISMISS_FINDING, {
+        findingId,
+      })
       expect(result).toEqual({ ok: true })
       const after = listFindings(fixture.db, { sessionId: 1, state: 'any' })[0]!
       expect(after.state).toBe('active')
@@ -334,8 +483,9 @@ describe('registerSecurityIpc', () => {
       expect(result.findingId).toBe(findingId)
       expect(result.sessionId).toBe(1)
       expect(fixture.searchInvalidations.count).toBe(1)
-      const msg = fixture.db.prepare('SELECT content_text FROM messages WHERE id = 10')
-        .get() as { content_text: string }
+      const msg = fixture.db.prepare('SELECT content_text FROM messages WHERE id = 10').get() as {
+        content_text: string
+      }
       expect(msg.content_text.includes('AKIAIOSFODNN7EXAMPLE')).toBe(false)
     })
 
@@ -346,17 +496,41 @@ describe('registerSecurityIpc', () => {
 
     it('PURGE_EVERYWHERE scrubs the value across sessions + returns touched sessions', async () => {
       // Same value (one hash) in two sessions.
-      fixture.db.prepare(
-        `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
+      fixture.db
+        .prepare(
+          `INSERT INTO sessions (id, project_id, source_id, session_uuid, file_path, title, started_at, ended_at, message_count)
          VALUES (2, 1, 1, 's-2', '/p/s-2', 'Session 2', '2026-01-02', '2026-01-02', 1)`,
-      ).run()
-      fixture.db.prepare(
-        `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
+        )
+        .run()
+      fixture.db
+        .prepare(
+          `INSERT INTO messages (id, session_id, source_id, role, content_text, timestamp, seq)
          VALUES (20, 2, 1, 'user', 'dup AKIAIOSFODNN7EXAMPLE', '2026-01-02', 0)`,
-      ).run()
+        )
+        .run()
       insertFindings(fixture.db, [
-        { sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 5, endOffset: 25, state: 'active' },
-        { sessionId: 2, messageId: 20, kind: 'api-key', valueHash: 'shared', confidence: 0.95, provider: 'regex', startOffset: 4, endOffset: 24, state: 'active' },
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'shared',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 5,
+          endOffset: 25,
+          state: 'active',
+        },
+        {
+          sessionId: 2,
+          messageId: 20,
+          kind: 'api-key',
+          valueHash: 'shared',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 4,
+          endOffset: 24,
+          state: 'active',
+        },
       ])
       const out = await invoke<{ count: number; sessionIds: number[] }>(
         SECURITY_IPC_CHANNELS.PURGE_EVERYWHERE,
@@ -365,7 +539,9 @@ describe('registerSecurityIpc', () => {
       expect(out.count).toBe(2)
       expect([...out.sessionIds].sort()).toEqual([1, 2])
       for (const id of [10, 20]) {
-        const msg = fixture.db.prepare('SELECT content_text FROM messages WHERE id = ?').get(id) as { content_text: string }
+        const msg = fixture.db
+          .prepare('SELECT content_text FROM messages WHERE id = ?')
+          .get(id) as { content_text: string }
         expect(msg.content_text.includes('AKIAIOSFODNN7EXAMPLE')).toBe(false)
       }
     })
@@ -411,10 +587,9 @@ describe('registerSecurityIpc', () => {
     })
 
     it('SET_PREFS broadcasts EVT_PREFS_CHANGED with the saved value', async () => {
-      const saved = await invoke<{ kindAllowlist: string[] }>(
-        SECURITY_IPC_CHANNELS.SET_PREFS,
-        { kindAllowlist: ['email'] },
-      )
+      const saved = await invoke<{ kindAllowlist: string[] }>(SECURITY_IPC_CHANNELS.SET_PREFS, {
+        kindAllowlist: ['email'],
+      })
       expect(saved.kindAllowlist).toEqual(['email'])
       const evt = sentEvents.find((e) => e.channel === SECURITY_IPC_CHANNELS.EVT_PREFS_CHANGED)
       expect(evt).toBeDefined()
@@ -423,12 +598,22 @@ describe('registerSecurityIpc', () => {
 
     it('LIST_ALLOWLIST_ENTRIES + REMOVE_ALLOWLIST_ENTRY round-trip', async () => {
       // Dismiss a finding (which writes to allowlist_session).
-      const fid = listFindings(fixture.db, { sessionId: 1 }).at(0)?.id
-        ?? (() => {
-          insertFindings(fixture.db, [{
-            sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'hX',
-            confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active',
-          }])
+      const fid =
+        listFindings(fixture.db, { sessionId: 1 }).at(0)?.id ??
+        (() => {
+          insertFindings(fixture.db, [
+            {
+              sessionId: 1,
+              messageId: 10,
+              kind: 'api-key',
+              valueHash: 'hX',
+              confidence: 0.95,
+              provider: 'regex',
+              startOffset: 0,
+              endOffset: 5,
+              state: 'active',
+            },
+          ])
           return listFindings(fixture.db, { sessionId: 1 })[0]!.id
         })()
       await invoke(SECURITY_IPC_CHANNELS.DISMISS_FINDING, { findingId: fid, scope: 'global' })
@@ -445,25 +630,40 @@ describe('registerSecurityIpc', () => {
         valueHash: target.valueHash,
       })
 
-      const afterRemove = await invoke<Array<{ scope: string }>>(SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES)
+      const afterRemove = await invoke<Array<{ scope: string }>>(
+        SECURITY_IPC_CHANNELS.LIST_ALLOWLIST_ENTRIES,
+      )
       expect(afterRemove.find((e) => e.scope === 'global')).toBeUndefined()
     })
 
     it('COUNT_ALLOWLIST_ENTRIES reflects dismiss + remove', async () => {
       const before = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
 
-      insertFindings(fixture.db, [{
-        sessionId: 1, messageId: 10, kind: 'api-key', valueHash: 'hCount',
-        confidence: 0.95, provider: 'regex', startOffset: 0, endOffset: 5, state: 'active',
-      }])
-      const fid = listFindings(fixture.db, { sessionId: 1 }).find((f) => f.valueHash === 'hCount')!.id
+      insertFindings(fixture.db, [
+        {
+          sessionId: 1,
+          messageId: 10,
+          kind: 'api-key',
+          valueHash: 'hCount',
+          confidence: 0.95,
+          provider: 'regex',
+          startOffset: 0,
+          endOffset: 5,
+          state: 'active',
+        },
+      ])
+      const fid = listFindings(fixture.db, { sessionId: 1 }).find(
+        (f) => f.valueHash === 'hCount',
+      )!.id
       await invoke(SECURITY_IPC_CHANNELS.DISMISS_FINDING, { findingId: fid, scope: 'global' })
 
       const after = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
       expect(after).toBe(before + 1)
 
       await invoke(SECURITY_IPC_CHANNELS.REMOVE_ALLOWLIST_ENTRY, {
-        scope: 'global', kind: 'api-key', valueHash: 'hCount',
+        scope: 'global',
+        kind: 'api-key',
+        valueHash: 'hCount',
       })
       const afterRemove = await invoke<number>(SECURITY_IPC_CHANNELS.COUNT_ALLOWLIST_ENTRIES)
       expect(afterRemove).toBe(before)
@@ -479,7 +679,8 @@ describe('registerSecurityIpc', () => {
       await fixture.push({ type: 'session-rescanned', sessionId: 7 })
       await new Promise((r) => setTimeout(r, 50))
       const forwarded = sentEvents.find(
-        (e) => e.channel === SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED &&
+        (e) =>
+          e.channel === SECURITY_IPC_CHANNELS.EVT_FINDINGS_CHANGED &&
           (e.payload as { type: string }).type === 'session-rescanned',
       )
       expect(forwarded).toBeDefined()
@@ -520,7 +721,14 @@ describe('registerSecurityIpc with mutationWorker', () => {
     handlers.clear()
     sentEvents.length = 0
     const db = setupDb()
-    const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
+    const status: ScanStatus = {
+      queued: 0,
+      scanning: null,
+      backfillRemaining: 0,
+      backfillTotal: 0,
+      manualBurstInFlight: false,
+      currentProfile: 'regex@4',
+    }
     const worker: ScanWorker = {
       enqueue: () => Effect.void,
       rescanAll: () => Effect.sync(() => 0),
@@ -535,26 +743,53 @@ describe('registerSecurityIpc with mutationWorker', () => {
     const calls: Array<{ method: string; args: unknown[] }> = []
     let searchInvalidations = 0
     const fakeProxy: MutationWorkerProxy = {
-      purgeFinding: async (id) => { calls.push({ method: 'purgeFinding', args: [id] }); return { findingId: id, sessionId: 1, maskUsed: '[redacted]', purgedAt: 'now' } },
-      purgeFindings: async (ids) => { calls.push({ method: 'purgeFindings', args: [ids] }); return [] },
-      purgeEverywhere: async (kind, hash) => { calls.push({ method: 'purgeEverywhere', args: [kind, hash] }); return { results: [], sessionIds: [] } },
-      dismissFinding: async (id, scope) => { calls.push({ method: 'dismissFinding', args: [id, scope] }); return null },
-      dismissFindings: async (ids, scope) => { calls.push({ method: 'dismissFindings', args: [ids, scope] }); return [] },
-      undismissFinding: async (id) => { calls.push({ method: 'undismissFinding', args: [id] }); return null },
+      purgeFinding: async (id) => {
+        calls.push({ method: 'purgeFinding', args: [id] })
+        return { findingId: id, sessionId: 1, maskUsed: '[redacted]', purgedAt: 'now' }
+      },
+      purgeFindings: async (ids) => {
+        calls.push({ method: 'purgeFindings', args: [ids] })
+        return []
+      },
+      purgeEverywhere: async (kind, hash) => {
+        calls.push({ method: 'purgeEverywhere', args: [kind, hash] })
+        return { results: [], sessionIds: [] }
+      },
+      dismissFinding: async (id, scope) => {
+        calls.push({ method: 'dismissFinding', args: [id, scope] })
+        return null
+      },
+      dismissFindings: async (ids, scope) => {
+        calls.push({ method: 'dismissFindings', args: [ids, scope] })
+        return []
+      },
+      undismissFinding: async (id) => {
+        calls.push({ method: 'undismissFinding', args: [id] })
+        return null
+      },
       changes: Stream.empty,
-      shutdown: async () => { /* no-op */ },
+      shutdown: async () => {
+        /* no-op */
+      },
     }
 
     const fakeWindow = {
-      webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
+      webContents: {
+        send: (channel: string, payload: unknown) => {
+          sentEvents.push({ channel, payload })
+        },
+      },
     } as unknown as import('electron').BrowserWindow
 
     const { dispose, attachMutationWorker } = registerSecurityIpc({
       db,
       worker,
-      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+      runPromise: <A, E>(eff: Effect.Effect<A, E>) =>
+        Effect.runPromise(eff as unknown as Effect.Effect<A>),
       getMainWindow: () => fakeWindow,
-      onSearchContentChanged: () => { searchInvalidations += 1 },
+      onSearchContentChanged: () => {
+        searchInvalidations += 1
+      },
     })
     // Late-attach the fake proxy — mirrors how production wires the
     // mutation worker in after the IPC layer is already live.
@@ -595,7 +830,14 @@ describe('registerSecurityIpc with mutationWorker', () => {
     handlers.clear()
     sentEvents.length = 0
     const db = setupDb()
-    const status: ScanStatus = { queued: 0, scanning: null, backfillRemaining: 0, backfillTotal: 0, manualBurstInFlight: false, currentProfile: 'regex@4' }
+    const status: ScanStatus = {
+      queued: 0,
+      scanning: null,
+      backfillRemaining: 0,
+      backfillTotal: 0,
+      manualBurstInFlight: false,
+      currentProfile: 'regex@4',
+    }
     const worker: ScanWorker = {
       enqueue: () => Effect.void,
       rescanAll: () => Effect.sync(() => 0),
@@ -607,24 +849,33 @@ describe('registerSecurityIpc with mutationWorker', () => {
 
     const mutationPubsub = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
     const fakeProxy: MutationWorkerProxy = {
-      purgeFinding: async () => { throw new Error('not used') },
+      purgeFinding: async () => {
+        throw new Error('not used')
+      },
       purgeFindings: async () => [],
       purgeEverywhere: async () => ({ results: [], sessionIds: [] }),
       dismissFinding: async () => null,
       dismissFindings: async () => [],
       undismissFinding: async () => null,
       changes: Stream.fromPubSub(mutationPubsub),
-      shutdown: async () => { /* no-op */ },
+      shutdown: async () => {
+        /* no-op */
+      },
     }
 
     const fakeWindow = {
-      webContents: { send: (channel: string, payload: unknown) => { sentEvents.push({ channel, payload }) } },
+      webContents: {
+        send: (channel: string, payload: unknown) => {
+          sentEvents.push({ channel, payload })
+        },
+      },
     } as unknown as import('electron').BrowserWindow
 
     const { dispose, attachMutationWorker } = registerSecurityIpc({
       db,
       worker,
-      runPromise: <A, E>(eff: Effect.Effect<A, E>) => Effect.runPromise(eff as unknown as Effect.Effect<A>),
+      runPromise: <A, E>(eff: Effect.Effect<A, E>) =>
+        Effect.runPromise(eff as unknown as Effect.Effect<A>),
       getMainWindow: () => fakeWindow,
     })
     attachMutationWorker(fakeProxy)
@@ -638,9 +889,7 @@ describe('registerSecurityIpc with mutationWorker', () => {
       const change: FindingsChange = { type: 'state-changed', sessionId: 5, state: 'purged' }
       await Effect.runPromise(PubSub.publish(mutationPubsub, change))
       await new Promise((r) => setTimeout(r, 50))
-      expect(sentEvents).toEqual([
-        { channel: 'security:evt-findings-changed', payload: change },
-      ])
+      expect(sentEvents).toEqual([{ channel: 'security:evt-findings-changed', payload: change }])
     } finally {
       dispose()
       db.close()

@@ -97,11 +97,7 @@ export function clearAll(db: Database.Database): void {
 /** Flip a single row's revoked_at without touching the rest. Used by
  *  the renderer-side revoke IPC so the cache (and any open editor)
  *  reflects the unpublish without waiting for the next myShares poll. */
-export function markRevoked(
-  db: Database.Database,
-  id: string,
-  revokedAt: number,
-): void {
+export function markRevoked(db: Database.Database, id: string, revokedAt: number): void {
   db.prepare(
     `UPDATE published_shares_cache
      SET revoked_at = ?, updated_at = ?

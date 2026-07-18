@@ -9,41 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SignInRouteImport } from './routes/sign-in'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as MeRouteImport } from './routes/me'
-import { Route as CliAuthRouteImport } from './routes/cli-auth'
-import { Route as SiteRouteImport } from './routes/_site'
 import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
+import { Route as SiteRouteImport } from './routes/_site'
+import { Route as CliAuthRouteImport } from './routes/cli-auth'
+import { Route as MeRouteImport } from './routes/me'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SiteIndexRouteImport } from './routes/_site.index'
-import { Route as SessionSidRouteImport } from './routes/session.$sid'
-import { Route as SSlugRouteImport } from './routes/s.$slug'
-import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
-import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
 import { Route as SiteConnectorsRouteImport } from './routes/_site.connectors'
+import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
+import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
+import { Route as SSlugRouteImport } from './routes/s.$slug'
+import { Route as SessionSidRouteImport } from './routes/session.$sid'
 import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
-import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
 import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
+import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
 
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
+  id: '/@{$handle}',
+  path: '/@{$handle}',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignInRoute = SignInRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MeRoute = MeRouteImport.update({
-  id: '/me',
-  path: '/me',
+const SiteRoute = SiteRouteImport.update({
+  id: '/_site',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CliAuthRoute = CliAuthRouteImport.update({
@@ -51,13 +40,24 @@ const CliAuthRoute = CliAuthRouteImport.update({
   path: '/cli-auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SiteRoute = SiteRouteImport.update({
-  id: '/_site',
+const MeRoute = MeRouteImport.update({
+  id: '/me',
+  path: '/me',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
-  id: '/@{$handle}',
-  path: '/@{$handle}',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SiteIndexRoute = SiteIndexRouteImport.update({
@@ -65,9 +65,19 @@ const SiteIndexRoute = SiteIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SiteRoute,
 } as any)
-const SessionSidRoute = SessionSidRouteImport.update({
-  id: '/session/$sid',
-  path: '/session/$sid',
+const SiteConnectorsRoute = SiteConnectorsRouteImport.update({
+  id: '/connectors',
+  path: '/connectors',
+  getParentRoute: () => SiteRoute,
+} as any)
+const SiteDaemonRoute = SiteDaemonRouteImport.update({
+  id: '/daemon',
+  path: '/daemon',
+  getParentRoute: () => SiteRoute,
+} as any)
+const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
+  id: '/blog/rss.xml',
+  path: '/blog/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SSlugRoute = SSlugRouteImport.update({
@@ -75,34 +85,24 @@ const SSlugRoute = SSlugRouteImport.update({
   path: '/s/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
-  id: '/blog/rss.xml',
-  path: '/blog/rss.xml',
+const SessionSidRoute = SessionSidRouteImport.update({
+  id: '/session/$sid',
+  path: '/session/$sid',
   getParentRoute: () => rootRouteImport,
-} as any)
-const SiteDaemonRoute = SiteDaemonRouteImport.update({
-  id: '/daemon',
-  path: '/daemon',
-  getParentRoute: () => SiteRoute,
-} as any)
-const SiteConnectorsRoute = SiteConnectorsRouteImport.update({
-  id: '/connectors',
-  path: '/connectors',
-  getParentRoute: () => SiteRoute,
 } as any)
 const SiteBlogIndexRoute = SiteBlogIndexRouteImport.update({
   id: '/blog/',
   path: '/blog/',
   getParentRoute: () => SiteRoute,
 } as any)
-const SiteDocsSplatRoute = SiteDocsSplatRouteImport.update({
-  id: '/docs/$',
-  path: '/docs/$',
-  getParentRoute: () => SiteRoute,
-} as any)
 const SiteBlogSlugRoute = SiteBlogSlugRouteImport.update({
   id: '/blog/$slug',
   path: '/blog/$slug',
+  getParentRoute: () => SiteRoute,
+} as any)
+const SiteDocsSplatRoute = SiteDocsSplatRouteImport.update({
+  id: '/docs/$',
+  path: '/docs/$',
   getParentRoute: () => SiteRoute,
 } as any)
 
@@ -229,39 +229,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sign-in': {
-      id: '/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/me': {
-      id: '/me'
-      path: '/me'
-      fullPath: '/me'
-      preLoaderRoute: typeof MeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cli-auth': {
-      id: '/cli-auth'
-      path: '/cli-auth'
-      fullPath: '/cli-auth'
-      preLoaderRoute: typeof CliAuthRouteImport
+    '/@{$handle}': {
+      id: '/@{$handle}'
+      path: '/@{$handle}'
+      fullPath: '/@{$handle}'
+      preLoaderRoute: typeof AtChar123handleChar125RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_site': {
@@ -271,11 +243,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SiteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/@{$handle}': {
-      id: '/@{$handle}'
-      path: '/@{$handle}'
-      fullPath: '/@{$handle}'
-      preLoaderRoute: typeof AtChar123handleChar125RouteImport
+    '/cli-auth': {
+      id: '/cli-auth'
+      path: '/cli-auth'
+      fullPath: '/cli-auth'
+      preLoaderRoute: typeof CliAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/me': {
+      id: '/me'
+      path: '/me'
+      fullPath: '/me'
+      preLoaderRoute: typeof MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_site/': {
@@ -285,11 +285,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SiteIndexRouteImport
       parentRoute: typeof SiteRoute
     }
-    '/session/$sid': {
-      id: '/session/$sid'
-      path: '/session/$sid'
-      fullPath: '/session/$sid'
-      preLoaderRoute: typeof SessionSidRouteImport
+    '/_site/connectors': {
+      id: '/_site/connectors'
+      path: '/connectors'
+      fullPath: '/connectors'
+      preLoaderRoute: typeof SiteConnectorsRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/_site/daemon': {
+      id: '/_site/daemon'
+      path: '/daemon'
+      fullPath: '/daemon'
+      preLoaderRoute: typeof SiteDaemonRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/blog/rss.xml': {
+      id: '/blog/rss.xml'
+      path: '/blog/rss.xml'
+      fullPath: '/blog/rss.xml'
+      preLoaderRoute: typeof BlogRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s/$slug': {
@@ -299,26 +313,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog/rss.xml': {
-      id: '/blog/rss.xml'
-      path: '/blog/rss.xml'
-      fullPath: '/blog/rss.xml'
-      preLoaderRoute: typeof BlogRssDotxmlRouteImport
+    '/session/$sid': {
+      id: '/session/$sid'
+      path: '/session/$sid'
+      fullPath: '/session/$sid'
+      preLoaderRoute: typeof SessionSidRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_site/daemon': {
-      id: '/_site/daemon'
-      path: '/daemon'
-      fullPath: '/daemon'
-      preLoaderRoute: typeof SiteDaemonRouteImport
-      parentRoute: typeof SiteRoute
-    }
-    '/_site/connectors': {
-      id: '/_site/connectors'
-      path: '/connectors'
-      fullPath: '/connectors'
-      preLoaderRoute: typeof SiteConnectorsRouteImport
-      parentRoute: typeof SiteRoute
     }
     '/_site/blog/': {
       id: '/_site/blog/'
@@ -327,18 +327,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SiteBlogIndexRouteImport
       parentRoute: typeof SiteRoute
     }
-    '/_site/docs/$': {
-      id: '/_site/docs/$'
-      path: '/docs/$'
-      fullPath: '/docs/$'
-      preLoaderRoute: typeof SiteDocsSplatRouteImport
-      parentRoute: typeof SiteRoute
-    }
     '/_site/blog/$slug': {
       id: '/_site/blog/$slug'
       path: '/blog/$slug'
       fullPath: '/blog/$slug'
       preLoaderRoute: typeof SiteBlogSlugRouteImport
+      parentRoute: typeof SiteRoute
+    }
+    '/_site/docs/$': {
+      id: '/_site/docs/$'
+      path: '/docs/$'
+      fullPath: '/docs/$'
+      preLoaderRoute: typeof SiteDocsSplatRouteImport
       parentRoute: typeof SiteRoute
     }
   }

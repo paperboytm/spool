@@ -4,7 +4,7 @@
 // marketing pages, docs, readers, account pages — to the merged web
 // app (apps/web).
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { routeFor } from '../../../workers/spool-pro-router/src/worker'
 

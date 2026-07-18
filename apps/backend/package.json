@@ -2,12 +2,26 @@
   "name": "@spool/backend",
   "version": "0.0.1",
   "private": true,
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
   "type": "module",
   "scripts": {
     "dev": "wrangler pages dev ./public --inspector-port 9230 --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG --r2 AVATARS --r2 HUB",
     "deploy:staging": "wrangler pages deploy public --project-name spool-share-backend-staging",
     "deploy:prod": "wrangler pages deploy public --project-name spool-share-backend",
-    "test": "vitest run",
+    "test": "vp test run",
     "typecheck": "tsc --noEmit",
     "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local",
     "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db-staging --remote",
@@ -16,12 +30,15 @@
   "dependencies": {
     "@spool-lab/session-kit": "workspace:*",
     "workers-og": "^0.0.27",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260415.1",
+    "@cloudflare/workers-types": "^5.20260718.1",
     "@spool-lab/cli": "workspace:*",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.0.0"
+    "@types/node": "^26.1.1",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "^4.112.0"
   }
 }

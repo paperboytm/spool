@@ -1,6 +1,3 @@
-import { forwardRef, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { useTranslation } from 'react-i18next'
-import { MoreHorizontal } from 'lucide-react'
 import {
   collectRedactList,
   TemplateRender,
@@ -9,6 +6,20 @@ import {
   type Conversation,
   type EditorOpts,
 } from '@spool/share-kit'
+import { MoreHorizontal } from 'lucide-react'
+import {
+  forwardRef,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { useHotkeys } from '../../hooks/useHotkeys.js'
 import { useProgressiveCount } from './preview-progressive.js'
 
@@ -270,23 +281,29 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
   }
 
   return (
-    <div className="relative flex-1 min-w-0 flex">
+    <div className="relative flex min-w-0 flex-1">
       <div
         ref={scrollRef}
         data-share-preview-scroll
         onMouseDown={beginPan}
         style={scrollCursor ? { cursor: scrollCursor } : undefined}
-        className="flex-1 overflow-auto scrollbar-none relative bg-warm-bg dark:bg-dark-bg cursor-grab"
+        className="bg-warm-bg dark:bg-dark-bg relative flex-1 cursor-grab scrollbar-none overflow-auto"
       >
         <div
-          className="relative px-10 py-8 flex flex-col items-center gap-3.5"
-          style={{ margin: '0 auto', width: 'fit-content', minWidth: '100%', boxSizing: 'border-box' }}
+          className="relative flex flex-col items-center gap-3.5 px-10 py-8"
+          style={{
+            margin: '0 auto',
+            width: 'fit-content',
+            minWidth: '100%',
+            boxSizing: 'border-box',
+          }}
         >
           {/* Header chrome above the canvas — template name + dims. */}
-          <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.08em] font-mono text-warm-muted dark:text-dark-muted">
-            <span className="w-4 h-px bg-warm-border dark:bg-dark-border" />
-            {TEMPLATES.find((x) => x.id === renderOpts.template)?.name} · {ratio.w}×{Math.round(naturalH)}
-            <span className="w-4 h-px bg-warm-border dark:bg-dark-border" />
+          <div className="text-warm-muted dark:text-dark-muted flex items-center gap-2.5 font-mono text-[10px] tracking-[0.08em] uppercase">
+            <span className="bg-warm-border dark:bg-dark-border h-px w-4" />
+            {TEMPLATES.find((x) => x.id === renderOpts.template)?.name} · {ratio.w}×
+            {Math.round(naturalH)}
+            <span className="bg-warm-border dark:bg-dark-border h-px w-4" />
           </div>
           {/* Scaled canvas — width/height transition for smooth zoom.
               The transform lives on a wrapper around the export-ref
@@ -352,10 +369,14 @@ export const PreviewPane = forwardRef<HTMLDivElement, Props>(function PreviewPan
             </div>
           </div>
           {/* Footer chrome below. */}
-          <div className="text-[10px] font-mono tracking-[0.04em] text-warm-faint dark:text-dark-muted">
-            {filled
-              ? <>1 / 1 · {t('shareEditorPanel.preview_wordCount_other', { count: convo.wordCount })}</>
-              : t('shareEditorPanel.preview_rendering')}
+          <div className="text-warm-faint dark:text-dark-muted font-mono text-[10px] tracking-[0.04em]">
+            {filled ? (
+              <>
+                1 / 1 · {t('shareEditorPanel.preview_wordCount_other', { count: convo.wordCount })}
+              </>
+            ) : (
+              t('shareEditorPanel.preview_rendering')
+            )}
           </div>
         </div>
       </div>
@@ -414,21 +435,31 @@ function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
     <div
       ref={rootRef}
       data-pan-ignore
-      className="absolute right-4 bottom-4 z-20 flex items-center gap-0 h-5 rounded bg-warm-surface dark:bg-dark-surface text-[10.5px] text-warm-text dark:text-dark-text"
+      className="bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text absolute right-4 bottom-4 z-20 flex h-5 items-center gap-0 rounded text-[10.5px]"
     >
       {expanded && (
         <>
-          <ZoomBtn label="−" onClick={onOut} ariaLabel={t('shareEditorPanel.preview_zoomOut')} disabled={percent <= minPercent} />
-          <span className="min-w-[26px] text-center select-none text-warm-text dark:text-dark-text tabular-nums">
+          <ZoomBtn
+            label="−"
+            onClick={onOut}
+            ariaLabel={t('shareEditorPanel.preview_zoomOut')}
+            disabled={percent <= minPercent}
+          />
+          <span className="text-warm-text dark:text-dark-text min-w-[26px] text-center tabular-nums select-none">
             {percent}%
           </span>
-          <ZoomBtn label="+" onClick={onIn} ariaLabel={t('shareEditorPanel.preview_zoomIn')} disabled={percent >= maxPercent} />
+          <ZoomBtn
+            label="+"
+            onClick={onIn}
+            ariaLabel={t('shareEditorPanel.preview_zoomIn')}
+            disabled={percent >= maxPercent}
+          />
           <button
             type="button"
             onClick={onFit}
             aria-label={t('shareEditorPanel.preview_zoomToFit')}
             aria-pressed={isFit}
-            className={`px-1.5 h-5 rounded transition-colors ${
+            className={`h-5 rounded px-1.5 transition-colors ${
               isFit
                 ? 'text-accent dark:text-accent-dark bg-accent-bg dark:bg-accent-bg-dark'
                 : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
@@ -441,10 +472,14 @@ function ZoomControl({ percent, isFit, onIn, onOut, onFit }: ZoomControlProps) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        aria-label={expanded ? t('shareEditorPanel.preview_hideZoomControls') : t('shareEditorPanel.preview_zoomControls')}
+        aria-label={
+          expanded
+            ? t('shareEditorPanel.preview_hideZoomControls')
+            : t('shareEditorPanel.preview_zoomControls')
+        }
         aria-expanded={expanded}
         title={t('shareEditorPanel.preview_zoomControls')}
-        className="w-5 h-5 grid place-items-center rounded text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text transition-colors"
+        className="text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text grid h-5 w-5 place-items-center rounded transition-colors"
       >
         <MoreHorizontal size={11} strokeWidth={1.75} aria-hidden />
       </button>
@@ -469,7 +504,7 @@ function ZoomBtn({
       onClick={onClick}
       aria-label={ariaLabel}
       disabled={disabled}
-      className={`w-5 h-5 grid place-items-center rounded text-[12px] leading-none ${
+      className={`grid h-5 w-5 place-items-center rounded text-[12px] leading-none ${
         disabled
           ? 'text-warm-faint dark:text-dark-muted cursor-default'
           : 'text-warm-muted dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2 cursor-pointer'

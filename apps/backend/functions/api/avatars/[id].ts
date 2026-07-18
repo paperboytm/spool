@@ -35,8 +35,9 @@ export const onRequestGet: PagesFunction<Env, 'id'> = async (ctx) => {
     // link must also get 404 once the user opts to hide their photo.
     // Without this the GET endpoint is the bypass that defeats the
     // resolver-level gate.
-    const row = await ctx.env.DB
-      .prepare('SELECT custom_avatar_id, avatar_visible FROM users WHERE id=? AND deleted_at IS NULL')
+    const row = await ctx.env.DB.prepare(
+      'SELECT custom_avatar_id, avatar_visible FROM users WHERE id=? AND deleted_at IS NULL',
+    )
       .bind(userId)
       .first<{ custom_avatar_id: string | null; avatar_visible: number | null }>()
     if (!row?.custom_avatar_id) throw new ApiError('NOT_FOUND')

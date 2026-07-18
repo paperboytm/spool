@@ -8,21 +8,32 @@ const CHUNKS = [
   'This relates to the search indexing feature you were working on.',
 ]
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 runMockAgent(async (id, params) => {
   const sessionId = params.sessionId ?? 'mock-session-001'
 
   notify('session/update', {
     sessionId,
-    update: { sessionUpdate: 'tool_call', toolCallId: 'mock-tool-001', title: 'Searching knowledge base', kind: 'search', status: 'in_progress' },
+    update: {
+      sessionUpdate: 'tool_call',
+      toolCallId: 'mock-tool-001',
+      title: 'Searching knowledge base',
+      kind: 'search',
+      status: 'in_progress',
+    },
   })
 
   await sleep(50)
 
   notify('session/update', {
     sessionId,
-    update: { sessionUpdate: 'tool_call_update', toolCallId: 'mock-tool-001', title: 'Searching knowledge base', status: 'completed' },
+    update: {
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'mock-tool-001',
+      title: 'Searching knowledge base',
+      status: 'completed',
+    },
   })
 
   for (const text of CHUNKS) {

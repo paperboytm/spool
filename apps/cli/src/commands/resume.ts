@@ -1,10 +1,11 @@
-import { Command } from 'commander'
-import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+
 import { sequenceRoot } from '@spool-lab/session-kit'
+import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch, type HubRecord } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
@@ -64,7 +65,9 @@ export async function handleResumeCommand(
     const records = await fetchRecords(client, ref.sid, wanted)
     await verifyRecords(records, wanted === meta.count ? meta.root : null)
 
-    const workspaceRoot = resolveWorkspaceRoot(options.workspace ?? dependencies.cwd ?? process.cwd())
+    const workspaceRoot = resolveWorkspaceRoot(
+      options.workspace ?? dependencies.cwd ?? process.cwd(),
+    )
     const homeDir = dependencies.homeDir ?? homedir()
     const sessionId = crypto.randomUUID()
 
@@ -110,7 +113,9 @@ export async function handleResumeCommand(
     if (result.error) {
       const code = (result.error as NodeJS.ErrnoException).code
       if (code === 'ENOENT') {
-        error(`${command} CLI not found on PATH — the session is materialized; run the command above manually.`)
+        error(
+          `${command} CLI not found on PATH — the session is materialized; run the command above manually.`,
+        )
         return 1
       }
       throw result.error
@@ -155,11 +160,7 @@ function resolveWorkspaceRoot(input: string): string {
   }
 }
 
-async function fetchRecords(
-  client: HubClient,
-  sid: string,
-  wanted: number,
-): Promise<HubRecord[]> {
+async function fetchRecords(client: HubClient, sid: string, wanted: number): Promise<HubRecord[]> {
   const records: HubRecord[] = []
   let from = 0
   while (records.length < wanted) {
@@ -177,7 +178,10 @@ async function fetchRecords(
   return records
 }
 
-async function verifyRecords(records: readonly HubRecord[], expectedRoot: string | null): Promise<void> {
+async function verifyRecords(
+  records: readonly HubRecord[],
+  expectedRoot: string | null,
+): Promise<void> {
   for (const record of records) {
     const digest = createHash('sha256').update(record.data, 'utf8').digest('hex')
     if (digest !== record.oid) {

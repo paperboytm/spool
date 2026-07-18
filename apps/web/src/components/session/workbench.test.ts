@@ -1,32 +1,35 @@
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
+import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { ConversationMessage } from '@spool-lab/session-view'
 import type { SpoolDocument } from '@spool/share-kit'
-import type { SessionViewV1 } from '@spool-lab/session-kit'
-import { describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vite-plus/test'
+
 import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
 
 vi.mock('@spool-lab/session-view', () => ({
-  MessageList: ({ useWindowScroll }: { useWindowScroll?: boolean }) => createElement(
-    'div',
-    {
-      'data-testid': 'message-list',
-      'data-window-scroll': String(useWindowScroll === true),
-    },
-    'Conversation',
-  ),
+  MessageList: ({ useWindowScroll }: { useWindowScroll?: boolean }) =>
+    createElement(
+      'div',
+      {
+        'data-testid': 'message-list',
+        'data-window-scroll': String(useWindowScroll === true),
+      },
+      'Conversation',
+    ),
 }))
 
 vi.mock('@spool/share-kit/timeline', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@spool/share-kit/timeline')>()
   return {
     ...actual,
-    TimelineBody: ({ progressive }: { progressive?: boolean }) => createElement(
-      'div',
-      { 'data-testid': 'timeline-body', 'data-progressive': String(progressive === true) },
-      'Shared timeline',
-    ),
+    TimelineBody: ({ progressive }: { progressive?: boolean }) =>
+      createElement(
+        'div',
+        { 'data-testid': 'timeline-body', 'data-progressive': String(progressive === true) },
+        'Shared timeline',
+      ),
   }
 })
 
@@ -94,7 +97,11 @@ describe('getUserPromptEntries', () => {
     ])
 
     expect(entries).toEqual([
-      { id: 13, excerpt: 'Redesign the session timeline', preview: 'Redesign the session timeline' },
+      {
+        id: 13,
+        excerpt: 'Redesign the session timeline',
+        preview: 'Redesign the session timeline',
+      },
       { id: 55, excerpt: 'Add workspace metadata', preview: 'Add workspace metadata' },
     ])
   })
@@ -130,23 +137,27 @@ describe('getUserPromptEntries', () => {
       message(233, 'user', '\n  ## `Review` the metadata layout  \nMore context'),
     ])
 
-    expect(entries).toEqual([{
-      id: 233,
-      excerpt: 'Review the metadata layout',
-      preview: '## `Review` the metadata layout  \nMore context',
-    }])
+    expect(entries).toEqual([
+      {
+        id: 233,
+        excerpt: 'Review the metadata layout',
+        preview: '## `Review` the metadata layout  \nMore context',
+      },
+    ])
   })
 })
 
 describe('getSpoolPromptEntries', () => {
   it('uses original turn indices for visible nonblank user turns', () => {
-    const entries = getSpoolPromptEntries(spoolDocument([
-      { role: 'assistant', body: 'Opening response' },
-      { role: 'user', body: '  # First prompt  ' },
-      { role: 'user', body: '\n\t' },
-      { role: 'assistant', body: 'Follow-up response' },
-      { role: 'user', body: 'Second prompt' },
-    ]))
+    const entries = getSpoolPromptEntries(
+      spoolDocument([
+        { role: 'assistant', body: 'Opening response' },
+        { role: 'user', body: '  # First prompt  ' },
+        { role: 'user', body: '\n\t' },
+        { role: 'assistant', body: 'Follow-up response' },
+        { role: 'user', body: 'Second prompt' },
+      ]),
+    )
 
     expect(entries).toEqual([
       { turnIndex: 1, excerpt: 'First prompt', preview: '# First prompt' },
@@ -155,12 +166,17 @@ describe('getSpoolPromptEntries', () => {
   })
 
   it('follows the shared selection projection instead of indexing hidden turns', () => {
-    const entries = getSpoolPromptEntries(spoolDocument([
-      { role: 'user', body: 'Hidden first prompt' },
-      { role: 'assistant', body: 'Visible response' },
-      { role: 'user', body: 'Visible second prompt' },
-      { role: 'user', body: 'Hidden third prompt' },
-    ], { selected: [1, 2] }))
+    const entries = getSpoolPromptEntries(
+      spoolDocument(
+        [
+          { role: 'user', body: 'Hidden first prompt' },
+          { role: 'assistant', body: 'Visible response' },
+          { role: 'user', body: 'Visible second prompt' },
+          { role: 'user', body: 'Hidden third prompt' },
+        ],
+        { selected: [1, 2] },
+      ),
+    )
 
     expect(entries).toEqual([
       { turnIndex: 2, excerpt: 'Visible second prompt', preview: 'Visible second prompt' },
@@ -168,19 +184,26 @@ describe('getSpoolPromptEntries', () => {
   })
 
   it('never adds a blank user turn to the prompt directory', () => {
-    const entries = getSpoolPromptEntries(spoolDocument([
-      { role: 'user', body: '   ' },
-      { role: 'assistant', body: 'Assistant response' },
-    ], { hideEmptyTurns: false }))
+    const entries = getSpoolPromptEntries(
+      spoolDocument(
+        [
+          { role: 'user', body: '   ' },
+          { role: 'assistant', body: 'Assistant response' },
+        ],
+        { hideEmptyTurns: false },
+      ),
+    )
 
     expect(entries).toEqual([])
   })
 
   it('uses the same redacted projection as the shared timeline', () => {
     const sensitiveEmail = 'maya@hogwarts.edu'
-    const entries = getSpoolPromptEntries(spoolDocument([
-      { role: 'user', body: `Please reply to ${sensitiveEmail}` },
-    ], { redact: true }))
+    const entries = getSpoolPromptEntries(
+      spoolDocument([{ role: 'user', body: `Please reply to ${sensitiveEmail}` }], {
+        redact: true,
+      }),
+    )
 
     expect(entries[0]?.preview).not.toContain(sensitiveEmail)
     expect(entries[0]?.preview).toContain('m***@hogwarts.edu')
@@ -218,28 +241,35 @@ const view: SessionViewV1 = {
   diffstat: { files: 1, adds: 2, dels: 1 },
 }
 
-function renderWorkbench(options: {
-  spool?: SpoolDocument | null
-  messages?: ParsedConversation
-  noteMd?: string | null
-  cardJson?: string | null
-  view?: SessionViewV1 | null
-} = {}): string {
-  return renderToStaticMarkup(createElement(SessionWorkbench, {
-    meta: {
-      ...meta,
-      noteMd: options.noteMd === undefined ? meta.noteMd : options.noteMd,
-      cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
-    },
-    view: options.view === undefined ? view : options.view,
-    provider: 'claude',
-    conversation: options.messages ?? conversation,
-    isDark: false,
-    initialRecordIndex: null,
-    spoolDocument: options.spool === undefined
-      ? spoolDocument([{ role: 'user', body: 'Published full prompt\nwith private detail removed' }])
-      : options.spool,
-  }))
+function renderWorkbench(
+  options: {
+    spool?: SpoolDocument | null
+    messages?: ParsedConversation
+    noteMd?: string | null
+    cardJson?: string | null
+    view?: SessionViewV1 | null
+  } = {},
+): string {
+  return renderToStaticMarkup(
+    createElement(SessionWorkbench, {
+      meta: {
+        ...meta,
+        noteMd: options.noteMd === undefined ? meta.noteMd : options.noteMd,
+        cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
+      },
+      view: options.view === undefined ? view : options.view,
+      provider: 'claude',
+      conversation: options.messages ?? conversation,
+      isDark: false,
+      initialRecordIndex: null,
+      spoolDocument:
+        options.spool === undefined
+          ? spoolDocument([
+              { role: 'user', body: 'Published full prompt\nwith private detail removed' },
+            ])
+          : options.spool,
+    }),
+  )
 }
 
 describe('SessionWorkbench', () => {
@@ -257,7 +287,9 @@ describe('SessionWorkbench', () => {
     const html = renderWorkbench()
 
     expect(html.match(/id="workspace-title"/g)).toHaveLength(1)
-    expect(html).not.toContain('<div class="border-t border-[var(--border)]"><h2 id="workspace-title"')
+    expect(html).not.toContain(
+      '<div class="border-t border-[var(--border)]"><h2 id="workspace-title"',
+    )
     expect(html).not.toContain('>Metadata<')
     expect(html).not.toContain('>Files<')
     expect(html).not.toContain('apps/web/src/session.tsx')

@@ -14,8 +14,9 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     // they can't open the account UI to find the Cancel button. Other
     // mutating endpoints stay locked behind the default policy.
     const user = await requireUser(ctx.request, ctx.env, { allowPendingDeletion: true })
-    const handle = await ctx.env.DB
-      .prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
+    const handle = await ctx.env.DB.prepare(
+      'SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL',
+    )
       .bind(user.id)
       .first<{ handle: string }>()
 

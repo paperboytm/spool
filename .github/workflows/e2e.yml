@@ -4,16 +4,16 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "apps/web/**"
-      - "videos/**"
-      - "**/*.md"
-      - "docs/**"
+      - 'apps/web/**'
+      - 'videos/**'
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
     paths-ignore:
-      - "apps/web/**"
-      - "videos/**"
-      - "**/*.md"
-      - "docs/**"
+      - 'apps/web/**'
+      - 'videos/**'
+      - '**/*.md'
+      - 'docs/**'
 
 # Tests only read the repo; upload-artifact needs no extra scope.
 permissions:

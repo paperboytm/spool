@@ -7,14 +7,14 @@ Spool indexes your AI agent sessions automatically. Each source is watched in re
 
 ## Agent sessions
 
-| Agent | Path |
-|-------|------|
-| Claude Code | `~/.claude/projects/` |
-| Claude Code (profiles) | `~/.claude-profiles/*/projects/` |
-| Codex CLI | `~/.codex/sessions/` |
-| Codex CLI (profiles) | `~/.codex-profiles/*/sessions/` |
-| Gemini CLI | `~/.gemini/tmp/*/chats/` |
-| OpenCode | `~/.local/share/opencode/opencode.db` |
+| Agent                  | Path                                  |
+| ---------------------- | ------------------------------------- |
+| Claude Code            | `~/.claude/projects/`                 |
+| Claude Code (profiles) | `~/.claude-profiles/*/projects/`      |
+| Codex CLI              | `~/.codex/sessions/`                  |
+| Codex CLI (profiles)   | `~/.codex-profiles/*/sessions/`       |
+| Gemini CLI             | `~/.gemini/tmp/*/chats/`              |
+| OpenCode               | `~/.local/share/opencode/opencode.db` |
 
 ## Platform data (Twitter, GitHub, Reddit, etc.)
 

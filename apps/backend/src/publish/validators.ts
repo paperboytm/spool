@@ -47,10 +47,7 @@ export const Snapshot = z.object({
     .refine(
       (c) => {
         const ids = new Set(c.turns.map((t) => t.id))
-        return (
-          c.turn_order.every((id) => ids.has(id)) &&
-          c.hidden_turns.every((id) => ids.has(id))
-        )
+        return c.turn_order.every((id) => ids.has(id)) && c.hidden_turns.every((id) => ids.has(id))
       },
       {
         message: 'turn_order/hidden_turns reference an unknown turn id',
@@ -97,7 +94,10 @@ export const PublishRequest = z.object({
   // handler re-runs `isValidSlug()` after this, but enforcing at the
   // schema boundary lets us reject malformed slugs before any DB
   // round-trips fire (idempotency SELECT, ownership SELECT).
-  override_slug: z.string().regex(/^[A-Za-z0-9_-]{21}$/).optional(),
+  override_slug: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{21}$/)
+    .optional(),
 })
 
 export type PublishRequestT = z.infer<typeof PublishRequest>

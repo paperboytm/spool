@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
-import { signInWithWorkos, type SignInResult } from '../auth/workos-auth.js'
+
 import { saveToken, loadToken, clearToken, isAvailable } from '../auth/session-store.js'
+import { signInWithWorkos, type SignInResult } from '../auth/workos-auth.js'
 import { authedFetch } from '../share/api-client.js'
 
 export interface SignInDeps {
@@ -38,9 +39,7 @@ export async function performSignIn(deps: SignInDeps): Promise<SignInResult['use
  *  browser. */
 export type SignInImpl = () => Promise<SignInResult>
 
-export function registerShareAuthIpc(
-  signInImpl: SignInImpl = signInWithWorkos,
-): void {
+export function registerShareAuthIpc(signInImpl: SignInImpl = signInWithWorkos): void {
   ipcMain.handle('share-auth:available', () => isAvailable())
 
   ipcMain.handle('share-auth:signin', async () => {

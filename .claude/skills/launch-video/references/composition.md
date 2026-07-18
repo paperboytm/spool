@@ -1,16 +1,16 @@
 # Composition
 
-The proven HyperFrames composition layout. Copy from `videos/launch-template/index.html` and customise per release; this doc explains *why* the template looks the way it does so you don't accidentally revert hard-won decisions.
+The proven HyperFrames composition layout. Copy from `videos/launch-template/index.html` and customise per release; this doc explains _why_ the template looks the way it does so you don't accidentally revert hard-won decisions.
 
 ## Canvas + window dimensions
 
-| Element | Value | Notes |
-|---|---|---|
-| Canvas | 1920×1080 | 16:9, Twitter-friendly |
-| Window logical size | 1000×685 | Renders the captured 1080×740 .mov at 1.46:1 aspect |
-| Window position | left 700, top 197 | Right of canvas centre, vertical centre |
-| Window `border-radius` | 8px | Matches macOS native window curve in the captured `.mov`. Smaller → `screencapture -R` desktop background bleeds into corners. Larger → app chrome gets clipped. |
-| Drop shadow | three layers (60/120, 24/48, 6/12 px) | Gives a "floating" feel. Single-layer shadow looks flat. |
+| Element                | Value                                 | Notes                                                                                                                                                            |
+| ---------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canvas                 | 1920×1080                             | 16:9, Twitter-friendly                                                                                                                                           |
+| Window logical size    | 1000×685                              | Renders the captured 1080×740 .mov at 1.46:1 aspect                                                                                                              |
+| Window position        | left 700, top 197                     | Right of canvas centre, vertical centre                                                                                                                          |
+| Window `border-radius` | 8px                                   | Matches macOS native window curve in the captured `.mov`. Smaller → `screencapture -R` desktop background bleeds into corners. Larger → app chrome gets clipped. |
+| Drop shadow            | three layers (60/120, 24/48, 6/12 px) | Gives a "floating" feel. Single-layer shadow looks flat.                                                                                                         |
 
 ## Text panel (left)
 
@@ -29,11 +29,11 @@ The proven HyperFrames composition layout. Copy from `videos/launch-template/ind
 
 Camera = `transform-origin + scale` on the `.window`. The annotation rectangles inherit the same transform because they live inside `.window`.
 
-| Intent | Pattern |
-|---|---|
-| First-screen / overview | No zoom (`scale: 1`) |
-| Highlight a sidebar region | Light zoom (`scale: 1.12–1.18`) with origin near the region's centre |
-| Punch into a small element (badge, banner) | Tight zoom (`scale: 1.25–1.5`) with origin over the element |
+| Intent                                     | Pattern                                                              |
+| ------------------------------------------ | -------------------------------------------------------------------- |
+| First-screen / overview                    | No zoom (`scale: 1`)                                                 |
+| Highlight a sidebar region                 | Light zoom (`scale: 1.12–1.18`) with origin near the region's centre |
+| Punch into a small element (badge, banner) | Tight zoom (`scale: 1.25–1.5`) with origin over the element          |
 
 Many releases ship with `scale: 1` throughout and rely on the spotlight mask (`spotlight.md`) for focus. Reach for a camera punch only when you want the underlying UI itself to physically grow into frame — not as a substitute for spotlight focus.
 
@@ -52,8 +52,16 @@ The amber outline that says "look here". Lives inside `.window`. Coords are in `
 ```
 
 ```css
-#annot-feature-X { left: 1%; top: 15%; width: 21%; height: 16%; }
-#annot-feature-X-label { left: 1%; top: 10.5%; }
+#annot-feature-X {
+  left: 1%;
+  top: 15%;
+  width: 21%;
+  height: 16%;
+}
+#annot-feature-X-label {
+  left: 1%;
+  top: 10.5%;
+}
 ```
 
 **Measuring annotation coords (do this fresh every release):**
@@ -96,7 +104,7 @@ t=0.80s   click / state change                ← action lands
 
 The 0.4s lead is the natural-feel range. Anything below 0.25s reads as simultaneous; above 0.6s reads as a delay.
 
-If your scene has only one panel-led beat per scene, this is automatic. For multi-click scenes where the spotlight retargets per click, only the *first* spotlight needs the lead — subsequent retargets can fire ~0.3–0.4s before each click.
+If your scene has only one panel-led beat per scene, this is automatic. For multi-click scenes where the spotlight retargets per click, only the _first_ spotlight needs the lead — subsequent retargets can fire ~0.3–0.4s before each click.
 
 ## Beat sync
 
@@ -132,7 +140,7 @@ Always append a 0.6–0.8s `afade=t=out` tail so the music decays into the locku
 
 ## Optional capstone scene
 
-Some releases earn an extra scene *between* the final feature beat and the brand outro — a stylised after-shot that shows the *outcome* of what the feature does (e.g. tangible exports fanned out as document cards, a list collapsing to "all clean", a generated artefact landing in a destination). Build it in pure HTML/CSS layered above `.window` so no extra captures are needed.
+Some releases earn an extra scene _between_ the final feature beat and the brand outro — a stylised after-shot that shows the _outcome_ of what the feature does (e.g. tangible exports fanned out as document cards, a list collapsing to "all clean", a generated artefact landing in a destination). Build it in pure HTML/CSS layered above `.window` so no extra captures are needed.
 
 Only earn this scene when the outcome is the headline. For releases whose payoff already lives inside the final feature clip (a count collapsing, a list emptying, a toggle settling), cut straight from that beat to the lockup — adding a capstone there forces redundancy and bloats runtime. The decision is per-release, not a default.
 
@@ -142,21 +150,24 @@ Already encoded in the template as `panelIn()`, `panelOut()`, `zoomTo()`, `clipF
 
 The `clipCut(outSel, inSel, at)` helper that swaps videos should bring the incoming clip's opacity to 1 at `at - 0.20` and drop the outgoing clip's opacity to 0 at `at + 0.10` — the 0.30s overlap gives the renderer time to decode the incoming clip's first frame before the outgoing one disappears. A tighter overlap can produce a one-frame dark gap that reads as a flash. See `pitfalls.md` on clip-boundary gaps.
 
-Word-by-word stagger on `panel-headline` is the one place where motion is *allowed* to be slightly playful — keeps the text from feeling like a static slide.
+Word-by-word stagger on `panel-headline` is the one place where motion is _allowed_ to be slightly playful — keeps the text from feeling like a static slide.
 
 ## End-of-timeline anchor
 
 The composition's last frame must be the lockup, not a fade-to-blank. GSAP's `fromTo` keeps a tween at its end-state after completion, but at the timeline's natural end the renderer may revert to the from-state if you don't pin the final state explicitly. Add zero-duration `.to()` tweens just before the composition boundary:
 
 ```js
-tl.fromTo("#outro-lockup",
+tl.fromTo(
+  '#outro-lockup',
   { y: 10, opacity: 0, scale: 0.98 },
-  { y: 0, opacity: 1, scale: 1, duration: 0.55, ease: "power3.out" }, 33.80);
+  { y: 0, opacity: 1, scale: 1, duration: 0.55, ease: 'power3.out' },
+  33.8,
+)
 // Anchor the held state at the composition boundary so the last
 // frame is the lockup, not a fade-to-blank.
-tl.to("#outro-lockup", { opacity: 1, y: 0, scale: 1, duration: 0.001 }, 35.49);
-tl.to("#outro",        { opacity: 1, duration: 0.001 }, 35.49);
-tl.to("#outro-fade",   { opacity: 1, duration: 0.001 }, 35.49);
+tl.to('#outro-lockup', { opacity: 1, y: 0, scale: 1, duration: 0.001 }, 35.49)
+tl.to('#outro', { opacity: 1, duration: 0.001 }, 35.49)
+tl.to('#outro-fade', { opacity: 1, duration: 0.001 }, 35.49)
 ```
 
 The composition `data-duration` is 35.50 in this example; the anchor tweens fire at 35.49 to guarantee the last rendered frame holds the lockup's full opacity.

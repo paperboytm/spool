@@ -1,8 +1,16 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { wellKnownBinPaths, nvmVersionBins, miseVersionBins } from './resolve-bin.js'
+
+import { describe, it, expect, afterEach, beforeEach } from 'vite-plus/test'
+
+import {
+  wellKnownBinPaths,
+  nvmVersionBins,
+  miseVersionBins,
+  resolveSystemBinary,
+  resolveSystemBinaryAsync,
+} from './resolve-bin.js'
 
 let tmpHome: string
 
@@ -11,7 +19,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  try { rmSync(tmpHome, { recursive: true, force: true }) } catch { /* ignore */ }
+  try {
+    rmSync(tmpHome, { recursive: true, force: true })
+  } catch {
+    /* ignore */
+  }
 })
 
 function touch(path: string): void {
@@ -35,6 +47,20 @@ describe('wellKnownBinPaths', () => {
   it('appends mise shim path', () => {
     const paths = wellKnownBinPaths('codex', tmpHome)
     expect(paths).toContain(`${tmpHome}/.local/share/mise/shims/codex`)
+  })
+
+  it.each(['codex; touch /tmp/pwned', '../codex', 'codex $(whoami)', ''])(
+    'rejects unsafe binary name %j before filesystem or shell lookup',
+    async (name) => {
+      expect(wellKnownBinPaths(name, tmpHome)).toEqual([])
+      expect(resolveSystemBinary(name)).toBeNull()
+      await expect(resolveSystemBinaryAsync(name)).resolves.toBeNull()
+    },
+  )
+
+  it('still resolves a safe binary name', async () => {
+    expect(resolveSystemBinary('node')).toMatch(/node$/)
+    await expect(resolveSystemBinaryAsync('node')).resolves.toMatch(/node$/)
   })
 })
 
@@ -66,9 +92,7 @@ describe('nvmVersionBins', () => {
 
 describe('miseVersionBins', () => {
   it('returns only the shim path when mise installs dir is missing', () => {
-    expect(miseVersionBins(tmpHome, 'codex')).toEqual([
-      `${tmpHome}/.local/share/mise/shims/codex`,
-    ])
+    expect(miseVersionBins(tmpHome, 'codex')).toEqual([`${tmpHome}/.local/share/mise/shims/codex`])
   })
 
   it('includes shim + installed versions, with latest first when present', () => {
@@ -95,7 +119,17 @@ describe('miseVersionBins', () => {
   })
 
   it('reproduces issue #237: mise-installed codex is discoverable via fallback', () => {
-    const codexPath = join(tmpHome, '.local', 'share', 'mise', 'installs', 'npm-openai-codex', 'latest', 'bin', 'codex')
+    const codexPath = join(
+      tmpHome,
+      '.local',
+      'share',
+      'mise',
+      'installs',
+      'npm-openai-codex',
+      'latest',
+      'bin',
+      'codex',
+    )
     touch(codexPath)
     const paths = wellKnownBinPaths('codex', tmpHome)
     expect(paths).toContain(codexPath)

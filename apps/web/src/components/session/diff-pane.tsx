@@ -3,13 +3,13 @@
 // net diff is recomputed CLIENT-SIDE with session-kit. The hub never
 // computes a diff, and a tampered author view is exposed right here.
 
-import { useEffect, useState } from 'react'
 import {
   composeSessionDiff,
   extractEditEvents,
   type SessionFileDiff,
   type SessionViewV1,
 } from '@spool-lab/session-kit'
+import { useEffect, useState } from 'react'
 
 import { fetchRecordsByIndices, type RangeFetcher } from '../../lib/hub-api'
 
@@ -28,7 +28,15 @@ interface Props {
   onJumpToRecord?: (index: number) => void
 }
 
-export function DiffPane({ view, provider, fetchRange, openFile, highlightRecord, onSelectFile, onJumpToRecord }: Props) {
+export function DiffPane({
+  view,
+  provider,
+  fetchRange,
+  openFile,
+  highlightRecord,
+  onSelectFile,
+  onJumpToRecord,
+}: Props) {
   const [diffs, setDiffs] = useState<Map<string, FileDiffState>>(new Map())
 
   useEffect(() => {
@@ -43,10 +51,9 @@ export function DiffPane({ view, provider, fetchRange, openFile, highlightRecord
           { provider },
         )
         const diff = composeSessionDiff(events).files.find((file) => file.path === openFile)
-        setDiffs((current) => new Map(current).set(
-          openFile,
-          diff ? { state: 'ready', diff } : { state: 'error' },
-        ))
+        setDiffs((current) =>
+          new Map(current).set(openFile, diff ? { state: 'ready', diff } : { state: 'error' }),
+        )
       })
       .catch(() => {
         setDiffs((current) => new Map(current).set(openFile, { state: 'error' }))
@@ -87,7 +94,9 @@ export function DiffPane({ view, provider, fetchRange, openFile, highlightRecord
         ))}
       </div>
 
-      {!openFile && <p className="m-0 p-2 text-xs text-[var(--faint)]">Select a file to see its net change.</p>}
+      {!openFile && (
+        <p className="m-0 p-2 text-xs text-[var(--faint)]">Select a file to see its net change.</p>
+      )}
       {active?.state === 'loading' && (
         <p className="m-0 p-2 text-xs text-[var(--faint)]">Computing diff from records…</p>
       )}
@@ -107,13 +116,21 @@ export function DiffPane({ view, provider, fetchRange, openFile, highlightRecord
   )
 }
 
-function FileDiffView({ diff, highlightRecord, onJumpToRecord }: {
+function FileDiffView({
+  diff,
+  highlightRecord,
+  onJumpToRecord,
+}: {
   diff: SessionFileDiff
   highlightRecord: number | null
   onJumpToRecord?: (index: number) => void
 }) {
   if (diff.hunks.length === 0) {
-    return <p className="m-0 p-2 text-xs text-[var(--faint)]">No net change — the edits cancelled out.</p>
+    return (
+      <p className="m-0 p-2 text-xs text-[var(--faint)]">
+        No net change — the edits cancelled out.
+      </p>
+    )
   }
   return (
     <div className="flex flex-col gap-2">
@@ -122,10 +139,14 @@ function FileDiffView({ diff, highlightRecord, onJumpToRecord }: {
         const hunkLabel = (
           <>
             @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-            <span className="text-[var(--accent)]"> {hunk.recordIndices.map((index) => `#${index}`).join(' ')}</span>
+            <span className="text-[var(--accent)]">
+              {' '}
+              {hunk.recordIndices.map((index) => `#${index}`).join(' ')}
+            </span>
           </>
         )
-        const hunkHeaderClass = 'block w-full border-0 border-b border-solid border-[var(--border)] bg-[var(--card-2)] px-2 py-1 text-left font-mono text-[11px] text-[var(--muted)] tabular-nums'
+        const hunkHeaderClass =
+          'block w-full border-0 border-b border-solid border-[var(--border)] bg-[var(--card-2)] px-2 py-1 text-left font-mono text-[11px] text-[var(--muted)] tabular-nums'
         return (
           <div
             key={hunkIndex}

@@ -2,6 +2,7 @@
 // reloads. Never leaves the browser.
 
 import { get, set, del, keys } from 'idb-keyval'
+
 import type { Conversation, EditorOpts } from '../types'
 import { normalizeOpts } from '../types'
 
@@ -39,7 +40,9 @@ export async function loadCurrentDraft(): Promise<Draft | undefined> {
 
 export async function listDrafts(): Promise<Draft[]> {
   const ks = await keys()
-  const draftKeys = ks.filter((k): k is string => typeof k === 'string' && k.startsWith(PREFIX) && k !== CURRENT_KEY)
+  const draftKeys = ks.filter(
+    (k): k is string => typeof k === 'string' && k.startsWith(PREFIX) && k !== CURRENT_KEY,
+  )
   const drafts = await Promise.all(draftKeys.map((k) => get<Draft>(k)))
   return drafts
     .map(hydrate)

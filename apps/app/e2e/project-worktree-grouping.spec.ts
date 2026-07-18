@@ -1,8 +1,10 @@
-import { test, expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { test, expect } from '@playwright/test'
+
 import { launchApp, restartApp, waitForSync, type AppContext } from './helpers/launch'
 
 test('historical Orca and Codex worktrees collapse into one sidebar project after restart', async () => {
@@ -12,11 +14,10 @@ test('historical Orca and Codex worktrees collapse into one sidebar project afte
   const repoPath = join(testHome, 'work', 'paperboy')
   mkdirSync(repoPath, { recursive: true })
   execFileSync('git', ['init', '-b', 'main'], { cwd: repoPath, stdio: 'ignore' })
-  execFileSync(
-    'git',
-    ['remote', 'add', 'origin', 'git@github.com:paperboytm/paperboy.git'],
-    { cwd: repoPath, stdio: 'ignore' },
-  )
+  execFileSync('git', ['remote', 'add', 'origin', 'git@github.com:paperboytm/paperboy.git'], {
+    cwd: repoPath,
+    stdio: 'ignore',
+  })
 
   let ctx: AppContext | null = null
   try {
@@ -49,12 +50,20 @@ test('historical Orca and Codex worktrees collapse into one sidebar project afte
                 ...(repositoryUrl ? { git: { repository_url: repositoryUrl } } : {}),
               },
             },
-            { timestamp: `2026-07-17T10:0${index}:01Z`, type: 'event_msg', payload: { type: 'user_message', message: `worktree ${index}` } },
-            { timestamp: `2026-07-17T10:0${index}:02Z`, type: 'event_msg', payload: { type: 'agent_message', message: 'done' } },
+            {
+              timestamp: `2026-07-17T10:0${index}:01Z`,
+              type: 'event_msg',
+              payload: { type: 'user_message', message: `worktree ${index}` },
+            },
+            {
+              timestamp: `2026-07-17T10:0${index}:02Z`,
+              type: 'event_msg',
+              payload: { type: 'agent_message', message: 'done' },
+            },
           ]
           writeFileSync(
             join(sessionDir, `rollout-2026-07-17T10-0${index}-00-${uuid}.jsonl`),
-            lines.map(line => JSON.stringify(line)).join('\n') + '\n',
+            lines.map((line) => JSON.stringify(line)).join('\n') + '\n',
           )
         }
         stalePaperboyCwds.forEach((cwd, index) => writeSession(cwd, index))
@@ -84,10 +93,13 @@ test('historical Orca and Codex worktrees collapse into one sidebar project afte
     // the production path that reopens the DB and reconciles old path rows.
     const orcaDir = join(testHome, 'Library', 'Application Support', 'orca')
     mkdirSync(orcaDir, { recursive: true })
-    writeFileSync(join(orcaDir, 'orca-data.json'), JSON.stringify({
-      repos: [{ id: 'repo-paperboy', path: repoPath, displayName: 'paperboy' }],
-      worktreeMeta: {},
-    }))
+    writeFileSync(
+      join(orcaDir, 'orca-data.json'),
+      JSON.stringify({
+        repos: [{ id: 'repo-paperboy', path: repoPath, displayName: 'paperboy' }],
+        worktreeMeta: {},
+      }),
+    )
 
     ctx = await restartApp(ctx)
     await waitForSync(ctx.window)

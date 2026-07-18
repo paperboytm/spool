@@ -9,9 +9,11 @@
 // See mutation-worker-thread.ts for the worker side of the protocol.
 
 import { Worker } from 'node:worker_threads'
-import { PubSub, Effect, Stream } from 'effect'
+
 import type { FindingsChange, PurgeResult } from '@spool-lab/core'
 import type { SensitiveKind } from '@spool-lab/redact'
+import { PubSub, Effect, Stream } from 'effect'
+
 import type {
   FromWorker,
   MutationCommand,
@@ -50,7 +52,11 @@ export class MutationWorkerError extends Error {
   public readonly reason: PurgeErrorWire['reason'] | 'unknown'
   public readonly findingId: number | undefined
   constructor(error: PurgeErrorWire | { reason: 'unknown'; message: string }) {
-    super('message' in error && typeof error.message === 'string' ? error.message : `mutation worker error: ${error.reason}`)
+    super(
+      'message' in error && typeof error.message === 'string'
+        ? error.message
+        : `mutation worker error: ${error.reason}`,
+    )
     this.name = 'MutationWorkerError'
     this.reason = error.reason
     this.findingId = 'findingId' in error ? error.findingId : undefined
@@ -67,7 +73,11 @@ export async function spawnMutationWorker(workerPath: string): Promise<MutationW
   const changes = await Effect.runPromise(PubSub.unbounded<FindingsChange>())
 
   function postSafe(msg: ToWorker): void {
-    try { worker.postMessage(msg) } catch { /* worker gone */ }
+    try {
+      worker.postMessage(msg)
+    } catch {
+      /* worker gone */
+    }
   }
 
   function send(payload: MutationCommand): Promise<MutationResult> {
@@ -89,7 +99,9 @@ export async function spawnMutationWorker(workerPath: string): Promise<MutationW
     const timeout = setTimeout(() => {
       worker.off('message', onMessage)
       worker.off('error', onError)
-      worker.terminate().catch(() => { /* nothing to do */ })
+      worker.terminate().catch(() => {
+        /* nothing to do */
+      })
       reject(new Error(`mutation worker did not report ready within ${BOOT_TIMEOUT_MS}ms`))
     }, BOOT_TIMEOUT_MS)
     function clear(): void {
@@ -196,7 +208,9 @@ export async function spawnMutationWorker(workerPath: string): Promise<MutationW
       await new Promise<void>((resolve) => {
         worker.once('exit', () => resolve())
         setTimeout(() => {
-          worker.terminate().catch(() => { /* nothing to do */ })
+          worker.terminate().catch(() => {
+            /* nothing to do */
+          })
           resolve()
         }, 3000)
       })

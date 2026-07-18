@@ -1,7 +1,6 @@
 import { net } from 'electron'
 
 import { loadToken } from '../auth/session-store.js'
-
 import { backendUrl } from './backend-url.js'
 
 // Electron's `net.fetch` honours macOS system proxy and the OS trust

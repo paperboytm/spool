@@ -18,6 +18,7 @@
 // the subscription delivers the first value.
 
 import { useSyncExternalStore } from 'react'
+
 import { securityApi, type SecurityPreferences } from './security.js'
 
 let cached: SecurityPreferences | null = null
@@ -39,7 +40,11 @@ function setCache(next: SecurityPreferences | null): void {
 
 function emit(): void {
   for (const fn of subscribers) {
-    try { fn() } catch (err) { console.error('[securityPrefsCache] subscriber threw:', err) }
+    try {
+      fn()
+    } catch (err) {
+      console.error('[securityPrefsCache] subscriber threw:', err)
+    }
   }
 }
 
@@ -49,7 +54,9 @@ function getSnapshot(): SecurityPreferences | null {
 
 function subscribe(fn: () => void): () => void {
   subscribers.add(fn)
-  return () => { subscribers.delete(fn) }
+  return () => {
+    subscribers.delete(fn)
+  }
 }
 
 /** React hook. Returns the current cached SecurityPreferences, or
@@ -70,8 +77,11 @@ export async function patchSecurityPrefs(patch: Partial<SecurityPreferences>): P
   // Cold cache: nothing to optimistically update or roll back. Just
   // persist; the EVT_PREFS_CHANGED broadcast primes the cache.
   if (!cached) {
-    try { await securityApi.setPrefs(patch) }
-    catch (err) { console.error('[securityPrefsCache] setPrefs failed:', err) }
+    try {
+      await securityApi.setPrefs(patch)
+    } catch (err) {
+      console.error('[securityPrefsCache] setPrefs failed:', err)
+    }
     return
   }
 
@@ -99,7 +109,8 @@ export async function primeSecurityPrefsCache(): Promise<SecurityPreferences | n
   ensureUpstreamSubscription()
   if (cached) return cached
   if (inflight) return inflight
-  inflight = securityApi.getPrefs()
+  inflight = securityApi
+    .getPrefs()
     .then((p) => {
       inflight = null
       setCache(p)

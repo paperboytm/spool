@@ -3,21 +3,22 @@
 Internal React library that powers Spool Share — the editor surface for turning AI conversations into PNG / PDF / `.spool` artifacts (Phase 0) and, eventually, hosted permalinks (Phase 2).
 
 Consumed by:
+
 - `@spool/app` — Electron renderer assembles its own three-column editor on top of these primitives
 - `@spool/web` (Phase 1) — the public spool.pro web app uses the same primitives
 
 ## What's in the box
 
-| Layer | Exports |
-|---|---|
-| Types | `Conversation`, `Turn`, `EditorOpts`, `Template`, `Paper`, `Typeface`, `Colorway`, `SpoolDocument`, `Origin`, …registries `PAPERS` / `TYPEFACES` / `TEMPLATES` / `COLORWAYS`, `DEFAULT_OPTS`, `normalizeOpts` |
-| Templates | `TemplateRender` (dispatches by `template` id) + individual exports `Atelier`, `Letter`, `Transcript`, `Interview`, `Chat` |
-| Template primitives | `Body` (markdown renderer with redact-chip support), `GapMarker` |
-| Components | `Wordmark`, `SourceMark`, `Icons` namespace |
-| Local exporters | `exportArtifact({ format: 'png' \| 'pdf', node, template, conversation })`, `saveBlob`, `buildSpoolDocument`, `downloadSpoolFile`, `readSpoolFile` |
-| Parsers | `parseShareUrl`, `detectPlatform`, `ParseError`, `fetchContent` (Jina-based) |
-| Drafts (IndexedDB) | `saveDraft`, `loadDraft`, `listDrafts`, `deleteDraft`, `draftIdFor` — used by spool.pro web; the Spool app uses its own SQLite-backed store |
-| Sensitive-data | `detectSensitiveSpans(text)` → matches across email / phone / API key / JWT / absolute path / env var |
+| Layer               | Exports                                                                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types               | `Conversation`, `Turn`, `EditorOpts`, `Template`, `Paper`, `Typeface`, `Colorway`, `SpoolDocument`, `Origin`, …registries `PAPERS` / `TYPEFACES` / `TEMPLATES` / `COLORWAYS`, `DEFAULT_OPTS`, `normalizeOpts` |
+| Templates           | `TemplateRender` (dispatches by `template` id) + individual exports `Atelier`, `Letter`, `Transcript`, `Interview`, `Chat`                                                                                    |
+| Template primitives | `Body` (markdown renderer with redact-chip support), `GapMarker`                                                                                                                                              |
+| Components          | `Wordmark`, `SourceMark`, `Icons` namespace                                                                                                                                                                   |
+| Local exporters     | `exportArtifact({ format: 'png' \| 'pdf', node, template, conversation })`, `saveBlob`, `buildSpoolDocument`, `downloadSpoolFile`, `readSpoolFile`                                                            |
+| Parsers             | `parseShareUrl`, `detectPlatform`, `ParseError`, `fetchContent` (Jina-based)                                                                                                                                  |
+| Drafts (IndexedDB)  | `saveDraft`, `loadDraft`, `listDrafts`, `deleteDraft`, `draftIdFor` — used by spool.pro web; the Spool app uses its own SQLite-backed store                                                                   |
+| Sensitive-data      | `detectSensitiveSpans(text)` → matches across email / phone / API key / JWT / absolute path / env var                                                                                                         |
 
 ## Usage
 

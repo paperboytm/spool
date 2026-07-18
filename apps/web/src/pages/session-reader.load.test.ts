@@ -1,6 +1,6 @@
 import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 vi.mock('../components/session/workbench', () => ({ SessionWorkbench: () => null }))
 
@@ -60,23 +60,31 @@ describe('loadSessionContent', () => {
     })
     const progress: Array<[number, number]> = []
 
-    const result = await loadSessionContent(meta.sid, meta, {
-      fetchView: vi.fn(async () => {
-        calls.push('view')
-        return view
-      }),
-      fetchSpoolFile: vi.fn(async () => {
-        calls.push('spool-invalid')
-        return null
-      }),
-      makeRangeFetcher: vi.fn(() => fetchRange),
-    }, {
-      onRecordProgress: (loaded, total) => progress.push([loaded, total]),
-    })
+    const result = await loadSessionContent(
+      meta.sid,
+      meta,
+      {
+        fetchView: vi.fn(async () => {
+          calls.push('view')
+          return view
+        }),
+        fetchSpoolFile: vi.fn(async () => {
+          calls.push('spool-invalid')
+          return null
+        }),
+        makeRangeFetcher: vi.fn(() => fetchRange),
+      },
+      {
+        onRecordProgress: (loaded, total) => progress.push([loaded, total]),
+      },
+    )
 
     expect(calls.indexOf('spool-invalid')).toBeLessThan(calls.indexOf('records:0-2'))
     expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })
-    expect(progress).toEqual([[0, 2], [2, 2]])
+    expect(progress).toEqual([
+      [0, 2],
+      [2, 2],
+    ])
   })
 
   it('skips the spool request and immediately uses raw records for legacy shares', async () => {
@@ -85,11 +93,15 @@ describe('loadSessionContent', () => {
       Array.from({ length: to - from }, (_, offset) => record(from + offset)),
     )
 
-    const result = await loadSessionContent(meta.sid, { ...meta, spoolFileOid: null }, {
-      fetchView: vi.fn(async () => view),
-      fetchSpoolFile,
-      makeRangeFetcher: vi.fn(() => fetchRange),
-    })
+    const result = await loadSessionContent(
+      meta.sid,
+      { ...meta, spoolFileOid: null },
+      {
+        fetchView: vi.fn(async () => view),
+        fetchSpoolFile,
+        makeRangeFetcher: vi.fn(() => fetchRange),
+      },
+    )
 
     expect(fetchSpoolFile).not.toHaveBeenCalled()
     expect(fetchRange).toHaveBeenCalledWith(0, 2)
@@ -102,11 +114,16 @@ describe('loadSessionContent', () => {
       Array.from({ length: to - from }, (_, offset) => record(from + offset)),
     )
 
-    const result = await loadSessionContent(meta.sid, meta, {
-      fetchView: vi.fn(async () => view),
-      fetchSpoolFile,
-      makeRangeFetcher: vi.fn(() => fetchRange),
-    }, { preferRawRecords: true })
+    const result = await loadSessionContent(
+      meta.sid,
+      meta,
+      {
+        fetchView: vi.fn(async () => view),
+        fetchSpoolFile,
+        makeRangeFetcher: vi.fn(() => fetchRange),
+      },
+      { preferRawRecords: true },
+    )
 
     expect(fetchSpoolFile).not.toHaveBeenCalled()
     expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })

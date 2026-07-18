@@ -3,8 +3,8 @@
 // Extracted from the large SecurityPage.tsx so each function can be
 // unit-tested independently of the React tree.
 
-import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
 import type { ScanStatus } from '@spool-lab/core'
+import { HIGH_SEVERITY_KINDS, INFO_SEVERITY_KINDS, type SensitiveKind } from '@spool-lab/redact'
 
 /** Threshold (sessions) below which a burst is treated as "ambient
  *  background work" — the meta-row pulse dot replaces the full
@@ -115,7 +115,7 @@ export function isInfoKind(kind: string): boolean {
 export function representativeKind(kinds: readonly string[]): string {
   if (kinds.length === 0) return 'mixed'
   const first = kinds[0]!
-  return kinds.every(k => k === first) ? first : 'mixed'
+  return kinds.every((k) => k === first) ? first : 'mixed'
 }
 
 /** Human-readable label for the per-kind purge mask + dismiss copy.
@@ -129,25 +129,25 @@ export function friendlyKind(kind: string): string {
 const FRIENDLY_KIND_MAP: Record<string, string> = {
   'api-key': 'API key',
   'private-key': 'private key',
-  'jwt': 'JWT',
-  'bearer': 'bearer token',
+  jwt: 'JWT',
+  bearer: 'bearer token',
   'kubeconfig-token': 'kubeconfig token',
   'env-var': 'env var',
   'url-creds': 'URL credentials',
   'connection-string': 'connection string',
   'ssh-key': 'SSH key',
   'cloud-cred-ini': 'cloud creds',
-  'netrc': 'netrc',
+  netrc: 'netrc',
   'basic-auth': 'basic auth',
   'generic-secret': 'secret',
-  'email': 'email',
+  email: 'email',
   'person-name': 'name',
-  'phone': 'phone',
+  phone: 'phone',
   'street-address': 'address',
   'credit-card': 'credit card',
-  'ssn': 'SSN',
+  ssn: 'SSN',
   'date-of-birth': 'DOB',
   'absolute-path': 'absolute path',
-  'ip': 'IP address',
+  ip: 'IP address',
   'internal-host': 'internal host',
 }

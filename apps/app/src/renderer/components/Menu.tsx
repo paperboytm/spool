@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+
 import { useHotkeys } from '../hooks/useHotkeys.js'
 
 type MenuItem =
@@ -31,14 +32,11 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
     const trig = triggerRef.current
     if (!trig) return
     const trigRect = trig.getBoundingClientRect()
-    const menuHeight = menuRef.current?.getBoundingClientRect().height
-      ?? items.length * 30 + 4
+    const menuHeight = menuRef.current?.getBoundingClientRect().height ?? items.length * 30 + 4
     const margin = 8
     const spaceBelow = window.innerHeight - trigRect.bottom
     const openAbove = spaceBelow < menuHeight + margin && trigRect.top > menuHeight + margin
-    const top = openAbove
-      ? Math.max(margin, trigRect.top - menuHeight - 4)
-      : trigRect.bottom + 4
+    const top = openAbove ? Math.max(margin, trigRect.top - menuHeight - 4) : trigRect.bottom + 4
     if (align === 'right') {
       setPosition({ top, right: window.innerWidth - trigRect.right })
     } else {
@@ -46,10 +44,13 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
     }
   }, [align, items.length])
 
-  const setMenuNode = useCallback((node: HTMLDivElement | null) => {
-    menuRef.current = node
-    if (node) measure()
-  }, [measure])
+  const setMenuNode = useCallback(
+    (node: HTMLDivElement | null) => {
+      menuRef.current = node
+      if (node) measure()
+    },
+    [measure],
+  )
 
   useLayoutEffect(() => {
     if (!open) {
@@ -82,59 +83,66 @@ export default function Menu({ trigger, items, align = 'right', testId }: Props)
 
   return (
     <div ref={triggerRef} className="inline-block" data-testid={testId}>
-      {trigger({ open, toggle: () => setOpen(o => !o) })}
-      {open && position && typeof document !== 'undefined' && createPortal(
-        <div
-          ref={setMenuNode}
-          role="menu"
-          style={{
-            position: 'fixed',
-            top: position.top,
-            ...(position.right !== undefined ? { right: position.right } : {}),
-            ...(position.left !== undefined ? { left: position.left } : {}),
-          }}
-          className="z-50 min-w-[160px] rounded-lg border border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface shadow-lg overflow-hidden"
-          onClick={(event) => event.stopPropagation()}
-        >
-          {items.map((item, index) => (
-            'separator' in item ? (
-              <div key={index} role="separator" className="my-1 h-px bg-warm-border dark:bg-dark-border" />
-            ) : (
-            <button
-              key={index}
-              type="button"
-              role="menuitem"
-              disabled={item.disabled}
-              onClick={(event) => {
-                event.stopPropagation()
-                if (item.disabled) return
-                item.onSelect()
-                setOpen(false)
-              }}
-              className={`group w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                item.active
-                  ? 'text-accent dark:text-accent-dark bg-accent/10 dark:bg-accent-dark/10'
-                  : 'text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {item.icon && (
-                <span
-                  className={`flex-none w-3.5 h-3.5 flex items-center justify-center transition-colors ${
+      {trigger({ open, toggle: () => setOpen((o) => !o) })}
+      {open &&
+        position &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={setMenuNode}
+            role="menu"
+            style={{
+              position: 'fixed',
+              top: position.top,
+              ...(position.right !== undefined ? { right: position.right } : {}),
+              ...(position.left !== undefined ? { left: position.left } : {}),
+            }}
+            className="border-warm-border dark:border-dark-border bg-warm-surface dark:bg-dark-surface z-50 min-w-[160px] overflow-hidden rounded-lg border shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {items.map((item, index) =>
+              'separator' in item ? (
+                <div
+                  key={index}
+                  role="separator"
+                  className="bg-warm-border dark:bg-dark-border my-1 h-px"
+                />
+              ) : (
+                <button
+                  key={index}
+                  type="button"
+                  role="menuitem"
+                  disabled={item.disabled}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (item.disabled) return
+                    item.onSelect()
+                    setOpen(false)
+                  }}
+                  className={`group flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
                     item.active
-                      ? ''
-                      : 'text-warm-faint dark:text-dark-muted group-hover:text-warm-text dark:group-hover:text-dark-text'
-                  }`}
+                      ? 'text-accent dark:text-accent-dark bg-accent/10 dark:bg-accent-dark/10'
+                      : 'text-warm-text dark:text-dark-text hover:bg-warm-surface2 dark:hover:bg-dark-surface2'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  {item.icon}
-                </span>
-              )}
-              <span className="flex-1 truncate">{item.label}</span>
-            </button>
-            )
-          ))}
-        </div>,
-        document.body,
-      )}
+                  {item.icon && (
+                    <span
+                      className={`flex h-3.5 w-3.5 flex-none items-center justify-center transition-colors ${
+                        item.active
+                          ? ''
+                          : 'text-warm-faint dark:text-dark-muted group-hover:text-warm-text dark:group-hover:text-dark-text'
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                  )}
+                  <span className="flex-1 truncate">{item.label}</span>
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

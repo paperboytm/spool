@@ -1,7 +1,9 @@
-import { test, expect, type Page } from '@playwright/test'
-import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { test, expect, type Page } from '@playwright/test'
+
+import { launchApp, waitForSync, type AppContext } from './helpers/launch'
 
 // The "Ignored items" review used to be reachable only via Settings →
 // Security → Ignored items → Review (three levels deep). This spec
@@ -24,23 +26,55 @@ let ctx: AppContext
 test.beforeAll(async () => {
   ctx = await launchApp({
     extraFixtures: ({ claudeDir }) => {
-      writeFileSync(join(claudeDir, 'test-project', 'ignored-entry.jsonl'), [
-        JSON.stringify({ type: 'user', sessionId: SID, cwd: '/tmp/test-project', uuid: 'ie-1', timestamp: '2026-05-21T10:00:00Z', message: { role: 'user', content: `leaked ${FAKE_AKIA}, rotate it` } }),
-        JSON.stringify({ type: 'assistant', uuid: 'ie-2', timestamp: '2026-05-21T10:00:05Z', message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' } }),
-      ].join('\n'))
+      writeFileSync(
+        join(claudeDir, 'test-project', 'ignored-entry.jsonl'),
+        [
+          JSON.stringify({
+            type: 'user',
+            sessionId: SID,
+            cwd: '/tmp/test-project',
+            uuid: 'ie-1',
+            timestamp: '2026-05-21T10:00:00Z',
+            message: { role: 'user', content: `leaked ${FAKE_AKIA}, rotate it` },
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            uuid: 'ie-2',
+            timestamp: '2026-05-21T10:00:05Z',
+            message: { role: 'assistant', model: 'claude-sonnet-4', content: 'ok' },
+          }),
+        ].join('\n'),
+      )
     },
   })
 })
 
-test.afterAll(async () => { await ctx?.cleanup() })
+test.afterAll(async () => {
+  await ctx?.cleanup()
+})
 
 async function waitForWorkerIdle(window: Page): Promise<void> {
-  await window.waitForFunction(async () => {
-    const api = (globalThis as { spool?: { security?: { getScanStatus: () => Promise<{ queued: number; scanning: number | null; backfillRemaining: number }> } } }).spool
-    if (!api?.security) return false
-    const s = await api.security.getScanStatus()
-    return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
-  }, { timeout: 30_000, polling: 250 })
+  await window.waitForFunction(
+    async () => {
+      const api = (
+        globalThis as {
+          spool?: {
+            security?: {
+              getScanStatus: () => Promise<{
+                queued: number
+                scanning: number | null
+                backfillRemaining: number
+              }>
+            }
+          }
+        }
+      ).spool
+      if (!api?.security) return false
+      const s = await api.security.getScanStatus()
+      return s.queued === 0 && s.scanning === null && s.backfillRemaining === 0
+    },
+    { timeout: 30_000, polling: 250 },
+  )
 }
 
 test('Security page surfaces an Ignored entry that opens the manage modal', async () => {
@@ -56,10 +90,16 @@ test('Security page surfaces an Ignored entry that opens the manage modal', asyn
 
   // Dismiss the fixture's api-key finding (writes an allowlist row).
   await window.evaluate(async () => {
-    const api = (globalThis as { spool?: { security?: {
-      listFindings: (f: unknown) => Promise<Array<{ id: number; kind: string }>>
-      dismissFinding: (id: number, scope: string) => Promise<unknown>
-    } } }).spool
+    const api = (
+      globalThis as {
+        spool?: {
+          security?: {
+            listFindings: (f: unknown) => Promise<Array<{ id: number; kind: string }>>
+            dismissFinding: (id: number, scope: string) => Promise<unknown>
+          }
+        }
+      }
+    ).spool
     const rows = await api!.security!.listFindings({ state: 'active' })
     const target = rows.find((r) => r.kind === 'api-key') ?? rows[0]
     if (target) await api!.security!.dismissFinding(target.id, 'global')

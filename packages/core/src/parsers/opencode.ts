@@ -1,5 +1,7 @@
-import Database from 'better-sqlite3'
 import { basename, dirname, join } from 'node:path'
+
+import Database from 'better-sqlite3'
+
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -68,7 +70,9 @@ export function makeOpenCodeSessionFilePath(dbPath: string, sessionId: string): 
   return `${dbPath}${OPENCODE_SESSION_SEPARATOR}${encodeURIComponent(sessionId)}`
 }
 
-export function parseOpenCodeSessionFilePath(filePath: string): { dbPath: string; sessionId: string } | null {
+export function parseOpenCodeSessionFilePath(
+  filePath: string,
+): { dbPath: string; sessionId: string } | null {
   const idx = filePath.lastIndexOf(OPENCODE_SESSION_SEPARATOR)
   if (idx === -1) return null
   const dbPath = filePath.slice(0, idx)
@@ -100,7 +104,8 @@ export function normalizeOpenCodeWatchPath(filePath: string): string {
 export function listOpenCodeSessionFilePaths(dbPath: string): string[] {
   const db = openOpenCodeDb(dbPath)
   try {
-    const rows = db.prepare(`
+    const rows = db
+      .prepare(`
       WITH RECURSIVE active_sessions(id, root_id, time_updated, depth) AS (
         SELECT id, id AS root_id, time_updated, 0 AS depth
         FROM session
@@ -117,9 +122,10 @@ export function listOpenCodeSessionFilePaths(dbPath: string): string[] {
       FROM active_sessions
       GROUP BY root_id
       ORDER BY time_updated DESC, root_id DESC
-    `).all() as Array<{ id: string; time_updated: number }>
-    sessionMtimeCache.set(dbPath, new Map(rows.map(row => [row.id, row.time_updated])))
-    return rows.map(row => makeOpenCodeSessionFilePath(dbPath, row.id))
+    `)
+      .all() as Array<{ id: string; time_updated: number }>
+    sessionMtimeCache.set(dbPath, new Map(rows.map((row) => [row.id, row.time_updated])))
+    return rows.map((row) => makeOpenCodeSessionFilePath(dbPath, row.id))
   } finally {
     db.close()
   }
@@ -136,7 +142,8 @@ export function getOpenCodeSessionIndexedMtime(filePath: string): string {
 
   const db = openOpenCodeDb(parsed.dbPath)
   try {
-    const row = db.prepare(`
+    const row = db
+      .prepare(`
       WITH RECURSIVE descendants(id, time_updated, depth) AS (
         SELECT id, time_updated, 0 AS depth
         FROM session
@@ -151,12 +158,29 @@ export function getOpenCodeSessionIndexedMtime(filePath: string): string {
       )
       SELECT MAX(time_updated) AS time_updated
       FROM descendants
-    `).get(parsed.sessionId) as { time_updated: number } | undefined
-    if (!row?.time_updated) throw new Error(`OpenCode parent session not found: ${parsed.sessionId}`)
+    `)
+      .get(parsed.sessionId) as { time_updated: number } | undefined
+    if (!row?.time_updated)
+      throw new Error(`OpenCode parent session not found: ${parsed.sessionId}`)
     return `${row.time_updated}::${OPENCODE_INDEX_VERSION}`
   } finally {
     db.close()
   }
+}
+
+function stripHtmlTags(value: string): string {
+  let result = ''
+  let insideTag = false
+  for (const char of value) {
+    if (char === '<') {
+      insideTag = true
+    } else if (char === '>') {
+      insideTag = false
+    } else if (!insideTag) {
+      result += char
+    }
+  }
+  return result
 }
 
 export function loadOpenCodeSession(filePath: string): ParseSessionResult {
@@ -165,11 +189,13 @@ export function loadOpenCodeSession(filePath: string): ParseSessionResult {
 
   const db = openOpenCodeDb(parsedPath.dbPath)
   try {
-    const session = db.prepare(`
+    const session = db
+      .prepare(`
       SELECT id, parent_id, directory, title, time_created, time_updated, model, agent
       FROM session
       WHERE id = ? AND time_archived IS NULL
-    `).get(parsedPath.sessionId) as OpenCodeSessionRow | undefined
+    `)
+      .get(parsedPath.sessionId) as OpenCodeSessionRow | undefined
 
     if (!session) return { kind: 'filtered' }
     // Subagent rows (parent_id set) are folded into their parent, never indexed
@@ -182,12 +208,19 @@ export function loadOpenCodeSession(filePath: string): ParseSessionResult {
     let model = normalizeModel(session.model)
     const messages = loadMessagesForOpenCodeSession(db, session, {
       sidechain: false,
-      onCwd: value => { if (!cwd) cwd = value },
-      onModel: value => { if (!model) model = value },
+      onCwd: (value) => {
+        if (!cwd) cwd = value
+      },
+      onModel: (value) => {
+        if (!model) model = value
+      },
     })
 
     const childSessions = listOpenCodeChildSessions(db, session.id)
-    let endedAtMs = Math.max(session.time_updated, ...childSessions.map(child => child.time_updated))
+    let endedAtMs = Math.max(
+      session.time_updated,
+      ...childSessions.map((child) => child.time_updated),
+    )
 
     for (const child of childSessions) {
       const groupKey = `${OPENCODE_SUBAGENT_PARENT_PREFIX}${child.id}`
@@ -204,12 +237,18 @@ export function loadOpenCodeSession(filePath: string): ParseSessionResult {
 
     if (messages.length === 0) return { kind: 'skipped' }
     messages.sort(compareParsedMessages)
-    messages.forEach((message, index) => { message.seq = index })
+    messages.forEach((message, index) => {
+      message.seq = index
+    })
 
-    const firstUserMessage = messages.find(message => !message.isSidechain && message.role === 'user' && message.contentText.trim().length > 0)
-    const title = session.title?.trim()
-      || firstUserMessage?.contentText.replace(/<[^>]+>/g, '').trim().slice(0, 120)
-      || '(no title)'
+    const firstUserMessage = messages.find(
+      (message) =>
+        !message.isSidechain && message.role === 'user' && message.contentText.trim().length > 0,
+    )
+    const derivedTitle = firstUserMessage
+      ? stripHtmlTags(firstUserMessage.contentText).trim().slice(0, 120)
+      : ''
+    const title = session.title?.trim() || derivedTitle || '(no title)'
 
     return {
       kind: 'parsed',
@@ -258,7 +297,8 @@ function groupPartsByMessage(partRows: OpenCodePartRow[]): Map<string, OpenCodeP
 }
 
 function listOpenCodeChildSessions(db: Database.Database, sessionId: string): OpenCodeSessionRow[] {
-  return db.prepare(`
+  return db
+    .prepare(`
     WITH RECURSIVE child_sessions(
       id, parent_id, directory, title, time_created, time_updated, model, agent, depth
     ) AS (
@@ -277,7 +317,8 @@ function listOpenCodeChildSessions(db: Database.Database, sessionId: string): Op
     SELECT id, parent_id, directory, title, time_created, time_updated, model, agent
     FROM child_sessions
     ORDER BY time_created ASC, depth ASC, id ASC
-  `).all(sessionId) as OpenCodeSessionRow[]
+  `)
+    .all(sessionId) as OpenCodeSessionRow[]
 }
 
 function loadMessagesForOpenCodeSession(
@@ -291,21 +332,25 @@ function loadMessagesForOpenCodeSession(
     onModel?: (value: string) => void
   },
 ): ParsedMessage[] {
-  const messageRows = db.prepare(`
+  const messageRows = db
+    .prepare(`
     SELECT id, time_created, data
     FROM message
     WHERE session_id = ?
     ORDER BY time_created ASC, id ASC
-  `).all(session.id) as OpenCodeMessageRow[]
+  `)
+    .all(session.id) as OpenCodeMessageRow[]
 
   if (messageRows.length === 0) return []
 
-  const partRows = db.prepare(`
+  const partRows = db
+    .prepare(`
     SELECT id, message_id, time_created, data
     FROM part
     WHERE session_id = ?
     ORDER BY message_id ASC, time_created ASC, id ASC
-  `).all(session.id) as OpenCodePartRow[]
+  `)
+    .all(session.id) as OpenCodePartRow[]
   const partsByMessage = groupPartsByMessage(partRows)
   const messages: ParsedMessage[] = []
 
@@ -323,7 +368,7 @@ function loadMessagesForOpenCodeSession(
     if (model) opts.onModel?.(model)
 
     const parts = (partsByMessage.get(messageRow.id) ?? [])
-      .map(part => parseJson<OpenCodePartData>(part.data))
+      .map((part) => parseJson<OpenCodePartData>(part.data))
       .filter((part): part is OpenCodePartData => Boolean(part))
 
     const contentText = extractText(parts)
@@ -369,17 +414,25 @@ function compareParsedMessages(a: ParsedMessage, b: ParsedMessage): number {
 }
 
 function extractText(parts: OpenCodePartData[]): string {
-  return stripSpoolSystemPrelude(parts
-    .filter(part => part.type === 'text' && typeof part.text === 'string')
-    .map(part => part.text ?? '')
-    .join('\n'))
-    .trim()
+  return stripSpoolSystemPrelude(
+    parts
+      .filter((part) => part.type === 'text' && typeof part.text === 'string')
+      .map((part) => part.text ?? '')
+      .join('\n'),
+  ).trim()
 }
 
 function extractToolNames(parts: OpenCodePartData[]): string[] {
-  return Array.from(new Set(parts
-    .filter(part => part.type === 'tool' && typeof part.tool === 'string' && part.tool.trim().length > 0)
-    .map(part => part.tool!)))
+  return Array.from(
+    new Set(
+      parts
+        .filter(
+          (part) =>
+            part.type === 'tool' && typeof part.tool === 'string' && part.tool.trim().length > 0,
+        )
+        .map((part) => part.tool!),
+    ),
+  )
 }
 
 function modelFromMessage(message: OpenCodeMessageData): string {

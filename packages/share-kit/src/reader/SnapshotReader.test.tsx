@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, it, expect } from 'vite-plus/test'
+
+import type { Snapshot } from '../lib/types'
 import { SnapshotReader } from './SnapshotReader'
 import { READER_INITIAL_TURNS } from './use-progressive-turns'
-import type { Snapshot } from '../lib/types'
 
 // Each turn body carries a unique marker so we can assert exactly which
 // turns made it into the first paint.

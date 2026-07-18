@@ -5,11 +5,7 @@
 // from cached metadata only). Listing state is metadata, not content, so
 // it gets a metadata-sized endpoint.
 
-import type {
-  D1Database,
-  KVNamespace,
-  PagesFunction,
-} from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../src/audit'
 import { requireUser } from '../../../../src/auth/require'
@@ -51,10 +47,7 @@ export const onRequestPatch: PagesFunction<Env, 'id'> = async (ctx) => {
     }
     const visibility = body.visibility
     if (visibility !== 'unlisted' && visibility !== 'profile-listed') {
-      throw new ApiError(
-        'UNPROCESSABLE',
-        "visibility must be 'unlisted' or 'profile-listed'",
-      )
+      throw new ApiError('UNPROCESSABLE', "visibility must be 'unlisted' or 'profile-listed'")
     }
 
     const existing = await ctx.env.DB.prepare(
@@ -90,9 +83,7 @@ export const onRequestPatch: PagesFunction<Env, 'id'> = async (ctx) => {
     // keeps its publish-time `publish.visibility` — no reader renders
     // it, and rewriting a multi-MB object to flip one cosmetic field
     // isn't worth the partial-failure surface.
-    await ctx.env.DB.prepare(
-      'UPDATE published_shares SET visibility=? WHERE id=? AND user_id=?',
-    )
+    await ctx.env.DB.prepare('UPDATE published_shares SET visibility=? WHERE id=? AND user_id=?')
       .bind(visibility, id, user.id)
       .run()
 

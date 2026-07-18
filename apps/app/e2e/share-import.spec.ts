@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test'
+
 import { launchApp, waitForSync, type AppContext } from './helpers/launch'
-import {
-  buildSampleSpoolDocument,
-  dropFileOn,
-  navigateToShares,
-} from './helpers/share'
+import { buildSampleSpoolDocument, dropFileOn, navigateToShares } from './helpers/share'
 
 let ctx: AppContext
 
@@ -26,7 +23,9 @@ test('drop .spool on Shares opens editor with imported content', async () => {
   // The drop hook is wired on the SharesPage root; dropping on the empty
   // state's button bubbles up to the same handler.
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
-  await expect(window.locator('[data-testid="share-editor-title"]')).toHaveText('Imported sample one')
+  await expect(window.locator('[data-testid="share-editor-title"]')).toHaveText(
+    'Imported sample one',
+  )
 })
 
 test('dropping the same content again opens the same draft (content-hash dedup)', async () => {

@@ -1,6 +1,7 @@
-import { expect, type Page } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+
+import { expect, type Page } from '@playwright/test'
 
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures')
 
@@ -10,7 +11,10 @@ const FIXTURES_DIR = join(__dirname, '..', 'fixtures')
  * header. Leaves the share editor open. Caller is responsible for
  * `expectShareEditorVisible` if it wants to await readiness.
  */
-export async function openShareEditorFromSessionDetail(window: Page, sessionUuid: string): Promise<void> {
+export async function openShareEditorFromSessionDetail(
+  window: Page,
+  sessionUuid: string,
+): Promise<void> {
   await openSessionDetail(window, sessionUuid)
   await window.locator('[data-testid="detail-share"]').click()
   await expect(window.locator('[data-testid="share-editor-page"]')).toBeVisible({ timeout: 5000 })
@@ -113,7 +117,9 @@ export async function installSaveFilePickerMock(window: Page): Promise<void> {
 }
 
 /** Pop the most recent write captured by `installSaveFilePickerMock`. */
-export async function readLastSavedFile(window: Page): Promise<{ filename: string; bytes: Uint8Array } | null> {
+export async function readLastSavedFile(
+  window: Page,
+): Promise<{ filename: string; bytes: Uint8Array } | null> {
   const result = await window.evaluate(() => {
     const winAny = window as unknown as {
       __spoolE2EWrites?: { filename: string; bytes: number[] }[]
@@ -189,10 +195,15 @@ export async function seedShareDraft(
       hideEmptyTurns: true,
     }
     const doc = { version: 1, conversation: convo, opts, exportedAt: new Date().toISOString() }
-    const preview = { ...doc, conversation: { ...convo, turns: (convo.turns as unknown[]).slice(0, 6) } }
-    await (window as unknown as {
-      spool: { shareDraft: { upsert: (input: unknown) => Promise<unknown> } }
-    }).spool.shareDraft.upsert({
+    const preview = {
+      ...doc,
+      conversation: { ...convo, turns: (convo.turns as unknown[]).slice(0, 6) },
+    }
+    await (
+      window as unknown as {
+        spool: { shareDraft: { upsert: (input: unknown) => Promise<unknown> } }
+      }
+    ).spool.shareDraft.upsert({
       draft_id: draftId,
       source_kind: payload.sourceKind ?? 'spool-session',
       source_origin: payload.sourceOrigin ?? null,
@@ -205,7 +216,9 @@ export async function seedShareDraft(
 }
 
 /** A minimal SpoolDocument suitable for drop-import tests. */
-export function buildSampleSpoolDocument(opts: { title?: string; bodySuffix?: string } = {}): string {
+export function buildSampleSpoolDocument(
+  opts: { title?: string; bodySuffix?: string } = {},
+): string {
   const conversation = {
     source: 'claude',
     sourceLabel: 'Claude',

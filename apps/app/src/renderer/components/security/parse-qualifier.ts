@@ -13,8 +13,8 @@
 // half-formed queries without UX punishing them; the test suite
 // pins the happy paths.
 
-import type { SensitiveKind } from '@spool-lab/redact'
 import type { FindingState, SessionFindingFilter } from '@spool-lab/core'
+import type { SensitiveKind } from '@spool-lab/redact'
 
 export interface ParsedQualifier {
   filter: SessionFindingFilter
@@ -23,7 +23,12 @@ export interface ParsedQualifier {
   text: string
 }
 
-const KNOWN_STATES: ReadonlySet<FindingState | 'any'> = new Set(['active', 'dismissed', 'purged', 'any'])
+const KNOWN_STATES: ReadonlySet<FindingState | 'any'> = new Set([
+  'active',
+  'dismissed',
+  'purged',
+  'any',
+])
 // `ignored` is the preferred user-facing spelling; it maps onto the
 // internal `dismissed` state. `dismissed` stays accepted for backward
 // compatibility.

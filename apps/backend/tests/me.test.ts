@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import type { KVNamespace } from '@cloudflare/workers-types'
+import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequestGet as checkHandleGet } from '../functions/api/handles/check'
 import { onRequestPost as claimHandlePost } from '../functions/api/handles/claim'
@@ -12,7 +12,6 @@ import { onRequestGet as meSharesGet } from '../functions/api/me/shares'
 import { requireUser } from '../src/auth/require'
 import type { SessionRecord } from '../src/auth/session'
 import { ApiError } from '../src/errors'
-
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 
@@ -39,11 +38,7 @@ const SESSION_TTL_SEC = 30 * 24 * 3600
 const SESSION_TTL_MS = SESSION_TTL_SEC * 1000
 const GRACE_PERIOD_MS = 24 * 3600 * 1000
 
-async function seedSession(
-  kv: KVNamespace,
-  token: string,
-  user_id: string,
-): Promise<void> {
+async function seedSession(kv: KVNamespace, token: string, user_id: string): Promise<void> {
   const now = Date.now()
   const rec: SessionRecord = {
     user_id,
@@ -218,9 +213,7 @@ describe('POST /api/handles/claim', () => {
     expect(env.state.handles).toHaveLength(1)
     expect(env.state.handles[0]?.handle).toBe('alice')
     expect(
-      env.state.audit.some(
-        (a) => a.action === 'handle.claim' && a.target_id === 'alice',
-      ),
+      env.state.audit.some((a) => a.action === 'handle.claim' && a.target_id === 'alice'),
     ).toBe(true)
   })
 
@@ -490,9 +483,7 @@ describe('POST /api/me/delete', () => {
       user_id: 'user-1',
       cancelled: 0,
     })
-    expect(env.state.audit.some((a) => a.action === 'account.delete.scheduled')).toBe(
-      true,
-    )
+    expect(env.state.audit.some((a) => a.action === 'account.delete.scheduled')).toBe(true)
   })
 
   it('INSERT OR REPLACE overwrites prior queue row', async () => {
