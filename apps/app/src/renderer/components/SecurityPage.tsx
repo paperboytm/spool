@@ -337,17 +337,25 @@ function SecurityPageInner({ onOpenSession, onShareSession, onOpenSettings }: Pr
   const lastBackfillTotalRef = useRef(0)
   useEffect(() => {
     let active = true
+    // `getScanStatus()` and the push subscription are intentionally
+    // started together. The invoke response is only a seed: an idle
+    // push can overtake an older busy response while the Promise is in
+    // flight. Once any push has arrived, ignore that stale seed so a
+    // clean archive cannot remain stuck in the scanning branch.
+    let receivedStatusPush = false
     let idleTimer: ReturnType<typeof setTimeout> | null = null
     void securityApi
       .getScanStatus()
       .then((s) => {
-        if (!active) return
+        if (!active || receivedStatusPush) return
         setScanStatus(s)
         const seedBusy = s.queued > 0 || s.scanning !== null || s.backfillRemaining > 0
-        if (seedBusy) setDisplayBusy(true)
+        wasScanningRef.current = seedBusy
+        setDisplayBusy(seedBusy)
       })
       .catch(() => {})
     const off = securityApi.onScanStatus((next) => {
+      receivedStatusPush = true
       setScanStatus(next)
       // Track the worker-reported high-water mark so the result
       // banner can still cite "scanned N sessions" after the worker

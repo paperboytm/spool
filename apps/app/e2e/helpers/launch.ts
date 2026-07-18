@@ -111,6 +111,11 @@ export async function launchApp(
   // contention. Only affects the Electron instance launched here, not
   // the production app.
   args.unshift('--force-prefers-reduced-motion')
+  // The product follows the user's OS language, but the E2E copy
+  // assertions are written against the English catalogue. Pin the
+  // launched Electron instance so developer-machine locale cannot
+  // turn semantic assertions into translation-dependent failures.
+  args.unshift('--lang=en-US')
 
   const app = await electron.launch({ args, cwd: APP_DIR, env })
 
@@ -140,6 +145,7 @@ export async function restartApp(ctx: AppContext): Promise<AppContext> {
   const args = [join(APP_DIR, 'out', 'main', 'index.mjs')]
   if (process.platform === 'linux') args.unshift('--no-sandbox')
   args.unshift('--force-prefers-reduced-motion')
+  args.unshift('--lang=en-US')
   const app = await electron.launch({ args, cwd: APP_DIR, env: ctx.env })
   const window = await app.firstWindow()
   return {
