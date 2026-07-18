@@ -16,7 +16,7 @@ export const DB_PATH = join(SPOOL_DIR, 'spool.db')
  * Latest schema version the running build knows how to migrate to.
  * Bump in lockstep with the last `db.pragma('user_version = N')` in runMigrations.
  */
-export const LATEST_SCHEMA_VERSION = 15
+export const LATEST_SCHEMA_VERSION = 16
 
 let _db: Database.Database | null = null
 let _wasNewDb = false
@@ -103,6 +103,7 @@ export function runMigrations(db: Database.Database): void {
       project_id     INTEGER NOT NULL REFERENCES projects(id),
       source_id      INTEGER NOT NULL REFERENCES sources(id),
       session_uuid   TEXT NOT NULL UNIQUE,
+      parent_session_uuid TEXT,
       file_path      TEXT NOT NULL UNIQUE,
       title          TEXT,
       title_source   TEXT NOT NULL DEFAULT 'derived',
@@ -735,6 +736,14 @@ export function runMigrations(db: Database.Database): void {
         ON published_shares_cache(draft_id) WHERE draft_id IS NOT NULL;
     `)
     db.pragma('user_version = 15')
+  }
+
+  if (version < 16) {
+    if (!columnExists(db, 'sessions', 'parent_session_uuid')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN parent_session_uuid TEXT')
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_uuid)')
+    db.pragma('user_version = 16')
   }
 
   rebuildFtsTableIfEmpty(db, 'messages', 'messages_fts_trigram')

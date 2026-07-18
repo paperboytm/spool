@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from 'react-i18next'
 
 import { insertSessionSorted } from '../../shared/sessionSort.js'
+import { buildSessionForest, type SessionTreeNode } from '../lib/sessionTree.js'
 import { FeaturedEmptyState } from './EmptyState.js'
 import VirtualSessionList, { type SessionListRow } from './VirtualSessionList.js'
 
@@ -184,10 +185,24 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
 
   // i18n.language is a stable per-locale key; depending on `t` (which
   // changes identity on most renders) would rebuild rows constantly.
+  const sessionForest = useMemo(() => buildSessionForest(recentSessions ?? []), [recentSessions])
+  const treeNodes = useMemo(() => {
+    const nodes = new Map<string, SessionTreeNode>()
+    const visit = (node: SessionTreeNode): void => {
+      nodes.set(node.session.sessionUuid, node)
+      for (const child of node.children) visit(child)
+    }
+    for (const root of sessionForest) visit(root)
+    return nodes
+  }, [sessionForest])
   const buckets = useMemo(
-    () => (recentSessions ? bucketByDate(recentSessions, looseTranslator(t)) : []),
+    () =>
+      bucketByDate(
+        sessionForest.map((node) => node.session),
+        looseTranslator(t),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recentSessions, i18n.language],
+    [sessionForest, i18n.language],
   )
   const totalSessions = pinnedSessions.length + (recentSessions?.length ?? 0)
   const pinnedLabel = useMemo(
@@ -225,14 +240,8 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
         dataAttr: { 'data-bucket': bucket.key },
       })
       for (const s of bucket.sessions) {
-        out.push({
-          kind: 'session',
-          id: s.sessionUuid,
-          session: s,
-          showProject: true,
-          bucket: bucket.key,
-          headerId: `bucket-${bucket.key}`,
-        })
+        const node = treeNodes.get(s.sessionUuid)
+        if (node) appendTreeRows(out, node, bucket.key, `bucket-${bucket.key}`)
       }
     }
     out.push({
@@ -243,7 +252,7 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
       total: totalSessions,
     })
     return out
-  }, [pinnedSessions, pinnedLabel, buckets, loadingMore, exhausted, totalSessions])
+  }, [pinnedSessions, pinnedLabel, buckets, treeNodes, loadingMore, exhausted, totalSessions])
 
   return (
     <div data-testid="library-landing" className="flex h-full flex-col overflow-hidden">
@@ -268,6 +277,33 @@ export default function LibraryLanding({ onOpenSession, onCopySessionId, onShare
       )}
     </div>
   )
+}
+
+function appendTreeRows(
+  rows: SessionListRow[],
+  node: SessionTreeNode,
+  bucket: BucketKey,
+  headerId: string,
+  depth = 0,
+  ancestorIds: string[] = [],
+): void {
+  rows.push({
+    kind: 'session',
+    id: node.session.sessionUuid,
+    session: node.session,
+    showProject: true,
+    bucket,
+    headerId,
+    treeDepth: depth,
+    treeAncestorIds: ancestorIds,
+    treeChildCount: node.children.length,
+  })
+  for (const child of node.children) {
+    appendTreeRows(rows, child, bucket, headerId, depth + 1, [
+      ...ancestorIds,
+      node.session.sessionUuid,
+    ])
+  }
 }
 
 function looseTranslator(t: ReturnType<typeof useTranslation>['t']): TranslateFn {

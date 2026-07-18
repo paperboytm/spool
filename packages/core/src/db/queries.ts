@@ -177,6 +177,7 @@ export function upsertSession(
     projectId: number
     sourceId: number
     sessionUuid: string
+    parentSessionUuid?: string | null
     filePath: string
     title: string
     startedAt: string
@@ -189,6 +190,7 @@ export function upsertSession(
   },
   mode: UpsertSessionMode = 'rewrite',
 ): number {
+  const parentSessionUuid = opts.parentSessionUuid ?? null
   const existing = db
     .prepare('SELECT id, file_path FROM sessions WHERE session_uuid = ?')
     .get(opts.sessionUuid) as { id: number; file_path: string } | undefined
@@ -221,12 +223,14 @@ export function upsertSession(
     db.prepare(`
       UPDATE sessions SET
         title = CASE WHEN title_source = 'derived' THEN ? ELSE title END,
+        parent_session_uuid = ?,
         file_path = ?,
         started_at = ?, ended_at = ?,
         has_tool_use = ?, cwd = ?, model = ?, raw_file_mtime = ?
       WHERE id = ?
     `).run(
       opts.title,
+      parentSessionUuid,
       opts.filePath,
       opts.startedAt,
       opts.endedAt,
@@ -242,14 +246,15 @@ export function upsertSession(
   const result = db
     .prepare(`
     INSERT INTO sessions
-      (project_id, source_id, session_uuid, file_path, title,
+      (project_id, source_id, session_uuid, parent_session_uuid, file_path, title,
        started_at, ended_at, message_count, has_tool_use, cwd, model, raw_file_mtime)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
     .run(
       opts.projectId,
       opts.sourceId,
       opts.sessionUuid,
+      parentSessionUuid,
       opts.filePath,
       opts.title,
       opts.startedAt,
@@ -430,7 +435,8 @@ export function recomputeMessageCount(db: Database.Database, sessionId: number):
 export const SESSION_SELECT = `
   SELECT
     s.id, s.project_id AS projectId, s.source_id AS sourceId,
-    s.session_uuid AS sessionUuid, s.file_path AS filePath,
+    s.session_uuid AS sessionUuid, s.parent_session_uuid AS parentSessionUuid,
+    s.file_path AS filePath,
     s.title, s.started_at AS startedAt, s.ended_at AS endedAt,
     s.message_count AS messageCount, s.has_tool_use AS hasToolUse,
     s.cwd, s.model,
@@ -1316,6 +1322,7 @@ export function rowToSession(r: Record<string, unknown>): Session {
     projectId: r['projectId'] as number,
     sourceId: r['sourceId'] as number,
     sessionUuid: r['sessionUuid'] as string,
+    parentSessionUuid: (r['parentSessionUuid'] as string | null) ?? null,
     filePath: r['filePath'] as string,
     title: r['title'] as string | null,
     startedAt: r['startedAt'] as string,

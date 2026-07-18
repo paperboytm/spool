@@ -48,6 +48,7 @@
     "projects": "项目",
     "collapse": "收起侧栏",
     "expand": "展开侧栏",
+    "resize": "调整侧栏宽度",
     "copySessionId": "复制会话 ID",
     "shareSession": "分享会话",
     "pin": "置顶",
@@ -144,6 +145,7 @@
     "bucket_earlierWeek": "本周早些时候",
     "bucket_earlierMonth": "本月早些时候",
     "bucket_older": "更早",
+    "childSessions_other": "{{count}} 个子会话",
     "footer_loadingMore": "正在加载更早的会话…",
     "footer_endOf_other": "共 {{count}} 个会话"
   },

@@ -155,6 +155,42 @@ describe('listRecentSessionsPage', () => {
     expect(page2.sessions.map((s) => s.sessionUuid)).toEqual(['a'])
     expect(page2.nextCursor).toBeNull()
   })
+
+  it('paginates roots while returning their nested child sessions', () => {
+    db.exec(`
+      INSERT INTO sessions (
+        project_id, source_id, session_uuid, parent_session_uuid, file_path,
+        title, started_at, ended_at, message_count, has_tool_use, raw_file_mtime
+      ) VALUES
+        (1,1,'root','', '/root','root','2026-05-04T00:00:00Z','2026-05-04T00:00:00Z',1,0,'2026-05-04T00:00:00Z'),
+        (1,1,'child','root','/child','child','2026-05-04T00:01:00Z','2026-05-04T00:01:00Z',1,0,'2026-05-04T00:01:00Z'),
+        (1,1,'grandchild','child','/grandchild','grandchild','2026-05-04T00:02:00Z','2026-05-04T00:02:00Z',1,0,'2026-05-04T00:02:00Z');
+    `)
+
+    const page1 = listRecentSessionsPage(db, { limit: 1 })
+    expect(page1.sessions.map((session) => session.sessionUuid)).toEqual([
+      'root',
+      'child',
+      'grandchild',
+    ])
+    expect(page1.nextCursor?.sessionUuid).toBe('root')
+
+    const page2 = listRecentSessionsPage(db, { limit: 1, cursor: page1.nextCursor! })
+    expect(page2.sessions.map((session) => session.sessionUuid)).toEqual(['c'])
+  })
+
+  it('promotes a child whose parent is absent from the index', () => {
+    db.exec(`
+      INSERT INTO sessions (
+        project_id, source_id, session_uuid, parent_session_uuid, file_path,
+        title, started_at, ended_at, message_count, has_tool_use, raw_file_mtime
+      ) VALUES
+        (1,1,'orphan','missing','/orphan','orphan','2026-05-04T00:00:00Z','2026-05-04T00:00:00Z',1,0,'2026-05-04T00:00:00Z');
+    `)
+
+    const page = listRecentSessionsPage(db, { limit: 1 })
+    expect(page.sessions.map((session) => session.sessionUuid)).toEqual(['orphan'])
+  })
 })
 
 describe('listProjectDirectoryCounts', () => {

@@ -24,6 +24,9 @@ export type SessionListRow =
       showProject?: boolean
       bucket?: BucketKey
       headerId: string | null
+      treeDepth?: number
+      treeAncestorIds?: string[]
+      treeChildCount?: number
     }
   | { kind: 'footer'; id: string; loading: boolean; exhausted: boolean; total: number }
 
@@ -60,6 +63,7 @@ export default function VirtualSessionList({
   // the set are open (we keep "closed" rather than "open" so newly arriving
   // headers default to open without needing to pre-populate state).
   const [closed, setClosed] = useState<Set<string>>(new Set())
+  const [openTreeNodes, setOpenTreeNodes] = useState<Set<string>>(new Set())
 
   const toggleHeader = useCallback((id: string) => {
     setClosed((prev) => {
@@ -71,12 +75,23 @@ export default function VirtualSessionList({
   }, [])
 
   const visible = useMemo<SessionListRow[]>(() => {
-    if (!collapsibleSections || closed.size === 0) return rows
     return rows.filter((r) => {
-      if (r.kind === 'session') return r.headerId == null || !closed.has(r.headerId)
+      if (r.kind === 'session') {
+        if (collapsibleSections && r.headerId != null && closed.has(r.headerId)) return false
+        return r.treeAncestorIds?.every((id) => openTreeNodes.has(id)) ?? true
+      }
       return true
     })
-  }, [rows, closed, collapsibleSections])
+  }, [rows, closed, collapsibleSections, openTreeNodes])
+
+  const toggleTreeNode = useCallback((id: string) => {
+    setOpenTreeNodes((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   return (
     <Virtuoso
@@ -109,6 +124,14 @@ export default function VirtualSessionList({
             {...(row.pinned ? { pinned: true } : {})}
             {...(row.showProject ? { showProject: true } : {})}
             {...(row.bucket ? { bucket: row.bucket } : {})}
+            {...(row.treeDepth !== undefined ? { treeDepth: row.treeDepth } : {})}
+            {...(row.treeChildCount
+              ? {
+                  treeChildCount: row.treeChildCount,
+                  treeExpanded: openTreeNodes.has(row.session.sessionUuid),
+                  onToggleTree: () => toggleTreeNode(row.session.sessionUuid),
+                }
+              : {})}
             {...(onPinChange ? { onPinChange } : {})}
             onOpenSession={onOpenSession}
             onCopySessionId={onCopySessionId}

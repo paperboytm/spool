@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
+import { LATEST_SCHEMA_VERSION } from './db.js'
 import type { PublishedShareCacheItem } from './published-shares-cache.js'
 
 const tempDirs: string[] = []
@@ -64,10 +65,10 @@ describe('published_shares_cache schema (v15)', () => {
     expect(names).toContain('idx_published_shares_cache_draft_id')
   })
 
-  it('user_version reaches 15 after migration', async () => {
+  it('user_version reaches the latest schema after migration', async () => {
     const { db } = await load()
     const v = (db.pragma('user_version') as Array<{ user_version: number }>)[0]?.user_version
-    expect(v).toBe(15)
+    expect(v).toBe(LATEST_SCHEMA_VERSION)
   })
 
   it('upsertMany inserts new rows and listAll returns them by published_at desc', async () => {

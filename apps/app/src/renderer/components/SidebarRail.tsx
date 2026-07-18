@@ -10,32 +10,40 @@ import type { ReactNode } from 'react'
 // rail below it, so all fold motion is pinned to this token.
 export const FOLD_EASE = 'cubic-bezier(0, 0, 0.2, 1)'
 export const FOLD_DURATION_MS = 280
+export const DEFAULT_SIDEBAR_WIDTH = 240
+export const MIN_SIDEBAR_WIDTH = 200
+export const MAX_SIDEBAR_WIDTH = 360
 
 type Props = {
   collapsed: boolean
   children: ReactNode
   collapsedWidth?: 'none' | 'chrome'
+  width?: number
+  resizing?: boolean
 }
 
 /**
- * Animated 240px ↔ 0 column that hosts the app's left navigation
+ * Animated sidebar-width ↔ 0 column that hosts the app's left navigation
  * sidebar. The wrapper clips its child via overflow-hidden so the
- * sidebar contents (Sidebar root is `w-60 flex-none`) never reflow
- * during the fold — only the wrapper's width transitions.
+ * sidebar contents do not overflow during the fold.
  *
  * Used by both the top-level App shell and PageLayout (share editor).
  * Single source for the rail's timing keeps it in lock-step with
  * AppTopBar's bg sidebar segment, which paints the same surface
  * colour over the top of the chrome.
  */
-export default function SidebarRail({ collapsed, collapsedWidth = 'none', children }: Props) {
-  const collapsedClass = collapsedWidth === 'chrome' ? 'w-12' : 'w-0'
+export default function SidebarRail({
+  collapsed,
+  collapsedWidth = 'none',
+  width = DEFAULT_SIDEBAR_WIDTH,
+  resizing = false,
+  children,
+}: Props) {
+  const collapsedPixels = collapsedWidth === 'chrome' ? 48 : 0
   return (
     <div
-      className={[
-        'flex-none overflow-hidden transition-[width] duration-[280ms] ease-out',
-        collapsed ? collapsedClass : 'w-60',
-      ].join(' ')}
+      className={`flex-none overflow-hidden ${resizing ? '' : 'transition-[width] duration-[280ms] ease-out'}`}
+      style={{ width: collapsed ? collapsedPixels : width }}
       aria-hidden={collapsed && collapsedWidth === 'none'}
     >
       {children}

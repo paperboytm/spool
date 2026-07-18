@@ -48,6 +48,7 @@
     "projects": "專案",
     "collapse": "收合側欄",
     "expand": "展開側欄",
+    "resize": "調整側欄寬度",
     "copySessionId": "複製會話 ID",
     "shareSession": "分享會話",
     "pin": "釘選",
@@ -144,6 +145,7 @@
     "bucket_earlierWeek": "本週稍早",
     "bucket_earlierMonth": "本月稍早",
     "bucket_older": "更早",
+    "childSessions_other": "{{count}} 個子會話",
     "footer_loadingMore": "正在載入更早的會話…",
     "footer_endOf_other": "共 {{count}} 個會話"
   },

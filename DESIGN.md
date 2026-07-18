@@ -42,14 +42,14 @@ The public web must show the artifact before explaining the product. Real Sessio
 ### Desktop app
 
 - **Core principle:** The desktop app is the author’s private preparation surface. Projects and Sessions are the home; search and publishing are actions within that context.
-- **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and remains visible across every main-pane state.
+- **Shell:** Persistent resizable left sidebar (240px default, 200–360px) + main pane. Sidebar lists projects derived from `project_groups_v` and remains visible across every main-pane state.
 - **Sidebar:** Warm surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label with a sort menu, then project rows. A divider separates derived projects from the always-last `Loose` entry.
 - **Project row:** Display name on the left, faint source-color dots in the middle, monospace count on the right. Active and hover states use `surface2`.
 - **Home:** Pinned Sessions above a recent feed bucketed by date. Entry to search is ⌘K or the top-right trigger.
 - **Project view:** Recent feed of one project with sort and source filters. A `PINNED` segment surfaces project-pinned Sessions on top.
 - **Session detail:** Opens as a main-pane state, not a modal. Share and Publish actions belong in the detail header.
 - **Search overlay (⌘K):** Floats above the current main pane on a dimmed backdrop, scoped to `All` or the current project. Fast and AI modes share the same surface.
-- **Width:** Window width ~960px; main-pane content stays near 720px; sidebar stays fixed at 240px.
+- **Width:** Window width ~960px; main-pane content stays near 720px; the sidebar remembers widths from 200–360px and defaults to 240px.
 
 ### Shape
 

@@ -48,6 +48,7 @@
     "projects": "Projekte",
     "collapse": "Seitenleiste einklappen",
     "expand": "Seitenleiste ausklappen",
+    "resize": "Seitenleiste skalieren",
     "copySessionId": "Sitzungs-ID kopieren",
     "shareSession": "Sitzung teilen",
     "pin": "Anheften",
@@ -149,6 +150,8 @@
     "bucket_earlierWeek": "Früher diese Woche",
     "bucket_earlierMonth": "Früher diesen Monat",
     "bucket_older": "Älter",
+    "childSessions_one": "{{count}} untergeordnete Sitzung",
+    "childSessions_other": "{{count}} untergeordnete Sitzungen",
     "footer_loadingMore": "Ältere Sitzungen werden geladen…",
     "footer_endOf_one": "Ende — {{count}} Sitzung",
     "footer_endOf_other": "Ende — {{count}} Sitzungen"

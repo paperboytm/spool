@@ -48,6 +48,7 @@
     "projects": "プロジェクト",
     "collapse": "サイドバーを折りたたむ",
     "expand": "サイドバーを展開",
+    "resize": "サイドバーの幅を変更",
     "copySessionId": "セッション ID をコピー",
     "shareSession": "セッションを共有",
     "pin": "ピン留め",
@@ -144,6 +145,7 @@
     "bucket_earlierWeek": "今週",
     "bucket_earlierMonth": "今月",
     "bucket_older": "それ以前",
+    "childSessions_other": "子セッション {{count}} 件",
     "footer_loadingMore": "古いセッションを読み込んでいます…",
     "footer_endOf_other": "{{count}} 件のセッション"
   },

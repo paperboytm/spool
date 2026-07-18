@@ -48,6 +48,7 @@
     "projects": "Projets",
     "collapse": "Réduire la barre latérale",
     "expand": "Déplier la barre latérale",
+    "resize": "Redimensionner la barre latérale",
     "copySessionId": "Copier l'ID de session",
     "shareSession": "Partager la session",
     "pin": "Épingler",
@@ -149,6 +150,8 @@
     "bucket_earlierWeek": "Plus tôt cette semaine",
     "bucket_earlierMonth": "Plus tôt ce mois-ci",
     "bucket_older": "Plus ancien",
+    "childSessions_one": "{{count}} session enfant",
+    "childSessions_other": "{{count}} sessions enfant",
     "footer_loadingMore": "Chargement des sessions plus anciennes…",
     "footer_endOf_one": "Fin — {{count}} session",
     "footer_endOf_other": "Fin — {{count}} sessions"

@@ -165,6 +165,20 @@ describe('upsertSession (title_source authority)', () => {
       .get('sess-1') as { file_path: string }
     expect(row.file_path).toBe('/real/path.jsonl')
   })
+
+  it('persists and updates the parent session relationship', () => {
+    upsertSession(db, baseOpts({ parentSessionUuid: 'parent-1' }))
+    let row = db
+      .prepare('SELECT parent_session_uuid FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { parent_session_uuid: string | null }
+    expect(row.parent_session_uuid).toBe('parent-1')
+
+    upsertSession(db, baseOpts({ parentSessionUuid: 'parent-2' }))
+    row = db
+      .prepare('SELECT parent_session_uuid FROM sessions WHERE session_uuid = ?')
+      .get('sess-1') as { parent_session_uuid: string | null }
+    expect(row.parent_session_uuid).toBe('parent-2')
+  })
 })
 
 describe('getOrCreateAskProject', () => {
