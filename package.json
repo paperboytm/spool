@@ -29,25 +29,5 @@
     "oxlint-tsgolint": "0.24.0",
     "turbo": "^2.9.6",
     "typescript": "7.0.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "electron",
-      "esbuild",
-      "workerd",
-      "acp-extension-codex-linux-x64"
-    ],
-    "peerDependencyRules": {
-      "allowAny": [
-        "vite",
-        "vitest"
-      ]
-    },
-    "overrides": {
-      "pathe@catalog:": "^2.0.3",
-      "wrangler@catalog:": "^4.0.0",
-      "@cloudflare/workers-types@catalog:": "^4.20260415.1"
-    }
   }
 }

@@ -2,3 +2,20 @@ packages:
   - "apps/*"
   - "packages/*"
   - "workers/*"
+
+allowBuilds:
+  better-sqlite3: true
+  electron: true
+  esbuild: true
+  workerd: true
+  acp-extension-codex-linux-x64: true
+
+peerDependencyRules:
+  allowAny:
+    - vite
+    - vitest
+
+overrides:
+  "@cloudflare/workers-types@catalog:": "^4.20260415.1"
+  "pathe@catalog:": "^2.0.3"
+  "wrangler@catalog:": "^4.0.0"
