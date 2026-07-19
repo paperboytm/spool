@@ -38,6 +38,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "node-abi": "^4.33.0",
     "taze": "^19.14.1",
     "typescript": "7.0.2",
     "vite": "catalog:",
