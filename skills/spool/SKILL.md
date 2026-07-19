@@ -32,14 +32,20 @@ Only **claude** and **codex** sessions can be shared. Sharing publishes the sele
    - Inside Claude Code, use `$CLAUDE_CODE_SESSION_ID`.
    - In another agent (or if that variable is unset), omit the session argument to select the latest indexed session whose cwd exactly matches the current directory.
    - For any other session, pass a UUID or unique UUID prefix from `spool list`. `<uuid>@<n>` shares only the first _n_ records.
-3. Write a share-ready Markdown Summary from the shared portion of the conversation. Use the session's predominant language and do not expose secrets. Start with a 1–2 sentence overview of the original purpose, then use short localized headings in this order:
-   - **Purpose**
-   - **Progress** — begin with a compact `Goal → Investigation → Implementation → Validation → Result`-style map, then recount the important stages chronologically, including pivots, failures, and validation.
-   - **Highlights** — concrete discoveries, decisions, files, commands, APIs, or tests that matter to the recipient.
-   - **Result vs. original goal** — classify it as fully met, partially met, diverged, or unresolved, and say why.
-   - **Next steps** only when the session supports them.
+3. Write a share-ready Markdown Summary from the shared portion of the conversation. It should read like a concise, polished GitHub README for this one session—not a turn-by-turn chat recap.
 
-   Distinguish completed work from proposals and unresolved items; never invent outcomes.
+   Determine the language from the session's natural-language conversation, giving substantive user messages more weight than assistant replies. Ignore code, logs, commands, paths, identifiers, metadata, and pasted material when deciding. For a mixed-language session, use the dominant language of the user's discussion; if none is clear, use the first substantive user request. Use that language for all prose and headings while preserving technical names in their original form.
+
+   Use this README-style structure, localizing every heading:
+   - `# <specific title>` derived from the actual goal, followed by a 1–2 sentence overview.
+   - `## Goal` — the original request, constraints, and meaningful scope changes.
+   - `## What happened` — the important stages in chronological order, grouped into concise paragraphs or bullets; include relevant pivots, failures, implementation details, and validation.
+   - `## Key decisions and findings` only when material decisions or discoveries shaped the work.
+   - `## Validation` only when the session contains concrete checks, tests, builds, or measurements.
+   - `## Outcome` — state whether the goal was achieved, partially achieved, changed, or remains unresolved, and explain why.
+   - `## Next steps` only when the session supports specific remaining work.
+
+   Omit optional sections without meaningful content. Use direct, neutral language, preserve useful technical details, distinguish completed work from proposals and unresolved items, do not expose secrets, and never invent outcomes.
 
 4. Pass that Summary directly. Agent tool shells are non-interactive, so do not rely on the CLI's post-upload Agent prompt:
 
