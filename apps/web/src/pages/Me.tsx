@@ -271,21 +271,16 @@ function ShareRow({
           {row.title}
         </span>
         <span className="sw-share-meta">
-          {/* Visibility is an icon-only glyph with a tooltip — text label
-           *  fought the title for visual weight (industry pattern:
-           *  GitHub gist / YouTube / Google Docs). `link-2` is the
-           *  straight-edge chain so it doesn't visually collide with
-           *  the copy-link button's curvy `link` icon. */}
           <span
             className="sw-share-vis"
             title={
               listed
-                ? 'On profile — visible on your /@handle page'
-                : 'Link only — unlisted, accessible only with the URL'
+                ? 'Public — visible in Explore, search, and on your profile'
+                : 'Public — visible in Explore and search'
             }
-            aria-label={listed ? 'On profile' : 'Link only'}
           >
-            <Icon name={listed ? 'globe' : 'link-2'} size={12} />
+            <Icon name="globe" size={12} />
+            Public{listed ? ' · on profile' : ''}
           </span>
           <span>published {humanDate(row.published_at)}</span>
         </span>
@@ -390,9 +385,7 @@ function RowMenu({
             <Icon name={copied ? 'check' : 'link'} size={13} />
             {copied ? 'Copied' : 'Copy link'}
           </button>
-          {/* Icon previews the TARGET state (globe = will appear on the
-           *  profile, link-2 = will go link-only) — same pairing as the
-           *  desktop row menu and the meta-line glyph. */}
+          {/* Profile listing is optional; both states remain public and discoverable. */}
           {(listed || canList) && (
             <button
               type="button"

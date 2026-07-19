@@ -54,7 +54,7 @@ function Hero() {
         <span className="pulse" />
         <span className="ver">Early access</span>
         <span className="dot" />
-        <span>Link-only by default</span>
+        <span>Public discovery</span>
         <span className="dot" />
         <span>Claude Code · Codex CLI</span>
         <span className="dot" />
@@ -75,9 +75,8 @@ function Hero() {
 
       <div className="hh-cta">
         <InstallPill />
-        <a href="https://github.com/spool-lab/spool" className="hh-btn hh-btn-p">
-          <GhIcon />
-          Star on GitHub
+        <a href="/explore" className="hh-btn hh-btn-p">
+          Explore Sessions →
         </a>
         <a href="/docs/installation" className="hh-btn hh-btn-g">
           Read the docs →
@@ -137,7 +136,7 @@ function HeroSidebar() {
 
       <div className="hh-lbl">
         <span>Session</span>
-        <span className="sort">Link-only</span>
+        <span className="sort">Public</span>
       </div>
 
       {HERO_PROJECTS.map((p) => (
@@ -175,7 +174,7 @@ function HeroMain() {
   return (
     <div className="hh-main">
       <h2 className="hh-app-h">JWT rotation without double refresh</h2>
-      <div className="hh-app-sub">Shared 2h ago · Claude Code · Link-only</div>
+      <div className="hh-app-sub">@maya · shared 2h ago · Claude Code · Public</div>
 
       <div className="hh-feed">
         <div className="hh-seg">
@@ -346,7 +345,7 @@ function BrowseSection() {
             <span className="accent">.</span>
           </>
         }
-        sub="Choose a Claude Code or Codex CLI Session, review the exact record range and sensitive-data findings, add an optional Summary, and share. New Hub shares are Link-only."
+        sub="Choose a Claude Code or Codex CLI Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Shared Sessions are public and can appear in Explore and search."
       />
 
       <div className="pillar-spec">
@@ -424,7 +423,7 @@ function BrowseDiagram() {
         <div className="bd-out-head">
           <FolderIcon />
           <span className="bd-out-name">Shared Session</span>
-          <span className="bd-out-meta">Link-only · source unchanged</span>
+          <span className="bd-out-meta">Public · source unchanged</span>
         </div>
         <div className="bd-out-stats">
           <div className="bd-out-stat">
@@ -816,8 +815,8 @@ function PrinciplesSection() {
     },
     {
       n: 'ii.',
-      title: 'Link-only by default.',
-      body: 'Sharing creates a durable URL for the chosen Session and record range. Nothing else on the machine is exposed.',
+      title: 'Explicit public sharing.',
+      body: 'Sharing creates a public, discoverable URL for the chosen Session and record range. Nothing else on the machine is exposed.',
     },
     {
       n: 'iii.',
@@ -869,15 +868,14 @@ function FinalCTA() {
       </div>
       <div className="row">
         <InstallPill />
-        <a href="https://github.com/spool-lab/spool" className="hh-btn hh-btn-p">
-          <GhIcon />
-          Star on GitHub
+        <a href="/explore" className="hh-btn hh-btn-p">
+          Explore Sessions →
         </a>
         <a href="/docs/installation" className="hh-btn hh-btn-g">
           Read the docs →
         </a>
       </div>
-      <div className="plat">Link-only by default · Claude Code · Codex CLI · MIT</div>
+      <div className="plat">Public discovery · Claude Code · Codex CLI · MIT</div>
     </section>
   )
 }
@@ -936,14 +934,6 @@ function FolderIcon({ dashed }: { dashed?: boolean }) {
       style={dashed ? { strokeDasharray: '2 2', opacity: 0.6 } : undefined}
     >
       <path d="M1 3.5a1 1 0 0 1 1-1h3l1.5 1.5h5.5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3.5z" />
-    </svg>
-  )
-}
-
-function GhIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.9 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
     </svg>
   )
 }

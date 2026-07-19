@@ -32,8 +32,8 @@ export function Privacy() {
                 sent to spool.pro.
               </li>
               <li>
-                New shares are Link-only. A separate Publish choice is required before a Session can
-                appear on your Profile or in Discovery.
+                Shared Sessions are public and may appear in Explore and search after you confirm
+                sharing.
               </li>
               <li>spool.pro runs no ads, behavioral analytics, or third-party tracking cookies.</li>
             </ul>
@@ -68,6 +68,9 @@ export function Privacy() {
             revocable credentials authenticate Desktop and CLI clients. Security-relevant actions
             are recorded in an audit log with a salted hash of IP address and the client user-agent.
             The salt rotates daily. Short-lived counters support rate limiting and abuse prevention.
+            Explore ranking uses daily qualified-read totals after a reader has spent active time
+            with a Session and reached meaningful depth or interacted with its evidence. The
+            qualified-read signal does not persist a raw IP address or user-agent.
           </p>
           <p>
             <strong>What we do not collect.</strong> We do not use advertising identifiers,
@@ -92,14 +95,10 @@ export function Privacy() {
 
           <h2>Visibility and recipients</h2>
           <p>
-            A <strong>Link-only</strong> Session can be read by anyone who has its URL, but Spool
-            does not list it on your Profile or in Discovery. Do not treat a Link-only URL as
-            secret.
-          </p>
-          <p>
-            A <strong>Public</strong> Session can appear on your Profile, in Discovery and search,
-            and in social-media previews. Search engines, preview services, and readers may create
-            copies outside our control.
+            A Shared Session is public and can appear on your Profile, in Explore and search, and in
+            social-media previews. Anyone with its URL can read it. Search engines, preview
+            services, and readers may create copies outside our control, so confirm the selected
+            content and sensitive-data findings before sharing.
           </p>
 
           <h2>Withdrawal, retention, and deletion</h2>

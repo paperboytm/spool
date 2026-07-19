@@ -32,7 +32,7 @@ If the Hub is unreachable, the local credential is still removed. Revoke the ser
 
 ## `spool share`
 
-Create a durable Link-only Shared Session URL. Spool checks the selected records for likely sensitive values before upload.
+Create a durable public Shared Session URL that can appear in Explore and search. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure.
 
 ```bash
 spool share                       # latest Session in the current directory

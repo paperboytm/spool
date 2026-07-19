@@ -499,7 +499,11 @@ export function SessionWorkbench({
             </section>
           </div>
 
-          <aside aria-label="Workspace" className="sw-session-sticky min-w-0 lg:sticky">
+          <aside
+            aria-label="Workspace"
+            data-qualified-read-evidence
+            className="sw-session-sticky min-w-0 lg:sticky"
+          >
             <div>
               <h2
                 id="workspace-title"

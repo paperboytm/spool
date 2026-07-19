@@ -13,7 +13,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             Spool<span className="dot">.</span>
           </Link>
           <nav className="links">
-            <Link to="/">Explore</Link>
+            <Link to="/explore" search={{ sort: 'recommended' }}>
+              Explore
+            </Link>
             <Link to="/docs/$" params={{ _splat: 'installation' }}>
               Docs
             </Link>
@@ -49,7 +51,10 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div className="foot-right">
           <div>
-            <a href="https://github.com/spool-lab/spool">GitHub</a> &nbsp;·&nbsp;{' '}
+            <Link to="/explore" search={{ sort: 'recommended' }}>
+              Explore
+            </Link>{' '}
+            &nbsp;·&nbsp; <a href="https://github.com/spool-lab/spool">GitHub</a> &nbsp;·&nbsp;{' '}
             <a href="https://discord.gg/aqeDxQUs5E">Discord</a> &nbsp;·&nbsp;{' '}
             <a href="https://x.com/spoollabs">X</a> &nbsp;·&nbsp; <Link to="/blog">Blog</Link>
           </div>

@@ -172,8 +172,8 @@ export function Icon({
     case 'link-2':
       // Lucide-style link-2: straight chain — distinct from the curvy
       // `link` glyph used by the copy-link button, so a meta-line
-      // visibility marker (link-only share) doesn't read as the same
-      // affordance as the copy action sitting next to it.
+      // profile-listing marker doesn't read as the same affordance as
+      // the copy action sitting next to it.
       return (
         <svg {...common}>
           <path d="M5 8h6" />

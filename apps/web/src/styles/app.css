@@ -663,6 +663,7 @@ html[data-theme='dark'] .sw-root {
 .sw-share-vis {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   color: var(--muted);
   cursor: help;
 }

@@ -52,7 +52,7 @@ A successful share returns a URL such as:
 https://spool.pro/session/claude_…
 ```
 
-Anyone with the URL can read the Shared Session without installing Spool. New Hub shares are Link-only while Public Profile and Discovery controls are being completed.
+Anyone with the URL can read the Shared Session without installing Spool. Shared Sessions are public and can appear in Explore and search after you confirm sharing.
 
 ## 6. Continue the work
 

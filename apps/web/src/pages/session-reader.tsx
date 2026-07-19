@@ -19,6 +19,7 @@ import {
   type HubSessionMeta,
   type RangeFetcher,
 } from '../lib/hub-api'
+import { useQualifiedRead } from '../lib/qualified-read'
 import { parseHubConversation } from '../lib/session-messages'
 import { deepLinkIndex, providerOf } from '../lib/session-page'
 import { Tombstone } from './Tombstone'
@@ -135,6 +136,7 @@ export function SessionReader({ sid }: { sid: string }) {
     () => (typeof window === 'undefined' ? null : deepLinkIndex(window.location.hash)),
     [sid],
   )
+  useQualifiedRead(sid, state.phase === 'ready')
 
   useEffect(() => {
     let cancelled = false

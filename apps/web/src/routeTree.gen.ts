@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
 import { Route as SiteRouteImport } from './routes/_site'
 import { Route as CliAuthRouteImport } from './routes/cli-auth'
+import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SignInRouteImport } from './routes/sign-in'
@@ -38,6 +39,11 @@ const SiteRoute = SiteRouteImport.update({
 const CliAuthRoute = CliAuthRouteImport.update({
   id: '/cli-auth',
   path: '/cli-auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreRoute = ExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MeRoute = MeRouteImport.update({
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/': typeof SiteIndexRoute
   '/cli-auth': typeof CliAuthRoute
+  '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/cli-auth': typeof CliAuthRoute
+  '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/_site': typeof SiteRouteWithChildren
   '/cli-auth': typeof CliAuthRoute
+  '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/@{$handle}'
     | '/'
     | '/cli-auth'
+    | '/explore'
     | '/me'
     | '/privacy'
     | '/sign-in'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
   to:
     | '/@{$handle}'
     | '/cli-auth'
+    | '/explore'
     | '/me'
     | '/privacy'
     | '/sign-in'
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/@{$handle}'
     | '/_site'
     | '/cli-auth'
+    | '/explore'
     | '/me'
     | '/privacy'
     | '/sign-in'
@@ -218,6 +230,7 @@ export interface RootRouteChildren {
   AtChar123handleChar125Route: typeof AtChar123handleChar125Route
   SiteRoute: typeof SiteRouteWithChildren
   CliAuthRoute: typeof CliAuthRoute
+  ExploreRoute: typeof ExploreRoute
   MeRoute: typeof MeRoute
   PrivacyRoute: typeof PrivacyRoute
   SignInRoute: typeof SignInRoute
@@ -248,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/cli-auth'
       fullPath: '/cli-auth'
       preLoaderRoute: typeof CliAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore': {
+      id: '/explore'
+      path: '/explore'
+      fullPath: '/explore'
+      preLoaderRoute: typeof ExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/me': {
@@ -368,6 +388,7 @@ const rootRouteChildren: RootRouteChildren = {
   AtChar123handleChar125Route: AtChar123handleChar125Route,
   SiteRoute: SiteRouteWithChildren,
   CliAuthRoute: CliAuthRoute,
+  ExploreRoute: ExploreRoute,
   MeRoute: MeRoute,
   PrivacyRoute: PrivacyRoute,
   SignInRoute: SignInRoute,

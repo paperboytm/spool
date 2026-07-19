@@ -45,4 +45,4 @@ Never commit the Spool data directory or Hub credential file to a repository.
 
 ## Publishing boundary
 
-Configuration does not make Sessions public. A Session leaves the machine only through an explicit Share flow. Public visibility is a separate explicit Publish choice.
+Configuration and local indexing do not make Sessions public. A Session leaves the machine only through an explicit Share flow; after confirmation, the Shared Session is public and can appear in Explore and search.
