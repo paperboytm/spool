@@ -1,8 +1,10 @@
+import { PassThrough } from 'node:stream'
+
 import { runMigrations } from '@spool-lab/core'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { createTextUi, type CliSelectOption, type CliUi } from '../ui.js'
+import { createClackUi, createTextUi, type CliSelectOption, type CliUi } from '../ui.js'
 import { handleListCommand } from './list.js'
 
 describe('spool list', () => {
@@ -41,7 +43,7 @@ describe('spool list', () => {
     expect(choices[0]?.label).toBe('00000002  Session 02')
     expect(choices[0]?.hint).toContain('claude')
     expect(confirmations).toEqual([
-      { message: 'Share Session 00000002 as Link-only?', initialValue: false },
+      { message: 'Share Session 00000002 as Link-only?', initialValue: true },
     ])
     expect(shared).toBe('00000002-0000-4000-8000-000000000002')
     expect(exit).toBe(0)
@@ -87,6 +89,57 @@ describe('spool list', () => {
     expect(choices).toHaveLength(45)
     expect(choices[0]?.label).toBe('00000045  Session 45')
     expect(choices.at(-1)?.label).toBe('00000001  Session 01')
+    expect(shared).toBe(false)
+    expect(outcomes).toEqual(['Session not shared.'])
+    expect(exit).toBe(0)
+  })
+
+  it('finds a Session beyond the first page without scanning each intervening page', async () => {
+    const db = createSessionDb(45)
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const confirmations: string[] = []
+    const ui = {
+      ...createClackUi({ input, output, interactive: true }),
+      confirm: async (message: string) => {
+        confirmations.push(message)
+        return false
+      },
+    } as CliUi
+
+    const result = handleListCommand({ limit: '20', all: true }, { db, ui, limitExplicit: false })
+    input.write('Session 01')
+    input.write('\r')
+
+    await expect(result).resolves.toBe(0)
+    expect(confirmations).toEqual(['Share Session 00000001 as Link-only?'])
+  })
+
+  it('cancels cleanly without starting Share when the confirmation is dismissed', async () => {
+    const db = createSessionDb(1)
+    const outcomes: string[] = []
+    let shared = false
+    const ui = {
+      ...createTextUi(),
+      interactive: true,
+      autocomplete: async (options: { choices: CliSelectOption<string>[] }) =>
+        options.choices[0]?.value ?? null,
+      confirm: async () => null,
+      cancel: (message: string) => outcomes.push(message),
+    } as CliUi
+
+    const exit = await handleListCommand(
+      { limit: '20', all: true },
+      {
+        db,
+        ui,
+        shareSession: async () => {
+          shared = true
+          return 0
+        },
+      },
+    )
+
     expect(shared).toBe(false)
     expect(outcomes).toEqual(['Session not shared.'])
     expect(exit).toBe(0)

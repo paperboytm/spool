@@ -6,6 +6,7 @@ import {
   canonicalizeRecord,
   isResumableSessionProvider,
   parseSessionText,
+  SESSION_PROVIDERS,
   type SessionProvider,
 } from '@spool-lab/session-kit'
 import { Command } from 'commander'
@@ -29,6 +30,10 @@ import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 // `spool share [<session-id>][@<n>]` publishes the session first. Once the
 // URL is live, an interactive terminal can offer one of the user's installed
 // local Agent CLIs to generate a Markdown Summary and advance the same head.
+
+const SHARE_REF_PATTERN = new RegExp(
+  `^(?:(?:${SESSION_PROVIDERS.join('|')})_)?([0-9A-Za-z_-]{8,128})(?:@([1-9][0-9]*))?$`,
+)
 
 export interface ShareTarget {
   provider: SessionProvider
@@ -386,9 +391,7 @@ async function readSpoolFileObject(path: string): Promise<{ oid: string; data: s
 
 function parseShareRef(input: string | undefined): { sessionUuid?: string; position?: number } {
   if (input === undefined) return {}
-  const match = input
-    .trim()
-    .match(/^(?:(?:claude|codex|gemini|opencode|pi)_)?([0-9A-Za-z_-]{8,128})(?:@([1-9][0-9]*))?$/)
+  const match = input.trim().match(SHARE_REF_PATTERN)
   if (!match?.[1]) {
     throw new Error(`Invalid session reference: ${input}. Expected <uuid> or <uuid>@<n>.`)
   }

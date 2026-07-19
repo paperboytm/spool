@@ -1,14 +1,13 @@
 import { getDB, searchFragments } from '@spool-lab/core'
-import type { FragmentResult, SessionSource } from '@spool-lab/core'
+import type { FragmentResult } from '@spool-lab/core'
+import { isSessionProvider, SESSION_PROVIDERS } from '@spool-lab/session-kit'
 import { Command } from 'commander'
-
-const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode', 'pi'])
 
 export const searchCommand = new Command('search')
   .description('Search your AI session history')
   .argument('<query>', 'Search query')
   .option('-n, --limit <n>', 'Max results', '10')
-  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|opencode|pi')
+  .option('-s, --source <name>', `Filter by source: ${SESSION_PROVIDERS.join('|')}`)
   .option('--since <date>', 'Only search sessions after this date (ISO or relative like "7d")')
   .option('--json', 'Output as JSON')
   .action(
@@ -19,8 +18,7 @@ export const searchCommand = new Command('search')
       const db = getDB(true)
 
       const since = opts.since ? resolveSince(opts.since) : undefined
-      const source =
-        opts.source && SESSION_SOURCES.has(opts.source) ? (opts.source as SessionSource) : undefined
+      const source = opts.source && isSessionProvider(opts.source) ? opts.source : undefined
       const results = searchFragments(db, query, {
         limit: parseInt(opts.limit, 10),
         ...(source !== undefined && { source }),

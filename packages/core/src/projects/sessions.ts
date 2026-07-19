@@ -19,6 +19,7 @@ export type SessionsPage = {
 
 export interface ListSessionsByIdentityOptions {
   sources?: SessionSource[]
+  search?: string
   sortOrder?: ProjectSessionSortOrder
   limit?: number
   excludePinned?: boolean
@@ -34,6 +35,7 @@ export function listSessionsByIdentity(
 ): SessionsPage {
   const {
     sources,
+    search,
     sortOrder = 'recent',
     limit = DEFAULT_PAGE_SIZE,
     excludePinned = false,
@@ -48,6 +50,8 @@ export function listSessionsByIdentity(
     conditions.push(`src.name IN (${placeholders})`)
     params.push(...sources)
   }
+
+  appendSessionSearchCondition(conditions, params, search)
 
   if (excludePinned) {
     conditions.push('NOT EXISTS (SELECT 1 FROM pins WHERE pins.session_uuid = s.session_uuid)')
@@ -64,17 +68,42 @@ export function listSessionsByIdentity(
 
 export function listRecentSessionsPage(
   db: Database.Database,
-  options: { limit?: number; cursor?: SessionsCursor } = {},
+  options: { limit?: number; cursor?: SessionsCursor; search?: string } = {},
 ): SessionsPage {
-  const { limit = DEFAULT_PAGE_SIZE, cursor } = options
+  const { limit = DEFAULT_PAGE_SIZE, cursor, search } = options
   const conditions: string[] = ['s.message_count > 0']
   const params: unknown[] = []
+  appendSessionSearchCondition(conditions, params, search)
   if (cursor) {
     const c = cursorWhere('recent', cursor)
     conditions.push(c.sql)
     params.push(...c.params)
   }
   return executePage(db, conditions, params, 'recent', limit)
+}
+
+function appendSessionSearchCondition(
+  conditions: string[],
+  params: unknown[],
+  search: string | undefined,
+): void {
+  const normalized = search?.trim().toLowerCase()
+  if (!normalized) return
+
+  conditions.push(`LOWER(
+    s.session_uuid || ' ' ||
+    COALESCE(s.title, '') || ' ' ||
+    src.name || ' ' ||
+    p.display_name || ' ' ||
+    p.display_path || ' ' ||
+    COALESCE(s.cwd, '') || ' ' ||
+    s.started_at
+  ) LIKE ? ESCAPE '\\'`)
+  params.push(`%${escapeLikePattern(normalized)}%`)
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
 }
 
 export type DirectoryCount = {

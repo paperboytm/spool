@@ -4,16 +4,14 @@ import {
   listSessionsByIdentity,
   resolveLocalProjectIdentity,
   type Session,
-  type SessionSource,
   type SessionsCursor,
 } from '@spool-lab/core'
+import { isSessionProvider, SESSION_PROVIDERS } from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
 import { formatDate, printSession } from '../format.js'
 import { createClackUi, createTextUi, type CliSelectOption, type CliUi } from '../ui.js'
 import { handleShareCommand } from './share.js'
-
-const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode', 'pi'])
 
 export interface ListCommandOptions {
   limit: string
@@ -71,8 +69,8 @@ export async function handleListCommand(
       choices: sessions.map(toAutocompleteChoice),
       ...(firstPage.hasMore
         ? {
-            loadMore: () => {
-              const page = loadPage()
+            loadMore: (search: string) => {
+              const page = loadPage(search)
               return {
                 choices: page.sessions.map(toAutocompleteChoice),
                 hasMore: page.hasMore,
@@ -85,10 +83,7 @@ export async function handleListCommand(
     })
     if (selected === null) return 0
 
-    const wantsShare = await ui.confirm(
-      `Share Session ${selected.slice(0, 8)} as Link-only?`,
-      false,
-    )
+    const wantsShare = await ui.confirm(`Share Session ${selected.slice(0, 8)} as Link-only?`, true)
     if (wantsShare !== true) {
       if (wantsShare === null) ui.cancel('Session not shared.')
       else ui.outro('Session not shared.')
@@ -114,6 +109,15 @@ function toAutocompleteChoice(session: Session): CliSelectOption<string> {
     value: session.sessionUuid,
     label: `${shortId}  ${session.title ?? '(no title)'}`,
     hint: `${session.source} · ${formatDate(session.startedAt)} · ${session.projectDisplayName}`,
+    searchText: [
+      session.sessionUuid,
+      session.title ?? '',
+      session.source,
+      session.projectDisplayName,
+      session.projectDisplayPath,
+      session.cwd ?? '',
+      session.startedAt,
+    ].join(' '),
   }
 }
 
@@ -131,34 +135,43 @@ function createSessionPageLoader({
   cwd,
   pageSize,
   maxResults,
-}: SessionPageLoaderOptions): () => { sessions: Session[]; hasMore: boolean } {
+}: SessionPageLoaderOptions): (search?: string) => { sessions: Session[]; hasMore: boolean } {
   const identityKey = opts.all ? undefined : resolveLocalProjectIdentity(db, cwd).key
-  const source =
-    opts.source && SESSION_SOURCES.has(opts.source) ? (opts.source as SessionSource) : undefined
+  const source = opts.source && isSessionProvider(opts.source) ? opts.source : undefined
   const projectNeedle = opts.project?.toLowerCase()
-  let cursor: SessionsCursor | undefined
-  let exhausted = false
-  let emitted = 0
+  const states = new Map<
+    string,
+    { cursor: SessionsCursor | undefined; exhausted: boolean; emitted: number }
+  >()
 
-  return () => {
-    const target = Math.min(pageSize, maxResults - emitted)
+  return (search = '') => {
+    const searchKey = search.trim().toLowerCase()
+    const state = states.get(searchKey) ?? {
+      cursor: undefined,
+      exhausted: false,
+      emitted: 0,
+    }
+    states.set(searchKey, state)
+    const target = Math.min(pageSize, maxResults - state.emitted)
     const sessions: Session[] = []
 
-    while (sessions.length < target && !exhausted) {
+    while (sessions.length < target && !state.exhausted) {
       const queryLimit = target - sessions.length
       const page = opts.all
         ? listRecentSessionsPage(db, {
             limit: queryLimit,
-            ...(cursor === undefined ? {} : { cursor }),
+            ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
+            ...(searchKey === '' ? {} : { search: searchKey }),
           })
         : listSessionsByIdentity(db, identityKey!, {
             limit: queryLimit,
             ...(source === undefined ? {} : { sources: [source] }),
-            ...(cursor === undefined ? {} : { cursor }),
+            ...(state.cursor === undefined ? {} : { cursor: state.cursor }),
+            ...(searchKey === '' ? {} : { search: searchKey }),
           })
 
-      cursor = page.nextCursor ?? undefined
-      exhausted = page.nextCursor === null
+      state.cursor = page.nextCursor ?? undefined
+      state.exhausted = page.nextCursor === null
       sessions.push(
         ...page.sessions.filter(
           (session) =>
@@ -169,15 +182,15 @@ function createSessionPageLoader({
       )
     }
 
-    emitted += sessions.length
-    return { sessions, hasMore: !exhausted && emitted < maxResults }
+    state.emitted += sessions.length
+    return { sessions, hasMore: !state.exhausted && state.emitted < maxResults }
   }
 }
 
 export const listCommand = new Command('list')
   .description('List recent AI sessions')
   .option('-n, --limit <n>', 'Max results', '20')
-  .option('-s, --source <name>', 'Filter by source: claude|codex|gemini|opencode|pi')
+  .option('-s, --source <name>', `Filter by source: ${SESSION_PROVIDERS.join('|')}`)
   .option('-p, --project <path>', 'Filter by project path substring')
   .option('-a, --all', 'List across all projects (ignore cwd)')
   .option('--json', 'Output as JSON')

@@ -7,6 +7,8 @@ export interface CliSelectOption<Value extends string> {
   value: Value
   label: string
   hint?: string
+  /** Canonical corpus used by both paged data queries and client filtering. */
+  searchText?: string
 }
 
 export interface CliChoicePage<Value extends string> {
@@ -46,7 +48,7 @@ export interface CliUi {
   autocomplete<Value extends string>(options: {
     message: string
     choices: CliSelectOption<Value>[]
-    loadMore?: () => CliChoicePage<Value>
+    loadMore?: (search: string) => CliChoicePage<Value>
     placeholder?: string
     maxItems?: number
   }): Promise<Value | null>
@@ -93,14 +95,15 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
     confirm: async (message, initialValue = true) => {
       if (!interactive) return null
       const result = await clack.confirm({ message, initialValue, ...common })
-      return clack.isCancel(result) ? null : result
+      return clack.isCancel(result) || result === undefined ? null : result
     },
     select: async ({ message, choices, initialValue }) => {
       if (!interactive) return null
+      type Value = (typeof choices)[number]['value']
       // Clack's conditional Option<T> cannot prove a generic string union is
       // primitive, although this adapter constrains every value to string.
       const clackOptions = toClackOptions(choices)
-      const result = await clack.select({
+      const result = await clack.select<Value>({
         message,
         options: clackOptions,
         ...(initialValue === undefined ? {} : { initialValue }),
@@ -113,37 +116,55 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
       type Value = (typeof choices)[number]['value']
       type Option = ClackOption<Value>
       let clackOptions = toClackOptions(choices)
+      const searchTextByValue = new Map<string, string>()
+      for (const choice of choices) {
+        if (choice.searchText !== undefined) {
+          searchTextByValue.set(choice.value, choice.searchText)
+        }
+      }
       let hasMore = loadMore !== undefined
       let lastSearch = ''
 
-      const appendPage = (): void => {
+      const appendPage = (search: string): void => {
         if (!loadMore || !hasMore) return
-        const page = loadMore()
-        clackOptions = [...clackOptions, ...toClackOptions(page.choices)]
+        const page = loadMore(search)
+        for (const choice of page.choices) {
+          if (choice.searchText !== undefined) {
+            searchTextByValue.set(choice.value, choice.searchText)
+          }
+        }
+        const knownValues = new Set(clackOptions.map((option) => option.value))
+        clackOptions = [
+          ...clackOptions,
+          ...toClackOptions(page.choices).filter((option) => !knownValues.has(option.value)),
+        ]
         hasMore = page.hasMore
       }
       const optionSource = loadMore
         ? function (this: ClackAutocompleteState<Option>): Option[] {
             const search = this.userInput
             const matchingOptions = (): Option[] =>
-              clackOptions.filter((option) => autocompleteMatches(search, option))
+              clackOptions.filter((option) =>
+                autocompleteMatches(search, option, searchTextByValue.get(String(option.value))),
+              )
             let filtered = matchingOptions()
             const searchChanged = search !== lastSearch
             lastSearch = search
 
-            if (searchChanged && search !== '') {
-              while (hasMore && filtered.length < (maxItems ?? 10)) {
-                appendPage()
-                filtered = matchingOptions()
-              }
+            if (searchChanged) {
+              // The caller pages against the active query, so one bounded DB
+              // request can search the whole library without scanning every
+              // intervening page in this synchronous terminal render.
+              hasMore = true
+              appendPage(search)
             } else if (
               hasMore &&
               filtered.length > 0 &&
               this.cursor >= Math.max(filtered.length - 2, 0)
             ) {
-              appendPage()
-              filtered = matchingOptions()
+              appendPage(search)
             }
+            filtered = matchingOptions()
 
             // Clack's documented dynamic-options getter is bound to the
             // prompt. It does not refilter options appended during render, so
@@ -158,9 +179,11 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
         options: optionSource,
         ...(placeholder === undefined ? {} : { placeholder }),
         ...(maxItems === undefined ? {} : { maxItems }),
+        filter: (search, option) =>
+          autocompleteMatches(search, option, searchTextByValue.get(String(option.value))),
         ...common,
       })
-      return clack.isCancel(result) ? null : result
+      return clack.isCancel(result) || result === undefined ? null : result
     },
     spinner: () => clack.spinner(common),
   }
@@ -179,10 +202,13 @@ function toClackOptions<Value extends string>(
 function autocompleteMatches<Value extends string>(
   search: string,
   option: ClackOption<Value>,
+  searchText?: string,
 ): boolean {
   if (search === '') return true
   const needle = search.toLowerCase()
-  return [option.label, option.hint, option.value].some((part) =>
+  const searchableParts =
+    searchText === undefined ? [option.label, option.hint, option.value] : [searchText]
+  return searchableParts.some((part) =>
     String(part ?? '')
       .toLowerCase()
       .includes(needle),

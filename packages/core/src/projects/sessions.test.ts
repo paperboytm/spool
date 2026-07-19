@@ -155,6 +155,13 @@ describe('listRecentSessionsPage', () => {
     expect(page2.sessions.map((s) => s.sessionUuid)).toEqual(['a'])
     expect(page2.nextCursor).toBeNull()
   })
+
+  it('searches the complete recent-session library before applying the page limit', () => {
+    const page = listRecentSessionsPage(db, { limit: 2, search: '2026-05-01' })
+
+    expect(page.sessions.map((session) => session.sessionUuid)).toEqual(['a'])
+    expect(page.nextCursor).toBeNull()
+  })
 })
 
 describe('listProjectDirectoryCounts', () => {
