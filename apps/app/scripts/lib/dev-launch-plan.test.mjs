@@ -12,6 +12,10 @@ describe('Electron dev launch plan', () => {
     expect(appPackage.scripts.dev.split(' && ')[0]).toBe('pnpm run ensure:electron-runtime')
   })
 
+  test('uses a path-safe executable name for packaged apps', () => {
+    expect(appPackage.build.executableName).toBe('Spool')
+  })
+
   test('builds isolated worker entries before starting Electron', () => {
     expect(DEV_LAUNCH_PLAN).toEqual([
       {
