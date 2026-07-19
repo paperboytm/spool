@@ -246,6 +246,7 @@ function shareDeps(
       cwd: workspaceRoot,
       log: (message: string) => logs.push(message),
       error: (message: string) => errors.push(message),
+      copyToClipboard: () => false,
       resolveTarget: () => ({
         provider: 'claude' as const,
         sessionUuid: SESSION_UUID,
@@ -287,6 +288,43 @@ describe('spool share local Agent Summary flow', () => {
     expect(events.indexOf(`note:Link-only URL:${url}`)).toBeLessThan(
       events.indexOf('success:Session shared as Link-only. Link copied to clipboard.'),
     )
+    expect(events).toContain(
+      'info:Keep this Session Link-only, or Publish it separately to show it on your Profile and in Discovery.',
+    )
+  })
+
+  it('keeps a completed share successful when clipboard access is unavailable', async () => {
+    for (const copyToClipboard of [
+      async () => false,
+      async () => {
+        throw new Error('clipboard unavailable')
+      },
+    ]) {
+      const hub = makeHub()
+      const workspace = mkdtempSync(join(tmpdir(), 'spool-share-copy-fallback-'))
+      const home = mkdtempSync(join(tmpdir(), 'spool-share-copy-fallback-home-'))
+      const filePath = writeFixtureSession(workspace)
+      const share = shareDeps(hub, workspace, filePath, home)
+      const events: string[] = []
+
+      const exit = await handleShareCommand(
+        undefined,
+        { agentSummary: false },
+        {
+          ...share.deps,
+          ui: interactiveUi({ events }),
+          copyToClipboard,
+        },
+      )
+
+      const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
+      expect(exit).toBe(0)
+      expect(events).toContain(`note:Link-only URL:${url}`)
+      expect(events).toContain('success:Session shared as Link-only.')
+      expect(events).toContain(
+        'info:Could not copy automatically. Copy the Link-only URL above to share it.',
+      )
+    }
   })
 
   it('uploads first, detects installed Agents, then generates and uploads the Summary', async () => {

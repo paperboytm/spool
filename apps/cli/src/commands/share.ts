@@ -268,21 +268,25 @@ async function announceShareComplete(
   copyToClipboard: (text: string) => boolean | Promise<boolean>,
 ): Promise<void> {
   ui.note(url, 'Link-only URL')
-  if (!ui.interactive) {
-    ui.success('Session shared as Link-only.')
-    return
-  }
-
-  try {
-    if (await copyToClipboard(url)) {
-      ui.success('Session shared as Link-only. Link copied to clipboard.')
-      return
+  let copied = false
+  if (ui.interactive) {
+    try {
+      copied = await copyToClipboard(url)
+    } catch {
+      // Clipboard access is a convenience; a live share must still succeed.
     }
-  } catch {
-    // Clipboard access is a convenience; a live share must still succeed.
   }
-  ui.success('Session shared as Link-only.')
-  ui.info('Could not copy automatically. Copy the Link-only URL above to share it.')
+  ui.success(
+    copied
+      ? 'Session shared as Link-only. Link copied to clipboard.'
+      : 'Session shared as Link-only.',
+  )
+  if (ui.interactive && !copied) {
+    ui.info('Could not copy automatically. Copy the Link-only URL above to share it.')
+  }
+  ui.info(
+    'Keep this Session Link-only, or Publish it separately to show it on your Profile and in Discovery.',
+  )
 }
 
 export const shareCommand = new Command('share')

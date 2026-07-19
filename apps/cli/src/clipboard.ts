@@ -12,6 +12,7 @@ export function copyTextToClipboard(text: string): boolean {
       input: text,
       encoding: 'utf8',
       stdio: ['pipe', 'ignore', 'ignore'],
+      timeout: 2_000,
       windowsHide: true,
     })
     if (result.status === 0) return true
@@ -30,6 +31,8 @@ function clipboardCommands(platform: NodeJS.Platform): ClipboardCommand[] {
         { command: 'wl-copy', args: [] },
         { command: 'xclip', args: ['-selection', 'clipboard'] },
         { command: 'xsel', args: ['--clipboard', '--input'] },
+        // Available from Linux processes running under WSL.
+        { command: 'clip.exe', args: [] },
       ]
   }
 }
