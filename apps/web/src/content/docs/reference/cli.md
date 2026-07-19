@@ -99,13 +99,17 @@ Sync is local and does not publish anything.
 
 ## `spool list`
 
-List recent local Sessions:
+List recent local Sessions for the project containing the current working directory:
 
 ```bash
 spool list
 spool list -s codex -n 10
 spool list --json
+spool list --all
 ```
+
+`--all` ignores the current-project scope and lists recent Sessions across every project. It
+still respects `--limit`; combine it with `--project <path>` to query a different project.
 
 ## `spool projects`
 

@@ -9,6 +9,7 @@ describe('fallbackDisplayName', () => {
   })
   it('handles trailing slash', () => {
     expect(fallbackDisplayName('/Users/chen/Code/spool/')).toBe('spool')
+    expect(fallbackDisplayName('/Users/chen/Code/spool///')).toBe('spool')
   })
   it('returns "(root)" for /', () => {
     expect(fallbackDisplayName('/')).toBe('(root)')
