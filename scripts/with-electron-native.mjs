@@ -1,9 +1,13 @@
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { electronModulesAbi } from './lib/electron-modules-abi.mjs'
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(scriptDir, '..')
+const appRequire = createRequire(join(repoRoot, 'apps/app/package.json'))
 const pnpmBin = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const command = process.argv[2]
 const args = process.argv.slice(3)
@@ -21,7 +25,7 @@ function run(program, programArgs, cwd = repoRoot) {
   })
 }
 
-function electronModulesAbi() {
+function electronModulesAbiForApp() {
   const result = spawnSync(
     pnpmBin,
     ['--filter', '@spool/app', 'exec', 'electron', '-p', 'process.versions.modules'],
@@ -31,11 +35,8 @@ function electronModulesAbi() {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
     },
   )
-  const modules = result.stdout?.trim()
-  if (result.status !== 0 || !modules || !/^\d+$/.test(modules)) {
-    throw new Error('could not determine Electron NODE_MODULE_VERSION')
-  }
-  return modules
+  const electronVersion = appRequire('electron/package.json').version
+  return electronModulesAbi({ result, electronVersion })
 }
 
 let commandStatus = 1
@@ -53,7 +54,7 @@ try {
   if (electronRebuild.status === 0) {
     const cache = run(process.execPath, [
       join(scriptDir, 'cache-better-sqlite3-native.mjs'),
-      electronModulesAbi(),
+      electronModulesAbiForApp(),
     ])
     if (cache.status === 0) {
       const result = run(command, args, process.cwd())
