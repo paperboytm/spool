@@ -10,6 +10,7 @@ import {
 } from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
+import { copyTextToClipboard } from '../clipboard.js'
 import { buildSessionSummaryPrompt } from '../hub/agent-summary-prompt.js'
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
@@ -57,6 +58,8 @@ export interface ShareCommandDependencies extends HubCredentialOptions {
   detectSummaryAgents?: () => Promise<LocalSummaryAgent[]>
   generateSummary?: (agent: LocalSummaryAgent, prompt: string) => Promise<string>
   buildSummaryPrompt?: (target: ShareTarget, prepared: PreparedShare) => string
+  /** Best-effort clipboard writer; injected in tests. */
+  copyToClipboard?: (text: string) => boolean | Promise<boolean>
   cwd?: string
 }
 
@@ -152,7 +155,7 @@ export async function handleShareCommand(
       upload.error('Session upload failed')
       throw cause
     }
-    ui.note(url, 'Shared session')
+    await announceShareComplete(ui, url, dependencies.copyToClipboard ?? copyTextToClipboard)
 
     if (options.summary !== undefined) {
       const summaryUpload = ui.spinner()
@@ -257,6 +260,29 @@ export async function handleShareCommand(
     }
     return 1
   }
+}
+
+async function announceShareComplete(
+  ui: CliUi,
+  url: string,
+  copyToClipboard: (text: string) => boolean | Promise<boolean>,
+): Promise<void> {
+  ui.note(url, 'Link-only URL')
+  if (!ui.interactive) {
+    ui.success('Session shared as Link-only.')
+    return
+  }
+
+  try {
+    if (await copyToClipboard(url)) {
+      ui.success('Session shared as Link-only. Link copied to clipboard.')
+      return
+    }
+  } catch {
+    // Clipboard access is a convenience; a live share must still succeed.
+  }
+  ui.success('Session shared as Link-only.')
+  ui.info('Could not copy automatically. Copy the Link-only URL above to share it.')
 }
 
 export const shareCommand = new Command('share')

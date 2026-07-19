@@ -257,6 +257,38 @@ function shareDeps(
 }
 
 describe('spool share local Agent Summary flow', () => {
+  it('confirms the Link-only URL and copies it in an interactive terminal', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-share-complete-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-share-complete-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    let copied = ''
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false },
+      {
+        ...share.deps,
+        ui: interactiveUi({ events }),
+        copyToClipboard: async (text: string) => {
+          copied = text
+          return true
+        },
+      },
+    )
+
+    const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
+    expect(exit).toBe(0)
+    expect(copied).toBe(url)
+    expect(events).toContain(`note:Link-only URL:${url}`)
+    expect(events).toContain('success:Session shared as Link-only. Link copied to clipboard.')
+    expect(events.indexOf(`note:Link-only URL:${url}`)).toBeLessThan(
+      events.indexOf('success:Session shared as Link-only. Link copied to clipboard.'),
+    )
+  })
+
   it('uploads first, detects installed Agents, then generates and uploads the Summary', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-flow-'))
@@ -295,7 +327,7 @@ describe('spool share local Agent Summary flow', () => {
     expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
       '## Outcome\n\nThe rename is ready.',
     )
-    expect(events.findIndex((event) => event.startsWith('note:Shared session:'))).toBeLessThan(
+    expect(events.findIndex((event) => event.startsWith('note:Link-only URL:'))).toBeLessThan(
       events.findIndex((event) => event.startsWith('confirm:')),
     )
     expect(events).toContain('select:Which local Agent should generate the Summary?')
