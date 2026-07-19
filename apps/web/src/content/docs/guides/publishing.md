@@ -5,14 +5,9 @@ description: Prepare, share, and manage an agent Session safely.
 
 Spool treats publishing as an explicit boundary. Local preparation never exposes a Session; the author chooses exactly which Session and record range to share.
 
-## Share and Publish
+## Share publicly
 
-These are separate actions:
-
-- **Share** creates a durable Link-only URL.
-- **Publish** makes a Shared Session Public so it can appear on an author’s Profile and in Discovery.
-
-Public visibility controls are being completed. Hub shares currently remain Link-only.
+**Share** creates a durable public URL. After the author reviews the selected records and confirms the disclosure, the Shared Session can appear in Explore and search. There is no separate Publish step in this release.
 
 ## Share from Desktop
 
@@ -20,7 +15,7 @@ Public visibility controls are being completed. Hub shares currently remain Link
 2. Choose **Share session** from the Session actions.
 3. Review the record count, file and diff summary, and sensitive-data findings.
 4. Edit the optional Summary.
-5. Confirm sharing and copy the returned URL.
+5. Confirm that the Session will be public and can appear in Explore and search, then copy the returned URL.
 
 The desktop flow automatically attaches a curated `.spool` document when the Session can be rendered that way.
 

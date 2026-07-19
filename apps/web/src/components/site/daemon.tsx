@@ -1,3 +1,4 @@
+import { Button, ButtonLink } from '@spool-lab/ui'
 import { useState } from 'react'
 
 import registry from '../../../data/registry.json'
@@ -221,9 +222,10 @@ function InstallPill({ cmd }: { cmd: string }) {
       .catch(() => {})
   }
   return (
-    <button
+    <Button
       type="button"
       className={`install${copied ? ' copied' : ''}`}
+      variant="outline"
       onClick={onClick}
       aria-label="Copy install command"
     >
@@ -259,7 +261,7 @@ function InstallPill({ cmd }: { cmd: string }) {
           </svg>
         )}
       </span>
-    </button>
+    </Button>
   )
 }
 
@@ -273,9 +275,11 @@ function CopyCliBtn({ cmd }: { cmd: string }) {
     } catch {}
   }
   return (
-    <button
+    <Button
+      size="sm"
       type="button"
       className={`c-copy-btn${copied ? ' copied' : ''}`}
+      variant="ghost"
       onClick={onClick}
       aria-label="Copy install command"
       title={copied ? 'Copied!' : 'Copy install command'}
@@ -311,7 +315,7 @@ function CopyCliBtn({ cmd }: { cmd: string }) {
         </svg>
       )}
       <span>{copied ? 'Copied' : 'Copy CLI'}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -547,10 +551,10 @@ export default function DaemonPage() {
             </p>
             <div className="cta-row tight">
               <InstallPill cmd={INSTALL_CMD} />
-              <a href={REPO_URL} className="btn primary">
+              <ButtonLink href={REPO_URL} className="daemon-cta-button" variant="accent">
                 <GhIcon />
                 &nbsp;Star on GitHub
-              </a>
+              </ButtonLink>
             </div>
             <div className="meta-row">
               <span>MIT</span>
@@ -622,12 +626,14 @@ export default function DaemonPage() {
                     </span>
                     <span className="c-actions">
                       <CopyCliBtn cmd={cliCmd} />
-                      <a
+                      <ButtonLink
                         href={`spool-daemon://connector/install/${pkg.name}`}
+                        size="sm"
+                        variant="outline"
                         className="c-install-btn"
                       >
                         Install
-                      </a>
+                      </ButtonLink>
                     </span>
                   </div>
                 </div>
@@ -780,12 +786,20 @@ export default function DaemonPage() {
               <CodeBlock code={PACKAGE_JSON_EXAMPLE} />
             </div>
             <div className="ps-cta">
-              <a href={`${REPO_URL}/blob/main/docs/connector-developer-guide.md`} className="btn">
+              <ButtonLink
+                href={`${REPO_URL}/blob/main/docs/connector-developer-guide.md`}
+                className="daemon-cta-button"
+                variant="outline"
+              >
                 Read the SDK guide →
-              </a>
-              <a href={`${REPO_URL}/tree/main/packages/connectors`} className="btn ghost">
+              </ButtonLink>
+              <ButtonLink
+                href={`${REPO_URL}/tree/main/packages/connectors`}
+                className="daemon-cta-button"
+                variant="ghost"
+              >
                 Built-in connectors
-              </a>
+              </ButtonLink>
             </div>
           </div>
         </section>
@@ -825,13 +839,13 @@ export default function DaemonPage() {
           </div>
           <div className="row">
             <InstallPill cmd={INSTALL_CMD} />
-            <a href={REPO_URL} className="btn primary">
+            <ButtonLink href={REPO_URL} className="daemon-cta-button" variant="accent">
               <GhIcon />
               &nbsp;Star on GitHub
-            </a>
-            <a href={`${REPO_URL}#readme`} className="btn">
+            </ButtonLink>
+            <ButtonLink href={`${REPO_URL}#readme`} className="daemon-cta-button" variant="outline">
               Read the docs →
-            </a>
+            </ButtonLink>
           </div>
           <div className="plat">macOS · Apple Silicon · Linux x86_64 · MIT · Built in the open</div>
         </section>

@@ -258,6 +258,23 @@ describe('workos web flow endpoints', () => {
     }
   }
 
+  it('returns a structured error instead of throwing when WorkOS is not configured', async () => {
+    const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')
+    const res = await invoke(
+      startGet,
+      req,
+      { PUBLIC_BASE_URL: 'https://spool.pro' },
+      { provider: 'workos' },
+    )
+
+    expect(res.status).toBe(500)
+    expect(res.headers.get('content-type')).toBe('application/json')
+    await expect(res.json()).resolves.toEqual({
+      error: 'INTERNAL',
+      detail: 'no WORKOS_CLIENT_ID',
+    })
+  })
+
   it('start 302s to AuthKit with state + next baked into cookies', async () => {
     const env = envFor()
     const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')

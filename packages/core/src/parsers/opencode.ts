@@ -1,7 +1,8 @@
 import { basename, dirname, join } from 'node:path'
 
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 
+import { openDatabase } from '../db/native-binding.js'
 import type { ParseSessionResult, ParsedMessage, ParsedSession } from '../types.js'
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
 
@@ -279,7 +280,7 @@ export function parseOpenCodeSession(filePath: string): ParsedSession | null {
 }
 
 function openOpenCodeDb(dbPath: string): Database.Database {
-  const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+  const db = openDatabase(dbPath, { readonly: true, fileMustExist: true })
   // OpenCode may hold a write lock while checkpointing the WAL; wait briefly
   // instead of throwing SQLITE_BUSY and churning the sync error log.
   db.pragma('busy_timeout = 5000')

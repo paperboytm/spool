@@ -1,6 +1,7 @@
+import { Avatar, SectionLabel } from '@spool-lab/ui'
 import { useEffect, useState } from 'react'
 
-import { Avatar, Footer, Header, Page } from '../components/Chrome'
+import { Footer, Header, Page } from '../components/Chrome'
 import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
 import { humanDate } from '../lib/dates'
 import { normalizeTabTitle } from '../lib/page-title'
@@ -92,17 +93,21 @@ export function Profile({ handle }: { handle: string }) {
       <main className="sw-main">
         <div className="sw-card w-600">
           <div className="sw-identity">
-            <Avatar src={profile.avatar_url} name={profile.name} size={54} />
+            <Avatar src={profile.avatar_url} name={profile.name} alt="" size="lg" />
             <div className="body">
               {profile.name && <h1 className="name">{profile.name}</h1>}
               <p className="handle">@{profile.handle}</p>
             </div>
           </div>
           <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
-          <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
+          <SectionLabel
+            className="sw-section-label"
+            role="heading"
+            aria-level={2}
+            count={profile.shares.length > 0 ? profile.shares.length : undefined}
+          >
             Published
-            {profile.shares.length > 0 && <span className="count">{profile.shares.length}</span>}
-          </h2>
+          </SectionLabel>
           {profile.shares.length === 0 ? (
             <p className="sw-empty">Nothing published yet.</p>
           ) : (

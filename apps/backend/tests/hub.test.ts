@@ -498,6 +498,22 @@ describe('hub object batches', () => {
 })
 
 describe('hub head and withdrawal', () => {
+  it('rejects a malformed declared SessionViewV1 before advancing the head', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const invalidView = await canonicalizeRecord('{"v":1}')
+    fixture.head.viewOid = invalidView.oid
+    expect((await upload(env, USER_A_TOKEN, [...fixture.records, invalidView])).status).toBe(200)
+
+    const response = await commit(env, fixture)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ detail: 'invalid session view' })
+    expect(env.state.hub_sessions).toHaveLength(0)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
   it('conflicts while objects are missing, commits after upload, and recommit clears withdrawal', async () => {
     const env = envFor()
     await seedUsers(env)
@@ -516,6 +532,19 @@ describe('hub head and withdrawal', () => {
     expect(committed.status).toBe(200)
     await expect(committed.json()).resolves.toEqual({ url: `${BASE_URL}/session/${SID}` })
     const createdAt = env.state.hub_sessions[0]?.created_at
+    expect(env.state.hub_session_discovery[0]).toMatchObject({
+      sid: SID,
+      agent: 'claude',
+      title: 'Please make the greeting warmer.',
+      summary_text: 'Outcome A synthetic shared session.',
+      message_count: 2,
+      tool_call_count: 2,
+      file_count: 1,
+      additions: 1,
+      deletions: 1,
+      quality_score: 18,
+      published_at: createdAt,
+    })
     env.state.hub_sessions[0]!.visibility = 'private'
 
     const withdrawn = await withdraw(env)
@@ -530,6 +559,7 @@ describe('hub head and withdrawal', () => {
       created_at: createdAt,
       withdrawn_at: null,
     })
+    expect(env.state.hub_session_discovery[0]?.published_at).toBe(createdAt)
   })
 
   it('forbids non-owners and makes a second owner withdrawal idempotent', async () => {

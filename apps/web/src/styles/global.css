@@ -5,81 +5,43 @@
 .page-shell *::before,
 .page-shell *::after {
   box-sizing: border-box;
+}
+
+.page-shell :where(h1, h2, h3, h4, p, ul, ol, figure, blockquote) {
   margin: 0;
   padding: 0;
 }
 
 :root {
-  --bg: #fafaf8;
-  --surface: #f4f4f0;
-  --surface2: #eeeee9;
-  --border: #e8e8e2;
-  --border2: #d8d8d0;
-  --text: #1c1c18;
-  --muted: #6b6b60;
-  --faint: #adadaa;
-  --accent: #c85a00;
-  --accent-bg: #fff3e8;
-  --accent-weak: rgba(200, 90, 0, 0.08);
-  --src-claude: #c26a4e;
+  --bg: var(--sp-bg);
+  --surface: var(--sp-surface);
+  --surface2: var(--sp-surface-2);
+  --border: var(--sp-border);
+  --border2: var(--sp-border-strong);
+  --text: var(--sp-text);
+  --muted: var(--sp-muted);
+  --faint: var(--sp-faint);
+  --accent: var(--sp-accent);
+  --accent-bg: var(--sp-accent-bg);
+  --accent-weak: color-mix(in srgb, var(--sp-accent) 8%, transparent);
+  --src-claude: var(--sp-source-claude);
   --src-twitter: #3a3a3a;
   --src-github: #555555;
   --src-youtube: #b22222;
   --src-chatgpt: #10a37f;
-  --src-gemini: #5887d0;
-  --src-codex: #4a9670;
+  --src-gemini: var(--sp-source-gemini);
+  --src-codex: var(--sp-source-codex);
   --src-reddit: #ff4500;
   --src-hn: #ff6600;
   --src-xhs: #ff2442;
   --paper: 39 39 3;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #141410;
-    --surface: #1c1c18;
-    --surface2: #242420;
-    --border: #2e2e28;
-    --border2: #3a3a34;
-    --text: #f2f2ec;
-    --muted: #8a8a80;
-    --faint: #505048;
-    --accent: #f07020;
-    --accent-bg: #2a1800;
-    --accent-weak: rgba(240, 112, 32, 0.1);
-    --src-claude: #e89a7c;
-    --src-twitter: #888880;
-    --src-github: #999990;
-    --src-youtube: #d44444;
-    --src-chatgpt: #20c38f;
-    --src-gemini: #8ab0e5;
-    --src-codex: #7cc9a2;
-    --src-reddit: #ff6b3d;
-    --src-hn: #ff8c3d;
-    --src-xhs: #ff4f6a;
-    --paper: 242 242 236;
-  }
-}
-
 [data-theme='dark'] {
-  --bg: #141410;
-  --surface: #1c1c18;
-  --surface2: #242420;
-  --border: #2e2e28;
-  --border2: #3a3a34;
-  --text: #f2f2ec;
-  --muted: #8a8a80;
-  --faint: #505048;
-  --accent: #f07020;
-  --accent-bg: #2a1800;
-  --accent-weak: rgba(240, 112, 32, 0.1);
-  --src-claude: #e89a7c;
   --src-twitter: #888880;
   --src-github: #999990;
   --src-youtube: #d44444;
   --src-chatgpt: #20c38f;
-  --src-gemini: #8ab0e5;
-  --src-codex: #7cc9a2;
   --src-reddit: #ff6b3d;
   --src-hn: #ff8c3d;
   --src-xhs: #ff4f6a;
@@ -93,11 +55,7 @@ html {
 }
 
 .page-shell {
-  font-family:
-    'Geist Variable',
-    'Geist',
-    -apple-system,
-    sans-serif;
+  font-family: var(--sp-font-sans);
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -141,7 +99,7 @@ a {
 
 code,
 .mono {
-  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-family: var(--sp-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -183,10 +141,7 @@ code,
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  font-size: 16px;
+  gap: var(--sp-space-2);
 }
 .brand .brand-mark {
   width: 22px;
@@ -194,23 +149,10 @@ code,
   color: var(--accent);
   display: inline-block;
 }
-.brand .dot {
-  color: var(--accent);
-  margin-left: -2px;
-}
-
 .top nav.links {
   display: flex;
   align-items: center;
-  gap: 22px;
-  font-size: 13px;
-}
-.top nav.links a {
-  color: var(--muted);
-  transition: color 80ms;
-}
-.top nav.links a:hover {
-  color: var(--text);
+  gap: var(--sp-space-1);
 }
 
 .top nav.links .sep {
@@ -218,28 +160,6 @@ code,
   height: 14px;
   background: var(--border);
 }
-.iconbtn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition:
-    background 80ms,
-    border-color 80ms,
-    color 80ms;
-}
-.iconbtn:hover {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
-}
-
 @media (max-width: 720px) {
   .top nav.links a.nav-hideable {
     display: none;
@@ -259,8 +179,8 @@ footer {
   flex-wrap: wrap;
 }
 footer .legal {
-  font-family: 'Geist Mono', monospace;
-  font-size: 10.5px;
+  font-family: var(--sp-font-mono);
+  font-size: var(--sp-text-label);
   color: var(--faint);
   letter-spacing: 0.06em;
 }
@@ -273,7 +193,7 @@ footer a:hover {
 footer .foot-left {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-space-2);
   max-width: 72ch;
 }
 footer .foot-prods {
@@ -283,13 +203,9 @@ footer .foot-prods {
   margin-bottom: 2px;
 }
 footer .foot-prod {
-  font-size: 14px;
   color: var(--text);
   text-decoration: none;
   transition: color 0.15s;
-}
-footer .foot-prod strong {
-  font-weight: 600;
 }
 footer .foot-prod:hover {
   color: var(--accent);

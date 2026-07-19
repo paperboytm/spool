@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 
 import { runAgentSearchCleanup } from '../migrations/agent-search-cleanup.js'
 import { upgradeWorktreeIdentities } from '../migrations/worktree-identity-upgrade.js'
 import { realFs } from '../projects/fs.js'
 import { computeIdentity, type IdentityFs } from '../projects/identity.js'
+import { openDatabase } from './native-binding.js'
 
 export const SPOOL_DIR = process.env['SPOOL_DATA_DIR'] ?? join(homedir(), '.spool')
 export const DB_PATH = join(SPOOL_DIR, 'spool.db')
@@ -41,7 +42,7 @@ export function getDB(arg?: boolean | OpenOptions): Database.Database {
   //   - wasNewDb=true  → DB file did not exist; this is a first-time install
   //   - wasNewDb=false → upgrade path, and initialUserVersion tells you from where
   _wasNewDb = !existsSync(DB_PATH)
-  const db = new Database(DB_PATH)
+  const db = openDatabase(DB_PATH)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   db.pragma('busy_timeout = 5000')

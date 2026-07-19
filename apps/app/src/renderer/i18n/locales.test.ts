@@ -59,6 +59,107 @@ const LOCALES: Array<[string, Tree]> = [
 
 const EN_PATHS = leafPaths(en as Tree)
 
+interface HubShareCopy {
+  title: string
+  lead: string
+  publish: string
+  publishing: string
+  doneTitle: string
+  doneLead: string
+}
+
+const PUBLIC_HUB_SHARE_COPY: Array<
+  [
+    locale: string,
+    copy: HubShareCopy,
+    terms: {
+      public: string
+      search: string
+      noSeparatePublish: string
+      sourceUnchanged: string
+      shareAction: string
+    },
+  ]
+> = [
+  [
+    'en',
+    en.hubShare,
+    {
+      public: 'public',
+      search: 'search',
+      noSeparatePublish: 'no separate Publish step',
+      sourceUnchanged: 'source Session stays unchanged',
+      shareAction: 'Share publicly',
+    },
+  ],
+  [
+    'de',
+    de.hubShare,
+    {
+      public: 'öffentlich',
+      search: 'Suche',
+      noSeparatePublish: 'separater Veröffentlichungsschritt',
+      sourceUnchanged: 'Quell-Session unverändert',
+      shareAction: 'Öffentlich teilen',
+    },
+  ],
+  [
+    'fr',
+    fr.hubShare,
+    {
+      public: 'publiquement',
+      search: 'recherche',
+      noSeparatePublish: 'étape de publication séparée',
+      sourceUnchanged: 'session source reste inchangée',
+      shareAction: 'Partager publiquement',
+    },
+  ],
+  [
+    'ja',
+    ja.hubShare,
+    {
+      public: '一般公開',
+      search: '検索',
+      noSeparatePublish: '別途公開操作',
+      sourceUnchanged: '元のセッションは変更されません',
+      shareAction: '公開して共有',
+    },
+  ],
+  [
+    'ko',
+    ko.hubShare,
+    {
+      public: '공개',
+      search: '검색',
+      noSeparatePublish: '별도의 게시 단계',
+      sourceUnchanged: '원본 세션은 변경되지 않습니다',
+      shareAction: '공개로 공유',
+    },
+  ],
+  [
+    'zh-CN',
+    zhCN.hubShare,
+    {
+      public: '公开',
+      search: '搜索',
+      noSeparatePublish: '单独的发布步骤',
+      sourceUnchanged: '源会话不会被更改',
+      shareAction: '公开分享',
+    },
+  ],
+  [
+    'zh-TW',
+    zhTW.hubShare,
+    {
+      public: '公開',
+      search: '搜尋',
+      noSeparatePublish: '另外的發佈步驟',
+      sourceUnchanged: '來源會話不會被變更',
+      shareAction: '公開分享',
+    },
+  ],
+]
+
 describe('locale key parity vs en.json', () => {
   it.each(LOCALES)('%s covers every translatable key in en.json', (name, tree) => {
     const present = leafPaths(tree)
@@ -140,6 +241,28 @@ describe('locale key parity vs en.json', () => {
         if (/_one$/.test(path)) offenders.push(path)
       }
       expect(offenders).toEqual([])
+    },
+  )
+})
+
+describe('Hub Share public-discovery copy', () => {
+  it.each(PUBLIC_HUB_SHARE_COPY)(
+    '%s makes the public boundary explicit before and after sharing',
+    (_locale, copy, terms) => {
+      expect(copy.title).toContain(terms.public)
+      expect(copy.lead).toContain('{{records}}')
+      expect(copy.publish).toBe(terms.shareAction)
+      expect(copy.publishing).not.toMatch(
+        /Publish|Publier|Publication|Veröffentlichen|公開中|게시 중|发布中|發佈中/,
+      )
+
+      for (const message of [copy.lead, copy.doneLead]) {
+        expect(message).toContain(terms.public)
+        expect(message).toContain('Explore')
+        expect(message).toContain(terms.search)
+        expect(message).toContain(terms.noSeparatePublish)
+        expect(message).toContain(terms.sourceUnchanged)
+      }
     },
   )
 })

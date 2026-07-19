@@ -1,5 +1,5 @@
 // Security headers for the runtime-SSR'd app surfaces (/s/*, /session/*,
-// /@*, /me, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
+// /@*, /explore, /me, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
 // file from the standalone share-web era — same values, same per-route
 // CSP split — applied by the request middleware in src/start.ts because
 // the merged app serves these routes through the TanStack Start worker
@@ -53,6 +53,7 @@ const BASE_HEADERS: Record<string, string> = {
  *  the noindex defaults. */
 const READER_PREFIXES = ['/s/', '/session/', '/@']
 const ACCOUNT_PATHS = ['/me', '/sign-in', '/cli-auth']
+const PUBLIC_APP_PATHS = ['/explore']
 const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']
 
 export function securityHeadersFor(
@@ -73,6 +74,13 @@ export function securityHeadersFor(
     return {
       ...BASE_HEADERS,
       'X-Robots-Tag': 'noindex',
+      'Content-Security-Policy': csp(nonce, { formAction: 'self', imgSrc: IMG_SRC_READER }),
+    }
+  }
+
+  if (PUBLIC_APP_PATHS.includes(path)) {
+    return {
+      ...BASE_HEADERS,
       'Content-Security-Policy': csp(nonce, { formAction: 'self', imgSrc: IMG_SRC_READER }),
     }
   }

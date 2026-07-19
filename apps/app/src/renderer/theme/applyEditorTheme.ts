@@ -43,56 +43,55 @@ function tokensForSide(slot: ThemeSideConfig, mode: 'light' | 'dark'): Record<st
 
   if (mode === 'light') {
     return {
-      '--color-warm-bg': bg,
-      '--color-warm-surface': surface,
-      '--color-warm-surface2': surface2,
-      '--color-warm-border': border,
-      '--color-warm-border2': border2,
-      '--color-warm-text': fg,
-      '--color-warm-muted': muted,
-      '--color-warm-faint': faint,
-      '--color-accent': accent,
-      '--color-accent-bg': accentBgLight,
+      '--sp-bg': bg,
+      '--sp-surface': surface,
+      '--sp-surface-2': surface2,
+      '--sp-surface2': 'var(--sp-surface-2)',
+      '--sp-border': border,
+      '--sp-border-strong': border2,
+      '--sp-border2': 'var(--sp-border-strong)',
+      '--sp-text': fg,
+      '--sp-muted': muted,
+      '--sp-faint': faint,
+      '--sp-accent': accent,
+      '--sp-accent-bg': accentBgLight,
     }
   }
 
   return {
-    '--color-dark-bg': bg,
-    '--color-dark-surface': surface,
-    '--color-dark-surface2': surface2,
-    '--color-dark-border': border,
-    '--color-dark-border2': border2,
-    '--color-dark-text': fg,
-    '--color-dark-muted': muted,
-    '--color-dark-faint': faint,
-    '--color-accent-dark': accent,
-    '--color-accent-bg-dark': accentBgDark,
+    '--sp-bg': bg,
+    '--sp-surface': surface,
+    '--sp-surface-2': surface2,
+    '--sp-surface2': 'var(--sp-surface-2)',
+    '--sp-border': border,
+    '--sp-border-strong': border2,
+    '--sp-border2': 'var(--sp-border-strong)',
+    '--sp-text': fg,
+    '--sp-muted': muted,
+    '--sp-faint': faint,
+    '--sp-accent': accent,
+    '--sp-accent-bg': accentBgDark,
   }
 }
 
 /**
- * Pushes all semantic colors used by Tailwind `@theme` tokens onto `document.documentElement`.
- * Light and dark sets are both updated so OS / app theme switches stay instant.
+ * Updates the active shared token set and mirrors Electron's effective theme
+ * onto html.dark. Tailwind's legacy aliases and shared components therefore
+ * read the same values without maintaining parallel palettes.
  */
 export function applyEditorTheme(state: ThemeEditorStateV1): void {
   const root = document.documentElement
-  const lightTok = tokensForSide(state.light, 'light')
-  const darkTok = tokensForSide(state.dark, 'dark')
-
-  for (const [k, v] of Object.entries({ ...lightTok, ...darkTok })) {
-    root.style.setProperty(k, v)
-  }
-
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const active = isDark ? state.dark : state.light
+  root.classList.toggle('dark', isDark)
+  for (const [token, value] of Object.entries(tokensForSide(active, isDark ? 'dark' : 'light'))) {
+    root.style.setProperty(token, value)
+  }
   root.style.setProperty(
-    '--font-sans',
-    fontStack(active.uiFont, `'Inter Variable', system-ui, sans-serif`),
+    '--sp-font-sans',
+    fontStack(active.uiFont, `'Geist Variable', 'Geist', sans-serif`),
   )
-  root.style.setProperty(
-    '--font-mono',
-    fontStack(active.codeFont, `'Geist Mono', ui-monospace, monospace`),
-  )
+  root.style.setProperty('--sp-font-mono', fontStack(active.codeFont, `'Geist Mono', monospace`))
 }
 
 export function themePreviewSnippet(state: ThemeEditorStateV1): string {

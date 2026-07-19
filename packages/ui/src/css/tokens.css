@@ -1,0 +1,99 @@
+:root {
+  color-scheme: light;
+
+  --sp-bg-light: #fafaf8;
+  --sp-bg-dark: #141410;
+  --sp-bg: #fafaf8;
+  --sp-surface: #f4f4f0;
+  --sp-surface-2: #eeeee9;
+  --sp-surface2: var(--sp-surface-2);
+  --sp-border: #e8e8e2;
+  --sp-border-strong: #d8d8d0;
+  --sp-border2: var(--sp-border-strong);
+  --sp-text: #1c1c18;
+  --sp-muted: #6b6b60;
+  --sp-faint: #adadaa;
+  --sp-accent: #c85a00;
+  --sp-accent-bg: #fff3e8;
+  --sp-on-accent: #ffffff;
+
+  --sp-source-claude: #c26a4e;
+  --sp-source-codex: #4a9670;
+  --sp-source-gemini: #5887d0;
+  --sp-source-opencode: #8a6f3d;
+  --sp-success: #6baf6b;
+  --sp-warning: #e4a640;
+  --sp-error: #c95a4f;
+
+  --sp-font-sans: 'Geist Variable', 'Geist', sans-serif;
+  --sp-font-mono: 'Geist Mono', monospace;
+  --sp-text-ui: 13px;
+  --sp-text-button: 12px;
+  --sp-text-meta: 11px;
+  --sp-text-label: 10px;
+  --sp-text-session-title: 15px;
+
+  --sp-control-button-sm: 28px;
+  --sp-control-button-md: 32px;
+  --sp-control-icon-sm: 24px;
+  --sp-control-icon-md: 32px;
+  --sp-control-search: 36px;
+  --sp-control-tab: 36px;
+  --sp-control-nav: 32px;
+
+  --sp-space-0-5: 2px;
+  --sp-space-1: 4px;
+  --sp-space-1-5: 6px;
+  --sp-space-2: 8px;
+  --sp-space-3: 12px;
+  --sp-space-4: 16px;
+  --sp-space-5: 20px;
+  --sp-space-6: 24px;
+  --sp-space-8: 32px;
+  --sp-space-12: 48px;
+  --sp-space-16: 64px;
+  --sp-space-24: 96px;
+
+  --sp-radius-badge: 4px;
+  --sp-radius-control: 6px;
+  --sp-radius-input: 8px;
+  --sp-radius-card: 10px;
+  --sp-radius-pill: 9999px;
+
+  --sp-motion-hover: 80ms;
+  --sp-focus-ring: 0 0 0 2px var(--sp-accent-bg), 0 0 0 3px var(--sp-accent);
+}
+
+html.dark,
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --sp-bg: #141410;
+  --sp-surface: #1c1c18;
+  --sp-surface-2: #242420;
+  --sp-border: #2e2e28;
+  --sp-border-strong: #3a3a34;
+  --sp-text: #f2f2ec;
+  --sp-muted: #8a8a80;
+  --sp-faint: #505048;
+  --sp-accent: #f07020;
+  --sp-accent-bg: #2a1800;
+  --sp-on-accent: #141410;
+
+  --sp-source-claude: #e89a7c;
+  --sp-source-codex: #7cc9a2;
+  --sp-source-gemini: #8ab0e5;
+  --sp-source-opencode: #c9a761;
+  --sp-success: #7dc07d;
+  --sp-warning: #f0b854;
+  --sp-error: #d67259;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f1f1f66 transparent;
+}
+
+html:is(.dark, [data-theme='dark']) {
+  scrollbar-color: #e6e6e666 transparent;
+}

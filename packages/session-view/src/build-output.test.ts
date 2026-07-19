@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe('package build output', () => {
   it('emits the exported stylesheet during a Vite build', async () => {
-    await execFileAsync('pnpm', ['exec', 'vite', 'build', '--outDir', OUT_DIR], {
+    await execFileAsync('pnpm', ['exec', 'vp', 'build', '--outDir', OUT_DIR], {
       cwd: PACKAGE_ROOT,
     })
 

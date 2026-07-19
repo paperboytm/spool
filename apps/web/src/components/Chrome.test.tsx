@@ -8,6 +8,9 @@ describe('Header', () => {
     const html = renderToStaticMarkup(<Header auth="out" sticky />)
 
     expect(html).toContain('class="sw-header sw-header-sticky"')
+    expect(html).toContain('aria-label="Toggle light or dark"')
+    expect(html).toContain('href="/sign-in"')
+    expect(html).toContain('Spool')
   })
 
   it('remains non-sticky by default on other pages', () => {

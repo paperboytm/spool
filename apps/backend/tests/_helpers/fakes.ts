@@ -131,6 +131,29 @@ type ApiTokenRow = {
   last_used_at: number | null
 }
 
+type HubSessionDiscoveryRow = {
+  sid: string
+  agent: 'claude' | 'codex'
+  title: string
+  summary_text: string | null
+  search_text: string
+  message_count: number
+  tool_call_count: number
+  file_count: number
+  additions: number
+  deletions: number
+  lineage_source_sid: string | null
+  quality_score: number
+  published_at: number
+  updated_at: number
+}
+
+type HubSessionEngagementDailyRow = {
+  sid: string
+  day: string
+  qualified_reads: number
+}
+
 export type FakeDbState = {
   users: UserRow[]
   audit: AuditRow[]
@@ -141,6 +164,8 @@ export type FakeDbState = {
   hub_sessions: HubSessionRow[]
   hub_objects: HubObjectRow[]
   api_tokens: ApiTokenRow[]
+  hub_session_discovery: HubSessionDiscoveryRow[]
+  hub_session_engagement_daily: HubSessionEngagementDailyRow[]
 }
 
 export function emptyState(): FakeDbState {
@@ -154,6 +179,8 @@ export function emptyState(): FakeDbState {
     hub_sessions: [],
     hub_objects: [],
     api_tokens: [],
+    hub_session_discovery: [],
+    hub_session_engagement_daily: [],
   }
 }
 
@@ -169,6 +196,17 @@ export function makeDb(state: FakeDbState = emptyState()): {
         return stmt
       },
       async first<T = unknown>(): Promise<T | null> {
+        if (sql.includes('/* discovery:session-live */')) {
+          const [sid] = params as [string]
+          const session = state.hub_sessions.find(
+            (row) => row.sid === sid && row.visibility === 'unlisted' && row.withdrawn_at === null,
+          )
+          if (!session) return null
+          const owner = state.users.find(
+            (row) => row.id === session.owner_user_id && row.deleted_at === null,
+          )
+          return owner ? ({ '1': 1 } as T) : null
+        }
         if (/^SELECT \* FROM hub_sessions WHERE sid=\?$/i.test(sql)) {
           const [sid] = params as [string]
           return (state.hub_sessions.find((row) => row.sid === sid) as T) ?? null
@@ -357,6 +395,83 @@ export function makeDb(state: FakeDbState = emptyState()): {
       // matched nothing so optimistic-concurrency callers can detect
       // races (mirrored real D1 surfaces the same value).
       async run(): Promise<{ success: boolean; meta: { changes: number } }> {
+        if (sql.includes('/* discovery:upsert-projection */')) {
+          const [
+            sid,
+            agent,
+            title,
+            summaryText,
+            searchText,
+            messageCount,
+            toolCallCount,
+            fileCount,
+            additions,
+            deletions,
+            lineageSourceSid,
+            qualityScore,
+            publishedAt,
+            updatedAt,
+          ] = params as [
+            string,
+            'claude' | 'codex',
+            string,
+            string | null,
+            string,
+            number,
+            number,
+            number,
+            number,
+            number,
+            string | null,
+            number,
+            number,
+            number,
+          ]
+          const existing = state.hub_session_discovery.find((row) => row.sid === sid)
+          if (existing) {
+            Object.assign(existing, {
+              agent,
+              title,
+              summary_text: summaryText,
+              search_text: searchText,
+              message_count: messageCount,
+              tool_call_count: toolCallCount,
+              file_count: fileCount,
+              additions,
+              deletions,
+              lineage_source_sid: lineageSourceSid,
+              quality_score: qualityScore,
+              updated_at: updatedAt,
+            })
+          } else {
+            state.hub_session_discovery.push({
+              sid,
+              agent,
+              title,
+              summary_text: summaryText,
+              search_text: searchText,
+              message_count: messageCount,
+              tool_call_count: toolCallCount,
+              file_count: fileCount,
+              additions,
+              deletions,
+              lineage_source_sid: lineageSourceSid,
+              quality_score: qualityScore,
+              published_at: publishedAt,
+              updated_at: updatedAt,
+            })
+          }
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* discovery:increment-engagement */')) {
+          const [sid, day] = params as [string, string]
+          const existing = state.hub_session_engagement_daily.find(
+            (row) => row.sid === sid && row.day === day,
+          )
+          if (existing) existing.qualified_reads += 1
+          else state.hub_session_engagement_daily.push({ sid, day, qualified_reads: 1 })
+          return { success: true, meta: { changes: 1 } }
+        }
         if (
           /^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(
             sql,
@@ -828,13 +943,93 @@ export function makeDb(state: FakeDbState = emptyState()): {
         }
         if (/^DELETE FROM hub_sessions WHERE owner_user_id=\?$/i.test(sql)) {
           const [ownerUserId] = params as [string]
+          const deletedSids = new Set(
+            state.hub_sessions
+              .filter((row) => row.owner_user_id === ownerUserId)
+              .map((row) => row.sid),
+          )
           const before = state.hub_sessions.length
           state.hub_sessions = state.hub_sessions.filter((row) => row.owner_user_id !== ownerUserId)
+          state.hub_session_discovery = state.hub_session_discovery.filter(
+            (row) => !deletedSids.has(row.sid),
+          )
+          state.hub_session_engagement_daily = state.hub_session_engagement_daily.filter(
+            (row) => !deletedSids.has(row.sid),
+          )
           return { success: true, meta: { changes: before - state.hub_sessions.length } }
         }
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
       async all<T = unknown>(): Promise<{ results: T[] }> {
+        if (sql.includes('/* discovery:list */')) {
+          let parameterIndex = 0
+          const sinceDay = params[parameterIndex] as string
+          parameterIndex += 1
+          const hasAgent = sql.includes('d.agent = ?')
+          const agent = hasAgent ? (params[parameterIndex] as 'claude' | 'codex') : null
+          if (hasAgent) parameterIndex += 1
+          const tokenCount = sql.match(/d\.search_text LIKE \?/g)?.length ?? 0
+          const tokens: string[] = []
+          for (let index = 0; index < tokenCount; index += 1) {
+            tokens.push(likePatternValue(params[parameterIndex] as string))
+            parameterIndex += 3
+          }
+          const limit = params[parameterIndex] as number
+
+          const items = state.hub_session_discovery
+            .flatMap((discovery) => {
+              if (agent !== null && discovery.agent !== agent) return []
+              const session = state.hub_sessions.find(
+                (row) =>
+                  row.sid === discovery.sid &&
+                  row.visibility === 'unlisted' &&
+                  row.withdrawn_at === null,
+              )
+              if (!session) return []
+              const user = state.users.find(
+                (row) => row.id === session.owner_user_id && row.deleted_at === null,
+              )
+              if (!user) return []
+              const handle =
+                state.handles.find(
+                  (row) => row.user_id === session.owner_user_id && row.released_at === null,
+                )?.handle ?? null
+              const displayName = user.display_name ?? user.name ?? ''
+              if (
+                !tokens.every(
+                  (token) =>
+                    discovery.search_text.includes(token) ||
+                    (handle ?? '').toLowerCase().includes(token) ||
+                    displayName.toLowerCase().includes(token),
+                )
+              ) {
+                return []
+              }
+              const qualifiedReads = state.hub_session_engagement_daily
+                .filter((row) => row.sid === discovery.sid && row.day >= sinceDay)
+                .reduce((sum, row) => sum + row.qualified_reads, 0)
+              return [
+                {
+                  ...discovery,
+                  record_count: session.record_count,
+                  owner_user_id: session.owner_user_id,
+                  handle,
+                  name: user.name,
+                  display_name: user.display_name ?? null,
+                  avatar_url: user.avatar_url,
+                  custom_avatar_id: user.custom_avatar_id ?? null,
+                  avatar_visible: user.avatar_visible ?? 1,
+                  qualified_reads_7d: qualifiedReads,
+                },
+              ]
+            })
+            .sort(
+              (left, right) =>
+                right.published_at - left.published_at || left.sid.localeCompare(right.sid),
+            )
+            .slice(0, limit)
+          return { results: items as T[] }
+        }
         if (/^SELECT DISTINCT pack_key FROM hub_objects WHERE owner_user_id=\?$/i.test(sql)) {
           const [ownerUserId] = params as [string]
           const packKeys = new Set(
@@ -1075,4 +1270,8 @@ export function makeR2(): {
     },
   }
   return { bucket: bucket as unknown as R2Bucket, store }
+}
+
+function likePatternValue(pattern: string): string {
+  return pattern.slice(1, -1).replace(/\\([\\%_])/g, '$1')
 }

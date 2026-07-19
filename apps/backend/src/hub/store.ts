@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types'
 
 // D1 access for the hub. Chunked IN() queries stay under D1's ~100 bound
 // parameter ceiling; object inserts go through db.batch() so a 4000-line
@@ -35,26 +35,32 @@ export async function getHubSession(db: D1Database, sid: string): Promise<HubSes
   return db.prepare('SELECT * FROM hub_sessions WHERE sid=?').bind(sid).first<HubSessionRow>()
 }
 
-export async function upsertHubSession(
+export async function upsertHubSession(db: D1Database, row: HubSessionUpsert): Promise<void> {
+  await prepareHubSessionUpsert(db, row).run()
+}
+
+export type HubSessionUpsert = {
+  sid: string
+  ownerUserId: string
+  root: string
+  recordCount: number
+  sig: string | null
+  cardJson: string | null
+  summaryMd: string | null
+  lineageJson: string | null
+  viewOid: string
+  spoolFileOid: string | null
+  now: number
+}
+
+export function prepareHubSessionUpsert(
   db: D1Database,
-  row: {
-    sid: string
-    ownerUserId: string
-    root: string
-    recordCount: number
-    sig: string | null
-    cardJson: string | null
-    summaryMd: string | null
-    lineageJson: string | null
-    viewOid: string
-    spoolFileOid: string | null
-    now: number
-  },
-): Promise<void> {
+  row: HubSessionUpsert,
+): D1PreparedStatement {
   // ON CONFLICT keeps owner_user_id / visibility / created_at and clears any
   // tombstone: an author re-sharing a withdrawn session is an explicit
   // re-publish decision.
-  await db
+  return db
     .prepare(
       'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at) ' +
         "VALUES (?,?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) " +
@@ -74,7 +80,6 @@ export async function upsertHubSession(
       row.now,
       row.now,
     )
-    .run()
 }
 
 export async function withdrawHubSession(

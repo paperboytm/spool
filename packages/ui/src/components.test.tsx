@@ -1,0 +1,161 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vite-plus/test'
+
+import {
+  Avatar,
+  Badge,
+  Button,
+  ButtonLink,
+  IconButton,
+  IconLink,
+  ListRow,
+  NavItem,
+  SearchField,
+  SectionLabel,
+  Tabs,
+  Wordmark,
+} from './index.js'
+
+describe('button primitives', () => {
+  it('render the correct semantic elements and visual variants', () => {
+    const button = renderToStaticMarkup(
+      <Button variant="accent" size="sm">
+        Publish
+      </Button>,
+    )
+    const link = renderToStaticMarkup(
+      <ButtonLink href="/explore" variant="outline" size="md">
+        Explore
+      </ButtonLink>,
+    )
+
+    expect(button).toContain('<button')
+    expect(button).toContain('type="button"')
+    expect(button).toContain('data-variant="accent"')
+    expect(button).toContain('data-size="sm"')
+    expect(link).toContain('<a href="/explore"')
+    expect(link).toContain('data-variant="outline"')
+  })
+
+  it('requires and forwards accessible labels for icon controls', () => {
+    const button = renderToStaticMarkup(<IconButton aria-label="Pin session">P</IconButton>)
+    const link = renderToStaticMarkup(
+      <IconLink aria-label="Open session" href="/sessions/1">
+        O
+      </IconLink>,
+    )
+
+    expect(button).toContain('aria-label="Pin session"')
+    expect(button).toContain('<button')
+    expect(link).toContain('aria-label="Open session"')
+    expect(link).toContain('<a')
+  })
+})
+
+describe('controlled primitives', () => {
+  it('renders a controlled search input with a semantic clear action', () => {
+    const html = renderToStaticMarkup(
+      <SearchField
+        aria-label="Search sessions"
+        value="agent"
+        onChange={vi.fn()}
+        onClear={vi.fn()}
+        clearLabel="Clear query"
+      />,
+    )
+
+    expect(html).toContain('type="search"')
+    expect(html).toContain('value="agent"')
+    expect(html).toContain('aria-label="Search sessions"')
+    expect(html).toContain('aria-label="Clear query"')
+  })
+
+  it('marks the controlled tab value and disabled items correctly', () => {
+    const html = renderToStaticMarkup(
+      <Tabs
+        aria-label="Session views"
+        value="summary"
+        onValueChange={vi.fn()}
+        items={[
+          { value: 'summary', label: 'Summary', ariaControls: 'summary-panel' },
+          { value: 'record', label: 'Record', disabled: true },
+        ]}
+      />,
+    )
+
+    expect(html).toContain('role="tablist"')
+    expect(html).toContain('aria-label="Session views"')
+    expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('aria-controls="summary-panel"')
+    expect(html).toContain('disabled=""')
+  })
+})
+
+describe('content primitives', () => {
+  it('renders link and button navigation with explicit active state', () => {
+    const link = renderToStaticMarkup(
+      <NavItem href="/explore" active leading="L" trailing="T">
+        Explore
+      </NavItem>,
+    )
+    const button = renderToStaticMarkup(<NavItem>Projects</NavItem>)
+
+    expect(link).toContain('<a')
+    expect(link).toContain('aria-current="page"')
+    expect(link).toContain('sp-nav-item__leading')
+    expect(link).toContain('sp-nav-item__trailing')
+    expect(button).toContain('<button')
+    expect(button).toContain('type="button"')
+  })
+
+  it('renders badge variants and avatar image fallbacks', () => {
+    const badge = renderToStaticMarkup(<Badge variant="source-codex">Codex</Badge>)
+    const fallback = renderToStaticMarkup(<Avatar name="Ada Lovelace" alt="Ada" />)
+    const image = renderToStaticMarkup(
+      <Avatar src="https://example.test/ada.png" name="Ada Lovelace" alt="Ada" />,
+    )
+
+    expect(badge).toContain('data-variant="source-codex"')
+    expect(fallback).toContain('sp-avatar__fallback')
+    expect(fallback).toContain('>AL</span>')
+    expect(fallback).toContain('role="img"')
+    expect(image).toContain('<img')
+    expect(image).toContain('referrerPolicy="no-referrer"')
+  })
+
+  it('keeps Session interpretation, evidence, and lineage in named row slots', () => {
+    const html = renderToStaticMarkup(
+      <ListRow
+        leading={<Avatar name="Lin" />}
+        attribution="@lin · published 2h ago"
+        title="Ship the shared UI foundation"
+        summary="A concise interpretation of the work."
+        metadata="12 messages · 4 files"
+        lineage="Continued from @lin/original"
+        trailing={<Button>Resume</Button>}
+      />,
+    )
+
+    expect(html).toContain('<article')
+    expect(html).toContain('sp-list-row__attribution')
+    expect(html).toContain('sp-list-row__summary')
+    expect(html).toContain('sp-list-row__metadata')
+    expect(html).toContain('sp-list-row__lineage')
+    expect(html).toContain('data-leading="true"')
+    expect(html).toContain('data-trailing="true"')
+  })
+
+  it('renders section slots and the canonical attributed wordmark', () => {
+    const section = renderToStaticMarkup(
+      <SectionLabel count={3} action={<button type="button">Sort</button>}>
+        Public sessions
+      </SectionLabel>,
+    )
+    const wordmark = renderToStaticMarkup(<Wordmark />)
+
+    expect(section).toContain('sp-section-label__count')
+    expect(section).toContain('sp-section-label__action')
+    expect(wordmark).toContain('Spool')
+    expect(wordmark).toContain('sp-wordmark__dot')
+  })
+})

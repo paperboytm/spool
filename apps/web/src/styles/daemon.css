@@ -237,16 +237,6 @@
       'cta';
   }
 }
-.btn.ghost {
-  background: transparent;
-  border: 1px dashed var(--border2);
-  color: var(--muted);
-}
-.btn.ghost:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 /* Code window — mac-style chrome */
 .plugin-code {
   background: var(--surface);
@@ -347,7 +337,7 @@
   white-space: nowrap;
   min-width: 0;
 }
-.cta-row.tight .btn {
+.cta-row.tight .daemon-cta-button {
   flex-shrink: 0;
 }
 @media (max-width: 700px) {
@@ -461,53 +451,14 @@
 }
 
 .c-install-btn {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: opacity 0.15s;
   white-space: nowrap;
-}
-.c-install-btn:hover {
-  opacity: 0.88;
 }
 
 .c-copy-btn {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  transition:
-    border-color 0.15s,
-    color 0.15s,
-    background 0.15s;
-}
-.c-copy-btn:hover {
-  border-color: var(--border2);
-  color: var(--text);
-  background: var(--bg);
-}
-.c-copy-btn svg {
-  width: 12px;
-  height: 12px;
-  display: block;
+  justify-content: flex-start;
 }
 .c-copy-btn.copied {
   color: var(--accent);
-  border-color: var(--accent);
 }
 
 /* ─── Hero override: equal columns, tray gets more vertical breathing ─── */

@@ -32,7 +32,7 @@ export function Terms() {
           <h2>The service</h2>
           <p>
             Spool hosts agent Sessions that authors explicitly share, serves them at durable URLs,
-            and may list Public Sessions on Profiles and Discovery surfaces. Supported clients can
+            and may list Shared Sessions on Profiles, Explore, and search. Supported clients can
             materialize a Shared Session as new agent-native work. The service does not host or
             restore a complete project repository.
           </p>
@@ -66,14 +66,10 @@ export function Terms() {
 
           <h2>Visibility</h2>
           <p>
-            A <strong>Link-only</strong> Session is available to anyone with its URL but is not
-            listed by Spool on your Profile or in Discovery. A <strong>Public</strong> Session may
-            be listed, searched, previewed, and shared broadly. Public visibility requires a
-            separate author choice.
-          </p>
-          <p>
-            Neither visibility state is a confidentiality service. Recipients can copy content, and
-            third-party caches or previews may outlive withdrawal.
+            A Shared Session is public: it is available to anyone with its URL and may be listed,
+            searched, previewed, and shared broadly after the author confirms sharing. It is not a
+            confidentiality service. Readers can copy content, and third-party caches or previews
+            may outlive withdrawal.
           </p>
 
           <h2>Withdrawal</h2>

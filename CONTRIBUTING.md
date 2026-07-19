@@ -94,9 +94,19 @@ The stack is three processes: backend (Wrangler, :8788), web
    ```
 
 4. **Run it**:
+
    ```bash
    ./scripts/share-dev.sh
    ```
+
+   In another terminal, the repository-local CLI automatically selects the
+   local Hub:
+
+   ```bash
+   pnpm spool login
+   ```
+
+   Set `SPOOL_HUB_URL` explicitly only when you want another Hub.
 
 Sign in with any method AuthKit offers (email code works out of the box);
 data lands in the local D1/KV/R2 under

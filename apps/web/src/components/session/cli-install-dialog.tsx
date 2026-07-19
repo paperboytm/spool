@@ -1,3 +1,4 @@
+import { IconButton } from '@spool-lab/ui'
 import { Check, Copy, SquareTerminal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -14,7 +15,6 @@ type CopiedCommand = 'install' | 'resume' | null
 export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
   const [copiedCommand, setCopiedCommand] = useState<CopiedCommand>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -25,7 +25,9 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
 
     setCopiedCommand(null)
     document.body.style.overflow = 'hidden'
-    closeButtonRef.current?.focus()
+    dialogRef.current
+      ?.querySelector<HTMLButtonElement>('[aria-label="Close CLI installation guide"]')
+      ?.focus()
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -95,15 +97,14 @@ export function CliInstallDialog({ open, resumeCommand, onClose }: Props) {
               Install the Spool CLI
             </h2>
           </div>
-          <button
-            ref={closeButtonRef}
+          <IconButton
+            size="sm"
             type="button"
-            className="m-0 inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-[var(--muted)] transition-colors duration-[80ms] hover:bg-[var(--card-2)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             aria-label="Close CLI installation guide"
             onClick={onClose}
           >
             <X size={16} strokeWidth={1.8} aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <p
@@ -176,16 +177,16 @@ function CommandRow({
   onCopy: () => void
 }) {
   return (
-    <div className="mt-3 flex h-8 min-w-0" aria-label={label}>
+    <div className="mt-3 flex h-8 min-w-0 gap-2" aria-label={label}>
       <code
-        className="flex h-8 min-w-0 flex-1 items-center overflow-x-auto rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--bg)] px-3 font-mono text-[11px] whitespace-nowrap text-[var(--text)]"
+        className="flex h-8 min-w-0 flex-1 items-center overflow-x-auto rounded-md border border-[var(--border-strong)] bg-[var(--bg)] px-3 font-mono text-[11px] whitespace-nowrap text-[var(--text)]"
         title={command}
       >
         {command}
       </code>
-      <button
+      <IconButton
+        size="md"
         type="button"
-        className="m-0 inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-r-md border border-[var(--border-strong)] bg-[var(--bg)] p-0 text-[var(--muted)] transition-colors duration-[80ms] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         title={copied ? 'Copied' : `Copy ${label.toLowerCase()}`}
         aria-label={copied ? `${label} copied` : `Copy ${label.toLowerCase()}`}
         onClick={onCopy}
@@ -195,7 +196,7 @@ function CommandRow({
         ) : (
           <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
         )}
-      </button>
+      </IconButton>
     </div>
   )
 }

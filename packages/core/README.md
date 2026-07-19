@@ -32,7 +32,9 @@ Browser-safe canonical records, views, and composed Session diffs belong to `@sp
 
 ## Native Dependency
 
-This package depends on [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3). The native binary must match the active Node or Electron runtime:
+This package depends on [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3). Repository tooling caches native addons by platform, architecture, and `NODE_MODULE_VERSION`, so Node and Electron builds can coexist. `pnpm spool` prepares a missing Node cache automatically; Desktop wrappers prepare the Electron cache before launch.
+
+Manual recovery remains available:
 
 ```bash
 pnpm run rebuild:native:node

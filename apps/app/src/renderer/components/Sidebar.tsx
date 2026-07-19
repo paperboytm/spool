@@ -1,4 +1,5 @@
 import type { ProjectGroup, Session, SessionSource, StatusInfo } from '@spool-lab/core'
+import { IconButton, NavItem, SectionLabel } from '@spool-lab/ui'
 import {
   Layers3 as LibraryIcon,
   Search as SearchIcon,
@@ -244,17 +245,13 @@ export default function Sidebar({
                       align="right"
                       testId="sidebar-pinned-sort-menu"
                       trigger={({ open, toggle }) => (
-                        <button
-                          type="button"
+                        <IconButton
+                          aria-label={t('sidebar.sortBy')}
                           data-testid="sidebar-pinned-sort-trigger"
                           onClick={toggle}
                           title={t('sidebar.sortBy')}
-                          aria-label={t('sidebar.sortBy')}
                           aria-haspopup="menu"
                           aria-expanded={open}
-                          className={`text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-end transition-opacity ${
-                            open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
-                          }`}
                         >
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                             <path
@@ -264,7 +261,7 @@ export default function Sidebar({
                               strokeLinecap="round"
                             />
                           </svg>
-                        </button>
+                        </IconButton>
                       )}
                       items={PINNED_SORT_OPTIONS.map((option) => ({
                         label: pinnedSortLabel(option.value),
@@ -304,17 +301,13 @@ export default function Sidebar({
                     align="right"
                     testId="sidebar-sort-menu"
                     trigger={({ open, toggle }) => (
-                      <button
-                        type="button"
+                      <IconButton
+                        aria-label={t('sidebar.sortBy')}
                         data-testid="sidebar-sort-trigger"
                         onClick={toggle}
                         title={t('sidebar.sortBy')}
-                        aria-label={t('sidebar.sortBy')}
                         aria-haspopup="menu"
                         aria-expanded={open}
-                        className={`text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-end transition-opacity ${
-                          open ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'
-                        }`}
                       >
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                           <path
@@ -324,7 +317,7 @@ export default function Sidebar({
                             strokeLinecap="round"
                           />
                         </svg>
-                      </button>
+                      </IconButton>
                     )}
                     items={SIDEBAR_SORT_OPTIONS.map((option) => ({
                       label: sidebarSortLabel(option.value),
@@ -408,24 +401,18 @@ function NavRow({
 }) {
   const dataAttrs = testId ? { 'data-testid': testId } : {}
   return (
-    <button
-      type="button"
+    <NavItem
       {...dataAttrs}
       onClick={onClick}
       title={title}
-      aria-current={active ? 'page' : undefined}
       aria-pressed={ariaPressed}
-      className={[
-        'w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors duration-75 text-[13px]',
-        active
-          ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
-          : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text',
-      ].join(' ')}
+      active={active}
+      leading={icon}
+      trailing={trailing}
+      className="w-full"
     >
-      <span className="inline-flex h-4 w-4 flex-none items-center justify-center">{icon}</span>
-      <span className="flex-1 truncate text-left">{label}</span>
-      {trailing}
-    </button>
+      {label}
+    </NavItem>
   )
 }
 
@@ -440,18 +427,17 @@ function SidebarCollapsedToggle({
 }) {
   const { t } = useTranslation()
   return (
-    <button
-      type="button"
+    <IconButton
+      aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
       data-testid="sidebar-toggle"
       onClick={onToggle}
       title={title}
-      aria-label={collapsed ? t('sidebar.expand') : t('sidebar.collapse')}
       aria-pressed={collapsed}
-      className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text ml-1 inline-flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors duration-75"
+      className="ml-1"
       style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
       <PanelLeft size={14} strokeWidth={1.75} />
-    </button>
+    </IconButton>
   )
 }
 
@@ -482,13 +468,14 @@ function SidebarStatus({
   const isOk = !syncStatus || syncStatus.phase === 'done'
 
   return (
-    <div className="flex h-[30px] flex-none items-center gap-2 pr-4 pl-4">
+    <div className="flex h-[30px] flex-none items-center gap-2 pr-2 pl-4">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <span
           className={`h-1.5 w-1.5 flex-none rounded-full ${isOk ? 'bg-status-success dark:bg-status-success-dark' : 'bg-status-warning dark:bg-status-warning-dark animate-pulse'}`}
         />
         <span
           data-testid="status-text"
+          data-session-count={status?.totalSessions ?? 0}
           className="text-warm-faint dark:text-dark-muted truncate font-mono text-[11px]"
           title={text}
         >
@@ -496,16 +483,14 @@ function SidebarStatus({
         </span>
       </div>
       {onSettingsClick && (
-        <button
-          type="button"
+        <IconButton
+          aria-label={t('sidebar.settings')}
           data-testid="settings-button"
           onClick={onSettingsClick}
           title={t('sidebar.settings')}
-          aria-label={t('sidebar.settings')}
-          className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 flex-none items-center justify-center transition-colors"
         >
           <SettingsIcon size={13} strokeWidth={1.75} />
-        </button>
+        </IconButton>
       )}
     </div>
   )
@@ -791,13 +776,13 @@ function SectionHeader({
   trailing?: ReactNode
 }) {
   return (
-    <div className="group mx-2 mt-1 flex items-center gap-1 px-2 py-1">
+    <SectionLabel className="group mx-2 mt-1 px-2 py-1" action={trailing}>
       <button
         type="button"
         data-testid={testId}
         aria-expanded={open}
         onClick={onToggle}
-        className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex flex-1 items-center gap-1.5 rounded-md text-left text-[11px] font-medium select-none"
+        className="flex items-center gap-1.5 text-left select-none"
       >
         <span>{label}</span>
         <svg
@@ -817,8 +802,7 @@ function SectionHeader({
           />
         </svg>
       </button>
-      {trailing}
-    </div>
+    </SectionLabel>
   )
 }
 
@@ -908,26 +892,25 @@ function PinnedRow({
             void handleUnpin()
           }}
           aria-label={t('sidebar.unpin')}
+          aria-pressed="true"
           disabled={unpinning}
-          className="text-accent/80 dark:text-accent-dark/80 hover:text-accent dark:hover:text-accent-dark inline-flex h-4 items-center justify-center transition-colors disabled:opacity-50"
+          className="text-accent/80 dark:text-accent-dark/80 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-accent dark:hover:text-accent-dark inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors disabled:opacity-50"
         >
           <PinIcon size={13} filled />
         </button>
         <Menu
           align="right"
           trigger={({ open, toggle }) => (
-            <button
-              type="button"
+            <IconButton
+              aria-label={t('common.more')}
               data-testid="sidebar-pinned-menu-trigger"
               onMouseDown={(e) => e.preventDefault()}
               onClick={toggle}
-              aria-label={t('common.more')}
               aria-haspopup="menu"
               aria-expanded={open}
-              className="text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text inline-flex h-4 items-center justify-center transition-colors"
             >
               <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
-            </button>
+            </IconButton>
           )}
           items={[
             ...(onShare
@@ -996,26 +979,27 @@ function ProjectRow({
     ? `${group.displayName}, ${sourceList}, ${sessionCountText}`
     : `${group.displayName}, ${sessionCountText}`
   return (
-    <button
+    <NavItem
       data-testid="sidebar-project-row"
       data-identity-key={group.identityKey}
       aria-label={ariaLabel}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-75 ${
-        active
-          ? 'bg-warm-surface2 dark:bg-dark-surface2 text-warm-text dark:text-dark-text'
-          : 'text-warm-text/85 dark:text-dark-text/85 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text'
-      }`}
-    >
-      <FolderIcon active={active} />
-      <span className="flex-1 truncate text-[13px]">{group.displayName}</span>
-      {showSourceDots && <SourceDots sources={group.sources} />}
-      {showSessionCount && (
-        <span className="text-warm-faint/70 dark:text-dark-muted/70 flex-none font-mono text-[11px] tabular-nums">
-          {group.sessionCount}
+      active={active}
+      leading={<FolderIcon active={active} />}
+      trailing={
+        <span className="flex items-center gap-2">
+          {showSourceDots && <SourceDots sources={group.sources} />}
+          {showSessionCount && (
+            <span className="text-warm-faint/70 dark:text-dark-muted/70 flex-none font-mono text-[11px] tabular-nums">
+              {group.sessionCount}
+            </span>
+          )}
         </span>
-      )}
-    </button>
+      }
+      className="w-full"
+    >
+      {group.displayName}
+    </NavItem>
   )
 }
 

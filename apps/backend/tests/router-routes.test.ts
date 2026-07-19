@@ -9,6 +9,8 @@ import { routeFor } from '../../web/src/edge-router'
 describe('spool-web routeFor', () => {
   it('routes the API to the backend', () => {
     expect(routeFor('/api/hub/v1/sessions/x')).toBe('backend')
+    expect(routeFor('/api/discovery/v1/sessions')).toBe('backend')
+    expect(routeFor('/api/discovery/v1/sessions/x/engagement')).toBe('backend')
     expect(routeFor('/api/cli-auth/start')).toBe('backend')
     expect(routeFor('/api/meta/abc')).toBe('backend')
   })

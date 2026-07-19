@@ -2,7 +2,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
+
+import { openDatabase } from '../db/native-binding.js'
 
 // Resolve home at call time (not module load) so tests can redirect via
 // process.env.HOME. node:os.homedir() reads the OS user info on POSIX and
@@ -71,7 +73,7 @@ function loadSupersetProjects(): { projects: SupersetProjectRow[]; globalBase: s
 
   let db: Database.Database | null = null
   try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true })
+    db = openDatabase(dbPath, { readonly: true, fileMustExist: true })
 
     const settings = db.prepare(`SELECT worktree_base_dir FROM settings WHERE id = 1`).get() as
       | { worktree_base_dir: string | null }

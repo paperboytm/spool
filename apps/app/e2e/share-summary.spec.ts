@@ -62,6 +62,11 @@ test.describe('agent summary failure', () => {
     await window.locator('[data-testid="detail-share"]').click()
 
     const dialog = window.locator('[data-testid="share-session-dialog"]')
+    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(dialog.locator('[data-testid="share-summary-option"]')).toHaveAttribute(
+      'data-selected',
+      '',
+    )
     await dialog.locator('[data-testid="share-session-continue"]').click()
     const error = dialog.locator('[data-testid="share-summary-error"]')
     await expect(error).toBeVisible({ timeout: 10_000 })

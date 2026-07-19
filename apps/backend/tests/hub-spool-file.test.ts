@@ -154,7 +154,17 @@ describe('hub spool-file attachment', () => {
     const record = await canonicalizeRecord(
       '{"type":"user","message":{"role":"user","content":"x"}}',
     )
-    const view = await canonicalizeRecord('{"v":1}')
+    const view = await canonicalizeRecord(
+      JSON.stringify({
+        v: 1,
+        index: [],
+        files: [],
+        outline: [],
+        firstPrompt: 'x',
+        lastReply: '',
+        diffstat: { files: 0, adds: 0, dels: 0 },
+      }),
+    )
     const head = {
       root: await sequenceRoot([record.oid]),
       count: 1,
