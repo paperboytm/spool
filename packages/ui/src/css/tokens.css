@@ -88,3 +88,12 @@ html[data-theme='dark'] {
   --sp-warning: #f0b854;
   --sp-error: #d67259;
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f1f1f66 transparent;
+}
+
+html:is(.dark, [data-theme='dark']) {
+  scrollbar-color: #e6e6e666 transparent;
+}
