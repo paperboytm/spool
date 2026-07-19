@@ -11,6 +11,7 @@ import { Command } from 'commander'
 
 import { formatDate, printSession } from '../format.js'
 import { createClackUi, createTextUi, type CliSelectOption, type CliUi } from '../ui.js'
+import { handleShareCommand } from './share.js'
 
 const SESSION_SOURCES = new Set(['claude', 'codex', 'gemini', 'opencode', 'pi'])
 
@@ -27,12 +28,13 @@ export interface ListCommandDependencies {
   ui?: CliUi
   cwd?: string
   limitExplicit?: boolean
+  shareSession?: (sessionUuid: string, ui: CliUi) => Promise<0 | 1>
 }
 
 export async function handleListCommand(
   opts: ListCommandOptions,
   dependencies: ListCommandDependencies = {},
-): Promise<string | null> {
+): Promise<0 | 1> {
   const db = dependencies.db ?? getDB(true)
   const ui = dependencies.ui ?? createTextUi()
   const limit = parseInt(opts.limit, 10)
@@ -49,7 +51,7 @@ export async function handleListCommand(
 
   if (opts.json) {
     console.log(JSON.stringify(sessions, null, 2))
-    return null
+    return 0
   }
 
   if (sessions.length === 0) {
@@ -57,14 +59,14 @@ export async function handleListCommand(
       console.log(
         'No sessions found for the current project. Run `spool list --all` to search all projects.',
       )
-      return null
+      return 0
     }
     console.log('No sessions found. Run `spool sync` to index sessions.')
-    return null
+    return 0
   }
 
   if (ui.interactive) {
-    return ui.autocomplete({
+    const selected = await ui.autocomplete({
       message: 'Select a Session',
       choices: sessions.map(toAutocompleteChoice),
       ...(firstPage.hasMore
@@ -81,12 +83,29 @@ export async function handleListCommand(
       placeholder: 'Search Sessions…',
       maxItems: 10,
     })
+    if (selected === null) return 0
+
+    const wantsShare = await ui.confirm(
+      `Share Session ${selected.slice(0, 8)} as Link-only?`,
+      false,
+    )
+    if (wantsShare !== true) {
+      if (wantsShare === null) ui.cancel('Session not shared.')
+      else ui.outro('Session not shared.')
+      return 0
+    }
+
+    const shareSession =
+      dependencies.shareSession ??
+      ((sessionUuid: string, shareUi: CliUi) =>
+        handleShareCommand(sessionUuid, {}, { ui: shareUi }))
+    return shareSession(selected, ui)
   }
 
   for (const session of sessions) {
     printSession(session)
   }
-  return null
+  return 0
 }
 
 function toAutocompleteChoice(session: Session): CliSelectOption<string> {
@@ -163,8 +182,9 @@ export const listCommand = new Command('list')
   .option('-a, --all', 'List across all projects (ignore cwd)')
   .option('--json', 'Output as JSON')
   .action(async (opts: ListCommandOptions, command: Command) => {
-    await handleListCommand(opts, {
+    const exitCode = await handleListCommand(opts, {
       ui: createClackUi(),
       limitExplicit: command.getOptionValueSource('limit') === 'cli',
     })
+    if (exitCode !== 0) process.exitCode = exitCode
   })
