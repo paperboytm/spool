@@ -105,16 +105,16 @@ Fold what you found into your reply as ordinary context, citing the source per c
 
 ## Command reference
 
-| Command                                             | Does                                                                                                               |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `spool sync [--watch]`                              | Index new sessions; `--watch` stays running                                                                        |
-| `spool search <query> [-s <source>] [--since 7d]`   | Full-text search; add `--json` for machine-readable results                                                        |
-| `spool list [-s <source>] [-p <path>] [-n <count>]` | Recent sessions; filters apply to a recent window, so raise `-n` when filtering                                    |
-| `spool projects [query] [-n <count>]`               | Project groups, or sessions for a name, identity key, path, or cwd                                                 |
-| `spool show <uuid\|sid\|url>`                       | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data |
-| `spool pin <uuid>` / `unpin <uuid>` / `pinned`      | Bookmark and list sessions; state is shared with the Spool app Library                                             |
-| `spool status` / `spool doctor [checkId] [--fix]`   | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                   |
-| `spool login [--token <t>]` / `spool logout`        | Hub browser-device auth (or token for automation) / revoke and clear credentials                                   |
-| `spool share [<uuid>[@<n>]] [--summary <markdown>]` | Publish selected Claude/Codex records; also supports `--no-agent-summary`, `--yes`, and `--spool-file`             |
-| `spool withdraw <sid\|url>`                         | Tombstone a share so its URL stops resolving                                                                       |
-| `spool resume <sid\|url>[@<n>] [--workspace <dir>]` | Materialize and natively fork a share; `--no-exec` prints the command without launching                            |
+| Command                                                     | Does                                                                                                                                |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `spool sync [--watch]`                                      | Index new sessions; `--watch` stays running                                                                                         |
+| `spool search <query> [-s <source>] [--since 7d]`           | Full-text search; add `--json` for machine-readable results                                                                         |
+| `spool list [-s <source>] [-p <path>] [-n <count>] [--all]` | Current-project Sessions by default; `--all` searches every project. Filters apply to a recent window, so raise `-n` when filtering |
+| `spool projects [query] [-n <count>]`                       | Project groups, or sessions for a name, identity key, path, or cwd                                                                  |
+| `spool show <uuid\|sid\|url>`                               | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data                  |
+| `spool pin <uuid>` / `unpin <uuid>` / `pinned`              | Bookmark and list sessions; state is shared with the Spool app Library                                                              |
+| `spool status` / `spool doctor [checkId] [--fix]`           | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                                    |
+| `spool login [--token <t>]` / `spool logout`                | Hub browser-device auth (or token for automation) / revoke and clear credentials                                                    |
+| `spool share [<uuid>[@<n>]] [--summary <markdown>]`         | Share selected Claude/Codex records as Link-only; also supports `--no-agent-summary`, `--yes`, and `--spool-file`                   |
+| `spool withdraw <sid\|url>`                                 | Tombstone a share so its URL stops resolving                                                                                        |
+| `spool resume <sid\|url>[@<n>] [--workspace <dir>]`         | Materialize and natively fork a share; `--no-exec` prints the command without launching                                             |

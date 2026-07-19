@@ -47,7 +47,7 @@ spool show <session> --json       # machine-readable output
 
 ```bash
 spool sync [--watch]
-spool list [-s <source>] [-n <count>] [--json]
+spool list [-s <source>] [-p <path>] [-n <count>] [-a|--all] [--json]
 spool projects [name] [-n <count>] [--json]
 spool search <query> [-s <source>] [--since 7d] [-n 10] [--json]
 spool status

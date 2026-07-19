@@ -36,6 +36,9 @@ spool list -n 10
 spool share <session-uuid>
 ```
 
+`spool list` uses the current project by default. Run `spool list --all` to see recent Sessions
+from every indexed project.
+
 Only Claude Code and Codex CLI Sessions can currently be shared and resumed.
 
 ## 4. Review before sharing

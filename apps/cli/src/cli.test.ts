@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, statSync, rmSync, mkdtempSync } from 'node:fs'
+import { existsSync, statSync, rmSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 
@@ -11,6 +11,7 @@ const BIN = resolve(import.meta.dirname, '..', 'bin', 'spool.js')
 
 const SESSION_UUID_1 = '00000000-aaaa-bbbb-cccc-000000000001'
 const SESSION_UUID_2 = '11111111-aaaa-bbbb-cccc-000000000002'
+const CWD_SESSION_UUID = '22222222-aaaa-bbbb-cccc-000000000003'
 const AMBIGUOUS_SESSION_UUID = '00000000-dddd-eeee-ffff-000000000003'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -23,10 +24,11 @@ const ISOLATED_ENV = {
   SPOOL_PI_DIR: '/nonexistent/pi',
 }
 
-function run(args: string[], env?: Record<string, string>): string {
+function run(args: string[], env?: Record<string, string>, cwd?: string): string {
   return execFileSync('node', [BIN, ...args], {
     encoding: 'utf8',
     env: { ...process.env, ...ISOLATED_ENV, ...env },
+    cwd,
     timeout: 15_000,
   })
 }
@@ -362,41 +364,93 @@ describe('share session-id prefixes', () => {
 
 describe('list', () => {
   let seeded: ReturnType<typeof createSeededDir>
+  let currentProjectDir: string
   beforeAll(() => {
     seeded = createSeededDir()
+    currentProjectDir = join(seeded.dir, 'current-project')
+    mkdirSync(join(currentProjectDir, 'packages', 'cli'), { recursive: true })
+    writeFileSync(join(currentProjectDir, 'package.json'), '{"name":"current-project"}')
+
+    const db = new Database(join(seeded.dir, 'spool.db'))
+    db.prepare(
+      'INSERT INTO projects (source_id, slug, display_path, display_name) VALUES (?, ?, ?, ?)',
+    ).run(1, 'current-project', currentProjectDir, 'current-project')
+    db.prepare(`
+      INSERT INTO sessions (
+        project_id, source_id, session_uuid, file_path, title, started_at,
+        ended_at, message_count, cwd, model, raw_file_mtime
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      2,
+      1,
+      CWD_SESSION_UUID,
+      '/fake/current-project-session.jsonl',
+      'Current project session',
+      '2026-04-08T10:00:00Z',
+      '2026-04-08T11:00:00Z',
+      1,
+      currentProjectDir,
+      'claude-4',
+      '2026-04-08',
+    )
+    db.close()
   })
   afterAll(() => {
     seeded.cleanup()
   })
 
-  it('lists sessions', () => {
-    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
+  it('defaults to sessions for the current cwd project', () => {
+    const out = run(
+      ['list'],
+      { SPOOL_DATA_DIR: seeded.dir },
+      join(currentProjectDir, 'packages', 'cli'),
+    )
+    expect(out).toContain('Current project session')
+    expect(out).not.toContain('Debugging authentication flow')
+    expect(out).not.toContain('Refactoring database queries')
+  })
+
+  it('--all ignores cwd and lists sessions from every project', () => {
+    const out = run(['list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('Current project session')
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain('Refactoring database queries')
   })
 
   it('prints an actionable short id per row (what spool share/show consume)', () => {
-    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain(SESSION_UUID_1.slice(0, 8))
     expect(out).not.toMatch(/^#[0-9a-f]{8}\b/m)
   })
 
   it('limits results with -n', () => {
-    const out = run(['list', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['list', '--all', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Refactoring database queries')
     expect(out).not.toContain('Debugging authentication flow')
   })
 
   it('filters by source', () => {
-    const out = run(['list', '-s', 'codex'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['list', '--all', '-s', 'codex'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('No sessions found')
   })
 
+  it('hints at --all when the current project has no matching sessions', () => {
+    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('spool list --all')
+    expect(out).not.toContain('spool sync')
+  })
+
+  it('does not treat a child project as the project containing cwd', () => {
+    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir }, seeded.dir)
+    expect(out).not.toContain('Current project session')
+    expect(out).toContain('spool list --all')
+  })
+
   it('outputs JSON', () => {
-    const out = run(['list', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['list', '--all', '--json'], { SPOOL_DATA_DIR: seeded.dir })
     const parsed = JSON.parse(out)
     expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.length).toBe(2)
+    expect(parsed.length).toBe(3)
     expect(parsed[0].sessionUuid).toBeTruthy()
   })
 
