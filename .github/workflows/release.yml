@@ -196,10 +196,10 @@ jobs:
       # downstream build.
       - name: Build publish targets
         run: |
-          pnpm -F @spool-lab/redact build
-          pnpm -F @spool-lab/session-kit build
-          pnpm -F @spool-lab/core build
-          pnpm -F @spool-lab/cli build
+          pnpm -F @spool-lab/redact run prepack
+          pnpm -F @spool-lab/session-kit run prepack
+          pnpm -F @spool-lab/core run prepack
+          pnpm -F @spool-lab/cli run prepack
 
       # Publish in dependency order. Each step is idempotent: if the registry
       # already has this version (re-run after a partial-fail), we skip rather
