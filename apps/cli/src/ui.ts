@@ -99,11 +99,7 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
       if (!interactive) return null
       // Clack's conditional Option<T> cannot prove a generic string union is
       // primitive, although this adapter constrains every value to string.
-      const clackOptions = choices.map(({ value, label, hint }) => ({
-        value,
-        label,
-        ...(hint === undefined ? {} : { hint }),
-      })) as ClackOption<(typeof choices)[number]['value']>[]
+      const clackOptions = toClackOptions(choices)
       const result = await clack.select({
         message,
         options: clackOptions,
@@ -129,14 +125,16 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
       const optionSource = loadMore
         ? function (this: ClackAutocompleteState<Option>): Option[] {
             const search = this.userInput
-            let filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+            const matchingOptions = (): Option[] =>
+              clackOptions.filter((option) => autocompleteMatches(search, option))
+            let filtered = matchingOptions()
             const searchChanged = search !== lastSearch
             lastSearch = search
 
             if (searchChanged && search !== '') {
               while (hasMore && filtered.length < (maxItems ?? 10)) {
                 appendPage()
-                filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+                filtered = matchingOptions()
               }
             } else if (
               hasMore &&
@@ -144,9 +142,12 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
               this.cursor >= Math.max(filtered.length - 2, 0)
             ) {
               appendPage()
-              filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+              filtered = matchingOptions()
             }
 
+            // Clack's documented dynamic-options getter is bound to the
+            // prompt. It does not refilter options appended during render, so
+            // keep its public filtered view aligned with the returned list.
             this.filteredOptions = filtered
             return clackOptions
           }
