@@ -33,9 +33,9 @@ export function extractEditEvents(
   const { provider, records, workspaceRoot } = normalizeArguments(first, second)
   const parsed = records.map(parseRecord)
   const indices = records.map(sequenceIndexOf)
-  return provider === 'claude'
-    ? extractClaudeEvents(parsed, indices, workspaceRoot)
-    : extractCodexEvents(parsed, indices, workspaceRoot)
+  if (provider === 'claude') return extractClaudeEvents(parsed, indices, workspaceRoot)
+  if (provider === 'codex') return extractCodexEvents(parsed, indices, workspaceRoot)
+  return []
 }
 
 function sequenceIndexOf(record: SessionRecord, position: number): number {

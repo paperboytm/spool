@@ -21,6 +21,7 @@
   --sp-source-codex: #4a9670;
   --sp-source-gemini: #5887d0;
   --sp-source-opencode: #8a6f3d;
+  --sp-source-pi: #a55a7a;
   --sp-success: #6baf6b;
   --sp-warning: #e4a640;
   --sp-error: #c95a4f;
@@ -84,6 +85,7 @@ html[data-theme='dark'] {
   --sp-source-codex: #7cc9a2;
   --sp-source-gemini: #8ab0e5;
   --sp-source-opencode: #c9a761;
+  --sp-source-pi: #d88aaa;
   --sp-success: #7dc07d;
   --sp-warning: #f0b854;
   --sp-error: #d67259;

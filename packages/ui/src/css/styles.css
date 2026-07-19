@@ -360,6 +360,21 @@
   color: var(--sp-source-codex);
 }
 
+.sp-badge--source-gemini {
+  border-color: var(--sp-source-gemini);
+  color: var(--sp-source-gemini);
+}
+
+.sp-badge--source-opencode {
+  border-color: var(--sp-source-opencode);
+  color: var(--sp-source-opencode);
+}
+
+.sp-badge--source-pi {
+  border-color: var(--sp-source-pi);
+  color: var(--sp-source-pi);
+}
+
 .sp-badge--success {
   border-color: var(--sp-success);
   color: var(--sp-success);

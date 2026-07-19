@@ -75,6 +75,7 @@ import type {
   ShareDraftRow,
   UpsertShareDraftInput,
 } from '@spool-lab/core'
+import { isSessionProvider } from '@spool-lab/session-kit'
 import type Database from 'better-sqlite3'
 import { Effect } from 'effect'
 
@@ -859,10 +860,7 @@ ipcMain.handle(
       if (cached) return cached
     }
 
-    const sessionSource =
-      source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
-        ? source
-        : undefined
+    const sessionSource = source !== undefined && isSessionProvider(source) ? source : undefined
     const results = searchFragments(db, query, {
       limit,
       ...(sessionSource ? { source: sessionSource } : {}),
@@ -885,10 +883,7 @@ ipcMain.handle(
     const cached = searchCache.get(cacheKey)
     if (cached) return cached
 
-    const sessionSource =
-      source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode'
-        ? source
-        : undefined
+    const sessionSource = source !== undefined && isSessionProvider(source) ? source : undefined
     const fragments = searchSessionPreview(db, query, {
       limit,
       ...(sessionSource ? { source: sessionSource } : {}),

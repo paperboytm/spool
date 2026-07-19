@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 
-import { sequenceRoot } from '@spool-lab/session-kit'
+import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
@@ -456,6 +456,86 @@ describe('spool share local Agent Summary flow', () => {
 })
 
 describe('spool share → spool resume round trip', () => {
+  it.each(['gemini', 'opencode', 'pi'] as const)(
+    'shares indexed %s sessions through portable records',
+    async (provider) => {
+      const hub = makeHub()
+      const workspace = mkdtempSync(join(tmpdir(), `spool-${provider}-share-`))
+      const home = mkdtempSync(join(tmpdir(), `spool-${provider}-share-home-`))
+      const sessionUuid = provider === 'opencode' ? 'ses_1234567890abcdef' : SESSION_UUID
+      const jsonl = serializePortableSession({
+        source: provider,
+        sessionUuid,
+        filePath: `/virtual/${provider}`,
+        title: `Share ${provider}`,
+        cwd: workspace,
+        model: '',
+        startedAt: '2026-07-19T00:00:00.000Z',
+        endedAt: '2026-07-19T00:00:01.000Z',
+        messages: [
+          {
+            uuid: 'portable-user',
+            parentUuid: null,
+            role: 'user',
+            contentText: `hello from ${provider}`,
+            timestamp: '2026-07-19T00:00:00.000Z',
+            isSidechain: false,
+            toolNames: [],
+            seq: 0,
+          },
+        ],
+      })
+      const logs: string[] = []
+      const errors: string[] = []
+
+      const exit = await handleShareCommand(
+        sessionUuid,
+        { agentSummary: false },
+        {
+          fetch: hub.fetchImpl,
+          homeDir: home,
+          env: { SPOOL_HUB_URL: HUB_URL, SPOOL_HUB_TOKEN: 'test-token' } as NodeJS.ProcessEnv,
+          cwd: workspace,
+          log: (message: string) => logs.push(message),
+          error: (message: string) => errors.push(message),
+          resolveTarget: () => ({
+            provider,
+            sessionUuid,
+            filePath: `/virtual/${provider}`,
+            cwd: workspace,
+            jsonl,
+          }),
+        },
+      )
+
+      expect(exit).toBe(0)
+      expect(errors).toEqual([])
+      expect(hub.sessions.get(`${provider}_${sessionUuid}`)).toBeDefined()
+      expect(logs.join('\n')).toContain(`${HUB_URL}/session/${provider}_${sessionUuid}`)
+    },
+  )
+
+  it('explains that portable shares are readable but not natively resumable', async () => {
+    const errors: string[] = []
+    const exit = await handleResumeCommand(
+      `pi_${SESSION_UUID}`,
+      {},
+      {
+        fetch: async () => {
+          throw new Error('must not fetch')
+        },
+        env: {} as NodeJS.ProcessEnv,
+        log: () => {},
+        error: (message: string) => errors.push(message),
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(errors.join('\n')).toContain(
+      'pi sessions can be shared and read, but native Resume is not supported yet.',
+    )
+  })
+
   it('shares through the 3-step handshake and resumes into a fresh local session', async () => {
     const hub = makeHub()
     const authorWs = mkdtempSync(join(tmpdir(), 'spool-author-'))

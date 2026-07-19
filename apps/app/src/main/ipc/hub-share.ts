@@ -13,12 +13,14 @@ import {
   type PreparedShare,
   type WorkspaceCard,
 } from '@spool-lab/cli/hub'
-import { getDB, getSessionWithMessages } from '@spool-lab/core'
+import { getDB, getSessionWithMessages, serializeIndexedSession } from '@spool-lab/core'
 import { detectSensitiveSpans, maskValueByKind } from '@spool-lab/redact'
 import {
+  SESSION_PROVIDER_LABELS,
   canonicalizeRecord,
-  parseClaudeSessionText,
-  parseCodexSessionLines,
+  isResumableSessionProvider,
+  parseSessionText,
+  type SessionProvider,
 } from '@spool-lab/session-kit'
 // Type-only: share-kit's runtime bundle needs a DOM at import time and
 // must never be required from the main process. The document is
@@ -51,10 +53,11 @@ export interface HubShareIpcDeps {
   fetchFn?: typeof globalThis.fetch
   loadTokenFn?: () => string | null
   resolveTarget?: (sessionUuid: string) => {
-    provider: 'claude' | 'codex'
+    provider: SessionProvider
     sessionUuid: string
     filePath: string
     cwd: string | null
+    jsonl?: string
   }
 }
 
@@ -68,11 +71,6 @@ function resolveTargetFromIndex(sessionUuid: string) {
   const found = getSessionWithMessages(db, sessionUuid)
   if (!found) throw new Error(`Session not found in the local index: ${sessionUuid}`)
   const { session } = found
-  if (session.source !== 'claude' && session.source !== 'codex') {
-    throw new Error(
-      `Sharing ${session.source} sessions is not supported yet (claude and codex only)`,
-    )
-  }
   if (session.filePath.startsWith('spool:')) {
     throw new Error('This session has no provider file on disk yet')
   }
@@ -81,6 +79,9 @@ function resolveTargetFromIndex(sessionUuid: string) {
     sessionUuid: session.sessionUuid,
     filePath: session.filePath,
     cwd: session.cwd,
+    ...(isResumableSessionProvider(session.source)
+      ? {}
+      : { jsonl: serializeIndexedSession(session, found.messages) }),
   }
 }
 
@@ -89,7 +90,7 @@ async function prepareEntry(sessionUuid: string, deps: HubShareIpcDeps): Promise
   const target = resolveTarget(sessionUuid)
   const workspaceRoot = detectWorkspaceRoot(target.cwd ?? process.cwd())
   const card = buildWorkspaceCard(workspaceRoot)
-  const jsonl = readFileSync(target.filePath, 'utf8')
+  const jsonl = target.jsonl ?? readFileSync(target.filePath, 'utf8')
   const prepared = await prepareShare({
     provider: target.provider,
     sessionUuid: target.sessionUuid,
@@ -112,13 +113,10 @@ async function prepareEntry(sessionUuid: string, deps: HubShareIpcDeps): Promise
  * succeeds) when the session yields no renderable turns.
  */
 async function buildAttachedSpoolFile(
-  target: { provider: 'claude' | 'codex'; sessionUuid: string; filePath: string },
+  target: { provider: SessionProvider; sessionUuid: string; filePath: string },
   jsonl: string,
 ): Promise<{ oid: string; data: string } | null> {
-  const result =
-    target.provider === 'claude'
-      ? parseClaudeSessionText(jsonl, target.filePath)
-      : parseCodexSessionLines(jsonl.split('\n'), target.filePath)
+  const result = parseSessionText(target.provider, jsonl, target.filePath)
   if (result.kind !== 'parsed') return null
 
   const turns = result.session.messages
@@ -143,8 +141,8 @@ async function buildAttachedSpoolFile(
     version: 2,
     exportedAt: new Date().toISOString(),
     conversation: {
-      source: target.provider === 'claude' ? 'claude-code' : 'codex',
-      sourceLabel: target.provider === 'claude' ? 'Claude Code' : 'Codex CLI',
+      source: target.provider === 'claude' ? 'claude-code' : target.provider,
+      sourceLabel: SESSION_PROVIDER_LABELS[target.provider],
       origin: { kind: 'agent-session', agent: target.provider, sessionUuid: target.sessionUuid },
       // The title derives from the first prompt, which can carry the same
       // secrets as the bodies — sanitize it too.

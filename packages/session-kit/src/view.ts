@@ -1,5 +1,6 @@
 import { composeSessionDiff } from './diff.js'
 import { extractEditEvents } from './edits.js'
+import { PORTABLE_MESSAGE_TYPE } from './messages.js'
 import type {
   EditEvent,
   SessionProvider,
@@ -138,12 +139,39 @@ function classifyRecord(
   editEvents: readonly EditEvent[],
 ): RecordDetails {
   if (!record) return { kind: 'other' }
-  const details = provider === 'claude' ? classifyClaude(record) : classifyCodex(record)
+  const details =
+    record['type'] === PORTABLE_MESSAGE_TYPE
+      ? classifyPortable(record)
+      : provider === 'claude'
+        ? classifyClaude(record)
+        : provider === 'codex'
+          ? classifyCodex(record)
+          : { kind: 'other' as const }
   if (editEvents.length > 0) {
     const tool = editEvents[0]?.tool
     return { ...details, kind: 'edit', ...(tool === undefined ? {} : { tool }) }
   }
   return details
+}
+
+function classifyPortable(record: UnknownRecord): RecordDetails {
+  const message = objectAt(record, 'message')
+  const role = stringAt(message, 'role')
+  const text = stringAt(message, 'content')
+  const toolNames = message?.['toolNames']
+  const tool = Array.isArray(toolNames)
+    ? toolNames.find((name): name is string => typeof name === 'string')
+    : undefined
+  if (role === 'user') return { kind: 'user', messageRole: 'user', ...(text ? { text } : {}) }
+  if (role === 'assistant') {
+    return {
+      kind: tool ? 'tool' : 'assistant',
+      messageRole: 'assistant',
+      ...(text ? { text } : {}),
+      ...(tool ? { tool } : {}),
+    }
+  }
+  return { kind: tool ? 'tool' : 'other', ...(text ? { text } : {}), ...(tool ? { tool } : {}) }
 }
 
 function classifyClaude(record: UnknownRecord): RecordDetails {

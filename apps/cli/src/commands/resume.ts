@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { sequenceRoot } from '@spool-lab/session-kit'
+import { isResumableSessionProvider, sequenceRoot } from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch, type HubRecord } from '../hub/client.js'
@@ -51,6 +51,11 @@ export async function handleResumeCommand(
 
   try {
     const ref = resolveSessionRef(input)
+    if (!isResumableSessionProvider(ref.provider)) {
+      throw new Error(
+        `${ref.provider} sessions can be shared and read, but native Resume is not supported yet.`,
+      )
+    }
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     const hubUrl = ref.hubUrl ?? credentials.hubUrl
     const client = new HubClient({

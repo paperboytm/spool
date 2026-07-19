@@ -1,7 +1,13 @@
-const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
-const SESSION_REF_PATTERN = new RegExp(`^((claude|codex)_${UUID_PATTERN})(?:@(0|[1-9][0-9]*))?$`)
+import { SESSION_PROVIDERS, type SessionProvider } from '@spool-lab/session-kit'
 
-export type SessionRefProvider = 'claude' | 'codex'
+const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+const PROVIDER_PATTERN = SESSION_PROVIDERS.join('|')
+const SESSION_ID_PATTERN = `[0-9A-Za-z_-]{8,128}`
+const SESSION_REF_PATTERN = new RegExp(
+  `^((?:${PROVIDER_PATTERN})_(?:${UUID_PATTERN}|${SESSION_ID_PATTERN}))(?:@(0|[1-9][0-9]*))?$`,
+)
+
+export type SessionRefProvider = SessionProvider
 
 export interface ResolvedSessionRef {
   sid: string
@@ -53,9 +59,9 @@ function parseSidAndPosition(value: string): ResolvedSessionRef | undefined {
   const match = value.match(SESSION_REF_PATTERN)
   const sid = match?.[1]
   if (!sid) return undefined
-  const provider = match[2] as SessionRefProvider
+  const provider = sid.slice(0, sid.indexOf('_')) as SessionRefProvider
 
-  const rawPosition = match[3]
+  const rawPosition = match[2]
   if (rawPosition === undefined) return { sid, provider }
 
   const position = Number(rawPosition)
@@ -65,6 +71,6 @@ function parseSidAndPosition(value: string): ResolvedSessionRef | undefined {
 
 function invalidSessionRef(input: string): never {
   throw new Error(
-    `Invalid session reference: ${input || '(empty)'}. Expected claude_<uuid>, codex_<uuid>, or an https://<host>/session/<sid> URL, optionally followed by @<n>.`,
+    `Invalid session reference: ${input || '(empty)'}. Expected <provider>_<session-id> or an https://<host>/session/<sid> URL, optionally followed by @<n>.`,
   )
 }

@@ -5,6 +5,7 @@ import {
   composeSessionDiff,
   deriveView,
   extractEditEvents,
+  isResumableSessionProvider,
   splitRecords,
   type SessionDiff,
   type SessionProvider,
@@ -159,8 +160,10 @@ async function showHub(
     const card = safeParse(meta.cardJson) as { branch?: string; head?: string } | null
     if (card?.head) log(`\nWorkspace: ${card.branch ?? '(detached)'} @ ${card.head.slice(0, 7)}`)
   }
-  log('')
-  log(`Resume:  spool resume ${meta.sid}`)
+  if (isResumableSessionProvider(ref.provider)) {
+    log('')
+    log(`Resume:  spool resume ${meta.sid}`)
+  }
   return 0
 }
 

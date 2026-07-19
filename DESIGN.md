@@ -128,6 +128,7 @@ Only currently-supported agent sources are listed. Add a row when a new source s
 | Codex CLI   | `#4A9670` | `#7CC9A2` |
 | Gemini      | `#5887D0` | `#8AB0E5` |
 | OpenCode    | `#8A6F3D` | `#C9A761` |
+| Pi          | `#A55A7A` | `#D88AAA` |
 
 ### Semantic States
 

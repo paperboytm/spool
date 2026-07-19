@@ -1,4 +1,4 @@
-import { canonicalizeRecord, sequenceRoot } from '@spool-lab/session-kit'
+import { canonicalizeRecord, sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import { describe, expect, it } from 'vite-plus/test'
 
 import { buildBirthText, extractBirthPayload, type BirthPayload } from './birth.js'
@@ -125,6 +125,54 @@ describe('prepareShare', () => {
         homeDir: HOME,
       }),
     ).rejects.toThrow(/out of range/)
+  })
+
+  it('prefix share @1 keeps portable session metadata with the first visible message', async () => {
+    const jsonl = serializePortableSession({
+      source: 'pi',
+      sessionUuid: 'portable-session',
+      filePath: '/sessions/pi.jsonl',
+      title: 'Portable prefix',
+      cwd: WS,
+      model: 'pi-model',
+      startedAt: '2026-07-19T00:00:00.000Z',
+      endedAt: '2026-07-19T00:00:01.000Z',
+      messages: [
+        {
+          uuid: 'u1',
+          parentUuid: null,
+          role: 'user',
+          contentText: 'first visible message',
+          timestamp: '2026-07-19T00:00:00.000Z',
+          isSidechain: false,
+          toolNames: [],
+          seq: 0,
+        },
+        {
+          uuid: 'a1',
+          parentUuid: 'u1',
+          role: 'assistant',
+          contentText: 'second visible message',
+          timestamp: '2026-07-19T00:00:01.000Z',
+          isSidechain: false,
+          toolNames: [],
+          seq: 1,
+        },
+      ],
+    })
+
+    const prefix = await prepareShare({
+      provider: 'pi',
+      sessionUuid: 'portable-session',
+      jsonl,
+      position: 1,
+      workspaceRoot: WS,
+      homeDir: HOME,
+    })
+
+    expect(prefix.count).toBe(1)
+    expect(prefix.view.firstPrompt).toBe('first visible message')
+    expect(prefix.view.lastReply).toBe('')
   })
 })
 

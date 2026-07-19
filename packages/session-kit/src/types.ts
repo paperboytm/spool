@@ -1,4 +1,26 @@
-export type SessionProvider = 'claude' | 'codex'
+export const SESSION_PROVIDERS = ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const
+export type SessionProvider = (typeof SESSION_PROVIDERS)[number]
+
+export const RESUMABLE_SESSION_PROVIDERS = ['claude', 'codex'] as const
+export type ResumableSessionProvider = (typeof RESUMABLE_SESSION_PROVIDERS)[number]
+
+export const SESSION_PROVIDER_LABELS: Record<SessionProvider, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex CLI',
+  gemini: 'Gemini CLI',
+  opencode: 'OpenCode',
+  pi: 'Pi',
+}
+
+export function isSessionProvider(value: unknown): value is SessionProvider {
+  return typeof value === 'string' && (SESSION_PROVIDERS as readonly string[]).includes(value)
+}
+
+export function isResumableSessionProvider(
+  value: SessionProvider,
+): value is ResumableSessionProvider {
+  return (RESUMABLE_SESSION_PROVIDERS as readonly SessionProvider[]).includes(value)
+}
 
 export type JsonPrimitive = boolean | number | string | null
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }

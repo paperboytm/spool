@@ -8,7 +8,7 @@ import { ApiError } from '../errors'
 // legitimate sessions.
 
 export const OID_RE = /^[0-9a-f]{64}$/
-export const SID_RE = /^(claude|codex)_[0-9A-Za-z-]{8,64}$/
+export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
 
 export const MAX_MANIFEST = 100_000
 export const MAX_SUMMARY_BYTES = 64 * 1024

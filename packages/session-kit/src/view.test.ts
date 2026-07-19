@@ -1,11 +1,57 @@
 import { describe, expect, it } from 'vite-plus/test'
 
+import { serializePortableSession } from './messages.js'
+import { splitRecords } from './records.js'
 import { deriveView } from './view.js'
 
 const line = (value: unknown): string => JSON.stringify(value)
 const byteLength = (value: string): number => new TextEncoder().encode(value).byteLength
 
 describe('deriveView', () => {
+  it('derives conversation evidence for portable Pi records without fabricating edit evidence', () => {
+    const records = splitRecords(
+      serializePortableSession({
+        source: 'pi',
+        sessionUuid: 'pi-session',
+        filePath: '/sessions/pi.jsonl',
+        title: 'Pi share',
+        cwd: '/workspace',
+        model: 'pi-model',
+        startedAt: '2026-07-19T01:00:00.000Z',
+        endedAt: '2026-07-19T01:00:05.000Z',
+        messages: [
+          {
+            uuid: 'u1',
+            parentUuid: null,
+            role: 'user',
+            contentText: 'Please share this',
+            timestamp: '2026-07-19T01:00:00.000Z',
+            isSidechain: false,
+            toolNames: [],
+            seq: 0,
+          },
+          {
+            uuid: 'a1',
+            parentUuid: 'u1',
+            role: 'assistant',
+            contentText: 'Done',
+            timestamp: '2026-07-19T01:00:05.000Z',
+            isSidechain: false,
+            toolNames: ['write'],
+            seq: 1,
+          },
+        ],
+      }),
+    )
+
+    const view = deriveView(records, { provider: 'pi' })
+
+    expect(view.firstPrompt).toBe('Please share this')
+    expect(view.lastReply).toBe('Done')
+    expect(view.outline).toEqual([{ i: 0, excerpt: 'Please share this' }])
+    expect(view.diffstat).toEqual({ files: 0, adds: 0, dels: 0 })
+  })
+
   it('derives the v1 view, diffstat, outline, and byte-capped excerpts', () => {
     const firstPrompt = `start:${'x'.repeat(5_000)}`
     const lastReply = `done:${'界'.repeat(2_000)}`

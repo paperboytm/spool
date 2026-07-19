@@ -3,19 +3,19 @@ title: Publishing Sessions
 description: Prepare, share, and manage an agent Session safely.
 ---
 
-Spool treats publishing as an explicit boundary. Local preparation never exposes a Session; the author chooses exactly which Session and record range to share.
+Spool treats sharing and publishing as two explicit boundaries. Local preparation never exposes a Session; the author chooses exactly which Session and record range to share, then separately decides whether to make that Shared Session Public.
 
-## Share publicly
+## Share by link
 
-**Share** creates a durable public URL. After the author reviews the selected records and confirms the disclosure, the Shared Session can appear in Explore and search. There is no separate Publish step in this release.
+**Share** creates a durable Link-only URL. Anyone with the URL can read it, but it does not appear on the author’s Profile, in Explore, or in search. **Publish** is the separate action that makes a Shared Session Public.
 
 ## Share from Desktop
 
-1. Open a Claude Code or Codex CLI Session.
+1. Open a Claude Code, Codex CLI, Gemini CLI, OpenCode, or Pi Session.
 2. Choose **Share session** from the Session actions.
 3. Review the record count, file and diff summary, and sensitive-data findings.
 4. Edit the optional Summary.
-5. Confirm that the Session will be public and can appear in Explore and search, then copy the returned URL.
+5. Confirm the Link-only disclosure, then copy the returned URL.
 
 The desktop flow automatically attaches a curated `.spool` document when the Session can be rendered that way.
 
@@ -46,7 +46,7 @@ In an interactive terminal, Spool can detect a local Claude Code or Codex CLI in
 
 ## Sensitive-data gate
 
-Before publishing, Spool checks the selected records for likely credentials, tokens, personal data, and absolute paths. Review every finding. `--yes` bypasses the interactive confirmation and should be reserved for controlled automation.
+Before sharing, Spool checks the selected records for likely credentials, tokens, personal data, and absolute paths. Review every finding. `--yes` bypasses the interactive confirmation and should be reserved for controlled automation.
 
 Sharing a prefix can reduce scope, but it is not a replacement for reviewing the selected content.
 

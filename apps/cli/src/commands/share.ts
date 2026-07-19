@@ -1,11 +1,11 @@
 import { readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 
-import { getDB, getSessionWithMessages } from '@spool-lab/core'
+import { getDB, getSessionWithMessages, serializeIndexedSession } from '@spool-lab/core'
 import {
   canonicalizeRecord,
-  parseClaudeSessionText,
-  parseCodexSessionLines,
+  isResumableSessionProvider,
+  parseSessionText,
   type SessionProvider,
 } from '@spool-lab/session-kit'
 import { Command } from 'commander'
@@ -35,6 +35,8 @@ export interface ShareTarget {
   sessionUuid: string
   filePath: string
   cwd: string | null
+  /** Portable JSONL for indexed sources without native provider records. */
+  jsonl?: string
 }
 
 export interface ShareCommandOptions {
@@ -100,7 +102,7 @@ export async function handleShareCommand(
       prepared = await prepareShare({
         provider: target.provider,
         sessionUuid: target.sessionUuid,
-        jsonl: readFileSync(target.filePath, 'utf8'),
+        jsonl: target.jsonl ?? readFileSync(target.filePath, 'utf8'),
         ...(position === undefined ? {} : { position }),
         workspaceRoot,
         homeDir,
@@ -344,10 +346,7 @@ async function chooseSummaryAgent(
 
 function buildPreparedSummaryPrompt(target: ShareTarget, prepared: PreparedShare): string {
   const raw = prepared.records.map((record) => record.data).join('\n')
-  const parsed =
-    target.provider === 'claude'
-      ? parseClaudeSessionText(raw, target.filePath)
-      : parseCodexSessionLines(raw.split('\n'), target.filePath)
+  const parsed = parseSessionText(target.provider, raw, target.filePath)
   if (parsed.kind !== 'parsed') {
     throw new Error('Could not extract the shared conversation for Summary generation.')
   }
@@ -389,7 +388,7 @@ function parseShareRef(input: string | undefined): { sessionUuid?: string; posit
   if (input === undefined) return {}
   const match = input
     .trim()
-    .match(/^(?:(?:claude|codex)_)?([0-9a-fA-F-]{8,64})(?:@([1-9][0-9]*))?$/)
+    .match(/^(?:(?:claude|codex|gemini|opencode|pi)_)?([0-9A-Za-z_-]{8,128})(?:@([1-9][0-9]*))?$/)
   if (!match?.[1]) {
     throw new Error(`Invalid session reference: ${input}. Expected <uuid> or <uuid>@<n>.`)
   }
@@ -408,11 +407,6 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
   const found = getSessionWithMessages(db, uuid)
   if (!found) throw new Error(`Session not found in the local index: ${uuid} (run \`spool sync\`?)`)
   const { session } = found
-  if (session.source !== 'claude' && session.source !== 'codex') {
-    throw new Error(
-      `Sharing ${session.source} sessions is not supported yet (claude and codex only)`,
-    )
-  }
   if (session.filePath.startsWith('spool:')) {
     throw new Error('This session has no provider file on disk yet')
   }
@@ -421,6 +415,9 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
     sessionUuid: session.sessionUuid,
     filePath: session.filePath,
     cwd: session.cwd,
+    ...(isResumableSessionProvider(session.source)
+      ? {}
+      : { jsonl: serializeIndexedSession(session, found.messages) }),
   }
 }
 

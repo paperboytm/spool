@@ -342,6 +342,23 @@ describe('hub authentication', () => {
 })
 
 describe('hub push', () => {
+  it('accepts every supported provider session id', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+
+    for (const sid of [
+      'claude_12345678',
+      'codex_12345678',
+      'gemini_12345678',
+      'opencode_ses_12345678',
+      'pi_12345678',
+    ]) {
+      const response = await push(env, fixture, USER_A_TOKEN, sid)
+      expect(response.status, sid).toBe(200)
+    }
+  })
+
   it('rejects a malformed sid with 400', async () => {
     const env = envFor()
     await seedUsers(env)
@@ -514,6 +531,20 @@ describe('hub head and withdrawal', () => {
     expect(env.state.hub_session_discovery).toHaveLength(0)
   })
 
+  it('commits a portable-provider head as Link-only without a Discovery projection', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const sid = 'pi_12345678'
+
+    const response = await uploadAndCommit(env, fixture, { sid })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ url: `${BASE_URL}/session/${sid}` })
+    expect(env.state.hub_sessions[0]).toMatchObject({ sid, visibility: 'unlisted' })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
   it('conflicts while objects are missing, commits after upload, and recommit clears withdrawal', async () => {
     const env = envFor()
     await seedUsers(env)
@@ -532,19 +563,7 @@ describe('hub head and withdrawal', () => {
     expect(committed.status).toBe(200)
     await expect(committed.json()).resolves.toEqual({ url: `${BASE_URL}/session/${SID}` })
     const createdAt = env.state.hub_sessions[0]?.created_at
-    expect(env.state.hub_session_discovery[0]).toMatchObject({
-      sid: SID,
-      agent: 'claude',
-      title: 'Please make the greeting warmer.',
-      summary_text: 'Outcome A synthetic shared session.',
-      message_count: 2,
-      tool_call_count: 2,
-      file_count: 1,
-      additions: 1,
-      deletions: 1,
-      quality_score: 18,
-      published_at: createdAt,
-    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
     env.state.hub_sessions[0]!.visibility = 'private'
 
     const withdrawn = await withdraw(env)
@@ -559,7 +578,7 @@ describe('hub head and withdrawal', () => {
       created_at: createdAt,
       withdrawn_at: null,
     })
-    expect(env.state.hub_session_discovery[0]?.published_at).toBe(createdAt)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
   })
 
   it('forbids non-owners and makes a second owner withdrawal idempotent', async () => {

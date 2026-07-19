@@ -1,4 +1,5 @@
 import type { FragmentResult } from '@spool-lab/core'
+import { isSessionProvider } from '@spool-lab/session-kit'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -147,10 +148,7 @@ export default function FragmentResults({
 }
 
 function formatSourceFilterLabel(source: string): string {
-  if (source === 'claude' || source === 'codex' || source === 'gemini' || source === 'opencode') {
-    return getSessionSourceLabel(source)
-  }
-  return source
+  return isSessionProvider(source) ? getSessionSourceLabel(source) : source
 }
 
 function FragmentRow({

@@ -1,16 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { audit } from '../../../../../../src/audit'
-import {
-  buildDiscoveryProjection,
-  prepareDiscoveryProjectionUpsert,
-  readDiscoveryView,
-} from '../../../../../../src/discovery/projection'
+import { readDiscoveryView } from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
-import { getHubSession, prepareHubSessionUpsert } from '../../../../../../src/hub/store'
+import { prepareHubSessionUpsert } from '../../../../../../src/hub/store'
 import { parseHeadBody, requireSid } from '../../../../../../src/hub/wire'
 import { publicBaseUrl } from '../../../../../../src/public-url'
 
@@ -33,20 +29,10 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       })
     }
 
-    const [existing, view] = await Promise.all([
-      getHubSession(ctx.env.DB, sid),
-      readDiscoveryView(ctx.env.DB, ctx.env.HUB, user.id, body.viewOid),
-    ])
+    // Validate the declared view before advancing the head. Sharing remains
+    // Link-only: a separate explicit Publish action owns Discovery projection.
+    await readDiscoveryView(ctx.env.DB, ctx.env.HUB, user.id, body.viewOid)
     const now = Date.now()
-    const projection = buildDiscoveryProjection({
-      sid,
-      summaryMd: body.summaryMd,
-      lineageJson: body.lineageJson,
-      recordCount: body.count,
-      publishedAt: existing?.created_at ?? now,
-      updatedAt: now,
-      view,
-    })
 
     await writeManifest(ctx.env.HUB, body.root, body.manifest)
     await ctx.env.DB.batch([
@@ -63,7 +49,6 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
         spoolFileOid: body.spoolFileOid,
         now,
       }),
-      prepareDiscoveryProjectionUpsert(ctx.env.DB, projection),
     ])
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {

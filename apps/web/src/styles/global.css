@@ -31,6 +31,8 @@
   --src-chatgpt: #10a37f;
   --src-gemini: var(--sp-source-gemini);
   --src-codex: var(--sp-source-codex);
+  --src-opencode: var(--sp-source-opencode);
+  --src-pi: var(--sp-source-pi);
   --src-reddit: #ff4500;
   --src-hn: #ff6600;
   --src-xhs: #ff2442;

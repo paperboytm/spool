@@ -39,7 +39,7 @@ spool share <session-uuid>
 `spool list` uses the current project by default. Run `spool list --all` to see recent Sessions
 from every indexed project.
 
-Only Claude Code and Codex CLI Sessions can currently be shared and resumed.
+Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared. Native Resume currently supports Claude Code and Codex CLI shares.
 
 ## 4. Review before sharing
 
@@ -55,7 +55,7 @@ A successful share returns a URL such as:
 https://spool.pro/session/claude_…
 ```
 
-Anyone with the URL can read the Shared Session without installing Spool. Shared Sessions are public and can appear in Explore and search after you confirm sharing.
+Anyone with the URL can read the Link-only Shared Session without installing Spool. Publishing it to a Profile, Explore, and search remains a separate action.
 
 ## 6. Continue the work
 

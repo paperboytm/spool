@@ -1,4 +1,9 @@
-import type { SessionViewV1 } from '@spool-lab/session-kit'
+import {
+  SESSION_PROVIDER_LABELS,
+  isResumableSessionProvider,
+  type SessionProvider,
+  type SessionViewV1,
+} from '@spool-lab/session-kit'
 import {
   MessageList,
   type ConversationMessage,
@@ -20,6 +25,7 @@ import {
   Copy,
   GitBranch,
   GitCommitHorizontal,
+  Link2,
   MessageSquareText,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -39,7 +45,7 @@ import { SessionSummary } from './session-summary'
 interface Props {
   meta: HubSessionMeta
   view: SessionViewV1 | null
-  provider: 'claude' | 'codex'
+  provider: SessionProvider
   conversation: ParsedConversation
   isDark: boolean
   initialRecordIndex: number | null
@@ -149,7 +155,8 @@ export function SessionWorkbench({
 
   const card = parseWorkspaceCard(meta.cardJson)
   const resume = resumeCommandFor(meta.sid)
-  const providerLabel = provider === 'claude' ? 'Claude Code' : 'Codex CLI'
+  const resumable = isResumableSessionProvider(provider)
+  const providerLabel = SESSION_PROVIDER_LABELS[provider]
   const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
     () => getUserPromptEntries(conversation.messages),
@@ -279,16 +286,17 @@ export function SessionWorkbench({
                 <Avatar src={meta.author.avatarUrl} name={avatarName} alt="" size="sm" />
                 {authorLabel(meta)}
               </span>
-              <Badge variant={provider === 'claude' ? 'source-claude' : 'source-codex'}>
+              <Badge variant={`source-${provider}`}>
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    provider === 'claude'
-                      ? 'bg-[var(--sp-source-claude)]'
-                      : 'bg-[var(--sp-source-codex)]'
-                  }`}
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: `var(--sp-source-${provider})` }}
                   aria-hidden="true"
                 />
                 {providerLabel}
+              </Badge>
+              <Badge data-testid="session-visibility">
+                <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                Link-only
               </Badge>
               <span title={humanDateTime(meta.updatedAt)}>
                 Shared {relativeDate(meta.updatedAt)}
@@ -304,44 +312,46 @@ export function SessionWorkbench({
             <span className="sr-only">Session ID: {meta.sid}</span>
           </div>
 
-          <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
-            <div className="flex h-8 min-w-0 gap-2" aria-label="Resume command">
-              <code
-                className="flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
-                title={resume}
-              >
-                {resume}
-              </code>
-              <IconButton
-                size="md"
-                type="button"
-                title={copied ? 'Copied' : 'Copy resume command'}
-                aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
-                onClick={copy}
-              >
-                {copied ? (
-                  <Check size={14} strokeWidth={1.8} aria-hidden="true" />
-                ) : (
-                  <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
-                )}
-                <span className="sr-only" aria-live="polite">
-                  {copied ? 'Copied' : ''}
-                </span>
-              </IconButton>
+          {resumable && (
+            <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
+              <div className="flex h-8 min-w-0 gap-2" aria-label="Resume command">
+                <code
+                  className="flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
+                  title={resume}
+                >
+                  {resume}
+                </code>
+                <IconButton
+                  size="md"
+                  type="button"
+                  title={copied ? 'Copied' : 'Copy resume command'}
+                  aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
+                  onClick={copy}
+                >
+                  {copied ? (
+                    <Check size={14} strokeWidth={1.8} aria-hidden="true" />
+                  ) : (
+                    <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
+                  )}
+                  <span className="sr-only" aria-live="polite">
+                    {copied ? 'Copied' : ''}
+                  </span>
+                </IconButton>
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-2 text-[11px] leading-4 text-[var(--muted)]">
+                <span>Don&apos;t have the Spool CLI?</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  aria-haspopup="dialog"
+                  onClick={() => setShowCliInstall(true)}
+                >
+                  Install it
+                </Button>
+              </div>
             </div>
-            <div className="mt-2 flex items-center justify-end gap-2 text-[11px] leading-4 text-[var(--muted)]">
-              <span>Don&apos;t have the Spool CLI?</span>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-haspopup="dialog"
-                onClick={() => setShowCliInstall(true)}
-              >
-                Install it
-              </Button>
-            </div>
-          </div>
+          )}
         </header>
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,720px)_280px] lg:items-start lg:gap-8">
@@ -506,11 +516,8 @@ export function SessionWorkbench({
                 <MetadataRow label="Provider">
                   <span className="inline-flex items-center gap-2">
                     <span
-                      className={`h-2 w-2 rounded-full ${
-                        provider === 'claude'
-                          ? 'bg-[var(--sp-source-claude)]'
-                          : 'bg-[var(--sp-source-codex)]'
-                      }`}
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: `var(--sp-source-${provider})` }}
                       aria-hidden="true"
                     />
                     {providerLabel}
@@ -605,11 +612,13 @@ export function SessionWorkbench({
           </aside>
         </div>
       </div>
-      <CliInstallDialog
-        open={showCliInstall}
-        resumeCommand={resume}
-        onClose={() => setShowCliInstall(false)}
-      />
+      {resumable && (
+        <CliInstallDialog
+          open={showCliInstall}
+          resumeCommand={resume}
+          onClose={() => setShowCliInstall(false)}
+        />
+      )}
     </main>
   )
 }

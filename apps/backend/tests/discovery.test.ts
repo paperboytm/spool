@@ -165,6 +165,16 @@ describe('Explore projection', () => {
     expect(migration).toContain("WHERE visibility = 'unlisted'")
     expect(migration).toContain('withdrawn_at IS NULL')
     expect(migration).not.toContain("visibility = 'public'")
+
+    const linkOnlyMigration = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        '../migrations/0006_enforce_link_only_share.sql',
+      ),
+      'utf8',
+    )
+    expect(linkOnlyMigration).toContain('DELETE FROM hub_session_engagement_daily')
+    expect(linkOnlyMigration).toContain('DELETE FROM hub_session_discovery')
   })
 })
 

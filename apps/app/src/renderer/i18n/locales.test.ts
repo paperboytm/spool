@@ -68,14 +68,13 @@ interface HubShareCopy {
   doneLead: string
 }
 
-const PUBLIC_HUB_SHARE_COPY: Array<
+const LINK_ONLY_HUB_SHARE_COPY: Array<
   [
     locale: string,
     copy: HubShareCopy,
     terms: {
-      public: string
-      search: string
-      noSeparatePublish: string
+      linkOnly: string
+      separatePublish: string
       sourceUnchanged: string
       shareAction: string
     },
@@ -85,77 +84,70 @@ const PUBLIC_HUB_SHARE_COPY: Array<
     'en',
     en.hubShare,
     {
-      public: 'public',
-      search: 'search',
-      noSeparatePublish: 'no separate Publish step',
+      linkOnly: 'Link-only',
+      separatePublish: 'separate action',
       sourceUnchanged: 'source Session stays unchanged',
-      shareAction: 'Share publicly',
+      shareAction: 'Share link',
     },
   ],
   [
     'de',
     de.hubShare,
     {
-      public: 'öffentlich',
-      search: 'Suche',
-      noSeparatePublish: 'separater Veröffentlichungsschritt',
-      sourceUnchanged: 'Quell-Session unverändert',
-      shareAction: 'Öffentlich teilen',
+      linkOnly: 'nur per Link',
+      separatePublish: 'separate Aktion',
+      sourceUnchanged: 'Quell-Session bleibt unverändert',
+      shareAction: 'Link teilen',
     },
   ],
   [
     'fr',
     fr.hubShare,
     {
-      public: 'publiquement',
-      search: 'recherche',
-      noSeparatePublish: 'étape de publication séparée',
+      linkOnly: 'accessible par lien',
+      separatePublish: 'action séparée',
       sourceUnchanged: 'session source reste inchangée',
-      shareAction: 'Partager publiquement',
+      shareAction: 'Partager le lien',
     },
   ],
   [
     'ja',
     ja.hubShare,
     {
-      public: '一般公開',
-      search: '検索',
-      noSeparatePublish: '別途公開操作',
+      linkOnly: 'リンク限定',
+      separatePublish: '別の操作',
       sourceUnchanged: '元のセッションは変更されません',
-      shareAction: '公開して共有',
+      shareAction: 'リンクを共有',
     },
   ],
   [
     'ko',
     ko.hubShare,
     {
-      public: '공개',
-      search: '검색',
-      noSeparatePublish: '별도의 게시 단계',
+      linkOnly: '링크 전용',
+      separatePublish: '별도 작업',
       sourceUnchanged: '원본 세션은 변경되지 않습니다',
-      shareAction: '공개로 공유',
+      shareAction: '링크 공유',
     },
   ],
   [
     'zh-CN',
     zhCN.hubShare,
     {
-      public: '公开',
-      search: '搜索',
-      noSeparatePublish: '单独的发布步骤',
+      linkOnly: '仅链接',
+      separatePublish: '单独的操作',
       sourceUnchanged: '源会话不会被更改',
-      shareAction: '公开分享',
+      shareAction: '分享链接',
     },
   ],
   [
     'zh-TW',
     zhTW.hubShare,
     {
-      public: '公開',
-      search: '搜尋',
-      noSeparatePublish: '另外的發佈步驟',
+      linkOnly: '僅連結',
+      separatePublish: '另外的操作',
       sourceUnchanged: '來源會話不會被變更',
-      shareAction: '公開分享',
+      shareAction: '分享連結',
     },
   ],
 ]
@@ -245,11 +237,11 @@ describe('locale key parity vs en.json', () => {
   )
 })
 
-describe('Hub Share public-discovery copy', () => {
-  it.each(PUBLIC_HUB_SHARE_COPY)(
-    '%s makes the public boundary explicit before and after sharing',
+describe('Hub Share Link-only copy', () => {
+  it.each(LINK_ONLY_HUB_SHARE_COPY)(
+    '%s keeps Share distinct from Publish before and after sharing',
     (_locale, copy, terms) => {
-      expect(copy.title).toContain(terms.public)
+      expect(copy.title).toContain(terms.linkOnly)
       expect(copy.lead).toContain('{{records}}')
       expect(copy.publish).toBe(terms.shareAction)
       expect(copy.publishing).not.toMatch(
@@ -257,10 +249,9 @@ describe('Hub Share public-discovery copy', () => {
       )
 
       for (const message of [copy.lead, copy.doneLead]) {
-        expect(message).toContain(terms.public)
+        expect(message).toContain(terms.linkOnly)
         expect(message).toContain('Explore')
-        expect(message).toContain(terms.search)
-        expect(message).toContain(terms.noSeparatePublish)
+        expect(message).toContain(terms.separatePublish)
         expect(message).toContain(terms.sourceUnchanged)
       }
     },

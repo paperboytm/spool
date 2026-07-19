@@ -8,7 +8,7 @@ import {
   ShieldAlert,
   Check,
   RotateCcw,
-  Globe,
+  Link2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -477,17 +477,13 @@ export default function SessionDetail({
                     },
                   ]
                 : []),
-              ...(session.source === 'claude' || session.source === 'codex'
-                ? [
-                    {
-                      label: t('hubShare.menuLabel'),
-                      icon: <Globe size={14} strokeWidth={1.6} aria-hidden />,
-                      onSelect: () => {
-                        setHubShareOpen(true)
-                      },
-                    },
-                  ]
-                : []),
+              {
+                label: t('hubShare.menuLabel'),
+                icon: <Link2 size={14} strokeWidth={1.6} aria-hidden />,
+                onSelect: () => {
+                  setHubShareOpen(true)
+                },
+              },
               {
                 label: t('session.refreshFromSource'),
                 icon: <RotateCcw size={14} strokeWidth={1.6} aria-hidden />,

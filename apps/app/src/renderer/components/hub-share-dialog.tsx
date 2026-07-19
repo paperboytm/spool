@@ -1,11 +1,11 @@
 // One-click share to spool.pro (the v2 records share). Prepare runs
 // locally and shows the honesty gate — record count, diffstat, redact
-// findings — before anything leaves the machine; publish runs the same
+// findings — before anything leaves the machine; Share runs the same
 // 3-step handshake the CLI uses. Mirrors RefreshFromSourceDialog's outer
 // modal shape.
 
 import { Button } from '@spool-lab/ui'
-import { Check, Copy, Globe, ShieldAlert } from 'lucide-react'
+import { Check, Copy, Link2, ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -15,7 +15,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 interface Props {
   open: boolean
   sessionUuid: string
-  /** Agent-generated or author-provided Markdown to review before publishing. */
+  /** Agent-generated or author-provided Markdown to review before sharing. */
   initialSummary?: string
   onClose: () => void
 }
@@ -87,7 +87,7 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
       >
         <div className="px-6 pt-5 pb-5">
           <div className="text-accent dark:text-accent-dark flex items-center gap-1.5 text-[12px] font-medium">
-            <Globe size={13} strokeWidth={1.7} aria-hidden />
+            <Link2 size={13} strokeWidth={1.7} aria-hidden />
             <span>{t('hubShare.pretitle')}</span>
           </div>
 

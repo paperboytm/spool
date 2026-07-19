@@ -43,7 +43,7 @@ Agent Sessions can contain credentials, personal data, local paths, and code tha
 Spool keeps the boundary clear:
 
 - local preparation does not publish anything;
-- Share creates a public URL that can appear in Explore and search after confirmation;
+- Share creates a Link-only URL; Publish separately makes it Public for Profiles and Discovery;
 - sensitive-data findings appear before disclosure;
 - an author can withdraw a Shared Session.
 

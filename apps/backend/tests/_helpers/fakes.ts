@@ -3,6 +3,7 @@
 // pulling in miniflare to keep test boot time low.
 
 import type { D1Database, KVNamespace, R2Bucket } from '@cloudflare/workers-types'
+import type { SessionProvider } from '@spool-lab/session-kit'
 
 type KvVal = { value: string; expiresAt: number | null }
 
@@ -133,7 +134,7 @@ type ApiTokenRow = {
 
 type HubSessionDiscoveryRow = {
   sid: string
-  agent: 'claude' | 'codex'
+  agent: SessionProvider
   title: string
   summary_text: string | null
   search_text: string
@@ -413,7 +414,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             updatedAt,
           ] = params as [
             string,
-            'claude' | 'codex',
+            SessionProvider,
             string,
             string | null,
             string,
@@ -966,7 +967,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const sinceDay = params[parameterIndex] as string
           parameterIndex += 1
           const hasAgent = sql.includes('d.agent = ?')
-          const agent = hasAgent ? (params[parameterIndex] as 'claude' | 'codex') : null
+          const agent = hasAgent ? (params[parameterIndex] as SessionProvider) : null
           if (hasAgent) parameterIndex += 1
           const tokenCount = sql.match(/d\.search_text LIKE \?/g)?.length ?? 0
           const tokens: string[] = []
