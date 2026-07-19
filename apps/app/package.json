@@ -116,6 +116,7 @@
   "build": {
     "appId": "com.linkclaw.spool",
     "productName": "Spool",
+    "executableName": "Spool",
     "npmRebuild": false,
     "publish": [
       {
