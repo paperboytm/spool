@@ -4,7 +4,7 @@ description: Share the current session and a share-ready Summary to the Spool hu
 allowed-tools: Bash
 ---
 
-Spool is the publishing platform for agent Sessions. **Share** sends the selected records to the Hub and creates a Link-only URL that other people can read and resume from another machine; Public visibility is always a separate author choice. A Share can carry a Markdown Summary: the interactive CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Local preparation covers Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi, so **any agent with a shell can recall another agent's Sessions**.
+Spool is the publishing platform for agent Sessions. **Share** sends the selected records to the Hub and creates a Link-only URL that other people can read; Public visibility is always a separate author choice. Claude Code and Codex CLI shares can also be resumed from another machine. A Share can carry a Markdown Summary: the interactive CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Local preparation and sharing cover Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi, so **any agent with a shell can recall another agent's Sessions**.
 
 ## Routing
 
@@ -12,7 +12,7 @@ Decide from `$ARGS` and the conversation:
 
 - **share/publish** this (or a specific) session → Share flow
 - **withdraw/unpublish** a shared session → `spool withdraw <sid-or-url>`
-- a **spool session URL or sid** the user wants to continue → `spool resume <sid-or-url>` (materializes it locally and forks the provider's native session)
+- a resumable **Claude/Codex spool session URL or sid** the user wants to continue → `spool resume <sid-or-url>` (materializes it locally and forks the provider's native session)
 - anything else (a topic, a question, "that session where…") → Recall flow
 
 ## Preflight
@@ -25,7 +25,7 @@ If missing, tell the user: install with `npm install -g @spool-lab/cli`, then `s
 
 ## Share flow
 
-Only **claude** and **codex** sessions can be shared. Sharing publishes the selected transcript records to the hub and prints a URL.
+**claude**, **codex**, **gemini**, **opencode**, and **pi** sessions can be shared. Sharing sends native Claude/Codex records or the other sources' provider-neutral indexed conversation to the Hub and prints a Link-only URL.
 
 1. Run `spool sync` so the session and its newest turns are indexed.
 2. Pick the target:
@@ -64,10 +64,10 @@ Outside Claude Code, omit the target: `spool share --summary "$summary" < /dev/n
 The `< /dev/null` is deliberate: if the secret gate needs confirmation, a non-interactive invocation must abort instead of hanging. Do not add `--yes` until the user explicitly accepts the reported risk.
 
 5. Handle outcomes:
-   - **`Ready to share: <url>`** — the records and provided Summary are live; give the user the URL. Teammates run `spool resume <sid-or-url>` to fork it locally.
+   - **`Session shared as Link-only`** — the records and provided Summary are live; give the user the URL. For Claude/Codex shares, teammates can run `spool resume <sid-or-url>` to fork it locally.
    - **`Not logged in`** — ask the user to run `spool login` (browser approval), then retry.
    - **Secret findings / `Cannot confirm ... without a TTY`** — show the findings summary and ask. Only after an explicit yes, re-run the same command with `--yes`.
-   - **`Sharing <source> sessions is not supported yet`** — explain that only Claude and Codex sessions are shareable.
+   - **`<source> sessions can be shared and read, but native Resume is not supported yet`** — explain that the share is readable, while native Resume currently requires Claude or Codex.
    - **`The session is already shared at <url>. Its previous Summary is unchanged.`** — preserve and report the live URL, and explain that only the Summary generation/upload failed.
 
 ## Recall flow
@@ -115,6 +115,6 @@ Fold what you found into your reply as ordinary context, citing the source per c
 | `spool pin <uuid>` / `unpin <uuid>` / `pinned`              | Bookmark and list sessions; state is shared with the Spool app Library                                                              |
 | `spool status` / `spool doctor [checkId] [--fix]`           | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                                    |
 | `spool login [--token <t>]` / `spool logout`                | Hub browser-device auth (or token for automation) / revoke and clear credentials                                                    |
-| `spool share [<uuid>[@<n>]] [--summary <markdown>]`         | Share selected Claude/Codex records as Link-only; also supports `--no-agent-summary`, `--yes`, and `--spool-file`                   |
+| `spool share [<uuid>[@<n>]] [--summary <markdown>]`         | Share any indexed agent Session as Link-only; also supports `--no-agent-summary`, `--yes`, and `--spool-file`                       |
 | `spool withdraw <sid\|url>`                                 | Tombstone a share so its URL stops resolving                                                                                        |
-| `spool resume <sid\|url>[@<n>] [--workspace <dir>]`         | Materialize and natively fork a share; `--no-exec` prints the command without launching                                             |
+| `spool resume <sid\|url>[@<n>] [--workspace <dir>]`         | Materialize and natively fork a Claude/Codex share; `--no-exec` prints the command without launching                                |

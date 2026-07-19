@@ -4,6 +4,7 @@ import { resolveSessionRef } from './ref.js'
 
 const CLAUDE_SID = 'claude_11111111-2222-4333-8444-555555555555'
 const CODEX_SID = 'codex_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+const PI_SID = 'pi_12345678-1234-4234-8234-123456789abc'
 
 describe('resolveSessionRef', () => {
   it.each([
@@ -23,6 +24,7 @@ describe('resolveSessionRef', () => {
       `https://hub.example:8443/session/${CODEX_SID}@7`,
       { sid: CODEX_SID, provider: 'codex', position: 7, hubUrl: 'https://hub.example:8443' },
     ],
+    ['portable provider sid', PI_SID, { sid: PI_SID, provider: 'pi' }],
   ])('parses a %s', (_label, input, expected) => {
     expect(resolveSessionRef(input)).toEqual(expected)
   })
@@ -30,8 +32,8 @@ describe('resolveSessionRef', () => {
   it.each([
     '',
     '11111111-2222-4333-8444-555555555555',
-    'gemini_11111111-2222-4333-8444-555555555555',
-    'claude_not-a-uuid',
+    'unknown_11111111-2222-4333-8444-555555555555',
+    'claude_not!a!uuid',
     `${CLAUDE_SID}@-1`,
     `${CLAUDE_SID}@1.5`,
     `http://spool.pro/session/${CLAUDE_SID}`,

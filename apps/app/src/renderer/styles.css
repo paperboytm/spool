@@ -85,6 +85,7 @@
   --color-src-codex: var(--sp-source-codex);
   --color-src-gemini: var(--sp-source-gemini);
   --color-src-opencode: var(--sp-source-opencode);
+  --color-src-pi: var(--sp-source-pi);
 
   --font-sans: var(--sp-font-sans);
   --font-mono: var(--sp-font-mono);

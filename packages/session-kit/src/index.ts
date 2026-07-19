@@ -1,6 +1,18 @@
 export { splitRecords, canonicalizeRecord } from './records.js'
-export { parseClaudeSessionText, parseCodexSessionLines } from './messages.js'
-export type { ParseProviderResult, ParsedMessage, ParsedProviderSession } from './messages.js'
+export {
+  parseClaudeSessionText,
+  parseCodexSessionLines,
+  parsePortableSessionText,
+  parseSessionText,
+  PORTABLE_MESSAGE_TYPE,
+  serializePortableSession,
+} from './messages.js'
+export type {
+  ParseProviderResult,
+  ParsedMessage,
+  ParsedProviderSession,
+  PortableSessionInput,
+} from './messages.js'
 export {
   SPOOL_SYSTEM_PRELUDE_CLOSE,
   SPOOL_SYSTEM_PRELUDE_OPEN,
@@ -38,6 +50,7 @@ export type {
   SessionDiff,
   SessionFileDiff,
   SessionProvider,
+  ResumableSessionProvider,
   SessionRecord,
   SessionRecordsOptions,
   SessionViewV1,
@@ -46,4 +59,12 @@ export type {
   ViewIndexEntry,
   ViewOutlineEntry,
   ViewRecordKind,
+} from './types.js'
+
+export {
+  RESUMABLE_SESSION_PROVIDERS,
+  SESSION_PROVIDER_LABELS,
+  SESSION_PROVIDERS,
+  isResumableSessionProvider,
+  isSessionProvider,
 } from './types.js'

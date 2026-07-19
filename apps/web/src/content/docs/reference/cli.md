@@ -32,7 +32,7 @@ If the Hub is unreachable, the local credential is still removed. Revoke the ser
 
 ## `spool share`
 
-Create a durable public Shared Session URL that can appear in Explore and search. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure.
+Create a durable Link-only Shared Session URL. Publishing it to a Profile and Explore remains a separate action. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure.
 
 ```bash
 spool share                       # latest Session in the current directory
@@ -44,7 +44,7 @@ spool share --spool-file x.spool  # attach a curated document
 spool share --yes                 # skip sensitive-data confirmation
 ```
 
-Only Claude Code and Codex CLI Sessions can currently be shared through the Hub.
+Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared through the Hub. Claude and Codex preserve their native records; the other sources share the provider-neutral conversation prepared in the local index.
 
 In an interactive terminal, Spool can detect a local Claude Code or Codex CLI installation and ask it to draft the Summary after the records have been shared. Summary generation uses the author’s own local Agent configuration.
 
@@ -70,6 +70,8 @@ spool resume <session-id>@12          # continue from a record prefix
 spool resume <url> --workspace <dir>  # choose the workspace root
 spool resume <url> --no-exec          # prepare without launching the agent
 ```
+
+Native Resume currently supports Claude Code and Codex CLI shares. Gemini CLI, OpenCode, and Pi shares remain readable but are not offered as resumable.
 
 Resume never modifies the source Shared Session.
 

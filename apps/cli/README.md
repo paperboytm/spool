@@ -18,7 +18,7 @@ spool resume <session-id-or-url>
 spool withdraw <session-id-or-url>
 ```
 
-`spool share` supports Claude Code and Codex CLI Sessions. It checks records for likely sensitive values, creates a Link-only URL, and can ask a detected local Agent to draft the optional Summary.
+`spool share` supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions. It checks records for likely sensitive values, creates a Link-only URL, and can ask a detected local Agent to draft the optional Summary.
 
 Useful publishing options:
 
@@ -30,7 +30,7 @@ spool share --spool-file x.spool  # attach a curated document
 spool share --yes                 # skip sensitive-data confirmation
 ```
 
-Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.
+For Claude Code and Codex CLI shares, Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.
 
 ## Read Sessions
 

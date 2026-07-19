@@ -1,4 +1,4 @@
-import type { SessionViewV1 } from '@spool-lab/session-kit'
+import type { SessionProvider, SessionViewV1 } from '@spool-lab/session-kit'
 import type { ConversationMessage } from '@spool-lab/session-view'
 import type { SpoolDocument } from '@spool/share-kit'
 import { createElement } from 'react'
@@ -248,6 +248,7 @@ function renderWorkbench(
     summaryMd?: string | null
     cardJson?: string | null
     view?: SessionViewV1 | null
+    provider?: SessionProvider
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -258,7 +259,7 @@ function renderWorkbench(
         cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
       },
       view: options.view === undefined ? view : options.view,
-      provider: 'claude',
+      provider: options.provider ?? 'claude',
       conversation: options.messages ?? conversation,
       isDark: false,
       initialRecordIndex: null,
@@ -277,6 +278,9 @@ describe('SessionWorkbench', () => {
     const html = renderWorkbench()
 
     expect(html).toContain('data-testid="timeline-body"')
+    expect(html).toContain('data-testid="session-visibility"')
+    expect(html).toContain('lucide-link-2')
+    expect(html).toContain('>Link-only</span>')
     expect(html).toContain('data-progressive="true"')
     expect(html).toContain('Published full prompt')
     expect(html).toContain('<h1>Purpose</h1>')
@@ -343,6 +347,17 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
     expect(html).toContain('class="sw-session-sticky min-w-0 lg:sticky"')
+  })
+
+  it('identifies a Pi share without offering an unsupported native Resume command', () => {
+    const html = renderWorkbench({ provider: 'pi' })
+
+    expect(html).toContain('data-variant="source-pi"')
+    expect(html).toContain('>Pi</span>')
+    expect(html).toContain('>Link-only</span>')
+    expect(html).not.toContain('spool resume')
+    expect(html).not.toContain('aria-label="Resume command"')
+    expect(html).not.toContain('Don&#x27;t have the Spool CLI?')
   })
 
   it('keeps the raw fallback usable without a summary, view, or messages', () => {

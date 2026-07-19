@@ -3,11 +3,7 @@
 // desktop indexer wraps), so what you read on spool.pro is what you'd see
 // opening the session in the app.
 
-import {
-  parseClaudeSessionText,
-  parseCodexSessionLines,
-  type ParsedMessage,
-} from '@spool-lab/session-kit'
+import { parseSessionText, type ParsedMessage, type SessionProvider } from '@spool-lab/session-kit'
 import type { ConversationMessage } from '@spool-lab/session-view'
 
 import type { HubRecordLine } from './hub-api'
@@ -20,14 +16,11 @@ export interface ParsedConversation {
 }
 
 export function parseHubConversation(
-  provider: 'claude' | 'codex',
+  provider: SessionProvider,
   records: readonly HubRecordLine[],
 ): ParsedConversation {
   const lines = records.map((record) => record.data)
-  const result =
-    provider === 'claude'
-      ? parseClaudeSessionText(lines.join('\n'), 'hub')
-      : parseCodexSessionLines(lines, 'hub')
+  const result = parseSessionText(provider, lines.join('\n'), 'hub')
 
   if (result.kind !== 'parsed') {
     return { messages: [], title: '', recordToMessageId: new Map() }

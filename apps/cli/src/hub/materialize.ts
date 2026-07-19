@@ -1,4 +1,4 @@
-import type { SessionProvider } from '@spool-lab/session-kit'
+import type { ResumableSessionProvider } from '@spool-lab/session-kit'
 
 import { buildBirthText, type BirthPayload } from './birth.js'
 
@@ -35,7 +35,7 @@ export interface MaterializedSession {
 }
 
 export function materializeSession(
-  provider: SessionProvider,
+  provider: ResumableSessionProvider,
   opts: MaterializeOptions,
 ): MaterializedSession {
   return provider === 'codex' ? materializeCodexSession(opts) : materializeClaudeSession(opts)

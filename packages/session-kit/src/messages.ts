@@ -5,6 +5,7 @@
 // its parser tests keep guarding this logic through the wrappers.
 
 import { stripSpoolSystemPrelude } from './spool-prelude.js'
+import { isSessionProvider, type SessionProvider } from './types.js'
 
 export interface ParsedMessage {
   uuid: string
@@ -18,7 +19,7 @@ export interface ParsedMessage {
 }
 
 export interface ParsedProviderSession {
-  source: 'claude' | 'codex'
+  source: SessionProvider
   sessionUuid: string
   filePath: string
   title: string
@@ -33,6 +34,164 @@ export type ParseProviderResult =
   | { kind: 'parsed'; session: ParsedProviderSession }
   | { kind: 'skipped' }
   | { kind: 'filtered' }
+
+export type PortableSessionInput = Omit<ParsedProviderSession, 'messages'> & {
+  messages: readonly ParsedMessage[]
+}
+
+const PORTABLE_SESSION_TYPE = 'spool_portable_session'
+export const PORTABLE_MESSAGE_TYPE = 'spool_portable_message'
+
+/**
+ * Serialize an indexed Session into a provider-neutral JSONL stream. Claude
+ * and Codex shares keep their native records for lossless Resume; sources
+ * without a native materializer use this format so their indexed conversation
+ * remains shareable without masquerading as another provider.
+ */
+export function serializePortableSession(session: PortableSessionInput): string {
+  const metadata = {
+    source: session.source,
+    sessionId: session.sessionUuid,
+    filePath: session.filePath,
+    title: session.title,
+    cwd: session.cwd,
+    model: session.model,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+  }
+  const records = session.messages.map((message, index) => ({
+    type: PORTABLE_MESSAGE_TYPE,
+    version: 1,
+    // Keep metadata on the first message instead of spending a synthetic
+    // record on a header. Prefix sharing (`@n`) can then keep its existing
+    // meaning: exactly the first n visible records, with @1 still parseable.
+    ...(index === 0 ? { session: metadata } : {}),
+    uuid: message.uuid,
+    parentUuid: message.parentUuid,
+    timestamp: message.timestamp,
+    isSidechain: message.isSidechain,
+    message: {
+      role: message.role,
+      content: message.contentText,
+      toolNames: message.toolNames,
+    },
+  }))
+  return records.map((record) => JSON.stringify(record)).join('\n') + '\n'
+}
+
+export function parseSessionText(
+  provider: SessionProvider,
+  raw: string,
+  filePath: string,
+): ParseProviderResult {
+  const portable = parsePortableSessionText(raw, filePath)
+  if (portable.kind === 'parsed') {
+    return portable.session.source === provider ? portable : { kind: 'filtered' }
+  }
+  if (provider === 'claude') return parseClaudeSessionText(raw, filePath)
+  if (provider === 'codex') return parseCodexSessionLines(raw.split('\n'), filePath)
+  return { kind: 'skipped' }
+}
+
+export function parsePortableSessionText(raw: string, filePath: string): ParseProviderResult {
+  let header: Record<string, unknown> | null = null
+  const messageRecords: Record<string, unknown>[] = []
+
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!isRecord(parsed)) continue
+    if (parsed['type'] === PORTABLE_SESSION_TYPE && parsed['version'] === 1 && header === null) {
+      // Backward compatibility with the original portable draft format.
+      header = parsed
+    } else if (parsed['type'] === PORTABLE_MESSAGE_TYPE) {
+      const embeddedSession = recordField(parsed, 'session')
+      if (header === null && embeddedSession !== null) header = embeddedSession
+      messageRecords.push(parsed)
+    }
+  }
+
+  const source = stringField(header, 'source')
+  if (!header || !source || !isSessionProvider(source)) return { kind: 'skipped' }
+
+  const messages: ParsedMessage[] = []
+  for (const record of messageRecords) {
+    const message = recordField(record, 'message')
+    const role = stringField(message, 'role')
+    if (role !== 'user' && role !== 'assistant' && role !== 'system') continue
+    const contentText = stringField(message, 'content') ?? ''
+    const toolNames = stringArrayField(message, 'toolNames')
+    if (!contentText && toolNames.length === 0) continue
+    messages.push({
+      uuid: stringField(record, 'uuid') ?? `portable-${messages.length}`,
+      parentUuid: nullableStringField(record, 'parentUuid'),
+      role,
+      contentText,
+      timestamp: stringField(record, 'timestamp') ?? '',
+      isSidechain: record['isSidechain'] === true,
+      toolNames,
+      seq: messages.length,
+    })
+  }
+  if (messages.length === 0) return { kind: 'skipped' }
+
+  const firstUser = messages.find(
+    (message) =>
+      message.role === 'user' && !message.isSidechain && message.contentText.trim().length > 0,
+  )
+  const timestamps = messages
+    .map((message) => message.timestamp)
+    .filter(Boolean)
+    .sort()
+  return {
+    kind: 'parsed',
+    session: {
+      source,
+      sessionUuid: stringField(header, 'sessionId') ?? filePath,
+      filePath: stringField(header, 'filePath') ?? filePath,
+      title: stringField(header, 'title') ?? firstUser?.contentText.slice(0, 120) ?? '(no title)',
+      cwd: stringField(header, 'cwd') ?? '',
+      model: stringField(header, 'model') ?? '',
+      startedAt: stringField(header, 'startedAt') ?? timestamps[0] ?? '',
+      endedAt: stringField(header, 'endedAt') ?? timestamps.at(-1) ?? '',
+      messages,
+    },
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function recordField(
+  source: Record<string, unknown> | null,
+  key: string,
+): Record<string, unknown> | null {
+  const value = source?.[key]
+  return isRecord(value) ? value : null
+}
+
+function stringField(source: Record<string, unknown> | null, key: string): string | null {
+  const value = source?.[key]
+  return typeof value === 'string' ? value : null
+}
+
+function nullableStringField(source: Record<string, unknown>, key: string): string | null {
+  const value = source[key]
+  return typeof value === 'string' ? value : null
+}
+
+function stringArrayField(source: Record<string, unknown> | null, key: string): string[] {
+  const value = source?.[key]
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
+}
 
 interface ContentItem {
   type: string

@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sequenceRoot } from '@spool-lab/session-kit'
+import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
 
 import type { HubSharePrepareResult, HubSharePublishResult } from '../../shared/hub-share.js'
@@ -74,6 +74,7 @@ function makeHub() {
 }
 
 const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
+const PI_SESSION_UUID = '7f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
 
 function writeFixture(dir: string): string {
   const line = (r: Record<string, unknown>) => JSON.stringify(r)
@@ -110,6 +111,56 @@ function setup() {
     fetchFn: hub.fetchImpl,
     loadTokenFn: loadToken,
     resolveTarget: () => ({ provider: 'claude', sessionUuid: SESSION_UUID, filePath, cwd: dir }),
+  })
+  return { hub, dir }
+}
+
+function setupPi() {
+  handlers.clear()
+  const hub = makeHub()
+  const dir = mkdtempSync(join(tmpdir(), 'hub-share-pi-ipc-'))
+  const jsonl = serializePortableSession({
+    source: 'pi',
+    sessionUuid: PI_SESSION_UUID,
+    filePath: join(dir, 'pi.jsonl'),
+    title: 'Share a Pi session',
+    cwd: dir,
+    model: 'pi-model',
+    startedAt: '2026-07-16T10:00:00.000Z',
+    endedAt: '2026-07-16T10:00:05.000Z',
+    messages: [
+      {
+        uuid: 'pi-u-1',
+        parentUuid: null,
+        role: 'user',
+        contentText: 'hello from Pi',
+        timestamp: '2026-07-16T10:00:00.000Z',
+        isSidechain: false,
+        toolNames: [],
+        seq: 0,
+      },
+      {
+        uuid: 'pi-a-1',
+        parentUuid: 'pi-u-1',
+        role: 'assistant',
+        contentText: 'Pi shared.',
+        timestamp: '2026-07-16T10:00:05.000Z',
+        isSidechain: false,
+        toolNames: [],
+        seq: 1,
+      },
+    ],
+  })
+  registerHubShareIpc({
+    fetchFn: hub.fetchImpl,
+    loadTokenFn: loadToken,
+    resolveTarget: () => ({
+      provider: 'pi',
+      sessionUuid: PI_SESSION_UUID,
+      filePath: join(dir, 'pi.jsonl'),
+      cwd: dir,
+      jsonl,
+    }),
   })
   return { hub, dir }
 }
@@ -159,6 +210,28 @@ describe('hub-share IPC', () => {
     expect(doc).toContain('hello, ship the demo')
     // The fixture's AWS key must be masked in the attached document.
     expect(doc).not.toContain('AKIAABCDEFGHIJKLMNOP')
+  })
+
+  it('prepares and publishes a portable Pi session with a readable attached document', async () => {
+    const { hub } = setupPi()
+    const prepared = await invoke<HubSharePrepareResult>('hub-share:prepare', {
+      sessionUuid: PI_SESSION_UUID,
+    })
+    if (!prepared.ok) throw new Error(prepared.error)
+    expect(prepared.prepared.sid).toBe(`pi_${PI_SESSION_UUID}`)
+    expect(prepared.prepared.count).toBe(2)
+
+    const result = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: PI_SESSION_UUID,
+      summary: '## Outcome\n\nPi is shareable.',
+    })
+    if (!result.ok) throw new Error(result.error)
+    expect(result.url).toBe(`https://hub.test/session/pi_${PI_SESSION_UUID}`)
+
+    const head = hub.sessions.get(`pi_${PI_SESSION_UUID}`)
+    const doc = hub.objects.get(head?.spoolFileOid ?? '') ?? ''
+    expect(doc).toContain('hello from Pi')
+    expect(doc).toContain('"source":"pi"')
   })
 
   it('publish without a signed-in session reports UNAUTHENTICATED', async () => {

@@ -148,7 +148,11 @@ export function prepareDiscoveryProjectionUpsert(
 
 function providerFromSid(sid: string): SessionProvider {
   if (!SID_RE.test(sid)) throw new ApiError('BAD_REQUEST', 'bad session id')
-  return sid.startsWith('claude_') ? 'claude' : 'codex'
+  const provider = sid.slice(0, sid.indexOf('_'))
+  if (provider !== 'claude' && provider !== 'codex') {
+    throw new ApiError('BAD_REQUEST', 'agent is not published to Discovery')
+  }
+  return provider
 }
 
 function fallbackTitle(agent: SessionProvider): string {

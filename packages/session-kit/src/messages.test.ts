@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test'
 
-import { parseClaudeSessionText } from './messages.js'
+import { parseClaudeSessionText, parseSessionText, serializePortableSession } from './messages.js'
 
 const line = (value: unknown): string => JSON.stringify(value)
 
@@ -214,4 +214,68 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
     expect(elapsedMs).toBeLessThan(1_000)
     expect(result.kind).toBe('parsed')
   })
+})
+
+describe('portable shared sessions', () => {
+  it.each(['gemini', 'opencode', 'pi'] as const)(
+    'round-trips indexed %s messages without pretending they are Claude or Codex records',
+    (source) => {
+      const raw = serializePortableSession({
+        source,
+        sessionUuid: `${source}-session`,
+        filePath: `/sessions/${source}`,
+        title: `${source} title`,
+        cwd: '/workspace',
+        model: `${source}-model`,
+        startedAt: '2026-07-19T01:00:00.000Z',
+        endedAt: '2026-07-19T01:00:05.000Z',
+        messages: [
+          {
+            uuid: 'user-1',
+            parentUuid: null,
+            role: 'user',
+            contentText: 'Share this session',
+            timestamp: '2026-07-19T01:00:00.000Z',
+            isSidechain: false,
+            toolNames: [],
+            seq: 0,
+          },
+          {
+            uuid: 'assistant-1',
+            parentUuid: 'user-1',
+            role: 'assistant',
+            contentText: 'Shared.',
+            timestamp: '2026-07-19T01:00:05.000Z',
+            isSidechain: false,
+            toolNames: ['write'],
+            seq: 1,
+          },
+        ],
+      })
+
+      const result = parseSessionText(source, raw, 'hub')
+      expect(raw.trim().split('\n')).toHaveLength(2)
+      expect(result.kind).toBe('parsed')
+      if (result.kind !== 'parsed') return
+      expect(result.session).toMatchObject({
+        source,
+        sessionUuid: `${source}-session`,
+        title: `${source} title`,
+        cwd: '/workspace',
+        model: `${source}-model`,
+      })
+      expect(result.session.messages.map((message) => message.contentText)).toEqual([
+        'Share this session',
+        'Shared.',
+      ])
+      expect(result.session.messages[1]?.toolNames).toEqual(['write'])
+
+      const prefix = parseSessionText(source, raw.split('\n')[0] ?? '', 'hub')
+      expect(prefix.kind).toBe('parsed')
+      if (prefix.kind !== 'parsed') return
+      expect(prefix.session.messages.map((message) => message.contentText)).toEqual([
+        'Share this session',
+      ])
+    },
+  )
 })

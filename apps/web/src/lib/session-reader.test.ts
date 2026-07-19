@@ -1,3 +1,4 @@
+import { serializePortableSession, type SessionProvider } from '@spool-lab/session-kit'
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
@@ -32,9 +33,14 @@ describe('route /session/:sid', () => {
     })
     expect(routeFor('/session/codex_abcd1234')).toEqual({ kind: 'session', sid: 'codex_abcd1234' })
     expect(routeFor('/session/gemini_abcd1234')).toEqual({
-      kind: 'tombstone',
-      reason: 'not-found',
+      kind: 'session',
+      sid: 'gemini_abcd1234',
     })
+    expect(routeFor('/session/opencode_abcd1234')).toEqual({
+      kind: 'session',
+      sid: 'opencode_abcd1234',
+    })
+    expect(routeFor('/session/pi_abcd1234')).toEqual({ kind: 'session', sid: 'pi_abcd1234' })
     expect(routeFor('/session/claude_x')).toEqual({ kind: 'tombstone', reason: 'not-found' })
     expect(routeFor('/session/')).toEqual({ kind: 'tombstone', reason: 'not-found' })
   })
@@ -127,6 +133,9 @@ describe('deep links and helpers', () => {
   it('derives provider and resume command', () => {
     expect(providerOf('codex_abc12345')).toBe('codex')
     expect(providerOf('claude_abc12345')).toBe('claude')
+    expect(providerOf('gemini_abc12345')).toBe('gemini')
+    expect(providerOf('opencode_abc12345')).toBe('opencode')
+    expect(providerOf('pi_abc12345')).toBe('pi')
     expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')).toBe(
       'spool resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69',
     )
@@ -236,6 +245,43 @@ describe('hub records → desktop-identical conversation', () => {
     expect(conversation.messages.map((m) => m.contentText)).toEqual(['hello codex', 'hi!'])
     expect(conversation.recordToMessageId.get(1)).toBe(1)
   })
+
+  it.each(['gemini', 'opencode', 'pi'] as const)(
+    'parses portable %s records under their real provider identity',
+    (provider: SessionProvider) => {
+      const lines = serializePortableSession({
+        source: provider,
+        sessionUuid: `${provider}-session`,
+        filePath: 'hub',
+        title: `${provider} title`,
+        cwd: '',
+        model: '',
+        startedAt: '2026-07-19T00:00:00.000Z',
+        endedAt: '2026-07-19T00:00:01.000Z',
+        messages: [
+          {
+            uuid: 'portable-u',
+            parentUuid: null,
+            role: 'user',
+            contentText: `hello ${provider}`,
+            timestamp: '2026-07-19T00:00:00.000Z',
+            isSidechain: false,
+            toolNames: [],
+            seq: 0,
+          },
+        ],
+      })
+        .trim()
+        .split('\n')
+      const records = lines.map((data, i) => ({ i, oid: `oid-${i}`, data }))
+
+      const conversation = parseHubConversation(provider, records)
+
+      expect(conversation.title).toBe(`${provider} title`)
+      expect(conversation.messages[0]?.contentText).toBe(`hello ${provider}`)
+      expect(conversation.recordToMessageId.get(0)).toBe(0)
+    },
+  )
 
   it('degrades to an empty conversation for unparseable sessions', () => {
     expect(parseHubConversation('claude', []).messages).toEqual([])

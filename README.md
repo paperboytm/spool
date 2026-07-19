@@ -4,7 +4,7 @@ Publish, discover, and continue agent sessions.
 
 Spool turns work done with coding agents into durable web pages that other people can understand and resume. An author shares a real Session—not a screenshot or reconstructed recap—and readers can move from Summary to conversation, tool activity, files, and diff before continuing the work in their own agent.
 
-> **Early stage.** Link-only sharing and native Resume work today for Claude Code and Codex CLI. Public Profiles and Discovery are the next active product surface. Feedback is welcome through [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
+> **Early stage.** Link-only sharing works for Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Native Resume currently works for Claude Code and Codex CLI. Feedback is welcome through [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
 ## Install
 
@@ -24,7 +24,7 @@ npm install -g @spool-lab/cli
 
 ## Share a Session
 
-From the desktop app, open a Claude Code or Codex CLI Session and choose **Share session**.
+From the desktop app, open an indexed Session and choose **Share session**.
 
 From a terminal:
 
@@ -36,7 +36,7 @@ spool share <session-uuid>
 
 Spool scans the selected Session for sensitive values, prepares an optional Summary, publishes the records to the Hub, and returns a durable URL.
 
-A reader can open that URL without installing Spool. To continue the work locally:
+A reader can open that URL without installing Spool. Claude Code and Codex CLI shares can also be continued locally:
 
 ```bash
 spool resume <session-url>
@@ -56,9 +56,9 @@ Nothing is published automatically. A new share is Link-only; public visibility 
 
 ## What Spool Includes
 
-- **Session publishing** — share Claude Code and Codex CLI Sessions from Desktop or CLI
+- **Session publishing** — share Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions from Desktop or CLI
 - **Readable Session pages** — Summary, conversation, tool activity, touched files, diff, and record deep links
-- **Native continuation** — materialize a Shared Session locally and continue it in its original agent format
+- **Native continuation** — materialize Claude Code and Codex CLI shares locally and continue them in their original agent format
 - **Sensitive-data checks** — detect likely credentials, tokens, personal data, and local paths before sharing
 - **Local preparation** — collect and organize Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions before deciding what to share
 - **Agent access** — use the bundled Spool skill or JSON CLI output from any shell-capable agent

@@ -1,6 +1,8 @@
 // Pure page logic for the v2 session reader — everything here is
 // string-in/value-out so the fallback chains and deep links test in node.
 
+import { isSessionProvider, type SessionProvider } from '@spool-lab/session-kit'
+
 import type { HubSessionMeta } from './hub-api'
 
 export interface WorkspaceCardDisplay {
@@ -80,8 +82,10 @@ export function repositoryUrlForRemote(remote: string): string | null {
   }
 }
 
-export function providerOf(sid: string): 'claude' | 'codex' {
-  return sid.startsWith('codex_') ? 'codex' : 'claude'
+export function providerOf(sid: string): SessionProvider {
+  const provider = sid.slice(0, sid.indexOf('_'))
+  if (!isSessionProvider(provider)) throw new Error(`Unsupported session provider in ${sid}`)
+  return provider
 }
 
 export function authorLabel(meta: HubSessionMeta): string {

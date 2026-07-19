@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 
-import { sequenceRoot } from '@spool-lab/session-kit'
+import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
@@ -246,6 +246,7 @@ function shareDeps(
       cwd: workspaceRoot,
       log: (message: string) => logs.push(message),
       error: (message: string) => errors.push(message),
+      copyToClipboard: () => false,
       resolveTarget: () => ({
         provider: 'claude' as const,
         sessionUuid: SESSION_UUID,
@@ -257,6 +258,75 @@ function shareDeps(
 }
 
 describe('spool share local Agent Summary flow', () => {
+  it('confirms the Link-only URL and copies it in an interactive terminal', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-share-complete-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-share-complete-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    let copied = ''
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false },
+      {
+        ...share.deps,
+        ui: interactiveUi({ events }),
+        copyToClipboard: async (text: string) => {
+          copied = text
+          return true
+        },
+      },
+    )
+
+    const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
+    expect(exit).toBe(0)
+    expect(copied).toBe(url)
+    expect(events).toContain(`note:Link-only URL:${url}`)
+    expect(events).toContain('success:Session shared as Link-only. Link copied to clipboard.')
+    expect(events.indexOf(`note:Link-only URL:${url}`)).toBeLessThan(
+      events.indexOf('success:Session shared as Link-only. Link copied to clipboard.'),
+    )
+    expect(events).toContain(
+      'info:Keep this Session Link-only, or Publish it separately to show it on your Profile and in Discovery.',
+    )
+  })
+
+  it('keeps a completed share successful when clipboard access is unavailable', async () => {
+    for (const copyToClipboard of [
+      async () => false,
+      async () => {
+        throw new Error('clipboard unavailable')
+      },
+    ]) {
+      const hub = makeHub()
+      const workspace = mkdtempSync(join(tmpdir(), 'spool-share-copy-fallback-'))
+      const home = mkdtempSync(join(tmpdir(), 'spool-share-copy-fallback-home-'))
+      const filePath = writeFixtureSession(workspace)
+      const share = shareDeps(hub, workspace, filePath, home)
+      const events: string[] = []
+
+      const exit = await handleShareCommand(
+        undefined,
+        { agentSummary: false },
+        {
+          ...share.deps,
+          ui: interactiveUi({ events }),
+          copyToClipboard,
+        },
+      )
+
+      const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
+      expect(exit).toBe(0)
+      expect(events).toContain(`note:Link-only URL:${url}`)
+      expect(events).toContain('success:Session shared as Link-only.')
+      expect(events).toContain(
+        'info:Could not copy automatically. Copy the Link-only URL above to share it.',
+      )
+    }
+  })
+
   it('uploads first, detects installed Agents, then generates and uploads the Summary', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-flow-'))
@@ -295,7 +365,7 @@ describe('spool share local Agent Summary flow', () => {
     expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
       '## Outcome\n\nThe rename is ready.',
     )
-    expect(events.findIndex((event) => event.startsWith('note:Shared session:'))).toBeLessThan(
+    expect(events.findIndex((event) => event.startsWith('note:Link-only URL:'))).toBeLessThan(
       events.findIndex((event) => event.startsWith('confirm:')),
     )
     expect(events).toContain('select:Which local Agent should generate the Summary?')
@@ -386,6 +456,86 @@ describe('spool share local Agent Summary flow', () => {
 })
 
 describe('spool share → spool resume round trip', () => {
+  it.each(['gemini', 'opencode', 'pi'] as const)(
+    'shares indexed %s sessions through portable records',
+    async (provider) => {
+      const hub = makeHub()
+      const workspace = mkdtempSync(join(tmpdir(), `spool-${provider}-share-`))
+      const home = mkdtempSync(join(tmpdir(), `spool-${provider}-share-home-`))
+      const sessionUuid = provider === 'opencode' ? 'ses_1234567890abcdef' : SESSION_UUID
+      const jsonl = serializePortableSession({
+        source: provider,
+        sessionUuid,
+        filePath: `/virtual/${provider}`,
+        title: `Share ${provider}`,
+        cwd: workspace,
+        model: '',
+        startedAt: '2026-07-19T00:00:00.000Z',
+        endedAt: '2026-07-19T00:00:01.000Z',
+        messages: [
+          {
+            uuid: 'portable-user',
+            parentUuid: null,
+            role: 'user',
+            contentText: `hello from ${provider}`,
+            timestamp: '2026-07-19T00:00:00.000Z',
+            isSidechain: false,
+            toolNames: [],
+            seq: 0,
+          },
+        ],
+      })
+      const logs: string[] = []
+      const errors: string[] = []
+
+      const exit = await handleShareCommand(
+        sessionUuid,
+        { agentSummary: false },
+        {
+          fetch: hub.fetchImpl,
+          homeDir: home,
+          env: { SPOOL_HUB_URL: HUB_URL, SPOOL_HUB_TOKEN: 'test-token' } as NodeJS.ProcessEnv,
+          cwd: workspace,
+          log: (message: string) => logs.push(message),
+          error: (message: string) => errors.push(message),
+          resolveTarget: () => ({
+            provider,
+            sessionUuid,
+            filePath: `/virtual/${provider}`,
+            cwd: workspace,
+            jsonl,
+          }),
+        },
+      )
+
+      expect(exit).toBe(0)
+      expect(errors).toEqual([])
+      expect(hub.sessions.get(`${provider}_${sessionUuid}`)).toBeDefined()
+      expect(logs.join('\n')).toContain(`${HUB_URL}/session/${provider}_${sessionUuid}`)
+    },
+  )
+
+  it('explains that portable shares are readable but not natively resumable', async () => {
+    const errors: string[] = []
+    const exit = await handleResumeCommand(
+      `pi_${SESSION_UUID}`,
+      {},
+      {
+        fetch: async () => {
+          throw new Error('must not fetch')
+        },
+        env: {} as NodeJS.ProcessEnv,
+        log: () => {},
+        error: (message: string) => errors.push(message),
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(errors.join('\n')).toContain(
+      'pi sessions can be shared and read, but native Resume is not supported yet.',
+    )
+  })
+
   it('shares through the 3-step handshake and resumes into a fresh local session', async () => {
     const hub = makeHub()
     const authorWs = mkdtempSync(join(tmpdir(), 'spool-author-'))
