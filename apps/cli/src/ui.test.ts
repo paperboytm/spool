@@ -33,4 +33,33 @@ describe('createClackUi', () => {
     expect(stderr).toBe('Example failure\n')
     expect(stdout + stderr).not.toContain('\u001B')
   })
+
+  it('loads the next autocomplete page when the user reaches the end', async () => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const ui = createClackUi({ input, output, interactive: true })
+    let loadCalls = 0
+
+    const selected = ui.autocomplete({
+      message: 'Select a Session',
+      choices: [1, 2, 3, 4, 5].map((n) => ({ value: `s${n}`, label: `Session ${n}` })),
+      loadMore: () => {
+        loadCalls += 1
+        return {
+          choices: [6, 7, 8, 9, 10].map((n) => ({
+            value: `s${n}`,
+            label: `Session ${n}`,
+          })),
+          hasMore: false,
+        }
+      },
+      maxItems: 5,
+    })
+
+    input.write('\u001B[B'.repeat(5))
+    input.write('\r')
+
+    await expect(selected).resolves.toBe('s6')
+    expect(loadCalls).toBe(1)
+  })
 })

@@ -9,6 +9,11 @@ export interface CliSelectOption<Value extends string> {
   hint?: string
 }
 
+export interface CliChoicePage<Value extends string> {
+  choices: CliSelectOption<Value>[]
+  hasMore: boolean
+}
+
 export interface CliSpinner {
   start(message?: string): void
   message(message?: string): void
@@ -38,6 +43,13 @@ export interface CliUi {
     choices: CliSelectOption<Value>[]
     initialValue?: Value
   }): Promise<Value | null>
+  autocomplete<Value extends string>(options: {
+    message: string
+    choices: CliSelectOption<Value>[]
+    loadMore?: () => CliChoicePage<Value>
+    placeholder?: string
+    maxItems?: number
+  }): Promise<Value | null>
   spinner(): CliSpinner
 }
 
@@ -46,6 +58,12 @@ export interface ClackUiOptions {
   output?: Writable
   errorOutput?: Writable
   interactive?: boolean
+}
+
+interface ClackAutocompleteState<Option> {
+  readonly cursor: number
+  readonly userInput: string
+  filteredOptions: Option[]
 }
 
 export function createClackUi(options: ClackUiOptions = {}): CliUi {
@@ -94,8 +112,80 @@ export function createClackUi(options: ClackUiOptions = {}): CliUi {
       })
       return clack.isCancel(result) ? null : result
     },
+    autocomplete: async ({ message, choices, loadMore, placeholder, maxItems }) => {
+      if (!interactive) return null
+      type Value = (typeof choices)[number]['value']
+      type Option = ClackOption<Value>
+      let clackOptions = toClackOptions(choices)
+      let hasMore = loadMore !== undefined
+      let lastSearch = ''
+
+      const appendPage = (): void => {
+        if (!loadMore || !hasMore) return
+        const page = loadMore()
+        clackOptions = [...clackOptions, ...toClackOptions(page.choices)]
+        hasMore = page.hasMore
+      }
+      const optionSource = loadMore
+        ? function (this: ClackAutocompleteState<Option>): Option[] {
+            const search = this.userInput
+            let filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+            const searchChanged = search !== lastSearch
+            lastSearch = search
+
+            if (searchChanged && search !== '') {
+              while (hasMore && filtered.length < (maxItems ?? 10)) {
+                appendPage()
+                filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+              }
+            } else if (
+              hasMore &&
+              filtered.length > 0 &&
+              this.cursor >= Math.max(filtered.length - 2, 0)
+            ) {
+              appendPage()
+              filtered = clackOptions.filter((option) => autocompleteMatches(search, option))
+            }
+
+            this.filteredOptions = filtered
+            return clackOptions
+          }
+        : clackOptions
+
+      const result = await clack.autocomplete<Value>({
+        message,
+        options: optionSource,
+        ...(placeholder === undefined ? {} : { placeholder }),
+        ...(maxItems === undefined ? {} : { maxItems }),
+        ...common,
+      })
+      return clack.isCancel(result) ? null : result
+    },
     spinner: () => clack.spinner(common),
   }
+}
+
+function toClackOptions<Value extends string>(
+  choices: CliSelectOption<Value>[],
+): ClackOption<Value>[] {
+  return choices.map(({ value, label, hint }) => ({
+    value,
+    label,
+    ...(hint === undefined ? {} : { hint }),
+  })) as ClackOption<Value>[]
+}
+
+function autocompleteMatches<Value extends string>(
+  search: string,
+  option: ClackOption<Value>,
+): boolean {
+  if (search === '') return true
+  const needle = search.toLowerCase()
+  return [option.label, option.hint, option.value].some((part) =>
+    String(part ?? '')
+      .toLowerCase()
+      .includes(needle),
+  )
 }
 
 /** Non-interactive adapter for exported command handlers and unit tests.
@@ -117,6 +207,7 @@ export function createTextUi(
     cancel: error,
     confirm: async () => null,
     select: async () => null,
+    autocomplete: async () => null,
     spinner: () => textSpinner(log, error),
   }
 }
