@@ -2,6 +2,8 @@
 // editable name in one row, save-on-blur, tiny text-link actions
 // beneath. Mirrors the desktop SettingsAccount → ProfileEditor.
 
+import { IconButton } from '@spool-lab/ui'
+import { Camera, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { deleteAvatar, type MeResponse, updateDisplayName, uploadAvatar } from '../lib/api'
@@ -104,43 +106,20 @@ export function ProfileEditor({ me, onChanged }: Props) {
               <span className="sw-avatar-initial">{initial}</span>
             )}
             <span className="sw-avatar-overlay" aria-hidden>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
+              <Camera size={16} strokeWidth={1.75} />
             </span>
           </button>
           {hasCustom && (
-            <button
+            <IconButton
+              size="sm"
               type="button"
               onClick={() => void handleRemoveCustom()}
               disabled={busy !== 'idle'}
               aria-label="Remove photo"
               className="sw-avatar-remove"
             >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
+              <X size={11} strokeWidth={2.4} aria-hidden="true" />
+            </IconButton>
           )}
         </div>
 

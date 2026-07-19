@@ -1,29 +1,52 @@
-import { Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { IconButton, IconLink, NavItem, Wordmark } from '@spool-lab/ui'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState, type MouseEvent } from 'react'
 
 import { readThemeAttr, writeThemeAttr } from '../../lib/theme'
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+
   return (
     <div className="page-shell">
       <header className="top">
         <div className="wrap top-inner">
           <Link to="/" className="brand">
             <SpoolMark />
-            Spool<span className="dot">.</span>
+            <Wordmark />
           </Link>
           <nav className="links">
-            <Link to="/explore" search={{ sort: 'recommended' }}>
+            <NavItem
+              href="/explore?sort=recommended"
+              onClick={(event) =>
+                routeInApp(event, () =>
+                  navigate({ to: '/explore', search: { sort: 'recommended' } }),
+                )
+              }
+            >
               Explore
-            </Link>
-            <Link to="/docs/$" params={{ _splat: 'installation' }}>
+            </NavItem>
+            <NavItem
+              href="/docs/installation"
+              onClick={(event) =>
+                routeInApp(event, () =>
+                  navigate({ to: '/docs/$', params: { _splat: 'installation' } }),
+                )
+              }
+            >
               Docs
-            </Link>
-            <Link to="/blog">Blog</Link>
+            </NavItem>
+            <NavItem
+              className="nav-hideable"
+              href="/blog"
+              onClick={(event) => routeInApp(event, () => navigate({ to: '/blog' }))}
+            >
+              Blog
+            </NavItem>
             <span className="sep" />
-            <a href="https://github.com/spool-lab/spool" className="iconbtn" aria-label="GitHub">
+            <IconLink href="https://github.com/spool-lab/spool" size="sm" aria-label="GitHub">
               <GhIcon />
-            </a>
+            </IconLink>
             <ThemeToggle />
           </nav>
         </div>
@@ -35,8 +58,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         <div className="foot-left">
           <div className="foot-prods">
             <Link to="/" className="foot-prod">
-              <strong>Spool</strong>
-              <span style={{ color: 'var(--accent)' }}>.</span>
+              <Wordmark />
             </Link>
           </div>
           <div>
@@ -63,6 +85,21 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       </footer>
     </div>
   )
+}
+
+function routeInApp(event: MouseEvent<HTMLAnchorElement>, navigate: () => void | Promise<void>) {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return
+  }
+  event.preventDefault()
+  void navigate()
 }
 
 function SpoolMark() {
@@ -107,7 +144,7 @@ function ThemeToggle() {
     setIsDark(!isDark)
   }
   return (
-    <button className="iconbtn" onClick={onClick} aria-label="Toggle theme" type="button">
+    <IconButton size="sm" onClick={onClick} aria-label="Toggle theme" type="button">
       {isDark ? (
         <svg
           width="14"
@@ -136,6 +173,6 @@ function ThemeToggle() {
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
       )}
-    </button>
+    </IconButton>
   )
 }

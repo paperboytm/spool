@@ -13,6 +13,7 @@ import {
 import { safeNext } from '../../../../src/auth/next'
 import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
 import { getProvider } from '../../../../src/auth/providers/registry'
+import { jsonError } from '../../../../src/errors'
 import { publicBaseUrl } from '../../../../src/public-url'
 
 type Env = {
@@ -36,25 +37,29 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     return new Response('Not found', { status: 404 })
   }
 
-  const url = new URL(ctx.request.url)
-  const next = safeNext(url.searchParams.get('next'))
-  const state = randomUrlSafe(STATE_BYTES)
-  const verifier = randomUrlSafe(PKCE_VERIFIER_BYTES)
-  const challenge = await pkceChallenge(verifier)
+  try {
+    const url = new URL(ctx.request.url)
+    const next = safeNext(url.searchParams.get('next'))
+    const state = randomUrlSafe(STATE_BYTES)
+    const verifier = randomUrlSafe(PKCE_VERIFIER_BYTES)
+    const challenge = await pkceChallenge(verifier)
 
-  // redirect_uri MUST come from PUBLIC_BASE_URL, not the request's own
-  // origin: when dev runs through the web app's vite proxy the request
-  // arrives at the backend (8788) but the URI registered with the
-  // provider is the web app's origin (3002). Using ctx.request.url
-  // here causes a 400 redirect_uri_mismatch on every dev sign-in.
-  const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/${provider.id}/callback`
-  const authorizeUrl = provider.buildAuthRequestUrl(
-    { state, codeChallenge: challenge, redirectUri },
-    ctx.env,
-  )
+    // redirect_uri MUST come from PUBLIC_BASE_URL, not the request's own
+    // origin: when dev runs through the web app's vite proxy the request
+    // arrives at the backend (8788) but the URI registered with the
+    // provider is the web app's origin (3002). Using ctx.request.url
+    // here causes a 400 redirect_uri_mismatch on every dev sign-in.
+    const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/${provider.id}/callback`
+    const authorizeUrl = provider.buildAuthRequestUrl(
+      { state, codeChallenge: challenge, redirectUri },
+      ctx.env,
+    )
 
-  const headers = new Headers({ Location: authorizeUrl })
-  headers.append('Set-Cookie', buildOauthCookie(OAUTH_STATE_COOKIE, `${state}|${next}`))
-  headers.append('Set-Cookie', buildOauthCookie(OAUTH_VERIFIER_COOKIE, verifier))
-  return new Response(null, { status: 302, headers })
+    const headers = new Headers({ Location: authorizeUrl })
+    headers.append('Set-Cookie', buildOauthCookie(OAUTH_STATE_COOKIE, `${state}|${next}`))
+    headers.append('Set-Cookie', buildOauthCookie(OAUTH_VERIFIER_COOKIE, verifier))
+    return new Response(null, { status: 302, headers })
+  } catch (error) {
+    return jsonError(error)
+  }
 }

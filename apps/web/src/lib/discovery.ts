@@ -80,6 +80,10 @@ function isDiscoveryResponse(value: unknown): value is DiscoverySessionsResponse
 }
 
 async function responseDetail(response: Response): Promise<string> {
+  if (response.status >= 500) {
+    return 'Explore is temporarily unavailable. Try again in a moment.'
+  }
+
   const body = (await response.json().catch(() => null)) as { detail?: unknown } | null
   return typeof body?.detail === 'string' && body.detail.trim() !== ''
     ? body.detail

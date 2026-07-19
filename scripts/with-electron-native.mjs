@@ -21,6 +21,23 @@ function run(program, programArgs, cwd = repoRoot) {
   })
 }
 
+function electronModulesAbi() {
+  const result = spawnSync(
+    pnpmBin,
+    ['--filter', '@spool/app', 'exec', 'electron', '-p', 'process.versions.modules'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    },
+  )
+  const modules = result.stdout?.trim()
+  if (result.status !== 0 || !modules || !/^\d+$/.test(modules)) {
+    throw new Error('could not determine Electron NODE_MODULE_VERSION')
+  }
+  return modules
+}
+
 let commandStatus = 1
 try {
   const electronRebuild = run(pnpmBin, [
@@ -34,8 +51,16 @@ try {
   ])
 
   if (electronRebuild.status === 0) {
-    const result = run(command, args, process.cwd())
-    commandStatus = result.status ?? 1
+    const cache = run(process.execPath, [
+      join(scriptDir, 'cache-better-sqlite3-native.mjs'),
+      electronModulesAbi(),
+    ])
+    if (cache.status === 0) {
+      const result = run(command, args, process.cwd())
+      commandStatus = result.status ?? 1
+    } else {
+      commandStatus = cache.status ?? 1
+    }
   } else {
     commandStatus = electronRebuild.status ?? 1
   }

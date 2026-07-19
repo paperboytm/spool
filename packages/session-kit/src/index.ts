@@ -13,6 +13,17 @@ export { deriveView } from './view.js'
 export { composeSessionDiff } from './diff.js'
 
 export type {
+  DiscoveryAuthor,
+  DiscoveryEngagementRequest,
+  DiscoveryEngagementResponse,
+  DiscoveryEvidence,
+  DiscoveryLineage,
+  DiscoverySessionItem,
+  DiscoverySessionsResponse,
+  DiscoverySort,
+} from './discovery.js'
+
+export type {
   CanonicalizeOptions,
   CanonicalRecord,
   DiffHunk,

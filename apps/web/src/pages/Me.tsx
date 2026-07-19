@@ -1,6 +1,7 @@
+import { Avatar, Button, IconButton, SectionLabel } from '@spool-lab/ui'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { Avatar, Footer, Header, Icon, Page } from '../components/Chrome'
+import { Footer, Header, Icon, Page } from '../components/Chrome'
 import { ProfileEditor } from '../components/ProfileEditor'
 import {
   cancelAccountDeletion,
@@ -175,14 +176,9 @@ function HandleClaim({ onClaimed }: { onClaimed: (handle: string) => void }) {
           />
         </div>
       </label>
-      <button
-        type="submit"
-        className="sw-btn sw-btn-primary"
-        disabled={submitDisabled}
-        style={{ padding: '9px 18px' }}
-      >
+      <Button type="submit" variant="accent" disabled={submitDisabled}>
         {busy ? 'Claiming…' : 'Claim'}
-      </button>
+      </Button>
       {status && (
         <p className={`sw-claim-status ${status.tone}`} role="status">
           {status.icon === 'spin' ? (
@@ -357,7 +353,8 @@ function RowMenu({
 
   return (
     <div ref={rootRef} className="sw-rowmenu">
-      <button
+      <IconButton
+        size="sm"
         type="button"
         className="sw-rowmenu-trigger"
         onClick={() => {
@@ -370,13 +367,15 @@ function RowMenu({
         aria-expanded={open}
       >
         <Icon name="more-h" size={14} />
-      </button>
+      </IconButton>
       {open && (
         <div role="menu" className="sw-rowmenu-pop">
           {/* Copy keeps the menu open so the "Copied" confirmation is
            *  visible where the click happened; the parent resets the
            *  copied flag after 1.5s. */}
-          <button
+          <Button
+            size="sm"
+            variant="ghost"
             type="button"
             role="menuitem"
             className={`sw-rowmenu-item${copied ? ' ok' : ''}`}
@@ -384,10 +383,12 @@ function RowMenu({
           >
             <Icon name={copied ? 'check' : 'link'} size={13} />
             {copied ? 'Copied' : 'Copy link'}
-          </button>
+          </Button>
           {/* Profile listing is optional; both states remain public and discoverable. */}
           {(listed || canList) && (
-            <button
+            <Button
+              size="sm"
+              variant="ghost"
               type="button"
               role="menuitem"
               className="sw-rowmenu-item"
@@ -396,9 +397,11 @@ function RowMenu({
             >
               <Icon name={listed ? 'link-2' : 'globe'} size={13} />
               {listed ? 'Remove from profile' : 'List on profile'}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            size="sm"
+            variant="ghost"
             type="button"
             role="menuitem"
             className="sw-rowmenu-item danger"
@@ -410,7 +413,7 @@ function RowMenu({
           >
             <Icon name="eye-off" size={13} />
             Unpublish
-          </button>
+          </Button>
           {err && <p className="sw-rowmenu-err">{err}</p>}
         </div>
       )}
@@ -534,27 +537,17 @@ function DeleteAccountModal({
         </p>
       )}
       <div className="sw-modal-actions">
-        <button type="button" className="sw-btn sw-btn-ghost" onClick={onClose} disabled={busy}>
+        <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
           Cancel
-        </button>
+        </Button>
         {pending ? (
-          <button
-            type="button"
-            className="sw-btn sw-btn-primary"
-            onClick={onCancel}
-            disabled={busy}
-          >
+          <Button type="button" variant="accent" onClick={onCancel} disabled={busy}>
             {busy ? 'Cancelling…' : 'Cancel deletion'}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            className="sw-btn sw-btn-danger"
-            onClick={onSchedule}
-            disabled={busy}
-          >
+          <Button type="button" variant="outline" onClick={onSchedule} disabled={busy}>
             {busy ? 'Scheduling…' : 'Yes, delete account'}
-          </button>
+          </Button>
         )}
       </div>
     </ModalShell>
@@ -588,12 +581,12 @@ function UnpublishConfirmModal({
         conversation again, republish from the desktop app — you'll get a new URL.
       </p>
       <div className="sw-modal-actions">
-        <button type="button" className="sw-btn sw-btn-ghost" onClick={onClose} disabled={busy}>
+        <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
           Cancel
-        </button>
-        <button type="button" className="sw-btn sw-btn-danger" onClick={onConfirm} disabled={busy}>
+        </Button>
+        <Button type="button" variant="outline" onClick={onConfirm} disabled={busy}>
           {busy ? 'Unpublishing…' : 'Yes, unpublish permanently'}
-        </button>
+        </Button>
       </div>
     </ModalShell>
   )
@@ -752,14 +745,14 @@ export function Me() {
             </div>
             <h1 className="sw-title">Something went wrong</h1>
             <p className="sw-lede">We couldn’t load your account.</p>
-            <button
+            <Button
               type="button"
-              className="sw-btn sw-btn-ghost"
+              variant="outline"
               style={{ marginTop: 20 }}
               onClick={() => void load()}
             >
               Try again
-            </button>
+            </Button>
           </div>
         </main>
         <Footer />
@@ -831,9 +824,9 @@ export function Me() {
             <span>
               <strong>Account deletion is pending.</strong>{' '}
               {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null}{' '}
-              <button type="button" className="sw-banner-action" onClick={openDelete}>
+              <Button type="button" size="sm" variant="ghost" onClick={openDelete}>
                 Cancel deletion
-              </button>{' '}
+              </Button>{' '}
               to restore access.
             </span>
           </div>
@@ -845,7 +838,7 @@ export function Me() {
             // ProfileEditor entirely so the surface communicates that
             // changes won't survive the grace window.
             <div className="sw-identity">
-              <Avatar src={me.avatar_url} name={me.display_name} size={54} />
+              <Avatar src={me.avatar_url} name={me.display_name} alt="" size="lg" />
               <div className="body">
                 <h1 className="name">{me.display_name}</h1>
                 {me.handle && (
@@ -854,18 +847,18 @@ export function Me() {
                   </p>
                 )}
               </div>
-              <button type="button" className="sw-btn sw-btn-ghost sw-btn-sm" onClick={onSignOut}>
+              <Button type="button" size="sm" variant="outline" onClick={onSignOut}>
                 Sign out
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="sw-me-header">
               <div className="sw-me-header-main">
                 <ProfileEditor me={me} onChanged={refreshMe} />
               </div>
-              <button type="button" className="sw-btn sw-btn-ghost sw-btn-sm" onClick={onSignOut}>
+              <Button type="button" size="sm" variant="outline" onClick={onSignOut}>
                 Sign out
-              </button>
+              </Button>
             </div>
           )}
 
@@ -881,12 +874,14 @@ export function Me() {
           )}
 
           <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
-          <h2 className="sw-section-label" style={{ marginBottom: 14 }}>
+          <SectionLabel
+            className="sw-section-label"
+            role="heading"
+            aria-level={2}
+            count={!pending && liveShares.length > 0 ? liveShares.length : undefined}
+          >
             Your shares
-            {!pending && liveShares.length > 0 && (
-              <span className="count">{liveShares.length}</span>
-            )}
-          </h2>
+          </SectionLabel>
           {pending ? (
             <p className="sw-empty">
               Hidden while deletion is pending. Cancel deletion to restore the list.
@@ -923,7 +918,9 @@ export function Me() {
                *  tab. The section only exists when there's history. */}
               {revokedShares.length > 0 && (
                 <div className="sw-collapse">
-                  <button
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     type="button"
                     className="sw-collapse-head"
                     onClick={() => setShowRevoked((v) => !v)}
@@ -933,7 +930,7 @@ export function Me() {
                     <span className={`sw-collapse-chev${showRevoked ? ' open' : ''}`} aria-hidden>
                       <Icon name="arrow-right" size={11} />
                     </span>
-                  </button>
+                  </Button>
                   {showRevoked && (
                     <ul className="sw-list">
                       {revokedShares.map((row) => (
@@ -958,9 +955,15 @@ export function Me() {
               <Icon name="lock" size={11} />
             </span>
             <span>Signed in as {me.email}</span>
-            <button type="button" className="sw-link-quiet" onClick={openDelete}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="sw-link-quiet"
+              onClick={openDelete}
+            >
               {pending ? 'Cancel deletion' : 'Delete account'}
-            </button>
+            </Button>
           </p>
           {state.unpublishErr && (
             <p className="sw-unpublish-err" role="alert">

@@ -2,7 +2,7 @@ import type { DiscoverySessionItem } from '@spool-lab/session-kit'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { DiscoveryRow } from './Explore'
+import { DiscoveryRow, ExplorePage } from './Explore'
 
 const item: DiscoverySessionItem = {
   sid: 'claude_abc12345',
@@ -43,5 +43,22 @@ describe('DiscoveryRow', () => {
     expect(html).toContain('−63')
     expect(html).toContain('/session/codex_source123')
     expect(html).toContain('Continued from source Session')
+  })
+})
+
+describe('Explore controls', () => {
+  it('exposes pressed filters and associates sort tabs with the result panel', () => {
+    const html = renderToStaticMarkup(
+      <ExplorePage search={{ sort: 'recommended' }} onSearchChange={() => {}} />,
+    )
+
+    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>All agents<\/button>/)
+    expect(html).toContain('aria-controls="explore-results"')
+    expect(html).toContain('id="explore-results"')
+    expect(html).toContain('role="tabpanel"')
+    for (const label of ['Home', 'Explore', 'Docs', 'Account']) {
+      expect(html).toContain(`aria-label="${label}"`)
+    }
+    expect(html).not.toContain('Share a Session')
   })
 })

@@ -32,5 +32,6 @@ test('clicking a sidebar project highlights the row', async () => {
 
   const firstRow = window.locator('[data-testid="sidebar-project-row"]').first()
   await firstRow.click()
-  await expect(firstRow).toHaveClass(/bg-warm-surface2/)
+  await expect(firstRow).toHaveAttribute('data-active', 'true')
+  await expect(firstRow).toHaveAttribute('aria-current', 'page')
 })

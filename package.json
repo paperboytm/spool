@@ -34,7 +34,7 @@
     "clean": "vp run -r clean",
     "check:phantom-independence": "scripts/phantom-independence-check.sh",
     "dev:install:mac": "scripts/dev-install-mac.sh",
-    "spool": "node apps/cli/bin/spool.js",
+    "spool": "node scripts/spool-local.mjs",
     "prepare": "vp config"
   },
   "devDependencies": {

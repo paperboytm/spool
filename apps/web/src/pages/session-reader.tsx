@@ -181,7 +181,7 @@ export function SessionReader({ sid }: { sid: string }) {
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
             <div className="mb-6 flex items-center gap-3">
-              <span className="rounded border border-[#C95A4F] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[#C95A4F] uppercase [[data-theme=dark]_&]:border-[#D67259] [[data-theme=dark]_&]:text-[#D67259]">
+              <span className="rounded border border-[var(--sp-error)] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[var(--sp-error)] uppercase">
                 Session unavailable
               </span>
               <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />

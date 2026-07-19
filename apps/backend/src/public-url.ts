@@ -3,12 +3,16 @@
 //   - OAuth start / callback to compute the registered redirect_uri
 //   - publish to compute the share URL returned in the response
 //
-// Dev runs the OAuth callback through the web app's vite proxy (port 3002),
-// so the redirect_uri the backend sends to Google must be the web app's
-// origin even though wrangler itself listens on 8788. The PUBLIC_BASE_URL
-// env var pins that origin; prod inherits the spool.pro default.
+// Dev runs the OAuth callback through the web app's Vite proxy (port 3002),
+// so development defaults to that origin even though Wrangler listens on
+// 8788. PUBLIC_BASE_URL can override any environment; production inherits
+// the spool.pro default.
 export const DEFAULT_PUBLIC_BASE_URL = 'https://spool.pro'
+export const LOCAL_PUBLIC_BASE_URL = 'http://localhost:3002'
 
-export function publicBaseUrl(env: { PUBLIC_BASE_URL?: string }): string {
-  return env.PUBLIC_BASE_URL ?? DEFAULT_PUBLIC_BASE_URL
+export function publicBaseUrl(env: { PUBLIC_BASE_URL?: string; ENV?: string }): string {
+  return (
+    env.PUBLIC_BASE_URL ??
+    (env.ENV === 'development' ? LOCAL_PUBLIC_BASE_URL : DEFAULT_PUBLIC_BASE_URL)
+  )
 }

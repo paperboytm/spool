@@ -1,8 +1,9 @@
 import { existsSync, statSync } from 'node:fs'
 
-import Database from 'better-sqlite3'
+import type Database from 'better-sqlite3'
 
 import { DB_PATH } from '../../db/db.js'
+import { openDatabase } from '../../db/native-binding.js'
 import { probeSqlite } from '../preflight.js'
 import type { Check, CheckResult, FixDescriptor } from '../types.js'
 
@@ -186,7 +187,7 @@ function withReadonlyDb(
     return { id, category: 'db', title, severity: 'warn', message: 'skipped — see `native.sqlite`' }
   }
   if (!existsSync(DB_PATH)) return skipped(id, title)
-  const db = new Database(DB_PATH, { readonly: true, fileMustExist: true })
+  const db = openDatabase(DB_PATH, { readonly: true, fileMustExist: true })
   try {
     const out = fn(db)
     return { id, category: 'db', title, ...out }
@@ -208,7 +209,7 @@ function skipped(id: string, title: string): CheckResult {
 function applyForeignKeyCleanup(
   violations: Array<{ table: string; rowid: number; parent: string; fkid: number }>,
 ): { ok: boolean; message: string } {
-  const db = new Database(DB_PATH)
+  const db = openDatabase(DB_PATH)
   try {
     db.pragma('foreign_keys = OFF')
     const grouped = new Map<string, number[]>()
@@ -231,7 +232,7 @@ function applyForeignKeyCleanup(
 }
 
 function applyWalCheckpoint(): { ok: boolean; message: string } {
-  const db = new Database(DB_PATH)
+  const db = openDatabase(DB_PATH)
   try {
     const result = db.pragma('wal_checkpoint(TRUNCATE)') as Array<{
       busy: number
@@ -252,7 +253,7 @@ function applyWalCheckpoint(): { ok: boolean; message: string } {
 }
 
 function applyVacuum(): { ok: boolean; message: string } {
-  const db = new Database(DB_PATH)
+  const db = openDatabase(DB_PATH)
   try {
     const before = statSync(DB_PATH).size
     db.exec('VACUUM')

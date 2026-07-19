@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs'
 
-import Database from 'better-sqlite3'
-
 import { DB_PATH, LATEST_SCHEMA_VERSION, getDB } from '../../db/db.js'
+import { openDatabase } from '../../db/native-binding.js'
 import { probeSqlite } from '../preflight.js'
 import type { Check, CheckResult } from '../types.js'
 
@@ -33,7 +32,7 @@ export const versionChecks: Check[] = [
         }
       }
 
-      const db = new Database(DB_PATH, { readonly: true, fileMustExist: true })
+      const db = openDatabase(DB_PATH, { readonly: true, fileMustExist: true })
       try {
         const row = db.pragma('user_version') as Array<{ user_version: number }>
         const current = row[0]?.user_version ?? 0

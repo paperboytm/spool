@@ -1,3 +1,4 @@
+import { IconButton } from '@spool-lab/ui'
 import { PanelLeft } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -116,17 +117,15 @@ function SidebarToggleButton({
   noDragStyle: CSSProperties
 }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      aria-label={ariaLabel}
       data-testid="sidebar-toggle"
       onClick={onToggle}
       title={title}
-      aria-label={ariaLabel}
       aria-pressed={pressed}
-      className="text-warm-faint dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 flex-none items-center justify-center rounded transition-colors duration-75"
       style={noDragStyle}
     >
       <PanelLeft size={13} strokeWidth={1.75} />
-    </button>
+    </IconButton>
   )
 }

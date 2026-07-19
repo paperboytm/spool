@@ -87,8 +87,8 @@ export function DiffPane({
           >
             <span className="min-w-0 truncate font-mono tabular-nums">{file.path}</span>
             <span className="shrink-0 font-mono text-[11px] tabular-nums">
-              <span className="text-[#6BAF6B] dark:text-[#7DC07D]">+{file.adds}</span>{' '}
-              <span className="text-[#C95A4F] dark:text-[#D67259]">-{file.dels}</span>
+              <span className="text-[var(--sp-success)]">+{file.adds}</span>{' '}
+              <span className="text-[var(--sp-error)]">-{file.dels}</span>
             </span>
           </button>
         ))}
@@ -101,7 +101,7 @@ export function DiffPane({
         <p className="m-0 p-2 text-xs text-[var(--faint)]">Computing diff from records…</p>
       )}
       {active?.state === 'error' && (
-        <p className="m-0 p-2 text-xs text-[#C95A4F] dark:text-[#D67259]">
+        <p className="m-0 p-2 text-xs text-[var(--sp-error)]">
           Could not reconstruct this file&apos;s diff from the shared records.
         </p>
       )}

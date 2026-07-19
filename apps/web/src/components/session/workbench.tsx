@@ -4,6 +4,7 @@ import {
   type ConversationMessage,
   type MessageListHandle,
 } from '@spool-lab/session-view'
+import { Avatar, Badge, Button, IconButton } from '@spool-lab/ui'
 import type { SpoolDocument } from '@spool/share-kit'
 import {
   TimelineBody,
@@ -20,7 +21,6 @@ import {
   GitBranch,
   GitCommitHorizontal,
   MessageSquareText,
-  UserRound,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -150,6 +150,7 @@ export function SessionWorkbench({
   const card = parseWorkspaceCard(meta.cardJson)
   const resume = resumeCommandFor(meta.sid)
   const providerLabel = provider === 'claude' ? 'Claude Code' : 'Codex CLI'
+  const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
     () => getUserPromptEntries(conversation.messages),
     [conversation.messages],
@@ -275,31 +276,20 @@ export function SessionWorkbench({
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-2 font-medium text-[var(--text)]">
-                {meta.author.avatarUrl ? (
-                  <img
-                    src={meta.author.avatarUrl}
-                    alt=""
-                    className="h-6 w-6 rounded-full border border-[var(--border)] object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card-2)]">
-                    <UserRound size={13} strokeWidth={1.7} aria-hidden="true" />
-                  </span>
-                )}
+                <Avatar src={meta.author.avatarUrl} name={avatarName} alt="" size="sm" />
                 {authorLabel(meta)}
               </span>
-              <span className="inline-flex items-center gap-2">
+              <Badge variant={provider === 'claude' ? 'source-claude' : 'source-codex'}>
                 <span
-                  className={`h-2 w-2 rounded-full ${
+                  className={`h-1.5 w-1.5 rounded-full ${
                     provider === 'claude'
-                      ? 'bg-[#C26A4E] [[data-theme=dark]_&]:bg-[#E89A7C]'
-                      : 'bg-[#4A9670] [[data-theme=dark]_&]:bg-[#7CC9A2]'
+                      ? 'bg-[var(--sp-source-claude)]'
+                      : 'bg-[var(--sp-source-codex)]'
                   }`}
                   aria-hidden="true"
                 />
                 {providerLabel}
-              </span>
+              </Badge>
               <span title={humanDateTime(meta.updatedAt)}>
                 Shared {relativeDate(meta.updatedAt)}
               </span>
@@ -315,16 +305,16 @@ export function SessionWorkbench({
           </div>
 
           <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
-            <div className="flex h-8 min-w-0" aria-label="Resume command">
+            <div className="flex h-8 min-w-0 gap-2" aria-label="Resume command">
               <code
-                className="flex h-8 min-w-0 flex-1 items-center truncate rounded-l-md border border-r-0 border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
+                className="flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
                 title={resume}
               >
                 {resume}
               </code>
-              <button
+              <IconButton
+                size="md"
                 type="button"
-                className="m-0 inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-r-md border border-[var(--border-strong)] bg-[var(--card)] p-0 text-[var(--muted)] transition-colors duration-[80ms] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                 title={copied ? 'Copied' : 'Copy resume command'}
                 aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
                 onClick={copy}
@@ -337,19 +327,20 @@ export function SessionWorkbench({
                 <span className="sr-only" aria-live="polite">
                   {copied ? 'Copied' : ''}
                 </span>
-              </button>
+              </IconButton>
             </div>
-            <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
-              Don&apos;t have the Spool CLI?{' '}
-              <button
+            <div className="mt-2 flex items-center justify-end gap-2 text-[11px] leading-4 text-[var(--muted)]">
+              <span>Don&apos;t have the Spool CLI?</span>
+              <Button
                 type="button"
-                className="m-0 cursor-pointer border-0 bg-transparent p-0 font-medium text-[var(--accent)] underline-offset-2 hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                size="sm"
+                variant="ghost"
                 aria-haspopup="dialog"
                 onClick={() => setShowCliInstall(true)}
               >
                 Install it
-              </button>
-            </p>
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -517,8 +508,8 @@ export function SessionWorkbench({
                     <span
                       className={`h-2 w-2 rounded-full ${
                         provider === 'claude'
-                          ? 'bg-[#C26A4E] [[data-theme=dark]_&]:bg-[#E89A7C]'
-                          : 'bg-[#4A9670] [[data-theme=dark]_&]:bg-[#7CC9A2]'
+                          ? 'bg-[var(--sp-source-claude)]'
+                          : 'bg-[var(--sp-source-codex)]'
                       }`}
                       aria-hidden="true"
                     />
@@ -546,10 +537,10 @@ export function SessionWorkbench({
                   <MetadataRow label="Changes">
                     <span className="font-mono tabular-nums">
                       {view.diffstat.files} {view.diffstat.files === 1 ? 'file' : 'files'}{' '}
-                      <span className="font-medium text-[#6BAF6B] [[data-theme=dark]_&]:text-[#7DC07D]">
+                      <span className="font-medium text-[var(--sp-success)]">
                         +{view.diffstat.adds}
                       </span>{' '}
-                      <span className="font-medium text-[#C95A4F] [[data-theme=dark]_&]:text-[#D67259]">
+                      <span className="font-medium text-[var(--sp-error)]">
                         -{view.diffstat.dels}
                       </span>
                     </span>

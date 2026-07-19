@@ -1,7 +1,6 @@
-// Shared chrome primitives for the spool.pro share-web pages. All five
+// Shared chrome composition for the spool.pro share-web pages. All five
 // routes (Reader, Tombstone, Profile, Me, SignIn) compose Page + Header
-// + Footer + the SW icon/avatar/wordmark vocab so a visual change lands
-// in exactly one file.
+// + Footer here while reusable visual primitives come from @spool-lab/ui.
 //
 // Theme contract: the root <html> carries data-theme = 'light' | 'dark'.
 // ThemeToggle reads/writes that attribute + persists to localStorage;
@@ -9,6 +8,7 @@
 // the inline script in routes/__root.tsx before React runs, so there's
 // no flash.
 
+import { Avatar, ButtonLink, IconButton, Wordmark } from '@spool-lab/ui'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -56,54 +56,6 @@ export function Page({
         {children}
       </div>
     </div>
-  )
-}
-
-function Wordmark({ size = 19 }: { size?: number }) {
-  return (
-    <span className="sw-wordmark" style={{ fontSize: size }}>
-      Spool<span className="dot">.</span>
-    </span>
-  )
-}
-
-function initialsOf(name: string | null | undefined): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase()
-  return ((parts[0]?.[0] ?? '') + (parts.at(-1)?.[0] ?? '')).toUpperCase()
-}
-
-export function Avatar({
-  src,
-  name,
-  size = 32,
-}: {
-  src: string | null | undefined
-  name: string | null | undefined
-  size?: number
-}) {
-  const fontSize = Math.round(size * 0.4)
-  // Track image-load failures so a blocked CDN (CSP, network) falls
-  // through to initials instead of a broken-image icon.
-  const [errored, setErrored] = useState(false)
-  useEffect(() => {
-    setErrored(false)
-  }, [src])
-  return (
-    <span className="sw-avatar" style={{ width: size, height: size, fontSize }}>
-      {src && !errored ? (
-        <img
-          src={src}
-          alt=""
-          referrerPolicy="no-referrer"
-          onError={() => setErrored(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : (
-        <span>{initialsOf(name)}</span>
-      )}
-    </span>
   )
 }
 
@@ -273,15 +225,9 @@ export function ThemeToggle() {
     setTheme(next)
   }, [theme])
   return (
-    <button
-      type="button"
-      className="sw-theme-toggle"
-      onClick={toggle}
-      title="Toggle theme"
-      aria-label="Toggle light or dark"
-    >
+    <IconButton size="sm" onClick={toggle} title="Toggle theme" aria-label="Toggle light or dark">
       <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={15} />
-    </button>
+    </IconButton>
   )
 }
 
@@ -325,12 +271,12 @@ export function Header({
       <div className="sw-header-right">
         <ThemeToggle />
         {resolved === 'out' || resolved === 'auto' ? (
-          <a className="sw-signin-link" href="/sign-in">
+          <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
             Sign in
-          </a>
+          </ButtonLink>
         ) : (
           <a href="/me" title="Your account" style={{ display: 'inline-flex' }}>
-            <Avatar src={resolved.src} name={resolved.name} size={30} />
+            <Avatar src={resolved.src} name={resolved.name} alt="" size="md" />
           </a>
         )}
       </div>

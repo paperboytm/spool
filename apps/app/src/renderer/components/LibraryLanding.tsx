@@ -1,4 +1,5 @@
 import type { Session, SessionsCursor } from '@spool-lab/core'
+import { SectionLabel } from '@spool-lab/ui'
 import { Layers3 as LibraryIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -294,25 +295,29 @@ export function CollapsibleSection({
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="group text-warm-faint dark:text-dark-muted hover:text-warm-text dark:hover:text-dark-text flex w-full items-center gap-1.5 px-6 pt-3 pb-1 text-[10px] font-semibold tracking-[0.08em] transition-colors duration-75 select-none"
+        className="group flex w-full px-6 pt-3 pb-1 select-none"
       >
-        <span>{label}</span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          aria-hidden
-          className={`flex-none opacity-30 transition-all group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
-        >
-          <path
-            d="M4 2L8 6L4 10"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <SectionLabel>
+          <span className="flex items-center gap-1.5">
+            <span>{label}</span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+              className={`flex-none opacity-30 transition-all group-hover:opacity-100 ${open ? 'rotate-90' : ''}`}
+            >
+              <path
+                d="M4 2L8 6L4 10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </SectionLabel>
       </button>
       {open && children}
     </div>

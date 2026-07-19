@@ -1,0 +1,63 @@
+{
+  "name": "@spool-lab/ui",
+  "version": "0.0.1",
+  "private": true,
+  "homepage": "https://github.com/spool-lab/spool#readme",
+  "bugs": {
+    "url": "https://github.com/spool-lab/spool/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "xinyao",
+    "email": "hi@xinyao.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spool-lab/spool.git"
+  },
+  "funding": "https://github.com/sponsors/xinyao27",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": {
+      "development": "./src/css/styles.css",
+      "default": "./dist/styles.css"
+    },
+    "./tokens.css": {
+      "development": "./src/css/tokens.css",
+      "default": "./dist/tokens.css"
+    }
+  },
+  "scripts": {
+    "dev": "vp build --watch",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lucide-react": "^1.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "vite": "catalog:",
+    "vite-plugin-dts": "^5.0.3",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

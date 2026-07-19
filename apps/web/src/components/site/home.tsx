@@ -1,3 +1,4 @@
+import { Button, ButtonLink } from '@spool-lab/ui'
 import { useEffect, useState } from 'react'
 
 const INSTALL_CMD = 'curl -fsSL https://spool.pro/install.sh | bash'
@@ -75,12 +76,12 @@ function Hero() {
 
       <div className="hh-cta">
         <InstallPill />
-        <a href="/explore" className="hh-btn hh-btn-p">
+        <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
-        </a>
-        <a href="/docs/installation" className="hh-btn hh-btn-g">
+        </ButtonLink>
+        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
           Read the docs →
-        </a>
+        </ButtonLink>
       </div>
 
       <div className="hh-window">
@@ -272,9 +273,10 @@ function InstallPill() {
       .catch(() => {})
   }
   return (
-    <button
+    <Button
       type="button"
       className={`hh-install${copied ? ' is-copied' : ''}`}
+      variant="outline"
       onClick={onClick}
       aria-label="Copy install command"
     >
@@ -310,7 +312,7 @@ function InstallPill() {
           </svg>
         )}
       </span>
-    </button>
+    </Button>
   )
 }
 
@@ -868,12 +870,12 @@ function FinalCTA() {
       </div>
       <div className="row">
         <InstallPill />
-        <a href="/explore" className="hh-btn hh-btn-p">
+        <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
-        </a>
-        <a href="/docs/installation" className="hh-btn hh-btn-g">
+        </ButtonLink>
+        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
           Read the docs →
-        </a>
+        </ButtonLink>
       </div>
       <div className="plat">Public discovery · Claude Code · Codex CLI · MIT</div>
     </section>

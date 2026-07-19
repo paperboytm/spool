@@ -8,6 +8,7 @@
 // re-validated server-side against the signed-in session, and the URL
 // never carries the pollable device_code.
 
+import { Button } from '@spool-lab/ui'
 import { useEffect, useState } from 'react'
 
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
@@ -104,9 +105,9 @@ export function CliAuth({ code }: Props) {
               autoComplete="off"
               aria-label="CLI sign-in code"
             />
-            <button className="sw-btn sw-btn-primary" type="submit">
+            <Button variant="accent" type="submit">
               Continue
-            </button>
+            </Button>
           </form>
         </Card>
       </Shell>
@@ -132,20 +133,12 @@ export function CliAuth({ code }: Props) {
             Approve only if this code matches the one in your terminal.
           </p>
           <div className="sw-cliauth-actions">
-            <button
-              className="sw-btn sw-btn-primary"
-              disabled={busy}
-              onClick={() => decide(info, 'approve')}
-            >
+            <Button variant="accent" disabled={busy} onClick={() => decide(info, 'approve')}>
               Approve
-            </button>
-            <button
-              className="sw-btn sw-btn-ghost"
-              disabled={busy}
-              onClick={() => decide(info, 'deny')}
-            >
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={() => decide(info, 'deny')}>
               Deny
-            </button>
+            </Button>
           </div>
         </Card>
       </Shell>

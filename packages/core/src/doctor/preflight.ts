@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import { openDatabase } from '../db/native-binding.js'
 
 type SqliteStatus = { ok: true } | { ok: false; error: Error }
 
@@ -14,7 +14,7 @@ let cached: SqliteStatus | null = null
 export function probeSqlite(): SqliteStatus {
   if (cached) return cached
   try {
-    const db = new Database(':memory:')
+    const db = openDatabase(':memory:')
     db.close()
     cached = { ok: true }
   } catch (err) {

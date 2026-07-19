@@ -112,7 +112,9 @@ export async function setDemoWindowBounds(
  * a non-zero session count.
  */
 export async function waitForDemoSync(window: Page): Promise<void> {
-  await expect(window.locator('[data-testid="status-text"]')).toContainText(/[1-9]\d*\s+session/, {
-    timeout: 15000,
-  })
+  await expect(window.locator('[data-testid="status-text"]')).toHaveAttribute(
+    'data-session-count',
+    /^[1-9]\d*$/,
+    { timeout: 15000 },
+  )
 }

@@ -8,6 +8,7 @@
 // here plus the matching backend provider registration. The visual
 // layout stays the same; only the button count grows.
 
+import { ButtonLink } from '@spool-lab/ui'
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
@@ -113,10 +114,15 @@ export function SignIn({ next }: Props) {
           <h1 className="sw-signin-title">Sign in</h1>
           <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>
           {PROVIDERS.map((p) => (
-            <a key={p.id} className="sw-provider-btn" href={authStartHref(p.id, dest)}>
+            <ButtonLink
+              key={p.id}
+              className="sw-provider-btn"
+              href={authStartHref(p.id, dest)}
+              variant="outline"
+            >
               {p.icon}
               {p.label}
-            </a>
+            </ButtonLink>
           ))}
           <div className="sw-signin-foot">
             <span className="ico">

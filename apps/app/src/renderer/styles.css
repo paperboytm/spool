@@ -16,17 +16,6 @@
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Inter Variable';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
-    format('woff2-variations');
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
   font-family: 'Hanken Grotesk Variable';
   font-style: normal;
   font-display: swap;
@@ -58,64 +47,69 @@
 @source "../../../../packages/session-view/src";
 
 @theme {
-  /* Warm palette — light */
-  --color-warm-bg: #fafaf8;
-  --color-warm-surface: #f4f4f0;
-  --color-warm-surface2: #eeeee9;
-  --color-warm-border: #e8e8e2;
-  --color-warm-border2: #d8d8d0;
-  --color-warm-text: #1c1c18;
-  --color-warm-muted: #6b6b60;
-  --color-warm-faint: #adadaa;
-  --color-accent: #c85a00;
-  --color-accent-bg: #fff3e8;
-  --color-accent-bg-strong: #ffe5cc;
+  /* Legacy Tailwind names remain available while @spool-lab/ui owns
+   * their values. Light and dark aliases intentionally resolve through
+   * the same active token set; the renderer mirrors the OS theme onto
+   * html.dark before React mounts. */
+  --color-warm-bg: var(--sp-bg);
+  --color-warm-surface: var(--sp-surface);
+  --color-warm-surface2: var(--sp-surface-2);
+  --color-warm-border: var(--sp-border);
+  --color-warm-border2: var(--sp-border-strong);
+  --color-warm-text: var(--sp-text);
+  --color-warm-muted: var(--sp-muted);
+  --color-warm-faint: var(--sp-faint);
+  --color-dark-bg: var(--sp-bg);
+  --color-dark-surface: var(--sp-surface);
+  --color-dark-surface2: var(--sp-surface-2);
+  --color-dark-border: var(--sp-border);
+  --color-dark-border2: var(--sp-border-strong);
+  --color-dark-text: var(--sp-text);
+  --color-dark-muted: var(--sp-muted);
+  --color-dark-faint: var(--sp-faint);
+  --color-accent: var(--sp-accent);
+  --color-accent-dark: var(--sp-accent);
+  --color-accent-bg: var(--sp-accent-bg);
+  --color-accent-bg-dark: var(--sp-accent-bg);
+  --color-accent-bg-strong: color-mix(in srgb, var(--sp-accent) 20%, var(--sp-bg));
+  --color-accent-bg-strong-dark: color-mix(in srgb, var(--sp-accent) 20%, var(--sp-bg));
 
-  /* Warm palette — dark */
-  --color-dark-bg: #141410;
-  --color-dark-surface: #1c1c18;
-  --color-dark-surface2: #242420;
-  --color-dark-border: #2e2e28;
-  --color-dark-border2: #3a3a34;
-  --color-dark-text: #f2f2ec;
-  --color-dark-muted: #9a9a8e;
-  --color-dark-faint: #505048;
-  --color-accent-dark: #f07020;
-  /** Dark-mode accent wash (cards, selected rows) — was hardcoded #2A1800 */
-  --color-accent-bg-dark: #2a1800;
-  --color-accent-bg-strong-dark: #3d2400;
+  --color-status-success: var(--sp-success);
+  --color-status-warning: var(--sp-warning);
+  --color-status-error: var(--sp-error);
+  --color-status-success-dark: var(--sp-success);
+  --color-status-warning-dark: var(--sp-warning);
+  --color-status-error-dark: var(--sp-error);
 
-  /* Status — warm-tuned, never Tailwind defaults (see DESIGN.md) */
-  --color-status-success: #6baf6b;
-  --color-status-warning: #e4a640;
-  --color-status-error: #c95a4f;
-  --color-status-success-dark: #7dc07d;
-  --color-status-warning-dark: #f0b854;
-  --color-status-error-dark: #d67259;
+  --color-src-claude: var(--sp-source-claude);
+  --color-src-codex: var(--sp-source-codex);
+  --color-src-gemini: var(--sp-source-gemini);
+  --color-src-opencode: var(--sp-source-opencode);
 
-  /* Source badges */
-  --color-src-claude: #c26a4e;
-  --color-src-codex: #4a9670;
-  --color-src-gemini: #5887d0;
-  --color-src-opencode: #8a6f3d;
-
-  /* Typography */
-  --font-sans: 'Inter Variable', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-sans: var(--sp-font-sans);
+  --font-mono: var(--sp-font-mono);
 }
 
 :root {
   -webkit-font-smoothing: antialiased;
-  font-family: var(--font-sans);
-  color-scheme: light dark;
-  background: var(--color-warm-bg);
-  color: var(--color-warm-text);
+  font-family: var(--sp-font-sans);
+  background: var(--sp-bg);
+  color: var(--sp-text);
 }
 
+/* The document paint sits one frame behind React during native window
+ * resize. Follow the live OS media query directly so newly exposed pixels
+ * never flash the opposite theme, while the active UI palette remains on
+ * the shared .dark token adapter. */
 @media (prefers-color-scheme: dark) {
   :root {
-    background: var(--color-dark-bg);
-    color: var(--color-dark-text);
+    background: var(--sp-bg-dark);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    background: var(--sp-bg-light);
   }
 }
 

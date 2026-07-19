@@ -27,11 +27,10 @@
 
 # PUBLIC_BASE_URL
 #   The origin OAuth start/callback bake into the redirect_uri sent to
-#   WorkOS. In dev this MUST be the share-web vite server (the /api/*
-#   proxy origin), not wrangler's own :8788 — and it must match the
-#   redirect URI registered in the WorkOS dashboard, or every web
-#   sign-in fails with a redirect_uri mismatch. Unset in prod (defaults
-#   to https://spool.pro).
+#   WorkOS. The checked-in development config defaults to the share-web
+#   Vite server below; keep this explicit when copying the file so custom
+#   local environments can override it. It must match the redirect URI
+#   registered in WorkOS. Unset in prod (defaults to https://spool.pro).
 
 # DEV_WORKOS_API_URL (optional — normally injected by share-dev.sh)
 #   workerd ignores proxy envs (workers-sdk#4515); on proxy-only dev

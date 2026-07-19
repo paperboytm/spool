@@ -1,4 +1,5 @@
 import type { Session } from '@spool-lab/core'
+import { IconButton, ListRow } from '@spool-lab/ui'
 import {
   SquareTerminal,
   MoreHorizontal,
@@ -74,7 +75,8 @@ export default function SessionRow({
   }
 
   return (
-    <div
+    <ListRow
+      as="div"
       data-testid="session-row"
       data-session-uuid={session.sessionUuid}
       {...(pinned ? { 'data-pinned': '' } : {})}
@@ -87,126 +89,115 @@ export default function SessionRow({
           handleOpen()
         }
       }}
-      className="group hover:bg-warm-surface dark:hover:bg-dark-surface focus:bg-warm-surface dark:focus:bg-dark-surface flex cursor-pointer items-start gap-3 px-5 py-3 transition-colors duration-75 focus:outline-none"
-    >
-      <div className="min-w-0 flex-1">
-        <div className="mb-0.5 flex items-center gap-2">
+      className="group focus:bg-warm-surface dark:focus:bg-dark-surface cursor-pointer focus:outline-none"
+      title={
+        <div className="flex min-w-0 items-center gap-2">
           <SourceBadge source={session.source} />
-          <span className="text-warm-text dark:text-dark-text truncate text-sm font-medium">
-            {title}
-          </span>
+          <span className="truncate">{title}</span>
         </div>
-        <p className="text-warm-faint dark:text-dark-muted truncate pl-1.5 text-xs">
+      }
+      metadata={
+        <p className="truncate">
           {showProject && (
             <>
-              <span className="text-warm-muted dark:text-dark-muted">
-                {session.projectDisplayName}
-              </span>
+              <span>{session.projectDisplayName}</span>
               {' · '}
             </>
           )}
           {date} · {t('session.msgs_other', { count: session.messageCount })}
           {model && ` · ${model}`}
         </p>
-      </div>
-
-      <div
-        className="-mt-0.5 flex flex-none items-center gap-1"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <SecurityBadgeSlot session={session} />
-        <span
-          className={
-            pinned
-              ? 'opacity-70 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100'
-              : 'opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100'
-          }
-        >
-          <PinButton
-            sessionUuid={session.sessionUuid}
-            pinned={pinned}
-            onChange={(next) => onPinChange?.(session.sessionUuid, next)}
-          />
-        </span>
-        <span className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 group-has-[[aria-expanded=true]]:opacity-100">
-          <Menu
-            align="right"
-            trigger={({ open, toggle }) => (
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={toggle}
-                aria-label={t('common.moreActions')}
-                aria-haspopup="menu"
-                aria-expanded={open}
-                className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 hover:text-warm-text dark:hover:text-dark-text inline-flex h-5 w-5 items-center justify-center rounded transition-colors duration-75"
-              >
-                <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
-              </button>
-            )}
-            items={[
-              ...(onShare
-                ? [
-                    {
-                      label: t('sidebar.shareSession'),
-                      icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
-                      onSelect: () => onShare(session.sessionUuid),
-                    },
-                  ]
-                : []),
-              {
-                label: resuming ? t('common.openingTerminal') : t('session.resume_inTerminal'),
-                icon: resuming ? (
-                  <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
-                ) : (
-                  <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />
-                ),
-                onSelect: () => {
-                  void handleResume()
-                },
-                disabled: resuming,
-              },
-              ...(resumeCommand
-                ? [
-                    {
-                      label: t('common.copyResumeCommand'),
-                      icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                      onSelect: () => {
-                        void handleCopyCommand()
+      }
+      trailing={
+        <div className="flex flex-none items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <SecurityBadgeSlot session={session} />
+          <span
+            className={
+              pinned
+                ? 'opacity-70 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100'
+                : 'opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100'
+            }
+          >
+            <PinButton
+              sessionUuid={session.sessionUuid}
+              pinned={pinned}
+              onChange={(next) => onPinChange?.(session.sessionUuid, next)}
+            />
+          </span>
+          <span className="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 group-has-[[aria-expanded=true]]:opacity-100">
+            <Menu
+              align="right"
+              trigger={({ open, toggle }) => (
+                <IconButton
+                  aria-label={t('common.moreActions')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={toggle}
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                >
+                  <MoreHorizontal size={13} strokeWidth={1.6} aria-hidden />
+                </IconButton>
+              )}
+              items={[
+                ...(onShare
+                  ? [
+                      {
+                        label: t('sidebar.shareSession'),
+                        icon: <SquarePen size={14} strokeWidth={1.6} aria-hidden />,
+                        onSelect: () => onShare(session.sessionUuid),
                       },
-                    },
-                  ]
-                : []),
-              {
-                label: t('sidebar.copySessionId'),
-                icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
-                onSelect: () => {
-                  void handleCopyId()
+                    ]
+                  : []),
+                {
+                  label: resuming ? t('common.openingTerminal') : t('session.resume_inTerminal'),
+                  icon: resuming ? (
+                    <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden />
+                  ) : (
+                    <SquareTerminal size={14} strokeWidth={1.6} aria-hidden />
+                  ),
+                  onSelect: () => {
+                    void handleResume()
+                  },
+                  disabled: resuming,
                 },
-              },
-            ]}
-          />
-        </span>
-      </div>
-    </div>
+                ...(resumeCommand
+                  ? [
+                      {
+                        label: t('common.copyResumeCommand'),
+                        icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
+                        onSelect: () => {
+                          void handleCopyCommand()
+                        },
+                      },
+                    ]
+                  : []),
+                {
+                  label: t('sidebar.copySessionId'),
+                  icon: <Copy size={14} strokeWidth={1.6} aria-hidden />,
+                  onSelect: () => {
+                    void handleCopyId()
+                  },
+                },
+              ]}
+            />
+          </span>
+        </div>
+      }
+    />
   )
 }
 
 /** Fixed-width state slot containing the SecurityBadge.
  *
  *  Naive placement (`{badge && <SecurityBadge />}` inline) shifts the pin
- *  icon column left on rows without a badge. By reserving a 32px slot
- *  for every row — even when empty — the pin/menu icons lock to the
- *  same X across the entire library.
+ *  icon column left on rows without a badge. Reserving the same canonical
+ *  24px hit area as the adjacent icon buttons keeps those columns locked.
  *
- *  Vertical alignment: the slot is `h-5` to match `PinButton`'s `w-5
- *  h-5` button, and lives inside the action group so it inherits the
- *  group's `-mt-0.5` offset against the title row. Icon size = 13 so
- *  the AlertTriangle reads as the same visual weight as PinIcon (also
- *  size 13). */
+ *  Icon size = 13 so AlertTriangle reads at the same visual weight as
+ *  PinIcon while the outer slot preserves the accessible hit area. */
 function SecurityBadgeSlot({ session }: { session: Session }): React.ReactElement {
   return (
-    <span className="inline-flex h-5 w-5 flex-none items-center justify-center">
+    <span className="inline-flex h-6 w-6 flex-none items-center justify-center">
       <SecurityBadge session={session} />
     </span>
   )

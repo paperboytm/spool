@@ -82,6 +82,19 @@ describe('Explore API client', () => {
     )
   })
 
+  it('replaces an opaque internal error with actionable Explore copy', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json({ error: 'INTERNAL', detail: 'unexpected' }, { status: 500 }),
+    )
+
+    await expect(fetchDiscoverySessions({ sort: 'recommended' }, fetcher)).rejects.toEqual(
+      expect.objectContaining<Partial<DiscoveryRequestError>>({
+        status: 500,
+        message: 'Explore is temporarily unavailable. Try again in a moment.',
+      }),
+    )
+  })
+
   it('posts the shared qualified-read payload to the Session endpoint', async () => {
     const fetcher = vi.fn(async () => Response.json({ accepted: false }))
 

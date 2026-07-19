@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import { getDB, getSessionWithMessages } from '@spool-lab/core'
@@ -393,14 +393,34 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
   }
 }
 
-function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string): string {
-  const row = db
+export function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string): string {
+  const exact = db
     .prepare('SELECT session_uuid FROM sessions WHERE cwd = ? ORDER BY ended_at DESC LIMIT 1')
     .get(cwd) as { session_uuid: string } | undefined
-  if (!row) {
-    throw new Error(`No indexed sessions for ${cwd}. Pass a session UUID or run \`spool sync\`.`)
+  if (exact) return exact.session_uuid
+
+  // Provider records may preserve a symlinked spelling of the workspace while
+  // process.cwd() returns its real path (notably macOS /tmp → /private/tmp).
+  // Compare real paths only as a fallback so the common indexed lookup stays
+  // cheap and a session can still be shared from the workspace it belongs to.
+  const canonicalCwd = canonicalExistingPath(cwd)
+  const candidates = db
+    .prepare('SELECT session_uuid, cwd FROM sessions WHERE cwd IS NOT NULL ORDER BY ended_at DESC')
+    .all() as Array<{ session_uuid: string; cwd: string }>
+  const matching = candidates.find(
+    (candidate) => canonicalExistingPath(candidate.cwd) === canonicalCwd,
+  )
+  if (matching) return matching.session_uuid
+
+  throw new Error(`No indexed sessions for ${cwd}. Pass a session UUID or run \`spool sync\`.`)
+}
+
+function canonicalExistingPath(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
   }
-  return row.session_uuid
 }
 
 function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentialOptions {

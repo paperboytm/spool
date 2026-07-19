@@ -1,8 +1,10 @@
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -10,13 +12,14 @@ import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 
 import { sequenceRoot } from '@spool-lab/session-kit'
+import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
 import type { HubFetch } from '../hub/client.js'
 import type { LocalSummaryAgent } from '../hub/local-summary-agent.js'
 import type { CliSpinner, CliUi } from '../ui.js'
 import { handleResumeCommand } from './resume.js'
-import { handleShareCommand } from './share.js'
+import { handleShareCommand, latestSessionUuidFor } from './share.js'
 
 // Command-level round trip against an in-memory hub that implements the
 // same wire contract as the backend. `spool share` seeds it, then
@@ -714,5 +717,35 @@ describe('spool share → spool resume round trip', () => {
     )
     expect(exit).toBe(1)
     expect(errors.join('\n')).toContain('withdrawn')
+  })
+})
+
+describe('default share target', () => {
+  it('matches a provider cwd written through a filesystem symlink', () => {
+    const base = mkdtempSync(join(tmpdir(), 'spool-share-cwd-'))
+    const realWorkspace = join(base, 'workspace')
+    const linkedWorkspace = join(base, 'workspace-link')
+    mkdirSync(realWorkspace)
+    symlinkSync(realWorkspace, linkedWorkspace, 'dir')
+
+    const db = new Database(':memory:')
+    try {
+      db.exec('CREATE TABLE sessions (session_uuid TEXT, cwd TEXT, ended_at TEXT)')
+      db.prepare('INSERT INTO sessions (session_uuid, cwd, ended_at) VALUES (?,?,?)').run(
+        SESSION_UUID,
+        linkedWorkspace,
+        '2026-07-19T12:00:00.000Z',
+      )
+
+      expect(
+        latestSessionUuidFor(
+          db as ReturnType<typeof import('@spool-lab/core').getDB>,
+          realWorkspace,
+        ),
+      ).toBe(SESSION_UUID)
+    } finally {
+      db.close()
+      rmSync(base, { recursive: true, force: true })
+    }
   })
 })

@@ -4,6 +4,7 @@
 // 3-step handshake the CLI uses. Mirrors RefreshFromSourceDialog's outer
 // modal shape.
 
+import { Button } from '@spool-lab/ui'
 import { Check, Copy, Globe, ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -144,25 +145,19 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
               />
 
               <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={state.phase === 'publishing'}
-                  className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 h-8 rounded-md px-3 text-[13px] transition-colors disabled:opacity-60"
-                >
+                <Button variant="ghost" onClick={onClose} disabled={state.phase === 'publishing'}>
                   {t('common.cancel')}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="accent"
                   data-testid="hub-share-publish"
                   onClick={() => {
                     void publish()
                   }}
                   disabled={state.phase === 'publishing'}
-                  className="bg-accent dark:bg-accent-dark h-8 rounded-md px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 dark:text-[#1A1206]"
                 >
                   {state.phase === 'publishing' ? t('hubShare.publishing') : t('hubShare.publish')}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -183,26 +178,23 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                 >
                   {state.url}
                 </code>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     void navigator.clipboard.writeText(state.url)
                     setCopied(true)
                   }}
-                  className="border-accent dark:border-accent-dark text-accent dark:text-accent-dark hover:bg-accent/10 dark:hover:bg-accent-dark/10 inline-flex h-6 flex-none items-center gap-1 rounded border px-2 text-[11px] transition-colors"
+                  className="flex-none"
                 >
                   <Copy size={11} strokeWidth={1.7} aria-hidden />
                   {copied ? t('common.copied') : t('common.copy')}
-                </button>
+                </Button>
               </div>
               <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="bg-accent dark:bg-accent-dark h-8 rounded-md px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 dark:text-[#1A1206]"
-                >
+                <Button variant="accent" onClick={onClose}>
                   {t('hubShare.doneClose')}
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -216,13 +208,9 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                 {state.message}
               </p>
               <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="text-warm-muted dark:text-dark-muted hover:bg-warm-surface2 dark:hover:bg-dark-surface2 h-8 rounded-md px-3 text-[13px] transition-colors"
-                >
+                <Button variant="ghost" onClick={onClose}>
                   {t('common.cancel')}
-                </button>
+                </Button>
               </div>
             </>
           )}
