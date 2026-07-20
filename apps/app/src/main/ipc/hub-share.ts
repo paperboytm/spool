@@ -30,7 +30,11 @@ import {
 import type { SpoolDocument } from '@spool/share-kit'
 import { ipcMain, net } from 'electron'
 
-import type { HubSharePrepareResult, HubSharePublishResult } from '../../shared/hub-share.js'
+import type {
+  HubSharePrepareResult,
+  HubSharePublishResult,
+  HubShareWithdrawResult,
+} from '../../shared/hub-share.js'
 import { loadToken } from '../auth/session-store.js'
 import { backendUrl } from '../share/backend-url.js'
 
@@ -244,6 +248,29 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
         })
         preparedCache.delete(args.sessionUuid)
         return { ok: true, url }
+      } catch (cause) {
+        if (cause instanceof HubHttpError && cause.status === 401) {
+          return { ok: false, error: 'UNAUTHENTICATED' }
+        }
+        return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'hub-share:withdraw',
+    async (_e, args: { sid: string }): Promise<HubShareWithdrawResult> => {
+      try {
+        const token = (deps.loadTokenFn ?? loadToken)()
+        if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
+
+        const client = new HubClient({
+          hubUrl: backendUrl(),
+          token,
+          fetch: deps.fetchFn ?? defaultFetch,
+        })
+        await client.withdrawSession(args.sid)
+        return { ok: true }
       } catch (cause) {
         if (cause instanceof HubHttpError && cause.status === 401) {
           return { ok: false, error: 'UNAUTHENTICATED' }

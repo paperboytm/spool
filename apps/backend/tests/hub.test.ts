@@ -9,6 +9,7 @@ import {
 } from '@spool-lab/session-kit'
 import { describe, expect, it } from 'vite-plus/test'
 
+import { onRequestGet as discoveryGet } from '../functions/api/discovery/v1/sessions'
 import { onRequestPost as batchPost } from '../functions/api/hub/v1/objects/batch'
 import { onRequestPost as headPost } from '../functions/api/hub/v1/sessions/[sid]/head'
 import { onRequestGet as metaGet } from '../functions/api/hub/v1/sessions/[sid]/index'
@@ -545,6 +546,30 @@ describe('hub head and withdrawal', () => {
     expect(env.state.hub_session_discovery).toHaveLength(0)
   })
 
+  it('publishes a supported Session to Discovery when its head is committed', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+
+    const committed = await uploadAndCommit(env, fixture)
+    expect(committed.status).toBe(200)
+
+    const discovery = await invoke(
+      discoveryGet,
+      new Request(`${BASE_URL}/api/discovery/v1/sessions?sort=recent`),
+      env,
+    )
+    const body = (await discovery.json()) as { items: Array<{ sid: string; title: string }> }
+
+    expect(discovery.status).toBe(200)
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        sid: SID,
+        title: 'Please make the greeting warmer.',
+      }),
+    ])
+  })
+
   it('conflicts while objects are missing, commits after upload, and recommit clears withdrawal', async () => {
     const env = envFor()
     await seedUsers(env)
@@ -563,7 +588,8 @@ describe('hub head and withdrawal', () => {
     expect(committed.status).toBe(200)
     await expect(committed.json()).resolves.toEqual({ url: `${BASE_URL}/session/${SID}` })
     const createdAt = env.state.hub_sessions[0]?.created_at
-    expect(env.state.hub_session_discovery).toHaveLength(0)
+    const publishedAt = env.state.hub_session_discovery[0]?.published_at
+    expect(env.state.hub_session_discovery).toHaveLength(1)
     env.state.hub_sessions[0]!.visibility = 'private'
 
     const withdrawn = await withdraw(env)
@@ -578,7 +604,8 @@ describe('hub head and withdrawal', () => {
       created_at: createdAt,
       withdrawn_at: null,
     })
-    expect(env.state.hub_session_discovery).toHaveLength(0)
+    expect(env.state.hub_session_discovery).toHaveLength(1)
+    expect(env.state.hub_session_discovery[0]?.published_at).toBe(publishedAt)
   })
 
   it('forbids non-owners and makes a second owner withdrawal idempotent', async () => {
@@ -636,6 +663,7 @@ describe('hub public reads', () => {
       root: fixture.head.root,
       count: fixture.head.count,
       summaryMd: fixture.head.summaryMd,
+      visibility: 'public',
       author: {
         handle: 'alice',
         displayName: 'Alice Example',

@@ -24,3 +24,5 @@ export type HubSharePrepareResult =
 export type HubSharePublishResult =
   | { ok: true; url: string }
   | { ok: false; error: 'UNAUTHENTICATED' | string }
+
+export type HubShareWithdrawResult = { ok: true } | { ok: false; error: 'UNAUTHENTICATED' | string }

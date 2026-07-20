@@ -1,6 +1,6 @@
 # Spool
 
-Spool is the publishing platform for agent sessions, starting with coding agents. It turns Sessions into readable, discoverable, and resumable work artifacts while keeping the original Session authoritative. Nothing leaves local preparation until an explicit Share, and nothing enters public Discovery until an explicit Publish.
+Spool is the publishing platform for agent sessions, starting with coding agents. It turns Sessions into readable, discoverable, and resumable work artifacts while keeping the original Session authoritative. Nothing leaves local preparation until an explicit Share. Supported Sessions are Public and discoverable by default once shared.
 
 ## Language
 
@@ -13,11 +13,11 @@ A Session an author has explicitly shared through Spool so other people can read
 _Avoid_: Post, upload
 
 **Share**:
-Create a Shared Session and receive a durable URL for it. A new share is Link-only unless the author explicitly publishes it. Sharing does not expose the author’s other Sessions.
+Create a Shared Session and receive a durable URL for it. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default. Providers not yet supported by Discovery remain Link-only. Sharing does not expose the author’s other Sessions.
 _Avoid_: Sync, export
 
 **Publish**:
-Make a Shared Session Public so it can appear on the author’s Profile and in Discovery.
+Make a Shared Session Public so it can appear in Discovery and, when profile listing is selected, on the author’s Profile. Supported Shares perform this publication step by default.
 _Avoid_: Share, upload, list on profile
 
 **Link-only**:

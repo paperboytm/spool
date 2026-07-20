@@ -21,7 +21,7 @@ npx @spool-lab/cli resume <session-id-or-url>
 npx @spool-lab/cli withdraw <session-id-or-url>
 ```
 
-`npx @spool-lab/cli share` supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions. It checks records for likely sensitive values, creates a Link-only URL, and can ask a detected local Agent to draft the optional Summary.
+`npx @spool-lab/cli share` supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions. It checks records for likely sensitive values, confirms the resulting visibility, creates a durable URL, and can ask a detected local Agent to draft the optional Summary. Claude Code and Codex CLI Sessions are Public in Explore by default; providers not yet supported by Explore remain Link-only. Non-interactive callers must pass `--visibility-confirmed`; this does not bypass sensitive-data findings.
 
 Useful publishing options:
 
@@ -30,7 +30,8 @@ npx @spool-lab/cli share <uuid>@12             # first 12 records
 npx @spool-lab/cli share --summary "..."       # provide Summary Markdown
 npx @spool-lab/cli share --no-agent-summary    # skip local Agent generation
 npx @spool-lab/cli share --spool-file x.spool  # attach a curated document
-npx @spool-lab/cli share --yes                 # skip sensitive-data confirmation
+npx @spool-lab/cli share --visibility-confirmed # acknowledge visibility without a TTY
+npx @spool-lab/cli share --yes                 # skip all confirmations, including secret findings
 ```
 
 For Claude Code and Codex CLI shares, Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.

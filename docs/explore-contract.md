@@ -5,16 +5,17 @@ This document is the implementation contract for the first public Explore surfac
 
 ## Product rule for v1
 
-For this release, **Share is public and discoverable**. Every live Hub Session with the existing
-internal `visibility = 'unlisted'` value is eligible for Explore and search. The old internal value
-is retained to avoid a destructive Hub table rebuild; it must not be exposed as “Link-only” in the
-Explore UI. Withdrawn Sessions are never returned.
+For this release, **Share is public and discoverable for providers supported by Explore**. A
+Claude Code or Codex CLI Hub head commit materializes a Discovery projection by default. The
+existing internal `visibility = 'unlisted'` value is retained to avoid a destructive Hub table
+rebuild; public visibility is represented by the projection and must not be inferred from that
+legacy value alone. Withdrawn Sessions are never returned.
 
 The sharing confirmation must say that the Session can appear in Explore and search. There is no
 separate Publish control in this version.
 
-This rule deliberately supersedes the longer-term Share/Publish split in `DESIGN.md` for this
-implementation only.
+Providers not yet supported by Explore remain Link-only. Existing Link-only Sessions are not
+published in bulk; re-sharing a supported Session materializes its projection.
 
 ## Source of truth
 
@@ -84,9 +85,9 @@ After a successful Hub head commit, read the one declared `viewOid`, validate it
 - `published_at`: original `hub_sessions.created_at`; re-sharing updates `updated_at` but does not
   make old work look newly published.
 
-The migration should backfill lightweight placeholder projections for existing live Hub Sessions.
-A later re-share heals them with full view evidence. Placeholder titles must use a meaningful
-Summary line or agent fallback, never expose the raw SID as the visible title.
+Migration `0005` originally backfilled lightweight placeholder projections. Migration `0006`
+removed those legacy entries when Link-only was briefly the default. The current Public-by-default
+rule is prospective: a new or repeated supported Share writes full view evidence directly.
 
 ### Quality score
 

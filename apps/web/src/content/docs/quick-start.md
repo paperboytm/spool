@@ -53,7 +53,7 @@ A successful share returns a URL such as:
 https://spool.pro/session/claude_…
 ```
 
-Anyone with the URL can read the Link-only Shared Session without installing Spool. Publishing it to a Profile, Explore, and search remains a separate action.
+Anyone with the URL can read the Shared Session without installing Spool. Claude Code and Codex CLI Shares are Public in Explore and search by default.
 
 ## 6. Continue the work
 

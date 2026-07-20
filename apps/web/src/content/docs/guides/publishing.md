@@ -3,11 +3,11 @@ title: Publishing Sessions
 description: Prepare, share, and manage an agent Session safely.
 ---
 
-Spool treats sharing and publishing as two explicit boundaries. Local preparation never exposes a Session; the author chooses exactly which Session and record range to share, then separately decides whether to make that Shared Session Public.
+Local preparation never exposes a Session. Share is the explicit disclosure boundary: the author chooses exactly which Session and record range to publish, reviews sensitive-data findings, and confirms before upload.
 
-## Share by link
+## Publish a Session
 
-**Share** creates a durable Link-only URL. Anyone with the URL can read it, but it does not appear on the author’s Profile, in Explore, or in search. **Publish** is the separate action that makes a Shared Session Public.
+**Share** creates a durable URL. Claude Code and Codex CLI Sessions are Public and eligible for Explore and search by default. Providers not yet supported by Explore remain Link-only.
 
 ## Share from the terminal
 

@@ -34,6 +34,6 @@ export function formatRedactSummary(summary: RedactGateSummary): string {
   for (const [kind, count] of summary.byKind.slice(0, 10)) {
     lines.push(`  - ${kind}: ${count}`)
   }
-  lines.push('Sharing sends the full transcript, including these values, to the Link-only URL.')
+  lines.push('Sharing sends the full transcript, including these values, to spool.pro.')
   return lines.join('\n')
 }

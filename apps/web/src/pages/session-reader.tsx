@@ -136,7 +136,7 @@ export function SessionReader({ sid }: { sid: string }) {
     () => (typeof window === 'undefined' ? null : deepLinkIndex(window.location.hash)),
     [sid],
   )
-  useQualifiedRead(sid, state.phase === 'ready')
+  useQualifiedRead(sid, state.phase === 'ready' && state.meta.visibility === 'public')
 
   useEffect(() => {
     let cancelled = false

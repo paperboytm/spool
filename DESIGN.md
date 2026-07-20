@@ -7,7 +7,7 @@
 - **Space/industry:** Developer knowledge sharing / agent-native publishing. Peers provide pieces of the experience—GitHub for code, YouTube for learning, Gists for sharing—but none treat an agent Session as a first-class public artifact that can be resumed.
 - **Product surfaces:** The public web is the publishing, Profile, Discovery, and reading surface. The desktop app is the local preparation and management surface. The CLI is the agent- and automation-friendly interface.
 - **Core positioning:** "See how people actually work with agents." Public Sessions and their authors are the center of the web experience; local organization and search support the act of publishing.
-- **Publishing boundary:** New shares are Link-only. A separate, explicit Publish action makes a Shared Session Public and eligible for Profile and Discovery surfaces.
+- **Publishing boundary:** Share is the explicit disclosure action. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default; providers not yet supported by Explore remain Link-only. The confirmation must state the resulting visibility before upload.
 
 ## Aesthetic Direction
 
@@ -216,8 +216,8 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 ### Publishing
 
 - **Prepare:** Show exactly which Session and record range will be shared, secret findings, and optional Summary before network transfer.
-- **Share complete:** Return the Link-only URL first. The next decision is explicit: keep Link-only or Publish publicly.
-- **Publish confirmation:** Explain that the Session will appear on the author’s Profile and in Discovery. Visibility is text + icon, never a globe icon by itself.
+- **Share complete:** Return the durable URL and state whether the Session is Public or Link-only. Supported Sessions are Public by default and can appear in Discovery.
+- **Publish confirmation:** Explain that supported Sessions can appear in Discovery and search. Visibility is text + icon, never a globe icon by itself.
 - **After publish:** Show `Public`, copy-link, view-profile, and withdraw actions. Never collapse Share and Publish into one ambiguous toggle.
 
 ### Desktop Search (⌘K overlay)
@@ -352,9 +352,9 @@ Do not write “You discussed this” to a reader who did not author the Session
 
 Desktop, account, and publishing flows may address the signed-in author directly where it adds signal:
 
-- “Your share is Link-only.”
-- “Publish this Session to your Profile?”
-- “Nothing is public until you publish it.”
+- “This Session will be Public in Explore.”
+- “Publish this Session?”
+- “Nothing leaves this machine until you confirm.”
 - “Withdrawn by you.”
 
 In dense lists, prefer compact facts over repeated pronouns:
@@ -384,14 +384,15 @@ In dense lists, prefer compact facts over repeated pronouns:
 
 ## Decisions Log
 
-| Date       | Decision                                      | Rationale                                                                                                                    |
-| ---------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-18 | Homepage is Featured-first                    | A real curated Session explains the product during community cold start; search gains prominence as the public corpus grows. |
-| 2026-07-18 | Share and Publish are separate actions        | A durable URL and public discoverability carry different privacy expectations. Public visibility must always be explicit.    |
-| 2026-07-18 | New shares are Link-only                      | The safest useful default is a shareable URL that does not appear on a Profile or in Discovery.                              |
-| 2026-07-18 | Public metadata is author-attributed          | Readers need to know whose work they are viewing; first-person language is reserved for the author’s own surfaces.           |
-| 2026-07-18 | Session pages show interpretation + evidence  | Summary helps orientation, while conversation, tools, files, and diff preserve trust and depth.                              |
-| 2026-07-18 | Resume creates lineage, never mutation        | Continuation should be visible without changing the source Session.                                                          |
-| 2026-07-18 | Warm amber remains the sole product accent    | Amber distinguishes Spool from cold developer tooling and supports the Warm Index direction.                                 |
-| 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                    |
-| 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                   |
+| Date       | Decision                                      | Rationale                                                                                                                                  |
+| ---------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-18 | Homepage is Featured-first                    | A real curated Session explains the product during community cold start; search gains prominence as the public corpus grows.               |
+| 2026-07-18 | Share and Publish are separate actions        | Superseded on 2026-07-20 by Public-by-default sharing for providers supported by Explore.                                                  |
+| 2026-07-18 | New shares are Link-only                      | Superseded on 2026-07-20; unsupported providers still use this fallback.                                                                   |
+| 2026-07-20 | Supported Shares are Public by default        | There is no reliable second Publish flow yet; the Share confirmation is the explicit disclosure boundary and must name Explore visibility. |
+| 2026-07-18 | Public metadata is author-attributed          | Readers need to know whose work they are viewing; first-person language is reserved for the author’s own surfaces.                         |
+| 2026-07-18 | Session pages show interpretation + evidence  | Summary helps orientation, while conversation, tools, files, and diff preserve trust and depth.                                            |
+| 2026-07-18 | Resume creates lineage, never mutation        | Continuation should be visible without changing the source Session.                                                                        |
+| 2026-07-18 | Warm amber remains the sole product accent    | Amber distinguishes Spool from cold developer tooling and supports the Warm Index direction.                                               |
+| 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                  |
+| 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                 |

@@ -4,7 +4,7 @@ description: Share the current session and a share-ready Summary to the Spool hu
 allowed-tools: Bash
 ---
 
-Spool is the publishing platform for agent Sessions. **Share** sends the selected records to the Hub and creates a Link-only URL that other people can read; Public visibility is always a separate author choice. Claude Code and Codex CLI shares can also be resumed from another machine. A Share can carry a Markdown Summary: the interactive CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Local preparation and sharing cover Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi, so **any agent with a shell can recall another agent's Sessions**.
+Spool is the publishing platform for agent Sessions. **Share** explicitly sends the selected records to the Hub and returns a durable URL. Claude Code and Codex CLI Shares are Public by default and can appear in Explore and search; Gemini CLI, OpenCode, and Pi remain Link-only until Discovery supports them. Claude Code and Codex CLI shares can also be resumed from another machine. A Share can carry a Markdown Summary: the interactive CLI can generate one with a detected Claude Code or Codex CLI, while an agent shell should provide its own Summary with `--summary`. Local preparation and sharing cover all five providers, so **any agent with a shell can recall another agent's Sessions**.
 
 ## Routing
 
@@ -23,7 +23,7 @@ global install is not required. If the user prefers the shorter `spool …` form
 
 ## Share flow
 
-**claude**, **codex**, **gemini**, **opencode**, and **pi** sessions can be shared. Sharing sends native Claude/Codex records or the other sources' provider-neutral indexed conversation to the Hub and prints a Link-only URL.
+**claude**, **codex**, **gemini**, **opencode**, and **pi** sessions can be shared. Sharing sends native Claude/Codex records or the other sources' provider-neutral indexed conversation to the Hub. The CLI states the resulting visibility before upload and then prints the durable URL.
 
 1. Run `npx @spool-lab/cli sync` so the session and its newest turns are indexed.
 2. Pick the target:
@@ -54,15 +54,16 @@ SPOOL_SUMMARY
 )"
 
 # Inside Claude Code:
-npx @spool-lab/cli share "$CLAUDE_CODE_SESSION_ID" --summary "$summary" < /dev/null
+npx @spool-lab/cli share "$CLAUDE_CODE_SESSION_ID" --summary "$summary" --visibility-confirmed < /dev/null
 ```
 
-Outside Claude Code, omit the target: `npx @spool-lab/cli share --summary "$summary" < /dev/null`. For a selected session, put its UUID before `--summary`. Add `--spool-file <path>` only when the user wants to attach a `.spool` document.
+Outside Claude Code, omit the target: `npx @spool-lab/cli share --summary "$summary" --visibility-confirmed < /dev/null`. For a selected session, put its UUID before `--summary`. Add `--spool-file <path>` only when the user wants to attach a `.spool` document. `--visibility-confirmed` acknowledges the stated Public/Link-only result but does not bypass sensitive-data findings.
 
 The `< /dev/null` is deliberate: if the secret gate needs confirmation, a non-interactive invocation must abort instead of hanging. Do not add `--yes` until the user explicitly accepts the reported risk.
 
 5. Handle outcomes:
-   - **`Session shared as Link-only`** — the records and provided Summary are live; give the user the URL. For Claude/Codex shares, teammates can run `npx @spool-lab/cli resume <sid-or-url>` to fork it locally.
+   - **`Session published`** — a Claude/Codex Session and its provided Summary are Public and can appear in Explore and search; give the user the URL. Teammates can run `npx @spool-lab/cli resume <sid-or-url>` to fork it locally.
+   - **`Session shared as Link-only`** — a Gemini/OpenCode/Pi Session and its provided Summary are live for anyone with the URL, but do not appear in Explore or search.
    - **`Not logged in`** — ask the user to run `npx @spool-lab/cli login` (browser approval), then retry.
    - **Secret findings / `Cannot confirm ... without a TTY`** — show the findings summary and ask. Only after an explicit yes, re-run the same command with `--yes`.
    - **`<source> sessions can be shared and read, but native Resume is not supported yet`** — explain that the share is readable, while native Resume currently requires Claude or Codex.
@@ -103,16 +104,16 @@ Fold what you found into your reply as ordinary context, citing the source per c
 
 ## Command reference
 
-| Command                                                                                           | Does                                                                                                                                |
-| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `npx @spool-lab/cli sync [--watch]`                                                               | Index new sessions; `--watch` stays running                                                                                         |
-| `npx @spool-lab/cli search <query> [-s <source>] [--since 7d]`                                    | Full-text search; add `--json` for machine-readable results                                                                         |
-| `npx @spool-lab/cli list [-s <source>] [-p <path>] [-n <count>] [--all]`                          | Current-project Sessions by default; `--all` searches every project. Filters apply to a recent window, so raise `-n` when filtering |
-| `npx @spool-lab/cli projects [query] [-n <count>]`                                                | Project groups, or sessions for a name, identity key, path, or cwd                                                                  |
-| `npx @spool-lab/cli show <uuid\|sid\|url>`                                                        | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data                  |
-| `npx @spool-lab/cli pin <uuid>` / `npx @spool-lab/cli unpin <uuid>` / `npx @spool-lab/cli pinned` | Bookmark and list sessions in private local state                                                                                   |
-| `npx @spool-lab/cli status` / `npx @spool-lab/cli doctor [checkId] [--fix]`                       | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                                    |
-| `npx @spool-lab/cli login [--token <t>]` / `npx @spool-lab/cli logout`                            | Hub browser-device auth (or token for automation) / revoke and clear credentials                                                    |
-| `npx @spool-lab/cli share [<uuid>[@<n>]] [--summary <markdown>]`                                  | Share any indexed agent Session as Link-only; also supports `--no-agent-summary`, `--yes`, and `--spool-file`                       |
-| `npx @spool-lab/cli withdraw <sid\|url>`                                                          | Tombstone a share so its URL stops resolving                                                                                        |
-| `npx @spool-lab/cli resume <sid\|url>[@<n>] [--workspace <dir>]`                                  | Materialize and natively fork a Claude/Codex share; `--no-exec` prints the command without launching                                |
+| Command                                                                                           | Does                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx @spool-lab/cli sync [--watch]`                                                               | Index new sessions; `--watch` stays running                                                                                                                             |
+| `npx @spool-lab/cli search <query> [-s <source>] [--since 7d]`                                    | Full-text search; add `--json` for machine-readable results                                                                                                             |
+| `npx @spool-lab/cli list [-s <source>] [-p <path>] [-n <count>] [--all]`                          | Current-project Sessions by default; `--all` searches every project. Filters apply to a recent window, so raise `-n` when filtering                                     |
+| `npx @spool-lab/cli projects [query] [-n <count>]`                                                | Project groups, or sessions for a name, identity key, path, or cwd                                                                                                      |
+| `npx @spool-lab/cli show <uuid\|sid\|url>`                                                        | Local transcript / shared Summary; `--log` timeline, `--diff` net change, `@r<n>` record, `--json` structured data                                                      |
+| `npx @spool-lab/cli pin <uuid>` / `npx @spool-lab/cli unpin <uuid>` / `npx @spool-lab/cli pinned` | Bookmark and list sessions in private local state                                                                                                                       |
+| `npx @spool-lab/cli status` / `npx @spool-lab/cli doctor [checkId] [--fix]`                       | Index stats / diagnostics; `doctor --fix --force` also permits destructive fixes                                                                                        |
+| `npx @spool-lab/cli login [--token <t>]` / `npx @spool-lab/cli logout`                            | Hub browser-device auth (or token for automation) / revoke and clear credentials                                                                                        |
+| `npx @spool-lab/cli share [<uuid>[@<n>]] [--summary <markdown>]`                                  | Publish Claude/Codex publicly by default; share other providers as Link-only. Also supports `--visibility-confirmed`, `--no-agent-summary`, `--yes`, and `--spool-file` |
+| `npx @spool-lab/cli withdraw <sid\|url>`                                                          | Tombstone a share so its URL stops resolving                                                                                                                            |
+| `npx @spool-lab/cli resume <sid\|url>[@<n>] [--workspace <dir>]`                                  | Materialize and natively fork a Claude/Codex share; `--no-exec` prints the command without launching                                                                    |

@@ -1,12 +1,17 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
+import { isDiscoverySessionSid } from '@spool-lab/session-kit'
 
 import { audit } from '../../../../../../src/audit'
-import { readDiscoveryView } from '../../../../../../src/discovery/projection'
+import {
+  buildDiscoveryProjection,
+  prepareDiscoveryProjectionUpsert,
+  readDiscoveryView,
+} from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
-import { prepareHubSessionUpsert } from '../../../../../../src/hub/store'
+import { getHubSession, prepareHubSessionUpsert } from '../../../../../../src/hub/store'
 import { parseHeadBody, requireSid } from '../../../../../../src/hub/wire'
 import { publicBaseUrl } from '../../../../../../src/public-url'
 
@@ -29,33 +34,52 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       })
     }
 
-    // Validate the declared view before advancing the head. Sharing remains
-    // Link-only: a separate explicit Publish action owns Discovery projection.
-    await readDiscoveryView(ctx.env.DB, ctx.env.HUB, user.id, body.viewOid)
+    // Validate the declared view before advancing the head. Explore currently
+    // supports Claude Code and Codex CLI; those providers publish by default,
+    // while portable providers remain readable by URL without failing Share.
+    const view = await readDiscoveryView(ctx.env.DB, ctx.env.HUB, user.id, body.viewOid)
+    const existing = await getHubSession(ctx.env.DB, sid)
     const now = Date.now()
+    const sessionUpsert = prepareHubSessionUpsert(ctx.env.DB, {
+      sid,
+      ownerUserId: user.id,
+      root: body.root,
+      recordCount: body.count,
+      sig: body.sig,
+      cardJson: body.cardJson,
+      summaryMd: body.summaryMd,
+      lineageJson: body.lineageJson,
+      viewOid: body.viewOid,
+      spoolFileOid: body.spoolFileOid,
+      now,
+    })
+    const discoverySupported = isDiscoverySessionSid(sid)
+    const statements = [sessionUpsert]
+    if (discoverySupported) {
+      statements.push(
+        prepareDiscoveryProjectionUpsert(
+          ctx.env.DB,
+          buildDiscoveryProjection({
+            sid,
+            summaryMd: body.summaryMd,
+            lineageJson: body.lineageJson,
+            recordCount: body.count,
+            publishedAt: existing?.created_at ?? now,
+            updatedAt: now,
+            view,
+          }),
+        ),
+      )
+    }
 
     await writeManifest(ctx.env.HUB, body.root, body.manifest)
-    await ctx.env.DB.batch([
-      prepareHubSessionUpsert(ctx.env.DB, {
-        sid,
-        ownerUserId: user.id,
-        root: body.root,
-        recordCount: body.count,
-        sig: body.sig,
-        cardJson: body.cardJson,
-        summaryMd: body.summaryMd,
-        lineageJson: body.lineageJson,
-        viewOid: body.viewOid,
-        spoolFileOid: body.spoolFileOid,
-        now,
-      }),
-    ])
+    await ctx.env.DB.batch(statements)
 
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,
       action: 'hub-share',
       target_id: sid,
-      details: { root: body.root, count: body.count },
+      details: { root: body.root, count: body.count, public: discoverySupported },
     })
 
     return jsonOk({ url: `${publicBaseUrl(ctx.env)}/session/${sid}` })

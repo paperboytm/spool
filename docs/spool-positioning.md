@@ -27,15 +27,14 @@ People increasingly build with agents, but the work is difficult to share well:
 ## The product loop
 
 ```text
-Create locally → Share by link → Publish publicly → Discover → Read → Resume / Fork
+Create locally → Review and Share publicly → Discover → Read → Resume / Fork
 ```
 
 1. **Create locally** — the original Session is produced by the author’s agent and remains authoritative.
-2. **Share** — the author creates a durable, Link-only URL. Nothing else on the author’s machine is exposed.
-3. **Publish** — the author can make that Shared Session Public so it appears on their Profile and in Discovery.
-4. **Discover** — readers find Sessions through authors, topics, agents, projects, and editorial surfaces.
-5. **Read** — Summary, conversation, tool activity, files, and diff make the work understandable at different depths.
-6. **Resume / Fork** — a reader continues from the shared point in a new native Session. The source remains unchanged and lineage stays visible.
+2. **Share** — after reviewing the exact Session boundary and sensitive-data findings, the author creates a durable URL. Claude Code and Codex CLI Sessions are Public and discoverable by default; unsupported providers remain Link-only. Nothing else on the author’s machine is exposed.
+3. **Discover** — readers find Sessions through authors, topics, agents, projects, and editorial surfaces.
+4. **Read** — Summary, conversation, tool activity, files, and diff make the work understandable at different depths.
+5. **Resume / Fork** — a reader continues from the shared point in a new native Session. The source remains unchanged and lineage stays visible.
 
 ## Who it is for
 
@@ -75,7 +74,7 @@ A Shared Session is a starting point, not a dead document. Resume creates new wo
 
 ### Safe by default
 
-Nothing is published automatically. New shares are Link-only. Public visibility is a separate, explicit choice. Secret detection, clear visibility labels, and withdrawal controls must be present at the publishing boundary.
+Nothing leaves the machine automatically. Share is the explicit disclosure boundary: supported Sessions are Public by default, and the confirmation names Explore visibility before upload. Secret detection, clear visibility labels, and withdrawal controls remain mandatory.
 
 ### Attributable
 
@@ -120,7 +119,7 @@ Share the full context, make the work understandable, and let others continue it
 2. Summary, conversation, tools, files, and diff in one readable page.
 3. Public Profiles and Discovery for finding useful work.
 4. Native Resume / Fork with visible lineage.
-5. Link-only by default; Public is always an explicit choice.
+5. Public-by-default for supported providers, with visibility stated before upload.
 
 ## Homepage narrative
 

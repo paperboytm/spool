@@ -11,7 +11,7 @@ Spool 是 agent session 的发布平台，从 coding agent 开始。
 四条不变量：
 
 1. 原始 Session 始终是 agent 工作的权威数据。
-2. Share 与 Publish 是两个显式动作，本地整理不会自动公开内容。
+2. Share 是显式公开边界；本地整理不会自动公开内容，受 Explore 支持的 Session 在确认 Share 后默认 Public。
 3. Resume 永远创建新的 Session，不修改来源 Session。
 4. 代码的权威在 Git；Spool 保存工作过程和上下文，不承担完整代码仓库的恢复职责。
 
@@ -22,9 +22,7 @@ Spool 是 agent session 的发布平台，从 coding agent 开始。
       ↓
 准备与安全检查
       ↓
-Share：生成 Link-only URL
-      ↓
-Publish：进入 Profile 与 Discovery
+Share：确认后生成 Public URL，并进入 Discovery
       ↓
 阅读 Summary / Conversation / Tools / Files / Diff
       ↓
@@ -33,11 +31,11 @@ Resume / Fork：创建带 lineage 的新 Session
 
 ### Share
 
-Share 选中一个 Session 或其前缀，生成持久 URL。新 Share 默认为 Link-only：知道 URL 的人可以访问，但它不会出现在作者 Profile 或 Discovery 中。
+Share 选中一个 Session 或其前缀，在展示 record 范围和敏感信息检查结果后生成持久 URL。Claude Code 与 Codex CLI Session 默认 Public，可进入 Discovery；Explore 尚未支持的 provider 保持 Link-only。
 
 ### Publish
 
-Publish 把 Shared Session 设为 Public。Public Session 可以出现在作者 Profile、主题集合、搜索和其他 Discovery 页面中。
+Publish 把 Link-only Shared Session 设为 Public。受支持的新 Share 默认同时完成这一步；Public Session 可以出现在搜索和其他 Discovery 页面中。
 
 ### Resume
 
@@ -58,7 +56,7 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 │ identity + visibility│
 │ lineage + withdrawal │
 └──────────┬───────────┘
-           │ explicit Publish / public read APIs
+           │ public read APIs
            ▼
 ┌──────────────────────┐
 │ Web                  │
@@ -95,7 +93,7 @@ Hub 不修改原始 Session 内容，也不替代 Git。
 
 Web 是公开发布与消费界面：
 
-- 提供将 Link-only Shared Session 设为 Public 的显式 Publish 控件；
+- 展示 Share 后的 Public / Link-only 状态；
 - Homepage 直接展示真实 Public Sessions；
 - Discovery 按主题、agent、作者和时间组织内容；
 - Profile 展示作者身份与 Public Sessions；
@@ -189,8 +187,8 @@ Discovery 只索引 Public Sessions，并支持：
 发布边界必须满足：
 
 - Share 前显示 Session、record 范围与敏感信息检查结果；
-- Share 完成后先返回 Link-only URL；
-- Publish 需要独立确认，明确说明将进入 Profile 与 Discovery；
+- Share 前明确说明受支持的 Session 将成为 Public 并进入 Discovery；
+- Share 完成后返回 URL 与最终 Public / Link-only 状态；
 - Link-only 不能被称为 private 或 secret；
 - Withdraw 立即拒绝新的读取，但无法追回读者已经下载的副本；
 - 账号删除物理清理该作者的 Hub Sessions、owner-scoped objects 与 packs，优先级高于普通 Withdraw；

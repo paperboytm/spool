@@ -32,8 +32,8 @@ export function Privacy() {
                 sent to spool.pro.
               </li>
               <li>
-                A new Share is Link-only. It appears in Explore and search only after a separate
-                Publish action.
+                Supported Sessions are Public in Explore and search by default after you confirm
+                Share; providers not yet supported by Explore remain Link-only.
               </li>
               <li>spool.pro runs no ads, behavioral analytics, or third-party tracking cookies.</li>
             </ul>
@@ -95,11 +95,11 @@ export function Privacy() {
 
           <h2>Visibility and recipients</h2>
           <p>
-            Anyone with a Shared Session URL can read it. A Link-only share does not appear on your
-            Profile, in Explore, or in search unless you separately Publish it. Public Sessions can
-            also appear in social-media previews. Search engines, preview services, and readers may
-            create copies outside our control, so confirm the selected content and sensitive-data
-            findings before sharing.
+            Anyone with a Shared Session URL can read it. Supported Sessions are Public by default
+            and can appear in Explore, search, and social-media previews. A provider not yet
+            supported by Explore remains Link-only. Search engines, preview services, and readers
+            may create copies outside our control, so confirm the selected content and
+            sensitive-data findings before sharing.
           </p>
 
           <h2>Withdrawal, retention, and deletion</h2>

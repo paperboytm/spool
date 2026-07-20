@@ -43,7 +43,10 @@ describe('spool list', () => {
     expect(choices[0]?.label).toBe('00000002  Session 02')
     expect(choices[0]?.hint).toContain('claude')
     expect(confirmations).toEqual([
-      { message: 'Share Session 00000002 as Link-only?', initialValue: true },
+      {
+        message: 'Publish Session 00000002 as Public? It can appear in Explore and search.',
+        initialValue: true,
+      },
     ])
     expect(shared).toBe('00000002-0000-4000-8000-000000000002')
     expect(exit).toBe(0)
@@ -94,6 +97,29 @@ describe('spool list', () => {
     expect(exit).toBe(0)
   })
 
+  it('discloses Link-only visibility for a provider outside Explore', async () => {
+    const db = createSessionDb(1)
+    const pi = db.prepare("SELECT id FROM sources WHERE name='pi'").get() as { id: number }
+    db.prepare('UPDATE sessions SET source_id=?').run(pi.id)
+    const confirmations: string[] = []
+    const ui = {
+      ...createTextUi(),
+      interactive: true,
+      autocomplete: async (options: { choices: CliSelectOption<string>[] }) =>
+        options.choices[0]?.value ?? null,
+      confirm: async (message: string) => {
+        confirmations.push(message)
+        return false
+      },
+    } as CliUi
+
+    await handleListCommand({ limit: '20', all: true }, { db, ui })
+
+    expect(confirmations).toEqual([
+      'Share Session 00000001 as Link-only? Anyone with the URL can read it.',
+    ])
+  })
+
   it('finds a Session beyond the first page without scanning each intervening page', async () => {
     const db = createSessionDb(45)
     const input = new PassThrough()
@@ -112,7 +138,9 @@ describe('spool list', () => {
     input.write('\r')
 
     await expect(result).resolves.toBe(0)
-    expect(confirmations).toEqual(['Share Session 00000001 as Link-only?'])
+    expect(confirmations).toEqual([
+      'Publish Session 00000001 as Public? It can appear in Explore and search.',
+    ])
   })
 
   it('cancels cleanly without starting Share when the confirmation is dismissed', async () => {

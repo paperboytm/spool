@@ -7,7 +7,11 @@ import {
   type Session,
   type SessionsCursor,
 } from '@spool-lab/core'
-import { isSessionProvider, SESSION_PROVIDERS } from '@spool-lab/session-kit'
+import {
+  isDiscoverySessionProvider,
+  isSessionProvider,
+  SESSION_PROVIDERS,
+} from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
 import { formatDate, printSession } from '../format.js'
@@ -65,6 +69,7 @@ export async function handleListCommand(
   }
 
   if (ui.interactive) {
+    const loadedSessions = new Map(sessions.map((session) => [session.sessionUuid, session]))
     const selected = await ui.autocomplete({
       message: 'Select a Session',
       choices: sessions.map(toAutocompleteChoice),
@@ -72,6 +77,9 @@ export async function handleListCommand(
         ? {
             loadMore: (search: string) => {
               const page = loadPage(search)
+              for (const session of page.sessions) {
+                loadedSessions.set(session.sessionUuid, session)
+              }
               return {
                 choices: page.sessions.map(toAutocompleteChoice),
                 hasMore: page.hasMore,
@@ -84,7 +92,14 @@ export async function handleListCommand(
     })
     if (selected === null) return 0
 
-    const wantsShare = await ui.confirm(`Share Session ${selected.slice(0, 8)} as Link-only?`, true)
+    const selectedSession = loadedSessions.get(selected)
+    const publicByDefault = isDiscoverySessionProvider(selectedSession?.source)
+    const wantsShare = await ui.confirm(
+      publicByDefault
+        ? `Publish Session ${selected.slice(0, 8)} as Public? It can appear in Explore and search.`
+        : `Share Session ${selected.slice(0, 8)} as Link-only? Anyone with the URL can read it.`,
+      true,
+    )
     if (wantsShare !== true) {
       if (wantsShare === null) ui.cancel('Session not shared.')
       else ui.outro('Session not shared.')
@@ -94,7 +109,11 @@ export async function handleListCommand(
     const shareSession =
       dependencies.shareSession ??
       ((sessionUuid: string, shareUi: CliUi) =>
-        handleShareCommand(sessionUuid, {}, { ui: shareUi }))
+        handleShareCommand(
+          sessionUuid,
+          { visibilityConfirmed: true, visibilityDisclosed: true },
+          { ui: shareUi },
+        ))
     return shareSession(selected, ui)
   }
 

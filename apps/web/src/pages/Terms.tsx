@@ -66,10 +66,11 @@ export function Terms() {
 
           <h2>Visibility</h2>
           <p>
-            Anyone with a Shared Session URL can read it. A new Share is Link-only and is not listed
-            on a Profile, in Explore, or in search unless the author separately Publishes it. It is
-            not a confidentiality service. Readers can copy content, and third-party caches or
-            previews may outlive withdrawal.
+            Anyone with a Shared Session URL can read it. Supported Sessions are Public by default
+            after the author confirms Share and may appear in Explore, search, or previews.
+            Providers not yet supported by Explore remain Link-only. Spool is not a confidentiality
+            service. Readers can copy content, and third-party caches or previews may outlive
+            withdrawal.
           </p>
 
           <h2>Withdrawal</h2>

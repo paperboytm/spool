@@ -43,4 +43,4 @@ Never commit the Spool data directory or Hub credential file to a repository.
 
 ## Publishing boundary
 
-Configuration and local indexing do not expose Sessions. A Session leaves the machine only through an explicit Share flow, which creates a Link-only URL. Making that Shared Session Public on a Profile and in Explore requires a separate Publish action.
+Configuration and local indexing do not expose Sessions. A Session leaves the machine only through an explicit Share flow. Claude Code and Codex CLI Shares are Public in Explore and search by default; providers not yet supported by Explore remain Link-only.

@@ -35,7 +35,7 @@ If the Hub is unreachable, the local credential is still removed. Revoke the ser
 
 ## `npx @spool-lab/cli share`
 
-Create a durable Link-only Shared Session URL. Publishing it to a Profile and Explore remains a separate action. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure.
+Create a durable Shared Session URL. Claude Code and Codex CLI Sessions are Public in Explore and search by default; providers not yet supported by Explore remain Link-only. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure. Non-interactive callers must pass `--visibility-confirmed`, which acknowledges visibility without bypassing sensitive-data findings.
 
 ```bash
 npx @spool-lab/cli share                       # latest Session in the current directory
@@ -44,14 +44,15 @@ npx @spool-lab/cli share <uuid>@12             # first 12 records only
 npx @spool-lab/cli share --summary "..."       # provide Summary Markdown
 npx @spool-lab/cli share --no-agent-summary    # skip the local Agent offer
 npx @spool-lab/cli share --spool-file x.spool  # attach a curated document
-npx @spool-lab/cli share --yes                 # skip sensitive-data confirmation
+npx @spool-lab/cli share --visibility-confirmed # acknowledge visibility without a TTY
+npx @spool-lab/cli share --yes                 # skip all confirmations, including secret findings
 ```
 
 Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared through the Hub. Claude and Codex preserve their native records; the other sources share the provider-neutral conversation prepared in the local index.
 
 In an interactive terminal, Spool can detect a local Claude Code or Codex CLI installation and ask it to draft the Summary after the records have been shared. Summary generation uses the author’s own local Agent configuration.
 
-`--yes` is intended for controlled automation. It does not remove sensitive values.
+`--yes` is intended for controlled automation. It accepts visibility and sensitive-data findings; it does not remove sensitive values.
 
 ## `npx @spool-lab/cli withdraw`
 

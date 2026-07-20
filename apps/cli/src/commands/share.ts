@@ -9,6 +9,7 @@ import {
 } from '@spool-lab/core'
 import {
   canonicalizeRecord,
+  isDiscoverySessionProvider,
   isResumableSessionProvider,
   parseSessionText,
   SESSION_PROVIDERS,
@@ -32,7 +33,7 @@ import { buildWorkspaceCard, detectWorkspaceRoot } from '../hub/workspace.js'
 import { expandLocalSessionUuid } from '../local-session-ref.js'
 import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
-// `spool share [<session-id>][@<n>]` publishes the session first. Once the
+// `spool share [<session-id>][@<n>]` publishes supported Sessions first. Once the
 // URL is live, an interactive terminal can offer one of the user's installed
 // local Agent CLIs to generate a Markdown Summary and advance the same head.
 
@@ -55,6 +56,10 @@ export interface ShareCommandOptions {
   /** Skip the post-upload local Agent offer. */
   agentSummary?: boolean
   yes?: boolean
+  /** An enclosing flow or non-interactive caller acknowledged the resulting visibility. */
+  visibilityConfirmed?: boolean
+  /** An enclosing UI already displayed the exact Public/Link-only outcome. */
+  visibilityDisclosed?: boolean
   /** Path to a .spool document to attach to the share. */
   spoolFile?: string
 }
@@ -90,6 +95,7 @@ export async function handleShareCommand(
     const { sessionUuid, position } = parseShareRef(input)
     const resolveTarget = dependencies.resolveTarget ?? resolveTargetFromIndex
     const target = resolveTarget(sessionUuid, cwd)
+    const publicByDefault = isDiscoverySessionProvider(target.provider)
 
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
@@ -141,6 +147,33 @@ export async function handleShareCommand(
       }
     }
 
+    const visibilityConfirmation = publicByDefault
+      ? 'Publish this Session as Public? It can appear in Explore and search.'
+      : 'Share this Session as Link-only? Anyone with the URL can read it.'
+    let visibilityDisclosed = options.visibilityDisclosed === true
+    if (options.yes !== true && options.visibilityConfirmed !== true) {
+      if (!ui.interactive) {
+        ui.error(
+          'Cannot confirm the resulting visibility without a TTY. Re-run with `--visibility-confirmed`.',
+        )
+        return 1
+      }
+      const approved = await ui.confirm(visibilityConfirmation, true)
+      if (approved !== true) {
+        if (approved === null) ui.cancel('Share cancelled before upload.')
+        else ui.outro('Session not shared.')
+        return 1
+      }
+      visibilityDisclosed = true
+    }
+    if (!visibilityDisclosed) {
+      ui.info(
+        publicByDefault
+          ? 'This Session will be Public and can appear in Explore and search.'
+          : 'This Session will be Link-only; anyone with the URL can read it.',
+      )
+    }
+
     const client = new HubClient({
       hubUrl: credentials.hubUrl,
       token: credentials.token,
@@ -167,7 +200,12 @@ export async function handleShareCommand(
       upload.error('Session upload failed')
       throw cause
     }
-    await announceShareComplete(ui, url, dependencies.copyToClipboard ?? copyTextToClipboard)
+    await announceShareComplete(
+      ui,
+      url,
+      publicByDefault,
+      dependencies.copyToClipboard ?? copyTextToClipboard,
+    )
 
     if (options.summary !== undefined) {
       const summaryUpload = ui.spinner()
@@ -280,9 +318,10 @@ export async function handleShareCommand(
 async function announceShareComplete(
   ui: CliUi,
   url: string,
+  publicByDefault: boolean,
   copyToClipboard: (text: string) => boolean | Promise<boolean>,
 ): Promise<void> {
-  ui.note(url, 'Link-only URL')
+  ui.note(url, publicByDefault ? 'Public Session URL' : 'Link-only URL')
   let copied = false
   if (ui.interactive) {
     try {
@@ -291,17 +330,16 @@ async function announceShareComplete(
       // Clipboard access is a convenience; a live share must still succeed.
     }
   }
-  ui.success(
-    copied
-      ? 'Session shared as Link-only. Link copied to clipboard.'
-      : 'Session shared as Link-only.',
-  )
+  const result = publicByDefault ? 'Session published.' : 'Session shared as Link-only.'
+  ui.success(copied ? `${result} Link copied to clipboard.` : result)
   if (ui.interactive && !copied) {
-    ui.info('Could not copy automatically. Copy the Link-only URL above to share it.')
+    ui.info('Could not copy automatically. Copy the Session URL above to share it.')
   }
-  ui.info(
-    'Keep this Session Link-only, or Publish it separately to show it on your Profile and in Discovery.',
-  )
+  if (publicByDefault) {
+    ui.info('This Session can appear in Explore and search. The source Session stays unchanged.')
+  } else {
+    ui.info('This provider is not yet supported in Explore, so the Session remains Link-only.')
+  }
 }
 
 export const shareCommand = new Command('share')
@@ -315,18 +353,28 @@ export const shareCommand = new Command('share')
     'Provide Summary Markdown directly (advanced; local Agent generation is recommended)',
   )
   .option('--no-agent-summary', 'Do not offer to generate a Summary with a local Agent')
-  .option('--yes', 'Skip the secret-findings confirmation')
+  .option('--visibility-confirmed', 'Acknowledge visibility when running without a TTY')
+  .option('--yes', 'Skip all confirmations, including secret findings')
   .option('--spool-file <path>', 'Attach a .spool document to the share')
   .action(
     async (
       session: string | undefined,
-      opts: { summary?: string; agentSummary: boolean; yes?: boolean; spoolFile?: string },
+      opts: {
+        summary?: string
+        agentSummary: boolean
+        visibilityConfirmed?: boolean
+        yes?: boolean
+        spoolFile?: string
+      },
     ) => {
       const exitCode = await handleShareCommand(
         session,
         {
           ...(opts.summary === undefined ? {} : { summary: opts.summary }),
           agentSummary: opts.agentSummary,
+          ...(opts.visibilityConfirmed === undefined
+            ? {}
+            : { visibilityConfirmed: opts.visibilityConfirmed }),
           ...(opts.yes === undefined ? {} : { yes: opts.yes }),
           ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
         },

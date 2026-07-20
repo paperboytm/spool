@@ -55,6 +55,7 @@ export interface HubSessionMeta {
   spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
+  visibility?: 'public' | 'link-only'
   author: HubAuthor
 }
 

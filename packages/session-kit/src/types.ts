@@ -4,6 +4,11 @@ export type SessionProvider = (typeof SESSION_PROVIDERS)[number]
 export const RESUMABLE_SESSION_PROVIDERS = ['claude', 'codex'] as const
 export type ResumableSessionProvider = (typeof RESUMABLE_SESSION_PROVIDERS)[number]
 
+/** Providers whose Hub shares are published to Explore by default. Keep this
+ * policy separate from Resume support even though the initial sets match. */
+export const DISCOVERY_SESSION_PROVIDERS = ['claude', 'codex'] as const
+export type DiscoverySessionProvider = (typeof DISCOVERY_SESSION_PROVIDERS)[number]
+
 export const SESSION_PROVIDER_LABELS: Record<SessionProvider, string> = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
@@ -20,6 +25,17 @@ export function isResumableSessionProvider(
   value: SessionProvider,
 ): value is ResumableSessionProvider {
   return (RESUMABLE_SESSION_PROVIDERS as readonly SessionProvider[]).includes(value)
+}
+
+export function isDiscoverySessionProvider(value: unknown): value is DiscoverySessionProvider {
+  return (
+    typeof value === 'string' && (DISCOVERY_SESSION_PROVIDERS as readonly string[]).includes(value)
+  )
+}
+
+export function isDiscoverySessionSid(sid: string): boolean {
+  const separator = sid.indexOf('_')
+  return separator > 0 && isDiscoverySessionProvider(sid.slice(0, separator))
 }
 
 export type JsonPrimitive = boolean | number | string | null

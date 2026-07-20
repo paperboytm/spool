@@ -42,6 +42,7 @@ export type {
   DiffLine,
   DiffLineKind,
   Diffstat,
+  DiscoverySessionProvider,
   EditEvent,
   EditTool,
   IndexedRecord,
@@ -62,9 +63,12 @@ export type {
 } from './types.js'
 
 export {
+  DISCOVERY_SESSION_PROVIDERS,
   RESUMABLE_SESSION_PROVIDERS,
   SESSION_PROVIDER_LABELS,
   SESSION_PROVIDERS,
+  isDiscoverySessionProvider,
+  isDiscoverySessionSid,
   isResumableSessionProvider,
   isSessionProvider,
 } from './types.js'

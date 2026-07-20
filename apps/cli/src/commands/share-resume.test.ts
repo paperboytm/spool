@@ -192,7 +192,7 @@ function writeFixtureSession(workspaceRoot: string): string {
 
 function interactiveUi(
   options: {
-    confirm?: boolean
+    confirm?: boolean | null | ((message: string) => boolean | null)
     selected?: 'claude' | 'codex'
     events?: string[]
   } = {},
@@ -218,7 +218,9 @@ function interactiveUi(
     cancel: (message) => events.push(`cancel:${message}`),
     confirm: async (message, initialValue) => {
       events.push(`confirm:${message}:${initialValue === true ? 'yes' : 'no'}`)
-      return options.confirm ?? true
+      return typeof options.confirm === 'function'
+        ? options.confirm(message)
+        : (options.confirm ?? true)
     },
     select: async ({ message }) => {
       events.push(`select:${message}`)
@@ -258,7 +260,7 @@ function shareDeps(
 }
 
 describe('spool share local Agent Summary flow', () => {
-  it('confirms the Link-only URL and copies it in an interactive terminal', async () => {
+  it('confirms the Public Session URL and copies it in an interactive terminal', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-share-complete-'))
     const home = mkdtempSync(join(tmpdir(), 'spool-share-complete-home-'))
@@ -283,13 +285,21 @@ describe('spool share local Agent Summary flow', () => {
     const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
     expect(exit).toBe(0)
     expect(copied).toBe(url)
-    expect(events).toContain(`note:Link-only URL:${url}`)
-    expect(events).toContain('success:Session shared as Link-only. Link copied to clipboard.')
-    expect(events.indexOf(`note:Link-only URL:${url}`)).toBeLessThan(
-      events.indexOf('success:Session shared as Link-only. Link copied to clipboard.'),
+    expect(events).toContain(`note:Public Session URL:${url}`)
+    expect(events).toContain(
+      'confirm:Publish this Session as Public? It can appear in Explore and search.:yes',
+    )
+    expect(
+      events.indexOf(
+        'confirm:Publish this Session as Public? It can appear in Explore and search.:yes',
+      ),
+    ).toBeLessThan(events.indexOf('spinner:start:Uploading session'))
+    expect(events).toContain('success:Session published. Link copied to clipboard.')
+    expect(events.indexOf(`note:Public Session URL:${url}`)).toBeLessThan(
+      events.indexOf('success:Session published. Link copied to clipboard.'),
     )
     expect(events).toContain(
-      'info:Keep this Session Link-only, or Publish it separately to show it on your Profile and in Discovery.',
+      'info:This Session can appear in Explore and search. The source Session stays unchanged.',
     )
   })
 
@@ -319,10 +329,10 @@ describe('spool share local Agent Summary flow', () => {
 
       const url = `${HUB_URL}/session/claude_${SESSION_UUID}`
       expect(exit).toBe(0)
-      expect(events).toContain(`note:Link-only URL:${url}`)
-      expect(events).toContain('success:Session shared as Link-only.')
+      expect(events).toContain(`note:Public Session URL:${url}`)
+      expect(events).toContain('success:Session published.')
       expect(events).toContain(
-        'info:Could not copy automatically. Copy the Link-only URL above to share it.',
+        'info:Could not copy automatically. Copy the Session URL above to share it.',
       )
     }
   })
@@ -365,13 +375,13 @@ describe('spool share local Agent Summary flow', () => {
     expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
       '## Outcome\n\nThe rename is ready.',
     )
-    expect(events.findIndex((event) => event.startsWith('note:Link-only URL:'))).toBeLessThan(
-      events.findIndex((event) => event.startsWith('confirm:')),
+    expect(events.findIndex((event) => event.startsWith('note:Public Session URL:'))).toBeLessThan(
+      events.findIndex((event) => event.startsWith('confirm:Generate a Summary')),
     )
     expect(events).toContain('select:Which local Agent should generate the Summary?')
   })
 
-  it('does not prompt or invoke an Agent when stdout is non-interactive', async () => {
+  it('does not prompt or invoke an Agent when non-interactive visibility is acknowledged', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-'))
     const home = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-home-'))
@@ -381,7 +391,7 @@ describe('spool share local Agent Summary flow', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      {},
+      { visibilityConfirmed: true },
       {
         ...share.deps,
         detectSummaryAgents: async () => {
@@ -393,7 +403,24 @@ describe('spool share local Agent Summary flow', () => {
 
     expect(exit).toBe(0)
     expect(detected).toBe(false)
+    expect(share.logs.join('\n')).toContain(
+      'This Session will be Public and can appear in Explore and search.',
+    )
     expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+  })
+
+  it('aborts before upload when non-interactive visibility is not acknowledged', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-unconfirmed-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-nontty-unconfirmed-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(undefined, { agentSummary: false }, share.deps)
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.size).toBe(0)
+    expect(share.errors.join('\n')).toContain('--visibility-confirmed')
   })
 
   it('preserves an existing Summary when the user declines regeneration', async () => {
@@ -405,7 +432,7 @@ describe('spool share local Agent Summary flow', () => {
     expect(
       await handleShareCommand(
         undefined,
-        { summary: '## Existing\n\nKeep this Summary.' },
+        { summary: '## Existing\n\nKeep this Summary.', visibilityConfirmed: true },
         share.deps,
       ),
     ).toBe(0)
@@ -415,7 +442,9 @@ describe('spool share local Agent Summary flow', () => {
       {},
       {
         ...share.deps,
-        ui: interactiveUi({ confirm: false }),
+        ui: interactiveUi({
+          confirm: (message) => message.startsWith('Publish this Session as Public?'),
+        }),
         detectSummaryAgents: async () => [
           { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
         ],
@@ -440,7 +469,9 @@ describe('spool share local Agent Summary flow', () => {
       {},
       {
         ...share.deps,
-        ui: interactiveUi({ confirm: false }),
+        ui: interactiveUi({
+          confirm: (message) => message.startsWith('Publish this Session as Public?'),
+        }),
         detectSummaryAgents: async () => [
           { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
         ],
@@ -490,7 +521,7 @@ describe('spool share → spool resume round trip', () => {
 
       const exit = await handleShareCommand(
         sessionUuid,
-        { agentSummary: false },
+        { agentSummary: false, visibilityConfirmed: true },
         {
           fetch: hub.fetchImpl,
           homeDir: home,
@@ -544,7 +575,11 @@ describe('spool share → spool resume round trip', () => {
     const share = shareDeps(hub, authorWs, filePath, authorHome)
 
     const summary = '## Outcome\n\nReady for review.'
-    const shareExit = await handleShareCommand(undefined, { summary }, share.deps)
+    const shareExit = await handleShareCommand(
+      undefined,
+      { summary, visibilityConfirmed: true },
+      share.deps,
+    )
     expect(share.errors).toEqual([])
     expect(shareExit).toBe(0)
 
@@ -660,7 +695,7 @@ describe('spool share → spool resume round trip', () => {
 
     const shareExit = await handleShareCommand(
       undefined,
-      { agentSummary: false },
+      { agentSummary: false, visibilityConfirmed: true },
       {
         ...share.deps,
         resolveTarget: () => ({
@@ -756,7 +791,7 @@ describe('spool share → spool resume round trip', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      { agentSummary: false, spoolFile: docPath },
+      { agentSummary: false, spoolFile: docPath, visibilityConfirmed: true },
       share.deps,
     )
     expect(share.errors).toEqual([])
@@ -778,7 +813,7 @@ describe('spool share → spool resume round trip', () => {
 
     const exit = await handleShareCommand(
       undefined,
-      { agentSummary: false, spoolFile: docPath },
+      { agentSummary: false, spoolFile: docPath, visibilityConfirmed: true },
       share.deps,
     )
     expect(exit).toBe(1)
@@ -813,6 +848,31 @@ describe('spool share → spool resume round trip', () => {
     expect(share.errors.join('\n')).toContain('Share cancelled')
     expect(hub.sessions.size).toBe(0)
     expect(share.logs.join('\n')).toContain('high-severity')
+  })
+
+  it('still requires secret approval after an enclosing visibility confirmation', async () => {
+    const hub = makeHub()
+    const ws = mkdtempSync(join(tmpdir(), 'spool-secret-list-flow-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-secret-list-flow-home-'))
+    const jsonl =
+      JSON.stringify({
+        type: 'user',
+        uuid: 'u-1',
+        sessionId: 'orig',
+        message: { role: 'user', content: 'my key is AKIAABCDEFGHIJKLMNOP' },
+      }) + '\n'
+    const filePath = join(ws, 'session.jsonl')
+    writeFileSync(filePath, jsonl, 'utf8')
+    const share = shareDeps(hub, ws, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false, visibilityConfirmed: true },
+      { ...share.deps, confirm: async () => false },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.size).toBe(0)
   })
 
   it('defaults the secret-finding confirmation to yes', async () => {
@@ -851,7 +911,13 @@ describe('spool share → spool resume round trip', () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-tamper-home-'))
     const filePath = writeFixtureSession(ws)
     const share = shareDeps(hub, ws, filePath, home)
-    expect(await handleShareCommand(undefined, { agentSummary: false }, share.deps)).toBe(0)
+    expect(
+      await handleShareCommand(
+        undefined,
+        { agentSummary: false, visibilityConfirmed: true },
+        share.deps,
+      ),
+    ).toBe(0)
 
     const sid = `claude_${SESSION_UUID}`
     const head = hub.sessions.get(sid) as StoredHead
@@ -879,7 +945,13 @@ describe('spool share → spool resume round trip', () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-gone-home-'))
     const filePath = writeFixtureSession(ws)
     const share = shareDeps(hub, ws, filePath, home)
-    expect(await handleShareCommand(undefined, { agentSummary: false }, share.deps)).toBe(0)
+    expect(
+      await handleShareCommand(
+        undefined,
+        { agentSummary: false, visibilityConfirmed: true },
+        share.deps,
+      ),
+    ).toBe(0)
 
     const sid = `claude_${SESSION_UUID}`
     ;(hub.sessions.get(sid) as StoredHead).withdrawn = true

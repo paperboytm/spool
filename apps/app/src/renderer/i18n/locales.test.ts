@@ -66,16 +66,23 @@ interface HubShareCopy {
   publishing: string
   doneTitle: string
   doneLead: string
+  linkOnlyTitle: string
+  linkOnlyLead: string
+  linkOnlyPublish: string
+  linkOnlyPublishing: string
+  linkOnlyDoneTitle: string
+  linkOnlyDoneLead: string
 }
 
-const LINK_ONLY_HUB_SHARE_COPY: Array<
+const HUB_SHARE_COPY: Array<
   [
     locale: string,
     copy: HubShareCopy,
     terms: {
+      public: string
       linkOnly: string
-      separatePublish: string
       sourceUnchanged: string
+      publishAction: string
       shareAction: string
     },
   ]
@@ -84,9 +91,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'en',
     en.hubShare,
     {
+      public: 'Public',
       linkOnly: 'Link-only',
-      separatePublish: 'separate action',
       sourceUnchanged: 'source Session stays unchanged',
+      publishAction: 'Publish Session',
       shareAction: 'Share link',
     },
   ],
@@ -94,9 +102,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'de',
     de.hubShare,
     {
+      public: 'Public',
       linkOnly: 'nur per Link',
-      separatePublish: 'separate Aktion',
       sourceUnchanged: 'Quell-Session bleibt unverändert',
+      publishAction: 'Session veröffentlichen',
       shareAction: 'Link teilen',
     },
   ],
@@ -104,9 +113,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'fr',
     fr.hubShare,
     {
+      public: 'publique',
       linkOnly: 'accessible par lien',
-      separatePublish: 'action séparée',
-      sourceUnchanged: 'session source reste inchangée',
+      sourceUnchanged: 'Session source reste inchangée',
+      publishAction: 'Publier la Session',
       shareAction: 'Partager le lien',
     },
   ],
@@ -114,9 +124,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'ja',
     ja.hubShare,
     {
+      public: '公開',
       linkOnly: 'リンク限定',
-      separatePublish: '別の操作',
       sourceUnchanged: '元のセッションは変更されません',
+      publishAction: 'セッションを公開',
       shareAction: 'リンクを共有',
     },
   ],
@@ -124,9 +135,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'ko',
     ko.hubShare,
     {
+      public: '공개',
       linkOnly: '링크 전용',
-      separatePublish: '별도 작업',
       sourceUnchanged: '원본 세션은 변경되지 않습니다',
+      publishAction: '세션 게시',
       shareAction: '링크 공유',
     },
   ],
@@ -134,9 +146,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'zh-CN',
     zhCN.hubShare,
     {
+      public: '公开',
       linkOnly: '仅链接',
-      separatePublish: '单独的操作',
       sourceUnchanged: '源会话不会被更改',
+      publishAction: '发布会话',
       shareAction: '分享链接',
     },
   ],
@@ -144,9 +157,10 @@ const LINK_ONLY_HUB_SHARE_COPY: Array<
     'zh-TW',
     zhTW.hubShare,
     {
+      public: '公開',
       linkOnly: '僅連結',
-      separatePublish: '另外的操作',
       sourceUnchanged: '來源會話不會被變更',
+      publishAction: '發佈會話',
       shareAction: '分享連結',
     },
   ],
@@ -237,21 +251,25 @@ describe('locale key parity vs en.json', () => {
   )
 })
 
-describe('Hub Share Link-only copy', () => {
-  it.each(LINK_ONLY_HUB_SHARE_COPY)(
-    '%s keeps Share distinct from Publish before and after sharing',
+describe('Hub Share visibility copy', () => {
+  it.each(HUB_SHARE_COPY)(
+    '%s makes supported Sessions Public and keeps unsupported providers Link-only',
     (_locale, copy, terms) => {
-      expect(copy.title).toContain(terms.linkOnly)
       expect(copy.lead).toContain('{{records}}')
-      expect(copy.publish).toBe(terms.shareAction)
-      expect(copy.publishing).not.toMatch(
-        /Publish|Publier|Publication|Veröffentlichen|公開中|게시 중|发布中|發佈中/,
-      )
+      expect(copy.lead).toContain(terms.public)
+      expect(copy.lead).toContain('Explore')
+      expect(copy.lead).toContain(terms.sourceUnchanged)
+      expect(copy.publish).toBe(terms.publishAction)
+      expect(copy.doneLead).toContain(terms.public)
+      expect(copy.doneLead).toContain('Explore')
+      expect(copy.doneLead).toContain(terms.sourceUnchanged)
 
-      for (const message of [copy.lead, copy.doneLead]) {
+      expect(copy.linkOnlyPublish).toBe(terms.shareAction)
+      for (const message of [copy.linkOnlyTitle, copy.linkOnlyLead, copy.linkOnlyDoneLead]) {
         expect(message).toContain(terms.linkOnly)
+      }
+      for (const message of [copy.linkOnlyLead, copy.linkOnlyDoneLead]) {
         expect(message).toContain('Explore')
-        expect(message).toContain(terms.separatePublish)
         expect(message).toContain(terms.sourceUnchanged)
       }
     },

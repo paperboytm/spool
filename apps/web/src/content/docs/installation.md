@@ -33,6 +33,6 @@ The terminal prints a short approval URL and waits for the browser confirmation.
 
 ## Local data and sharing
 
-Session preparation happens locally. Nothing is shared automatically. A Link-only URL is created only after you choose a Session and confirm the Share flow.
+Session preparation happens locally. Nothing is shared automatically. A durable URL is created only after you choose a Session, review the disclosure boundary, and confirm Share; supported Sessions are Public by default.
 
 See [Quick Start](/docs/quick-start) to share your first Session.

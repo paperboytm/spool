@@ -5,7 +5,11 @@ import { join } from 'node:path'
 import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
 
-import type { HubSharePrepareResult, HubSharePublishResult } from '../../shared/hub-share.js'
+import type {
+  HubSharePrepareResult,
+  HubSharePublishResult,
+  HubShareWithdrawResult,
+} from '../../shared/hub-share.js'
 
 type Handler = (e: unknown, ...args: unknown[]) => unknown
 
@@ -38,6 +42,7 @@ interface StoredHead {
 function makeHub() {
   const objects = new Map<string, string>()
   const sessions = new Map<string, StoredHead>()
+  const withdrawn = new Set<string>()
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
@@ -68,9 +73,14 @@ function makeHub() {
       sessions.set(decodeURIComponent(match[1] as string), body)
       return json({ url: `https://hub.test/session/${match[1]}` })
     }
+    const withdrawMatch = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)\/withdraw$/)
+    if (withdrawMatch && method === 'POST') {
+      withdrawn.add(decodeURIComponent(withdrawMatch[1] as string))
+      return json({ withdrawn: true })
+    }
     return json({ error: 'NOT_FOUND' }, 404)
   }
-  return { fetchImpl, sessions, objects }
+  return { fetchImpl, sessions, objects, withdrawn }
 }
 
 const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
@@ -242,5 +252,15 @@ describe('hub-share IPC', () => {
       summary: '',
     })
     expect(result).toEqual({ ok: false, error: 'UNAUTHENTICATED' })
+  })
+
+  it('withdraw tombstones a completed Hub share', async () => {
+    const { hub } = setup()
+    const result = await invoke<HubShareWithdrawResult>('hub-share:withdraw', {
+      sid: `claude_${SESSION_UUID}`,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(hub.withdrawn).toContain(`claude_${SESSION_UUID}`)
   })
 })

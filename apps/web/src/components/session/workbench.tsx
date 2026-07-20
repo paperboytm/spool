@@ -25,6 +25,7 @@ import {
   Copy,
   GitBranch,
   GitCommitHorizontal,
+  Globe2,
   Link2,
   MessageSquareText,
 } from 'lucide-react'
@@ -157,6 +158,8 @@ export function SessionWorkbench({
   const resume = resumeCommandFor(meta.sid)
   const resumable = isResumableSessionProvider(provider)
   const providerLabel = SESSION_PROVIDER_LABELS[provider]
+  const isPublic = meta.visibility === 'public'
+  const visibilityTimestamp = isPublic ? meta.createdAt : meta.updatedAt
   const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
     () => getUserPromptEntries(conversation.messages),
@@ -295,11 +298,15 @@ export function SessionWorkbench({
                 {providerLabel}
               </Badge>
               <Badge data-testid="session-visibility">
-                <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
-                Link-only
+                {isPublic ? (
+                  <Globe2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                ) : (
+                  <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                )}
+                {isPublic ? 'Public' : 'Link-only'}
               </Badge>
-              <span title={humanDateTime(meta.updatedAt)}>
-                Shared {relativeDate(meta.updatedAt)}
+              <span title={humanDateTime(visibilityTimestamp)}>
+                {isPublic ? 'Published' : 'Shared'} {relativeDate(visibilityTimestamp)}
               </span>
             </div>
             <h1

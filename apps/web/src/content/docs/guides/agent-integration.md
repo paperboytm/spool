@@ -25,10 +25,10 @@ Ask the agent to “share this session to Spool.” The skill:
 1. syncs the latest records;
 2. selects the current Session;
 3. prepares a concise Summary;
-4. runs `npx @spool-lab/cli share` without bypassing sensitive-data findings;
+4. runs `npx @spool-lab/cli share --visibility-confirmed` without bypassing sensitive-data findings;
 5. returns the durable URL.
 
-Only Claude Code and Codex CLI Sessions can currently be published through the Hub.
+Claude Code and Codex CLI Sessions are Public by default. Gemini CLI, OpenCode, and Pi Sessions use Link-only URLs until Explore supports them.
 
 ## Continue a Spool Session
 

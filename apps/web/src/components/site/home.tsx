@@ -347,7 +347,7 @@ function BrowseSection() {
             <span className="accent">.</span>
           </>
         }
-        sub="Choose a Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Every Share starts Link-only; Publish is the separate action that can add it to your Profile and Explore."
+        sub="Choose a Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Supported Sessions are Public in Explore and search by default."
       />
 
       <div className="pillar-spec">
@@ -819,8 +819,8 @@ function PrinciplesSection() {
     },
     {
       n: 'ii.',
-      title: 'Share first. Publish separately.',
-      body: 'Share creates a Link-only URL for the chosen Session and record range. A separate Publish action makes it Public and discoverable.',
+      title: 'Review first. Publish once.',
+      body: 'Share is the explicit disclosure step. After you review the exact Session boundary and sensitive-data findings, supported Sessions become Public and discoverable by default.',
     },
     {
       n: 'iii.',
