@@ -216,8 +216,8 @@ function interactiveUi(
     error: (message) => events.push(`error:${message}`),
     outro: (message) => events.push(`outro:${message}`),
     cancel: (message) => events.push(`cancel:${message}`),
-    confirm: async (message) => {
-      events.push(`confirm:${message}`)
+    confirm: async (message, initialValue) => {
+      events.push(`confirm:${message}:${initialValue === true ? 'yes' : 'no'}`)
       return options.confirm ?? true
     },
     select: async ({ message }) => {
@@ -813,6 +813,36 @@ describe('spool share → spool resume round trip', () => {
     expect(share.errors.join('\n')).toContain('Share cancelled')
     expect(hub.sessions.size).toBe(0)
     expect(share.logs.join('\n')).toContain('high-severity')
+  })
+
+  it('defaults the secret-finding confirmation to yes', async () => {
+    const hub = makeHub()
+    const ws = mkdtempSync(join(tmpdir(), 'spool-secret-default-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-secret-default-home-'))
+    const jsonl =
+      JSON.stringify({
+        type: 'user',
+        uuid: 'u-1',
+        sessionId: 'orig',
+        message: { role: 'user', content: 'my key is AKIAABCDEFGHIJKLMNOP and secret stuff' },
+      }) + '\n'
+    const filePath = join(ws, 'session.jsonl')
+    writeFileSync(filePath, jsonl, 'utf8')
+    const share = shareDeps(hub, ws, filePath, home)
+    const events: string[] = []
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false },
+      {
+        ...share.deps,
+        ui: interactiveUi({ events }),
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(events).toContain('confirm:Share despite the secret findings?:yes')
+    expect(hub.sessions.size).toBe(1)
   })
 
   it('fails resume when a record does not match its oid', async () => {

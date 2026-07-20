@@ -124,7 +124,7 @@ export async function handleShareCommand(
       if (options.yes !== true) {
         const approved = dependencies.confirm
           ? await dependencies.confirm('Share despite the secret findings?')
-          : await ui.confirm('Share despite the secret findings?', false)
+          : await ui.confirm('Share despite the secret findings?', true)
         if (approved !== true) {
           if (approved === null && !ui.interactive) {
             ui.error('Cannot confirm secret findings without a TTY. Re-run with `--yes`.')
