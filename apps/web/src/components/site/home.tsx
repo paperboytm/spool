@@ -1,7 +1,7 @@
 import { Button, ButtonLink } from '@spool-lab/ui'
 import { useEffect, useState } from 'react'
 
-const INSTALL_CMD = 'curl -fsSL https://spool.pro/install.sh | bash'
+const SHARE_CMD = 'npx @spool-lab/cli share'
 
 export default function HomePage() {
   useScrollReveal()
@@ -75,12 +75,12 @@ function Hero() {
       </p>
 
       <div className="hh-cta">
-        <InstallPill />
+        <ShareCommandPill />
         <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
         </ButtonLink>
-        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
-          Read the docs →
+        <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
+          Share yours →
         </ButtonLink>
       </div>
 
@@ -261,11 +261,11 @@ function SessionRow({
   )
 }
 
-function InstallPill() {
+function ShareCommandPill() {
   const [copied, setCopied] = useState(false)
   const onClick = () => {
     void navigator.clipboard
-      .writeText(INSTALL_CMD)
+      .writeText(SHARE_CMD)
       .then(() => {
         setCopied(true)
         setTimeout(() => setCopied(false), 1600)
@@ -278,10 +278,10 @@ function InstallPill() {
       className={`hh-install${copied ? ' is-copied' : ''}`}
       variant="outline"
       onClick={onClick}
-      aria-label="Copy install command"
+      aria-label="Copy share command"
     >
       <span className="tick">$</span>
-      <code>{INSTALL_CMD}</code>
+      <code>{SHARE_CMD}</code>
       <span className="copy">
         {copied ? (
           <svg
@@ -347,7 +347,7 @@ function BrowseSection() {
             <span className="accent">.</span>
           </>
         }
-        sub="Choose a Claude Code or Codex CLI Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Shared Sessions are public and can appear in Explore and search."
+        sub="Choose a Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Every Share starts Link-only; Publish is the separate action that can add it to your Profile and Explore."
       />
 
       <div className="pillar-spec">
@@ -819,8 +819,8 @@ function PrinciplesSection() {
     },
     {
       n: 'ii.',
-      title: 'Explicit public sharing.',
-      body: 'Sharing creates a public, discoverable URL for the chosen Session and record range. Nothing else on the machine is exposed.',
+      title: 'Share first. Publish separately.',
+      body: 'Share creates a Link-only URL for the chosen Session and record range. A separate Publish action makes it Public and discoverable.',
     },
     {
       n: 'iii.',
@@ -871,12 +871,12 @@ function FinalCTA() {
         <span className="accent">.</span>
       </div>
       <div className="row">
-        <InstallPill />
+        <ShareCommandPill />
         <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
         </ButtonLink>
-        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
-          Read the docs →
+        <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
+          Share yours →
         </ButtonLink>
       </div>
       <div className="plat">Public discovery · Claude Code · Codex CLI · MIT</div>

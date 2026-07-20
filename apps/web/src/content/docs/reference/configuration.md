@@ -21,8 +21,6 @@ Override the directory for development or isolated automation:
 SPOOL_DATA_DIR=/some/path npx @spool-lab/cli sync
 ```
 
-Desktop development uses `~/.spool-dev/` automatically.
-
 ## Source locations
 
 | Agent                | Path                                  |

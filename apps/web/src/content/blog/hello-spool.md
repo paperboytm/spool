@@ -50,12 +50,6 @@ Spool keeps the boundary clear:
 ## Try the current sharing flow
 
 ```bash
-curl -fsSL https://spool.pro/install.sh | bash
-```
-
-Or run the CLI directly with npx:
-
-```bash
 npx @spool-lab/cli sync
 npx @spool-lab/cli login
 npx @spool-lab/cli share <session-uuid>

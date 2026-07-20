@@ -1,6 +1,6 @@
 # Spool 产品架构
 
-> 本文定义 Spool 的长期产品边界与各端职责。领域语言以根目录 `CONTEXT.md` 为准，公开叙事以 `docs/spool-positioning.md` 为准。
+> 本文定义 Spool 当前对外产品边界与各端职责。领域语言以根目录 `CONTEXT.md` 为准，公开叙事以 `docs/spool-positioning.md` 为准。
 
 ## 1. 核心定义
 
@@ -47,10 +47,10 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 
 ```text
 ┌──────────────────────┐
-│ Desktop / CLI        │
-│ 本地准备、检查与发布  │
+│ CLI                  │
+│ 本地准备、检查与分享  │
 └──────────┬───────────┘
-           │ explicit Share / Publish
+           │ explicit Share
            ▼
 ┌──────────────────────┐
 │ Hub                  │
@@ -58,7 +58,7 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 │ identity + visibility│
 │ lineage + withdrawal │
 └──────────┬───────────┘
-           │ public read APIs
+           │ explicit Publish / public read APIs
            ▼
 ┌──────────────────────┐
 │ Web                  │
@@ -67,19 +67,9 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 └──────────────────────┘
 ```
 
-### Desktop
-
-作者的私有准备与管理界面：
-
-- 读取并组织本地 Sessions；
-- 检查要分享的范围与敏感信息；
-- 编辑或生成 Summary；
-- 执行 Share、Publish、Withdraw；
-- 管理自己发布过的 Sessions。
-
 ### CLI
 
-供终端、agent 和自动化使用的稳定接口：
+作者、agent 和自动化进行本地准备与 Share 的稳定接口：
 
 - `npx @spool-lab/cli share`：创建 Shared Session；
 - `npx @spool-lab/cli show`：按摘要、timeline、diff 或 record 阅读；
@@ -105,6 +95,7 @@ Hub 不修改原始 Session 内容，也不替代 Git。
 
 Web 是公开发布与消费界面：
 
+- 提供将 Link-only Shared Session 设为 Public 的显式 Publish 控件；
 - Homepage 直接展示真实 Public Sessions；
 - Discovery 按主题、agent、作者和时间组织内容；
 - Profile 展示作者身份与 Public Sessions；

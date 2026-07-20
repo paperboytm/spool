@@ -12,7 +12,7 @@ npx @spool-lab/cli --version
 If you prefer the shorter `spool` command, run `npm install -g @spool-lab/cli` once and use
 `spool …` afterward.
 
-The CLI uses the same local data directory as Desktop and provides the stable shell interface for users, agents, and automation.
+The CLI stores prepared Sessions in the local Spool data directory and provides the stable shell interface for users, agents, and automation.
 
 ## `npx @spool-lab/cli login`
 
@@ -145,7 +145,7 @@ Whitespace-separated terms use all-term matching with exact-phrase hits ranked f
 
 ## Pins
 
-Pins are private organization state shared with Desktop:
+Pins are private local organization state:
 
 ```bash
 npx @spool-lab/cli pin <uuid>

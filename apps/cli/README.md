@@ -66,7 +66,7 @@ npx @spool-lab/cli unpin <uuid>
 npx @spool-lab/cli pinned [--json]
 ```
 
-Pin state is shared with Desktop and does not affect Public Profile order or Discovery ranking.
+Pin state is local and does not affect Public Profile order or Discovery ranking.
 
 ## Diagnostics
 

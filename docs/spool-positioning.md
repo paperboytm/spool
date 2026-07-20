@@ -167,7 +167,7 @@ Avoid:
 - social feed
 - “private link”
 - claims that nothing ever leaves the machine
-- positioning Spool as only a search box, archive, or desktop utility
+- positioning Spool as only a search box, archive, or local-only utility
 
 ## Product boundaries
 

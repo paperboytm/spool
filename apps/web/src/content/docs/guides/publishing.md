@@ -9,17 +9,7 @@ Spool treats sharing and publishing as two explicit boundaries. Local preparatio
 
 **Share** creates a durable Link-only URL. Anyone with the URL can read it, but it does not appear on the author’s Profile, in Explore, or in search. **Publish** is the separate action that makes a Shared Session Public.
 
-## Share from Desktop
-
-1. Open a Claude Code, Codex CLI, Gemini CLI, OpenCode, or Pi Session.
-2. Choose **Share session** from the Session actions.
-3. Review the record count, file and diff summary, and sensitive-data findings.
-4. Edit the optional Summary.
-5. Confirm the Link-only disclosure, then copy the returned URL.
-
-The desktop flow automatically attaches a curated `.spool` document when the Session can be rendered that way.
-
-## Share from the CLI
+## Share from the terminal
 
 ```bash
 npx @spool-lab/cli sync

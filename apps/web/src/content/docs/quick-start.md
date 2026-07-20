@@ -3,11 +3,11 @@ title: Quick Start
 description: Share an agent Session and let someone else continue it.
 ---
 
-With the desktop app or the no-install CLI path from [Installation](/docs/installation), you can turn a Claude Code or Codex CLI Session into a durable URL in a few minutes.
+With the no-install CLI path from [Installation](/docs/installation), you can turn a supported agent Session into a durable URL in a few minutes.
 
 ## 1. Prepare your Sessions
 
-Launch the desktop app, or index from the terminal:
+Index Sessions from your terminal:
 
 ```bash
 npx @spool-lab/cli sync
@@ -17,7 +17,7 @@ Spool reads supported agent Session files on your machine and groups them by pro
 
 ## 2. Sign in
 
-Sign in from Desktop, or run:
+Sign in from the terminal:
 
 ```bash
 npx @spool-lab/cli login
@@ -27,9 +27,7 @@ The CLI opens a browser-approval flow and stores a revocable Hub credential on t
 
 ## 3. Choose a Session
 
-In Desktop, open a Session and choose **Share session**.
-
-From the CLI, find a Session and share it:
+Find a Session and share it:
 
 ```bash
 npx @spool-lab/cli list -n 10

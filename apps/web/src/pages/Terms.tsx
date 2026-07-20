@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'July 18, 2026'
+const LAST_UPDATED = 'July 20, 2026'
 
 export function Terms() {
   useEffect(() => {
@@ -66,10 +66,10 @@ export function Terms() {
 
           <h2>Visibility</h2>
           <p>
-            A Shared Session is public: it is available to anyone with its URL and may be listed,
-            searched, previewed, and shared broadly after the author confirms sharing. It is not a
-            confidentiality service. Readers can copy content, and third-party caches or previews
-            may outlive withdrawal.
+            Anyone with a Shared Session URL can read it. A new Share is Link-only and is not listed
+            on a Profile, in Explore, or in search unless the author separately Publishes it. It is
+            not a confidentiality service. Readers can copy content, and third-party caches or
+            previews may outlive withdrawal.
           </p>
 
           <h2>Withdrawal</h2>

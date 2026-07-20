@@ -24,7 +24,7 @@ Claude Code and Codex profile directories are also detected:
 
 ## Local preparation
 
-Desktop watches supported source locations while it runs. The CLI can trigger the same ingestion explicitly:
+Use the CLI to index supported source locations explicitly or keep them up to date with watch mode:
 
 ```bash
 npx @spool-lab/cli sync
