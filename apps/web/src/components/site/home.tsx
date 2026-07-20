@@ -400,7 +400,7 @@ function BrowseDiagram() {
         <div className="bd-src bd-src-soon">
           <div className="bd-src-head">
             <span className="bd-soon-badge">share</span>
-            <span className="bd-src-path">spool share claude_7a55b1ee-…</span>
+            <span className="bd-src-path">npx @spool-lab/cli share claude_7a55b1ee-…</span>
           </div>
         </div>
       </div>
@@ -541,9 +541,9 @@ function SearchSection() {
         }
         sub={
           <>
-            <code>spool resume</code> verifies the shared records, creates a new provider-native
-            Session, and preserves where it came from. Choose a workspace and keep working in the
-            agent you already use.
+            <code>npx @spool-lab/cli resume</code> verifies the shared records, creates a new
+            provider-native Session, and preserves where it came from. Choose a workspace and keep
+            working in the agent you already use.
           </>
         }
       />
@@ -588,7 +588,9 @@ function CmdKOverlay() {
       <div className="cmdk-pop">
         <div className="cmdk-bar">
           <SearchIcon size={16} />
-          <span className="cmdk-q">spool resume https://spool.pro/session/claude_…</span>
+          <span className="cmdk-q">
+            npx @spool-lab/cli resume https://spool.pro/session/claude_…
+          </span>
           <span className="cmdk-modes">
             <span className="cmdk-mode on" title="Verify">
               <BoltIcon />
@@ -743,7 +745,7 @@ function AgentSection() {
 
         <div className="term">
           <div className="line">
-            <span className="p">$</span> <span className="you">spool resume</span>
+            <span className="p">$</span> <span className="you">npx @spool-lab/cli resume</span>
           </div>
           <div className="line" style={{ marginTop: 10 }}>
             <span className="sys">&gt;</span>{' '}

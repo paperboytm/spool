@@ -81,12 +81,12 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 
 供终端、agent 和自动化使用的稳定接口：
 
-- `spool share`：创建 Shared Session；
-- `spool show`：按摘要、timeline、diff 或 record 阅读；
-- `spool resume`：物化并继续 Shared Session；
-- `spool withdraw`：撤回访问；
-- `spool login/logout`：管理 Hub 凭证；
-- `spool sync/search/list/projects`：本地准备与检索。
+- `npx @spool-lab/cli share`：创建 Shared Session；
+- `npx @spool-lab/cli show`：按摘要、timeline、diff 或 record 阅读；
+- `npx @spool-lab/cli resume`：物化并继续 Shared Session；
+- `npx @spool-lab/cli withdraw`：撤回访问；
+- `npx @spool-lab/cli login/logout`：管理 Hub 凭证；
+- `npx @spool-lab/cli sync/search/list/projects`：本地准备与检索。
 
 ### Hub
 

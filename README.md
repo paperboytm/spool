@@ -19,8 +19,11 @@ The desktop app currently supports macOS on Apple Silicon. Release artifacts are
 ### CLI
 
 ```bash
-npm install -g @spool-lab/cli
+npx @spool-lab/cli --version
 ```
+
+No global install is required. If you prefer the shorter `spool` command, run
+`npm install -g @spool-lab/cli` once and use `spool …` afterward.
 
 ## Share a Session
 
@@ -29,9 +32,9 @@ From the desktop app, open an indexed Session and choose **Share session**.
 From a terminal:
 
 ```bash
-spool sync
-spool login
-spool share <session-uuid>
+npx @spool-lab/cli sync
+npx @spool-lab/cli login
+npx @spool-lab/cli share <session-uuid>
 ```
 
 Spool scans the selected Session for sensitive values, prepares an optional Summary, publishes the records to the Hub, and returns a durable URL.
@@ -39,7 +42,7 @@ Spool scans the selected Session for sensitive values, prepares an optional Summ
 A reader can open that URL without installing Spool. Claude Code and Codex CLI shares can also be continued locally:
 
 ```bash
-spool resume <session-url>
+npx @spool-lab/cli resume <session-url>
 ```
 
 Resume creates a new provider-native Session and preserves its relationship to the source. The shared source is never modified.

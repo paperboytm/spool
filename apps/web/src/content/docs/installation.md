@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the Spool desktop app or CLI.
+description: Install the Spool desktop app or run the CLI with npx.
 ---
 
 Spool currently publishes and resumes Claude Code and Codex CLI Sessions. The desktop app runs on macOS with Apple Silicon; the CLI runs anywhere its Node.js dependencies are supported.
@@ -23,17 +23,18 @@ You can also download the release artifact directly from [GitHub Releases](https
 
 ## CLI
 
-Install the CLI globally:
+Run the CLI directly with npx. It downloads the package when needed, so no global install is required:
+
+```bash
+npx @spool-lab/cli --version
+npx @spool-lab/cli doctor
+```
+
+If you prefer the shorter `spool` command, install it globally once:
 
 ```bash
 npm install -g @spool-lab/cli
-```
-
-Verify it is available:
-
-```bash
 spool --version
-spool doctor
 ```
 
 The desktop app and CLI use the same local Session index.
@@ -43,7 +44,7 @@ The desktop app and CLI use the same local Session index.
 Desktop sign-in opens the system browser. The CLI uses a browser-approval flow that also works over SSH:
 
 ```bash
-spool login
+npx @spool-lab/cli login
 ```
 
 The terminal prints a short approval URL and waits for the browser confirmation.

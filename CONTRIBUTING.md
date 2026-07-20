@@ -71,7 +71,7 @@ The stack is three processes: backend (Wrangler, :8788), web
      authorize in the system browser and gets the code back on this
      custom scheme.
 
-   The CLI needs no credentials of its own: `spool login` uses the
+   The repository-local CLI needs no credentials of its own: `pnpm spool login` uses the
    browser-approval flow at `/cli-auth`, which rides on the web session.
 
 2. **Two gitignored config files** (wrangler and electron-vite each have

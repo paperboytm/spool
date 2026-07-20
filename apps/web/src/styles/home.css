@@ -1514,9 +1514,9 @@ section.sect:last-of-type {
 }
 .cmdk-q {
   flex: 1;
-  font-size: 15px;
+  font-size: 12px;
   color: var(--text);
-  font-family: 'Geist Variable', 'Geist', sans-serif;
+  font-family: var(--sp-font-mono);
 }
 .cmdk-modes {
   display: inline-flex;

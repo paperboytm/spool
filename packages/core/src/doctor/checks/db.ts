@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs'
 
 import type Database from 'better-sqlite3'
 
+import { formatCliCommand } from '../../cli-command.js'
 import { DB_PATH } from '../../db/db.js'
 import { openDatabase } from '../../db/native-binding.js'
 import { probeSqlite } from '../preflight.js'
@@ -24,7 +25,7 @@ export const dbChecks: Check[] = [
           category: 'db',
           title: 'Database file',
           severity: 'warn',
-          message: `Not found at ${DB_PATH} — run \`spool sync\` to create it`,
+          message: `Not found at ${DB_PATH} — run \`${formatCliCommand('sync')}\` to create it`,
           details: { path: DB_PATH },
         }
       }

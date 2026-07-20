@@ -436,14 +436,14 @@ describe('list', () => {
 
   it('hints at --all when the current project has no matching sessions', () => {
     const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('spool list --all')
-    expect(out).not.toContain('spool sync')
+    expect(out).toContain('npx @spool-lab/cli list --all')
+    expect(out).not.toContain('npx @spool-lab/cli sync')
   })
 
   it('does not treat a child project as the project containing cwd', () => {
     const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir }, seeded.dir)
     expect(out).not.toContain('Current project session')
-    expect(out).toContain('spool list --all')
+    expect(out).toContain('npx @spool-lab/cli list --all')
   })
 
   it('outputs JSON', () => {

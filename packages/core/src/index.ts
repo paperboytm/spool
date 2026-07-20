@@ -1,5 +1,6 @@
 export * from './types.js'
 export * from './sharing.js'
+export * from './cli-command.js'
 export * from './db/db.js'
 export * from './db/queries.js'
 export * from './db/share-drafts.js'

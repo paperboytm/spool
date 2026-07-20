@@ -1,7 +1,12 @@
 import { readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 
-import { getDB, getSessionWithMessages, serializeIndexedSession } from '@spool-lab/core'
+import {
+  formatCliCommand,
+  getDB,
+  getSessionWithMessages,
+  serializeIndexedSession,
+} from '@spool-lab/core'
 import {
   canonicalizeRecord,
   isResumableSessionProvider,
@@ -88,7 +93,7 @@ export async function handleShareCommand(
 
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
-      ui.error('Not logged in. Run `spool login` first.')
+      ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
       return 1
     }
 
@@ -262,7 +267,9 @@ export async function handleShareCommand(
     }
   } catch (cause) {
     if (cause instanceof HubHttpError && cause.status === 401) {
-      ui.error('Authentication failed. Run `spool login` to update your hub token.')
+      ui.error(
+        `Authentication failed. Run \`${formatCliCommand('login')}\` to update your hub token.`,
+      )
     } else {
       ui.error(cause instanceof Error ? cause.message : String(cause))
     }
@@ -408,7 +415,11 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
       ? latestSessionUuidFor(db, cwd)
       : expandLocalSessionUuid(db, sessionUuid)
   const found = getSessionWithMessages(db, uuid)
-  if (!found) throw new Error(`Session not found in the local index: ${uuid} (run \`spool sync\`?)`)
+  if (!found) {
+    throw new Error(
+      `Session not found in the local index: ${uuid} (run \`${formatCliCommand('sync')}\`?)`,
+    )
+  }
   const { session } = found
   if (session.filePath.startsWith('spool:')) {
     throw new Error('This session has no provider file on disk yet')
@@ -443,7 +454,9 @@ export function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string):
   )
   if (matching) return matching.session_uuid
 
-  throw new Error(`No indexed sessions for ${cwd}. Pass a session UUID or run \`spool sync\`.`)
+  throw new Error(
+    `No indexed sessions for ${cwd}. Pass a session UUID or run \`${formatCliCommand('sync')}\`.`,
+  )
 }
 
 function canonicalExistingPath(path: string): string {

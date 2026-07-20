@@ -3,14 +3,14 @@ title: Quick Start
 description: Share an agent Session and let someone else continue it.
 ---
 
-After [installing Spool](/docs/installation), you can turn a Claude Code or Codex CLI Session into a durable URL in a few minutes.
+With the desktop app or the no-install CLI path from [Installation](/docs/installation), you can turn a Claude Code or Codex CLI Session into a durable URL in a few minutes.
 
 ## 1. Prepare your Sessions
 
 Launch the desktop app, or index from the terminal:
 
 ```bash
-spool sync
+npx @spool-lab/cli sync
 ```
 
 Spool reads supported agent Session files on your machine and groups them by project. This preparation step is local; it does not publish anything.
@@ -20,7 +20,7 @@ Spool reads supported agent Session files on your machine and groups them by pro
 Sign in from Desktop, or run:
 
 ```bash
-spool login
+npx @spool-lab/cli login
 ```
 
 The CLI opens a browser-approval flow and stores a revocable Hub credential on this machine.
@@ -32,11 +32,11 @@ In Desktop, open a Session and choose **Share session**.
 From the CLI, find a Session and share it:
 
 ```bash
-spool list -n 10
-spool share <session-uuid>
+npx @spool-lab/cli list -n 10
+npx @spool-lab/cli share <session-uuid>
 ```
 
-`spool list` uses the current project by default. Run `spool list --all` to see recent Sessions
+`npx @spool-lab/cli list` uses the current project by default. Run `npx @spool-lab/cli list --all` to see recent Sessions
 from every indexed project.
 
 Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared. Native Resume currently supports Claude Code and Codex CLI shares.
@@ -59,10 +59,10 @@ Anyone with the URL can read the Link-only Shared Session without installing Spo
 
 ## 6. Continue the work
 
-A reader who has the CLI can create a new native Session from the shared point:
+A reader can create a new native Session from the shared point without a global install:
 
 ```bash
-spool resume <session-url>
+npx @spool-lab/cli resume <session-url>
 ```
 
 Resume never modifies the source. It creates new work and preserves the relationship back to the Shared Session.

@@ -1,4 +1,4 @@
-import { getDB, searchFragments } from '@spool-lab/core'
+import { formatCliCommand, getDB, searchFragments } from '@spool-lab/core'
 import type { FragmentResult } from '@spool-lab/core'
 import { isSessionProvider, SESSION_PROVIDERS } from '@spool-lab/session-kit'
 import { Command } from 'commander'
@@ -32,7 +32,9 @@ export const searchCommand = new Command('search')
 
       if (results.length === 0) {
         console.log('No results found.')
-        console.log('Tip: run `spool sync` to index new sessions, or try broader search terms.')
+        console.log(
+          `Tip: run \`${formatCliCommand('sync')}\` to index new sessions, or try broader search terms.`,
+        )
         return
       }
 

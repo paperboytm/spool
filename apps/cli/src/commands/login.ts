@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { hostname } from 'node:os'
 
+import { formatCliCommand } from '@spool-lab/core'
 import { Command } from 'commander'
 
 import {
@@ -116,7 +117,9 @@ async function browserLogin(
     }
   }
   waiting.error('Timed out waiting for browser approval')
-  throw new Error('timed out waiting for browser approval. Run `spool login` again.')
+  throw new Error(
+    `timed out waiting for browser approval. Run \`${formatCliCommand('login')}\` again.`,
+  )
 }
 
 export const loginCommand = new Command('login')

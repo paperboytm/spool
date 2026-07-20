@@ -1,4 +1,4 @@
-import { getDB, getStatus } from '@spool-lab/core'
+import { formatCliCommand, getDB, getStatus } from '@spool-lab/core'
 import { Command } from 'commander'
 
 export const statusCommand = new Command('status').description('Show index status').action(() => {
@@ -13,7 +13,7 @@ export const statusCommand = new Command('status').description('Show index statu
     console.log(`Last synced:  ${s.lastSyncedAt ? formatDate(s.lastSyncedAt) : 'never'}`)
   } catch (err) {
     if (err instanceof Error && err.message.includes('SQLITE_CANTOPEN')) {
-      console.log('No index found. Run `spool sync` to create it.')
+      console.log(`No index found. Run \`${formatCliCommand('sync')}\` to create it.`)
     } else {
       console.error('Failed to read index:', err instanceof Error ? err.message : err)
       process.exitCode = 1
