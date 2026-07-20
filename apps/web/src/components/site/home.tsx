@@ -1,7 +1,7 @@
 import { Button, ButtonLink } from '@spool-lab/ui'
 import { useEffect, useState } from 'react'
 
-const INSTALL_CMD = 'curl -fsSL https://spool.pro/install.sh | bash'
+const SHARE_CMD = 'npx @spool-lab/cli share'
 
 export default function HomePage() {
   useScrollReveal()
@@ -75,12 +75,12 @@ function Hero() {
       </p>
 
       <div className="hh-cta">
-        <InstallPill />
+        <ShareCommandPill />
         <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
         </ButtonLink>
-        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
-          Read the docs →
+        <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
+          Share yours →
         </ButtonLink>
       </div>
 
@@ -261,11 +261,11 @@ function SessionRow({
   )
 }
 
-function InstallPill() {
+function ShareCommandPill() {
   const [copied, setCopied] = useState(false)
   const onClick = () => {
     void navigator.clipboard
-      .writeText(INSTALL_CMD)
+      .writeText(SHARE_CMD)
       .then(() => {
         setCopied(true)
         setTimeout(() => setCopied(false), 1600)
@@ -278,10 +278,10 @@ function InstallPill() {
       className={`hh-install${copied ? ' is-copied' : ''}`}
       variant="outline"
       onClick={onClick}
-      aria-label="Copy install command"
+      aria-label="Copy share command"
     >
       <span className="tick">$</span>
-      <code>{INSTALL_CMD}</code>
+      <code>{SHARE_CMD}</code>
       <span className="copy">
         {copied ? (
           <svg
@@ -347,7 +347,7 @@ function BrowseSection() {
             <span className="accent">.</span>
           </>
         }
-        sub="Choose a Claude Code or Codex CLI Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Shared Sessions are public and can appear in Explore and search."
+        sub="Choose a Session, review the exact record range and sensitive-data findings, add an optional Summary, and confirm. Supported Sessions are Public in Explore and search by default."
       />
 
       <div className="pillar-spec">
@@ -400,7 +400,7 @@ function BrowseDiagram() {
         <div className="bd-src bd-src-soon">
           <div className="bd-src-head">
             <span className="bd-soon-badge">share</span>
-            <span className="bd-src-path">spool share claude_7a55b1ee-…</span>
+            <span className="bd-src-path">npx @spool-lab/cli share claude_7a55b1ee-…</span>
           </div>
         </div>
       </div>
@@ -541,9 +541,9 @@ function SearchSection() {
         }
         sub={
           <>
-            <code>spool resume</code> verifies the shared records, creates a new provider-native
-            Session, and preserves where it came from. Choose a workspace and keep working in the
-            agent you already use.
+            <code>npx @spool-lab/cli resume</code> verifies the shared records, creates a new
+            provider-native Session, and preserves where it came from. Choose a workspace and keep
+            working in the agent you already use.
           </>
         }
       />
@@ -588,7 +588,9 @@ function CmdKOverlay() {
       <div className="cmdk-pop">
         <div className="cmdk-bar">
           <SearchIcon size={16} />
-          <span className="cmdk-q">spool resume https://spool.pro/session/claude_…</span>
+          <span className="cmdk-q">
+            npx @spool-lab/cli resume https://spool.pro/session/claude_…
+          </span>
           <span className="cmdk-modes">
             <span className="cmdk-mode on" title="Verify">
               <BoltIcon />
@@ -743,7 +745,7 @@ function AgentSection() {
 
         <div className="term">
           <div className="line">
-            <span className="p">$</span> <span className="you">spool resume</span>
+            <span className="p">$</span> <span className="you">npx @spool-lab/cli resume</span>
           </div>
           <div className="line" style={{ marginTop: 10 }}>
             <span className="sys">&gt;</span>{' '}
@@ -817,8 +819,8 @@ function PrinciplesSection() {
     },
     {
       n: 'ii.',
-      title: 'Explicit public sharing.',
-      body: 'Sharing creates a public, discoverable URL for the chosen Session and record range. Nothing else on the machine is exposed.',
+      title: 'Review first. Publish once.',
+      body: 'Share is the explicit disclosure step. After you review the exact Session boundary and sensitive-data findings, supported Sessions become Public and discoverable by default.',
     },
     {
       n: 'iii.',
@@ -869,12 +871,12 @@ function FinalCTA() {
         <span className="accent">.</span>
       </div>
       <div className="row">
-        <InstallPill />
+        <ShareCommandPill />
         <ButtonLink href="/explore" className="hh-btn" variant="accent">
           Explore Sessions →
         </ButtonLink>
-        <ButtonLink href="/docs/installation" className="hh-btn" variant="outline">
-          Read the docs →
+        <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
+          Share yours →
         </ButtonLink>
       </div>
       <div className="plat">Public discovery · Claude Code · Codex CLI · MIT</div>

@@ -27,7 +27,7 @@ The most useful technical material often makes you want to try it yourself.
 A Spool URL is both a page and a continuation point. With the CLI, a reader can resume the shared records as a new native Session in a supported coding agent. The source stays unchanged, and the relationship between source and continuation remains visible.
 
 ```bash
-spool resume <session-url>
+npx @spool-lab/cli resume <session-url>
 ```
 
 ## Public work needs identity and discovery
@@ -43,23 +43,19 @@ Agent Sessions can contain credentials, personal data, local paths, and code tha
 Spool keeps the boundary clear:
 
 - local preparation does not publish anything;
-- Share creates a Link-only URL; Publish separately makes it Public for Profiles and Discovery;
+- Share publishes supported Sessions to Discovery by default after an explicit review and confirmation;
 - sensitive-data findings appear before disclosure;
 - an author can withdraw a Shared Session.
 
 ## Try the current sharing flow
 
 ```bash
-curl -fsSL https://spool.pro/install.sh | bash
+npx @spool-lab/cli sync
+npx @spool-lab/cli login
+npx @spool-lab/cli share <session-uuid>
 ```
 
-Or install the CLI:
-
-```bash
-npm install -g @spool-lab/cli
-spool sync
-spool login
-spool share <session-uuid>
-```
+No global install is required. If you prefer the shorter `spool` command, install it once with
+`npm install -g @spool-lab/cli`.
 
 Spool is open source and being built in public. [Follow the repository on GitHub](https://github.com/spool-lab/spool) if agent work deserves a better public format.

@@ -1,3 +1,4 @@
+import { formatCliCommand } from '@spool-lab/core'
 import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
@@ -27,7 +28,7 @@ export async function handleWithdrawCommand(
     resolvedSid = ref.sid
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
-      ui.error('Not logged in. Run `spool login` first.')
+      ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
       return 1
     }
 
@@ -67,7 +68,7 @@ export const withdrawCommand = new Command('withdraw')
 
 function friendlyHubError(error: HubHttpError, sid: string): string {
   if (error.status === 401) {
-    return 'Authentication failed. Run `spool login` to update your hub token.'
+    return `Authentication failed. Run \`${formatCliCommand('login')}\` to update your hub token.`
   }
 
   if (error.status === 404) return `Session not found: ${sid}`

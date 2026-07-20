@@ -1,5 +1,9 @@
 import type { D1Database, D1PreparedStatement, R2Bucket } from '@cloudflare/workers-types'
-import type { SessionProvider, SessionViewV1 } from '@spool-lab/session-kit'
+import {
+  isDiscoverySessionProvider,
+  type SessionProvider,
+  type SessionViewV1,
+} from '@spool-lab/session-kit'
 
 import { ApiError } from '../errors'
 import { readObjects } from '../hub/packs'
@@ -146,10 +150,18 @@ export function prepareDiscoveryProjectionUpsert(
     )
 }
 
+export async function isPublishedToDiscovery(db: D1Database, sid: string): Promise<boolean> {
+  const row = await db
+    .prepare('/* discovery:is-published */ SELECT 1 FROM hub_session_discovery WHERE sid = ?')
+    .bind(sid)
+    .first()
+  return row !== null
+}
+
 function providerFromSid(sid: string): SessionProvider {
   if (!SID_RE.test(sid)) throw new ApiError('BAD_REQUEST', 'bad session id')
   const provider = sid.slice(0, sid.indexOf('_'))
-  if (provider !== 'claude' && provider !== 'codex') {
+  if (!isDiscoverySessionProvider(provider)) {
     throw new ApiError('BAD_REQUEST', 'agent is not published to Discovery')
   }
   return provider

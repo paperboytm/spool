@@ -24,11 +24,11 @@ Claude Code and Codex profile directories are also detected:
 
 ## Local preparation
 
-Desktop watches supported source locations while it runs. The CLI can trigger the same ingestion explicitly:
+Use the CLI to index supported source locations explicitly or keep them up to date with watch mode:
 
 ```bash
-spool sync
-spool sync --watch
+npx @spool-lab/cli sync
+npx @spool-lab/cli sync --watch
 ```
 
 Ingestion does not publish a Session. It makes the Session available for review, organization, search, and an explicit Share action.

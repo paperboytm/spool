@@ -45,7 +45,7 @@ export function deepLinkHash(index: number): string {
  *  by default) — shorter to copy than the full page URL, which stays
  *  accepted by the CLI for cross-hub cases. */
 export function resumeCommandFor(sid: string): string {
-  return `spool resume ${sid}`
+  return `npx @spool-lab/cli resume ${sid}`
 }
 
 /** Turn the fetch remote recorded in a workspace card into a browser link.

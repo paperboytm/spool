@@ -1,4 +1,5 @@
 import {
+  formatCliCommand,
   getDB,
   getSessionWithMessages,
   isPinned,
@@ -62,7 +63,7 @@ export const pinnedCommand = new Command('pinned')
     }
 
     if (sessions.length === 0) {
-      console.log('No pinned sessions. Pin one with `spool pin <uuid>`.')
+      console.log(`No pinned sessions. Pin one with \`${formatCliCommand('pin <uuid>')}\`.`)
       return
     }
 

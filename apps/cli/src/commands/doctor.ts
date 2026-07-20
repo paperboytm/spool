@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { runChecks, type CheckResult, type FixResult } from '@spool-lab/core'
+import { formatCliCommand, runChecks, type CheckResult, type FixResult } from '@spool-lab/core'
 import { Command } from 'commander'
 
 import { createClackUi } from '../ui.js'
@@ -18,7 +18,10 @@ interface DoctorFlags {
 
 export const doctorCommand = new Command('doctor')
   .description('Diagnose your Spool environment, database, and config files')
-  .argument('[checkId]', 'Run only a single check, e.g. `spool doctor db.integrity`')
+  .argument(
+    '[checkId]',
+    `Run only a single check, e.g. \`${formatCliCommand('doctor db.integrity')}\``,
+  )
   .option('-v, --verbose', 'Show raw details for each check')
   .option('--json', 'Print machine-readable output')
   .option('--fix', 'Apply safe fixes for any failing checks')
@@ -59,7 +62,9 @@ export const doctorCommand = new Command('doctor')
       const applied = await applyFixes(results, flags.force === true)
       fixing.stop(`Applied ${applied.applied.length} fixes`)
       printFixSummary(applied)
-      if (applied.applied.length > 0) ui.info('Re-run `spool doctor` to verify.')
+      if (applied.applied.length > 0) {
+        ui.info(`Re-run \`${formatCliCommand('doctor')}\` to verify.`)
+      }
     } else {
       printFixHint(results)
     }
@@ -153,7 +158,10 @@ function printFixHint(results: CheckResult[]): void {
   if (destructive > 0) parts.push(`${destructive} destructive (needs --force)`)
   console.log()
   console.log(
-    c('dim', `Run \`spool doctor --fix\` to apply automatic fixes (${parts.join(', ')}).`),
+    c(
+      'dim',
+      `Run \`${formatCliCommand('doctor --fix')}\` to apply automatic fixes (${parts.join(', ')}).`,
+    ),
   )
 }
 

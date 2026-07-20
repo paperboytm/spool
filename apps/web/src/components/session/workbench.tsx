@@ -25,6 +25,7 @@ import {
   Copy,
   GitBranch,
   GitCommitHorizontal,
+  Globe2,
   Link2,
   MessageSquareText,
 } from 'lucide-react'
@@ -39,7 +40,7 @@ import {
   repositoryUrlForRemote,
   resumeCommandFor,
 } from '../../lib/session-page'
-import { CliInstallDialog } from './cli-install-dialog'
+import { CliResumeDialog } from './cli-resume-dialog'
 import { SessionSummary } from './session-summary'
 
 interface Props {
@@ -145,7 +146,7 @@ export function SessionWorkbench({
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
   const [targetTurnIndex, setTargetTurnIndex] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
-  const [showCliInstall, setShowCliInstall] = useState(false)
+  const [showCliResumeGuide, setShowCliResumeGuide] = useState(false)
   const [previewPromptKey, setPreviewPromptKey] = useState<string | null>(null)
   const listRef = useRef<MessageListHandle>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -157,6 +158,8 @@ export function SessionWorkbench({
   const resume = resumeCommandFor(meta.sid)
   const resumable = isResumableSessionProvider(provider)
   const providerLabel = SESSION_PROVIDER_LABELS[provider]
+  const isPublic = meta.visibility === 'public'
+  const visibilityTimestamp = isPublic ? meta.createdAt : meta.updatedAt
   const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
     () => getUserPromptEntries(conversation.messages),
@@ -295,11 +298,15 @@ export function SessionWorkbench({
                 {providerLabel}
               </Badge>
               <Badge data-testid="session-visibility">
-                <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
-                Link-only
+                {isPublic ? (
+                  <Globe2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                ) : (
+                  <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                )}
+                {isPublic ? 'Public' : 'Link-only'}
               </Badge>
-              <span title={humanDateTime(meta.updatedAt)}>
-                Shared {relativeDate(meta.updatedAt)}
+              <span title={humanDateTime(visibilityTimestamp)}>
+                {isPublic ? 'Published' : 'Shared'} {relativeDate(visibilityTimestamp)}
               </span>
             </div>
             <h1
@@ -339,15 +346,15 @@ export function SessionWorkbench({
                 </IconButton>
               </div>
               <div className="mt-2 flex items-center justify-end gap-2 text-[11px] leading-4 text-[var(--muted)]">
-                <span>Don&apos;t have the Spool CLI?</span>
+                <span>No global install needed.</span>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   aria-haspopup="dialog"
-                  onClick={() => setShowCliInstall(true)}
+                  onClick={() => setShowCliResumeGuide(true)}
                 >
-                  Install it
+                  How npx works
                 </Button>
               </div>
             </div>
@@ -613,10 +620,10 @@ export function SessionWorkbench({
         </div>
       </div>
       {resumable && (
-        <CliInstallDialog
-          open={showCliInstall}
+        <CliResumeDialog
+          open={showCliResumeGuide}
           resumeCommand={resume}
-          onClose={() => setShowCliInstall(false)}
+          onClose={() => setShowCliResumeGuide(false)}
         />
       )}
     </main>

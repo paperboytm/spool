@@ -1,4 +1,4 @@
-import { getDB, listProjectGroups, listSessionsByIdentity } from '@spool-lab/core'
+import { formatCliCommand, getDB, listProjectGroups, listSessionsByIdentity } from '@spool-lab/core'
 import type { ProjectGroup, ProjectGroupWithPaths } from '@spool-lab/core'
 import { Command } from 'commander'
 
@@ -126,7 +126,7 @@ function listGroups(groups: ProjectGroup[], json: boolean): void {
     return
   }
   if (groups.length === 0) {
-    console.log('No projects found. Run `spool sync` to index sessions.')
+    console.log(`No projects found. Run \`${formatCliCommand('sync')}\` to index sessions.`)
     return
   }
   for (const g of groups) {

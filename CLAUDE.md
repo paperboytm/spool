@@ -7,7 +7,7 @@ Do not deviate without explicit user approval.
 Key rules at a glance:
 
 - Public web is content-first: show real Sessions and authors before feature explanations
-- `Share` creates a Link-only URL; `Publish` is the separate, explicit Public action
+- `Share` explicitly sends records; supported Claude/Codex Shares are Public by default, while unsupported providers remain Link-only
 - Public metadata is author-attributed (`@handle · published 2h ago`), never first-person
 - Warm amber accent `#C85A00` (light) / `#F07020` (dark) — never blue or purple
 - Warm near-black `#141410` for dark mode — never pure `#000` or cold `#0A0A0A`

@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 
+import { formatCliCommand } from '../../cli-command.js'
 import { DB_PATH, LATEST_SCHEMA_VERSION, getDB } from '../../db/db.js'
 import { openDatabase } from '../../db/native-binding.js'
 import { probeSqlite } from '../preflight.js'
@@ -74,7 +75,7 @@ export const versionChecks: Check[] = [
           severity: 'error',
           message:
             `DB is at v${current} but this CLI only knows up to v${LATEST_SCHEMA_VERSION}. ` +
-            `Upgrade the CLI (npm i -g @spool-lab/cli).`,
+            `Run the current CLI with \`${formatCliCommand('doctor')}\`.`,
           details: { current, expected: LATEST_SCHEMA_VERSION },
         }
       } finally {

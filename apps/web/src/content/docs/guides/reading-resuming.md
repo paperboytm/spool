@@ -26,18 +26,18 @@ A record deep link opens a precise point in the Session with surrounding context
 ## Read from the CLI
 
 ```bash
-spool show <session-id-or-url>        # first-screen overview
-spool show <session-id-or-url> --log  # record timeline
-spool show <session-id-or-url> --diff # composed net diff
-spool show <session-id-or-url>@r3     # one record
+npx @spool-lab/cli show <session-id-or-url>        # first-screen overview
+npx @spool-lab/cli show <session-id-or-url> --log  # record timeline
+npx @spool-lab/cli show <session-id-or-url> --diff # composed net diff
+npx @spool-lab/cli show <session-id-or-url>@r3     # one record
 ```
 
 ## Resume the Session
 
-Install the CLI, then run:
+Run this directly with npx; no global install is required:
 
 ```bash
-spool resume <session-id-or-url>
+npx @spool-lab/cli resume <session-id-or-url>
 ```
 
 Spool verifies the shared records, materializes a new provider-native Session, adds source context, and launches the supported agent.
@@ -45,13 +45,13 @@ Spool verifies the shared records, materializes a new provider-native Session, a
 Choose a workspace explicitly when needed:
 
 ```bash
-spool resume <url> --workspace ~/code/project
+npx @spool-lab/cli resume <url> --workspace ~/code/project
 ```
 
 To prepare the Session without launching the agent:
 
 ```bash
-spool resume <url> --no-exec
+npx @spool-lab/cli resume <url> --no-exec
 ```
 
 ## Continuation semantics

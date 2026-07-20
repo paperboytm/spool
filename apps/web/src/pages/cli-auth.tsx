@@ -1,4 +1,4 @@
-// CLI login approval page (/cli-auth?code=XXXX-XXXX). `spool login`
+// CLI login approval page (/cli-auth?code=XXXX-XXXX). `npx @spool-lab/cli login`
 // prints the same code it bakes into this URL; the user confirms the
 // two match and approves, which mints a scoped sph_ token the CLI then
 // claims by polling. Requires a web session — unauthenticated visitors
@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react'
 
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
 import { type CliAuthInfo, decideCliAuth, fetchCliAuthInfo } from '../lib/cli-auth'
+
+const CLI_LOGIN_COMMAND = 'npx @spool-lab/cli login'
 
 interface Props {
   code: string | null
@@ -82,7 +84,12 @@ export function CliAuth({ code }: Props) {
       <Shell>
         <Card
           title="Approve CLI sign-in"
-          sub="Enter the code shown in your terminal by spool login."
+          sub={
+            <>
+              Enter the code shown in your terminal by{' '}
+              <code className="font-mono text-[var(--text)]">{CLI_LOGIN_COMMAND}</code>.
+            </>
+          }
         >
           <form
             className="sw-cliauth-form"
@@ -179,7 +186,13 @@ export function CliAuth({ code }: Props) {
         <Card
           icon={<Icon name="clock" size={22} />}
           title="Code expired"
-          sub="This code has expired or was already handled. Run spool login again for a fresh one."
+          sub={
+            <>
+              This code has expired or was already handled. Run{' '}
+              <code className="font-mono text-[var(--text)]">{CLI_LOGIN_COMMAND}</code> again for a
+              fresh one.
+            </>
+          }
         />
       </Shell>
     )
@@ -216,7 +229,7 @@ function Card({
 }: {
   icon?: React.ReactNode
   title: string
-  sub: string
+  sub: React.ReactNode
   children?: React.ReactNode
 }) {
   return (

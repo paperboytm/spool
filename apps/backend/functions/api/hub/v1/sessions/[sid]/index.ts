@@ -1,5 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
+import { isPublishedToDiscovery } from '../../../../../../src/discovery/projection'
 import { jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
 import { getHubAuthor } from '../../../../../../src/hub/store'
@@ -14,6 +15,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     const sid = requireSid(ctx.params['sid'])
     const session = await requireReadableSession(ctx.env.DB, sid)
     const author = await getHubAuthor(ctx.env.DB, session.owner_user_id)
+    const published = await isPublishedToDiscovery(ctx.env.DB, sid)
     const summaryMd = session.note_md
     return jsonOk({
       sid: session.sid,
@@ -29,6 +31,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
       spoolFileOid: session.spool_file_oid,
       createdAt: session.created_at,
       updatedAt: session.updated_at,
+      visibility: published ? 'public' : 'link-only',
       author,
     })
   } catch (e) {

@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'July 18, 2026'
+const LAST_UPDATED = 'July 20, 2026'
 
 export function Terms() {
   useEffect(() => {
@@ -66,10 +66,11 @@ export function Terms() {
 
           <h2>Visibility</h2>
           <p>
-            A Shared Session is public: it is available to anyone with its URL and may be listed,
-            searched, previewed, and shared broadly after the author confirms sharing. It is not a
-            confidentiality service. Readers can copy content, and third-party caches or previews
-            may outlive withdrawal.
+            Anyone with a Shared Session URL can read it. Supported Sessions are Public by default
+            after the author confirms Share and may appear in Explore, search, or previews.
+            Providers not yet supported by Explore remain Link-only. Spool is not a confidentiality
+            service. Readers can copy content, and third-party caches or previews may outlive
+            withdrawal.
           </p>
 
           <h2>Withdrawal</h2>

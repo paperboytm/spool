@@ -25,11 +25,13 @@ export interface HubSessionMeta {
   spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
+  visibility: 'public' | 'link-only'
   author: HubAuthor
 }
 
-type HubSessionMetaWire = Omit<HubSessionMeta, 'summaryMd'> & {
+type HubSessionMetaWire = Omit<HubSessionMeta, 'summaryMd' | 'visibility'> & {
   summaryMd?: string | null
+  visibility?: HubSessionMeta['visibility']
   /** Compatibility with Hub responses from before the Summary rename. */
   noteMd?: string | null
 }
@@ -55,7 +57,11 @@ export async function fetchHubMeta(sid: string): Promise<HubMetaResult> {
       const { noteMd, ...meta } = (await r.json()) as HubSessionMetaWire
       return {
         kind: 'ok',
-        meta: { ...meta, summaryMd: meta.summaryMd ?? noteMd ?? null },
+        meta: {
+          ...meta,
+          summaryMd: meta.summaryMd ?? noteMd ?? null,
+          visibility: meta.visibility ?? 'link-only',
+        },
       }
     }
     if (r.status === 410) {

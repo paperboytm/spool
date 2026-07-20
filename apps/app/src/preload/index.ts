@@ -65,7 +65,11 @@ export type SecurityReadiness =
   | { ready: true }
   | { ready: false; reason: 'booting' | 'scanner-unavailable' }
 import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
-import type { HubSharePrepareResult, HubSharePublishResult } from '../shared/hub-share.js'
+import type {
+  HubSharePrepareResult,
+  HubSharePublishResult,
+  HubShareWithdrawResult,
+} from '../shared/hub-share.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
 import type { SearchSortOrder } from '../shared/searchSort.js'
 import type {
@@ -491,6 +495,8 @@ const spoolShare = {
     ipcRenderer.invoke('hub-share:prepare', { sessionUuid }),
   hubSharePublish: (sessionUuid: string, summary: string): Promise<HubSharePublishResult> =>
     ipcRenderer.invoke('hub-share:publish', { sessionUuid, summary }),
+  hubShareWithdraw: (sid: string): Promise<HubShareWithdrawResult> =>
+    ipcRenderer.invoke('hub-share:withdraw', { sid }),
 }
 
 export type SpoolShareAPI = typeof spoolShare

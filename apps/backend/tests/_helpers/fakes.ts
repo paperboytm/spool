@@ -197,6 +197,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
         return stmt
       },
       async first<T = unknown>(): Promise<T | null> {
+        if (sql.includes('/* discovery:is-published */')) {
+          const [sid] = params as [string]
+          return state.hub_session_discovery.some((row) => row.sid === sid)
+            ? ({ '1': 1 } as T)
+            : null
+        }
         if (sql.includes('/* discovery:session-live */')) {
           const [sid] = params as [string]
           const session = state.hub_sessions.find(

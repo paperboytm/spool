@@ -33,6 +33,8 @@ vi.mock('@spool/share-kit/timeline', async (importOriginal) => {
   }
 })
 
+vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 6, 20, 12))
+
 import { SessionWorkbench, getSpoolPromptEntries, getUserPromptEntries } from './workbench'
 
 function message(
@@ -220,8 +222,9 @@ const meta: HubSessionMeta = {
   lineageJson: null,
   viewOid: 'view-oid',
   spoolFileOid: 'spool-oid',
-  createdAt: Date.UTC(2026, 6, 17, 6),
+  createdAt: Date.UTC(2026, 6, 10, 6),
   updatedAt: Date.UTC(2026, 6, 17, 7),
+  visibility: 'public',
   author: { handle: 'dev-user', displayName: 'Dev User', avatarUrl: null },
 }
 
@@ -249,6 +252,7 @@ function renderWorkbench(
     cardJson?: string | null
     view?: SessionViewV1 | null
     provider?: SessionProvider
+    visibility?: HubSessionMeta['visibility']
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -257,6 +261,7 @@ function renderWorkbench(
         ...meta,
         summaryMd: options.summaryMd === undefined ? meta.summaryMd : options.summaryMd,
         cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
+        visibility: options.visibility ?? meta.visibility,
       },
       view: options.view === undefined ? view : options.view,
       provider: options.provider ?? 'claude',
@@ -279,12 +284,21 @@ describe('SessionWorkbench', () => {
 
     expect(html).toContain('data-testid="timeline-body"')
     expect(html).toContain('data-testid="session-visibility"')
-    expect(html).toContain('lucide-link-2')
-    expect(html).toContain('>Link-only</span>')
+    expect(html).toContain('lucide-earth')
+    expect(html).toContain('>Public</span>')
+    expect(html).toContain('Published Jul 10, 2026')
     expect(html).toContain('data-progressive="true"')
     expect(html).toContain('Published full prompt')
     expect(html).toContain('<h1>Purpose</h1>')
     expect(html).not.toContain('>Files<')
+  })
+
+  it('uses update time only for Link-only sharing metadata', () => {
+    const html = renderWorkbench({ visibility: 'link-only' })
+
+    expect(html).toContain('>Link-only</span>')
+    expect(html).toContain('Shared 3d ago')
+    expect(html).not.toContain('Published 3d ago')
   })
 
   it('uses one Workspace section and omits the file browser', () => {
@@ -339,10 +353,10 @@ describe('SessionWorkbench', () => {
     expect(html).not.toContain('Run this command locally to pick up where this session left off.')
     expect(html).toContain('md:items-center')
     expect(html).toContain('aria-label="Resume command"')
-    expect(html).toContain('spool resume claude_test-session')
-    expect(html).toContain('Don&#x27;t have the Spool CLI?')
+    expect(html).toContain('npx @spool-lab/cli resume claude_test-session')
+    expect(html).toContain('No global install needed.')
     expect(html).toContain('aria-haspopup="dialog"')
-    expect(html).toContain('>Install it</button>')
+    expect(html).toContain('>How npx works</button>')
     expect(html).toContain('href="https://github.com/paperboytm/spool"')
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
@@ -350,12 +364,12 @@ describe('SessionWorkbench', () => {
   })
 
   it('identifies a Pi share without offering an unsupported native Resume command', () => {
-    const html = renderWorkbench({ provider: 'pi' })
+    const html = renderWorkbench({ provider: 'pi', visibility: 'link-only' })
 
     expect(html).toContain('data-variant="source-pi"')
     expect(html).toContain('>Pi</span>')
     expect(html).toContain('>Link-only</span>')
-    expect(html).not.toContain('spool resume')
+    expect(html).not.toContain('npx @spool-lab/cli resume')
     expect(html).not.toContain('aria-label="Resume command"')
     expect(html).not.toContain('Don&#x27;t have the Spool CLI?')
   })

@@ -1,37 +1,26 @@
 # Spool
 
-Publish, discover, and continue agent sessions.
+Share, read, and continue agent sessions.
 
 Spool turns work done with coding agents into durable web pages that other people can understand and resume. An author shares a real Session—not a screenshot or reconstructed recap—and readers can move from Summary to conversation, tool activity, files, and diff before continuing the work in their own agent.
 
-> **Early stage.** Link-only sharing works for Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Native Resume currently works for Claude Code and Codex CLI. Feedback is welcome through [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
+> **Early stage.** Claude Code and Codex CLI shares are Public by default and can appear in Explore and search. Gemini CLI, OpenCode, and Pi shares remain Link-only until Discovery supports them. Native Resume currently works for Claude Code and Codex CLI. Feedback is welcome through [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
-## Install
-
-### Desktop
+## Use the CLI
 
 ```bash
-curl -fsSL https://spool.pro/install.sh | bash
+npx @spool-lab/cli --version
 ```
 
-The desktop app currently supports macOS on Apple Silicon. Release artifacts are also available from the [latest GitHub release](https://github.com/spool-lab/spool/releases/latest).
-
-### CLI
-
-```bash
-npm install -g @spool-lab/cli
-```
+No global install is required. If you prefer the shorter `spool` command, run
+`npm install -g @spool-lab/cli` once and use `spool …` afterward.
 
 ## Share a Session
 
-From the desktop app, open an indexed Session and choose **Share session**.
-
-From a terminal:
-
 ```bash
-spool sync
-spool login
-spool share <session-uuid>
+npx @spool-lab/cli sync
+npx @spool-lab/cli login
+npx @spool-lab/cli share <session-uuid>
 ```
 
 Spool scans the selected Session for sensitive values, prepares an optional Summary, publishes the records to the Hub, and returns a durable URL.
@@ -39,36 +28,37 @@ Spool scans the selected Session for sensitive values, prepares an optional Summ
 A reader can open that URL without installing Spool. Claude Code and Codex CLI shares can also be continued locally:
 
 ```bash
-spool resume <session-url>
+npx @spool-lab/cli resume <session-url>
 ```
 
 Resume creates a new provider-native Session and preserves its relationship to the source. The shared source is never modified.
 
 ## Product Model
 
-- **Share** creates a durable Link-only URL.
-- **Publish** makes a Shared Session Public so it can appear on the author’s Profile and in Discovery.
+- **Share** is the explicit action that sends selected Session records to the Hub and returns a durable URL.
+- **Publish** is the default result for supported Claude Code and Codex CLI Shares: a Public Session that can appear on the author’s Profile, in Explore, and in search.
 - **Read** moves from Summary to conversation, tools, files, and net diff.
 - **Resume / Fork** creates new agent-native work with visible lineage.
 - **Withdraw** removes access to a Shared Session.
 
-Nothing is published automatically. A new share is Link-only; public visibility is always a separate, explicit choice.
+Nothing leaves the machine until the author explicitly runs Share. The Share confirmation states the resulting visibility before upload: supported Claude Code and Codex CLI Sessions are Public by default; other providers remain Link-only.
 
 ## What Spool Includes
 
-- **Session publishing** — share Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions from Desktop or CLI
+- **Session sharing** — publish Claude Code and Codex CLI Sessions publicly by default, with Link-only fallback for Gemini CLI, OpenCode, and Pi
 - **Readable Session pages** — Summary, conversation, tool activity, touched files, diff, and record deep links
 - **Native continuation** — materialize Claude Code and Codex CLI shares locally and continue them in their original agent format
 - **Sensitive-data checks** — detect likely credentials, tokens, personal data, and local paths before sharing
 - **Local preparation** — collect and organize Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions before deciding what to share
 - **Agent access** — use the bundled Spool skill or JSON CLI output from any shell-capable agent
-- **Public identity and Discovery** — Profiles, Public Sessions, topics, and continuation lineage are the community layer under active development
+- **Public identity and Discovery** — author Profiles, Explore/search, Public Sessions, and continuation lineage
 
-## Architecture
+## Share Stack
+
+The current Share-focused surfaces are:
 
 ```text
 apps/
-  app/          Electron desktop app for preparing, reading, and sharing Sessions
   cli/          CLI for indexing, sharing, reading, resuming, and automation
   web/          spool.pro: homepage, docs, Profiles, account pages, and Session reader
   backend/      Hub, identity, publication, and media API on Cloudflare
@@ -76,7 +66,7 @@ packages/
   core/         Local Session ingestion, organization, SQLite, and full-text search
   redact/       Sensitive-data detection shared by publishing surfaces
   session-kit/  Browser-safe Session model, canonical records, views, and diffs
-  session-view/ Shared conversation renderer for Desktop and Web
+  session-view/ Shared conversation renderer for Session pages
   share-kit/    Curated `.spool` documents, templates, and export primitives
 ```
 
@@ -86,50 +76,26 @@ The original provider Session remains authoritative. Git remains authoritative f
 
 ```bash
 pnpm install
-pnpm exec electron-rebuild -f -w better-sqlite3
-pnpm dev
+pnpm run rebuild:native:node
 ```
 
-Run the standard checks with:
+Run the checks for the Share surfaces with:
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm build
+pnpm --filter @spool-lab/cli typecheck
+pnpm --filter @spool-lab/cli test
+pnpm --filter @spool/backend typecheck
+pnpm --filter @spool/backend test
+pnpm --filter @spool/web typecheck
+pnpm --filter @spool/web test
+pnpm --filter @spool/web build
 ```
 
-Do not run desktop end-to-end tests unless the task specifically requires them.
-
-### Native runtime switching
-
-`better-sqlite3` must match the active runtime:
+Start the backend and Web documentation site in separate terminals:
 
 ```bash
-pnpm run rebuild:native:node      # Node tests and CLI work
-pnpm run rebuild:native:electron  # Electron development and packaging
-```
-
-### Development data
-
-Desktop development uses `~/.spool-dev/` instead of the production data directory.
-
-```bash
-pnpm --filter @spool/app dev:seed-from-prod
-pnpm --filter @spool/app dev:reset-db
-```
-
-Override it with `SPOOL_DATA_DIR=/some/path pnpm dev`.
-
-## Release
-
-```bash
-./scripts/release.sh
-```
-
-Build and signing run in GitHub Actions. For a local macOS package without a release:
-
-```bash
-pnpm run package:mac
+pnpm --filter @spool/backend dev
+pnpm --filter @spool/web dev
 ```
 
 ## License

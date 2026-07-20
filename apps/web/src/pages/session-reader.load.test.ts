@@ -19,6 +19,7 @@ const meta: HubSessionMeta = {
   spoolFileOid: 'spool-oid',
   createdAt: 1,
   updatedAt: 2,
+  visibility: 'public',
   author: { handle: null, displayName: null, avatarUrl: null },
 }
 

@@ -18,10 +18,8 @@ Spool stores local application data under `~/.spool/` by default.
 Override the directory for development or isolated automation:
 
 ```bash
-SPOOL_DATA_DIR=/some/path spool sync
+SPOOL_DATA_DIR=/some/path npx @spool-lab/cli sync
 ```
-
-Desktop development uses `~/.spool-dev/` automatically.
 
 ## Source locations
 
@@ -39,10 +37,10 @@ These source locations are built in.
 
 ## Hub credentials
 
-`spool login` writes a revocable token to `hub-credentials.json`. `spool logout` asks the Hub to revoke that token and removes the local file. If a machine is lost, revoke its credential from the account surface.
+`npx @spool-lab/cli login` writes a revocable token to `hub-credentials.json`. `npx @spool-lab/cli logout` asks the Hub to revoke that token and removes the local file. If a machine is lost, revoke its credential from the account surface.
 
 Never commit the Spool data directory or Hub credential file to a repository.
 
 ## Publishing boundary
 
-Configuration and local indexing do not expose Sessions. A Session leaves the machine only through an explicit Share flow, which creates a Link-only URL. Making that Shared Session Public on a Profile and in Explore requires a separate Publish action.
+Configuration and local indexing do not expose Sessions. A Session leaves the machine only through an explicit Share flow. Claude Code and Codex CLI Shares are Public in Explore and search by default; providers not yet supported by Explore remain Link-only.

@@ -281,8 +281,8 @@ function ShareRow({
           <span>published {humanDate(row.published_at)}</span>
         </span>
       </a>
-      {/* Row actions live in a single ⋯ menu, mirroring the desktop
-       *  Published row: hover-revealed (always visible on touch — see
+      {/* Row actions live in a single ⋯ menu: hover-revealed
+       *  (always visible on touch — see
        *  the hover:none media rule), pinned while open. Revoked rows
        *  get no actions at all — the slug is permanently 410, so Copy
        *  link would hand out a dead URL. */}
@@ -578,7 +578,8 @@ function UnpublishConfirmModal({
       <p className="sw-modal-body">
         This permanently deletes the snapshot from R2 and locks the URL to{' '}
         <span className="sw-mono">410 Gone</span>. The slug can never be reused. To share this
-        conversation again, republish from the desktop app — you'll get a new URL.
+        conversation again, run <span className="sw-mono">npx @spool-lab/cli share</span> — you'll
+        get a new URL.
       </p>
       <div className="sw-modal-actions">
         <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
@@ -914,8 +915,8 @@ export function Me() {
               )}
               {/* Revoked shares are history records: collapsed by default
                *  (they accumulate forever — only account deletion purges
-               *  them) and display-only, mirroring the desktop Published
-               *  tab. The section only exists when there's history. */}
+               *  them) and display-only. The section only exists when
+               *  there's history. */}
               {revokedShares.length > 0 && (
                 <div className="sw-collapse">
                   <Button

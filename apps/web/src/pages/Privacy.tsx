@@ -7,7 +7,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'July 18, 2026'
+const LAST_UPDATED = 'July 20, 2026'
 
 export function Privacy() {
   useEffect(() => {
@@ -32,8 +32,8 @@ export function Privacy() {
                 sent to spool.pro.
               </li>
               <li>
-                Shared Sessions are public and may appear in Explore and search after you confirm
-                sharing.
+                Supported Sessions are Public in Explore and search by default after you confirm
+                Share; providers not yet supported by Explore remain Link-only.
               </li>
               <li>spool.pro runs no ads, behavioral analytics, or third-party tracking cookies.</li>
             </ul>
@@ -65,16 +65,16 @@ export function Privacy() {
           </p>
           <p>
             <strong>Operational data.</strong> Session cookies keep Web users signed in, and
-            revocable credentials authenticate Desktop and CLI clients. Security-relevant actions
-            are recorded in an audit log with a salted hash of IP address and the client user-agent.
-            The salt rotates daily. Short-lived counters support rate limiting and abuse prevention.
+            revocable credentials authenticate installed clients. Security-relevant actions are
+            recorded in an audit log with a salted hash of IP address and the client user-agent. The
+            salt rotates daily. Short-lived counters support rate limiting and abuse prevention.
             Explore ranking uses daily qualified-read totals after a reader has spent active time
             with a Session and reached meaningful depth or interacted with its evidence. The
             qualified-read signal does not persist a raw IP address or user-agent.
           </p>
           <p>
             <strong>What we do not collect.</strong> We do not use advertising identifiers,
-            behavioral analytics, third-party tracking cookies, or Desktop telemetry.
+            behavioral analytics, third-party tracking cookies, or client telemetry.
           </p>
 
           <h2>How we use data</h2>
@@ -95,10 +95,11 @@ export function Privacy() {
 
           <h2>Visibility and recipients</h2>
           <p>
-            A Shared Session is public and can appear on your Profile, in Explore and search, and in
-            social-media previews. Anyone with its URL can read it. Search engines, preview
-            services, and readers may create copies outside our control, so confirm the selected
-            content and sensitive-data findings before sharing.
+            Anyone with a Shared Session URL can read it. Supported Sessions are Public by default
+            and can appear in Explore, search, and social-media previews. A provider not yet
+            supported by Explore remains Link-only. Search engines, preview services, and readers
+            may create copies outside our control, so confirm the selected content and
+            sensitive-data findings before sharing.
           </p>
 
           <h2>Withdrawal, retention, and deletion</h2>

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 
-import { getDB, getSessionWithMessages } from '@spool-lab/core'
+import { formatCliCommand, getDB, getSessionWithMessages } from '@spool-lab/core'
 import {
   composeSessionDiff,
   deriveView,
@@ -162,7 +162,7 @@ async function showHub(
   }
   if (isResumableSessionProvider(ref.provider)) {
     log('')
-    log(`Resume:  spool resume ${meta.sid}`)
+    log(`Resume:  ${formatCliCommand(`resume ${meta.sid}`)}`)
   }
   return 0
 }
