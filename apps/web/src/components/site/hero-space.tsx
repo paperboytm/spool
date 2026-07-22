@@ -6,9 +6,9 @@
  * glowing ring, over a volumetric core faked with stacked glow sprites.
  * Laptops on a ground ring emit Session comets that fly along 3D arcs
  * and join the galaxy on arrival. UnrealBloom + exponential fog carry
- * the look; thin CSS light beams sweep the band on top (see .hs-band)
- * while the base stays the same void black as the rest of the
- * page, so scrolling out of the hero has no color jump.
+ * the dark-mode look; thin CSS light beams sweep the band on top (see
+ * .hs-band) while the canvas follows the active page background, so
+ * scrolling out of the hero has no color jump.
  *
  * three.js loads lazily inside the effect so the initial page chunk
  * stays lean. prefers-reduced-motion renders one settled frame; the
@@ -85,6 +85,16 @@ function readPalette(el: Element) {
   }
 }
 type Palette = ReturnType<typeof readPalette>
+
+export function getHeroRenderPolicy(darkMode: boolean) {
+  return {
+    /* Light mode must blend with the page instead of introducing a
+     * second, GPU-cleared background behind the scene. */
+    transparentCanvas: !darkMode,
+    clearAlpha: darkMode ? 1 : 0,
+    postProcessing: darkMode,
+  }
+}
 
 const MACHINE_RING = 285
 const SPACE_RADIUS = 132
@@ -248,6 +258,7 @@ export function HeroSpace({
       const rand = seededRandom(20260722)
       const pal = readPalette(canvas)
       const darkMode = pal.bg.r + pal.bg.g + pal.bg.b < 3 * 128
+      const renderPolicy = getHeroRenderPolicy(darkMode)
       /* Monochrome-blue family derived from the accent: deep, base, and
        * airy variants keep variety without leaving the brand hue. */
       const blueDeep = mixRgb(pal.accent, { r: 8, g: 28, b: 88 }, darkMode ? 0.35 : 0.45)
@@ -269,43 +280,20 @@ export function HeroSpace({
 
       let renderer: import('three').WebGLRenderer
       try {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          alpha: renderPolicy.transparentCanvas,
+        })
       } catch {
         return
       }
-      /* The composer chain (tone map + double sRGB encode) shifts flat
-       * colors, so numerically invert it per channel to find the raw clear
-       * value that displays exactly as the theme background. */
-      const aces = (x: number) => (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)
-      const toSrgb = (x: number) =>
-        x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055
-      const chain = (x: number) => toSrgb(toSrgb(Math.min(1, darkMode ? aces(1.24 * x) : x)))
-      const solveChannel = (target: number) => {
-        let lo = 0
-        let hi = 8
-        for (let i = 0; i < 40; i++) {
-          const mid = (lo + hi) / 2
-          if (chain(mid) < target) lo = mid
-          else hi = mid
-        }
-        return (lo + hi) / 2
-      }
-      const clearColor = new THREE.Color(
-        solveChannel(pal.bg.r / 255),
-        solveChannel(pal.bg.g / 255),
-        solveChannel(pal.bg.b / 255),
-      )
-      clearColor.convertLinearToSRGB()
-      clearColor.convertSRGBToLinear()
-      renderer.setClearColor(clearColor, 1)
+      renderer.setClearColor(hexIntOf(pal.bg), renderPolicy.clearAlpha)
       renderer.toneMapping = THREE.ACESFilmicToneMapping
       renderer.toneMappingExposure = 1.24
 
       const scene = new THREE.Scene()
-      scene.fog = new THREE.FogExp2(
-        clearColor.getHex(THREE.LinearSRGBColorSpace),
-        darkMode ? 0.00095 : 0.00024,
-      )
+      scene.fog = new THREE.FogExp2(hexIntOf(pal.bg), darkMode ? 0.00095 : 0.00024)
 
       const camera = new THREE.PerspectiveCamera(30, 2, 10, 4000)
       const lookAt = new THREE.Vector3(0, 92, 0)
@@ -354,7 +342,7 @@ export function HeroSpace({
       /* ── Volumetric core: stacked soft glow sprites along the axis ── */
       const coreMat = new THREE.SpriteMaterial({
         map: softDot,
-        color: 0xf07020,
+        color: ACCENT,
         transparent: true,
         opacity: darkMode ? 0.055 : 0.12,
         blending: glowBlend,
@@ -706,6 +694,8 @@ export function HeroSpace({
         varying float vAlpha;
         void main() {
           gl_FragColor = vec4(uColor, vAlpha) * texture2D(uMap, gl_PointCoord);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }
       `
       interface Flight {
@@ -853,16 +843,20 @@ export function HeroSpace({
         )
       }
 
-      /* ── Composer: bloom ── */
-      const composer = new EffectComposer(renderer)
-      composer.addPass(new RenderPass(scene, camera))
-      const bloom = new UnrealBloomPass(
-        new THREE.Vector2(1, 1),
-        darkMode ? 0.5 : 0,
-        0.22,
-        darkMode ? 0.52 : 1,
-      )
-      composer.addPass(bloom)
+      /* ── Dark-mode composer: bloom ──
+       * Light mode renders straight to its transparent canvas. Apart from
+       * avoiding a redundant zero-strength bloom pass, this prevents the
+       * bloom pass's opaque full-screen composite from painting black
+       * behind the scene before CSS can provide the shared white page
+       * background. */
+      const composer = renderPolicy.postProcessing ? new EffectComposer(renderer) : undefined
+      const bloom = renderPolicy.postProcessing
+        ? new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.22, 0.52)
+        : undefined
+      if (composer && bloom) {
+        composer.addPass(new RenderPass(scene, camera))
+        composer.addPass(bloom)
+      }
 
       /* ── Sizing / camera framing ── */
       const dprCap = 2
@@ -873,8 +867,10 @@ export function HeroSpace({
         const dpr = Math.min(dprCap, window.devicePixelRatio || 1)
         renderer.setPixelRatio(dpr)
         renderer.setSize(w, h, false)
-        composer.setSize(w, h)
-        bloom.setSize(w * dpr, h * dpr)
+        if (composer && bloom) {
+          composer.setSize(w, h)
+          bloom.setSize(w * dpr, h * dpr)
+        }
         camera.aspect = w / h
         if (align === 'right' && w >= 980) {
           camera.setViewOffset(w, h, -w * 0.12, 0, w, h)
@@ -979,7 +975,8 @@ export function HeroSpace({
           }
         }
 
-        composer.render()
+        if (composer) composer.render()
+        else renderer.render(scene, camera)
       }
 
       let raf = 0
@@ -1000,7 +997,7 @@ export function HeroSpace({
         for (const f of flights) f.trailGeo.dispose()
         for (const fl of flashes) (fl.sprite.material as import('three').SpriteMaterial).dispose()
         for (const d of disposables) d.dispose()
-        composer.dispose()
+        composer?.dispose()
         renderer.dispose()
       }
     })()

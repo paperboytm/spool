@@ -955,14 +955,16 @@ section.sect:last-of-type {
 .hs-bg {
   position: absolute;
   inset: 0;
+  background: var(--bg);
 }
 .hs-canvas {
   display: block;
   width: 100%;
   height: 100%;
+  background: var(--bg);
 }
 /* Narrow light beams sweeping slowly across the first screen. The base
-   stays the page's void black — only thin shafts move, so there is
+   stays the active page background — only thin shafts move, so there is
    no color jump when scrolling into the sections below. */
 .hs-band {
   position: absolute;
