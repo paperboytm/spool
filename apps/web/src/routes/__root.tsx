@@ -15,18 +15,18 @@ import '@fontsource/geist-mono/600.css'
 import { Tombstone } from '../pages/Tombstone'
 
 // Boot-time theme selection, inlined in <head> so neither surface
-// flashes the wrong theme before hydration. Reads the unified key
-// first, then the two keys the split sites used to write, then the
-// system preference.
+// flashes the wrong theme before hydration. Dark is the default on
+// every device regardless of the system preference; an explicit user
+// choice (the header toggle) still wins.
 const THEME_BOOT = `(function(){
   try {
     var s = localStorage.getItem('spool-theme')
       || localStorage.getItem('spool.share-web.theme');
-    var d = s === 'dark' || s === 'light'
-      ? s === 'dark'
-      : matchMedia('(prefers-color-scheme: dark)').matches;
+    var d = s === 'dark' || s === 'light' ? s === 'dark' : true;
     document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
-  } catch (e) {}
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
 })();`
 
 export const Route = createRootRoute({
@@ -35,14 +35,13 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Spool' },
-      { name: 'theme-color', content: '#141410', media: '(prefers-color-scheme: dark)' },
-      { name: 'theme-color', content: '#FAFAF8', media: '(prefers-color-scheme: light)' },
+      { name: 'theme-color', content: '#000000' },
     ],
     links: [
-      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
-      { rel: 'icon', href: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { rel: 'icon', href: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      { rel: 'icon', href: '/favicon.svg?v=3', type: 'image/svg+xml' },
+      { rel: 'icon', href: '/favicon-32x32.png?v=3', sizes: '32x32', type: 'image/png' },
+      { rel: 'icon', href: '/favicon-16x16.png?v=3', sizes: '16x16', type: 'image/png' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png?v=3' },
     ],
     scripts: [{ children: THEME_BOOT }],
   }),

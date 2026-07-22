@@ -4,7 +4,7 @@ import { useState } from 'react'
 import registry from '../../../data/registry.json'
 
 const INSTALL_CMD = 'curl -fsSL https://spool.pro/install-daemon.sh | bash'
-const REPO_URL = 'https://github.com/spool-lab/spool-daemon'
+const REPO_URL = 'https://github.com/paperboytm/spool-daemon'
 
 // ─── Tray cells (hero specimen, 8 cells × 2 cols) ──────────────────────
 const TRAY_CELLS = [

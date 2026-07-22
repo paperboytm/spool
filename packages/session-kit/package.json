@@ -2,9 +2,9 @@
   "name": "@spool-lab/session-kit",
   "version": "0.6.3",
   "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and Session diffs for Spool.",
-  "homepage": "https://github.com/spool-lab/spool#readme",
+  "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
-    "url": "https://github.com/spool-lab/spool/issues"
+    "url": "https://github.com/paperboytm/spool/issues"
   },
   "license": "MIT",
   "author": {
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/spool-lab/spool.git"
+    "url": "git+https://github.com/paperboytm/spool.git"
   },
   "funding": "https://github.com/sponsors/xinyao27",
   "files": [

@@ -2,9 +2,9 @@
   "name": "@spool/web",
   "version": "0.6.3",
   "private": true,
-  "homepage": "https://github.com/spool-lab/spool#readme",
+  "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
-    "url": "https://github.com/spool-lab/spool/issues"
+    "url": "https://github.com/paperboytm/spool/issues"
   },
   "license": "MIT",
   "author": {
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/spool-lab/spool.git"
+    "url": "git+https://github.com/paperboytm/spool.git"
   },
   "funding": "https://github.com/sponsors/xinyao27",
   "type": "module",
@@ -44,7 +44,8 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.45.1",
@@ -53,6 +54,7 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^6.0.3",
     "tailwindcss": "^4.3.3",
     "undici": "^8.7.0",

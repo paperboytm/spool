@@ -2,16 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import HomePage from '../components/site/home'
 
-const TITLE = 'Spool — Share and continue agent sessions'
+const TITLE = 'Spool — One shared space for agent sessions'
 const DESC =
-  'Turn real coding-agent Sessions into durable, readable links that others can understand and resume.'
+  'Agents work on every machine; their Sessions die in local files. Spool streams them into one shared space — readable, searchable, and resumable — so agent work becomes team knowledge.'
 
 const JSON_LD = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'Spool',
   description:
-    'Share real coding-agent Sessions as durable, readable links and continue them as new native work.',
+    'Spool publishes real coding-agent Sessions readable end to end — the reasoning, the dead ends, and the author decisions behind the diff — so others can learn from the work and resume it.',
   url: 'https://spool.pro',
   author: { '@type': 'Organization', name: 'Spool', url: 'https://spool.pro' },
 })

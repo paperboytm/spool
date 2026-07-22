@@ -20,6 +20,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SiteIndexRouteImport } from './routes/_site.index'
 import { Route as SiteConnectorsRouteImport } from './routes/_site.connectors'
 import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
+import { Route as SiteLogoLabRouteImport } from './routes/_site.logo-lab'
 import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SessionSidRouteImport } from './routes/session.$sid'
@@ -81,6 +82,11 @@ const SiteDaemonRoute = SiteDaemonRouteImport.update({
   path: '/daemon',
   getParentRoute: () => SiteRoute,
 } as any)
+const SiteLogoLabRoute = SiteLogoLabRouteImport.update({
+  id: '/logo-lab',
+  path: '/logo-lab',
+  getParentRoute: () => SiteRoute,
+} as any)
 const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
   id: '/blog/rss.xml',
   path: '/blog/rss.xml',
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/connectors': typeof SiteConnectorsRoute
   '/daemon': typeof SiteDaemonRoute
+  '/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/connectors': typeof SiteConnectorsRoute
   '/daemon': typeof SiteDaemonRoute
+  '/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/_site/connectors': typeof SiteConnectorsRoute
   '/_site/daemon': typeof SiteDaemonRoute
+  '/_site/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/connectors'
     | '/daemon'
+    | '/logo-lab'
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/connectors'
     | '/daemon'
+    | '/logo-lab'
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/_site/connectors'
     | '/_site/daemon'
+    | '/_site/logo-lab'
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SiteDaemonRouteImport
       parentRoute: typeof SiteRoute
     }
+    '/_site/logo-lab': {
+      id: '/_site/logo-lab'
+      path: '/logo-lab'
+      fullPath: '/logo-lab'
+      preLoaderRoute: typeof SiteLogoLabRouteImport
+      parentRoute: typeof SiteRoute
+    }
     '/blog/rss.xml': {
       id: '/blog/rss.xml'
       path: '/blog/rss.xml'
@@ -367,6 +386,7 @@ declare module '@tanstack/react-router' {
 interface SiteRouteChildren {
   SiteConnectorsRoute: typeof SiteConnectorsRoute
   SiteDaemonRoute: typeof SiteDaemonRoute
+  SiteLogoLabRoute: typeof SiteLogoLabRoute
   SiteIndexRoute: typeof SiteIndexRoute
   SiteBlogSlugRoute: typeof SiteBlogSlugRoute
   SiteDocsSplatRoute: typeof SiteDocsSplatRoute
@@ -376,6 +396,7 @@ interface SiteRouteChildren {
 const SiteRouteChildren: SiteRouteChildren = {
   SiteConnectorsRoute: SiteConnectorsRoute,
   SiteDaemonRoute: SiteDaemonRoute,
+  SiteLogoLabRoute: SiteLogoLabRoute,
   SiteIndexRoute: SiteIndexRoute,
   SiteBlogSlugRoute: SiteBlogSlugRoute,
   SiteDocsSplatRoute: SiteDocsSplatRoute,
