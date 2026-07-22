@@ -7,7 +7,7 @@
  * Laptops on a ground ring emit Session comets that fly along 3D arcs
  * and join the galaxy on arrival. UnrealBloom + exponential fog carry
  * the look; thin CSS light beams sweep the band on top (see .hs-band)
- * while the base stays the same warm near-black as the rest of the
+ * while the base stays the same void black as the rest of the
  * page, so scrolling out of the hero has no color jump.
  *
  * three.js loads lazily inside the effect so the initial page chunk
@@ -48,7 +48,7 @@ function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {
 }
 
 const WHITE: Rgb = { r: 255, g: 255, b: 255 }
-const NEAR_BLACK: Rgb = { r: 20, g: 20, b: 16 }
+const VOID_BLACK: Rgb = { r: 0, g: 0, b: 0 }
 
 function rgbaOf(c: Rgb, a: number): string {
   return `rgba(${c.r},${c.g},${c.b},${a})`
@@ -61,8 +61,8 @@ function hexIntOf(c: Rgb): number {
 function readPalette(el: Element) {
   const css = getComputedStyle(el)
   const read = (name: string, fallback: Rgb) => parseCssColor(css.getPropertyValue(name), fallback)
-  const accent = read('--accent', { r: 0, g: 153, b: 255 })
-  const bgc = read('--bg', NEAR_BLACK)
+  const accent = read('--accent', { r: 19, g: 135, b: 255 })
+  const bgc = read('--bg', VOID_BLACK)
   const dark = bgc.r + bgc.g + bgc.b < 3 * 128
   return {
     accent,
@@ -70,18 +70,18 @@ function readPalette(el: Element) {
     codex: read('--src-codex', { r: 124, g: 201, b: 162 }),
     gemini: read('--src-gemini', { r: 138, g: 176, b: 229 }),
     /* Scene neutrals follow the active design system. */
-    bg: read('--bg', NEAR_BLACK),
-    surface: read('--surface', { r: 28, g: 28, b: 24 }),
-    border: read('--border', { r: 46, g: 46, b: 40 }),
-    border2: read('--border2', { r: 58, g: 58, b: 52 }),
-    muted: read('--muted', { r: 138, g: 138, b: 128 }),
+    bg: read('--bg', VOID_BLACK),
+    surface: read('--surface', { r: 9, g: 9, b: 9 }),
+    border: read('--border', { r: 31, g: 31, b: 31 }),
+    border2: read('--border2', { r: 46, g: 46, b: 46 }),
+    muted: read('--muted', { r: 166, g: 166, b: 166 }),
     /* Derived tints: toward white on dark themes; saturated and deep on
      * light so particles read as ink, not haze. */
     bright: mixRgb(accent, dark ? WHITE : { r: 0, g: 40, b: 110 }, dark ? 0.3 : 0.2),
     soft: mixRgb(accent, dark ? WHITE : { r: 0, g: 40, b: 110 }, dark ? 0.55 : 0.35),
     sparkle: mixRgb(accent, dark ? WHITE : { r: 0, g: 40, b: 110 }, dark ? 0.45 : 0.1),
     pale: mixRgb(accent, dark ? WHITE : bgc, dark ? 0.82 : 0.3),
-    dimmed: mixRgb(accent, dark ? NEAR_BLACK : WHITE, 0.45),
+    dimmed: mixRgb(accent, dark ? VOID_BLACK : WHITE, 0.45),
   }
 }
 type Palette = ReturnType<typeof readPalette>
@@ -115,7 +115,7 @@ function makeSoftDot(THREE: typeof import('three')) {
   return tex
 }
 
-/** Radial amber glow for the floor under the space. */
+/** Radial accent glow for the floor under the space. */
 function makeFloorGlow(THREE: typeof import('three'), accent: Rgb) {
   const c = document.createElement('canvas')
   c.width = c.height = 256
@@ -129,7 +129,7 @@ function makeFloorGlow(THREE: typeof import('three'), accent: Rgb) {
   return new THREE.CanvasTexture(c)
 }
 
-/** Terminal screen texture: a dark warm display running an agent
+/** Terminal screen texture: a void display running an agent
  * session — glowing code lines in the machine's source color, a divider,
  * and a bright cursor block. Reads as "an agent at work", not flat color. */
 function makeScreenTexture(THREE: typeof import('three'), color: Rgb, seed: number) {
@@ -138,7 +138,7 @@ function makeScreenTexture(THREE: typeof import('three'), color: Rgb, seed: numb
   c.width = 256
   c.height = 160
   const g = c.getContext('2d')!
-  g.fillStyle = '#0c0c0a'
+  g.fillStyle = '#090909'
   g.fillRect(0, 0, 256, 160)
   /* Soft glow pooling at the bottom of the display. */
   const r = color.r
@@ -160,7 +160,7 @@ function makeScreenTexture(THREE: typeof import('three'), color: Rgb, seed: numb
       const bright = 0.28 + rnd() * 0.5
       const dim = rnd() > 0.72
       g.fillStyle = dim
-        ? `rgba(138,138,128,${0.3 + rnd() * 0.2})`
+        ? `rgba(166,166,166,${0.3 + rnd() * 0.2})`
         : `rgba(${r},${gr},${b},${bright})`
       g.beginPath()
       g.roundRect(x, y, wSeg, 7, 3.5)
@@ -175,7 +175,7 @@ function makeScreenTexture(THREE: typeof import('three'), color: Rgb, seed: numb
   g.beginPath()
   g.roundRect(14, y + 2, 8, 9, 2)
   g.fill()
-  g.fillStyle = 'rgba(242,242,236,0.8)'
+  g.fillStyle = 'rgba(255,255,255,0.8)'
   g.beginPath()
   g.roundRect(28, y + 2, 30, 9, 3)
   g.fill()
@@ -622,7 +622,7 @@ export function HeroSpace({
       const screenGeo = new THREE.PlaneGeometry(68, 42)
       const edgeMat = new THREE.LineBasicMaterial({
         color: hexIntOf(
-          darkMode ? mixRgb(pal.border2, WHITE, 0.18) : mixRgb(pal.muted, NEAR_BLACK, 0.3),
+          darkMode ? mixRgb(pal.border2, WHITE, 0.18) : mixRgb(pal.muted, VOID_BLACK, 0.3),
         ),
         transparent: true,
         opacity: 0.5,

@@ -245,7 +245,7 @@
   overflow: hidden;
   box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.02),
-    0 18px 40px -24px rgba(28, 28, 24, 0.18);
+    0 18px 40px -24px rgba(10, 10, 10, 0.18);
 }
 .code-head {
   display: flex;

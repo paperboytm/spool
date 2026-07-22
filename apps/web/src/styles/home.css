@@ -962,7 +962,7 @@ section.sect:last-of-type {
   height: 100%;
 }
 /* Narrow light beams sweeping slowly across the first screen. The base
-   stays the page's warm near-black — only thin shafts move, so there is
+   stays the page's void black — only thin shafts move, so there is
    no color jump when scrolling into the sections below. */
 .hs-band {
   position: absolute;

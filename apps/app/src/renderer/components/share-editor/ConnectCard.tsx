@@ -50,7 +50,7 @@ export function ConnectCard({ onSignedIn }: { onSignedIn?: () => void }) {
         }}
         disabled={busy}
         data-testid="connect-card-signin"
-        className="dark:bg-dark-surface2 dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-7 items-center justify-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium text-[#1C1C18] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        className="dark:bg-dark-surface2 text-warm-text dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-7 items-center justify-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? (
           <>

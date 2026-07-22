@@ -312,7 +312,7 @@ function PublishedList({
               void handleSignIn()
             }}
             disabled={signingIn}
-            className="dark:bg-dark-surface2 dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-8 items-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium text-[#1C1C18] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            className="dark:bg-dark-surface2 text-warm-text dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-8 items-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg width={15} height={15} viewBox="0 0 18 18" fill="none" aria-hidden>
               <path
