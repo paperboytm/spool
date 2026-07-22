@@ -29,13 +29,13 @@ test('html root background tracks color-scheme (no white flash on resize)', asyn
   const darkBg = await ctx.window.evaluate(
     () => getComputedStyle(document.documentElement).backgroundColor,
   )
-  // --color-dark-bg = #141410 = rgb(20, 20, 16)
-  expect(darkBg).toBe('rgb(20, 20, 16)')
+  // --color-dark-bg = --sp-bg (dark) = #000000
+  expect(darkBg).toBe('rgb(0, 0, 0)')
 
   await ctx.window.emulateMedia({ colorScheme: 'light' })
   const lightBg = await ctx.window.evaluate(
     () => getComputedStyle(document.documentElement).backgroundColor,
   )
-  // --color-warm-bg = #FAFAF8 = rgb(250, 250, 248)
-  expect(lightBg).toBe('rgb(250, 250, 248)')
+  // --color-warm-bg = --sp-bg (light) = #FFFFFF
+  expect(lightBg).toBe('rgb(255, 255, 255)')
 })
