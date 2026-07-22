@@ -2,7 +2,9 @@ import { Avatar, Button, IconButton, SectionLabel } from '@spool-lab/ui'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Footer, Header, Icon, Page } from '../components/Chrome'
+import { ManagedSessionsSection } from '../components/ManagedSessionsSection'
 import { ProfileEditor } from '../components/ProfileEditor'
+import { TeamsSection } from '../components/TeamsSection'
 import {
   cancelAccountDeletion,
   checkHandle,
@@ -17,6 +19,7 @@ import {
   type MeResponse,
   type MeShareRow,
   type MySharesFetchResult,
+  type DeleteAccountResult,
 } from '../lib/api'
 import { humanDate, humanDateTime } from '../lib/dates'
 
@@ -42,6 +45,7 @@ type LoadState =
       kind: 'ok'
       me: MeResponse
       shares: MeShareRow[]
+      legacySharesUnavailable?: boolean
       deleteOpen?: boolean
       unpublishTarget?: MeShareRow | null
       unpublishBusy?: boolean
@@ -57,17 +61,20 @@ type LoadState =
 //
 // The asymmetry that motivates this: a 5xx/network failure on
 // /api/me/shares must NOT collapse into the empty-state ("nothing
-// published") — that's a lie. Only a genuine 200-with-zero-rows is
-// empty. We reuse the same 'error' card the /api/me failure already
-// uses so the two are consistent. A shares-side 'unauthenticated' after
-// /api/me succeeded is a cookie race; treat it as an error+retry rather
-// than silently empty. 'forbidden' (deletion-pending) is NOT a failure
-// here — /api/me carries deletion_pending_until and the shares section
-// is hidden in that state, so we render with an empty list.
+// published") — that's a lie. Legacy snapshots are secondary to current
+// Hub Sessions, though, so their failure no longer blocks the whole
+// account. The outcome carries an explicit unavailable state for that
+// section. 'forbidden' (deletion-pending) is expected because the legacy
+// section is hidden during the grace window.
 export type LoadOutcome =
   | { kind: 'redirect' }
   | { kind: 'error' }
-  | { kind: 'ok'; me: MeResponse; shares: MeShareRow[] }
+  | {
+      kind: 'ok'
+      me: MeResponse
+      shares: MeShareRow[]
+      legacySharesUnavailable?: boolean
+    }
 
 export function resolveLoadOutcome(
   meResult: MeFetchResult,
@@ -82,9 +89,9 @@ export function resolveLoadOutcome(
   if (sharesResult.kind === 'forbidden') {
     return { kind: 'ok', me: meResult.me, shares: [] }
   }
-  // 'error' or a racing 'unauthenticated' — surface the retry card
-  // instead of a false empty-state.
-  return { kind: 'error' }
+  // 'error' or a racing 'unauthenticated': keep current Sessions and Teams
+  // usable, but do not misrepresent unavailable legacy data as an empty list.
+  return { kind: 'ok', me: meResult.me, shares: [], legacySharesUnavailable: true }
 }
 
 function shareUrl(id: string): string {
@@ -461,7 +468,16 @@ function ModalShell({
   )
 }
 
-function DeleteAccountModal({
+export function deleteAccountScheduleFailureMessage(
+  result: Exclude<DeleteAccountResult, { kind: 'ok' }>,
+): string {
+  if (result.kind === 'conflict') {
+    return `Account deletion is blocked: ${result.detail ?? 'transfer ownership of or archive every Team you own first.'}`
+  }
+  return 'Could not schedule deletion — try again.'
+}
+
+export function DeleteAccountModal({
   open,
   onClose,
   pendingUntil,
@@ -498,7 +514,7 @@ function DeleteAccountModal({
       onClose()
       return
     }
-    setErr('Could not schedule deletion — try again.')
+    setErr(deleteAccountScheduleFailureMessage(r))
   }
 
   async function onCancel() {
@@ -527,8 +543,10 @@ function DeleteAccountModal({
         </p>
       ) : (
         <p className="sw-modal-body">
-          Unpublishes every share and removes your account record after 24 hours. You can undo this
-          from the same place within that window.
+          Your personally owned Sessions are withdrawn and your account is removed after 24 hours.
+          Team-owned Sessions remain with their Team. If you own an active Team, transfer ownership
+          or archive the Team before continuing. You can undo this from the same place within that
+          window.
         </p>
       )}
       {err && (
@@ -619,7 +637,12 @@ export function Me() {
       setState({ kind: 'error' })
       return
     }
-    setState({ kind: 'ok', me: outcome.me, shares: outcome.shares })
+    setState({
+      kind: 'ok',
+      me: outcome.me,
+      shares: outcome.shares,
+      ...(outcome.legacySharesUnavailable ? { legacySharesUnavailable: true } : {}),
+    })
   }, [])
 
   // Re-fetch only /api/me (not /me/shares) after a profile edit so the
@@ -630,6 +653,19 @@ export function Me() {
     if (meResult.kind === 'ok') {
       setState((s) => (s.kind === 'ok' ? { ...s, me: meResult.me } : s))
     }
+  }, [])
+
+  const refreshLegacyShares = useCallback(async () => {
+    const result = await fetchMyShares()
+    if (result.kind === 'unauthenticated') {
+      window.location.assign('/sign-in?next=/me')
+      return
+    }
+    setState((current) => {
+      if (current.kind !== 'ok') return current
+      if (result.kind !== 'ok') return { ...current, legacySharesUnavailable: true }
+      return { ...current, shares: result.shares, legacySharesUnavailable: false }
+    })
   }, [])
 
   useEffect(() => {
@@ -713,10 +749,7 @@ export function Me() {
 
   function onDeletionCancelled(): void {
     setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, deletion_pending_until: null } } : s))
-    void fetchMyShares().then((r) => {
-      if (r.kind !== 'ok') return
-      setState((s) => (s.kind === 'ok' ? { ...s, shares: r.shares } : s))
-    })
+    void refreshLegacyShares()
   }
 
   if (state.kind === 'loading') {
@@ -874,19 +907,43 @@ export function Me() {
             </>
           )}
 
-          <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
+          {!pending ? (
+            <>
+              <div className="sw-divider sw-account-section-divider" />
+              <ManagedSessionsSection />
+              <div className="sw-divider sw-account-section-divider" />
+              <TeamsSection />
+            </>
+          ) : null}
+
+          <div className="sw-divider sw-account-section-divider" />
           <SectionLabel
             className="sw-section-label"
             role="heading"
             aria-level={2}
             count={!pending && liveShares.length > 0 ? liveShares.length : undefined}
           >
-            Your shares
+            Legacy shares
           </SectionLabel>
+          {!pending ? (
+            <p className="sw-section-help">
+              Snapshot links published by older Spool clients. Current Hub Sessions are managed
+              above and Team-owned copies also appear in their workspace.
+            </p>
+          ) : null}
           {pending ? (
             <p className="sw-empty">
               Hidden while deletion is pending. Cancel deletion to restore the list.
             </p>
+          ) : state.legacySharesUnavailable ? (
+            <div className="sw-team-panel-error" role="alert">
+              <p>
+                Could not load legacy snapshot links. Current Sessions and Teams are unaffected.
+              </p>
+              <Button variant="outline" onClick={() => void refreshLegacyShares()}>
+                Try again
+              </Button>
+            </div>
           ) : (
             <>
               {liveShares.length === 0 ? (

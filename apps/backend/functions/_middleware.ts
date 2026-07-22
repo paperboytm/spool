@@ -12,6 +12,14 @@ export const onRequest: PagesFunction = async (ctx) => {
   const url = new URL(ctx.request.url)
   if (url.pathname.startsWith('/api/')) {
     headers.set('Content-Security-Policy', API_CSP)
+    // Team/account Session JSON is tenant data even when a particular response
+    // is an authorization error. Make the contract explicit at the common
+    // boundary so a new handler cannot accidentally weaken it.
+    if (isTenantApiPath(url.pathname)) {
+      headers.set('Cache-Control', 'private, no-store')
+      appendVary(headers, 'Cookie')
+      appendVary(headers, 'Authorization')
+    }
     // Cache-Control discipline: default ALL /api/ responses to
     // `no-store` unless the handler explicitly set a value. The
     // previous version only defaulted mutations, which left every
@@ -33,4 +41,23 @@ export const onRequest: PagesFunction = async (ctx) => {
     statusText: res.statusText,
     headers,
   })
+}
+
+function isTenantApiPath(pathname: string): boolean {
+  return (
+    pathname === '/api/teams' ||
+    pathname.startsWith('/api/teams/') ||
+    pathname === '/api/me/sessions' ||
+    pathname.startsWith('/api/me/sessions/')
+  )
+}
+
+function appendVary(headers: Headers, value: string): void {
+  const current = (headers.get('vary') ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  if (current.includes('*')) return
+  if (!current.some((item) => item.toLowerCase() === value.toLowerCase())) current.push(value)
+  headers.set('Vary', current.join(', '))
 }

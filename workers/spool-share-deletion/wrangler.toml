@@ -5,14 +5,11 @@
 # deletion-worker.ts) deploys as this standalone Worker sharing the
 # backend's D1 / KV / R2 resources.
 #
-# Unlike the Pages project (dashboard-bound), a plain Worker needs the
-# resource ids inline. The ids are NOT secrets, but we still keep prod
-# values out of the public repo: copy this file to wrangler.local.toml
-# (gitignored; the name must end in .toml or wrangler's --config parser
-# silently falls back to the default config), fill the TODOs from the
-# dashboard, and deploy with
-#   wrangler deploy --config wrangler.local.toml
-# Local end-to-end verification: see README.md next to this file.
+# This file is the editable local/custom template. Production uses the
+# committed wrangler.prod.toml; its resource identifiers are not credentials.
+# For local end-to-end verification, copy this file to wrangler.local.toml
+# (gitignored), replace the two TODO ids with any local placeholder, and follow
+# README.md next to this file.
 #
 # Bindings are the subset the sweep needs — no SESSIONS / RATE / NONCE.
 
@@ -30,6 +27,7 @@ crons = ["0 */6 * * *"]
 binding = "DB"
 database_name = "spool-share-db"
 database_id = "TODO-fill-from-dashboard"
+migrations_dir = "../../apps/backend/migrations"
 
 [[kv_namespaces]]
 binding = "META"

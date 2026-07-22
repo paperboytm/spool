@@ -27,14 +27,15 @@ People increasingly build with agents, but the work is difficult to share well:
 ## The product loop
 
 ```text
-Create locally → Review and Share publicly → Discover → Read → Resume / Fork
+Create locally → Review and Share → Manage audience → Discover / Team workspace → Read → Resume / Fork
 ```
 
 1. **Create locally** — the original Session is produced by the author’s agent and remains authoritative.
 2. **Share** — after reviewing the exact Session boundary and sensitive-data findings, the author creates a durable URL. Claude Code and Codex CLI Sessions are Public and discoverable by default; unsupported providers remain Link-only. Nothing else on the author’s machine is exposed.
-3. **Discover** — readers find Sessions through authors, topics, agents, projects, and editorial surfaces.
-4. **Read** — Summary, conversation, tool activity, files, and diff make the work understandable at different depths.
-5. **Resume / Fork** — a reader continues from the shared point in a new native Session. The source remains unchanged and lineage stays visible.
+3. **Manage audience** — the author can keep the initial Public or Link-only result, or transfer the hosted asset into a Team. `Team · name` limits access to current members; Team Owners and Admins can later change it to Public or Link-only.
+4. **Discover or work as a Team** — Public Sessions are found through authors, topics, agents, projects, and editorial surfaces. Team-only Sessions become durable shared knowledge inside the workspace without entering public discovery.
+5. **Read** — Summary, conversation, tool activity, files, and diff make the work understandable at different depths.
+6. **Resume / Fork** — an authorized reader continues from the shared point in a new native Session. The source remains unchanged and lineage stays visible.
 
 ## Who it is for
 
@@ -52,7 +53,7 @@ People who want to take useful work into their own environment and continue it w
 
 ### Teams and communities
 
-Groups that want agent work to become reviewable, teachable, and reusable shared knowledge.
+Groups that want agent work to become reviewable, teachable, and reusable shared knowledge, with a membership-gated workspace before deciding whether to publish outside it.
 
 ## Product pillars
 
@@ -74,7 +75,7 @@ A Shared Session is a starting point, not a dead document. Resume creates new wo
 
 ### Safe by default
 
-Nothing leaves the machine automatically. Share is the explicit disclosure boundary: supported Sessions are Public by default, and the confirmation names Explore visibility before upload. Secret detection, clear visibility labels, and withdrawal controls remain mandatory.
+Nothing leaves the machine automatically. Share is the explicit disclosure boundary: supported Sessions are Public by default, and the confirmation names Explore visibility before upload. Every later audience change names its effect: moving to a Team removes public discovery, while Team-to-Public or Team-to-Link-only discloses a Team-owned asset outside the membership boundary. Secret detection, clear visibility labels, role checks, and withdrawal controls remain mandatory.
 
 ### Attributable
 
@@ -94,14 +95,21 @@ The community begins as a corpus, not an engagement feed. High-quality Sessions,
 
 ## Visibility model
 
-| State     | Accessible by URL | Appears on Profile | Appears in Discovery |
-| --------- | ----------------- | ------------------ | -------------------- |
-| Local     | No                | No                 | No                   |
-| Link-only | Yes               | No                 | No                   |
-| Public    | Yes               | Yes                | Yes                  |
-| Withdrawn | No                | No                 | No                   |
+| State                  | Who can read the URL | Appears on Profile | Appears in Discovery |
+| ---------------------- | -------------------- | ------------------ | -------------------- |
+| Local                  | Nobody               | No                 | No                   |
+| Link-only              | Anyone with the URL  | No                 | No                   |
+| Team-only (`Team · …`) | Current Team members | No                 | No                   |
+| Public                 | Anyone               | Yes                | Yes                  |
+| Withdrawn              | Nobody               | No                 | No                   |
 
 The UI must never use “private” for a Link-only Session: anyone with the URL can read it.
+Team-only is a real authenticated membership boundary, but authorized members can still copy what
+they can read. The label must name the Team instead of relying on a lock icon alone.
+
+Moving a Session into a Team transfers ownership and control of the hosted Spool asset to the Team
+workspace. That asset remains with the Team if the original author leaves or deletes their account.
+Owners and Admins manage disclosure; Members can read Team-only assets but cannot publish them.
 
 ## Messaging hierarchy
 
@@ -118,8 +126,9 @@ Share the full context, make the work understandable, and let others continue it
 1. Real agent sessions, not reconstructed posts.
 2. Summary, conversation, tools, files, and diff in one readable page.
 3. Public Profiles and Discovery for finding useful work.
-4. Native Resume / Fork with visible lineage.
-5. Public-by-default for supported providers, with visibility stated before upload.
+4. Team workspaces with invitations, role-based administration, and member-only Sessions.
+5. Native Resume / Fork with visible lineage.
+6. Public-by-default for supported providers, with visibility stated before upload and again before each later audience change.
 
 ## Homepage narrative
 
@@ -150,6 +159,9 @@ Use:
 - agent session
 - Shared Session
 - Public Session
+- Team-only Session
+- Team workspace
+- Team · {name}
 - Share by link
 - Publish publicly
 - Profile
@@ -173,5 +185,9 @@ Avoid:
 Spool does not host or restore a project’s complete codebase. Git remains authoritative for code; the Session remains authoritative for agent work.
 
 Spool does not silently publish local work. Capturing a Session and publishing it are separate actions with an explicit boundary.
+
+Spool does not treat an individual author as the permanent controller of a Team asset. Transfer into
+a Team is explicit and durable; the Team keeps the hosted asset, and its Owners and Admins control
+whether it remains Team-only or is disclosed as Link-only or Public.
 
 Spool does not modify a source Session when someone resumes it. Continuation always creates new work with lineage.

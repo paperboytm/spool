@@ -53,6 +53,12 @@ function mockWorkos(opts: { identities?: unknown } = {}) {
         headers: { 'content-type': 'application/json' },
       })
     }
+    if (url.includes('/user_management/organization_memberships?')) {
+      return new Response(JSON.stringify({ data: [], list_metadata: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
     throw new Error(`unexpected fetch: ${url}`)
   })
 }

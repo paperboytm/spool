@@ -8,6 +8,7 @@
 - **Product surfaces:** The public web is the publishing, Profile, Discovery, and reading surface. The desktop app is the local preparation and management surface. The CLI is the agent- and automation-friendly interface.
 - **Core positioning:** "See how people actually work with agents." Public Sessions and their authors are the center of the web experience; local organization and search support the act of publishing.
 - **Publishing boundary:** Share is the explicit disclosure action. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default; providers not yet supported by Explore remain Link-only. The confirmation must state the resulting visibility before upload.
+- **Workspace boundary:** A Team is an explicit tenant, backed by one WorkOS Organization and one Spool authorization projection. Team-owned Sessions survive an individual member leaving or deleting their account. Personal and Team storage, authorization, quotas, and audit records must never be inferred from navigation state alone.
 
 ## Aesthetic Direction
 
@@ -24,6 +25,7 @@
 2. **Session pages** help a reader understand and continue the work.
 3. **Profiles** establish authorship and collect a person’s Public Sessions.
 4. **Desktop and CLI** help an author prepare, share, publish, and manage Sessions.
+5. **Teams** let members keep shared work inside a named workspace before deciding whether the Team should publish it more broadly.
 
 The public web must show the artifact before explaining the product. Real Sessions, authors, topics, and evidence carry more weight than feature illustrations.
 
@@ -35,7 +37,7 @@ The public web must show the artifact before explaining the product. Real Sessio
 - **Discovery:** Search is prominent at the top, followed by clear filters for topic, agent, author, and recency. Results remain readable without opening each Session.
 - **Profile:** Author identity and recurring topics come first, followed by Public Sessions. Counts support the content; they are not the hero.
 - **Session page:** Summary establishes intent and outcome; conversation/tool activity shows process; files and diff show evidence; Resume/Fork is the primary action after reading. Source and continuation lineage remain visible.
-- **Visibility:** `Link-only`, `Public`, and `Withdrawn` are explicit text labels with icons. Never communicate visibility by icon alone at the publishing boundary.
+- **Visibility:** `Link-only`, `Team · {name}`, `Public`, and `Withdrawn` are explicit text labels with icons. Never communicate visibility by icon alone at the publishing boundary.
 - **Alignment:** Editorial surfaces are predominantly left-aligned. A centered treatment is acceptable only for a short empty state or a focused search affordance—not as a substitute for public content.
 - **Width:** Marketing and Discovery shells use a ~1120px max width. Reading columns stay near 720px; timeline/diff workbenches may expand to the full shell.
 
@@ -214,12 +216,31 @@ Semantic colors are tuned for contrast against the void palette — never use Ta
 - **Link-only Session:** Same reader, but label it `Link-only` and exclude discovery navigation that implies public listing.
 - **Withdrawn:** Keep a stable unavailable page with no leaked title, Summary, author, or content.
 
+### Team workspace
+
+- **Tenant model:** Each Team is a durable workspace, not a filter over personal content. Resource ownership and authorization come from the server; a client-side Team switcher is only navigation context.
+- **Roles:** `Owner`, `Admin`, and `Member` are single, explicit roles. Owners manage the workspace and ownership; Admins manage members, invitations, and Team Sessions; Members can read Team Sessions and contribute their own. The last Owner cannot leave, be removed, or be demoted until ownership is transferred.
+- **Creation:** Creating a Team immediately creates its WorkOS Organization membership and makes the creator an Owner. Show the durable Team name and membership state only after the complete operation succeeds.
+- **Navigation:** `/me` shows a compact Team list and a clear `Create team` action. `/teams/{id}` uses `Sessions`, `Members`, and `Settings` sections. The global account menu may provide Team shortcuts, but must not imply that switching scope changes authorization.
+- **Members:** The Members surface shows identity, role, join state, and pending invitations. Invitations name their recipient and intended role; Owners/Admins can resend or revoke them. Destructive membership actions require explicit confirmation and explain the effect on access.
+- **Session ownership:** Moving a personal Session into a Team is an ownership transfer. State that the Team keeps the Session if the author later leaves. Team Owners/Admins may manage Team-owned Sessions; attribution still names the original author while that identity exists.
+- **Responsive layout:** At 320px, use one column and move row actions below identity/content; every interactive target is at least 44px. At 768px, two-column forms are allowed. Desktop may use a 240px Team rail plus a main column, within the 1120px shell.
+
+### Team Session
+
+- **Access:** `Team · {name}` means only current members can read it. It is genuinely private to the tenant, unlike `Link-only`, which remains readable by anyone with the URL.
+- **Private response:** Team Session metadata, view, records, and attached `.spool` document all require the same membership gate and use `private, no-store`. A removed member loses access on the next request.
+- **No public projection:** Team-only Sessions never enter Explore, Profile lists or counts, public search, engagement ranking, RSS, previews, or OG metadata. Anonymous server rendering must not reveal title, Summary, author, lineage, or evidence.
+- **Reader state:** An anonymous visitor sees a sign-in affordance that preserves the intended URL. An authenticated non-member sees the same unavailable treatment as an unknown Session; do not reveal which Team owns it.
+- **Disclosure changes:** Personal → Team, Team → Public, and Team → Link-only are named, confirmed actions. Public → Team immediately removes all public discovery and engagement projections before the change is reported complete.
+
 ### Publishing
 
 - **Prepare:** Show exactly which Session and record range will be shared, secret findings, and optional Summary before network transfer.
 - **Share complete:** Return the durable URL and state whether the Session is Public or Link-only. Supported Sessions are Public by default and can appear in Discovery.
 - **Publish confirmation:** Explain that supported Sessions can appear in Discovery and search. Visibility is text + icon, never a globe icon by itself.
 - **After publish:** Show `Public`, copy-link, view-profile, and withdraw actions. Never collapse Share and Publish into one ambiguous toggle.
+- **Team target:** Team is an explicit optional target, never a sticky hidden default. Selecting it changes the confirmation to `Team · {name}` and explains that current members can read it and the Team owns the resulting Session.
 
 ### Desktop Search (⌘K overlay)
 
@@ -367,6 +388,7 @@ In dense lists, prefer compact facts over repeated pronouns:
 
 - `Link-only` means anyone with the URL can read it.
 - `Public` means it may appear on the author’s Profile and in Discovery.
+- `Team · {name}` means only current members of that Team can read it; the Team retains the Session when an individual member leaves.
 - Never call a Link-only URL `private` or `secret`.
 
 ## Anti-patterns — Never Do
@@ -396,5 +418,6 @@ In dense lists, prefer compact facts over repeated pronouns:
 | 2026-07-18 | Resume creates lineage, never mutation        | Continuation should be visible without changing the source Session.                                                                                                                                                                                                                 |
 | 2026-07-18 | Warm amber remains the sole product accent    | Superseded on 2026-07-22: the accent is now Framer-derived electric blue on a void palette.                                                                                                                                                                                         |
 | 2026-07-22 | Void palette + electric blue accent           | After a design-system exploration (open-design packages), the Warm Index structure keeps its layout while the palette moves to void black/white with the Paperboy wing blue `#1387FF`/`#5BB1F0` (post-acquisition brand color). The WebGL hero follows the active light/dark theme. |
+| 2026-07-22 | Teams are durable tenant workspaces           | Team-only is a real authorization and ownership boundary, not a renamed link state. WorkOS carries organization identity and invitations; Spool enforces roles, storage ownership, disclosure, and public-projection isolation.                                                     |
 | 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                                                                                                                                                           |
 | 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                                                                                                                                                          |

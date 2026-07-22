@@ -19,13 +19,14 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler pages dev ./public --inspector-port 9230 --d1 DB --kv SESSIONS --kv META --kv RATE --kv NONCE --r2 SNAPSHOTS --r2 OG --r2 AVATARS --r2 HUB",
-    "deploy:staging": "node scripts/deploy-pages.mjs staging",
     "deploy:prod": "node scripts/deploy-pages.mjs production",
+    "deploy:staging": "node scripts/deploy-pages.mjs staging",
+    "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local --config wrangler.toml",
+    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --remote --config wrangler.prod.toml",
+    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db-staging --remote --config wrangler.staging.toml",
+    "schema:smoke": "node scripts/schema-smoke.mjs",
     "test": "vp test run",
-    "typecheck": "tsc --noEmit",
-    "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local",
-    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db-staging --remote",
-    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --remote"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@spool-lab/session-kit": "workspace:*",
@@ -33,7 +34,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260718.1",
+    "@cloudflare/workers-types": "^5.20260722.1",
     "@spool-lab/cli": "workspace:*",
     "@types/node": "^26.1.1",
     "vite": "catalog:",

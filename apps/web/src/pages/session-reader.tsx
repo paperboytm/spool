@@ -138,6 +138,7 @@ export async function loadSessionContent(
 type PageState =
   | { phase: 'loading'; loaded: number; total: number | null }
   | { phase: 'not-found' }
+  | { phase: 'auth-required' }
   | { phase: 'withdrawn'; at: number }
   | { phase: 'error' }
   | {
@@ -190,6 +191,7 @@ export function SessionReader({ sid }: { sid: string }) {
       const meta = await fetchHubMeta(sid)
       if (cancelled) return
       if (meta.kind === 'not-found') return setState({ phase: 'not-found' })
+      if (meta.kind === 'auth-required') return setState({ phase: 'auth-required' })
       if (meta.kind === 'withdrawn') return setState({ phase: 'withdrawn', at: meta.at })
       if (meta.kind === 'error') return setState({ phase: 'error' })
 
@@ -260,6 +262,39 @@ export function SessionReader({ sid }: { sid: string }) {
   }, [effectiveRecords, state])
 
   if (state.phase === 'not-found') return <Tombstone reason="not-found" />
+
+  if (state.phase === 'auth-required') {
+    const next = `/session/${encodeURIComponent(sid)}`
+    return (
+      <Page>
+        <Header sticky />
+        <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
+          <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] md:p-8">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="rounded border border-[var(--accent)] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[var(--accent)] uppercase">
+                Team Session
+              </span>
+              <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
+            </div>
+            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
+              Sign in to check access
+            </h1>
+            <p className="mt-3 mb-6 text-[13px] leading-5 text-[var(--muted)]">
+              This Session is visible only to current members of its Team. Sign in with your Spool
+              account to continue.
+            </p>
+            <a
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 text-[13px] font-semibold text-white no-underline hover:opacity-90"
+              href={`/sign-in?next=${encodeURIComponent(next)}`}
+            >
+              Sign in
+            </a>
+          </div>
+        </main>
+        <Footer />
+      </Page>
+    )
+  }
 
   if (state.phase === 'withdrawn') {
     return (

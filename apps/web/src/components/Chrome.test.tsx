@@ -19,4 +19,17 @@ describe('Header', () => {
     expect(html).toContain('class="sw-header"')
     expect(html).not.toContain('sw-header-sticky')
   })
+
+  it('shows a usable team shortcut for signed-in account chrome', () => {
+    const html = renderToStaticMarkup(
+      <Header
+        auth={{ name: 'Alice', src: null }}
+        contextTeam={{ id: 'team/a', name: 'Paperboy' }}
+      />,
+    )
+
+    expect(html).toContain('href="/teams/team%2Fa"')
+    expect(html).toContain('>Paperboy</span>')
+    expect(html).toContain('href="/me"')
+  })
 })

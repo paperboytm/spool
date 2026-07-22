@@ -21,6 +21,7 @@ dist-electron/
 
 # Cloudflare local state and generated deployment artifacts
 .wrangler/
+.wrangler-deploy-*.toml
 
 # Source maps
 *.js.map
@@ -64,6 +65,7 @@ build/
 *.node
 
 # Compiled artifacts that may end up in src/ by mistake
+*.tsbuildinfo
 packages/*/src/**/*.js
 apps/*/src/**/*.js
 packages/*/src/**/*.d.ts

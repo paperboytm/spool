@@ -315,6 +315,9 @@ describe('workos web flow endpoints', () => {
       if (url.endsWith('/user_management/users/user_wos_1/identities')) {
         return jsonResponse([{ idp_id: 'g-sub-9', provider: 'GoogleOAuth' }])
       }
+      if (url.includes('/user_management/organization_memberships?')) {
+        return jsonResponse({ data: [], list_metadata: {} })
+      }
       throw new Error(`unexpected fetch: ${url}`)
     })
 

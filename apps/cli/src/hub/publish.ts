@@ -7,14 +7,31 @@ import {
 import { UPLOAD_MAX_LINES, chunkUploads, type PreparedShare } from './share-pipeline.js'
 import type { WorkspaceCard } from './workspace.js'
 
-export interface PublishPreparedShareOptions {
+interface PublishPreparedShareBaseOptions {
   card: WorkspaceCard | null
   /** Markdown shown as the shared session's Summary. */
   summary: string | null
   /** Optional curated .spool document attached to the share. */
   spoolFile?: HubObjectUpload | null
   onUploadProgress?: (uploaded: number, total: number) => void
+  /** Fail if durable Team ownership changed after the caller reviewed it. */
+  expectedTeamId?: string | null
 }
+
+type PublishPreparedShareTarget =
+  | {
+      /** Explicit personal disclosure, or omit for the provider-aware default. */
+      visibility?: 'public' | 'link-only'
+      teamId?: never
+    }
+  | {
+      /** Team is always an explicit tenant target; its id cannot accompany Public/Link-only. */
+      visibility: 'team'
+      teamId: string
+    }
+
+export type PublishPreparedShareOptions = PublishPreparedShareBaseOptions &
+  PublishPreparedShareTarget
 
 /**
  * Commit a prepared session through the Hub's push → upload → head protocol.
@@ -29,8 +46,19 @@ export async function publishPreparedShare(
   prepared: PreparedShare,
   options: PublishPreparedShareOptions,
 ): Promise<HubHeadResponse> {
+  if (options.visibility === 'team' ? !options.teamId : options.teamId !== undefined) {
+    throw new Error('Team publishing requires visibility "team" and a Team id together')
+  }
   const spoolFile = options.spoolFile ?? null
   const summary = options.summary?.trim() ? options.summary : null
+  const target =
+    options.visibility === 'team'
+      ? { visibility: options.visibility, teamId: options.teamId }
+      : options.visibility === undefined
+        ? {}
+        : { visibility: options.visibility }
+  const ownershipExpectation =
+    options.expectedTeamId === undefined ? {} : { expectedTeamId: options.expectedTeamId }
   const head: HubSessionWriteRequest = {
     root: prepared.root,
     count: prepared.count,
@@ -41,6 +69,8 @@ export async function publishPreparedShare(
     lineageJson: prepared.lineageJson,
     viewOid: prepared.viewOid,
     spoolFileOid: spoolFile?.oid ?? null,
+    ...target,
+    ...ownershipExpectation,
   }
 
   const { missing } = await client.pushSession(prepared.sid, head)

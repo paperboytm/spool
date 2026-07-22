@@ -4,7 +4,7 @@
 
 import type { Snapshot } from '@spool/share-kit'
 
-import { invalidateAuthCache } from './auth-cache'
+import { invalidateAuthCache, setResolvedAuthIdentity } from './auth-cache'
 import { clearCachedMe, writeCachedMe } from './me-cache'
 
 export type SnapshotFetchResult =
@@ -189,7 +189,9 @@ export async function fetchMe(): Promise<MeFetchResult> {
       const me = (await r.json()) as MeResponse
       // Write the public-identity slice into the SWR cache so the next
       // page mount can paint the avatar before the round trip lands.
-      writeCachedMe({ name: me.name, avatar_url: me.avatar_url })
+      const identity = { name: me.display_name, src: me.avatar_url }
+      writeCachedMe({ name: me.display_name, avatar_url: me.avatar_url })
+      setResolvedAuthIdentity(identity)
       return { kind: 'ok', me }
     }
     if (r.status === 401) {
@@ -369,7 +371,10 @@ export async function signOut(): Promise<boolean> {
   }
 }
 
-export type DeleteAccountResult = { kind: 'ok'; scheduled_at: number } | { kind: 'error' }
+export type DeleteAccountResult =
+  | { kind: 'ok'; scheduled_at: number }
+  | { kind: 'conflict'; detail?: string }
+  | { kind: 'error' }
 
 export async function scheduleAccountDeletion(): Promise<DeleteAccountResult> {
   try {
@@ -380,6 +385,15 @@ export async function scheduleAccountDeletion(): Promise<DeleteAccountResult> {
     if (r.status === 200) {
       const body = (await r.json()) as { scheduled_at: number }
       return { kind: 'ok', scheduled_at: body.scheduled_at }
+    }
+    if (r.status === 409) {
+      const body = (await r.json().catch(() => null)) as { detail?: unknown } | null
+      return {
+        kind: 'conflict',
+        ...(typeof body?.detail === 'string' && body.detail.trim()
+          ? { detail: body.detail.trim() }
+          : {}),
+      }
     }
     return { kind: 'error' }
   } catch {

@@ -226,6 +226,33 @@ describe('_middleware security headers', () => {
     expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
+  it('marks tenant API success and error responses private and credential-varying', async () => {
+    const { onRequest } = await import('../functions/_middleware')
+    const cases = [
+      { url: 'https://x/api/teams', method: 'GET', status: 200 },
+      { url: 'https://x/api/teams/team_1/members', method: 'POST', status: 403 },
+      { url: 'https://x/api/me/sessions', method: 'GET', status: 200 },
+      { url: 'https://x/api/me/sessions/codex_1', method: 'PATCH', status: 404 },
+    ]
+
+    for (const testCase of cases) {
+      const req = new Request(testCase.url, { method: testCase.method })
+      const inner = new Response('{"ok":true}', {
+        status: testCase.status,
+        headers: { vary: 'Accept-Encoding' },
+      })
+      const res = await (
+        onRequest as unknown as (c: {
+          request: Request
+          next: () => Promise<Response>
+        }) => Promise<Response>
+      )({ request: req, next: async () => inner })
+
+      expect(res.headers.get('cache-control')).toBe('private, no-store')
+      expect(res.headers.get('vary')).toBe('Accept-Encoding, Cookie, Authorization')
+    }
+  })
+
   it('does NOT set CSP for non-/api routes', async () => {
     const { onRequest } = await import('../functions/_middleware')
     const inner = new Response('<html/>', { headers: { 'content-type': 'text/html' } })

@@ -27,17 +27,26 @@ describe('resolveLoadOutcome', () => {
     })
   })
 
-  // Regression for the bug: a 5xx / network failure on /api/me/shares was
-  // swallowed into an empty list, so the page rendered "nothing
-  // published" — a lie. It must surface the error/retry card instead.
-  it('surfaces an error (NOT an empty list) when /api/me/shares fails', () => {
+  // Legacy snapshots cannot block the main Hub Session/Team account surface,
+  // but their failure must remain distinct from a genuine empty response.
+  it('keeps the account usable and marks legacy shares unavailable when their request fails', () => {
     const out = resolveLoadOutcome(meOk, { kind: 'error' })
-    expect(out.kind).toBe('error')
+    expect(out).toEqual({
+      kind: 'ok',
+      me: ME,
+      shares: [],
+      legacySharesUnavailable: true,
+    })
   })
 
-  it('surfaces an error when /api/me/shares races to unauthenticated after /api/me succeeded', () => {
+  it('marks legacy shares unavailable when their request races to unauthenticated', () => {
     const out = resolveLoadOutcome(meOk, { kind: 'unauthenticated' })
-    expect(out.kind).toBe('error')
+    expect(out).toEqual({
+      kind: 'ok',
+      me: ME,
+      shares: [],
+      legacySharesUnavailable: true,
+    })
   })
 
   it('renders ok with the real rows when both succeed', () => {

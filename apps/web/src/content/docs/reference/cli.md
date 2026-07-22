@@ -37,6 +37,8 @@ If the Hub is unreachable, the local credential is still removed. Revoke the ser
 
 Create a durable Shared Session URL. Claude Code and Codex CLI Sessions are Public in Explore and search by default; providers not yet supported by Explore remain Link-only. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure. Non-interactive callers must pass `--visibility-confirmed`, which acknowledges visibility without bypassing sensitive-data findings.
 
+The CLI reports this initial Public or Link-only result. Team transfer is a separate, confirmed action on [your account page](/me): choosing `Team · name` makes the hosted asset Team-owned and limits reading to current members until a Team Owner or Admin changes its visibility.
+
 ```bash
 npx @spool-lab/cli share                       # latest Session in the current directory
 npx @spool-lab/cli share <uuid>                # specific Session; UUID prefixes work

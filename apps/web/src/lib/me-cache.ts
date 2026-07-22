@@ -1,5 +1,5 @@
 // Stale-while-revalidate localStorage cache for the signed-in user's
-// public identity (name + avatar URL). Read at Header mount so the
+// public identity (resolved display name + avatar URL). Read at Header mount so the
 // first paint shows a real avatar instead of a 100ms blank-spot while
 // /api/me round-trips. The fresh fetch then revalidates and writes
 // back. True auth is always backend-validated — this only affects the
@@ -12,6 +12,7 @@ const KEY = 'spool.share-web.me'
 const VERSION = 1
 
 export interface CachedMe {
+  /** Resolved display name, not the raw identity-provider claim. */
   name: string | null
   avatar_url: string | null
 }

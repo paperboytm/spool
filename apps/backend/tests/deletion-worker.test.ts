@@ -32,7 +32,10 @@ function seedUser(state: FakeDbState, id: string): void {
     avatar_url: `https://example.com/${id}.png`,
     created_at: Date.now(),
     last_signin_at: Date.now(),
-    deletion_pending_until: null,
+    // Every user seeded in this suite has already confirmed account
+    // deletion. The production worker refuses to claim a queue row unless
+    // this current-state marker is still present.
+    deletion_pending_until: Date.now() - 1,
     deleted_at: null,
   })
   // Mirror the user_identities link that upsertUserByIdentity would
@@ -118,6 +121,76 @@ async function seedHubData(
 }
 
 describe('runDeletionSweep', () => {
+  it('re-checks live Team ownership and safely cancels before destructive work', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-owner')
+    env.state.users[0]!.deletion_pending_until = Date.now() - 1
+    env.state.teams.push({
+      id: 'team-owned',
+      name: 'Owned Team',
+      workos_organization_id: 'org_owned',
+      archived_at: null,
+    })
+    env.state.team_memberships.push({
+      team_id: 'team-owned',
+      user_id: 'user-owner',
+      role: 'owner',
+      workos_membership_id: 'om_owner',
+    })
+    env.state.deletion_queue.push({
+      user_id: 'user-owner',
+      scheduled_at: Date.now() - 1_000,
+      cancelled: 0,
+    })
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    expect(env.state.deletion_queue[0]?.cancelled).toBe(1)
+    expect(env.state.users[0]).toMatchObject({
+      email: 'user-owner@example.com',
+      deleted_at: null,
+      deletion_pending_until: null,
+    })
+    expect(env.state.team_memberships).toHaveLength(1)
+    expect(env.state.workos_cleanup_outbox).toEqual([])
+  })
+
+  it('atomically enqueues every external membership before deleting the local account', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-member')
+    env.state.teams.push({
+      id: 'team-member',
+      name: 'Member Team',
+      workos_organization_id: 'org_member',
+      archived_at: null,
+    })
+    env.state.team_memberships.push({
+      team_id: 'team-member',
+      user_id: 'user-member',
+      role: 'member',
+      workos_membership_id: 'om_member',
+    })
+    env.state.deletion_queue.push({
+      user_id: 'user-member',
+      scheduled_at: Date.now() - 1_000,
+      cancelled: 0,
+    })
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    expect(env.state.team_memberships).toEqual([])
+    expect(env.state.workos_cleanup_outbox).toEqual([
+      expect.objectContaining({
+        operation: 'membership.delete',
+        resource_id: 'om_member',
+        team_id: 'team-member',
+        user_id: 'user-member',
+      }),
+    ])
+  })
+
   it('purges a due user with no Hub data and removes the queue row', async () => {
     const env = envFor()
     seedUser(env.state, 'user-1')
@@ -304,7 +377,9 @@ describe('runDeletionSweep', () => {
     expect(env.state.deletion_queue).toHaveLength(1)
     expect(env.state.users[0]?.deleted_at).toBeNull()
 
-    await runDeletionSweep(env, Date.now())
+    // A failed processor keeps its lease so another cron cannot race its
+    // external cleanup. Once that lease expires, the next sweep resumes.
+    await runDeletionSweep(env, Date.now() + 31 * 60 * 1000)
 
     expect(env._hub.has(packKey)).toBe(false)
     expect(env._hub.has(orphanPack)).toBe(false)
@@ -335,7 +410,7 @@ describe('runDeletionSweep', () => {
     let failOnce = true
     const intercept = (sql: string) => {
       const stmt = realPrepare(sql)
-      if (/^DELETE FROM hub_sessions WHERE owner_user_id=\?$/i.test(sql)) {
+      if (/^DELETE FROM hub_sessions WHERE owner_user_id=\? AND team_id IS NULL$/i.test(sql)) {
         return {
           bind: (userId: string) => ({
             run: async () => {
@@ -356,16 +431,15 @@ describe('runDeletionSweep', () => {
     const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
     await runDeletionSweep(env, Date.now())
 
-    // The fake batch is deliberately non-transactional, so this models
-    // the harsh boundary where hub_objects committed before hub_sessions
-    // failed. The physical pack is already gone; the withdrawn Session
-    // and queue row make the state safe and retryable.
+    // D1 rolls the two row deletions back together. The physical pack is
+    // already gone, but the withdrawn Session and queue row keep the state
+    // fail-closed; retrying the idempotent R2 delete then commits both rows.
     expect(env._hub.has(packKey)).toBe(false)
-    expect(env.state.hub_objects).toEqual([])
+    expect(env.state.hub_objects).toHaveLength(1)
     expect(env.state.hub_sessions[0]?.withdrawn_at).not.toBeNull()
     expect(env.state.deletion_queue).toHaveLength(1)
 
-    await runDeletionSweep(env, Date.now())
+    await runDeletionSweep(env, Date.now() + 31 * 60 * 1000)
 
     expect(env.state.hub_sessions).toEqual([])
     expect(env.state.deletion_queue).toEqual([])
@@ -413,12 +487,39 @@ describe('runDeletionSweep', () => {
     expect(env.state.deletion_queue.length).toBe(1)
   })
 
-  it('in-loop cancel re-check skips a user whose row flipped to cancelled between SELECTs', async () => {
-    // Outer SELECT picks up user-1 + user-2 (both due). Before the
-    // per-user loop processes user-1, we flip its queue row to
-    // cancelled=1 — simulating a real-world POST DELETE /api/me/delete
-    // landing inside the cron's processing window. The inner re-check
-    // must catch it and skip; user-2 must still be processed.
+  it('does not steal a live processing lease and resumes it only after expiry', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    const slug = nanoidSlug()
+    await seedShareWithAssets(env, 'user-1', slug)
+    const now = Date.now()
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: now - 1_000,
+      cancelled: 0,
+      state: 'processing',
+      processing_token: 'delete_original',
+      processing_lease_until: now + 60_000,
+    })
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, now)
+
+    expect(env._snapshots.has(`${slug}.json`)).toBe(true)
+    expect(env.state.deletion_queue[0]?.processing_token).toBe('delete_original')
+    expect(env.state.users[0]?.deleted_at).toBeNull()
+
+    await runDeletionSweep(env, now + 60_001)
+
+    expect(env._snapshots.has(`${slug}.json`)).toBe(false)
+    expect(env.state.deletion_queue).toEqual([])
+    expect(env.state.users[0]?.deleted_at).not.toBeNull()
+  })
+
+  it('does not delete when cancellation wins the atomic processing claim', async () => {
+    // Outer SELECT picks up user-1 + user-2. Simulate cancellation winning
+    // immediately before user-1's guarded UPDATE claim; user-2 must still
+    // be processed normally.
     const env = envFor()
     seedUser(env.state, 'user-1')
     seedUser(env.state, 'user-2')
@@ -431,16 +532,27 @@ describe('runDeletionSweep', () => {
       { user_id: 'user-2', scheduled_at: Date.now() - 1000, cancelled: 0 },
     )
 
-    // Intercept the inner-loop SELECT so user-1's check returns null
-    // (as if cancelled landed) while user-2's check returns truthy.
     const realPrepare = env.DB.prepare.bind(env.DB)
     const intercept = (sql: string) => {
       const stmt = realPrepare(sql)
-      if (/^SELECT 1 FROM deletion_queue WHERE user_id=\? AND cancelled=0/i.test(sql)) {
+      if (sql.includes('/* account-deletion:claim */')) {
+        const bound: unknown[] = []
         return {
-          bind: (uid: string) => ({
-            first: async () => (uid === 'user-1' ? null : { '1': 1 }),
-          }),
+          bind: (...params: unknown[]) => {
+            bound.push(...params)
+            return {
+              run: async () => {
+                const uid = bound[2] as string
+                if (uid === 'user-1') {
+                  const queue = env.state.deletion_queue.find((row) => row.user_id === uid)!
+                  queue.cancelled = 1
+                  queue.state = 'cancelled'
+                  return { success: true, meta: { changes: 0 } }
+                }
+                return stmt.bind(...bound).run()
+              },
+            }
+          },
         } as unknown as ReturnType<typeof realPrepare>
       }
       return stmt

@@ -1,18 +1,29 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 import { isDiscoverySessionSid } from '@spool-lab/session-kit'
 
-import { audit } from '../../../../../../src/audit'
+import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
 import {
   buildDiscoveryProjection,
-  prepareDiscoveryProjectionUpsert,
+  filterLineageForAudience,
+  isPublishedToDiscovery,
+  prepareAuthorizedDiscoveryProjectionDelete,
+  prepareAuthorizedDiscoveryProjectionUpsert,
+  prepareAuthorizedEngagementDelete,
   readDiscoveryView,
 } from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
-import { getHubSession, prepareHubSessionUpsert } from '../../../../../../src/hub/store'
-import { parseHeadBody, requireSid } from '../../../../../../src/hub/wire'
+import {
+  getHubSession,
+  isTeamStorageQuotaError,
+  personalObjectBytes,
+  prepareAuthorizedPersonalObjectAliases,
+  prepareAuthorizedHeadUpsert,
+  teamStorageBytes,
+} from '../../../../../../src/hub/store'
+import { parseHeadBody, requireSid, TEAM_QUOTA_BYTES } from '../../../../../../src/hub/wire'
 import { publicBaseUrl } from '../../../../../../src/public-url'
 
 // Step 3 of the share handshake: commit the head. Re-runs the same
@@ -27,20 +38,97 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     const sid = requireSid(ctx.params['sid'])
     const body = await parseHeadBody(ctx.request)
 
-    const { missing } = await validateHead(ctx.env.DB, user.id, sid, body)
+    const existing = await getHubSession(ctx.env.DB, sid)
+    const { missing, aliasOids, teamId, teamRole } = await validateHead(
+      ctx.env.DB,
+      user.id,
+      sid,
+      body,
+    )
     if (missing.length > 0) {
       throw new ApiError('CONFLICT', 'objects missing — upload before committing', {
         missing: missing.slice(0, 50),
       })
     }
+    if (existing?.team_id && existing.withdrawn_at !== null) {
+      // Team withdrawal is permanent. A Team author may continue an active
+      // Session, but no role can resurrect a tenant tombstone through head.
+      throw new ApiError('GONE', 'withdrawn', { withdrawnAt: existing.withdrawn_at })
+    }
 
-    // Validate the declared view before advancing the head. Explore currently
-    // supports Claude Code and Codex CLI; those providers publish by default,
-    // while portable providers remain readable by URL without failing Share.
-    const view = await readDiscoveryView(ctx.env.DB, ctx.env.HUB, user.id, body.viewOid)
-    const existing = await getHubSession(ctx.env.DB, sid)
-    const now = Date.now()
-    const sessionUpsert = prepareHubSessionUpsert(ctx.env.DB, {
+    const discoverySupported = isDiscoverySessionSid(sid)
+    const wasPublic = existing ? await isPublishedToDiscovery(ctx.env.DB, sid) : false
+    const effectiveVisibility =
+      body.visibility ??
+      (existing
+        ? existing.visibility === 'private' && existing.team_id
+          ? 'team'
+          : wasPublic
+            ? 'public'
+            : 'link-only'
+        : teamId
+          ? 'team'
+          : discoverySupported
+            ? 'public'
+            : 'link-only')
+    if (effectiveVisibility === 'team' && !teamId) {
+      throw new ApiError('UNPROCESSABLE', 'Team visibility requires a Team')
+    }
+    if (effectiveVisibility === 'public' && !discoverySupported) {
+      throw new ApiError('UNPROCESSABLE', 'this provider can only be Link-only or Team-visible')
+    }
+    const currentVisibility = existing
+      ? existing.visibility === 'private' && existing.team_id
+        ? 'team'
+        : wasPublic
+          ? 'public'
+          : 'link-only'
+      : null
+    const accessChanged =
+      existing === null || existing.team_id !== teamId || currentVisibility !== effectiveVisibility
+    const requestedStorageVisibility: 'private' | 'unlisted' =
+      effectiveVisibility === 'team' ? 'private' : 'unlisted'
+    const committedStorageVisibility: 'private' | 'unlisted' =
+      existing && !accessChanged
+        ? (existing.visibility as 'private' | 'unlisted')
+        : requestedStorageVisibility
+    const existingTeamOwned = existing?.team_id != null
+    const requireTeamManager =
+      teamId !== null &&
+      ((existingTeamOwned && accessChanged) ||
+        (!existingTeamOwned && effectiveVisibility !== 'team'))
+    if (requireTeamManager && teamRole !== 'owner' && teamRole !== 'admin') {
+      throw new ApiError('FORBIDDEN')
+    }
+    const safeLineageJson = await filterLineageForAudience(
+      ctx.env.DB,
+      body.lineageJson,
+      effectiveVisibility === 'team' ? teamId : null,
+    )
+
+    // Validate the declared view before advancing the head. During a transfer,
+    // objects not yet in the Team index still live in the current writer's
+    // personal namespace; after validation they are aliased before access flips.
+    const view = await readDiscoveryView(
+      ctx.env.DB,
+      ctx.env.HUB,
+      user.id,
+      body.viewOid,
+      teamId && !aliasOids.includes(body.viewOid) ? teamId : null,
+    )
+
+    if (teamId && aliasOids.length > 0) {
+      const [used, incoming] = await Promise.all([
+        teamStorageBytes(ctx.env.DB, teamId),
+        personalObjectBytes(ctx.env.DB, user.id, aliasOids),
+      ])
+      if (used + incoming > TEAM_QUOTA_BYTES) {
+        throw new ApiError('UNPROCESSABLE', 'Team storage quota exceeded')
+      }
+    }
+
+    const now = existing ? Math.max(Date.now(), existing.updated_at + 1) : Date.now()
+    const sessionUpsert = prepareAuthorizedHeadUpsert(ctx.env.DB, {
       sid,
       ownerUserId: user.id,
       root: body.root,
@@ -48,38 +136,99 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       sig: body.sig,
       cardJson: body.cardJson,
       summaryMd: body.summaryMd,
-      lineageJson: body.lineageJson,
+      lineageJson: safeLineageJson,
       viewOid: body.viewOid,
       spoolFileOid: body.spoolFileOid,
       now,
+      actorUserId: user.id,
+      expectedTeamId: existing?.team_id ?? null,
+      expectedVisibility: existing?.visibility ?? 'unlisted',
+      expectedWithdrawnAt: existing?.withdrawn_at ?? null,
+      expectedRoot: existing?.root ?? null,
+      expectedUpdatedAt: existing?.updated_at ?? null,
+      expectedPublished: wasPublic,
+      expectedExists: existing !== null,
+      targetTeamId: teamId,
+      targetVisibility: requestedStorageVisibility,
+      changeAccess: accessChanged,
+      clearWithdrawal: existing?.team_id == null && existing?.withdrawn_at != null,
+      requireTeamManager,
     })
-    const discoverySupported = isDiscoverySessionSid(sid)
     const statements = [sessionUpsert]
-    if (discoverySupported) {
+    if (teamId && aliasOids.length > 0) {
       statements.push(
-        prepareDiscoveryProjectionUpsert(
+        ...prepareAuthorizedPersonalObjectAliases(ctx.env.DB, {
+          sid,
+          ownerUserId: user.id,
+          actorUserId: user.id,
+          teamId,
+          root: body.root,
+          updatedAt: now,
+          visibility: committedStorageVisibility,
+          oids: aliasOids,
+          now,
+          requireTeamManager,
+        }),
+      )
+    }
+    const projectionGate = {
+      sid,
+      actorUserId: user.id,
+      teamId,
+      root: body.root,
+      updatedAt: now,
+      visibility: committedStorageVisibility,
+      withdrawn: false,
+      requireAuthor: true,
+      requireTeamManager,
+    }
+    if (effectiveVisibility === 'public') {
+      statements.push(
+        prepareAuthorizedDiscoveryProjectionUpsert(
           ctx.env.DB,
           buildDiscoveryProjection({
             sid,
             summaryMd: body.summaryMd,
-            lineageJson: body.lineageJson,
+            lineageJson: safeLineageJson,
             recordCount: body.count,
             publishedAt: existing?.created_at ?? now,
             updatedAt: now,
             view,
           }),
+          projectionGate,
         ),
+      )
+    } else if (teamId || body.visibility !== undefined || wasPublic) {
+      // Visibility and public projections change in one D1 transaction. A
+      // Team recommit also scrubs stale projections left by an older build.
+      statements.push(
+        prepareAuthorizedEngagementDelete(ctx.env.DB, projectionGate),
+        prepareAuthorizedDiscoveryProjectionDelete(ctx.env.DB, projectionGate),
       )
     }
 
     await writeManifest(ctx.env.HUB, body.root, body.manifest)
-    await ctx.env.DB.batch(statements)
+    let results
+    try {
+      results = await ctx.env.DB.batch(statements)
+    } catch (error) {
+      if (isTeamStorageQuotaError(error)) {
+        throw new ApiError('UNPROCESSABLE', 'Team storage quota exceeded')
+      }
+      throw error
+    }
+    if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')
 
-    await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
+    auditAfterCommit(ctx, {
       user_id: user.id,
       action: 'hub-share',
       target_id: sid,
-      details: { root: body.root, count: body.count, public: discoverySupported },
+      details: {
+        root: body.root,
+        count: body.count,
+        visibility: effectiveVisibility,
+        team_id: teamId,
+      },
     })
 
     return jsonOk({ url: `${publicBaseUrl(ctx.env)}/session/${sid}` })

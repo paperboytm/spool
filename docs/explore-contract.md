@@ -17,6 +17,10 @@ separate Publish control in this version.
 Providers not yet supported by Explore remain Link-only. Existing Link-only Sessions are not
 published in bulk; re-sharing a supported Session materializes its projection.
 
+Team-only Sessions never have a Discovery projection. A Team-owned Session may enter Explore only
+after a Team Owner or Admin explicitly changes it to Public; changing a Public Session to Team-only
+removes its projection and engagement rows before the visibility change reports success.
+
 ## Source of truth
 
 - `hub_sessions` remains authoritative for ownership, lifecycle, Summary, lineage, and record count.
@@ -155,8 +159,9 @@ The response is `DiscoverySessionsResponse`:
 
 Rules:
 
-- Only live Hub Sessions are returned: `visibility = 'unlisted'`, `withdrawn_at IS NULL`, and owner
-  account not deleted.
+- Only live Public Hub Sessions are returned: `visibility = 'unlisted'`, a live Discovery
+  projection, `withdrawn_at IS NULL`, and owner account not deleted. A Team-owned Public Session
+  may qualify; a Team-only Session never does.
 - Author values are resolved at read time so profile edits do not require reindexing.
 - `summaryExcerpt` is plain text and bounded to 360 characters.
 - Cursors are opaque to clients. v1 may encode an offset plus a fingerprint of `q/sort/agent`; a
@@ -229,8 +234,7 @@ popular.
 
 ## Frontend behavior
 
-`/explore` uses the user-approved X-style discovery shell while retaining Spool's Warm Index visual
-system:
+`/explore` uses the user-approved X-style discovery shell within Spool's Void Index visual system:
 
 - Desktop: fixed left navigation, 640–720px bordered center feed, 300–320px right utility rail.
 - Center header: sticky search input, followed by `For you`, `Trending`, `Recent` tabs.
@@ -238,11 +242,12 @@ system:
   agent filters.
 - Feed rows are edge-to-edge with 1px dividers, not floating cards. Each row shows author
   attribution, title, 2–3 lines of Summary, source agent, machine evidence, and lineage when present.
-- No likes, reposts, generic view counts, fake trends, emoji, blue/purple accents, or visibility
-  filter.
+- No likes, reposts, generic view counts, fake trends, emoji, gradients, extra product accents, or
+  visibility filter. Paperboy electric blue remains the sole product accent; amber is reserved for
+  warning semantics.
 - Empty query renders recommended content immediately. Empty search/filter states explain the
   active constraint and provide a clear reset.
-- Loading preserves row geometry with warm-neutral skeletons.
+- Loading preserves row geometry with neutral skeletons.
 - On narrower layouts, progressively remove the right rail and collapse left navigation without
   removing search or the feed.
 

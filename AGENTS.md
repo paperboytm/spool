@@ -15,6 +15,7 @@ Key rules at a glance:
 - Geist Sans for UI chrome; Geist Mono for Session records, commands, URLs, and paths
 - Session pages separate interpretive Summary from machine-derived evidence
 - Visibility and continuation lineage must remain explicit trust signals
+- `Team · {name}` is a real tenant boundary: current members only, `private, no-store`, and never included in public Profile, Explore, search, RSS, previews, or OG metadata
 - Emoji are placeholder icons only — production UI uses Lucide React SVGs
 - "via ACP · local" remains mandatory wherever local AI synthesis appears
 

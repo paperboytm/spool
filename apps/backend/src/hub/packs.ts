@@ -13,6 +13,10 @@ export function packKeyFor(userId: string, packId: string): string {
   return `hub/packs/${userId}/${packId}`
 }
 
+export function teamPackKeyFor(teamId: string, packId: string): string {
+  return `hub/team-packs/${teamId}/${packId}`
+}
+
 export function manifestKeyFor(root: string): string {
   return `hub/manifests/${root}`
 }

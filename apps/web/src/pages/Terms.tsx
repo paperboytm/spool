@@ -6,7 +6,7 @@ import { useEffect } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 
-const LAST_UPDATED = 'July 20, 2026'
+const LAST_UPDATED = 'July 22, 2026'
 
 export function Terms() {
   useEffect(() => {
@@ -23,10 +23,11 @@ export function Terms() {
           <p className="sw-legal-date">Last updated: {LAST_UPDATED}</p>
 
           <p>
-            These terms cover spool.new and its Session publishing, reading, Profile, Discovery, and
-            Resume services. By creating an account or sharing a Session, you agree to them. The
-            short version: your content remains yours, you are responsible for what you disclose, do
-            not use the service to harm people, and the service is provided as-is.
+            These terms cover spool.new and its Session publishing, reading, Team, Profile,
+            Discovery, and Resume services. By creating an account, joining a Team, or sharing a
+            Session, you agree to them. The short version: rights in your content remain yours, Team
+            workspaces control the hosted assets transferred to them, you are responsible for what
+            you disclose, do not use the service to harm people, and the service is provided as-is.
           </p>
 
           <h2>The service</h2>
@@ -47,37 +48,86 @@ export function Terms() {
             You are responsible for activity under your account and for protecting authenticated
             devices and credentials. You can manage or delete the account from{' '}
             <a href="/me">your account page</a>. Deletion is described in the{' '}
-            <a href="/privacy">privacy policy</a>.
+            <a href="/privacy">privacy policy</a>. If you own a Team, you must transfer ownership or
+            archive that Team before deleting your account.
+          </p>
+
+          <h2>Teams, roles, and invitations</h2>
+          <p>
+            A Team is a shared workspace with Owner, Admin, and Member roles. Owners control Team
+            ownership and closure. Owners and Admins can invite and manage members, assign permitted
+            roles, and manage Team-owned Session visibility. Members can access Team-only Sessions
+            while their membership is active. You may invite someone only when you are authorized to
+            add them and may use their email address only for that purpose.
+          </p>
+          <p>
+            You are responsible for choosing appropriate roles and for activity performed through
+            permissions you grant. A role change, removal, or departure can end an individual's
+            access, but it does not delete assets owned by the Team. Team administrative actions are
+            subject to the permissions shown in the service.
           </p>
 
           <h2>Your content</h2>
           <p>
-            Your Session content remains yours. You grant us a non-exclusive license to store,
-            verify, copy, display, and distribute a Shared Session as needed to operate its URL,
-            reader, Profile listing, Discovery entry, previews, and Resume APIs. This license ends
-            when the content is deleted, subject to security records, legal obligations, and copies
-            made by third parties.
+            Your underlying intellectual-property rights in Session content remain yours or with
+            their existing rights holder. You grant us a non-exclusive license to store, verify,
+            copy, display, and distribute a Shared Session as needed to operate its URL, reader,
+            Team workspace, Profile listing, Discovery entry, previews, and Resume APIs. This
+            license ends when the hosted content is deleted, subject to security records, legal
+            obligations, Team retention described below, and copies made by third parties.
           </p>
           <p>
             You are responsible for everything you share or publish, including user messages, agent
             output, tool activity, code, credentials, personal information, and third-party
             material. You confirm that you have the right to disclose it.
           </p>
+          <p>
+            Moving a Session into a Team transfers ownership and control of the hosted Spool asset
+            to that Team workspace. It does not by itself transfer underlying intellectual-property
+            rights between you, your employer, or other Team participants; those rights follow your
+            separate agreements and applicable law. Once transferred, the Team keeps the hosted
+            asset if the original author later leaves, is removed, or deletes their account.
+          </p>
 
           <h2>Visibility</h2>
+          <ul>
+            <li>
+              <strong>Public</strong> Sessions can be read by anyone and may appear in Explore,
+              search, Profiles, and previews.
+            </li>
+            <li>
+              <strong>Link-only</strong> Sessions can be read by anyone with the URL, but are not
+              listed on Spool's public discovery surfaces.
+            </li>
+            <li>
+              <strong>Team-only</strong> Sessions, shown as <strong>Team · name</strong>, can be
+              read only by current members of that Team.
+            </li>
+          </ul>
           <p>
-            Anyone with a Shared Session URL can read it. Supported Sessions are Public by default
-            after the author confirms Share and may appear in Explore, search, or previews.
-            Providers not yet supported by Explore remain Link-only. Spool is not a confidentiality
-            service. Readers can copy content, and third-party caches or previews may outlive
+            Supported Sessions are Public by default after the author confirms Share; providers not
+            yet supported by Explore remain Link-only. Moving a Session to Team-only removes it from
+            public discovery. Team Owners and Admins may later change a Team-owned Session to Public
+            or Link-only, which discloses it outside the Team. By transferring an asset to a Team,
+            you authorize those roles to make visibility decisions for its hosted copy.
+          </p>
+          <p>
+            Spool applies access controls to Team-only Sessions, but no online service can guarantee
+            absolute confidentiality. Authorized Team members can copy content. Public and Link-only
+            readers, third-party caches, and previews may retain copies after visibility changes or
             withdrawal.
           </p>
 
           <h2>Withdrawal</h2>
           <p>
-            Withdrawing a Shared Session blocks new access and removes it from Spool's public
-            surfaces. Withdrawal does not revoke copies already made by readers, search engines, or
-            preview services.
+            Withdrawing a personally owned Shared Session immediately blocks new access, removes its
+            current hosted copy from public and management surfaces, and makes its URL return a gone
+            response. Visibility changes cannot restore that copy, but the author may later
+            explicitly Share the same Session again. Withdrawing a Team-owned Session is permanent:
+            a Team Owner or Admin can withdraw it, and no Team member can revive it through a new
+            Session head. Withdrawal does not revoke copies already made by readers, Team members,
+            search engines, or preview services. Leaving a Team or deleting an individual account
+            does not withdraw or delete Team-owned assets; they remain under Team control.
           </p>
 
           <h2>Use restrictions</h2>

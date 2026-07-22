@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vite-plus/test'
 import type {
   HubSharePrepareResult,
   HubSharePublishResult,
+  HubShareTeamsResult,
   HubShareWithdrawResult,
 } from '../../shared/hub-share.js'
 
@@ -37,19 +38,41 @@ interface StoredHead {
   viewOid: string
   spoolFileOid: string | null
   summaryMd: string | null
+  visibility?: 'public' | 'link-only' | 'team'
+  teamId?: string
+  expectedTeamId?: string | null
 }
 
 function makeHub() {
   const objects = new Map<string, string>()
   const sessions = new Map<string, StoredHead>()
+  const pushes = new Map<string, StoredHead>()
   const withdrawn = new Set<string>()
+  const teamAuthorizations: Array<string | null> = []
+  const requestCounts = { get: 0, push: 0, head: 0, upload: 0 }
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
   const fetchImpl: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(String(input))
     const method = init?.method ?? 'GET'
+    if (method === 'GET' && url.pathname === '/api/teams') {
+      teamAuthorizations.push(new Headers(init?.headers).get('authorization'))
+      return json({
+        teams: [
+          {
+            id: 'team_00000000000000000000000000000000',
+            name: 'Platform',
+            role: 'member',
+            permissions: ['team:leave'],
+            member_count: 3,
+            archived_at: null,
+          },
+        ],
+      })
+    }
     if (method === 'POST' && url.pathname === '/api/hub/v1/objects/batch') {
+      requestCounts.upload++
       for (const line of String(init?.body ?? '').split('\n')) {
         if (line.trim() === '') continue
         const { oid, data } = JSON.parse(line) as { oid: string; data: string }
@@ -57,9 +80,44 @@ function makeHub() {
       }
       return json({ stored: 1 })
     }
+    const sessionMatch = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)$/)
+    if (sessionMatch && method === 'GET') {
+      const sid = decodeURIComponent(sessionMatch[1] as string)
+      requestCounts.get++
+      if (withdrawn.has(sid)) return json({ error: 'GONE' }, 410)
+      const head = sessions.get(sid)
+      if (!head) return json({ error: 'NOT_FOUND' }, 404)
+      return json({
+        sid,
+        root: head.root,
+        count: head.count,
+        sig: null,
+        cardJson: null,
+        summaryMd: head.summaryMd,
+        lineageJson: null,
+        viewOid: head.viewOid,
+        spoolFileOid: head.spoolFileOid,
+        createdAt: 1,
+        updatedAt: 1,
+        visibility: head.visibility,
+        team: head.teamId ? { id: head.teamId, name: 'Platform' } : null,
+        author: { handle: null, displayName: null, avatarUrl: null },
+      })
+    }
     const match = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)\/(push|head)$/)
     if (match && method === 'POST') {
       const body = JSON.parse(String(init?.body)) as StoredHead
+      const sid = decodeURIComponent(match[1] as string)
+      const current = sessions.get(sid)
+      if (body.expectedTeamId !== undefined && (current?.teamId ?? null) !== body.expectedTeamId) {
+        return json(
+          {
+            error: 'CONFLICT',
+            detail: 'session ownership changed; review the current Team target',
+          },
+          409,
+        )
+      }
       const wanted = [
         ...new Set([
           ...body.manifest,
@@ -68,9 +126,15 @@ function makeHub() {
         ]),
       ]
       const missing = wanted.filter((oid) => !objects.has(oid))
-      if (match[2] === 'push') return json({ missing })
+      if (match[2] === 'push') {
+        requestCounts.push++
+        pushes.set(sid, body)
+        return json({ missing })
+      }
+      requestCounts.head++
       if (missing.length > 0) return json({ error: 'CONFLICT' }, 409)
-      sessions.set(decodeURIComponent(match[1] as string), body)
+      sessions.set(sid, body)
+      withdrawn.delete(sid)
       return json({ url: `https://hub.test/session/${match[1]}` })
     }
     const withdrawMatch = url.pathname.match(/^\/api\/hub\/v1\/sessions\/([^/]+)\/withdraw$/)
@@ -80,7 +144,15 @@ function makeHub() {
     }
     return json({ error: 'NOT_FOUND' }, 404)
   }
-  return { fetchImpl, sessions, objects, withdrawn }
+  return {
+    fetchImpl,
+    sessions,
+    pushes,
+    objects,
+    withdrawn,
+    teamAuthorizations,
+    requestCounts,
+  }
 }
 
 const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
@@ -204,12 +276,17 @@ describe('hub-share IPC', () => {
     const result = await invoke<HubSharePublishResult>('hub-share:publish', {
       sessionUuid: SESSION_UUID,
       summary: '## Outcome\n\nTake a look.',
+      target: { visibility: 'default' },
     })
     if (!result.ok) throw new Error(result.error)
     expect(result.url).toBe(`https://hub.test/session/claude_${SESSION_UUID}`)
+    expect(result.visibility).toBe('public')
 
     const head = hub.sessions.get(`claude_${SESSION_UUID}`)
     expect(head?.summaryMd).toBe('## Outcome\n\nTake a look.')
+    expect(head?.visibility).toBe('public')
+    expect(head?.teamId).toBeUndefined()
+    expect(head?.expectedTeamId).toBeNull()
     expect(head?.root).toBe(await sequenceRoot(head?.manifest ?? []))
     expect(hub.objects.has(head?.viewOid ?? '')).toBe(true)
 
@@ -220,6 +297,133 @@ describe('hub-share IPC', () => {
     expect(doc).toContain('hello, ship the demo')
     // The fixture's AWS key must be masked in the attached document.
     expect(doc).not.toContain('AKIAABCDEFGHIJKLMNOP')
+  })
+
+  it('loads the signed-in user Teams with the app session bearer', async () => {
+    const { hub } = setup()
+
+    const result = await invoke<HubShareTeamsResult>('hub-share:teams', undefined)
+
+    expect(result).toEqual({
+      ok: true,
+      teams: [{ id: 'team_00000000000000000000000000000000', name: 'Platform' }],
+    })
+    expect(hub.teamAuthorizations).toEqual(['Bearer session-token'])
+  })
+
+  it('publishes to an explicit Team target in both push and committed head', async () => {
+    const { hub } = setup()
+    await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
+
+    const result = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: SESSION_UUID,
+      summary: 'Team-owned result.',
+      target: {
+        visibility: 'team',
+        teamId: 'team_00000000000000000000000000000000',
+      },
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      url: `https://hub.test/session/claude_${SESSION_UUID}`,
+      visibility: 'team',
+    })
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'team',
+      teamId: 'team_00000000000000000000000000000000',
+    })
+    expect(hub.pushes.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'team',
+      teamId: 'team_00000000000000000000000000000000',
+      expectedTeamId: null,
+    })
+  })
+
+  it('blocks a Team-owned re-share before upload or head instead of changing disclosure', async () => {
+    const { hub } = setup()
+    await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
+    const first = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: SESSION_UUID,
+      summary: 'Team-owned result.',
+      target: {
+        visibility: 'team',
+        teamId: 'team_00000000000000000000000000000000',
+      },
+    })
+    expect(first.ok).toBe(true)
+    const before = { ...hub.requestCounts }
+
+    const second = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: SESSION_UUID,
+      summary: 'Would otherwise become Public.',
+      target: { visibility: 'default' },
+    })
+
+    expect(second).toEqual({ ok: false, error: 'TEAM_OWNED_SESSION' })
+    expect(hub.requestCounts).toEqual(before)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'team',
+      teamId: 'team_00000000000000000000000000000000',
+      summaryMd: 'Team-owned result.',
+    })
+  })
+
+  it('allows a withdrawn personal Session to be explicitly shared again', async () => {
+    const { hub } = setup()
+    await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
+    expect(
+      (
+        await invoke<HubSharePublishResult>('hub-share:publish', {
+          sessionUuid: SESSION_UUID,
+          summary: 'First personal share.',
+          target: { visibility: 'default' },
+        })
+      ).ok,
+    ).toBe(true)
+    expect(
+      (
+        await invoke<HubShareWithdrawResult>('hub-share:withdraw', {
+          sid: `claude_${SESSION_UUID}`,
+        })
+      ).ok,
+    ).toBe(true)
+    const withdrawnResponse = await hub.fetchImpl(
+      `https://hub.test/api/hub/v1/sessions/claude_${SESSION_UUID}`,
+    )
+    expect(withdrawnResponse.status).toBe(410)
+    const readsBeforeReshare = hub.requestCounts.get
+
+    await invoke<HubSharePrepareResult>('hub-share:prepare', { sessionUuid: SESSION_UUID })
+    const reshared = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: SESSION_UUID,
+      summary: 'Shared again after withdrawal.',
+      target: { visibility: 'default' },
+    })
+
+    expect(reshared).toMatchObject({ ok: true, visibility: 'public' })
+    expect(hub.requestCounts.get).toBe(readsBeforeReshare)
+    expect(hub.withdrawn).not.toContain(`claude_${SESSION_UUID}`)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
+      'Shared again after withdrawal.',
+    )
+  })
+
+  it('rejects a Team id combined with a non-Team visibility at the IPC boundary', async () => {
+    const { hub } = setup()
+
+    const result = await invoke<HubSharePublishResult>('hub-share:publish', {
+      sessionUuid: SESSION_UUID,
+      summary: '',
+      target: {
+        visibility: 'public',
+        teamId: 'team_00000000000000000000000000000000',
+      },
+    })
+
+    expect(result).toEqual({ ok: false, error: 'Invalid Share target' })
+    expect(hub.pushes.size).toBe(0)
+    expect(hub.sessions.size).toBe(0)
   })
 
   it('prepares and publishes a portable Pi session with a readable attached document', async () => {
@@ -234,11 +438,15 @@ describe('hub-share IPC', () => {
     const result = await invoke<HubSharePublishResult>('hub-share:publish', {
       sessionUuid: PI_SESSION_UUID,
       summary: '## Outcome\n\nPi is shareable.',
+      target: { visibility: 'default' },
     })
     if (!result.ok) throw new Error(result.error)
     expect(result.url).toBe(`https://hub.test/session/pi_${PI_SESSION_UUID}`)
+    expect(result.visibility).toBe('link-only')
 
     const head = hub.sessions.get(`pi_${PI_SESSION_UUID}`)
+    expect(head?.visibility).toBe('link-only')
+    expect(head?.teamId).toBeUndefined()
     const doc = hub.objects.get(head?.spoolFileOid ?? '') ?? ''
     expect(doc).toContain('hello from Pi')
     expect(doc).toContain('"source":"pi"')
@@ -250,6 +458,7 @@ describe('hub-share IPC', () => {
     const result = await invoke<HubSharePublishResult>('hub-share:publish', {
       sessionUuid: SESSION_UUID,
       summary: '',
+      target: { visibility: 'default' },
     })
     expect(result).toEqual({ ok: false, error: 'UNAUTHENTICATED' })
   })

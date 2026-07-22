@@ -18,15 +18,23 @@ export async function invoke<E>(
   env: E,
   params: Record<string, string> = {},
 ): Promise<Response> {
-  return handler({
+  const deferred: Promise<unknown>[] = []
+  const response = await handler({
     request: req,
     env,
     next: async () => new Response('not-found', { status: 404 }),
     params,
-    waitUntil: () => undefined,
+    waitUntil: (promise: Promise<unknown>) => {
+      deferred.push(promise)
+    },
     passThroughOnException: () => undefined,
     data: {},
   } as unknown as EventContext<E, string, Record<string, unknown>>)
+  // Pages delivers the response before waitUntil work completes. Unit tests
+  // wait for those tasks to settle so post-commit audit/outbox assertions are
+  // deterministic without turning a background failure into a request error.
+  await Promise.allSettled(deferred)
+  return response
 }
 
 // Pull every Set-Cookie value off a Response across runtimes. The CF

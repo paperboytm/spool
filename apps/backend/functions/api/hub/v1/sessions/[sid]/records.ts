@@ -1,9 +1,13 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { ApiError, jsonError } from '../../../../../../src/errors'
-import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
+import {
+  requireReadableSession,
+  sessionContentCacheControl,
+  type HubEnv,
+} from '../../../../../../src/hub/head'
 import { readManifest, readObjects } from '../../../../../../src/hub/packs'
-import { locateObjects } from '../../../../../../src/hub/store'
+import { locateSessionObjects } from '../../../../../../src/hub/store'
 import { MAX_READ_BYTES, MAX_RECORDS_PER_READ, requireSid } from '../../../../../../src/hub/wire'
 
 // Batched record read: NDJSON lines `{ i, oid, data }`, in sequence order.
@@ -15,7 +19,9 @@ import { MAX_READ_BYTES, MAX_RECORDS_PER_READ, requireSid } from '../../../../..
 export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
   try {
     const sid = requireSid(ctx.params['sid'])
-    const session = await requireReadableSession(ctx.env.DB, sid)
+    const session = await requireReadableSession(ctx.request, ctx.env, sid)
+    const cacheControl = sessionContentCacheControl(session)
+    const privateVary = session.visibility === 'private' ? { vary: 'Cookie, Authorization' } : {}
 
     const url = new URL(ctx.request.url)
     const from = parseBound(url.searchParams.get('from'), 0)
@@ -25,7 +31,10 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
 
     const etag = `W/"${session.root}:${from}-${to}"`
     if (ctx.request.headers.get('if-none-match') === etag) {
-      return new Response(null, { status: 304, headers: { etag } })
+      return new Response(null, {
+        status: 304,
+        headers: { etag, 'cache-control': cacheControl, ...privateVary },
+      })
     }
 
     const manifest = await readManifest(ctx.env.HUB, session.root)
@@ -34,7 +43,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     }
 
     const oids = manifest.slice(from, to)
-    const located = await locateObjects(ctx.env.DB, session.owner_user_id, oids)
+    const located = await locateSessionObjects(ctx.env.DB, session, oids)
     const locations = oids.map((oid) => {
       const location = located.get(oid)
       if (!location) throw new ApiError('INTERNAL', 'record object missing')
@@ -58,7 +67,8 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     return new Response(lines.join(''), {
       headers: {
         'content-type': 'application/x-ndjson',
-        'cache-control': 'public, max-age=3600',
+        'cache-control': cacheControl,
+        ...privateVary,
         etag,
       },
     })

@@ -1,11 +1,12 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { audit } from '../../../../../../src/audit'
+import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
-import type { HubEnv } from '../../../../../../src/hub/head'
-import { getHubSession, withdrawHubSession } from '../../../../../../src/hub/store'
+import { activeTeamRole, type HubEnv } from '../../../../../../src/hub/head'
+import { getHubSession, prepareAuthorizedWithdrawal } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
+import { checkRate } from '../../../../../../src/rate-limit'
 
 // Tombstone, not deletion: the meta endpoint answers 410 immediately, the
 // body endpoints refuse, R2 objects stay put (account deletion is the
@@ -18,12 +19,33 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
 
     const existing = await getHubSession(ctx.env.DB, sid)
     if (!existing) throw new ApiError('NOT_FOUND')
-    if (existing.owner_user_id !== user.id) throw new ApiError('FORBIDDEN', 'not owner')
+    if (existing.team_id) {
+      const role = await activeTeamRole(ctx.env.DB, existing.team_id, user.id)
+      if (role === null) throw new ApiError('NOT_FOUND')
+      if (role !== 'owner' && role !== 'admin') throw new ApiError('FORBIDDEN')
+    } else if (existing.owner_user_id !== user.id) {
+      throw new ApiError('FORBIDDEN', 'not owner')
+    }
+    const rate = await checkRate(ctx.env.RATE, {
+      bucket: 'hub-withdraw-h',
+      key: `${user.id}:${sid}`,
+      windowSec: 60 * 60,
+      max: 30,
+    })
+    if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
 
     if (existing.withdrawn_at === null) {
-      const changed = await withdrawHubSession(ctx.env.DB, sid, user.id, Date.now())
-      if (!changed) throw new ApiError('INTERNAL', 'withdraw failed')
-      await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
+      const now = Date.now()
+      const results = await ctx.env.DB.batch([
+        prepareAuthorizedWithdrawal(ctx.env.DB, {
+          sid,
+          actorUserId: user.id,
+          expectedTeamId: existing.team_id,
+          now,
+        }),
+      ])
+      if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')
+      auditAfterCommit(ctx, {
         user_id: user.id,
         action: 'hub-withdraw',
         target_id: sid,

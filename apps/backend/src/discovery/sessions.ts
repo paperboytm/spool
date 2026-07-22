@@ -26,7 +26,10 @@ type ListOptions = {
   fingerprint: string
 }
 
-export const DISCOVERY_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=30'
+// Discovery contains disclosure-sensitive metadata. A Public -> Team change
+// must disappear on the next request, so neither browsers nor shared edge
+// caches may serve a stale list assembled before the transition.
+export const DISCOVERY_CACHE_CONTROL = 'no-store'
 
 export async function listDiscoverySessions(
   db: D1Database,

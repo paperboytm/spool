@@ -72,6 +72,11 @@ interface HubShareCopy {
   linkOnlyPublishing: string
   linkOnlyDoneTitle: string
   linkOnlyDoneLead: string
+  teamTitle: string
+  teamLead: string
+  teamPublish: string
+  teamDoneTitle: string
+  teamDoneLead: string
 }
 
 const HUB_SHARE_COPY: Array<
@@ -84,6 +89,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: string
       publishAction: string
       shareAction: string
+      currentMembers: string
+      teamOwns: string
     },
   ]
 > = [
@@ -96,6 +103,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: 'source Session stays unchanged',
       publishAction: 'Publish Session',
       shareAction: 'Share link',
+      currentMembers: 'current members',
+      teamOwns: 'owns',
     },
   ],
   [
@@ -107,6 +116,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: 'Quell-Session bleibt unverändert',
       publishAction: 'Session veröffentlichen',
       shareAction: 'Link teilen',
+      currentMembers: 'aktuelle Mitglieder',
+      teamOwns: 'gehört',
     },
   ],
   [
@@ -118,6 +129,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: 'Session source reste inchangée',
       publishAction: 'Publier la Session',
       shareAction: 'Partager le lien',
+      currentMembers: 'membres actuels',
+      teamOwns: 'appartient',
     },
   ],
   [
@@ -129,6 +142,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: '元のセッションは変更されません',
       publishAction: 'セッションを公開',
       shareAction: 'リンクを共有',
+      currentMembers: '現在のメンバー',
+      teamOwns: '所有',
     },
   ],
   [
@@ -140,6 +155,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: '원본 세션은 변경되지 않습니다',
       publishAction: '세션 게시',
       shareAction: '링크 공유',
+      currentMembers: '현재 멤버',
+      teamOwns: '소유',
     },
   ],
   [
@@ -151,6 +168,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: '源会话不会被更改',
       publishAction: '发布会话',
       shareAction: '分享链接',
+      currentMembers: '当前成员',
+      teamOwns: '归 Team 所有',
     },
   ],
   [
@@ -162,6 +181,8 @@ const HUB_SHARE_COPY: Array<
       sourceUnchanged: '來源會話不會被變更',
       publishAction: '發佈會話',
       shareAction: '分享連結',
+      currentMembers: '目前成員',
+      teamOwns: '歸 Team 所有',
     },
   ],
 ]
@@ -271,6 +292,22 @@ describe('Hub Share visibility copy', () => {
       for (const message of [copy.linkOnlyLead, copy.linkOnlyDoneLead]) {
         expect(message).toContain('Explore')
         expect(message).toContain(terms.sourceUnchanged)
+      }
+
+      expect(copy.teamPublish).toContain('Team')
+      for (const message of [
+        copy.teamTitle,
+        copy.teamLead,
+        copy.teamDoneTitle,
+        copy.teamDoneLead,
+      ]) {
+        expect(message).toContain('Team')
+        expect(message).toContain('{{name}}')
+      }
+      expect(copy.teamLead).toContain('{{records}}')
+      for (const message of [copy.teamLead, copy.teamDoneLead]) {
+        expect(message).toContain(terms.currentMembers)
+        expect(message).toContain(terms.teamOwns)
       }
     },
   )

@@ -1,0 +1,50 @@
+# Production config for the account-deletion cron Worker. Resource identifiers
+# are intentionally committed alongside the matching Pages config; credentials
+# remain external and Wrangler authenticates with CLOUDFLARE_API_TOKEN.
+
+name = "spool-share-deletion"
+account_id = "6898ecdad1e8341d3e09d4b46124d72e"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[secrets]
+required = ["WORKOS_OPERATIONS_TOKEN"]
+
+[vars]
+WORKOS_OPERATIONS_URL = "https://spool-share-backend.pages.dev/api/internal/workos/cleanup"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spool-share-db"
+database_id = "fa7aa980-e646-4ebe-8c2f-bf5d5d30ab9d"
+migrations_dir = "../../apps/backend/migrations"
+
+[[kv_namespaces]]
+binding = "META"
+id = "b5f5a1ad9f3e456cbdbdc7c7125c4dec"
+
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "spool-snapshots"
+
+[[r2_buckets]]
+binding = "OG"
+bucket_name = "spool-og"
+
+[[r2_buckets]]
+binding = "AVATARS"
+bucket_name = "spool-avatars"
+
+[[r2_buckets]]
+binding = "HUB"
+bucket_name = "spool-hub"

@@ -523,6 +523,37 @@ describe('DELETE /api/me/delete', () => {
     expect(env.state.deletion_queue[0]?.cancelled).toBe(1)
     expect(env.state.audit.some((a) => a.action === 'account.delete.cancel')).toBe(true)
   })
+
+  it('returns 409 without promising recovery once the worker owns the processing lease', async () => {
+    const env = envFor()
+    seedUser(env.state)
+    const pendingUntil = Date.now() - 1
+    env.state.users[0]!.deletion_pending_until = pendingUntil
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: pendingUntil,
+      cancelled: 0,
+      state: 'processing',
+      processing_token: 'delete_claimed',
+      processing_lease_until: Date.now() + 60_000,
+    })
+    await seedSession(env.SESSIONS, TOKEN, 'user-1')
+
+    const res = await invoke(
+      cancelDelete,
+      authedReq('https://x/api/me/delete', { method: 'DELETE' }),
+      env,
+    )
+
+    expect(res.status).toBe(409)
+    expect(env.state.users[0]?.deletion_pending_until).toBe(pendingUntil)
+    expect(env.state.deletion_queue[0]).toMatchObject({
+      cancelled: 0,
+      state: 'processing',
+      processing_token: 'delete_claimed',
+    })
+    expect(env.state.audit.some((row) => row.action === 'account.delete.cancel')).toBe(false)
+  })
 })
 
 describe('ApiError surfacing', () => {

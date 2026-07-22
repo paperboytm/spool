@@ -24,7 +24,7 @@ The Hub does not modify provider Session content. Canonical records are verified
 
 ## Cloudflare Bindings
 
-Production resource identifiers are configured on the Cloudflare project, not committed to the repository. Wrangler files define binding names and shape; external contributors can run the complete stack against local emulation.
+`wrangler.prod.toml` and `wrangler.staging.toml` are the committed source of truth for each environment's Pages project and D1/KV/R2 identifiers. Resource identifiers are not credentials. WorkOS credentials and other secret values remain in Cloudflare, while CI authentication stays in GitHub Actions secrets. The base `wrangler.toml` defines the equivalent local-emulation shape.
 
 Bindings include:
 
@@ -39,10 +39,11 @@ The test suite is hermetic and uses in-memory D1/KV/R2 fakes:
 ```bash
 pnpm install
 pnpm --filter @spool/backend typecheck
+pnpm --filter @spool/backend run schema:smoke
 pnpm --filter @spool/backend test
 ```
 
-No Cloudflare account is required.
+The schema smoke creates an isolated temporary local D1 database, applies every committed migration, verifies the migration ledger, and runs `PRAGMA foreign_key_check`. No Cloudflare account is required.
 
 ## Local Development
 
@@ -60,11 +61,10 @@ http://localhost:3002/api/auth/workos/callback
 spool://auth/callback
 ```
 
-Apply every migration to local D1:
+Apply every migration to the persistent local-development D1 database:
 
 ```bash
-cd apps/backend
-corepack pnpm wrangler d1 migrations apply spool-share-db --local
+pnpm --filter @spool/backend run d1:migrate:local
 ```
 
 Start only the backend:
@@ -93,6 +93,48 @@ It checks security headers, unauthenticated access, identifier enumeration, and 
 
 ## Deploy
 
-Production and staging Wrangler files select the Cloudflare project environment. Resource bindings and secrets must already exist on that project.
+Production and staging Wrangler files select the Cloudflare project and storage resources. Secret values must already exist on the corresponding Pages project.
 
-The account-deletion scheduled handler is deployed as the companion Worker under `workers/spool-share-deletion`, using the same storage bindings.
+A push to `main` deploys production. A manual `Deploy Cloudflare` workflow dispatch defaults to staging and can explicitly select production. The workflow builds first, applies the selected environment's complete D1 migration set, deploys Pages, and then deploys the matching web router. Any failed step stops the release before later components are published.
+
+Production additionally deploys the account-deletion companion Worker under `workers/spool-share-deletion`, using the same committed D1/KV/R2 resources (including the Hub bucket).
+
+### WorkOS Team operations
+
+D1 is the runtime Team authorization source of truth. WorkOS membership and
+organization deletes are placed in `workos_cleanup_outbox`; Pages drains that
+table with its existing `WORKOS_API_KEY`. The deletion Worker only triggers the
+protected Pages drain endpoint and never receives the WorkOS key.
+
+Generate one high-entropy operations token and install the same value on Pages
+and the companion Worker (do not print it or commit it):
+
+```bash
+wrangler pages secret put WORKOS_OPERATIONS_TOKEN --project-name spool-share-backend
+wrangler secret put WORKOS_OPERATIONS_TOKEN \
+  --config workers/spool-share-deletion/wrangler.prod.toml
+```
+
+Webhook registration is an intentionally temporary bootstrap. Set a separate
+one-time token on Pages, deploy, then call the endpoint with an empty body. It
+creates or repairs exactly `https://spool.new/api/webhooks/workos`, enabled only
+for membership deletion/update, organization deletion, and user deletion. The
+response secret must be piped directly back into Cloudflare and never logged:
+
+```bash
+wrangler pages secret put WORKOS_BOOTSTRAP_TOKEN --project-name spool-share-backend
+
+bootstrap_json="$(curl -fsS -X POST \
+  -H "Authorization: Bearer $WORKOS_BOOTSTRAP_TOKEN" \
+  https://spool.new/api/internal/workos/bootstrap-webhook)"
+printf '%s' "$bootstrap_json" | jq -er '.secret' | \
+  wrangler pages secret put WORKOS_WEBHOOK_SECRET --project-name spool-share-backend
+unset bootstrap_json
+
+wrangler pages secret delete WORKOS_BOOTSTRAP_TOKEN --project-name spool-share-backend
+```
+
+Redeploy Pages after removing the bootstrap token. Without
+`WORKOS_BOOTSTRAP_TOKEN`, the bootstrap route returns 404; the long-lived
+cleanup endpoint independently requires `WORKOS_OPERATIONS_TOKEN` using a
+constant-time comparison.

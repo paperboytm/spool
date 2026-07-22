@@ -18,12 +18,14 @@
   "funding": "https://github.com/sponsors/xinyao27",
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy --config wrangler.local.toml",
-    "deploy:dry": "wrangler deploy --dry-run --outdir dist",
+    "deploy": "pnpm run deploy:prod",
+    "deploy:dry": "wrangler deploy --dry-run --config wrangler.prod.toml --outdir dist",
+    "deploy:local": "wrangler deploy --config wrangler.local.toml",
+    "deploy:prod": "wrangler deploy --config wrangler.prod.toml",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260718.1",
+    "@cloudflare/workers-types": "^5.20260722.1",
     "typescript": "^7.0.2",
     "wrangler": "^4.112.0"
   }

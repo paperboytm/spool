@@ -37,8 +37,16 @@
 #   networks point server-side WorkOS calls at the share-web vite relay:
 #   http://localhost:3002/__dev/workos. Leave unset otherwise.
 
+# WORKOS_WEBHOOK_SECRET / WORKOS_OPERATIONS_TOKEN
+#   Optional for local Team lifecycle testing. Use a dev webhook endpoint's
+#   whsec_ value and an independently generated high-entropy bearer token.
+#   WORKOS_BOOTSTRAP_TOKEN is intentionally omitted: bootstrap production only
+#   as a short-lived Cloudflare secret, then delete it immediately.
+
 WORKOS_CLIENT_ID=
 WORKOS_API_KEY=
+WORKOS_WEBHOOK_SECRET=
+WORKOS_OPERATIONS_TOKEN=
 SESSION_SIGNING_KEY=
 ABUSE_NOTIFY_EMAIL=dev@localhost
 ADMIN_USER_IDS=

@@ -1,5 +1,5 @@
-// Shared chrome composition for the spool.new share-web pages. All five
-// routes (Reader, Tombstone, Profile, Me, SignIn) compose Page + Header
+// Shared chrome composition for the spool.new app pages. Reader, Team,
+// account, profile, tombstone, and sign-in routes compose Page + Header
 // + Footer here while reusable visual primitives come from @spool-lab/ui.
 //
 // Theme contract: the root <html> carries data-theme = 'light' | 'dark'.
@@ -9,6 +9,7 @@
 // no flash.
 
 import { Avatar, ButtonLink, IconButton, Wordmark } from '@spool-lab/ui'
+import { Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -21,7 +22,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import '../styles/app.css'
 
 import { fetchMe } from '../lib/api'
-import { type AuthIdentity, getCachedAuth, setCachedAuth } from '../lib/auth-cache'
+import {
+  AUTH_IDENTITY_CHANGED,
+  type AuthIdentity,
+  getCachedAuth,
+  setCachedAuth,
+} from '../lib/auth-cache'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 
@@ -33,7 +39,7 @@ async function resolveAuthState(): Promise<AuthIdentity> {
   const p = (async () => {
     const r = await fetchMe()
     if (r.kind === 'ok') {
-      return { name: r.me.name, src: r.me.avatar_url } as AuthIdentity
+      return { name: r.me.display_name, src: r.me.avatar_url } as AuthIdentity
     }
     return 'out' as AuthIdentity
   })()
@@ -234,9 +240,11 @@ export function ThemeToggle() {
 export function Header({
   auth = 'auto' as AuthState,
   sticky = false,
+  contextTeam,
 }: {
   auth?: AuthState
   sticky?: boolean
+  contextTeam?: { id: string; name: string } | null
 }) {
   // 'auto' = SWR pattern: first frame paints from the localStorage
   // cache, background fetchMe revalidates and rewrites. 'out' or an
@@ -262,6 +270,15 @@ export function Header({
     }
   }, [auth])
 
+  useEffect(() => {
+    if (auth !== 'auto') return
+    const onIdentityChanged = (event: WindowEventMap[typeof AUTH_IDENTITY_CHANGED]) => {
+      setResolved(event.detail)
+    }
+    window.addEventListener(AUTH_IDENTITY_CHANGED, onIdentityChanged)
+    return () => window.removeEventListener(AUTH_IDENTITY_CHANGED, onIdentityChanged)
+  }, [auth])
+
   return (
     <header className={`sw-header${sticky ? ' sw-header-sticky' : ''}`}>
       {/* Same-origin since the landing/share merge — works in dev too. */}
@@ -275,9 +292,24 @@ export function Header({
             Sign in
           </ButtonLink>
         ) : (
-          <a href="/me" title="Your account" style={{ display: 'inline-flex' }}>
-            <Avatar src={resolved.src} name={resolved.name} alt="" size="md" />
-          </a>
+          <>
+            <a
+              className="sw-team-quick"
+              href={contextTeam ? `/teams/${encodeURIComponent(contextTeam.id)}` : '/me#teams'}
+              title={contextTeam ? `Open ${contextTeam.name}` : 'Open your teams'}
+            >
+              <Users size={14} strokeWidth={1.7} aria-hidden="true" />
+              <span>{contextTeam?.name ?? 'Teams'}</span>
+            </a>
+            <a
+              className="sw-account-link"
+              href="/me"
+              title="Your account"
+              aria-label="Open your account"
+            >
+              <Avatar src={resolved.src} name={resolved.name} alt="" size="md" />
+            </a>
+          </>
         )}
       </div>
     </header>

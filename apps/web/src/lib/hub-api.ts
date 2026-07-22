@@ -25,7 +25,8 @@ export interface HubSessionMeta {
   spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
-  visibility: 'public' | 'link-only'
+  visibility: 'public' | 'link-only' | 'team'
+  team?: { id: string; name: string } | null
   author: HubAuthor
 }
 
@@ -39,6 +40,7 @@ type HubSessionMetaWire = Omit<HubSessionMeta, 'summaryMd' | 'visibility'> & {
 export type HubMetaResult =
   | { kind: 'ok'; meta: HubSessionMeta }
   | { kind: 'withdrawn'; at: number }
+  | { kind: 'auth-required' }
   | { kind: 'not-found' }
   | { kind: 'error' }
 
@@ -68,6 +70,7 @@ export async function fetchHubMeta(sid: string): Promise<HubMetaResult> {
       const body = (await r.json().catch(() => ({}))) as { withdrawnAt?: number }
       return { kind: 'withdrawn', at: body.withdrawnAt ?? Date.now() }
     }
+    if (r.status === 401) return { kind: 'auth-required' }
     if (r.status === 404 || r.status === 400) return { kind: 'not-found' }
     return { kind: 'error' }
   } catch {
