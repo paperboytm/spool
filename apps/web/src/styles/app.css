@@ -1561,6 +1561,9 @@ html[data-theme='dark'] .sw-root {
 .sw-team-invite-controls label {
   min-width: 0;
 }
+.sw-team-invite-controls .sp-button {
+  height: 48px;
+}
 .sw-team-members-block,
 .sw-team-invitations-block {
   margin-top: var(--sp-space-6);
