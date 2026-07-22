@@ -55,6 +55,14 @@ jobs:
       - name: Check source
         run: pnpm exec vp check
 
+      # Backend and web tests import workspace packages through their public
+      # dist/ exports. A clean runner has no generated artifacts, so build all
+      # transitive test dependencies before either test suite starts.
+      - name: Build test dependencies
+        run: |
+          pnpm vp run --filter '@spool/backend^...' build
+          pnpm vp run --filter '@spool/web^...' build
+
       - name: Verify backend
         run: |
           pnpm --filter @spool/backend run schema:smoke
@@ -97,11 +105,6 @@ jobs:
               process.exit(1)
             }
           '
-
-      # The web build imports workspace libraries that ship dist/
-      # artifacts, so build those before Wrangler builds the app.
-      - name: Build workspace dependencies
-        run: pnpm vp run --filter '@spool/web^...' build
 
       # Build before mutating remote state. The backend has no build step;
       # Pages deploys its checked-in Functions directly.

@@ -36,6 +36,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build unit-test dependencies
+        run: |
+          pnpm vp run --filter '@spool/backend^...' build
+          pnpm vp run --filter '@spool/web^...' build
       - name: Verify backend D1 migrations
         if: runner.os == 'Linux'
         run: pnpm --filter @spool/backend run schema:smoke
