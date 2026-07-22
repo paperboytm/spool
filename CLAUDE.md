@@ -9,8 +9,8 @@ Key rules at a glance:
 - Public web is content-first: show real Sessions and authors before feature explanations
 - `Share` explicitly sends records; supported Claude/Codex Shares are Public by default, while unsupported providers remain Link-only
 - Public metadata is author-attributed (`@handle · published 2h ago`), never first-person
-- Warm amber accent `#C85A00` (light) / `#F07020` (dark) — never blue or purple
-- Warm near-black `#141410` for dark mode — never pure `#000` or cold `#0A0A0A`
+- Paperboy wing blue accent `#1387FF` (light) / `#5BB1F0` (dark) on a void palette
+- Pure white `#FFFFFF` light background; void black `#000000` dark background
 - Geist Sans for UI chrome; Geist Mono for Session records, commands, URLs, and paths
 - Session pages separate interpretive Summary from machine-derived evidence
 - Visibility and continuation lineage must remain explicit trust signals

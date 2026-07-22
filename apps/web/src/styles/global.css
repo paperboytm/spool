@@ -169,52 +169,63 @@ code,
 }
 
 /* ── footer ── */
-footer {
-  padding: 40px 0 56px;
+/* footer.wrap outranks .wrap, whose `padding: 0 40px` would otherwise
+   zero out the footer's vertical padding. */
+footer.wrap {
+  padding: 40px 40px 48px;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
   color: var(--muted);
+}
+@media (max-width: 700px) {
+  footer.wrap {
+    padding: 32px 20px 40px;
+  }
+}
+.foot-top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 24px;
   flex-wrap: wrap;
 }
-footer .legal {
-  font-family: var(--sp-font-mono);
-  font-size: var(--sp-text-label);
-  color: var(--faint);
-  letter-spacing: 0.06em;
-}
-footer a {
-  color: var(--muted);
-}
-footer a:hover {
+.foot-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: var(--text);
-}
-footer .foot-left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-space-2);
-  max-width: 72ch;
-}
-footer .foot-prods {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 2px;
-}
-footer .foot-prod {
-  color: var(--text);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.04em;
   text-decoration: none;
-  transition: color 0.15s;
 }
-footer .foot-prod:hover {
+.foot-brand:hover {
   color: var(--accent);
 }
-footer .foot-right {
-  text-align: right;
+.foot-dot {
+  color: var(--accent);
+}
+.foot-by {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.foot-brand:hover .foot-by {
+  color: var(--accent);
+}
+.foot-links {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 20px;
+}
+.foot-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.foot-links a:hover {
+  color: var(--text);
 }

@@ -58,4 +58,4 @@ npx @spool-lab/cli share <session-uuid>
 No global install is required. If you prefer the shorter `spool` command, install it once with
 `npm install -g @spool-lab/cli`.
 
-Spool is open source and being built in public. [Follow the repository on GitHub](https://github.com/spool-lab/spool) if agent work deserves a better public format.
+Spool is open source and being built in public. [Follow the repository on GitHub](https://github.com/paperboytm/spool) if agent work deserves a better public format.

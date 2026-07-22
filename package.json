@@ -2,14 +2,14 @@
   "name": "spool",
   "version": "0.6.3",
   "private": true,
-  "homepage": "https://github.com/spool-lab/spool#readme",
+  "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
-    "url": "https://github.com/spool-lab/spool/issues"
+    "url": "https://github.com/paperboytm/spool/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/spool-lab/spool.git"
+    "url": "git+https://github.com/paperboytm/spool.git"
   },
   "type": "module",
   "scripts": {

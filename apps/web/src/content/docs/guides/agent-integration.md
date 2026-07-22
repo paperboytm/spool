@@ -7,7 +7,7 @@ Spool ships a skill for shell-capable coding agents. It lets an agent share the 
 
 ## Install the skill
 
-The source lives at [`skills/spool/SKILL.md`](https://github.com/spool-lab/spool/blob/main/skills/spool/SKILL.md).
+The source lives at [`skills/spool/SKILL.md`](https://github.com/paperboytm/spool/blob/main/skills/spool/SKILL.md).
 
 Place it in the skill directory used by your agent. The agent can run the CLI directly with npx:
 

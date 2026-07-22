@@ -11,7 +11,7 @@
 
 ## Aesthetic Direction
 
-- **Direction:** Warm Index — editorial-warm, not terminal-cold. Function-first but with personality.
+- **Direction:** Void Index — Framer-derived void black + electric blue over the Warm Index structure. Function-first but with personality.
 - **Decoration level:** Minimal. Typography, authentic Session content, and color warmth carry the page. No gradients or decorative blobs.
 - **Mood:** The feeling of finding a thoughtful piece of work in a well-kept public index. Intimate, focused, and trustworthy; never corporate or clinical.
 - **Differentiation:** Developer platforms default to cold grays, dense dashboards, or social-feed gloss. Spool's warm near-blacks and amber accent frame technical work as something worth reading without disguising its provenance.
@@ -91,31 +91,31 @@ Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows a
 
 | Token         | Hex       | Usage                                                 |
 | ------------- | --------- | ----------------------------------------------------- |
-| `--bg`        | `#FAFAF8` | App background — warm off-white, never pure white     |
-| `--surface`   | `#F4F4F0` | Cards, titlebar, status bar                           |
-| `--surface2`  | `#EEEEE9` | Hovered surfaces, mode pill background                |
-| `--border`    | `#E8E8E2` | Dividers, card borders                                |
-| `--border2`   | `#D8D8D0` | Input borders, focused-adjacent                       |
-| `--text`      | `#1C1C18` | Primary text                                          |
-| `--muted`     | `#6B6B60` | Secondary text, labels                                |
-| `--faint`     | `#ADADAA` | Placeholder text, disabled state                      |
-| `--accent`    | `#C85A00` | Primary accent — amber/orange                         |
-| `--accent-bg` | `#FFF3E8` | Accent-tinted backgrounds (selected state, AI answer) |
+| `--bg`        | `#FFFFFF` | App background — pure white                           |
+| `--surface`   | `#F5F5F5` | Cards, titlebar, status bar                           |
+| `--surface2`  | `#ECECEC` | Hovered surfaces, mode pill background                |
+| `--border`    | `#E5E5E5` | Dividers, card borders                                |
+| `--border2`   | `#D4D4D4` | Input borders, focused-adjacent                       |
+| `--text`      | `#0A0A0A` | Primary text                                          |
+| `--muted`     | `#666666` | Secondary text, labels                                |
+| `--faint`     | `#A3A3A3` | Placeholder text, disabled state                      |
+| `--accent`    | `#1387FF` | Primary accent — Paperboy wing blue                   |
+| `--accent-bg` | `#E7F2FF` | Accent-tinted backgrounds (selected state, AI answer) |
 
 ### Dark Mode
 
-| Token         | Hex       | Usage                                                |
-| ------------- | --------- | ---------------------------------------------------- |
-| `--bg`        | `#141410` | Warm near-black, never pure `#000`                   |
-| `--surface`   | `#1C1C18` | Cards, titlebar, status bar                          |
-| `--surface2`  | `#242420` | Hovered surfaces                                     |
-| `--border`    | `#2E2E28` | Dividers                                             |
-| `--border2`   | `#3A3A34` | Input borders                                        |
-| `--text`      | `#F2F2EC` | Primary text — warm near-white                       |
-| `--muted`     | `#8A8A80` | Secondary text                                       |
-| `--faint`     | `#505048` | Placeholder, disabled                                |
-| `--accent`    | `#F07020` | Accent brightened for dark — still amber, never blue |
-| `--accent-bg` | `#2A1800` | Accent backgrounds on dark                           |
+| Token         | Hex       | Usage                                      |
+| ------------- | --------- | ------------------------------------------ |
+| `--bg`        | `#000000` | Void black                                 |
+| `--surface`   | `#090909` | Cards, titlebar, status bar                |
+| `--surface2`  | `#111111` | Hovered surfaces                           |
+| `--border`    | `#1F1F1F` | Dividers                                   |
+| `--border2`   | `#2E2E2E` | Input borders                              |
+| `--text`      | `#FFFFFF` | Primary text                               |
+| `--muted`     | `#A6A6A6` | Secondary text                             |
+| `--faint`     | `#555555` | Placeholder, disabled                      |
+| `--accent`    | `#0099FF` | Accent brightened for dark — electric blue |
+| `--accent-bg` | `#002A44` | Accent backgrounds on dark                 |
 
 ### Source Badge Colors
 
@@ -384,15 +384,16 @@ In dense lists, prefer compact facts over repeated pronouns:
 
 ## Decisions Log
 
-| Date       | Decision                                      | Rationale                                                                                                                                  |
-| ---------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-18 | Homepage is Featured-first                    | A real curated Session explains the product during community cold start; search gains prominence as the public corpus grows.               |
-| 2026-07-18 | Share and Publish are separate actions        | Superseded on 2026-07-20 by Public-by-default sharing for providers supported by Explore.                                                  |
-| 2026-07-18 | New shares are Link-only                      | Superseded on 2026-07-20; unsupported providers still use this fallback.                                                                   |
-| 2026-07-20 | Supported Shares are Public by default        | There is no reliable second Publish flow yet; the Share confirmation is the explicit disclosure boundary and must name Explore visibility. |
-| 2026-07-18 | Public metadata is author-attributed          | Readers need to know whose work they are viewing; first-person language is reserved for the author’s own surfaces.                         |
-| 2026-07-18 | Session pages show interpretation + evidence  | Summary helps orientation, while conversation, tools, files, and diff preserve trust and depth.                                            |
-| 2026-07-18 | Resume creates lineage, never mutation        | Continuation should be visible without changing the source Session.                                                                        |
-| 2026-07-18 | Warm amber remains the sole product accent    | Amber distinguishes Spool from cold developer tooling and supports the Warm Index direction.                                               |
-| 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                  |
-| 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                 |
+| Date       | Decision                                      | Rationale                                                                                                                                                                                                                                                                           |
+| ---------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-18 | Homepage is Featured-first                    | A real curated Session explains the product during community cold start; search gains prominence as the public corpus grows.                                                                                                                                                        |
+| 2026-07-18 | Share and Publish are separate actions        | Superseded on 2026-07-20 by Public-by-default sharing for providers supported by Explore.                                                                                                                                                                                           |
+| 2026-07-18 | New shares are Link-only                      | Superseded on 2026-07-20; unsupported providers still use this fallback.                                                                                                                                                                                                            |
+| 2026-07-20 | Supported Shares are Public by default        | There is no reliable second Publish flow yet; the Share confirmation is the explicit disclosure boundary and must name Explore visibility.                                                                                                                                          |
+| 2026-07-18 | Public metadata is author-attributed          | Readers need to know whose work they are viewing; first-person language is reserved for the author’s own surfaces.                                                                                                                                                                  |
+| 2026-07-18 | Session pages show interpretation + evidence  | Summary helps orientation, while conversation, tools, files, and diff preserve trust and depth.                                                                                                                                                                                     |
+| 2026-07-18 | Resume creates lineage, never mutation        | Continuation should be visible without changing the source Session.                                                                                                                                                                                                                 |
+| 2026-07-18 | Warm amber remains the sole product accent    | Superseded on 2026-07-22: the accent is now Framer-derived electric blue on a void palette.                                                                                                                                                                                         |
+| 2026-07-22 | Void palette + electric blue accent           | After a design-system exploration (open-design packages), the Warm Index structure keeps its layout while the palette moves to void black/white with the Paperboy wing blue `#1387FF`/`#5BB1F0` (post-acquisition brand color). The WebGL hero follows the active light/dark theme. |
+| 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                                                                                                                                                           |
+| 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                                                                                                                                                          |

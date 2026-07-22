@@ -3,6 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState, type MouseEvent } from 'react'
 
 import { readThemeAttr, writeThemeAttr } from '../../lib/theme'
+import { SpoolMark } from './spool-mark'
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -12,7 +13,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <header className="top">
         <div className="wrap top-inner">
           <Link to="/" className="brand">
-            <SpoolMark />
+            <SpoolMark className="brand-mark" size={22} />
             <Wordmark />
           </Link>
           <nav className="links">
@@ -44,7 +45,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
               Blog
             </NavItem>
             <span className="sep" />
-            <IconLink href="https://github.com/spool-lab/spool" size="sm" aria-label="GitHub">
+            <IconLink href="https://github.com/paperboytm/spool" size="sm" aria-label="GitHub">
               <GhIcon />
             </IconLink>
             <ThemeToggle />
@@ -55,32 +56,23 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <div className="page-content">{children}</div>
 
       <footer className="wrap">
-        <div className="foot-left">
-          <div className="foot-prods">
-            <Link to="/" className="foot-prod">
-              <Wordmark />
-            </Link>
-          </div>
-          <div>
-            Share, understand, and continue agent Sessions. Made by{' '}
-            <strong style={{ color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-              spool-lab
-            </strong>
-            .
-          </div>
-          <div className="legal">MIT · MADE IN THE OPEN · 2026</div>
-          <div className="legal">SPOOL™ IS A TRADEMARK OF TYPESAFE LIMITED</div>
-        </div>
-        <div className="foot-right">
-          <div>
+        <div className="foot-top">
+          <a href="https://paperboy.com" className="foot-brand">
+            <SpoolMark size={18} />
+            <span>
+              Spool<span className="foot-dot">.</span>
+            </span>
+            <span className="foot-by">by Paperboy</span>
+          </a>
+          <div className="foot-links">
             <Link to="/explore" search={{ sort: 'recommended' }}>
               Explore
-            </Link>{' '}
-            &nbsp;·&nbsp; <a href="https://github.com/spool-lab/spool">GitHub</a> &nbsp;·&nbsp;{' '}
-            <a href="https://discord.gg/aqeDxQUs5E">Discord</a> &nbsp;·&nbsp;{' '}
-            <a href="https://x.com/spoollabs">X</a> &nbsp;·&nbsp; <Link to="/blog">Blog</Link>
+            </Link>
+            <a href="https://github.com/paperboytm/spool">GitHub</a>
+            <a href="https://discord.gg/aqeDxQUs5E">Discord</a>
+            <a href="https://x.com/spoollabs">X</a>
+            <Link to="/blog">Blog</Link>
           </div>
-          <div className="legal">SPOOL-LAB · @ MAIN</div>
         </div>
       </footer>
     </div>
@@ -100,29 +92,6 @@ function routeInApp(event: MouseEvent<HTMLAnchorElement>, navigate: () => void |
   }
   event.preventDefault()
   void navigate()
-}
-
-function SpoolMark() {
-  return (
-    <svg
-      className="brand-mark"
-      width="22"
-      height="22"
-      viewBox="0 0 32 32"
-      fill="none"
-      stroke="currentColor"
-    >
-      <ellipse cx="16" cy="9" rx="12" ry="4.5" strokeWidth="1.8" />
-      <line x1="4" y1="9" x2="4" y2="22" strokeWidth="1.8" />
-      <line x1="28" y1="9" x2="28" y2="22" strokeWidth="1.8" />
-      <path d="M4 22 C4 24.5 9 27 16 27 C23 27 28 24.5 28 22" strokeWidth="1.8" />
-      <ellipse cx="16" cy="11" rx="7" ry="2.5" strokeWidth="1.2" />
-      <line x1="9" y1="11" x2="9" y2="20" strokeWidth="1.2" />
-      <line x1="23" y1="11" x2="23" y2="20" strokeWidth="1.2" />
-      <path d="M9 20 C9 21.5 12 23 16 23 C20 23 23 21.5 23 20" strokeWidth="1.2" />
-      <ellipse cx="16" cy="11" rx="3" ry="1.2" fill="currentColor" stroke="none" />
-    </svg>
-  )
 }
 
 function GhIcon() {

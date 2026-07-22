@@ -198,7 +198,7 @@ function RightRail({
       <nav className="explore-legal" aria-label="Legal">
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
-        <a href="https://github.com/spool-lab/spool">GitHub</a>
+        <a href="https://github.com/paperboytm/spool">GitHub</a>
       </nav>
     </aside>
   )
