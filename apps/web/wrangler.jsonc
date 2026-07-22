@@ -9,14 +9,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  // Keep a Worker route while the acquired apex still has legacy DNS.
-  // The route takes ownership of every request without disrupting spool.pro.
-  "routes": [
-    {
-      "pattern": "spool.new/*",
-      "zone_name": "spool.new",
-    },
-  ],
+  // Routes are intentionally managed in Cloudflare rather than on every
+  // deploy. The production trigger is `spool.new/*`; omitting `routes` while
+  // `workers_dev` is false lets the least-privilege CI token update the Worker
+  // without needing DNS-zone permissions or disturbing that existing trigger.
   "vars": {
     "ORIGIN_BACKEND": "https://spool-share-backend.pages.dev",
   },
@@ -27,12 +23,8 @@
   "env": {
     "staging": {
       "name": "spool-new-router-staging",
-      "routes": [
-        {
-          "pattern": "staging.spool.new/*",
-          "zone_name": "spool.new",
-        },
-      ],
+      // Expected trigger once staging DNS is provisioned:
+      // `staging.spool.new/*` in the `spool.new` zone.
       "vars": {
         "ORIGIN_BACKEND": "https://spool-share-backend-staging.pages.dev",
       },
