@@ -50,4 +50,16 @@ describe('Web shared UI contract', () => {
     expect(coarsePointerCss).toMatch(/min-width:\s*44px/)
     expect(coarsePointerCss).toMatch(/min-height:\s*44px/)
   })
+
+  it('keeps every control in the Team invitation row the same height on desktop', () => {
+    const css = source('src/styles/app.css')
+    const desktopCss = css.split('@media (max-width: 768px)')[0] ?? ''
+
+    expect(desktopCss).toMatch(
+      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*48px;[^}]*\}/,
+    )
+    expect(desktopCss).toMatch(
+      /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
+    )
+  })
 })
