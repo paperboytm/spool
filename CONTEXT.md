@@ -9,11 +9,11 @@ The authoritative conversation record produced by a coding agent, including the 
 _Avoid_: Chat, thread, transcript
 
 **Shared Session**:
-A Session an author has explicitly shared through Spool so other people can read it and, when supported, resume it as new work. A Shared Session is either Link-only or Public.
+A Session an author has explicitly shared through Spool so an intended audience can read it and, when supported, resume it as new work. A Shared Session is Public, Link-only, or Team-only.
 _Avoid_: Post, upload
 
 **Share**:
-Create a Shared Session and receive a durable URL for it. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default. Providers not yet supported by Discovery remain Link-only. Sharing does not expose the author’s other Sessions.
+Create a Shared Session and receive a durable URL for it. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default. Providers not yet supported by Discovery remain Link-only. After Share, a signed-in author can transfer the hosted asset into a Team. Sharing does not expose the author’s other Sessions.
 _Avoid_: Sync, export
 
 **Publish**:
@@ -24,9 +24,17 @@ _Avoid_: Share, upload, list on profile
 A Shared Session that is available to people who have its URL but is not listed on the author’s Profile or in Discovery.
 _Avoid_: Private, secret
 
+**Team-only**:
+A Team-owned Shared Session that only current members of that Team can read. The UI names its audience as `Team · {name}`. Team Owners and Admins can change the hosted asset to Public or Link-only.
+_Avoid_: Private link, unlisted Team Session
+
 **Public**:
 A Shared Session that may appear on the author’s Profile and in Discovery. Public does not imply that unrelated local Sessions are visible.
 _Avoid_: Profile-listed
+
+**Team**:
+A shared workspace with Owner, Admin, and Member roles. Moving a Session into a Team transfers control of the hosted Spool asset to that workspace; it remains there if the original author leaves or deletes their account.
+_Avoid_: Group, organization page
 
 **Profile**:
 An author’s public identity and collection of Public Sessions on Spool.

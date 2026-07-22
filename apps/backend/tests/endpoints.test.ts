@@ -38,6 +38,12 @@ function workosOk(url: string): Response | null {
       headers: { 'content-type': 'application/json' },
     })
   }
+  if (url.includes('/user_management/organization_memberships?')) {
+    return new Response('{"data":[],"list_metadata":{}}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
   return null
 }
 

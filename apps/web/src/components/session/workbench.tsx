@@ -28,6 +28,7 @@ import {
   Globe2,
   Link2,
   MessageSquareText,
+  UsersRound,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -162,6 +163,7 @@ export function SessionWorkbench({
   const resumable = isResumableSessionProvider(provider)
   const providerLabel = SESSION_PROVIDER_LABELS[provider]
   const isPublic = meta.visibility === 'public'
+  const isTeam = meta.visibility === 'team'
   const visibilityTimestamp = isPublic ? meta.createdAt : meta.updatedAt
   const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
@@ -301,10 +303,16 @@ export function SessionWorkbench({
               <Badge data-testid="session-visibility">
                 {isPublic ? (
                   <Globe2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                ) : isTeam ? (
+                  <UsersRound size={12} strokeWidth={1.7} aria-hidden="true" />
                 ) : (
                   <Link2 size={12} strokeWidth={1.7} aria-hidden="true" />
                 )}
-                {isPublic ? 'Public' : 'Link-only'}
+                {isPublic
+                  ? 'Public'
+                  : isTeam
+                    ? `Team · ${meta.team?.name ?? 'members'}`
+                    : 'Link-only'}
               </Badge>
               <span title={humanDateTime(visibilityTimestamp)}>
                 {isPublic ? 'Published' : 'Shared'} {relativeDate(visibilityTimestamp)}

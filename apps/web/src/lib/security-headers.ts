@@ -1,5 +1,5 @@
 // Security headers for the runtime-SSR'd app surfaces (/s/*, /session/*,
-// /@*, /explore, /me, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
+// /@*, /explore, /me, /teams/*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
 // file from the standalone share-web era — same values, same per-route
 // CSP split — applied by the request middleware in src/start.ts because
 // the merged app serves these routes through the TanStack Start worker
@@ -19,7 +19,7 @@
 // option) so the framework stamps it onto every inline script it emits.
 
 const IMG_SRC_READER =
-  "'self' data: https://spool.new https://spool.pro https://lh3.googleusercontent.com"
+  "'self' data: https://spool.new https://spool.pro https://lh3.googleusercontent.com https://workoscdn.com https://images.workoscdn.com"
 
 function csp(
   nonce: string | undefined,
@@ -54,8 +54,16 @@ const BASE_HEADERS: Record<string, string> = {
  *  the noindex defaults. */
 const READER_PREFIXES = ['/s/', '/session/', '/@']
 const ACCOUNT_PATHS = ['/me', '/sign-in', '/cli-auth']
+const ACCOUNT_PREFIXES = ['/teams/']
 const PUBLIC_APP_PATHS = ['/explore']
 const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']
+
+function isAccountPath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  return (
+    ACCOUNT_PATHS.includes(path) || ACCOUNT_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  )
+}
 
 export function securityHeadersFor(
   pathname: string,
@@ -71,7 +79,7 @@ export function securityHeadersFor(
     }
   }
 
-  if (ACCOUNT_PATHS.includes(path)) {
+  if (isAccountPath(pathname)) {
     return {
       ...BASE_HEADERS,
       'X-Robots-Tag': 'noindex',
@@ -96,12 +104,12 @@ export function securityHeadersFor(
   return { ...BASE_HEADERS, 'X-Robots-Tag': 'noindex' }
 }
 
-/** Cache-Control for the share reader pages, decided from the final
- *  response status like the old Pages Functions did: successful pages
- *  share the snapshot API's 30s window so a revoke takes the page (and
- *  its social-card preview) off-air on the same timeline; everything
- *  else must not be cached. Non-reader paths are left alone. */
+/** Legacy snapshot documents retain their 30s revoke window. Account,
+ *  Team, and v2 Session documents are always private/no-store because the
+ *  middleware cannot safely infer a Session's tenant visibility from the
+ *  final HTML response. Other routes keep their default cache behavior. */
 export function cacheHeaderFor(pathname: string, status: number): string | null {
+  if (isAccountPath(pathname) || pathname.startsWith('/session/')) return 'private, no-store'
   if (!READER_PREFIXES.some((p) => pathname.startsWith(p))) return null
   return status === 200 ? 'public, max-age=30, s-maxage=30, must-revalidate' : 'no-store'
 }

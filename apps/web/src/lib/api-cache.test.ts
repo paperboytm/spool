@@ -47,7 +47,7 @@ describe('api.ts cache side-effects', () => {
     // Reset the in-memory auth memo between tests so we observe the
     // intended state, not a leftover from a previous it().
     setCachedAuth(Promise.resolve('out'))
-    setCachedAuth(null as unknown as Promise<never>) // wipe via re-set
+    setCachedAuth(null)
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -64,13 +64,18 @@ describe('api.ts cache side-effects', () => {
       id: 'u1',
       email: 'alice@example.com',
       name: 'Alice',
+      display_name: 'Alice Cooper',
       avatar_url: 'https://x/a.png',
       handle: 'alice',
       deletion_pending_until: null,
     })
     const r = await fetchMe()
     expect(r.kind).toBe('ok')
-    expect(readCachedMe()).toEqual({ name: 'Alice', avatar_url: 'https://x/a.png' })
+    expect(readCachedMe()).toEqual({ name: 'Alice Cooper', avatar_url: 'https://x/a.png' })
+    await expect(getCachedAuth()).resolves.toEqual({
+      name: 'Alice Cooper',
+      src: 'https://x/a.png',
+    })
   })
 
   it('fetchMe 401 clears the cache + invalidates the auth memo', async () => {

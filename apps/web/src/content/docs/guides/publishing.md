@@ -9,6 +9,20 @@ Local preparation never exposes a Session. Share is the explicit disclosure boun
 
 **Share** creates a durable URL. Claude Code and Codex CLI Sessions are Public and eligible for Explore and search by default. Providers not yet supported by Explore remain Link-only.
 
+That is the initial visibility chosen by the CLI Share flow. After sharing, sign in to [your account](/me) to keep the Session Public or Link-only, or move it into a Team.
+
+## Share with a Team
+
+Create or open a Team from [your account](/me), then choose `Team · name` for a Session. Moving it transfers control of the hosted Spool asset to that Team and removes it from Explore and public Profile surfaces. Only current Team members can read a Team-only Session.
+
+The Team keeps that hosted asset if the original author later leaves or deletes their account. Team Owners and Admins can change a Team-owned Session to Public or Link-only; Spool asks for confirmation because either choice discloses the Session outside the Team.
+
+The three shared visibility levels are:
+
+- **Public** — anyone can read; the Session may appear in Explore, search, and Profiles.
+- **Link-only** — anyone with the URL can read; the Session is not listed on public discovery surfaces.
+- **Team-only** (`Team · name`) — only current members of that Team can read.
+
 ## Share from the terminal
 
 ```bash
@@ -46,4 +60,6 @@ Sharing a prefix can reduce scope, but it is not a replacement for reviewing the
 npx @spool-lab/cli withdraw <session-id-or-url>
 ```
 
-Withdrawal makes the URL unavailable. It cannot revoke copies that a reader already downloaded or cached, so treat every share as disclosure to its recipients.
+Withdrawal immediately makes the current URL return `410 Gone`. It cannot revoke copies that a reader or Team member already downloaded or cached, so treat every share and visibility change as disclosure to its recipients.
+
+Personal owners can also Withdraw from the Session row on [their account](/me). Changing visibility cannot restore that hosted copy, but the author can later explicitly Share the same Session again. For a Team-owned Session, an Owner or Admin can Withdraw from the Team workspace. Team withdrawal is permanent: the Session leaves the management list, every audience loses access, and no member can revive it by submitting another Session head.

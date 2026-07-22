@@ -26,7 +26,12 @@ if (target === undefined) {
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)))
 const redirectPath = join(appDir, '.wrangler', 'deploy', 'config.json')
+const commitHash = process.env.GITHUB_SHA?.trim()
+if (commitHash !== undefined && !/^[0-9a-f]{40}$/i.test(commitHash)) {
+  throw new Error('GITHUB_SHA must be a full 40-character Git commit hash')
+}
 let previousRedirect = null
+let generatedConfigPath = null
 
 try {
   previousRedirect = await readFile(redirectPath)
@@ -34,15 +39,30 @@ try {
   if (error?.code !== 'ENOENT') throw error
 }
 
-await mkdir(dirname(redirectPath), { recursive: true })
-await writeFile(
-  redirectPath,
-  `${JSON.stringify({ configPath: `../../${target.config}` }, null, 2)}\n`,
-)
-
 let child
 let signal = null
 try {
+  let effectiveConfig = target.config
+  if (commitHash) {
+    const source = await readFile(join(appDir, target.config), 'utf8')
+    if (!source.includes('\n[vars]\n') || /^BUILD_VERSION\s*=/m.test(source)) {
+      throw new Error(`${target.config} must contain one [vars] table without BUILD_VERSION`)
+    }
+    const generatedName = `.wrangler-deploy-${process.pid}.toml`
+    generatedConfigPath = join(appDir, generatedName)
+    await writeFile(
+      generatedConfigPath,
+      source.replace('\n[vars]\n', `\n[vars]\nBUILD_VERSION = "${commitHash}"\n`),
+    )
+    effectiveConfig = generatedName
+  }
+
+  await mkdir(dirname(redirectPath), { recursive: true })
+  await writeFile(
+    redirectPath,
+    `${JSON.stringify({ configPath: `../../${effectiveConfig}` }, null, 2)}\n`,
+  )
+
   child = spawn(
     process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
     [
@@ -55,6 +75,7 @@ try {
       target.project,
       '--branch',
       target.branch,
+      ...(commitHash ? ['--commit-hash', commitHash] : []),
     ],
     {
       cwd: appDir,
@@ -84,4 +105,5 @@ try {
 } finally {
   if (previousRedirect === null) await rm(redirectPath, { force: true })
   else await writeFile(redirectPath, previousRedirect)
+  if (generatedConfigPath !== null) await rm(generatedConfigPath, { force: true })
 }

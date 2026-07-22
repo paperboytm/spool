@@ -2,7 +2,7 @@
 // editable name in one row, save-on-blur, tiny text-link actions
 // beneath. Mirrors the desktop SettingsAccount → ProfileEditor.
 
-import { IconButton } from '@spool-lab/ui'
+import { Avatar, IconButton } from '@spool-lab/ui'
 import { Camera, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -87,8 +87,6 @@ export function ProfileEditor({ me, onChanged }: Props) {
   }
 
   const hasCustom = !!me.custom_avatar_id
-  const initial = computeInitial(me.display_name)
-
   return (
     <section className="sw-profile-editor">
       <div className="sw-profile-row">
@@ -100,11 +98,7 @@ export function ProfileEditor({ me, onChanged }: Props) {
             aria-label="Change profile photo"
             className="sw-avatar-btn"
           >
-            {me.avatar_url ? (
-              <img src={me.avatar_url} alt="" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="sw-avatar-initial">{initial}</span>
-            )}
+            <Avatar src={me.avatar_url} name={me.display_name} alt="" size="lg" />
             <span className="sw-avatar-overlay" aria-hidden>
               <Camera size={16} strokeWidth={1.75} />
             </span>
@@ -161,17 +155,6 @@ export function ProfileEditor({ me, onChanged }: Props) {
       />
     </section>
   )
-}
-
-function computeInitial(name: string): string {
-  if (!name) return '?'
-  try {
-    const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-    for (const s of seg.segment(name)) return s.segment.toUpperCase()
-  } catch {
-    return name.charAt(0).toUpperCase()
-  }
-  return '?'
 }
 
 function messageForDisplayNameError(msg: string): string {

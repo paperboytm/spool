@@ -17,6 +17,8 @@ import { ApiError, jsonError } from '../../../src/errors'
 import { checkRate } from '../../../src/rate-limit'
 import { clientIp } from '../../../src/request'
 import { upsertUserByIdentity } from '../../../src/store/d1'
+import { opportunisticallyDrainWorkosCleanup } from '../../../src/teams/cleanup'
+import { syncWorkosMemberships } from '../../../src/teams/sync'
 
 type Env = {
   DB: D1Database
@@ -24,6 +26,7 @@ type Env = {
   RATE: KVNamespace
   WORKOS_CLIENT_ID?: string
   WORKOS_API_KEY?: string
+  DEV_WORKOS_API_URL?: string
 }
 
 type Body = { provider?: unknown; code?: unknown; code_verifier?: unknown }
@@ -79,6 +82,14 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
         ? { resolveAliases: () => resolveAliasIdentities(claim.sub, ctx.env) }
         : {},
     )
+    if (claim.provider === 'workos') {
+      await syncWorkosMemberships(ctx.env.DB, ctx.env, {
+        localUserId: user.id,
+        workosUserId: claim.sub,
+        email: claim.email,
+      })
+      ctx.waitUntil(opportunisticallyDrainWorkosCleanup(ctx.env.DB, ctx.env))
+    }
     const sess = await createSession(ctx.env.SESSIONS, user.id)
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,

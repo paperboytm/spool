@@ -24,6 +24,7 @@ import { Route as SiteLogoLabRouteImport } from './routes/_site.logo-lab'
 import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SessionSidRouteImport } from './routes/session.$sid'
+import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
 import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
 import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
@@ -102,6 +103,11 @@ const SessionSidRoute = SessionSidRouteImport.update({
   path: '/session/$sid',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
+  id: '/teams/$teamId',
+  path: '/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SiteBlogIndexRoute = SiteBlogIndexRouteImport.update({
   id: '/blog/',
   path: '/blog/',
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
   '/blog/': typeof SiteBlogIndexRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/': typeof SiteIndexRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
   '/_site/': typeof SiteIndexRoute
   '/_site/blog/$slug': typeof SiteBlogSlugRoute
   '/_site/docs/$': typeof SiteDocsSplatRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
+    | '/teams/$teamId'
     | '/blog/$slug'
     | '/docs/$'
     | '/blog/'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
+    | '/teams/$teamId'
     | '/'
     | '/blog/$slug'
     | '/docs/$'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/blog/rss.xml'
     | '/s/$slug'
     | '/session/$sid'
+    | '/teams/$teamId'
     | '/_site/'
     | '/_site/blog/$slug'
     | '/_site/docs/$'
@@ -250,6 +262,7 @@ export interface RootRouteChildren {
   BlogRssDotxmlRoute: typeof BlogRssDotxmlRoute
   SSlugRoute: typeof SSlugRoute
   SessionSidRoute: typeof SessionSidRoute
+  TeamsTeamIdRoute: typeof TeamsTeamIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -359,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionSidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId': {
+      id: '/teams/$teamId'
+      path: '/teams/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_site/blog/': {
       id: '/_site/blog/'
       path: '/blog'
@@ -417,6 +437,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRssDotxmlRoute: BlogRssDotxmlRoute,
   SSlugRoute: SSlugRoute,
   SessionSidRoute: SessionSidRoute,
+  TeamsTeamIdRoute: TeamsTeamIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -23,6 +23,8 @@ npx @spool-lab/cli withdraw <session-id-or-url>
 
 `npx @spool-lab/cli share` supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions. It checks records for likely sensitive values, confirms the resulting visibility, creates a durable URL, and can ask a detected local Agent to draft the optional Summary. Claude Code and Codex CLI Sessions are Public in Explore by default; providers not yet supported by Explore remain Link-only. Non-interactive callers must pass `--visibility-confirmed`; this does not bypass sensitive-data findings.
 
+Public or Link-only is the initial CLI Share result. After sharing, use the spool.new account surface to move a Session to `Team · name`. That transfers control of the hosted asset to the Team and limits reading to current members until a Team Owner or Admin changes its visibility.
+
 Useful publishing options:
 
 ```bash

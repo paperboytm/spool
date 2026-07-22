@@ -22,6 +22,8 @@ import { checkRate } from '../../../../src/rate-limit'
 import { clientIp } from '../../../../src/request'
 import { CC_NO_STORE } from '../../../../src/security/cache-control'
 import { upsertUserByIdentity } from '../../../../src/store/d1'
+import { opportunisticallyDrainWorkosCleanup } from '../../../../src/teams/cleanup'
+import { syncWorkosMemberships } from '../../../../src/teams/sync'
 
 type Env = {
   DB: D1Database
@@ -29,6 +31,7 @@ type Env = {
   RATE: KVNamespace
   WORKOS_CLIENT_ID?: string
   WORKOS_API_KEY?: string
+  DEV_WORKOS_API_URL?: string
   // Must mirror the same value /api/auth/[provider]/start used so the
   // token exchange's redirect_uri is bit-identical to the authorize one.
   PUBLIC_BASE_URL?: string
@@ -79,6 +82,18 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
         ? { resolveAliases: () => resolveAliasIdentities(claim.sub, ctx.env) }
         : {},
     )
+    // WorkOS transports Organization membership, while D1 owns runtime
+    // authorization and role selection. Refresh the local projection before
+    // issuing a browser session so a newly-accepted invitation is usable on
+    // the first request after sign-in.
+    if (claim.provider === 'workos') {
+      await syncWorkosMemberships(ctx.env.DB, ctx.env, {
+        localUserId: user.id,
+        workosUserId: claim.sub,
+        email: claim.email,
+      })
+      ctx.waitUntil(opportunisticallyDrainWorkosCleanup(ctx.env.DB, ctx.env))
+    }
     const sess = await createSession(ctx.env.SESSIONS, user.id)
     await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
       user_id: user.id,

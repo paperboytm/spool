@@ -17,6 +17,12 @@ export interface HubSessionWriteRequest {
   viewOid: string
   /** Optional curated .spool document attached to the share. */
   spoolFileOid: string | null
+  /** Explicit disclosure target. Omitted to preserve the Hub's provider-aware default. */
+  visibility?: 'public' | 'link-only' | 'team'
+  /** Required alongside `visibility: 'team'`; never inferred from UI navigation state. */
+  teamId?: string
+  /** Optional optimistic tenant precondition; null means personal/new. */
+  expectedTeamId?: string | null
 }
 
 export interface HubPushResponse {
@@ -55,7 +61,9 @@ export interface HubSessionMeta {
   spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
-  visibility?: 'public' | 'link-only'
+  visibility?: 'public' | 'link-only' | 'team'
+  /** Durable workspace owner, independent of the current disclosure level. */
+  team?: { id: string; name: string } | null
   author: HubAuthor
 }
 

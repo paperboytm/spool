@@ -9,11 +9,12 @@ Key rules at a glance:
 - Public web is content-first: show real Sessions and authors before feature explanations
 - `Share` explicitly sends records; supported Claude/Codex Shares are Public by default, while unsupported providers remain Link-only
 - Public metadata is author-attributed (`@handle · published 2h ago`), never first-person
-- Paperboy wing blue accent `#1387FF` (light) / `#5BB1F0` (dark) on a void palette
-- Pure white `#FFFFFF` light background; void black `#000000` dark background
+- Paperboy electric blue accent `#1387FF` (light) / `#5BB1F0` (dark) is the sole product accent; amber is reserved for warning semantics
+- Void palette: `#000000` background with `#090909` surfaces in dark mode; white with neutral-gray surfaces in light mode
 - Geist Sans for UI chrome; Geist Mono for Session records, commands, URLs, and paths
 - Session pages separate interpretive Summary from machine-derived evidence
 - Visibility and continuation lineage must remain explicit trust signals
+- `Team · {name}` is a real tenant boundary: current members only, `private, no-store`, and never included in public Profile, Explore, search, RSS, previews, or OG metadata
 - Emoji are placeholder icons only — production UI uses Lucide React SVGs
 - "via ACP · local" remains mandatory wherever local AI synthesis appears
 

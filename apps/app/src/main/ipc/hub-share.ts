@@ -18,6 +18,7 @@ import { detectSensitiveSpans, maskValueByKind } from '@spool-lab/redact'
 import {
   SESSION_PROVIDER_LABELS,
   canonicalizeRecord,
+  isDiscoverySessionSid,
   isResumableSessionProvider,
   parseSessionText,
   type SessionProvider,
@@ -33,6 +34,9 @@ import { ipcMain, net } from 'electron'
 import type {
   HubSharePrepareResult,
   HubSharePublishResult,
+  HubShareTarget,
+  HubShareTeam,
+  HubShareTeamsResult,
   HubShareWithdrawResult,
 } from '../../shared/hub-share.js'
 import { loadToken } from '../auth/session-store.js'
@@ -52,6 +56,7 @@ interface PreparedEntry {
 }
 
 const preparedCache = new Map<string, PreparedEntry>()
+const TEAM_ID_RE = /^[0-9A-Za-z_-]{8,128}$/
 
 export interface HubShareIpcDeps {
   fetchFn?: typeof globalThis.fetch
@@ -224,9 +229,32 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
     },
   )
 
+  ipcMain.handle('hub-share:teams', async (): Promise<HubShareTeamsResult> => {
+    try {
+      const token = (deps.loadTokenFn ?? loadToken)()
+      if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
+
+      const client = new HubClient({
+        hubUrl: backendUrl(),
+        token,
+        fetch: deps.fetchFn ?? defaultFetch,
+      })
+      const payload = await client.getJson<unknown>('/api/teams')
+      return { ok: true, teams: parseTeamList(payload) }
+    } catch (cause) {
+      if (cause instanceof HubHttpError && cause.status === 401) {
+        return { ok: false, error: 'UNAUTHENTICATED' }
+      }
+      return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
+    }
+  })
+
   ipcMain.handle(
     'hub-share:publish',
-    async (_e, args: { sessionUuid: string; summary: string }): Promise<HubSharePublishResult> => {
+    async (
+      _e,
+      args: { sessionUuid: string; summary: string; target: HubShareTarget },
+    ): Promise<HubSharePublishResult> => {
       try {
         const token = (deps.loadTokenFn ?? loadToken)()
         if (!token) return { ok: false, error: 'UNAUTHENTICATED' }
@@ -234,6 +262,14 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
         const entry =
           preparedCache.get(args.sessionUuid) ?? (await prepareEntry(args.sessionUuid, deps))
         const { prepared, card, spoolFile } = entry
+        const target = parseShareTarget(args.target)
+        const publishTarget =
+          target.visibility === 'team'
+            ? ({ visibility: 'team', teamId: target.teamId } as const)
+            : ({
+                visibility: isDiscoverySessionSid(prepared.sid) ? 'public' : 'link-only',
+              } as const)
+        const visibility = publishTarget.visibility
 
         const client = new HubClient({
           hubUrl: backendUrl(),
@@ -245,12 +281,24 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
           card,
           summary: args.summary,
           spoolFile,
+          // Push and head both require the Session to still be personal or new.
+          // The explicit-null tenant CAS closes a concurrent Personal -> Team
+          // transfer race without blocking an intentionally re-shared tombstone.
+          expectedTeamId: null,
+          ...publishTarget,
         })
         preparedCache.delete(args.sessionUuid)
-        return { ok: true, url }
+        return { ok: true, url, visibility }
       } catch (cause) {
         if (cause instanceof HubHttpError && cause.status === 401) {
           return { ok: false, error: 'UNAUTHENTICATED' }
+        }
+        if (
+          cause instanceof HubHttpError &&
+          cause.status === 409 &&
+          cause.bodyMessage === 'session ownership changed; review the current Team target'
+        ) {
+          return { ok: false, error: 'TEAM_OWNED_SESSION' }
         }
         return { ok: false, error: cause instanceof Error ? cause.message : String(cause) }
       }
@@ -279,4 +327,42 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
       }
     },
   )
+}
+
+function parseShareTarget(value: unknown): HubShareTarget {
+  if (!isRecord(value)) throw new Error('Invalid Share target')
+  if (value['visibility'] === 'default') return { visibility: 'default' }
+  if (value['visibility'] === 'team') {
+    const teamId = value['teamId']
+    if (typeof teamId !== 'string' || !TEAM_ID_RE.test(teamId)) {
+      throw new Error('Invalid Team target')
+    }
+    return { visibility: 'team', teamId }
+  }
+  throw new Error('Invalid Share target')
+}
+
+function parseTeamList(value: unknown): HubShareTeam[] {
+  if (!isRecord(value) || !Array.isArray(value['teams'])) {
+    throw new Error('Invalid Teams response from spool.new')
+  }
+  return value['teams'].map((team) => {
+    if (!isRecord(team)) throw new Error('Invalid Team in spool.new response')
+    const id = team['id']
+    const name = team['name']
+    if (
+      typeof id !== 'string' ||
+      !TEAM_ID_RE.test(id) ||
+      typeof name !== 'string' ||
+      name.trim() === '' ||
+      name.length > 80
+    ) {
+      throw new Error('Invalid Team in spool.new response')
+    }
+    return { id, name }
+  })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

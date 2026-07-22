@@ -1,20 +1,36 @@
-name: Deploy Production
+name: Deploy Cloudflare
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      target:
+        description: Cloudflare environment to deploy
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
 
 concurrency:
-  group: deploy-web-production
-  cancel-in-progress: true
+  group: deploy-cloudflare-${{ github.event_name == 'push' && 'production' || inputs.target }}
+  # A deployment mutates D1, Pages, and two Workers in sequence. Never cancel
+  # a running production release halfway through that state transition; queue
+  # the newer commit behind it instead.
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    name: Deploy ${{ github.event_name == 'push' && 'production' || inputs.target }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     permissions:
       contents: read
+    env:
+      DEPLOY_TARGET: ${{ github.event_name == 'push' && 'production' || inputs.target }}
+      EXPECTED_CLOUDFLARE_ACCOUNT_ID: 6898ecdad1e8341d3e09d4b46124d72e
     steps:
       - uses: actions/checkout@v6
 
@@ -28,22 +44,151 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Cloudflare account target
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: test "$CLOUDFLARE_ACCOUNT_ID" = "$EXPECTED_CLOUDFLARE_ACCOUNT_ID"
+
+      # Keep the release self-gating. The separate E2E workflow may still be
+      # running when a main push arrives, so every non-E2E check required by
+      # this deployment runs before the first remote mutation.
+      - name: Check source
+        run: pnpm exec vp check
+
+      - name: Verify backend
+        run: |
+          pnpm --filter @spool/backend run schema:smoke
+          pnpm --filter @spool/backend run typecheck
+          pnpm --filter @spool/backend test
+
+      - name: Verify web
+        run: |
+          pnpm --filter @spool/web run typecheck
+          pnpm --filter @spool/web test
+
+      - name: Verify deletion Worker
+        run: |
+          pnpm --filter spool-share-deletion run typecheck
+          pnpm --filter spool-share-deletion run deploy:dry
+
+      # Secret values stay only in Cloudflare. Listing returns names and
+      # encrypted markers, which lets CI fail before migrations when one side
+      # of the Pages <-> cron outbox bridge is missing.
+      - name: Verify production secret bindings
+        if: env.DEPLOY_TARGET == 'production'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pages_secrets="$(pnpm --filter @spool/backend exec wrangler pages secret list --project-name spool-share-backend)"
+          for name in SESSION_SIGNING_KEY WORKOS_API_KEY WORKOS_CLIENT_ID WORKOS_WEBHOOK_SECRET WORKOS_OPERATIONS_TOKEN; do
+            if ! grep -Fq -- "- ${name}:" <<<"$pages_secrets"; then
+              echo "::error::Missing required Pages secret: ${name}"
+              exit 1
+            fi
+          done
+          worker_secrets="$(pnpm --filter spool-share-deletion exec wrangler secret list --config wrangler.prod.toml --format json)"
+          WORKER_SECRETS="$worker_secrets" node --input-type=module -e '
+            const rows = JSON.parse(process.env.WORKER_SECRETS ?? "[]")
+            if (!rows.some((row) => row.name === "WORKOS_OPERATIONS_TOKEN")) {
+              console.error("::error::Missing deletion Worker secret: WORKOS_OPERATIONS_TOKEN")
+              process.exit(1)
+            }
+          '
+
       # The web build imports workspace libraries that ship dist/
       # artifacts, so build those before Wrangler builds the app.
       - name: Build workspace dependencies
         run: pnpm vp run --filter '@spool/web^...' build
 
+      # Build before mutating remote state. The backend has no build step;
+      # Pages deploys its checked-in Functions directly.
+      - name: Build web router
+        run: pnpm --filter @spool/web run build
+
+      # Apply every committed D1 migration before publishing code that may
+      # depend on the new schema. A failed migration stops the job, leaving
+      # the currently deployed backend and router untouched.
+      - name: Apply staging D1 migrations
+        if: env.DEPLOY_TARGET == 'staging'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @spool/backend run d1:migrate:staging
+
+      - name: Apply production D1 migrations
+        if: env.DEPLOY_TARGET == 'production'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @spool/backend run d1:migrate:prod
+
+      # The deletion sweep shares production D1/KV/R2 with Pages. Publish its
+      # fail-closed ownership checks before exposing the new Team endpoints.
+      # Until Pages is updated its protected outbox callback may return 404;
+      # the Worker treats that as retryable and performs no unsafe cleanup.
+      - name: Deploy production deletion Worker
+        if: env.DEPLOY_TARGET == 'production'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter spool-share-deletion run deploy:prod
+
       # The router proxies every /api request to Pages, so publish the backend
-      # first. If that deployment fails, the existing Worker stays pointed at
-      # the last healthy production backend.
-      - name: Deploy backend to Cloudflare Pages
+      # before the router. If that deployment fails, the existing router stays
+      # pointed at the last healthy Pages deployment.
+      - name: Deploy staging backend to Cloudflare Pages
+        if: env.DEPLOY_TARGET == 'staging'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @spool/backend run deploy:staging
+
+      - name: Deploy production backend to Cloudflare Pages
+        if: env.DEPLOY_TARGET == 'production'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm --filter @spool/backend run deploy:prod
 
-      - name: Deploy web router to Cloudflare Workers
+      - name: Deploy staging web router to Cloudflare Workers
+        if: env.DEPLOY_TARGET == 'staging'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm --filter @spool/web run deploy
+        run: pnpm --filter @spool/web exec wrangler deploy --env staging
+
+      - name: Deploy production web router to Cloudflare Workers
+        if: env.DEPLOY_TARGET == 'production'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @spool/web exec wrangler deploy
+
+      - name: Verify production routes
+        if: env.DEPLOY_TARGET == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          trap 'rm -f "$headers" "$body"' EXIT
+          ready=0
+          for _ in $(seq 1 12); do
+            if curl --fail --silent --show-error --dump-header "$headers" --output "$body" https://spool.new/api/health \
+              && grep -Fqi 'x-spool-route: backend' "$headers" \
+              && HEALTH_BODY="$(tr -d '\n' < "$body")" node --input-type=module -e '
+                const payload = JSON.parse(process.env.HEALTH_BODY ?? "{}")
+                if (payload.ok !== true || payload.version !== process.env.GITHUB_SHA) process.exit(1)
+              '
+            then
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          test "$ready" = 1
+          test "$(curl --retry 5 --retry-delay 2 --retry-all-errors --silent --show-error --output /dev/null --write-out '%{http_code}' https://spool.new/api/teams)" = 401
+          test "$(curl --retry 5 --retry-delay 2 --retry-all-errors --silent --show-error --output /dev/null --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' https://spool.new/api/webhooks/workos)" = 400

@@ -10,7 +10,12 @@ import { Check, Copy, Link2, ShieldAlert, Trash2, UserRound } from 'lucide-react
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { HubSharePrepared } from '../../shared/hub-share.js'
+import type {
+  HubSharePrepared,
+  HubShareTarget,
+  HubShareTeam,
+  HubShareVisibility,
+} from '../../shared/hub-share.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 
 interface Props {
@@ -23,13 +28,28 @@ interface Props {
 
 type DialogState =
   | { phase: 'preparing' }
-  | { phase: 'ready'; prepared: HubSharePrepared; summary: string }
-  | { phase: 'publishing'; prepared: HubSharePrepared; summary: string }
+  | {
+      phase: 'ready'
+      prepared: HubSharePrepared
+      summary: string
+      teams: HubShareTeam[]
+      teamsError: string | null
+      targetTeamId: string | null
+    }
+  | {
+      phase: 'publishing'
+      prepared: HubSharePrepared
+      summary: string
+      teams: HubShareTeam[]
+      teamsError: string | null
+      targetTeamId: string | null
+    }
   | {
       phase: 'done'
       sid: string
       url: string
-      publicByDefault: boolean
+      visibility: HubShareVisibility
+      teamName: string | null
       profileHandle: string | null
     }
   | { phase: 'error'; message: string; unauthenticated: boolean }
@@ -52,12 +72,29 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
     setWithdrawal('idle')
     setState({ phase: 'preparing' })
     let cancelled = false
-    void window.spoolShare.hubSharePrepare(sessionUuid).then((result) => {
+    void Promise.all([
+      window.spoolShare.hubSharePrepare(sessionUuid).catch((cause: unknown) => ({
+        ok: false as const,
+        error: cause instanceof Error ? cause.message : String(cause),
+      })),
+      window.spoolShare.hubShareTeams().catch((cause: unknown) => ({
+        ok: false as const,
+        error: cause instanceof Error ? cause.message : String(cause),
+      })),
+    ]).then(([preparedResult, teamsResult]) => {
       if (cancelled) return
-      if (result.ok) {
-        setState({ phase: 'ready', prepared: result.prepared, summary: initialSummary })
+      if (preparedResult.ok) {
+        setState({
+          phase: 'ready',
+          prepared: preparedResult.prepared,
+          summary: initialSummary,
+          teams: teamsResult.ok ? teamsResult.teams : [],
+          teamsError: teamsResult.ok ? null : teamsResult.error,
+          // Deliberately reset on every open. Team is explicit, never sticky.
+          targetTeamId: null,
+        })
       } else {
-        setState({ phase: 'error', message: result.error, unauthenticated: false })
+        setState({ phase: 'error', message: preparedResult.error, unauthenticated: false })
       }
     })
     return () => {
@@ -67,29 +104,42 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
 
   const publish = useCallback(async () => {
     if (state.phase !== 'ready') return
-    const publicByDefault = isDiscoverySessionSid(state.prepared.sid)
-    setState({ phase: 'publishing', prepared: state.prepared, summary: state.summary })
-    const result = await window.spoolShare.hubSharePublish(sessionUuid, state.summary)
+    const selectedTeam =
+      state.targetTeamId === null
+        ? null
+        : (state.teams.find((team) => team.id === state.targetTeamId) ?? null)
+    const target: HubShareTarget = selectedTeam
+      ? { visibility: 'team', teamId: selectedTeam.id }
+      : { visibility: 'default' }
+    setState({ ...state, phase: 'publishing' })
+    const result = await window.spoolShare.hubSharePublish(sessionUuid, state.summary, target)
     if (result.ok) {
-      const me = publicByDefault ? await window.spoolShare.me().catch(() => null) : null
+      const me =
+        result.visibility === 'public' ? await window.spoolShare.me().catch(() => null) : null
       setState({
         phase: 'done',
         sid: state.prepared.sid,
         url: result.url,
-        publicByDefault,
+        visibility: result.visibility,
+        teamName: result.visibility === 'team' ? (selectedTeam?.name ?? null) : null,
         profileHandle: me?.handle ?? null,
       })
     } else {
       setState({
         phase: 'error',
-        message: result.error === 'UNAUTHENTICATED' ? t('hubShare.signInHint') : result.error,
+        message:
+          result.error === 'UNAUTHENTICATED'
+            ? t('hubShare.signInHint')
+            : result.error === 'TEAM_OWNED_SESSION'
+              ? t('hubShare.teamOwnedReshareError')
+              : result.error,
         unauthenticated: result.error === 'UNAUTHENTICATED',
       })
     }
   }, [state, sessionUuid, t])
 
   const withdraw = useCallback(async () => {
-    if (state.phase !== 'done') return
+    if (state.phase !== 'done' || state.visibility === 'team') return
     if (!window.confirm(t('hubShare.withdrawConfirm'))) return
     setWithdrawal('withdrawing')
     const result = await window.spoolShare.hubShareWithdraw(state.sid)
@@ -97,6 +147,13 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
   }, [state, t])
 
   if (!open) return null
+
+  const shareState = state.phase === 'ready' || state.phase === 'publishing' ? state : null
+  const selectedTeam =
+    shareState?.targetTeamId == null
+      ? null
+      : (shareState.teams.find((team) => team.id === shareState.targetTeamId) ?? null)
+  const publicByDefault = shareState ? isDiscoverySessionSid(shareState.prepared.sid) : false
 
   return (
     <div
@@ -109,7 +166,7 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
       }}
     >
       <div
-        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border w-[480px] max-w-[90vw] overflow-hidden rounded-[10px] border font-sans"
+        className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border max-h-[90vh] w-[480px] max-w-[90vw] overflow-y-auto rounded-[10px] border font-sans"
         style={{ boxShadow: '0 18px 48px rgba(10,10,10,0.18), 0 2px 6px rgba(10,10,10,0.08)' }}
       >
         <div className="px-6 pt-5 pb-5">
@@ -127,19 +184,19 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
           {(state.phase === 'ready' || state.phase === 'publishing') && (
             <>
               <h2 className="text-warm-text dark:text-dark-text mt-2 text-[16px] font-semibold">
-                {t(
-                  isDiscoverySessionSid(state.prepared.sid)
-                    ? 'hubShare.title'
-                    : 'hubShare.linkOnlyTitle',
-                )}
+                {selectedTeam
+                  ? t('hubShare.teamTitle', { name: selectedTeam.name })
+                  : t(publicByDefault ? 'hubShare.title' : 'hubShare.linkOnlyTitle')}
               </h2>
               <p className="text-warm-muted dark:text-dark-muted mt-1.5 text-[13px] leading-relaxed">
-                {t(
-                  isDiscoverySessionSid(state.prepared.sid)
-                    ? 'hubShare.lead'
-                    : 'hubShare.linkOnlyLead',
-                  { records: state.prepared.count },
-                )}
+                {selectedTeam
+                  ? t('hubShare.teamLead', {
+                      name: selectedTeam.name,
+                      records: state.prepared.count,
+                    })
+                  : t(publicByDefault ? 'hubShare.lead' : 'hubShare.linkOnlyLead', {
+                      records: state.prepared.count,
+                    })}
               </p>
               <p className="text-warm-faint dark:text-dark-muted mt-2 font-mono text-[11px]">
                 {state.prepared.files} files{' '}
@@ -163,6 +220,51 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                   </p>
                 </div>
               )}
+
+              <label
+                htmlFor="hub-share-target"
+                className="text-warm-muted dark:text-dark-muted mt-4 block text-[10px] font-semibold tracking-[0.08em] uppercase"
+              >
+                {t('hubShare.targetLabel')}
+              </label>
+              <select
+                id="hub-share-target"
+                data-testid="hub-share-target"
+                value={state.targetTeamId ?? ''}
+                disabled={state.phase === 'publishing'}
+                onChange={(event) => {
+                  if (state.phase !== 'ready') return
+                  const teamId = event.target.value
+                  setState({ ...state, targetTeamId: teamId === '' ? null : teamId })
+                }}
+                className="border-warm-border2 dark:border-dark-border2 bg-warm-surface dark:bg-dark-surface text-warm-text dark:text-dark-text focus:border-accent dark:focus:border-accent-dark mt-1 h-11 w-full rounded-lg border px-3 text-[13px] outline-none"
+              >
+                <option value="">
+                  {t(
+                    publicByDefault
+                      ? 'hubShare.defaultPublicTarget'
+                      : 'hubShare.defaultLinkOnlyTarget',
+                  )}
+                </option>
+                {state.teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {t('hubShare.teamTarget', { name: team.name })}
+                  </option>
+                ))}
+              </select>
+              {state.teamsError ? (
+                <p className="text-status-error mt-1.5 text-[11px] leading-relaxed">
+                  {t(
+                    state.teamsError === 'UNAUTHENTICATED'
+                      ? 'hubShare.teamsSignInHint'
+                      : 'hubShare.teamsLoadError',
+                  )}
+                </p>
+              ) : state.teams.length === 0 ? (
+                <p className="text-warm-faint dark:text-dark-faint mt-1.5 text-[11px] leading-relaxed">
+                  {t('hubShare.noTeamsHint')}
+                </p>
+              ) : null}
 
               <label className="text-warm-muted dark:text-dark-muted mt-4 block text-[10px] font-semibold tracking-[0.08em] uppercase">
                 {t('hubShare.summaryLabel')}
@@ -194,14 +296,18 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                 >
                   {state.phase === 'publishing'
                     ? t(
-                        isDiscoverySessionSid(state.prepared.sid)
-                          ? 'hubShare.publishing'
-                          : 'hubShare.linkOnlyPublishing',
+                        selectedTeam
+                          ? 'hubShare.teamPublishing'
+                          : publicByDefault
+                            ? 'hubShare.publishing'
+                            : 'hubShare.linkOnlyPublishing',
                       )
                     : t(
-                        isDiscoverySessionSid(state.prepared.sid)
-                          ? 'hubShare.publish'
-                          : 'hubShare.linkOnlyPublish',
+                        selectedTeam
+                          ? 'hubShare.teamPublish'
+                          : publicByDefault
+                            ? 'hubShare.publish'
+                            : 'hubShare.linkOnlyPublish',
                       )}
                 </Button>
               </div>
@@ -215,18 +321,24 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                 {t(
                   withdrawal === 'withdrawn'
                     ? 'hubShare.withdrawnTitle'
-                    : state.publicByDefault
-                      ? 'hubShare.doneTitle'
-                      : 'hubShare.linkOnlyDoneTitle',
+                    : state.visibility === 'team'
+                      ? 'hubShare.teamDoneTitle'
+                      : state.visibility === 'public'
+                        ? 'hubShare.doneTitle'
+                        : 'hubShare.linkOnlyDoneTitle',
+                  { name: state.teamName ?? '' },
                 )}
               </h2>
               <p className="text-warm-muted dark:text-dark-muted mt-1.5 text-[13px]">
                 {t(
                   withdrawal === 'withdrawn'
                     ? 'hubShare.withdrawnLead'
-                    : state.publicByDefault
-                      ? 'hubShare.doneLead'
-                      : 'hubShare.linkOnlyDoneLead',
+                    : state.visibility === 'team'
+                      ? 'hubShare.teamDoneLead'
+                      : state.visibility === 'public'
+                        ? 'hubShare.doneLead'
+                        : 'hubShare.linkOnlyDoneLead',
+                  { name: state.teamName ?? '' },
                 )}
               </p>
               {withdrawal !== 'withdrawn' && (
@@ -255,7 +367,7 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                 <p className="text-status-error mt-2 text-[12px]">{t('hubShare.withdrawError')}</p>
               )}
               <div className="mt-4 flex flex-wrap justify-end gap-2">
-                {withdrawal !== 'withdrawn' && state.publicByDefault && (
+                {withdrawal !== 'withdrawn' && state.visibility === 'public' && (
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -266,7 +378,7 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
                     {t(state.profileHandle ? 'hubShare.viewProfile' : 'hubShare.setUpProfile')}
                   </Button>
                 )}
-                {withdrawal !== 'withdrawn' && (
+                {withdrawal !== 'withdrawn' && state.visibility !== 'team' && (
                   <Button
                     variant="outline"
                     onClick={() => void withdraw()}

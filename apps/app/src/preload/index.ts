@@ -68,6 +68,8 @@ import type { ThemeEditorStateV1 } from '../renderer/theme/editorTypes.js'
 import type {
   HubSharePrepareResult,
   HubSharePublishResult,
+  HubShareTarget,
+  HubShareTeamsResult,
   HubShareWithdrawResult,
 } from '../shared/hub-share.js'
 import type { PinnedSortOrder } from '../shared/pinnedSort.js'
@@ -493,8 +495,13 @@ const spoolShare = {
   // v2 hub share (records, not styled snapshots) — one-click publish.
   hubSharePrepare: (sessionUuid: string): Promise<HubSharePrepareResult> =>
     ipcRenderer.invoke('hub-share:prepare', { sessionUuid }),
-  hubSharePublish: (sessionUuid: string, summary: string): Promise<HubSharePublishResult> =>
-    ipcRenderer.invoke('hub-share:publish', { sessionUuid, summary }),
+  hubShareTeams: (): Promise<HubShareTeamsResult> => ipcRenderer.invoke('hub-share:teams'),
+  hubSharePublish: (
+    sessionUuid: string,
+    summary: string,
+    target: HubShareTarget,
+  ): Promise<HubSharePublishResult> =>
+    ipcRenderer.invoke('hub-share:publish', { sessionUuid, summary, target }),
   hubShareWithdraw: (sid: string): Promise<HubShareWithdrawResult> =>
     ipcRenderer.invoke('hub-share:withdraw', { sid }),
 }

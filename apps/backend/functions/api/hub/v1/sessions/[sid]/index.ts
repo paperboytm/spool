@@ -1,8 +1,15 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { isPublishedToDiscovery } from '../../../../../../src/discovery/projection'
+import {
+  filterLineageForAudience,
+  isPublishedToDiscovery,
+} from '../../../../../../src/discovery/projection'
 import { jsonError, jsonOk } from '../../../../../../src/errors'
-import { requireReadableSession, type HubEnv } from '../../../../../../src/hub/head'
+import {
+  isTeamOnlySession,
+  requireReadableSession,
+  type HubEnv,
+} from '../../../../../../src/hub/head'
 import { getHubAuthor } from '../../../../../../src/hub/store'
 import { requireSid } from '../../../../../../src/hub/wire'
 
@@ -13,27 +20,44 @@ import { requireSid } from '../../../../../../src/hub/wire'
 export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
   try {
     const sid = requireSid(ctx.params['sid'])
-    const session = await requireReadableSession(ctx.env.DB, sid)
+    const session = await requireReadableSession(ctx.request, ctx.env, sid)
     const author = await getHubAuthor(ctx.env.DB, session.owner_user_id)
-    const published = await isPublishedToDiscovery(ctx.env.DB, sid)
+    const team = session.team_id
+      ? await ctx.env.DB.prepare('SELECT id, name FROM teams WHERE id=? AND archived_at IS NULL')
+          .bind(session.team_id)
+          .first<{ id: string; name: string }>()
+      : null
+    const teamOnly = isTeamOnlySession(session)
+    const published = teamOnly ? false : await isPublishedToDiscovery(ctx.env.DB, sid)
     const summaryMd = session.note_md
-    return jsonOk({
-      sid: session.sid,
-      root: session.root,
-      count: session.record_count,
-      sig: session.sig,
-      summaryMd,
-      // Rolling-upgrade alias for older CLI/Desktop/Web clients.
-      noteMd: summaryMd,
-      cardJson: session.card_json,
-      lineageJson: session.lineage_json,
-      viewOid: session.view_oid,
-      spoolFileOid: session.spool_file_oid,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      visibility: published ? 'public' : 'link-only',
-      author,
-    })
+    const lineageJson = await filterLineageForAudience(
+      ctx.env.DB,
+      session.lineage_json,
+      teamOnly ? session.team_id : null,
+    )
+    return jsonOk(
+      {
+        sid: session.sid,
+        root: session.root,
+        count: session.record_count,
+        sig: session.sig,
+        summaryMd,
+        // Rolling-upgrade alias for older CLI/Desktop/Web clients.
+        noteMd: summaryMd,
+        cardJson: session.card_json,
+        lineageJson,
+        viewOid: session.view_oid,
+        spoolFileOid: session.spool_file_oid,
+        createdAt: session.created_at,
+        updatedAt: session.updated_at,
+        visibility: teamOnly ? 'team' : published ? 'public' : 'link-only',
+        team,
+        author,
+      },
+      teamOnly
+        ? { headers: { 'cache-control': 'private, no-store', vary: 'Cookie, Authorization' } }
+        : undefined,
+    )
   } catch (e) {
     return jsonError(e)
   }

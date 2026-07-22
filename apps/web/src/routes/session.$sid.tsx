@@ -20,32 +20,35 @@ interface HubMetaForOg {
   noteMd?: string | null
   count: number
   author: { handle: string | null; displayName: string | null }
+  visibility?: 'public' | 'link-only' | 'team'
 }
 
 export interface LoaderData {
   og: { title: string; description: string } | null
+  noindex: boolean
 }
 
 async function loadSessionOgMeta(sid: string): Promise<LoaderData> {
   if (!SID_RE.test(sid)) throw notFound()
-  if (!import.meta.env.SSR) return { og: null }
+  if (!import.meta.env.SSR) return { og: null, noindex: false }
 
   try {
     const apiOrigin = serverApiOrigin()
     const res = await fetch(`${apiOrigin}/api/hub/v1/sessions/${encodeURIComponent(sid)}`)
-    if (res.status !== 200) return { og: null }
+    if (res.status !== 200) return { og: null, noindex: true }
     const meta = (await res.json()) as HubMetaForOg
     const author = meta.author.handle
       ? `@${meta.author.handle}`
       : (meta.author.displayName ?? 'someone')
     return {
+      noindex: meta.visibility !== 'public',
       og: {
         title: sessionOgTitle(meta.summaryMd ?? meta.noteMd),
         description: `A coding-agent session shared by ${author} — ${meta.count} records.`,
       },
     }
   } catch {
-    return { og: null }
+    return { og: null, noindex: true }
   }
 }
 
@@ -54,12 +57,16 @@ export const Route = createFileRoute('/session/$sid')({
   loader: ({ params }) => loadSessionOgMeta(params.sid),
   head: ({ loaderData, params }) => {
     const og = loaderData?.og
-    if (!og) return {}
-    return sessionOgHead({
+    const robots = loaderData?.noindex
+      ? [{ name: 'robots', content: 'noindex, nofollow, noarchive' }]
+      : []
+    if (!og) return { meta: robots }
+    const head = sessionOgHead({
       title: og.title,
       description: og.description,
       canonicalUrl: `${PUBLIC_SITE_ORIGIN}/session/${params.sid}`,
     })
+    return { ...head, meta: [...(head.meta ?? []), ...robots] }
   },
   component: SessionSharePage,
 })

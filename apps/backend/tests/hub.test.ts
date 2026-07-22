@@ -7,7 +7,7 @@ import {
   sequenceRoot,
   type CanonicalRecord,
 } from '@spool-lab/session-kit'
-import { describe, expect, it } from 'vite-plus/test'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 import { onRequestGet as discoveryGet } from '../functions/api/discovery/v1/sessions'
 import { onRequestPost as batchPost } from '../functions/api/hub/v1/objects/batch'
@@ -21,7 +21,9 @@ import {
   onRequestDelete as tokensDelete,
   onRequestPost as tokensPost,
 } from '../functions/api/hub/v1/tokens'
+import { onRequestPatch as visibilityPatch } from '../functions/api/me/sessions/[sid]'
 import type { SessionRecord } from '../src/auth/session'
+import { TEAM_QUOTA_BYTES } from '../src/hub/wire'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
@@ -29,7 +31,9 @@ const BASE_URL = 'https://share.example.test'
 const SID = 'claude_12345678-abcd-4321-abcd-1234567890ab'
 const USER_A_TOKEN = 'a'.repeat(40)
 const USER_B_TOKEN = 'b'.repeat(40)
+const USER_C_TOKEN = 'c'.repeat(40)
 const DEV_TOKEN = 'local-hub-dev-token'
+const TEAM_ID = `team_${'d'.repeat(32)}`
 
 type Fixture = Awaited<ReturnType<typeof makeFixture>>
 type TestEnv = ReturnType<typeof envFor>
@@ -170,6 +174,14 @@ function jsonPost(url: string, body: unknown, token?: string): Request {
   return new Request(url, { method: 'POST', headers, body: JSON.stringify(body) })
 }
 
+function jsonPatch(url: string, body: unknown, token: string): Request {
+  return new Request(url, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 function batchRequest(entries: readonly CanonicalRecord[], token: string): Request {
   const body = entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
   return new Request(`${BASE_URL}/api/hub/v1/objects/batch`, {
@@ -202,6 +214,20 @@ async function withdraw(env: TestEnv, token = USER_A_TOKEN, sid = SID) {
   return invoke(withdrawPost, jsonPost(`${sessionUrl(sid)}/withdraw`, {}, token), env, { sid })
 }
 
+async function changeVisibility(
+  env: TestEnv,
+  body: { visibility: 'public' | 'link-only' | 'team'; team_id?: string | null },
+  token = USER_A_TOKEN,
+  sid = SID,
+) {
+  return invoke(
+    visibilityPatch,
+    jsonPatch(`${BASE_URL}/api/me/sessions/${sid}`, body, token),
+    env,
+    { sid },
+  )
+}
+
 async function uploadAndCommit(
   env: TestEnv,
   fixture: Fixture,
@@ -219,6 +245,10 @@ async function uploadAndCommit(
 
 function readRequest(url: string, etag?: string): Request {
   return new Request(url, etag ? { headers: { 'if-none-match': etag } } : undefined)
+}
+
+function authenticatedReadRequest(url: string, token: string): Request {
+  return new Request(url, { headers: { cookie: `spool_session=${token}` } })
 }
 
 function parseNdjson(body: string): Array<{ i: number; oid: string; data: string }> {
@@ -628,6 +658,44 @@ describe('hub head and withdrawal', () => {
   })
 })
 
+describe('Hub management mutation limits', () => {
+  it('limits visibility changes before a Public transition reads its R2 view', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      expect((await changeVisibility(env, { visibility: 'link-only' })).status).toBe(200)
+    }
+    env._hub.clear()
+
+    const limited = await changeVisibility(env, { visibility: 'public' })
+
+    expect(limited.status).toBe(429)
+    await expect(limited.json()).resolves.toMatchObject({ error: 'TOO_MANY_REQUESTS' })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('limits repeated withdrawal requests without rewriting the tombstone', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    expect((await withdraw(env)).status).toBe(200)
+    const withdrawnAt = env.state.hub_sessions[0]!.withdrawn_at
+
+    for (let attempt = 1; attempt < 30; attempt += 1) {
+      expect((await withdraw(env)).status).toBe(200)
+    }
+    const limited = await withdraw(env)
+
+    expect(limited.status).toBe(429)
+    await expect(limited.json()).resolves.toMatchObject({ error: 'TOO_MANY_REQUESTS' })
+    expect(env.state.hub_sessions[0]!.withdrawn_at).toBe(withdrawnAt)
+  })
+})
+
 describe('hub public reads', () => {
   it('returns 404 for unknown session metadata', async () => {
     const env = envFor()
@@ -667,7 +735,7 @@ describe('hub public reads', () => {
       author: {
         handle: 'alice',
         displayName: 'Alice Example',
-        avatarUrl: '/api/avatars/avatar-a',
+        avatarUrl: '/api/avatars/user-a?v=avatar-a',
       },
     })
 
@@ -709,7 +777,7 @@ describe('hub public reads', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe(etag)
-    expect(response.headers.get('cache-control')).toBe('public, max-age=3600')
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     await expect(response.json()).resolves.toEqual(fixture.viewValue)
 
     const cached = await invoke(viewGet, readRequest(`${sessionUrl(SID)}/view`, etag), env, {
@@ -739,7 +807,7 @@ describe('hub public reads', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe(etag)
-    expect(response.headers.get('cache-control')).toBe('public, max-age=3600')
+    expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     expect(lines).toHaveLength(500)
     expect(lines.map((line) => line.i)).toEqual(Array.from({ length: 500 }, (_, i) => i))
     expect(lines.map((line) => line.oid)).toEqual(fixture.head.manifest.slice(0, 500))
@@ -850,5 +918,961 @@ describe('hub public reads', () => {
 
     expect(readerDiff).toEqual(authorDiff)
     expect(receivedView.diffstat).toEqual(readerDiff.diffstat)
+  })
+})
+
+describe('Hub final live-user authorization gates', () => {
+  it('does not create a personal head when account deletion wins after authentication', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.users.find((row) => row.id === 'user-a')!.deletion_pending_until = Date.now()
+        return originalBatch(statements)
+      },
+    })
+
+    const committed = await commit(env, fixture)
+
+    expect(committed.status).toBe(404)
+    expect(env.state.hub_sessions).toHaveLength(0)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('does not republish a personal Session when deletion wins the visibility CAS', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    expect((await changeVisibility(env, { visibility: 'link-only' })).status).toBe(200)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+    const original = { ...env.state.hub_sessions[0]! }
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.users.find((row) => row.id === 'user-a')!.deletion_pending_until = Date.now()
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'public' })
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      visibility: original.visibility,
+      updated_at: original.updated_at,
+    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+})
+
+describe('Team-only Hub isolation', () => {
+  async function teamEnv() {
+    const env = envFor()
+    await seedUsers(env)
+    seedUser(env.state, 'user-c')
+    await seedSession(env.SESSIONS, USER_C_TOKEN, 'user-c')
+    env.state.teams.push({ id: TEAM_ID, name: 'Launch Team', archived_at: null })
+    env.state.team_memberships.push(
+      { team_id: TEAM_ID, user_id: 'user-a', role: 'owner' },
+      { team_id: TEAM_ID, user_id: 'user-b', role: 'member' },
+    )
+    return env
+  }
+
+  it('returns a committed head when post-commit audit delivery fails', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    const originalPrepare = env.DB.prepare.bind(env.DB)
+    Object.assign(env.DB, {
+      prepare: (sql: string) => {
+        const statement = originalPrepare(sql) as unknown as {
+          run: () => Promise<unknown>
+        }
+        if (sql.startsWith('INSERT INTO audit_log ')) {
+          statement.run = async () => {
+            throw new Error('audit unavailable')
+          }
+        }
+        return statement
+      },
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const committed = await commit(env, fixture)
+
+    expect(committed.status).toBe(200)
+    expect(env.state.hub_sessions).toHaveLength(1)
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('post-commit audit failed'))
+  })
+
+  it('moves a personal Session into a Team and gates every content endpoint', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    const teamHead = { ...fixture.head, visibility: 'team' as const, teamId: TEAM_ID }
+
+    const committed = await invoke(
+      headPost,
+      jsonPost(`${sessionUrl(SID)}/head`, teamHead, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(committed.status).toBe(200)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      sid: SID,
+      owner_user_id: 'user-a',
+      visibility: 'private',
+      team_id: TEAM_ID,
+    })
+    expect(env.state.hub_team_objects).toHaveLength(fixture.entries.length)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+
+    const anonymous = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(anonymous.status).toBe(401)
+
+    const outsider = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_C_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(outsider.status).toBe(404)
+
+    const memberMeta = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(memberMeta.status).toBe(200)
+    expect(memberMeta.headers.get('cache-control')).toBe('private, no-store')
+    expect(memberMeta.headers.get('vary')).toBe('Cookie, Authorization')
+    await expect(memberMeta.json()).resolves.toMatchObject({
+      visibility: 'team',
+      team: { id: TEAM_ID, name: 'Launch Team' },
+    })
+
+    const memberView = await invoke(
+      viewGet,
+      authenticatedReadRequest(`${sessionUrl(SID)}/view`, USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(memberView.status).toBe(200)
+    expect(memberView.headers.get('cache-control')).toBe('private, no-store')
+    await expect(memberView.json()).resolves.toEqual(fixture.viewValue)
+
+    const memberRecords = await invoke(
+      recordsGet,
+      authenticatedReadRequest(`${sessionUrl(SID)}/records?from=0&to=20`, USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(memberRecords.status).toBe(200)
+    expect(memberRecords.headers.get('cache-control')).toBe('private, no-store')
+    expect(parseNdjson(await memberRecords.text())).toHaveLength(fixture.records.length)
+
+    env.state.team_memberships = env.state.team_memberships.filter(
+      (row) => !(row.team_id === TEAM_ID && row.user_id === 'user-b'),
+    )
+    const removedMember = await invoke(
+      viewGet,
+      authenticatedReadRequest(`${sessionUrl(SID)}/view`, USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(removedMember.status).toBe(404)
+  })
+
+  it('rejects stale personal/new tenant expectations in both push and head', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+
+    const changed = await makeFixture([
+      ...syntheticRecords(),
+      {
+        type: 'assistant',
+        timestamp: '2026-07-16T01:00:04.000Z',
+        message: { role: 'assistant', content: 'A concurrent update.' },
+      },
+    ])
+    const stalePersonalHead = {
+      ...changed.head,
+      visibility: 'public' as const,
+      expectedTeamId: null,
+    }
+
+    const outsiderPush = await invoke(
+      pushPost,
+      jsonPost(`${sessionUrl(SID)}/push`, stalePersonalHead, USER_C_TOKEN),
+      env,
+      { sid: SID },
+    )
+    const outsiderHead = await invoke(
+      headPost,
+      jsonPost(`${sessionUrl(SID)}/head`, stalePersonalHead, USER_C_TOKEN),
+      env,
+      { sid: SID },
+    )
+
+    const pushed = await invoke(
+      pushPost,
+      jsonPost(`${sessionUrl(SID)}/push`, stalePersonalHead, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+    const committed = await invoke(
+      headPost,
+      jsonPost(`${sessionUrl(SID)}/head`, stalePersonalHead, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+
+    expect(outsiderPush.status).toBe(404)
+    expect(outsiderHead.status).toBe(404)
+    expect(pushed.status).toBe(409)
+    expect(committed.status).toBe(409)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      root: fixture.head.root,
+      visibility: 'private',
+      team_id: TEAM_ID,
+    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+    expect(env._hub.has(`hub/manifests/${changed.head.root}`)).toBe(false)
+  })
+
+  it('scrubs Explore when a Public Session becomes Team-only', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    expect(env.state.hub_session_discovery).toHaveLength(1)
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(200)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      visibility: 'private',
+      team_id: TEAM_ID,
+    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('returns member-safe management permissions after a personal Session joins a Team', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture, { token: USER_B_TOKEN })).status).toBe(200)
+
+    const changed = await changeVisibility(
+      env,
+      { visibility: 'team', team_id: TEAM_ID },
+      USER_B_TOKEN,
+    )
+
+    expect(changed.status).toBe(200)
+    await expect(changed.json()).resolves.toMatchObject({
+      session: {
+        team_id: TEAM_ID,
+        visibility: 'team',
+        can_manage_visibility: false,
+      },
+    })
+  })
+
+  it('charges only aliases still missing from the Team when a transfer is retried', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const wanted = fixture.entries.map((entry) => entry.oid)
+    const alreadyAliased = env.state.hub_objects.find((row) => row.oid === wanted[0])!
+    const missingBytes = env.state.hub_objects
+      .filter((row) => wanted.slice(1).includes(row.oid))
+      .reduce((total, row) => total + row.size, 0)
+    env.state.hub_team_objects.push({
+      team_id: TEAM_ID,
+      oid: alreadyAliased.oid,
+      size: TEAM_QUOTA_BYTES - missingBytes,
+      pack_key: alreadyAliased.pack_key,
+      offset: alreadyAliased.offset,
+      length: alreadyAliased.length,
+      created_at: Date.now(),
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'team', team_id: TEAM_ID })
+
+    expect(changed.status).toBe(200)
+    expect(env.state.hub_team_objects.map((row) => row.oid).sort()).toEqual(wanted.sort())
+    expect(env.state.hub_team_objects.reduce((total, row) => total + row.size, 0)).toBe(
+      TEAM_QUOTA_BYTES,
+    )
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      visibility: 'private',
+      team_id: TEAM_ID,
+    })
+  })
+
+  it('maps the atomic D1 quota trigger when capacity changes after preflight', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const originalPrepare = env.DB.prepare.bind(env.DB)
+    let raced = false
+    Object.assign(env.DB, {
+      prepare: (sql: string) => {
+        if (!raced && sql.includes('/* hub:authorized-team-alias-after-commit */')) {
+          raced = true
+          env.state.hub_team_objects.push({
+            team_id: TEAM_ID,
+            oid: 'f'.repeat(64),
+            size: TEAM_QUOTA_BYTES,
+            pack_key: 'hub/team-packs/concurrent',
+            offset: 0,
+            length: TEAM_QUOTA_BYTES,
+            created_at: Date.now(),
+          })
+        }
+        return originalPrepare(sql)
+      },
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'team', team_id: TEAM_ID })
+
+    expect(changed.status).toBe(422)
+    await expect(changed.json()).resolves.toMatchObject({
+      detail: 'Team storage quota exceeded',
+    })
+    expect(env.state.hub_team_objects).toHaveLength(1)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      visibility: 'unlisted',
+      team_id: null,
+    })
+  })
+
+  it('leaves zero Team aliases when membership removal wins a visibility transfer', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.team_memberships = env.state.team_memberships.filter(
+          (row) => row.user_id !== 'user-a',
+        )
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'team', team_id: TEAM_ID })
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({ team_id: null, visibility: 'unlisted' })
+  })
+
+  it('leaves zero Team aliases when account deletion wins a visibility transfer', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.users.find((row) => row.id === 'user-a')!.deletion_pending_until = Date.now()
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'team', team_id: TEAM_ID })
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({ team_id: null, visibility: 'unlisted' })
+  })
+
+  it('leaves zero Team aliases when a newer head wins a visibility transfer CAS', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const original = { ...env.state.hub_sessions[0]! }
+    const winnerRoot = 'f'.repeat(64)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        Object.assign(env.state.hub_sessions[0]!, {
+          root: winnerRoot,
+          updated_at: original.updated_at + 1,
+        })
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await changeVisibility(env, { visibility: 'team', team_id: TEAM_ID })
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      root: winnerRoot,
+      team_id: null,
+      visibility: 'unlisted',
+    })
+  })
+
+  it('leaves zero Team aliases when membership removal wins a head transfer', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.team_memberships = env.state.team_memberships.filter(
+          (row) => row.user_id !== 'user-a',
+        )
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({ team_id: null, visibility: 'unlisted' })
+  })
+
+  it('leaves zero Team aliases when account deletion wins a head transfer', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        env.state.users.find((row) => row.id === 'user-a')!.deletion_pending_until = Date.now()
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({ team_id: null, visibility: 'unlisted' })
+  })
+
+  it('leaves zero Team aliases when a newer head wins the head-transfer CAS', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const winnerRoot = 'e'.repeat(64)
+    const originalUpdatedAt = env.state.hub_sessions[0]!.updated_at
+    const originalBatch = env.DB.batch.bind(env.DB)
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        Object.assign(env.state.hub_sessions[0]!, {
+          root: winnerRoot,
+          updated_at: originalUpdatedAt + 1,
+        })
+        return originalBatch(statements)
+      },
+    })
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(404)
+    expect(env.state.hub_team_objects).toHaveLength(0)
+    expect(env.state.hub_sessions[0]).toMatchObject({ root: winnerRoot, team_id: null })
+  })
+
+  it('does not let a Team admin rewrite another author’s attributed Session', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+    env.state.team_memberships.find((row) => row.user_id === 'user-b')!.role = 'admin'
+
+    const rewrite = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_B_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(rewrite.status).toBe(404)
+  })
+
+  it('lets a member update their own active Team content but not its disclosure or withdrawal', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_B_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_B_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+
+    const contentUpdate = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        {
+          ...fixture.head,
+          summaryMd: '## Outcome\n\nUpdated by the Team member author.',
+          visibility: 'team',
+          teamId: TEAM_ID,
+        },
+        USER_B_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+    const headPublish = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'public', teamId: TEAM_ID },
+        USER_B_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+    const publish = await changeVisibility(
+      env,
+      { visibility: 'public', team_id: TEAM_ID },
+      USER_B_TOKEN,
+    )
+    const memberWithdraw = await withdraw(env, USER_B_TOKEN)
+
+    expect(contentUpdate.status).toBe(200)
+    expect(headPublish.status).toBe(403)
+    expect(publish.status).toBe(403)
+    expect(memberWithdraw.status).toBe(403)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      note_md: '## Outcome\n\nUpdated by the Team member author.',
+      visibility: 'private',
+      withdrawn_at: null,
+    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('never resurrects a withdrawn Team Session through head, for either managers or authors', async () => {
+    const ownerEnv = await teamEnv()
+    const ownerFixture = await makeFixture()
+    expect((await upload(ownerEnv, USER_A_TOKEN, ownerFixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...ownerFixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          ownerEnv,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+    expect((await withdraw(ownerEnv, USER_A_TOKEN)).status).toBe(200)
+    const ownerRevive = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...ownerFixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      ownerEnv,
+      { sid: SID },
+    )
+
+    const memberEnv = await teamEnv()
+    const memberFixture = await makeFixture()
+    expect((await upload(memberEnv, USER_B_TOKEN, memberFixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...memberFixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_B_TOKEN,
+          ),
+          memberEnv,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+    expect((await withdraw(memberEnv, USER_A_TOKEN)).status).toBe(200)
+    const memberRevive = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...memberFixture.head, visibility: 'team', teamId: TEAM_ID },
+        USER_B_TOKEN,
+      ),
+      memberEnv,
+      { sid: SID },
+    )
+
+    expect(ownerRevive.status).toBe(410)
+    expect(memberRevive.status).toBe(410)
+    expect(ownerEnv.state.hub_sessions[0]?.withdrawn_at).not.toBeNull()
+    expect(memberEnv.state.hub_sessions[0]?.withdrawn_at).not.toBeNull()
+  })
+
+  it('makes a concurrent Team archive win over an in-flight public head commit', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let raced = false
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        if (!raced) {
+          raced = true
+          env.state.teams[0]!.archived_at = Date.now()
+        }
+        return originalBatch(statements)
+      },
+    })
+    const publish = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'public', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(publish.status).toBe(404)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      visibility: 'private',
+      team_id: TEAM_ID,
+    })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('makes concurrent member removal win over an in-flight Team head update', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let raced = false
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        if (!raced) {
+          raced = true
+          env.state.team_memberships = env.state.team_memberships.filter(
+            (row) => row.user_id !== 'user-a',
+          )
+        }
+        return originalBatch(statements)
+      },
+    })
+    const update = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        {
+          ...fixture.head,
+          summaryMd: '## Outcome\n\nThis update must not commit.',
+          visibility: 'team',
+          teamId: TEAM_ID,
+        },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(update.status).toBe(404)
+    expect(env.state.hub_sessions[0]?.note_md).toBe(fixture.head.summaryMd)
+  })
+
+  it('makes concurrent member removal win over visibility and withdrawal writes', async () => {
+    async function activeAdminSession() {
+      const env = await teamEnv()
+      const fixture = await makeFixture()
+      expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+      expect(
+        (
+          await invoke(
+            headPost,
+            jsonPost(
+              `${sessionUrl(SID)}/head`,
+              { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+              USER_A_TOKEN,
+            ),
+            env,
+            { sid: SID },
+          )
+        ).status,
+      ).toBe(200)
+      env.state.team_memberships.find((row) => row.user_id === 'user-a')!.role = 'admin'
+      env.state.team_memberships.find((row) => row.user_id === 'user-b')!.role = 'owner'
+      return env
+    }
+
+    const visibilityEnv = await activeAdminSession()
+    const originalVisibilityBatch = visibilityEnv.DB.batch.bind(visibilityEnv.DB)
+    let visibilityRace = false
+    Object.assign(visibilityEnv.DB, {
+      batch: async (statements: Parameters<typeof originalVisibilityBatch>[0]) => {
+        if (!visibilityRace) {
+          visibilityRace = true
+          visibilityEnv.state.team_memberships = visibilityEnv.state.team_memberships.filter(
+            (row) => row.user_id !== 'user-a',
+          )
+        }
+        return originalVisibilityBatch(statements)
+      },
+    })
+    const visibility = await changeVisibility(
+      visibilityEnv,
+      { visibility: 'public', team_id: TEAM_ID },
+      USER_A_TOKEN,
+    )
+
+    const withdrawEnv = await activeAdminSession()
+    const originalWithdrawBatch = withdrawEnv.DB.batch.bind(withdrawEnv.DB)
+    let withdrawRace = false
+    Object.assign(withdrawEnv.DB, {
+      batch: async (statements: Parameters<typeof originalWithdrawBatch>[0]) => {
+        if (!withdrawRace) {
+          withdrawRace = true
+          withdrawEnv.state.team_memberships = withdrawEnv.state.team_memberships.filter(
+            (row) => row.user_id !== 'user-a',
+          )
+        }
+        return originalWithdrawBatch(statements)
+      },
+    })
+    const withdrawn = await withdraw(withdrawEnv, USER_A_TOKEN)
+
+    expect(visibility.status).toBe(404)
+    expect(visibilityEnv.state.hub_sessions[0]?.visibility).toBe('private')
+    expect(visibilityEnv.state.hub_session_discovery).toHaveLength(0)
+    expect(withdrawn.status).toBe(404)
+    expect(withdrawEnv.state.hub_sessions[0]?.withdrawn_at).toBeNull()
+  })
+
+  it('reveals a withdrawn Team Session only to a current member', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'team', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+    env.state.hub_sessions[0]!.withdrawn_at = Date.now()
+
+    const anonymous = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    const outsider = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_C_TOKEN),
+      env,
+      { sid: SID },
+    )
+    const member = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    const outsiderManagement = await changeVisibility(
+      env,
+      { visibility: 'public', team_id: TEAM_ID },
+      USER_C_TOKEN,
+    )
+
+    expect(anonymous.status).toBe(401)
+    expect(outsider.status).toBe(404)
+    expect(member.status).toBe(410)
+    expect(outsiderManagement.status).toBe(404)
+  })
+
+  it('keeps Team lineage inside its readable audience', async () => {
+    const env = await teamEnv()
+    const sourceSid = 'codex_87654321-abcd-4321-abcd-1234567890ab'
+    const otherTeamId = `team_${'e'.repeat(32)}`
+    env.state.teams.push({ id: otherTeamId, name: 'Other Team', archived_at: null })
+    env.state.hub_sessions.push({
+      sid: sourceSid,
+      owner_user_id: 'user-c',
+      root: 'f'.repeat(64),
+      record_count: 1,
+      sig: null,
+      card_json: null,
+      note_md: null,
+      lineage_json: null,
+      view_oid: null,
+      spool_file_oid: null,
+      visibility: 'private',
+      team_id: otherTeamId,
+      withdrawn_at: null,
+      created_at: 1,
+      updated_at: 1,
+    })
+    const fixture = await makeFixture()
+    const lineageJson = JSON.stringify({
+      source: { sid: sourceSid, position: 1, url: `${BASE_URL}/session/${sourceSid}` },
+    })
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+
+    const crossTeam = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, lineageJson, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+    expect(crossTeam.status).toBe(200)
+    expect(env.state.hub_sessions.find((row) => row.sid === SID)?.lineage_json).toBeNull()
+
+    env.state.hub_sessions.find((row) => row.sid === sourceSid)!.team_id = TEAM_ID
+    const sameTeam = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, lineageJson, visibility: 'team', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+    expect(sameTeam.status).toBe(200)
+    expect(env.state.hub_sessions.find((row) => row.sid === SID)?.lineage_json).toBe(lineageJson)
+
+    // Defense in depth for rows written by an older release.
+    env.state.hub_sessions.find((row) => row.sid === sourceSid)!.team_id = otherTeamId
+    const metadata = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    await expect(metadata.json()).resolves.toMatchObject({ lineageJson: null })
   })
 })

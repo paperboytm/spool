@@ -3,35 +3,32 @@ pages_build_output_dir = "public"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
-# This file contains NO production resource IDs by design.
+# This is the local-development binding shape. Production and staging use the
+# committed wrangler.prod.toml and wrangler.staging.toml files respectively;
+# their resource ids are Cloudflare identifiers, not credentials. The
+# deploy-pages.mjs helper selects the exact environment config without
+# rewriting this file.
 #
-# For a Cloudflare Pages project, the runtime D1 / KV / R2 bindings
-# are configured per-project in the Cloudflare dashboard:
-#   Cloudflare → Workers & Pages → spool-share-backend → Settings →
-#   Functions → Bindings → add D1 / KV / R2 binding by name.
-#
-# Source of truth for production bindings is the dashboard, not this
-# file. Keep prod resource IDs out of the public repo — see
-# docs/runbooks/spool-share-launch.md §1 for the one-time setup.
+# Secret values remain external: configure them in Cloudflare and expose only
+# the API token/account id to CI through GitHub Actions secrets.
 #
 # What this file controls:
 #   - Binding names that `functions/` reads via `ctx.env.*`
 #   - Migrations directory for `wrangler d1 migrations apply`
 #   - Bucket names (R2 — resource labels, not secrets)
 #
-# Local dev: `wrangler pages dev` ignores any id field below — it
-# emulates each binding with a throwaway file under `.wrangler/state/`.
-# No CF account required.
+# Local dev: `wrangler pages dev` emulates these bindings under
+# `.wrangler/state/`. No Cloudflare account is required.
 
 [[d1_databases]]
 binding = "DB"
 database_name = "spool-share-db"
 migrations_dir = "migrations"
-# database_id deliberately omitted; configured in Pages dashboard.
+# database_id deliberately omitted; local emulation does not need one.
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-# id deliberately omitted; configured in Pages dashboard.
+# id deliberately omitted; local emulation does not need one.
 
 [[kv_namespaces]]
 binding = "META"
@@ -66,7 +63,7 @@ ENV = "development"
 # this lives here as documentation only — the deletion worker is a
 # companion Worker (functions/_scheduled/deletion-worker.ts) sharing the
 # same D1/KV/R2 bindings, and its cron is set in
-# workers/spool-share-deletion/wrangler.toml.
+# workers/spool-share-deletion/wrangler.prod.toml.
 
 # Secrets (set ONCE per environment via wrangler — never commit):
 #   wrangler pages secret put WORKOS_CLIENT_ID         --project-name spool-share-backend
@@ -75,6 +72,12 @@ ENV = "development"
 #        in the WorkOS dashboard)
 #   wrangler pages secret put WORKOS_API_KEY           --project-name spool-share-backend
 #       (doubles as the OAuth client_secret and the identities-API Bearer key)
+#   wrangler pages secret put WORKOS_WEBHOOK_SECRET    --project-name spool-share-backend
+#       (HMAC secret returned by the one-time WorkOS webhook bootstrap)
+#   wrangler pages secret put WORKOS_OPERATIONS_TOKEN  --project-name spool-share-backend
+#       (shared only with the deletion Worker; protects the outbox drain endpoint)
+#   wrangler pages secret put WORKOS_BOOTSTRAP_TOKEN   --project-name spool-share-backend
+#       (temporary; remove immediately after POST /api/internal/workos/bootstrap-webhook)
 #   wrangler pages secret put ADMIN_USER_IDS           --project-name spool-share-backend
 #       (comma-separated user ids allowed to hit /api/admin/*)
 #

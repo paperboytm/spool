@@ -27,11 +27,14 @@ describe('spool-share-deletion deploy shape', () => {
     expect(typeof shell.default?.scheduled).toBe('function')
   })
 
-  it('wrangler.toml declares exactly the bindings DeletionEnv needs', () => {
-    const toml = readFileSync(join(WORKER_DIR, 'wrangler.toml'), 'utf8')
-    const bindings = [...toml.matchAll(/^binding = "(\w+)"$/gm)].map((m) => m[1])
-    expect(new Set(bindings)).toEqual(new Set(DELETION_BINDING_NAMES))
-  })
+  it.each(['wrangler.toml', 'wrangler.prod.toml'])(
+    '%s declares exactly the bindings DeletionEnv needs',
+    (configName) => {
+      const toml = readFileSync(join(WORKER_DIR, configName), 'utf8')
+      const bindings = [...toml.matchAll(/^binding = "(\w+)"$/gm)].map((m) => m[1])
+      expect(new Set(bindings)).toEqual(new Set(DELETION_BINDING_NAMES))
+    },
+  )
 
   it('wrangler.toml keeps the cron and the entry path', () => {
     const toml = readFileSync(join(WORKER_DIR, 'wrangler.toml'), 'utf8')
@@ -43,6 +46,14 @@ describe('spool-share-deletion deploy shape', () => {
     expect(toml).toContain('bucket_name = "spool-snapshots"')
     expect(toml).toContain('bucket_name = "spool-og"')
     expect(toml).toContain('bucket_name = "spool-avatars"')
+    expect(toml).toContain('bucket_name = "spool-hub"')
+  })
+
+  it('the production config is deployable without local TODO values', () => {
+    const toml = readFileSync(join(WORKER_DIR, 'wrangler.prod.toml'), 'utf8')
+    expect(toml).not.toContain('TODO-fill-from-dashboard')
+    expect(toml).toContain('database_id = "fa7aa980-e646-4ebe-8c2f-bf5d5d30ab9d"')
+    expect(toml).toContain('id = "b5f5a1ad9f3e456cbdbdc7c7125c4dec"')
     expect(toml).toContain('bucket_name = "spool-hub"')
   })
 })

@@ -30,7 +30,7 @@ overrides:
   vitest: 'catalog:'
 
 minimumReleaseAgeExclude:
-  - '@cloudflare/workers-types@5.20260718.1'
+  - '@cloudflare/workers-types@5.20260718.1 || 5.20260722.1'
   - '@tanstack/react-start-rsc@0.1.29'
   - '@tanstack/react-start@1.168.30'
   - '@tanstack/router-generator@1.167.21'

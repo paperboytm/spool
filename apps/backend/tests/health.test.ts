@@ -7,7 +7,7 @@ import { onRequestGet as healthGet } from '../functions/api/health'
 // Live `wrangler pages dev` smoke is deferred to manual.
 async function runWithMiddleware(
   req: Request,
-  env: { BUILD_VERSION?: string } = {},
+  env: { BUILD_VERSION?: string; CF_PAGES_COMMIT_SHA?: string } = {},
 ): Promise<Response> {
   const ctx = {
     request: req,
@@ -42,5 +42,13 @@ describe('GET /api/health', () => {
     })
     const body = (await r.json()) as { version: string }
     expect(body.version).toBe('abc1234')
+  })
+
+  it('surfaces the Pages commit SHA when no explicit version is set', async () => {
+    const r = await runWithMiddleware(new Request('https://spool.new/api/health'), {
+      CF_PAGES_COMMIT_SHA: '717422e012345678901234567890123456789012',
+    })
+    const body = (await r.json()) as { version: string }
+    expect(body.version).toBe('717422e012345678901234567890123456789012')
   })
 })

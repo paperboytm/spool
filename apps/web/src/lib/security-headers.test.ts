@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test'
 
-import { securityHeadersFor } from './security-headers'
+import { cacheHeaderFor, securityHeadersFor } from './security-headers'
 
 describe('Explore security headers', () => {
   it('keeps public discovery indexable while applying the app CSP', () => {
@@ -12,5 +12,21 @@ describe('Explore security headers', () => {
     expect(headers?.['Content-Security-Policy']).toContain("form-action 'self'")
     expect(headers?.['Content-Security-Policy']).toContain('https://spool.new')
     expect(headers?.['Content-Security-Policy']).toContain('https://spool.pro')
+    expect(headers?.['Content-Security-Policy']).toContain('https://workoscdn.com')
+    expect(headers?.['Content-Security-Policy']).toContain('https://images.workoscdn.com')
+  })
+
+  it('treats Team workspaces as authenticated app routes', () => {
+    const headers = securityHeadersFor('/teams/team_123', 'nonce-1')
+
+    expect(headers?.['Content-Security-Policy']).toContain("form-action 'self'")
+    expect(headers?.['Content-Security-Policy']).toContain('https://images.workoscdn.com')
+    expect(headers?.['X-Robots-Tag']).toBe('noindex')
+    expect(cacheHeaderFor('/teams/team_123', 200)).toBe('private, no-store')
+  })
+
+  it('never shares a Session reader document through a public cache', () => {
+    expect(cacheHeaderFor('/session/codex_123', 200)).toBe('private, no-store')
+    expect(cacheHeaderFor('/s/legacy-link', 200)).toContain('public')
   })
 })

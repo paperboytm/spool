@@ -7,7 +7,7 @@ import {
 
 import { ApiError } from '../errors'
 import { readObjects } from '../hub/packs'
-import { locateObjects } from '../hub/store'
+import { locateObjects, locateTeamObjects } from '../hub/store'
 import { SID_RE } from '../hub/wire'
 
 const MAX_VIEW_BYTES = 8 * 1024 * 1024
@@ -39,8 +39,11 @@ export async function readDiscoveryView(
   bucket: R2Bucket,
   ownerUserId: string,
   viewOid: string,
+  teamId: string | null = null,
 ): Promise<SessionViewV1> {
-  const located = await locateObjects(db, ownerUserId, [viewOid])
+  const located = teamId
+    ? await locateTeamObjects(db, teamId, [viewOid])
+    : await locateObjects(db, ownerUserId, [viewOid])
   const location = located.get(viewOid)
   if (!location) throw new ApiError('INTERNAL', 'view object missing')
   if (location.length > MAX_VIEW_BYTES) {
@@ -150,12 +153,197 @@ export function prepareDiscoveryProjectionUpsert(
     )
 }
 
+export type AuthorizedProjectionGate = {
+  sid: string
+  actorUserId: string
+  teamId: string | null
+  root: string
+  updatedAt: number
+  visibility: 'unlisted' | 'private'
+  withdrawn: boolean
+  requireAuthor: boolean
+  requireTeamManager: boolean
+}
+
+const AUTHORIZED_SESSION_PROJECTION_GATE = `
+  EXISTS (
+    SELECT 1
+    FROM hub_sessions gated_session
+    WHERE gated_session.sid=?
+      AND gated_session.root=?
+      AND gated_session.updated_at=?
+      AND gated_session.visibility=?
+      AND (
+        (?=1 AND gated_session.withdrawn_at IS NOT NULL)
+        OR (?=0 AND gated_session.withdrawn_at IS NULL)
+      )
+      AND (?=0 OR gated_session.owner_user_id=?)
+      AND (
+        (? IS NULL AND gated_session.team_id IS NULL AND gated_session.owner_user_id=?)
+        OR
+        (gated_session.team_id=? AND EXISTS (
+          SELECT 1
+          FROM teams gated_team
+          JOIN team_memberships gated_member ON gated_member.team_id=gated_team.id
+          WHERE gated_team.id=? AND gated_team.archived_at IS NULL
+            AND gated_team.deletion_pending_until IS NULL
+            AND gated_member.user_id=?
+            AND (?=0 OR gated_member.role IN ('owner','admin'))
+        ))
+      )
+  )`
+
+function authorizedProjectionGateValues(gate: AuthorizedProjectionGate): unknown[] {
+  const withdrawn = gate.withdrawn ? 1 : 0
+  return [
+    gate.sid,
+    gate.root,
+    gate.updatedAt,
+    gate.visibility,
+    withdrawn,
+    withdrawn,
+    gate.requireAuthor ? 1 : 0,
+    gate.actorUserId,
+    gate.teamId,
+    gate.actorUserId,
+    gate.teamId,
+    gate.teamId,
+    gate.actorUserId,
+    gate.requireTeamManager ? 1 : 0,
+  ]
+}
+
+/** Projection writes share the same final authorization snapshot as their
+ * Hub mutation. If Team authority changed before the D1 batch, both the head
+ * write and this SELECT-gated upsert become no-ops. */
+export function prepareAuthorizedDiscoveryProjectionUpsert(
+  db: D1Database,
+  projection: DiscoveryProjection,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-upsert-projection */
+       INSERT INTO hub_session_discovery
+         (sid, agent, title, summary_text, search_text, message_count,
+          tool_call_count, file_count, additions, deletions,
+          lineage_source_sid, quality_score, published_at, updated_at)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+       WHERE ${AUTHORIZED_SESSION_PROJECTION_GATE}
+       ON CONFLICT(sid) DO UPDATE SET
+         agent=excluded.agent,
+         title=excluded.title,
+         summary_text=excluded.summary_text,
+         search_text=excluded.search_text,
+         message_count=excluded.message_count,
+         tool_call_count=excluded.tool_call_count,
+         file_count=excluded.file_count,
+         additions=excluded.additions,
+         deletions=excluded.deletions,
+         lineage_source_sid=excluded.lineage_source_sid,
+         quality_score=excluded.quality_score,
+         updated_at=excluded.updated_at`,
+    )
+    .bind(
+      projection.sid,
+      projection.agent,
+      projection.title,
+      projection.summaryText,
+      projection.searchText,
+      projection.messageCount,
+      projection.toolCallCount,
+      projection.fileCount,
+      projection.additions,
+      projection.deletions,
+      projection.lineageSourceSid,
+      projection.qualityScore,
+      projection.publishedAt,
+      projection.updatedAt,
+      ...authorizedProjectionGateValues(gate),
+    )
+}
+
+export function prepareAuthorizedDiscoveryProjectionDelete(
+  db: D1Database,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-delete-projection */
+       DELETE FROM hub_session_discovery
+       WHERE sid=? AND ${AUTHORIZED_SESSION_PROJECTION_GATE}`,
+    )
+    .bind(gate.sid, ...authorizedProjectionGateValues(gate))
+}
+
+export function prepareAuthorizedEngagementDelete(
+  db: D1Database,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-delete-engagement */
+       DELETE FROM hub_session_engagement_daily
+       WHERE sid=? AND ${AUTHORIZED_SESSION_PROJECTION_GATE}`,
+    )
+    .bind(gate.sid, ...authorizedProjectionGateValues(gate))
+}
+
 export async function isPublishedToDiscovery(db: D1Database, sid: string): Promise<boolean> {
   const row = await db
     .prepare('/* discovery:is-published */ SELECT 1 FROM hub_session_discovery WHERE sid = ?')
     .bind(sid)
     .first()
   return row !== null
+}
+
+/** Public lineage may point only at another currently Public Session. This
+ *  strips references to Team/Link-only sources before projection so a child
+ *  cannot become an existence oracle for its private source. */
+export async function filterPublicLineage(
+  db: D1Database,
+  lineageJson: string | null,
+): Promise<string | null> {
+  return filterLineageForAudience(db, lineageJson, null)
+}
+
+/** Preserve lineage only when the audience of the child Session may also
+ * read its source. Public/Link-only children may reference only Public
+ * sources; Team-only children may additionally reference a live source owned
+ * by the same Team. This is applied both on write and on read so older rows
+ * cannot disclose a private source id or URL after a visibility change. */
+export async function filterLineageForAudience(
+  db: D1Database,
+  lineageJson: string | null,
+  audienceTeamId: string | null,
+): Promise<string | null> {
+  if (!lineageJson) return null
+  let sourceSid: string | null = null
+  try {
+    const parsed = JSON.parse(lineageJson) as { source?: { sid?: unknown } }
+    sourceSid = typeof parsed.source?.sid === 'string' ? parsed.source.sid : null
+  } catch {
+    return null
+  }
+  if (!sourceSid || !SID_RE.test(sourceSid)) return null
+  const source = await db
+    .prepare(
+      '/* discovery:lineage-source-audience */ ' +
+        'SELECT s.team_id, s.visibility, s.withdrawn_at, ' +
+        'CASE WHEN d.sid IS NULL THEN 0 ELSE 1 END AS published ' +
+        'FROM hub_sessions s LEFT JOIN hub_session_discovery d ON d.sid=s.sid WHERE s.sid=?',
+    )
+    .bind(sourceSid)
+    .first<{
+      team_id: string | null
+      visibility: string
+      withdrawn_at: number | null
+      published: number
+    }>()
+  if (!source || source.withdrawn_at !== null) return null
+  const publicSource = source.visibility === 'unlisted' && source.published === 1
+  const sameTeamSource = audienceTeamId !== null && source.team_id === audienceTeamId
+  return publicSource || sameTeamSource ? lineageJson : null
 }
 
 function providerFromSid(sid: string): SessionProvider {

@@ -1,6 +1,6 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
-import { audit } from '../../../../src/audit'
+import { auditAfterCommit } from '../../../../src/audit-after-commit'
 import { requireUser } from '../../../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
 import { sha256Hex } from '../../../../src/hub/auth'
@@ -28,7 +28,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
 
     const { id, token } = await mintApiToken(ctx.env.DB, user.id, label)
 
-    await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
+    auditAfterCommit(ctx, {
       user_id: user.id,
       action: 'hub-token-create',
       target_id: id,
@@ -62,7 +62,7 @@ export const onRequestDelete: PagesFunction<HubEnv> = async (ctx) => {
 
     await ctx.env.DB.prepare('DELETE FROM api_tokens WHERE token_hash=?').bind(hash).run()
 
-    await audit(ctx.env.DB, ctx.env.RATE, ctx.request, {
+    auditAfterCommit(ctx, {
       user_id: row.user_id,
       action: 'hub-token-revoke',
       target_id: row.id,

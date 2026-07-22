@@ -9,6 +9,7 @@ import { ApiError } from '../errors'
 
 export const OID_RE = /^[0-9a-f]{64}$/
 export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
+export const TEAM_ID_RE = /^[0-9A-Za-z_-]{8,128}$/
 
 export const MAX_MANIFEST = 100_000
 export const MAX_SUMMARY_BYTES = 64 * 1024
@@ -19,6 +20,7 @@ export const MAX_BATCH_LINES = 4000
 export const MAX_RECORDS_PER_READ = 500
 export const MAX_READ_BYTES = 8 * 1024 * 1024
 export const USER_QUOTA_BYTES = 1024 * 1024 * 1024
+export const TEAM_QUOTA_BYTES = 5 * 1024 * 1024 * 1024
 
 const boundedText = (maxBytes: number) =>
   z.string().refine((value) => new TextEncoder().encode(value).byteLength <= maxBytes, {
@@ -42,6 +44,14 @@ export const HeadBody = z
     // Optional curated .spool document (content-addressed, rides through
     // objects/batch like the view). Default keeps older clients valid.
     spoolFileOid: z.string().regex(OID_RE).nullable().default(null),
+    // Optional in the rolling protocol. Older clients omit both fields and
+    // keep the current tenant/access state (or use the provider default for
+    // a new Session). Team visibility is never inferred from a UI switcher.
+    visibility: z.enum(['public', 'link-only', 'team']).optional(),
+    teamId: z.string().regex(TEAM_ID_RE).nullable().optional(),
+    // Optional optimistic tenant precondition. Explicit null means the caller
+    // observed a personal/new Session; omission keeps older clients working.
+    expectedTeamId: z.string().regex(TEAM_ID_RE).nullable().optional(),
   })
   .superRefine((body, context) => {
     if (body.summaryMd === undefined && body.noteMd === undefined) {

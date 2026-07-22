@@ -1,0 +1,219 @@
+import { spawn } from 'node:child_process'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const appDir = dirname(dirname(fileURLToPath(import.meta.url)))
+const migrationsDir = join(appDir, 'migrations')
+const migrationNames = (await readdir(migrationsDir, { withFileTypes: true }))
+  .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
+  .map((entry) => entry.name)
+  .sort()
+
+if (migrationNames.length === 0) {
+  throw new Error(`No SQL migrations found in ${migrationsDir}`)
+}
+
+const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+
+function runWrangler(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(pnpm, ['exec', 'wrangler', ...args], {
+      cwd: appDir,
+      env: { ...process.env, NO_COLOR: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+    })
+
+    child.once('error', reject)
+    child.once('close', (code) => {
+      if (code === 0) {
+        resolve({ stderr, stdout })
+        return
+      }
+
+      reject(
+        new Error(`wrangler ${args.join(' ')} failed with exit code ${code}\n${stdout}${stderr}`),
+      )
+    })
+  })
+}
+
+async function executeJson(stateDir, command) {
+  const { stdout } = await runWrangler([
+    'd1',
+    'execute',
+    'spool-share-db',
+    '--local',
+    '--persist-to',
+    stateDir,
+    '--config',
+    'wrangler.toml',
+    '--command',
+    command,
+    '--json',
+  ])
+  const payload = JSON.parse(stdout)
+  if (!Array.isArray(payload)) {
+    throw new TypeError('Wrangler returned an unexpected D1 JSON payload')
+  }
+  return payload.flatMap((execution) => execution.results ?? [])
+}
+
+async function expectD1Failure(stateDir, command, expectedMessage) {
+  try {
+    await executeJson(stateDir, command)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message.includes(expectedMessage)) {
+      throw new Error(`Expected D1 failure containing ${expectedMessage}, received:\n${message}`)
+    }
+    return
+  }
+  throw new Error(`Expected D1 command to fail: ${command}`)
+}
+
+const stateDir = await mkdtemp(join(tmpdir(), 'spool-d1-schema-smoke-'))
+
+try {
+  await runWrangler([
+    'd1',
+    'migrations',
+    'apply',
+    'spool-share-db',
+    '--local',
+    '--persist-to',
+    stateDir,
+    '--config',
+    'wrangler.toml',
+  ])
+
+  const migrationRows = await executeJson(stateDir, 'SELECT name FROM d1_migrations ORDER BY id;')
+  const appliedNames = migrationRows.map((row) => row.name)
+  if (JSON.stringify(appliedNames) !== JSON.stringify(migrationNames)) {
+    throw new Error(
+      `Applied migration ledger does not match disk.\nExpected: ${migrationNames.join(', ')}\nActual: ${appliedNames.join(', ')}`,
+    )
+  }
+
+  const foreignKeyViolations = await executeJson(stateDir, 'PRAGMA foreign_key_check;')
+  if (foreignKeyViolations.length !== 0) {
+    throw new Error(
+      `PRAGMA foreign_key_check found violations:\n${JSON.stringify(foreignKeyViolations, null, 2)}`,
+    )
+  }
+
+  const membershipColumns = await executeJson(stateDir, 'PRAGMA table_info(team_memberships);')
+  if (!membershipColumns.some((column) => column.name === 'workos_updated_at')) {
+    throw new Error('team_memberships.workos_updated_at was not migrated')
+  }
+  const durabilityTables = await executeJson(
+    stateDir,
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('workos_webhook_events','workos_cleanup_outbox','workos_membership_denials','workos_user_denials','team_creation_requests','team_invitation_requests') ORDER BY name;",
+  )
+  if (durabilityTables.length !== 6) {
+    throw new Error(`Missing WorkOS durability tables: ${JSON.stringify(durabilityTables)}`)
+  }
+  await executeJson(
+    stateDir,
+    `INSERT INTO users (id,email,created_at,last_signin_at)
+       VALUES ('durable-user','durable@example.test',1,1);
+     INSERT INTO teams (id,workos_organization_id,name,created_by_user_id,created_at,updated_at)
+       VALUES ('team_durable','org_durable','Durable','durable-user',1,1);
+     INSERT INTO team_memberships
+       (team_id,user_id,role,workos_membership_id,workos_updated_at,joined_at,updated_at)
+       VALUES ('team_durable','durable-user','owner','om_durable',1,1,1);
+     INSERT INTO workos_webhook_events
+       (event_id,event_type,event_created_at,received_at,processed_at)
+       VALUES ('event_durable','organization_membership.updated',1,1,1);
+     INSERT INTO workos_cleanup_outbox
+       (id,operation,resource_id,team_id,user_id,next_attempt_at,created_at,updated_at)
+       VALUES ('woc_durable','membership.delete','om_durable','team_durable','durable-user',1,1,1);
+     INSERT INTO team_creation_requests
+       (user_id,idempotency_key,team_id,normalized_name,status,workos_organization_id,created_at,updated_at)
+       VALUES ('durable-user','create_durable_0001','team_durable','Durable','completed','org_durable',1,1);
+     INSERT INTO team_invitation_requests
+       (team_id,invited_by_user_id,idempotency_key,invitation_id,normalized_email,desired_role,status,workos_invitation_id,created_at,updated_at)
+       VALUES ('team_durable','durable-user','invite_durable_0001','tinv_durable','invitee@example.test','member','completed','inv_durable',1,1);
+     INSERT INTO workos_membership_denials
+       (organization_id,membership_id,workos_user_id,reason,workos_updated_at,team_id,user_id,previous_role,denied_at,event_id)
+       VALUES ('org_denied','om_denied','workos_denied','inactive',1,NULL,NULL,NULL,1,'event_denied');
+     INSERT INTO workos_user_denials (workos_user_id,denied_at,event_id)
+       VALUES ('workos_deleted',1,'event_user_deleted');`,
+  )
+
+  const quota = 5 * 1024 * 1024 * 1024
+  await executeJson(
+    stateDir,
+    `INSERT INTO users (id,email,created_at,last_signin_at) VALUES ('quota-user','quota@example.test',1,1);
+     INSERT INTO teams (id,workos_organization_id,name,created_by_user_id,created_at,updated_at)
+       VALUES ('team_quota_a','org_quota_a','Quota A','quota-user',1,1),
+              ('team_quota_b','org_quota_b','Quota B','quota-user',1,1);
+     INSERT INTO hub_team_objects (team_id,oid,size,pack_key,offset,length,created_at)
+       VALUES ('team_quota_a','a-main',${quota - 10},'pack-a',0,${quota - 10},1),
+              ('team_quota_a','a-tail',10,'pack-a',${quota - 10},10,1),
+              ('team_quota_b','b-full',${quota},'pack-b',0,${quota},1);`,
+  )
+
+  // Idempotent aliases at the cap must not double count an existing oid.
+  await executeJson(
+    stateDir,
+    `INSERT OR IGNORE INTO hub_team_objects (team_id,oid,size,pack_key,offset,length,created_at)
+       VALUES ('team_quota_a','a-tail',10,'pack-a',${quota - 10},10,1);`,
+  )
+  await expectD1Failure(
+    stateDir,
+    `INSERT INTO hub_team_objects (team_id,oid,size,pack_key,offset,length,created_at)
+       VALUES ('team_quota_a','a-over',1,'pack-over',0,1,1);`,
+    'team storage quota exceeded',
+  )
+
+  // Same-Team updates exclude only OLD itself; a growth beyond the cap fails.
+  await executeJson(
+    stateDir,
+    "UPDATE hub_team_objects SET size=10 WHERE team_id='team_quota_a' AND oid='a-tail';",
+  )
+  await expectD1Failure(
+    stateDir,
+    "UPDATE hub_team_objects SET size=11 WHERE team_id='team_quota_a' AND oid='a-tail';",
+    'team storage quota exceeded',
+  )
+
+  // A cross-Team move counts every existing target row. It fails while B is
+  // full, then succeeds exactly at the boundary after ten bytes are freed.
+  await expectD1Failure(
+    stateDir,
+    "UPDATE hub_team_objects SET team_id='team_quota_b' WHERE team_id='team_quota_a' AND oid='a-tail';",
+    'team storage quota exceeded',
+  )
+  await executeJson(
+    stateDir,
+    `UPDATE hub_team_objects SET size=${quota - 10} WHERE team_id='team_quota_b' AND oid='b-full';
+     UPDATE hub_team_objects SET team_id='team_quota_b' WHERE team_id='team_quota_a' AND oid='a-tail';`,
+  )
+  const quotaTotals = await executeJson(
+    stateDir,
+    'SELECT team_id, SUM(size) AS total FROM hub_team_objects GROUP BY team_id ORDER BY team_id;',
+  )
+  const teamB = quotaTotals.find((row) => row.team_id === 'team_quota_b')
+  if (teamB?.total !== quota) {
+    throw new Error(`Cross-Team quota trigger produced unexpected total: ${JSON.stringify(teamB)}`)
+  }
+
+  console.log(
+    `D1 schema smoke passed: ${migrationNames.length} migrations applied; foreign keys and Team quota triggers valid.`,
+  )
+} finally {
+  await rm(stateDir, { force: true, recursive: true })
+}

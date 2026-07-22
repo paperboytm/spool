@@ -15,6 +15,7 @@ const NOW = Date.parse('2026-07-19T12:00:00.000Z')
 const DAY_MS = 24 * 60 * 60 * 1000
 const CLAUDE_SID = 'claude_11111111-2222-4333-8444-555555555555'
 const CODEX_SID = 'codex_aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+const TEAM_ID = 'team_discovery_0001'
 
 function makeEnv() {
   const { db, state } = makeDb(emptyState())
@@ -55,6 +56,7 @@ function seedDiscovery(
     quality?: number
     visibility?: string
     withdrawnAt?: number | null
+    teamId?: string | null
   },
 ): void {
   const owner = options.owner ?? 'user-1'
@@ -73,6 +75,7 @@ function seedDiscovery(
     view_oid: 'b'.repeat(64),
     spool_file_oid: null,
     visibility: options.visibility ?? 'unlisted',
+    team_id: options.teamId ?? null,
     withdrawn_at: options.withdrawnAt ?? null,
     created_at: publishedAt,
     updated_at: publishedAt,
@@ -228,9 +231,7 @@ describe('GET /api/discovery/v1/sessions', () => {
     }
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('cache-control')).toBe(
-      'public, max-age=30, stale-while-revalidate=30',
-    )
+    expect(response.headers.get('cache-control')).toBe('no-store')
     expect(body.version).toBe(1)
     expect(body.items).toEqual([
       expect.objectContaining({
@@ -254,6 +255,93 @@ describe('GET /api/discovery/v1/sessions', () => {
       items: Array<{ author: { avatarUrl: string | null } }>
     }
     expect(hiddenAvatarBody.items[0]?.author.avatarUrl).toBeNull()
+  })
+
+  it('keeps Team-owned Public content after author deletion but removes identity fields', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'deleted-team-author', {
+      deleted_at: NOW,
+      display_name: 'Former Author',
+      custom_avatar_id: 'old-avatar',
+    })
+    env.state.teams.push({
+      id: TEAM_ID,
+      workos_organization_id: 'org_discovery',
+      name: 'Discovery Team',
+      deletion_pending_until: null,
+      archived_at: null,
+    })
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      owner: 'deleted-team-author',
+      title: 'Team knowledge survives',
+      teamId: TEAM_ID,
+    })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+      env,
+    )
+    const body = (await response.json()) as {
+      items: Array<{
+        sid: string
+        author: { handle: string | null; displayName: string | null; avatarUrl: string | null }
+      }>
+    }
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        sid: CLAUDE_SID,
+        author: { handle: null, displayName: null, avatarUrl: null },
+      }),
+    ])
+
+    env.state.teams[0]!.archived_at = NOW
+    const archived = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+      env,
+    )
+    await expect(archived.json()).resolves.toMatchObject({ items: [] })
+  })
+
+  it('hides stale lineage as soon as its source is no longer currently Public', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, { sid: CLAUDE_SID, title: 'Source' })
+    seedDiscovery(env.state, { sid: CODEX_SID, title: 'Child', publishedAt: NOW + 1 })
+    env.state.hub_session_discovery.find((row) => row.sid === CODEX_SID)!.lineage_source_sid =
+      CLAUDE_SID
+
+    const list = async () => {
+      const response = await invoke(
+        sessionsGet,
+        new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+        env,
+      )
+      return (await response.json()) as {
+        items: Array<{ sid: string; lineage: { sourceSid: string } | null }>
+      }
+    }
+
+    expect((await list()).items.find((item) => item.sid === CODEX_SID)?.lineage).toEqual({
+      sourceSid: CLAUDE_SID,
+    })
+
+    // Deliberately leave the stale source projection behind: the read path
+    // must use the current Session disclosure rather than cached lineage.
+    env.state.hub_sessions.find((row) => row.sid === CLAUDE_SID)!.visibility = 'private'
+    expect((await list()).items.find((item) => item.sid === CODEX_SID)?.lineage).toBeNull()
+
+    env.state.hub_sessions.find((row) => row.sid === CLAUDE_SID)!.visibility = 'unlisted'
+    env.state.hub_sessions.find((row) => row.sid === CLAUDE_SID)!.withdrawn_at = NOW
+    expect((await list()).items.find((item) => item.sid === CODEX_SID)?.lineage).toBeNull()
+
+    env.state.hub_sessions.find((row) => row.sid === CLAUDE_SID)!.withdrawn_at = null
+    env.state.hub_session_discovery = env.state.hub_session_discovery.filter(
+      (row) => row.sid !== CLAUDE_SID,
+    )
+    expect((await list()).items.find((item) => item.sid === CODEX_SID)?.lineage).toBeNull()
   })
 
   it('uses v1 ranking and keeps exact title search ahead of popularity', async () => {
