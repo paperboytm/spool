@@ -932,7 +932,108 @@ section.sect:last-of-type {
   font-family: 'Geist Variable', 'Geist', sans-serif;
 }
 .home-page .final {
-  padding-bottom: 64px;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100svh;
+  padding: 96px 0;
+  align-items: center;
+  box-sizing: border-box;
+}
+.home-page .final-content {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  min-height: calc(100svh - 192px);
+  gap: 48px;
+}
+.home-page .session-tape {
+  position: absolute;
+  z-index: 0;
+  inset-block: 0;
+  left: 50%;
+  width: 100vw;
+  height: 100%;
+  margin: 0;
+  overflow: clip;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      ellipse at 62% 58%,
+      color-mix(in srgb, var(--accent) 5%, transparent),
+      transparent 52%
+    ),
+    var(--surface);
+  border-block: 1px solid var(--border);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.home-page .session-tape__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+.home-page .session-tape.is-ready .session-tape__canvas {
+  opacity: 1;
+}
+.home-page .session-tape__fallback {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: min(560px, calc(100vw - 48px));
+  height: 208px;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--border2) 32%, transparent);
+  transform: translate(-50%, -50%) rotate(-4deg);
+  transition: opacity 160ms ease;
+}
+.home-page .session-tape.is-ready .session-tape__fallback {
+  opacity: 0;
+}
+.home-page .session-tape__fallback pre {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.18;
+  color: var(--muted);
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.home-page .session-tape__vignette {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface) 72%, transparent),
+      color-mix(in srgb, var(--surface) 36%, transparent) 40%,
+      transparent 68%,
+      color-mix(in srgb, var(--surface) 56%, transparent)
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--surface) 76%, transparent),
+      transparent 24%,
+      transparent 76%,
+      color-mix(in srgb, var(--surface) 64%, transparent)
+    );
 }
 .final .row {
   margin-top: 40px;
@@ -940,6 +1041,46 @@ section.sect:last-of-type {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+}
+.home-page .final .row {
+  margin-top: 0;
+}
+@media (max-width: 700px) {
+  .home-page .final {
+    min-height: 100svh;
+    padding-block: 48px;
+  }
+  .home-page .final-content {
+    min-height: calc(100svh - 96px);
+    gap: 24px;
+  }
+  .home-page .session-tape__fallback {
+    width: calc(100vw - 40px);
+    height: 176px;
+    transform: translate(-50%, -50%) rotate(-3deg);
+  }
+  .home-page .session-tape__vignette {
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--surface) 68%, transparent),
+        color-mix(in srgb, var(--surface) 28%, transparent) 72%,
+        color-mix(in srgb, var(--surface) 52%, transparent)
+      ),
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--surface) 72%, transparent),
+        transparent 20%,
+        transparent 80%,
+        color-mix(in srgb, var(--surface) 64%, transparent)
+      );
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-page .session-tape__canvas,
+  .home-page .session-tape__fallback {
+    transition: none;
+  }
 }
 /* Still used by the daemon page's closing `.sect.final` section. */
 .final .plat {
