@@ -56,6 +56,9 @@ describe('Web shared UI contract', () => {
     const desktopCss = css.split('@media (max-width: 768px)')[0] ?? ''
 
     expect(desktopCss).toMatch(
+      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*48px;[^}]*\}/,
+    )
+    expect(desktopCss).toMatch(
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
     )
   })
