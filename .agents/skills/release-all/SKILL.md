@@ -1,6 +1,6 @@
 ---
 name: release-all
-description: Publish the complete Spool release train: synchronized versions, desktop artifacts, npm packages, and the production web deployment.
+description: Publish the complete Spool CLI release train: synchronized versions, npm packages, the GitHub release, and the matching production web deployment.
 disable-model-invocation: true
 argument-hint: "[patch|minor]"
 ---
@@ -19,7 +19,7 @@ From the repository root, read the three source-of-truth files above. Interpret 
 - `minor` → minor release
 - any other value → stop and state the supported values
 
-Derive the current version, next version, tag, manifests changed by the release script, npm publish targets, expected release assets, and required repository secrets. Do not maintain a second hard-coded target list in this skill.
+Derive the current version, next version, tag, manifests changed by the release script, npm publish targets, GitHub release metadata, and required repository secrets. Do not maintain a second hard-coded target list in this skill.
 
 This step is complete when every derived target has a concrete verification check for the next version.
 
@@ -62,19 +62,20 @@ Record the predicted version and tag, then run exactly one command:
 ./scripts/release.sh --minor
 ```
 
-Use a timeout long enough for GitHub Actions to build, sign, notarize, publish, and return. After it exits, record the release commit from `git rev-parse HEAD`.
+Use a timeout long enough for GitHub Actions to verify and publish the npm packages, create the GitHub release, deploy production web, and return. After it exits, record the release commit from `git rev-parse HEAD`.
 
 If any command fails after launch begins, continue the same version through [RECOVERY.md](RECOVERY.md). `release.sh` runs once per release attempt because another invocation would bump a second version.
 
 This step is complete when the exact-tag Release workflow concludes successfully.
 
-## 4. Wait for production web
+## 4. Verify the workflow-owned production deploy
 
-The release commit's push to `main` starts Deploy Web independently. Poll for the run whose `headSha` equals the recorded release commit, then watch it:
+The Release workflow dispatches production web only after npm publication succeeds, then waits for that deployment. Locate the `workflow_dispatch` run whose `headSha` equals the recorded release commit and confirm it succeeded:
 
 ```bash
 gh run list --workflow=deploy-web.yml --commit "$RELEASE_COMMIT" \
-  --limit 1 --json databaseId,headSha,status,conclusion,url
+  --event workflow_dispatch --limit 1 \
+  --json databaseId,headSha,status,conclusion,url
 gh run watch "$WEB_RUN_ID" --exit-status
 ```
 
@@ -87,7 +88,7 @@ Verify against the target map from step 1:
 1. Every manifest changed by `release.sh` contains the new version.
 2. `origin/main` contains the release commit and the remote tag resolves to it.
 3. The exact-tag Release workflow succeeded.
-4. The GitHub release exists and contains every artifact class uploaded by the workflow.
+4. The GitHub release exists at the new CLI version and its install command uses `https://spool.new/install.sh`.
 5. Every npm publish target resolves at the new version with `npm view <name>@<version> version`. Retry registry reads for up to two minutes.
 6. Deploy Web succeeded for the release commit.
 

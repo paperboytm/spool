@@ -2,11 +2,9 @@
 set -euo pipefail
 
 # Bumps version, tags, pushes, and dispatches the CI Release workflow.
-# Build + sign + notarize + artifact upload run in GitHub Actions using the
-# Developer ID Application cert and app-specific password stored as repo
-# secrets (CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
-# APPLE_TEAM_ID). The workflow also publishes @spool-lab/core and
-# @spool-lab/cli to npm using NODE_AUTH_TOKEN (granular token,
+# The GitHub Actions workflow publishes @spool-lab/core and @spool-lab/cli to
+# npm, creates the GitHub release, then deploys the matching production web.
+# npm authentication uses NODE_AUTH_TOKEN (granular token,
 # scope=@spool-lab, read+write, "Bypass 2FA" enabled). @spool-lab/redact
 # is published only when its version on disk differs from the registry,
 # and is bumped here in lockstep with the rest so versions stay aligned.
@@ -60,7 +58,7 @@ NEW_VERSION="$major.$minor.$patch"
 TAG="v$NEW_VERSION"
 green "Bumping to $NEW_VERSION"
 
-for f in package.json apps/app/package.json packages/core/package.json apps/cli/package.json apps/web/package.json packages/redact/package.json packages/session-kit/package.json; do
+for f in package.json packages/core/package.json apps/cli/package.json apps/web/package.json packages/redact/package.json packages/session-kit/package.json; do
   if [[ -f "$f" ]]; then
     jq --arg v "$NEW_VERSION" '.version = $v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   fi
@@ -76,8 +74,8 @@ green "Dispatching Release workflow on $TAG..."
 gh workflow run release.yml --ref "$TAG"
 
 # `gh workflow run` is fire-and-forget — poll for the run it just queued so we
-# can hand it to `gh run watch` and block until CI finishes. Without this the
-# script would return before artifacts exist, defeating the point of waiting.
+# can hand it to `gh run watch` and block until npm, the GitHub release, and
+# the matching production web deployment are complete.
 dim "Waiting for workflow run to appear..."
 RUN_ID=""
 for _ in $(seq 1 30); do
@@ -95,4 +93,4 @@ fi
 green "Watching run $RUN_ID..."
 gh run watch "$RUN_ID" --exit-status
 
-green "Done: https://github.com/spool-lab/spool/releases/tag/$TAG"
+green "Released and deployed: https://github.com/spool-lab/spool/releases/tag/$TAG"

@@ -427,6 +427,7 @@ section.sect:last-of-type {
 
 .hh-install {
   max-width: 100%;
+  font-size: var(--sp-text-command);
 }
 .hh-install code {
   overflow: hidden;
@@ -444,6 +445,10 @@ section.sect:last-of-type {
 .hh-install .copy {
   color: var(--faint);
   display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-space-1);
+  font-size: 11px;
   transition: color 120ms;
 }
 .hh-install:hover .copy {
@@ -451,6 +456,9 @@ section.sect:last-of-type {
 }
 .hh-install.is-copied .copy {
   color: var(--accent);
+}
+.hh-install.is-copy-failed .copy {
+  color: var(--error);
 }
 
 .hh-bd {
@@ -1379,7 +1387,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   color: var(--muted);
 }
 
-/* ────── Flow show v3: streamed session → spool share + option → particle
+/* ────── Flow show v3: streamed session → spool + option → particle
    into the Spool knowledge server → URL → machine B wakes, types resume →
    particle into B and the chat streams on. One 18s pure-CSS timeline;
    base styles are the completed state for reduced motion. ────── */
@@ -1488,7 +1496,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
 .fs-cmd {
   margin-top: auto;
   font-family: 'Geist Mono', monospace;
-  font-size: 11px;
+  font-size: 13px;
   color: #ffffff;
   background: #090909;
   border: 1px solid #2e2e2e;
@@ -1521,7 +1529,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   white-space: nowrap;
 }
 .fs-type-a {
-  max-width: 11ch;
+  max-width: 5ch;
 }
 .fs-type-b {
   max-width: 28ch;
@@ -1639,7 +1647,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
     animation-name: fsA3;
   }
   .fs-type-a {
-    animation: fsTypeA 18s steps(11, end) infinite;
+    animation: fsTypeA 18s steps(5, end) infinite;
   }
   .fs-caret-a {
     animation: fsCaretA 18s linear infinite;
@@ -1746,7 +1754,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
     opacity: 0;
   }
 }
-/* 2 · spool share is typed, option confirmed */
+/* 2 · spool is typed, option confirmed */
 @keyframes fsTypeA {
   0%,
   12% {
@@ -1754,7 +1762,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   }
   18%,
   100% {
-    max-width: 11ch;
+    max-width: 5ch;
   }
 }
 @keyframes fsCaretA {

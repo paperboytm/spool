@@ -27,8 +27,8 @@ Claude Code and Codex profile directories are also detected:
 Use the CLI to index supported source locations explicitly or keep them up to date with watch mode:
 
 ```bash
-npx @spool-lab/cli sync
-npx @spool-lab/cli sync --watch
+spool sync
+spool sync --watch
 ```
 
 Ingestion does not publish a Session. It makes the Session available for review, organization, search, and an explicit Share action.

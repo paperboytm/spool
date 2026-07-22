@@ -11,6 +11,7 @@ describe('shared UI CSS contract', () => {
   it('owns the canonical compact type and control dimensions', () => {
     expect(tokens).toContain('--sp-text-ui: 13px')
     expect(tokens).toContain('--sp-text-button: 12px')
+    expect(tokens).toContain('--sp-text-command: 14px')
     expect(tokens).toContain('--sp-text-meta: 11px')
     expect(tokens).toContain('--sp-text-label: 10px')
     expect(tokens).toContain('--sp-text-session-title: 15px')

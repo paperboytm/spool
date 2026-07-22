@@ -146,7 +146,7 @@ describe('spool show against the hub', () => {
     expect(out).toContain('@xy · 4 records')
     expect(out).toContain('Why I shared this')
     expect(out).toContain('src/a.ts')
-    expect(out).toContain(`npx @spool-lab/cli resume ${SID}`)
+    expect(out).toContain(`spool resume ${SID}`)
   })
 
   it('--log prints the record timeline from the view', async () => {

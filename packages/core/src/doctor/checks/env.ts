@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { SPOOL_DIR } from '../../db/db.js'
 import type { Check, CheckResult } from '../types.js'
 
-const MIN_NODE_MAJOR = 20
+const MIN_NODE_VERSION = [22, 19, 0] as const
 const MIN_FREE_BYTES = 1 * 1024 * 1024 * 1024 // 1 GB
 
 export const envChecks: Check[] = [
@@ -14,8 +14,8 @@ export const envChecks: Check[] = [
     title: 'Node.js version',
     run: (): CheckResult => {
       const v = process.versions.node
-      const major = Number(v.split('.')[0])
-      if (Number.isNaN(major)) {
+      const parts = v.split('.').map(Number)
+      if (parts.length < 3 || parts.some(Number.isNaN)) {
         return mk(
           'env.node-version',
           'Node.js version',
@@ -24,13 +24,13 @@ export const envChecks: Check[] = [
           { version: v },
         )
       }
-      if (major < MIN_NODE_MAJOR) {
+      if (compareVersion(parts, MIN_NODE_VERSION) < 0) {
         return mk(
           'env.node-version',
           'Node.js version',
           'error',
-          `Node ${v} is below the minimum supported (≥${MIN_NODE_MAJOR})`,
-          { version: v, minMajor: MIN_NODE_MAJOR },
+          `Node ${v} is below the minimum supported (≥${MIN_NODE_VERSION.join('.')})`,
+          { version: v, minVersion: MIN_NODE_VERSION.join('.') },
         )
       }
       return mk('env.node-version', 'Node.js version', 'ok', v, { version: v })
@@ -90,6 +90,14 @@ export const envChecks: Check[] = [
     },
   },
 ]
+
+function compareVersion(actual: number[], minimum: readonly number[]): number {
+  for (let index = 0; index < minimum.length; index++) {
+    const difference = (actual[index] ?? 0) - (minimum[index] ?? 0)
+    if (difference !== 0) return difference
+  }
+  return 0
+}
 
 function mk(
   id: string,

@@ -355,7 +355,7 @@ describe('withdraw command handler', () => {
   })
 
   it.each([
-    [401, 'Authentication failed. Run `npx @spool-lab/cli login` to update your hub token.'],
+    [401, 'Authentication failed. Run `spool login` to update your hub token.'],
     [404, `Session not found: ${SID}`],
     [410, `Session already withdrawn: ${SID}`],
   ])('prints a friendly HTTP %s error', async (status, expected) => {

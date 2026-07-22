@@ -2,6 +2,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import {
+  formatCliInstallHint,
   formatCliCommand,
   getDB,
   getSessionWithMessages,
@@ -100,6 +101,7 @@ export async function handleShareCommand(
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
       ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
+      ui.info(formatCliInstallHint())
       return 1
     }
 
@@ -308,6 +310,7 @@ export async function handleShareCommand(
       ui.error(
         `Authentication failed. Run \`${formatCliCommand('login')}\` to update your hub token.`,
       )
+      ui.info(formatCliInstallHint())
     } else {
       ui.error(cause instanceof Error ? cause.message : String(cause))
     }
@@ -350,7 +353,7 @@ export const shareCommand = new Command('share')
   )
   .option(
     '-s, --summary <markdown>',
-    'Provide Summary Markdown directly (advanced; local Agent generation is recommended)',
+    'Upload exactly this Markdown; does not generate a Summary (advanced)',
   )
   .option('--no-agent-summary', 'Do not offer to generate a Summary with a local Agent')
   .option('--visibility-confirmed', 'Acknowledge visibility when running without a TTY')

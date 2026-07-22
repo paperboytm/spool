@@ -32,7 +32,7 @@ function DocsPage() {
   const page = Route.useLoaderData()
   return (
     <DocsLayout currentPath={page.path} frontmatter={page.frontmatter}>
-      <Markdown>{page.body}</Markdown>
+      <Markdown copyCode>{page.body}</Markdown>
     </DocsLayout>
   )
 }

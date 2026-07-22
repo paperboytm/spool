@@ -5,7 +5,7 @@
 - **What this is:** The publishing platform for agent sessions, starting with coding agents. Spool turns agent work into readable, discoverable, and resumable artifacts.
 - **Who it is for:** Authors who want to show how they work with agents; readers looking for real workflows and reasoning; and people who want to continue useful work in their own agent.
 - **Space/industry:** Developer knowledge sharing / agent-native publishing. Peers provide pieces of the experience—GitHub for code, YouTube for learning, Gists for sharing—but none treat an agent Session as a first-class public artifact that can be resumed.
-- **Product surfaces:** The public web is the publishing, Profile, Discovery, and reading surface. The desktop app is the local preparation and management surface. The CLI is the agent- and automation-friendly interface.
+- **Product surfaces:** The public web is the publishing, Profile, Discovery, and reading surface. The installed CLI is the local preparation, management, agent, and automation interface. The legacy Electron app is not distributed.
 - **Core positioning:** "See how people actually work with agents." Public Sessions and their authors are the center of the web experience; local organization and search support the act of publishing.
 - **Publishing boundary:** Share is the explicit disclosure action. Claude Code and Codex CLI Shares are Public and eligible for Discovery by default; providers not yet supported by Explore remain Link-only. The confirmation must state the resulting visibility before upload.
 - **Workspace boundary:** A Team is an explicit tenant, backed by one WorkOS Organization and one Spool authorization projection. Team-owned Sessions survive an individual member leaving or deleting their account. Personal and Team storage, authorization, quotas, and audit records must never be inferred from navigation state alone.
@@ -24,7 +24,7 @@
 1. **Discovery** helps a visitor find a Session worth opening.
 2. **Session pages** help a reader understand and continue the work.
 3. **Profiles** establish authorship and collect a person’s Public Sessions.
-4. **Desktop and CLI** help an author prepare, share, publish, and manage Sessions.
+4. **CLI** helps an author prepare, share, publish, and manage Sessions.
 5. **Teams** let members keep shared work inside a named workspace before deciding whether the Team should publish it more broadly.
 
 The public web must show the artifact before explaining the product. Real Sessions, authors, topics, and evidence carry more weight than feature illustrations.
@@ -41,7 +41,9 @@ The public web must show the artifact before explaining the product. Real Sessio
 - **Alignment:** Editorial surfaces are predominantly left-aligned. A centered treatment is acceptable only for a short empty state or a focused search affordance—not as a substitute for public content.
 - **Width:** Marketing and Discovery shells use a ~1120px max width. Reading columns stay near 720px; timeline/diff workbenches may expand to the full shell.
 
-### Desktop app
+### Legacy desktop app (not distributed)
+
+The Electron source remains only as legacy implementation reference while it is retired. It is not an installation or release target; new product flows must use the CLI and public web. The rules below describe existing legacy UI when maintenance or removal work touches it.
 
 - **Core principle:** The desktop app is the author’s private preparation surface. Projects and Sessions are the home; search and publishing are actions within that context.
 - **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and remains visible across every main-pane state.
@@ -67,21 +69,22 @@ Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows a
 
 ### Type Scale
 
-| Role                                  | Size    | Weight  | Font                               |
-| ------------------------------------- | ------- | ------- | ---------------------------------- |
-| Marketing hero                        | 48–72px | 600     | Geist Sans, letter-spacing −0.04em |
-| Public page title / Profile name      | 28–36px | 600     | Geist Sans, letter-spacing −0.02em |
-| Session page title                    | 24–32px | 600     | Geist Sans, letter-spacing −0.02em |
-| Desktop page title                    | 20px    | 600     | Geist Sans, letter-spacing −0.01em |
-| Sidebar wordmark                      | 18px    | 700     | Geist Sans, letter-spacing −0.04em |
-| Search input (⌘K overlay)             | 15px    | 400     | Geist Sans                         |
-| Public Summary / marketing body       | 15–17px | 400     | Geist Sans                         |
-| Search input (results page)           | 13px    | 400     | Geist Sans                         |
-| Body / result actions                 | 13px    | 400/500 | Geist Sans                         |
-| Session content / fragments / command | 12px    | 400     | Geist Mono                         |
-| Secondary / meta                      | 11px    | 400/500 | Geist Sans                         |
-| Labels / caps                         | 10px    | 600     | Geist Sans, letter-spacing 0.08em  |
-| Badges / paths                        | 11px    | 500/600 | Geist Mono                         |
+| Role                                 | Size    | Weight  | Font                               |
+| ------------------------------------ | ------- | ------- | ---------------------------------- |
+| Marketing hero                       | 48–72px | 600     | Geist Sans, letter-spacing −0.04em |
+| Public page title / Profile name     | 28–36px | 600     | Geist Sans, letter-spacing −0.02em |
+| Session page title                   | 24–32px | 600     | Geist Sans, letter-spacing −0.02em |
+| Desktop page title                   | 20px    | 600     | Geist Sans, letter-spacing −0.01em |
+| Sidebar wordmark                     | 18px    | 700     | Geist Sans, letter-spacing −0.04em |
+| Search input (⌘K overlay)            | 15px    | 400     | Geist Sans                         |
+| Public Summary / marketing body      | 15–17px | 400     | Geist Sans                         |
+| Search input (results page)          | 13px    | 400     | Geist Sans                         |
+| Body / result actions                | 13px    | 400/500 | Geist Sans                         |
+| Session content / fragments          | 12px    | 400     | Geist Mono                         |
+| Runnable commands / docs code blocks | 14px    | 400/500 | Geist Mono                         |
+| Secondary / meta                     | 11px    | 400/500 | Geist Sans                         |
+| Labels / caps                        | 10px    | 600     | Geist Sans, letter-spacing 0.08em  |
+| Badges / paths                       | 11px    | 500/600 | Geist Mono                         |
 
 **Floor:** 11px for body / UI / meta text. Labels-and-caps may use 10px (small uppercase reads cleanly even below the body floor). No half-pixel sizes (12.5, 13.5) — they fight sub-pixel rendering.
 
@@ -372,7 +375,7 @@ Do not write “You discussed this” to a reader who did not author the Session
 
 ### Author surfaces
 
-Desktop, account, and publishing flows may address the signed-in author directly where it adds signal:
+CLI, account, and publishing flows may address the signed-in author directly where it adds signal:
 
 - “This Session will be Public in Explore.”
 - “Publish this Session?”
@@ -419,5 +422,6 @@ In dense lists, prefer compact facts over repeated pronouns:
 | 2026-07-18 | Warm amber remains the sole product accent    | Superseded on 2026-07-22: the accent is now Framer-derived electric blue on a void palette.                                                                                                                                                                                         |
 | 2026-07-22 | Void palette + electric blue accent           | After a design-system exploration (open-design packages), the Warm Index structure keeps its layout while the palette moves to void black/white with the Paperboy wing blue `#1387FF`/`#5BB1F0` (post-acquisition brand color). The WebGL hero follows the active light/dark theme. |
 | 2026-07-22 | Teams are durable tenant workspaces           | Team-only is a real authorization and ownership boundary, not a renamed link state. WorkOS carries organization identity and invitations; Spool enforces roles, storage ownership, disclosure, and public-projection isolation.                                                     |
+| 2026-07-22 | CLI replaces the distributed desktop app      | Local preparation and continuation ship through the installed `spool` command; `/install.sh`, npm, GitHub releases, and production web advance as one CLI-first release train.                                                                                                      |
 | 2026-07-18 | Geist Sans for chrome; Geist Mono for records | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                                                                                                                                                           |
 | 2026-07-18 | Icons follow adjacent-role sizing             | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                                                                                                                                                          |

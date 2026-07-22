@@ -260,6 +260,38 @@ function shareDeps(
 }
 
 describe('spool share local Agent Summary flow', () => {
+  it('shows the installer when an npx caller does not have the spool command yet', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-share-login-home-'))
+    const events: string[] = []
+
+    try {
+      await expect(
+        handleShareCommand(
+          undefined,
+          { agentSummary: false },
+          {
+            homeDir: home,
+            env: {},
+            cwd: '/tmp/example',
+            ui: interactiveUi({ events }),
+            resolveTarget: () => ({
+              provider: 'claude',
+              sessionUuid: SESSION_UUID,
+              filePath: '/tmp/unused-session.jsonl',
+              cwd: '/tmp/example',
+            }),
+          },
+        ),
+      ).resolves.toBe(1)
+
+      expect(events.join('\n')).toContain('Not logged in. Run `spool login` first.')
+      expect(events.join('\n')).toContain('npx @spool-lab/cli login')
+      expect(events.join('\n')).toContain('https://spool.new/docs/installation')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('confirms the Public Session URL and copies it in an interactive terminal', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-share-complete-'))

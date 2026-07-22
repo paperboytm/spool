@@ -3,6 +3,7 @@
 
 import { isSessionProvider, type SessionProvider } from '@spool-lab/session-kit'
 
+import { resumeBootstrapCommand } from './cli-command'
 import type { HubSessionMeta } from './hub-api'
 
 export interface WorkspaceCardDisplay {
@@ -41,11 +42,11 @@ export function deepLinkHash(index: number): string {
   return `#r/${index}`
 }
 
-/** The sid alone resumes against the reader's configured hub (spool.new
- *  by default) — shorter to copy than the full page URL, which stays
- *  accepted by the CLI for cross-hub cases. */
+/** Bootstrap the CLI and resume against this reader's spool.new Session id.
+ * The install pipeline finishes before the caller's shell launches Resume,
+ * preserving the terminal TTY for the native agent. */
 export function resumeCommandFor(sid: string): string {
-  return `npx @spool-lab/cli resume ${sid}`
+  return resumeBootstrapCommand(sid)
 }
 
 /** Turn the fetch remote recorded in a workspace card into a browser link.

@@ -596,8 +596,7 @@ function UnpublishConfirmModal({
       <p className="sw-modal-body">
         This permanently deletes the snapshot from R2 and locks the URL to{' '}
         <span className="sw-mono">410 Gone</span>. The slug can never be reused. To share this
-        conversation again, run <span className="sw-mono">npx @spool-lab/cli share</span> — you'll
-        get a new URL.
+        conversation again, run <span className="sw-mono">spool share</span> — you'll get a new URL.
       </p>
       <div className="sw-modal-actions">
         <Button type="button" variant="outline" onClick={onClose} disabled={busy}>

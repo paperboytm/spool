@@ -20,7 +20,7 @@ The Hub does not modify provider Session content. Canonical records are verified
 - **Desktop** — WorkOS PKCE public client with the `spool://auth/callback` custom scheme; the app exchanges the code through `/api/auth/sign-in-with-code`
 - **CLI** — provider-independent browser approval through `/api/cli-auth/{start,approve,poll}`; the polling terminal receives a revocable `sph_` API token
 
-`npx @spool-lab/cli logout` revokes the active CLI token through `DELETE /api/hub/v1/tokens`.
+`spool logout` revokes the active CLI token through `DELETE /api/hub/v1/tokens`.
 
 ## Cloudflare Bindings
 

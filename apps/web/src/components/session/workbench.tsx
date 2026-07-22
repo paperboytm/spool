@@ -9,7 +9,7 @@ import {
   type ConversationMessage,
   type MessageListHandle,
 } from '@spool-lab/session-view'
-import { Avatar, Badge, Button, IconButton } from '@spool-lab/ui'
+import { Avatar, Badge, Button } from '@spool-lab/ui'
 import type { SpoolDocument } from '@spool/share-kit'
 import {
   TimelineBody,
@@ -28,10 +28,12 @@ import {
   Globe2,
   Link2,
   MessageSquareText,
+  SquareTerminal,
   UsersRound,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { copyCommandText, type CopyCommandState } from '../../lib/cli-command'
 import { humanDateTime, relativeDate } from '../../lib/dates'
 import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
@@ -42,7 +44,6 @@ import {
   resumeCommandFor,
 } from '../../lib/session-page'
 import type { SessionRoute } from '../../lib/session-route'
-import { CliResumeDialog } from './cli-resume-dialog'
 import { SessionRouteMap } from './route-map'
 import { SessionSummary } from './session-summary'
 
@@ -150,8 +151,7 @@ export function SessionWorkbench({
       : (conversation.recordToMessageId.get(initialRecordIndex) ?? null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
   const [targetTurnIndex, setTargetTurnIndex] = useState<number | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [showCliResumeGuide, setShowCliResumeGuide] = useState(false)
+  const [copyState, setCopyState] = useState<CopyCommandState>('idle')
   const [previewPromptKey, setPreviewPromptKey] = useState<string | null>(null)
   const listRef = useRef<MessageListHandle>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -260,11 +260,14 @@ export function SessionWorkbench({
     [],
   )
 
-  const copy = () => {
-    void navigator.clipboard.writeText(resume)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1400)
+  const copy = async () => {
+    const state = await copyCommandText(resume)
+    setCopyState(state)
+    window.setTimeout(() => setCopyState('idle'), state === 'copied' ? 1400 : 2600)
   }
+
+  const copied = copyState === 'copied'
+  const copyFailed = copyState === 'failed'
 
   const jumpToMessage = (messageId: number) => {
     setTargetMessageId(messageId)
@@ -282,10 +285,7 @@ export function SessionWorkbench({
       aria-labelledby="sw-workbench-title"
     >
       <div className="mx-auto w-full max-w-[1120px] px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <header
-          className="mb-6 flex flex-col gap-4 border-b border-[var(--border)] pb-5 md:flex-row md:items-center md:justify-between"
-          title={`Session ${meta.sid}`}
-        >
+        <header className="mb-6 border-b border-[var(--border)] pb-5" title={`Session ${meta.sid}`}>
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-[var(--muted)]">
               <span className="inline-flex items-center gap-2 font-medium text-[var(--text)]">
@@ -320,7 +320,7 @@ export function SessionWorkbench({
             </div>
             <h1
               id="sw-workbench-title"
-              className="m-0 max-w-[760px] text-xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-[var(--text)] md:text-2xl"
+              className="m-0 max-w-[760px] text-2xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-[var(--text)]"
               title={fullTitle}
             >
               {title}
@@ -329,20 +329,56 @@ export function SessionWorkbench({
           </div>
 
           {resumable && (
-            <div className="min-w-0 shrink-0 md:w-[320px]" aria-label="Resume this session locally">
-              <div className="flex h-8 min-w-0 gap-2" aria-label="Resume command">
+            <section
+              className="mt-4 w-full max-w-[720px] min-w-0"
+              aria-labelledby="resume-session-title"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2
+                  id="resume-session-title"
+                  className="m-0 inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text)]"
+                >
+                  <SquareTerminal
+                    className="text-[var(--accent)]"
+                    size={14}
+                    strokeWidth={1.7}
+                    aria-hidden="true"
+                  />
+                  Resume in {providerLabel}
+                </h2>
+                <span className="text-[11px] leading-4 text-[var(--muted)]">
+                  Installs or updates the Spool CLI, then continues locally.
+                </span>
+              </div>
+              <div
+                className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row"
+                aria-label="One-command Session resume"
+              >
                 <code
-                  className="flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[11px] text-[var(--muted)]"
+                  className="flex h-11 min-w-0 flex-1 items-center overflow-x-auto rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-sm whitespace-nowrap text-[var(--text)] sm:h-8"
                   title={resume}
                 >
                   {resume}
                 </code>
-                <IconButton
-                  size="md"
+                <Button
                   type="button"
-                  title={copied ? 'Copied' : 'Copy resume command'}
-                  aria-label={copied ? 'Resume command copied' : 'Copy resume command'}
-                  onClick={copy}
+                  className="h-11 shrink-0 sm:h-8"
+                  variant="accent"
+                  title={
+                    copied
+                      ? 'Copied'
+                      : copyFailed
+                        ? 'Copy failed; try again'
+                        : 'Copy resume command'
+                  }
+                  aria-label={
+                    copied
+                      ? 'Resume command copied'
+                      : copyFailed
+                        ? 'Copy failed; try resume command again'
+                        : 'Copy resume command'
+                  }
+                  onClick={() => void copy()}
                 >
                   {copied ? (
                     <Check size={14} strokeWidth={1.8} aria-hidden="true" />
@@ -350,23 +386,24 @@ export function SessionWorkbench({
                     <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
                   )}
                   <span className="sr-only" aria-live="polite">
-                    {copied ? 'Copied' : ''}
+                    {copied
+                      ? 'Copied'
+                      : copyFailed
+                        ? 'Copy failed; select the command manually'
+                        : ''}
                   </span>
-                </IconButton>
-              </div>
-              <div className="mt-2 flex items-center justify-end gap-2 text-[11px] leading-4 text-[var(--muted)]">
-                <span>No global install needed.</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  aria-haspopup="dialog"
-                  onClick={() => setShowCliResumeGuide(true)}
-                >
-                  How npx works
+                  {copied ? 'Copied' : copyFailed ? 'Try again' : 'Copy command'}
                 </Button>
               </div>
-            </div>
+              <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
+                Resume creates a new local Session. This published source stays unchanged.
+                {copyFailed && (
+                  <span className="ml-2 text-[var(--error)]">
+                    Copy failed — select the command manually.
+                  </span>
+                )}
+              </p>
+            </section>
           )}
         </header>
 
@@ -649,13 +686,6 @@ export function SessionWorkbench({
           </aside>
         </div>
       </div>
-      {resumable && (
-        <CliResumeDialog
-          open={showCliResumeGuide}
-          resumeCommand={resume}
-          onClose={() => setShowCliResumeGuide(false)}
-        />
-      )}
     </main>
   )
 }

@@ -2,3 +2,7 @@
 # route diagnostic header here. Dynamic web and API responses set it in code.
 /*
   x-spool-route: web
+
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300

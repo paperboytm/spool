@@ -70,14 +70,14 @@ Poll `gh run list` for a run whose `headBranch` is the tag and whose `headSha` i
 gh run watch "$RUN_ID" --exit-status
 ```
 
-The workflow is designed for same-version re-dispatch: existing npm versions are skipped and release assets are replaced.
+The workflow is designed for same-version re-dispatch: existing npm versions are skipped, release notes are updated, and production web is dispatched again.
 
-### Release succeeded, but Deploy Web is absent or failed
+### npm and the GitHub release succeeded, but Deploy Web is absent or failed
 
-First require `origin/main` to equal the release commit. Re-dispatch production web and watch the resulting run:
+Prefer re-dispatching the same-tag Release workflow so it owns and records the complete train. If npm and the GitHub release are already verified and only the deployment needs recovery, first require `origin/main` to equal the release commit, then dispatch production web explicitly and watch the resulting run:
 
 ```bash
-gh workflow run deploy-web.yml --ref main
+gh workflow run deploy-web.yml --ref main -f target=production
 ```
 
 If `origin/main` has advanced, stop and report the release commit and current remote commit instead of deploying an unverified revision.

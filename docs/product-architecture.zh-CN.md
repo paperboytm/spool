@@ -78,12 +78,16 @@ Resume 拉取并验证来源 Session 的 records，将其物化为新的 provide
 
 作者、agent 和自动化进行本地准备与 Share 的稳定接口：
 
-- `npx @spool-lab/cli share`：创建 Shared Session；
-- `npx @spool-lab/cli show`：按摘要、timeline、diff 或 record 阅读；
-- `npx @spool-lab/cli resume`：物化并继续 Shared Session；
-- `npx @spool-lab/cli withdraw`：撤回访问；
-- `npx @spool-lab/cli login/logout`：管理 Hub 凭证；
-- `npx @spool-lab/cli sync/search/list/projects`：本地准备与检索。
+- `curl -fsSL https://spool.new/install.sh | sh`：一次安装 CLI；
+- `spool`：在当前项目刷新本地索引，必要时登录，然后为最新 Session 启动 Share 流程；
+- `spool share`：显式选择 Session、record 范围或 Share 选项；
+- `spool show`：按摘要、timeline、diff 或 record 阅读；
+- `spool resume`：物化并继续 Shared Session；
+- `spool withdraw`：撤回访问；
+- `spool login/logout`：管理 Hub 凭证；
+- `spool sync/search/list/projects`：本地准备与检索。
+
+裸 `spool` 是日常入口，但不会绕过披露边界：CLI 仍须在上传前展示 record 范围、敏感信息检查结果和 Public / Link-only 状态，并等待确认。
 
 ### Hub
 

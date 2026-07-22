@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -29,8 +29,7 @@ export const doctorCommand = new Command('doctor')
   .action(async (checkId: string | undefined, flags: DoctorFlags) => {
     const filter = checkId ? [checkId] : undefined
     if (flags.json) {
-      const rawResults = await runChecks(filter)
-      const results = refineForAppVersion(rawResults, readCliVersion(), readAppVersion())
+      const results = await runChecks(filter)
       printJson(results)
       setExit(results)
       return
@@ -38,14 +37,12 @@ export const doctorCommand = new Command('doctor')
 
     const ui = createClackUi()
     ui.intro('Spool Doctor')
-    const app = readAppVersion()
-    ui.info(`CLI ${readCliVersion()}${app ? ` · Desktop ${app.version}` : ''}`)
+    ui.info(`CLI ${readCliVersion()}`)
     const checking = ui.spinner()
     checking.start(checkId ? `Running ${checkId}` : 'Checking the local Spool environment')
     let results: CheckResult[]
     try {
-      const rawResults = await runChecks(filter)
-      results = refineForAppVersion(rawResults, readCliVersion(), readAppVersion())
+      results = await runChecks(filter)
       checking.stop(`Completed ${results.length} checks`)
     } catch (cause) {
       checking.error('Checks failed')
@@ -80,7 +77,6 @@ function printJson(results: CheckResult[]): void {
   const cliVersion = readCliVersion()
   const out = {
     cli: { version: cliVersion },
-    app: readAppVersion(),
     results: results.map((r) => ({
       id: r.id,
       category: r.category,
@@ -256,72 +252,6 @@ function readCliVersion(): string {
   } catch {
     return 'unknown'
   }
-}
-
-function readAppVersion(): { version: string; path: string } | null {
-  if (process.platform !== 'darwin') return null
-  const plistPath = '/Applications/Spool.app/Contents/Info.plist'
-  if (!existsSync(plistPath)) return null
-  try {
-    const raw = readFileSync(plistPath, 'utf8')
-    const match = raw.match(/<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/)
-    if (!match || !match[1]) return null
-    return { version: match[1], path: '/Applications/Spool.app' }
-  } catch {
-    return null
-  }
-}
-
-/**
- * Compare two semver-ish strings ("1.2.3", "1.2.3-rc.4"). Returns negative if
- * a < b, 0 if equal, positive if a > b. Pre-release/build suffix is ignored;
- * any non-numeric segment becomes 0.
- */
-export function compareSemver(a: string, b: string): number {
-  const parse = (s: string) =>
-    s
-      .split(/[-+]/)[0]!
-      .split('.')
-      .map((n) => parseInt(n, 10) || 0)
-  const av = parse(a)
-  const bv = parse(b)
-  for (let i = 0; i < Math.max(av.length, bv.length); i++) {
-    const d = (av[i] ?? 0) - (bv[i] ?? 0)
-    if (d !== 0) return d
-  }
-  return 0
-}
-
-/**
- * When the CLI is ahead of the installed Spool.app, running the
- * `versions.schema-compat` migrate fix would push the DB to a schema the
- * installed app can no longer open. Reframe the message to recommend upgrading
- * the app first, and mark the fix as destructive so `--fix` alone skips it
- * (`--fix --force` still works as an escape hatch for users who know what
- * they're doing).
- */
-export function refineForAppVersion(
-  results: CheckResult[],
-  cliVersion: string,
-  app: { version: string; path: string } | null,
-): CheckResult[] {
-  if (!app || cliVersion === 'unknown') return results
-  if (compareSemver(cliVersion, app.version) <= 0) return results
-  return results.map((r) => {
-    if (r.id !== 'versions.schema-compat' || !r.fix) return r
-    return {
-      ...r,
-      message: `${r.message} — Spool.app is ${app.version}, older than this CLI ${cliVersion}`,
-      fix: {
-        ...r.fix,
-        description:
-          `Upgrade Spool.app to ${cliVersion} first, then re-run. ` +
-          `Migrating now would leave the installed app unable to open the database. ` +
-          `--fix --force overrides this guard if you know what you're doing.`,
-        destructive: true,
-      },
-    }
-  })
 }
 
 function formatDetail(v: unknown): string {

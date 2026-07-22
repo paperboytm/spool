@@ -2,62 +2,53 @@
  * composes — command pill, section head, goal-route map, flow animation,
  * and the closing CTA. */
 import { Button, ButtonLink } from '@spool-lab/ui'
+import { Check, CircleAlert, Copy } from 'lucide-react'
 import { useState } from 'react'
 
+import { CLI_INSTALL_COMMAND, copyCommandText, type CopyCommandState } from '../../lib/cli-command'
 import { SessionTape } from './session-tape'
 import { SpoolMark } from './spool-mark'
 
-export const SHARE_CMD = 'npx @spool-lab/cli share'
-
-export function ShareCommandPill() {
-  const [copied, setCopied] = useState(false)
+export function InstallCommandPill() {
+  const [copyState, setCopyState] = useState<CopyCommandState>('idle')
   const onClick = () => {
-    void navigator.clipboard
-      .writeText(SHARE_CMD)
-      .then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1600)
-      })
-      .catch(() => {})
+    void copyCommandText(CLI_INSTALL_COMMAND).then((state) => {
+      setCopyState(state)
+      setTimeout(() => setCopyState('idle'), state === 'copied' ? 1600 : 2600)
+    })
   }
+  const copied = copyState === 'copied'
+  const failed = copyState === 'failed'
+
   return (
     <Button
       type="button"
-      className={`hh-install${copied ? ' is-copied' : ''}`}
+      className={`hh-install${copied ? ' is-copied' : ''}${failed ? ' is-copy-failed' : ''}`}
       variant="outline"
       onClick={onClick}
-      aria-label="Copy share command"
+      aria-label={
+        copied
+          ? 'CLI install command copied'
+          : failed
+            ? 'Copy failed; try CLI install command again'
+            : 'Copy CLI install command'
+      }
     >
       <span className="tick">$</span>
-      <code>{SHARE_CMD}</code>
-      <span className="copy">
+      <code>{CLI_INSTALL_COMMAND}</code>
+      <span className="copy" aria-live="polite">
         {copied ? (
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
+          <>
+            <Check size={13} strokeWidth={1.8} aria-hidden="true" />
+            <span>Copied</span>
+          </>
+        ) : failed ? (
+          <>
+            <CircleAlert size={13} strokeWidth={1.8} aria-hidden="true" />
+            <span>Try again</span>
+          </>
         ) : (
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="9" y="9" width="13" height="13" rx="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
+          <Copy size={13} strokeWidth={1.8} aria-hidden="true" />
         )}
       </span>
     </Button>
@@ -187,7 +178,7 @@ export function GoalTrail() {
 }
 
 /* Choreographed loop (18s, pure CSS — see the fs* keyframes): the
- * session streams into machine A; `spool share` + option confirm; a
+ * session streams into machine A; `spool` + option confirm; a
  * particle carries it into the Spool knowledge server; the public URL
  * appears; machine B wakes and types `spool resume`; a particle flows
  * into B and the chat streams on. Reduced motion shows the completed
@@ -215,8 +206,7 @@ export function FlowShow() {
               <span className="fs-line fs-dim fs-al fs-a2" style={{ width: '48%' }} />
               <span className="fs-line fs-al fs-a3" style={{ width: '62%' }} />
               <div className="fs-cmd fs-cmd-share">
-                <span className="acc">$</span>{' '}
-                <span className="fs-type fs-type-a">spool share</span>
+                <span className="acc">$</span> <span className="fs-type fs-type-a">spool</span>
                 <span className="fs-caret fs-caret-a" aria-hidden />
               </div>
               <div className="fs-sel">
@@ -296,7 +286,7 @@ export function FinalCTA({ centered = false }: { centered?: boolean } = {}) {
           <span className="accent">.</span>
         </div>
         <div className="row">
-          <ShareCommandPill />
+          <InstallCommandPill />
           <ButtonLink href="/explore" className="hh-btn" variant="accent">
             Explore Sessions →
           </ButtonLink>
