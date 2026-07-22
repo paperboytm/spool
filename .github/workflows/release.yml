@@ -49,7 +49,7 @@ jobs:
           mv "$ZIP" "apps/app/dist/Spool-${VERSION}-arm64-mac.zip"
 
       - name: Upload mac artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: mac-artifacts
           path: |
@@ -90,7 +90,7 @@ jobs:
           mv "$APPIMAGE" "apps/app/dist/Spool-${VERSION}-x86_64.AppImage"
 
       - name: Upload linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: linux-artifacts
           path: |
@@ -111,7 +111,7 @@ jobs:
         run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
           path: artifacts
           merge-multiple: true
