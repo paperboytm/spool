@@ -126,7 +126,7 @@ function LeftNavigation() {
       </nav>
       <div className="explore-left-footer">
         <ExploreThemeButton />
-        <span>Warm Index</span>
+        <span>Void Index</span>
       </div>
     </aside>
   )

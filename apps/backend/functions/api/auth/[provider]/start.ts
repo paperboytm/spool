@@ -14,13 +14,13 @@ import { safeNext } from '../../../../src/auth/next'
 import { pkceChallenge, randomUrlSafe } from '../../../../src/auth/pkce'
 import { getProvider } from '../../../../src/auth/providers/registry'
 import { jsonError } from '../../../../src/errors'
-import { publicBaseUrl } from '../../../../src/public-url'
+import { oauthPublicBaseUrl } from '../../../../src/public-url'
 
 type Env = {
   WORKOS_CLIENT_ID?: string
   // Public origin the provider must redirect back to — must exactly
   // match the value registered with the provider. Defaults to
-  // spool.pro; dev sets it to the web app's origin (e.g. http://localhost:3002).
+  // spool.new; dev sets it to the web app's origin (e.g. http://localhost:3002).
   PUBLIC_BASE_URL?: string
 }
 
@@ -49,7 +49,7 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     // arrives at the backend (8788) but the URI registered with the
     // provider is the web app's origin (3002). Using ctx.request.url
     // here causes a 400 redirect_uri_mismatch on every dev sign-in.
-    const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/${provider.id}/callback`
+    const redirectUri = `${oauthPublicBaseUrl(ctx.request, ctx.env)}/api/auth/${provider.id}/callback`
     const authorizeUrl = provider.buildAuthRequestUrl(
       { state, codeChallenge: challenge, redirectUri },
       ctx.env,

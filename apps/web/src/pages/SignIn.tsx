@@ -110,7 +110,7 @@ export function SignIn({ next }: Props) {
           <div className="sw-signin-emblem">
             <SpoolMark size={30} />
           </div>
-          <div className="sw-eyebrow">spool.pro</div>
+          <div className="sw-eyebrow">spool.new</div>
           <h1 className="sw-signin-title">Sign in</h1>
           <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>
           {PROVIDERS.map((p) => (

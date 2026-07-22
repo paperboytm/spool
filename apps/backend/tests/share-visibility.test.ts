@@ -72,7 +72,7 @@ function patchReq(id: string, body: unknown, token: string | null = TOKEN): Requ
     'CF-Connecting-IP': '1.2.3.4',
   }
   if (token) headers['authorization'] = `Bearer ${token}`
-  return new Request(`https://spool.pro/api/me/shares/${id}`, {
+  return new Request(`https://spool.new/api/me/shares/${id}`, {
     method: 'PATCH',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),

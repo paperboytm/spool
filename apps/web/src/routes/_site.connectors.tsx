@@ -1,10 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
+
 export const Route = createFileRoute('/_site/connectors')({
   head: () => ({
     meta: [{ title: 'Redirecting to /daemon' }, { name: 'robots', content: 'noindex' }],
-    links: [{ rel: 'canonical', href: 'https://spool.pro/daemon' }],
+    links: [{ rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/daemon` }],
   }),
   component: ConnectorsRedirect,
 })

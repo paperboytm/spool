@@ -32,7 +32,7 @@ Claude Code and Codex CLI Sessions are Public by default. Gemini CLI, OpenCode, 
 
 ## Continue a Spool Session
 
-Give the agent a spool.pro Session URL and ask it to continue the work. The skill routes the URL to:
+Give the agent a spool.new Session URL and ask it to continue the work. Legacy spool.pro Session URLs remain supported. The skill routes the URL to:
 
 ```bash
 npx @spool-lab/cli resume <session-url>

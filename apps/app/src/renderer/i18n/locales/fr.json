@@ -354,7 +354,7 @@
       "deleteConfirm_item_shares_prefix": "Chaque partage publié renverra",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "Votre handle est libéré et peut être réservé par n'importe qui",
-      "deleteConfirm_item_record": "Votre enregistrement de compte est supprimé de spool.pro",
+      "deleteConfirm_item_record": "Votre enregistrement de compte est supprimé de spool.new",
       "deleteConfirm_footnote": "Vous pouvez annuler depuis cet écran à tout moment avant la fin du délai. Les brouillons sur cet appareil ne sont pas affectés — ils restent locaux.",
       "deleteConfirm_confirm": "Programmer la suppression",
       "deleteConfirm_scheduling": "Programmation…",
@@ -636,7 +636,7 @@
       "publishUnredacted": "Publier avec les secrets visibles",
       "publishing": "Publication…",
       "tryAgain": "Réessayer",
-      "footerHint": "Un instantané est envoyé vers spool.pro. Révocable à tout moment.",
+      "footerHint": "Un instantané est envoyé vers spool.new. Révocable à tout moment.",
       "footerHint_published": "L'instantané se trouve au lien ci-dessus. Révocable à tout moment.",
       "error_sessionExpired": "Votre session a expiré — reconnectez-vous pour publier.",
       "error_rateLimited": "Trop de publications. Réessayez dans quelques minutes.",
@@ -670,7 +670,7 @@
       "downloading": "Export en cours…"
     },
     "connectCard": {
-      "title": "Se connecter à spool.pro",
+      "title": "Se connecter à spool.new",
       "body": "Spool n'envoie que les instantanés que vous publiez explicitement. Vos brouillons et votre bibliothèque ne quittent jamais cette machine.",
       "signInWithGoogle": "Se connecter avec Google",
       "waitingForBrowser": "En attente du navigateur…",
@@ -680,7 +680,7 @@
       "title": "Dépublier ce partage ?",
       "body_prefix": "Action irréversible. Le lien renverra",
       "body_emphasis": "410 Gone",
-      "body_suffix": ", l'instantané est supprimé du stockage spool.pro et l'URL ne peut pas être réutilisée. Pour partager à nouveau cette conversation, vous devrez publier une nouvelle copie — elle aura une nouvelle URL.",
+      "body_suffix": ", l'instantané est supprimé du stockage spool.new et l'URL ne peut pas être réutilisée. Pour partager à nouveau cette conversation, vous devrez publier une nouvelle copie — elle aura une nouvelle URL.",
       "confirm": "Oui, dépublier définitivement",
       "confirming": "Dépublication…"
     }
@@ -912,10 +912,10 @@
     "toggleOptions": "Options"
   },
   "hubShare": {
-    "menuLabel": "Partager sur spool.pro",
-    "pretitle": "Partager sur spool.pro",
+    "menuLabel": "Partager sur spool.new",
+    "pretitle": "Partager sur spool.new",
     "title": "Publier cette Session ?",
-    "lead": "Publie la transcription complète ({{records}} enregistrements) comme Session publique sur spool.pro. Elle peut apparaître dans Explore et la recherche, et la Session source reste inchangée.",
+    "lead": "Publie la transcription complète ({{records}} enregistrements) comme Session publique sur spool.new. Elle peut apparaître dans Explore et la recherche, et la Session source reste inchangée.",
     "secretsWarning": "{{total}} secrets potentiels détectés (dont {{high}} à haut risque). Le partage envoie ces valeurs.",
     "summaryLabel": "Résumé (Markdown)",
     "publish": "Publier la Session",
@@ -923,7 +923,7 @@
     "doneTitle": "Session publiée",
     "doneLead": "Cette Session est publique et peut apparaître dans Explore et la recherche. La Session source reste inchangée.",
     "linkOnlyTitle": "Créer un partage accessible par lien ?",
-    "linkOnlyLead": "Ce fournisseur n’est pas encore pris en charge dans Explore. Partage la transcription complète ({{records}} enregistrements) via une URL accessible par lien sur spool.pro ; la Session source reste inchangée.",
+    "linkOnlyLead": "Ce fournisseur n’est pas encore pris en charge dans Explore. Partage la transcription complète ({{records}} enregistrements) via une URL accessible par lien sur spool.new ; la Session source reste inchangée.",
     "linkOnlyPublish": "Partager le lien",
     "linkOnlyPublishing": "Partage…",
     "linkOnlyDoneTitle": "Lien partagé",

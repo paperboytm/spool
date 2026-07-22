@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { blogPosts } from '../lib/content'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 
 const TITLE = 'Blog — Spool'
 const DESC = 'Updates, technical deep-dives, and product announcements from the Spool team.'
@@ -11,18 +12,18 @@ export const Route = createFileRoute('/_site/blog/')({
       { title: TITLE },
       { name: 'description', content: DESC },
       { property: 'og:type', content: 'website' },
-      { property: 'og:url', content: 'https://spool.pro/blog/' },
+      { property: 'og:url', content: `${PUBLIC_SITE_ORIGIN}/blog/` },
       { property: 'og:title', content: TITLE },
       { property: 'og:description', content: DESC },
-      { property: 'og:image', content: 'https://spool.pro/og-image.png' },
+      { property: 'og:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
       { property: 'og:site_name', content: 'Spool' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },
       { name: 'twitter:description', content: DESC },
-      { name: 'twitter:image', content: 'https://spool.pro/og-image.png' },
+      { name: 'twitter:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
     ],
     links: [
-      { rel: 'canonical', href: 'https://spool.pro/blog/' },
+      { rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/blog/` },
       { rel: 'alternate', type: 'application/rss+xml', title: 'Spool Blog', href: '/blog/rss.xml' },
     ],
   }),

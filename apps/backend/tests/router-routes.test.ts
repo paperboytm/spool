@@ -1,4 +1,4 @@
-// Route-table guard for the spool.pro entry Worker (same cross-package
+// Route-table guard for the spool.new entry Worker (same cross-package
 // pattern as deletion-worker-deploy.test.ts). /api/* goes to the Pages
 // backend; marketing, docs, readers, and account pages stay in apps/web.
 

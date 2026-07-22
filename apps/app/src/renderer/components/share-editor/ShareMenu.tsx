@@ -57,7 +57,7 @@ type Props = {
  * Single editor-topbar entry point for sharing. Replaces the separate
  * Publish + Export buttons with one Share popover that carries two tabs:
  *
- *   - Publish — the full spool.pro publish flow (visibility / expiry /
+ *   - Publish — the full spool.new publish flow (visibility / expiry /
  *     PII gate / errors) plus the post-publish manage surface (URL,
  *     copy, view, republish, unpublish).
  *   - Export — the four local-only formats (PNG / PDF / Markdown /

@@ -17,7 +17,7 @@ type Env = {
   SNAPSHOTS: R2Bucket
   OG: R2Bucket
   // Origin returned in the published share URL. Dev points this at the
-  // local web-app vite server; prod defaults to spool.pro.
+  // local web-app vite server; prod defaults to spool.new.
   PUBLIC_BASE_URL?: string
 }
 

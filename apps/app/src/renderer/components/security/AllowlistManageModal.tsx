@@ -115,7 +115,7 @@ export default function AllowlistManageModal({ onClose }: Props) {
     >
       <div
         className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border flex max-h-[70vh] min-h-[240px] w-[720px] max-w-[calc(100vw-64px)] flex-col overflow-hidden rounded-[10px] border"
-        style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
+        style={{ boxShadow: '0 18px 48px rgba(10,10,10,0.18), 0 2px 6px rgba(10,10,10,0.08)' }}
       >
         <header className="flex items-center justify-between gap-4 px-5 pt-4 pb-2">
           <h2 className="text-warm-text dark:text-dark-text min-w-0 text-[15px] leading-[20px] font-semibold tracking-[-0.005em]">

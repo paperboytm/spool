@@ -28,9 +28,9 @@ export function Profile({ handle }: { handle: string }) {
       setState(next)
       if (next.kind === 'ok') {
         const display = next.profile.name ?? `@${next.profile.handle}`
-        document.title = `${normalizeTabTitle(display)} · spool.pro`
+        document.title = `${normalizeTabTitle(display)} · spool.new`
       } else {
-        document.title = 'Profile not found · spool.pro'
+        document.title = 'Profile not found · spool.new'
       }
     })
     return () => {

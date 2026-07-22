@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import DaemonPage from '../components/site/daemon'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 
 const TITLE = 'Spool Daemon — Background sync for your captures'
 const DESC =
@@ -12,13 +13,13 @@ export const Route = createFileRoute('/_site/daemon')({
       { title: TITLE },
       { name: 'description', content: DESC },
       { property: 'og:type', content: 'website' },
-      { property: 'og:url', content: 'https://spool.pro/daemon' },
+      { property: 'og:url', content: `${PUBLIC_SITE_ORIGIN}/daemon` },
       { property: 'og:title', content: TITLE },
       { property: 'og:description', content: DESC },
-      { property: 'og:image', content: 'https://spool.pro/og-image.png' },
+      { property: 'og:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
       { property: 'og:site_name', content: 'Spool' },
     ],
-    links: [{ rel: 'canonical', href: 'https://spool.pro/daemon' }],
+    links: [{ rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/daemon` }],
   }),
   component: DaemonPage,
 })

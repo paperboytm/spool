@@ -12,6 +12,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { sessionOgHead, sessionOgTitle } from '../lib/og-meta'
 import { SID_RE } from '../lib/route'
 import { serverApiOrigin } from '../lib/server-api-origin'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 import { SessionReader } from '../pages/session-reader'
 
 interface HubMetaForOg {
@@ -22,16 +23,12 @@ interface HubMetaForOg {
 }
 
 export interface LoaderData {
-  og: { title: string; description: string; origin: string } | null
+  og: { title: string; description: string } | null
 }
 
 async function loadSessionOgMeta(sid: string): Promise<LoaderData> {
   if (!SID_RE.test(sid)) throw notFound()
   if (!import.meta.env.SSR) return { og: null }
-
-  const server = await import('@tanstack/react-start/server')
-  const requestUrl = server.getRequest().url
-  const origin = new URL(requestUrl).origin
 
   try {
     const apiOrigin = serverApiOrigin()
@@ -45,7 +42,6 @@ async function loadSessionOgMeta(sid: string): Promise<LoaderData> {
       og: {
         title: sessionOgTitle(meta.summaryMd ?? meta.noteMd),
         description: `A coding-agent session shared by ${author} — ${meta.count} records.`,
-        origin,
       },
     }
   } catch {
@@ -62,7 +58,7 @@ export const Route = createFileRoute('/session/$sid')({
     return sessionOgHead({
       title: og.title,
       description: og.description,
-      canonicalUrl: `${og.origin}/session/${params.sid}`,
+      canonicalUrl: `${PUBLIC_SITE_ORIGIN}/session/${params.sid}`,
     })
   },
   component: SessionSharePage,

@@ -6,7 +6,7 @@
  * time. In dev set this to `http://localhost:3002` (the web app
  * vite server) via `apps/app/.env.development.local`. In prod
  * builds the env is unset and the function returns
- * `https://spool.pro`.
+ * `https://spool.new`.
  *
  * Why this is a renderer concern (and not just a `published.url` echo):
  * the Published-tab list draws from a local cache of slugs and titles,
@@ -15,7 +15,7 @@
  * runtime-known on this side.
  */
 
-const DEFAULT_PUBLIC_URL = 'https://spool.pro'
+const DEFAULT_PUBLIC_URL = 'https://spool.new'
 
 export function sharePublicOrigin(
   env: Record<string, string | undefined> = import.meta.env as Record<string, string | undefined>,
@@ -38,7 +38,7 @@ export function sharePublicUrl(slug: string, env?: Record<string, string | undef
  *   - an absolute URL to the provider CDN (e.g. lh3.googleusercontent.com)
  *
  * Relative `/api/*` paths must hit the backend origin directly.
- * In prod the backend and public web share an origin (spool.pro) so
+ * In prod the backend and public web share an origin (spool.new) so
  * `sharePublicOrigin()` works as a fallback, but in dev they're split
  * (3002 = web-app vite, 8788 = wrangler) and the web app vite proxy
  * only exists when that dev server is actually running. Prefer the

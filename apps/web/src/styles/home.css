@@ -962,7 +962,7 @@ section.sect:last-of-type {
   height: 100%;
 }
 /* Narrow light beams sweeping slowly across the first screen. The base
-   stays the page's warm near-black — only thin shafts move, so there is
+   stays the page's void black — only thin shafts move, so there is
    no color jump when scrolling into the sections below. */
 .hs-band {
   position: absolute;
@@ -1256,8 +1256,8 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
 }
 .fs-lscreen {
   width: 100%;
-  background: #0c0c0a;
-  border: 2px solid #3a3a34;
+  background: #090909;
+  border: 2px solid #2e2e2e;
   border-bottom-width: 4px;
   border-radius: 12px 12px 3px 3px;
   padding: 10px;
@@ -1266,7 +1266,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   width: 112%;
   max-width: calc(100% + 36px);
   height: 9px;
-  background: linear-gradient(#454540, #24241f);
+  background: linear-gradient(#555555, #111111);
   border-radius: 1px 1px 9px 9px;
   position: relative;
 }
@@ -1278,7 +1278,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   transform: translateX(-50%);
   width: 56px;
   height: 3.5px;
-  background: #1a1a16;
+  background: #111111;
   border-radius: 0 0 5px 5px;
 }
 .fs-lwho {
@@ -1288,8 +1288,8 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   color: var(--muted);
 }
 .fs-win {
-  background: #161613;
-  border: 1px solid #2e2e28;
+  background: #090909;
+  border: 1px solid #2e2e2e;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -1298,8 +1298,8 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #1c1c18;
-  border-bottom: 1px solid #2e2e28;
+  background: #111111;
+  border-bottom: 1px solid #2e2e2e;
 }
 .fs-dots {
   display: inline-flex;
@@ -1309,7 +1309,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #3a3a34;
+  background: #2e2e2e;
 }
 .gt-bar .fs-dots i {
   background: var(--border2);
@@ -1318,7 +1318,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   flex: 1;
   font-family: 'Geist Mono', monospace;
   font-size: 10px;
-  color: #8a8a80;
+  color: #a6a6a6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1337,7 +1337,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   background: color-mix(in srgb, var(--accent) 72%, transparent);
 }
 .fs-line.fs-dim {
-  background: color-mix(in srgb, #8a8a80 45%, transparent);
+  background: color-mix(in srgb, #a6a6a6 45%, transparent);
 }
 .fs-line.fs-ok {
   background: color-mix(in srgb, var(--sp-success) 80%, transparent);
@@ -1346,9 +1346,9 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
   margin-top: auto;
   font-family: 'Geist Mono', monospace;
   font-size: 11px;
-  color: #f2f2ec;
-  background: #101010;
-  border: 1px solid #2e2e28;
+  color: #ffffff;
+  background: #090909;
+  border: 1px solid #2e2e2e;
   border-radius: 6px;
   padding: 6px 10px;
   overflow: hidden;
@@ -1365,7 +1365,7 @@ html:not(.dark):not([data-theme='dark']) .hs-scrim {
 .fs-sel {
   font-family: 'Geist Mono', monospace;
   font-size: 10.5px;
-  color: #8a8a80;
+  color: #a6a6a6;
 }
 .fs-sel b {
   color: #7dc07d;

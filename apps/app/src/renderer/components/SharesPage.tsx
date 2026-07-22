@@ -241,7 +241,7 @@ function PublishedList({
   )
 
   // Re-fetch the published list when this window regains focus — picks up
-  // remote revocations (user opened spool.pro/me on the web and revoked)
+  // remote revocations (user opened spool.new/me on the web and revoked)
   // that the desktop wouldn't otherwise see until a manual restart.
   useEffect(() => {
     if (!user) return
@@ -312,7 +312,7 @@ function PublishedList({
               void handleSignIn()
             }}
             disabled={signingIn}
-            className="dark:bg-dark-surface2 dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-8 items-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium text-[#1C1C18] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            className="dark:bg-dark-surface2 text-warm-text dark:text-dark-text border-warm-border2 dark:border-dark-border2 hover:border-accent hover:dark:border-accent-dark inline-flex h-8 items-center gap-2 rounded-md border bg-white px-3 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg width={15} height={15} viewBox="0 0 18 18" fill="none" aria-hidden>
               <path
@@ -361,7 +361,7 @@ function PublishedList({
 
   // Stale banner — the last remote fetch failed, so the rows below are
   // the local cache and may be behind the backend (e.g. a revoke done
-  // on spool.pro/me). A persistent inline strip, not a toast: the
+  // on spool.new/me). A persistent inline strip, not a toast: the
   // condition persists until a refresh succeeds, and the focus-driven
   // refresh would re-toast on every window switch.
   const handleRetry = async () => {

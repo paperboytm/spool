@@ -5,8 +5,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { blogPosts } from '../lib/content'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 
-const SITE = 'https://spool.pro'
+const SITE = PUBLIC_SITE_ORIGIN
 const TITLE = 'Spool Blog'
 const DESC = 'Updates, technical deep-dives, and product announcements from the Spool team.'
 

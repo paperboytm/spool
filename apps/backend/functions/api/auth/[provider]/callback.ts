@@ -17,7 +17,7 @@ import { safeNext } from '../../../../src/auth/next'
 import { getProvider } from '../../../../src/auth/providers/registry'
 import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { ApiError, jsonError } from '../../../../src/errors'
-import { publicBaseUrl } from '../../../../src/public-url'
+import { oauthPublicBaseUrl } from '../../../../src/public-url'
 import { checkRate } from '../../../../src/rate-limit'
 import { clientIp } from '../../../../src/request'
 import { CC_NO_STORE } from '../../../../src/security/cache-control'
@@ -66,7 +66,7 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     const next = safeNext(rawNext)
 
     // Must match /api/auth/[provider]/start's redirect_uri exactly.
-    const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/${provider.id}/callback`
+    const redirectUri = `${oauthPublicBaseUrl(ctx.request, ctx.env)}/api/auth/${provider.id}/callback`
     const claim = await provider.exchangeCode(
       { code, codeVerifier: verifier, redirectUri },
       ctx.env,

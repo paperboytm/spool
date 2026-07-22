@@ -22,6 +22,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { snapshotOgHead } from '../lib/og-meta'
 import { SLUG_RE } from '../lib/route'
 import { serverApiOrigin } from '../lib/server-api-origin'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 import { Reader } from '../pages/Reader'
 
 interface MetaForOg {
@@ -33,23 +34,19 @@ interface MetaForOg {
 }
 
 export interface LoaderData {
-  og: { title: string; origin: string } | null
+  og: { title: string } | null
 }
 
 async function loadOgMeta(slug: string): Promise<LoaderData> {
   if (!SLUG_RE.test(slug)) throw notFound()
   if (!import.meta.env.SSR) return { og: null }
 
-  const server = await import('@tanstack/react-start/server')
-  const requestUrl = server.getRequest().url
-  const origin = new URL(requestUrl).origin
-
   try {
     const apiOrigin = serverApiOrigin()
     const res = await fetch(`${apiOrigin}/api/meta/${encodeURIComponent(slug)}`)
     if (res.status !== 200) return { og: null }
     const meta = (await res.json()) as MetaForOg
-    return { og: { title: meta.title ?? '', origin } }
+    return { og: { title: meta.title ?? '' } }
   } catch {
     return { og: null }
   }
@@ -63,8 +60,8 @@ export const Route = createFileRoute('/s/$slug')({
     if (!og) return {}
     return snapshotOgHead({
       title: og.title,
-      ogImageUrl: `${og.origin}/api/og/${params.slug}.png`,
-      canonicalUrl: `${og.origin}/s/${params.slug}`,
+      ogImageUrl: `${PUBLIC_SITE_ORIGIN}/api/og/${params.slug}.png`,
+      canonicalUrl: `${PUBLIC_SITE_ORIGIN}/s/${params.slug}`,
     })
   },
   component: SnapshotSharePage,

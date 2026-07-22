@@ -1,4 +1,4 @@
-// One-click share to spool.pro (the v2 records share). Prepare runs
+// One-click share to spool.new (the v2 records share). Prepare runs
 // locally and shows the honesty gate — record count, diffstat, redact
 // findings — before anything leaves the machine; Share runs the same
 // 3-step handshake the CLI uses. Mirrors RefreshFromSourceDialog's outer
@@ -110,7 +110,7 @@ export default function HubShareDialog({ open, sessionUuid, initialSummary = '',
     >
       <div
         className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border w-[480px] max-w-[90vw] overflow-hidden rounded-[10px] border font-sans"
-        style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
+        style={{ boxShadow: '0 18px 48px rgba(10,10,10,0.18), 0 2px 6px rgba(10,10,10,0.08)' }}
       >
         <div className="px-6 pt-5 pb-5">
           <div className="text-accent dark:text-accent-dark flex items-center gap-1.5 text-[12px] font-medium">

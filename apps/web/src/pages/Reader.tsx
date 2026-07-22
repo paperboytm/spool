@@ -73,9 +73,9 @@ export function Reader({ id }: { id: string }) {
       const next = fromFetch(result)
       setState(next)
       if (next.kind === 'ok') {
-        document.title = `${normalizeTabTitle(next.snapshot.conversation.title)} · spool.pro`
+        document.title = `${normalizeTabTitle(next.snapshot.conversation.title)} · spool.new`
       } else if (next.kind === 'gone' || next.kind === 'not-found') {
-        document.title = 'Unavailable · spool.pro'
+        document.title = 'Unavailable · spool.new'
       }
     })
     return () => {

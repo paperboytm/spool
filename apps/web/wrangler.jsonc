@@ -1,17 +1,20 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  // Keep the existing production service name so the first direct deploy can
-  // replace its script without trying to steal the already-bound route.
-  "name": "spool-pro-router",
+  // Post-acquisition home: the site runs on spool.new in the Paperboy
+  // Cloudflare account.
+  "name": "spool-new-router",
+  "account_id": "6898ecdad1e8341d3e09d4b46124d72e",
   "main": "src/server.ts",
   "compatibility_date": "2026-07-17",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
+  // Keep a Worker route while the acquired apex still has legacy DNS.
+  // The route takes ownership of every request without disrupting spool.pro.
   "routes": [
     {
-      "pattern": "spool.pro/*",
-      "zone_name": "spool.pro",
+      "pattern": "spool.new/*",
+      "zone_name": "spool.new",
     },
   ],
   "vars": {
@@ -23,11 +26,11 @@
   },
   "env": {
     "staging": {
-      "name": "spool-pro-router-staging",
+      "name": "spool-new-router-staging",
       "routes": [
         {
-          "pattern": "staging.spool.pro/*",
-          "zone_name": "spool.pro",
+          "pattern": "staging.spool.new/*",
+          "zone_name": "spool.new",
         },
       ],
       "vars": {

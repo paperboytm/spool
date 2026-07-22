@@ -1,4 +1,4 @@
-import { session as electronSession } from 'electron'
+import type { Session } from 'electron'
 
 import { backendUrl, DEFAULT_BACKEND } from '../share/backend-url.js'
 
@@ -36,12 +36,12 @@ import { backendUrl, DEFAULT_BACKEND } from '../share/backend-url.js'
 
 // Backend origins: the renderer renders user-uploaded avatars served
 // from `/api/avatars/<id>` on the share-backend. In dev that's the
-// local wrangler at :8788; in prod it's spool.pro. Without these
+// local wrangler at :8788; in prod it's spool.new. Without these
 // origins in img-src Chromium silently drops the request — the
 // network tab shows nothing and the <img> renders as broken.
 const IMG_ALLOW_DEV = "'self' data: blob: https://lh3.googleusercontent.com http://localhost:8788"
 const IMG_ALLOW_PROD =
-  "'self' data: blob: https://lh3.googleusercontent.com https://spool.pro https://*.spool.pro"
+  "'self' data: blob: https://lh3.googleusercontent.com https://spool.new https://*.spool.new https://spool.pro https://*.spool.pro"
 
 // The editor's PDF preview renders a generated `blob:` URL inside an
 // `<iframe>` and lets Chromium's built-in PDF MIME handler take over.
@@ -71,14 +71,14 @@ const CONNECT_BLOB = 'blob:'
 // different backend (staging, local mock, future domain move) — the
 // renderer's direct fetches (avatars in img-src, api calls in
 // connect-src) must follow the same override or they silently 404
-// behind CSP while main happily talks to the new host. The canonical
-// spool.pro family stays in the prod allow-list unconditionally:
-// published-share URLs and avatar links keep pointing there even when
-// the API origin is overridden.
+// behind CSP while main happily talks to the new host. Both the
+// canonical spool.new family and the legacy spool.pro family
+// stay in the prod allow-list unconditionally. Existing published-share
+// URLs and avatar links may still point at spool.pro during migration.
 function overrideBackendOrigin(): string | null {
   try {
     // Compare normalized origins, not raw strings — an override of
-    // `https://spool.pro/` (trailing slash) is still the default and
+    // `https://spool.new/` (trailing slash) is still the default and
     // must not duplicate the origin in the policy.
     const origin = new URL(backendUrl()).origin
     return origin === new URL(DEFAULT_BACKEND).origin ? null : origin
@@ -114,7 +114,7 @@ export function buildCsp(opts: { dev: boolean; backendOrigin?: string | null }):
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     `img-src ${IMG_ALLOW_PROD}${extra}`,
-    `connect-src 'self' ${CONNECT_BLOB} https://spool.pro https://*.spool.pro${extra}`,
+    `connect-src 'self' ${CONNECT_BLOB} https://spool.new https://*.spool.new https://spool.pro https://*.spool.pro${extra}`,
     `frame-src ${FRAME_ALLOW}`,
     `object-src ${OBJECT_ALLOW}`,
     "frame-ancestors 'none'",
@@ -157,7 +157,7 @@ const PROD_CSP = buildCsp({ dev: false })
 const PF_DEV_CSP = buildPfInferenceCsp({ dev: true })
 const PF_PROD_CSP = buildPfInferenceCsp({ dev: false })
 
-export function installRendererCsp(opts: { dev: boolean }): void {
+export function installRendererCsp(opts: { dev: boolean }, rendererSession: Session): void {
   // Diagnostic escape hatch: setting SPOOL_DISABLE_CSP=1 skips the
   // installation entirely so we can A/B which directive is gating a
   // surface. Kept inside the module rather than at the call site so a
@@ -165,7 +165,7 @@ export function installRendererCsp(opts: { dev: boolean }): void {
   if (process.env['SPOOL_DISABLE_CSP'] === '1') return
   const policy = buildCsp({ dev: opts.dev, backendOrigin: overrideBackendOrigin() })
   const pfPolicy = opts.dev ? PF_DEV_CSP : PF_PROD_CSP
-  electronSession.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+  rendererSession.webRequest.onHeadersReceived((details, callback) => {
     // Only inject CSP into responses for the documents we actually
     // ship. Chromium's built-in PDF viewer extension serves its UI
     // off `chrome-extension://`; if we replace that response's CSP

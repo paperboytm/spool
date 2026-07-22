@@ -45,7 +45,7 @@ export default function RefreshFromSourceDialog({ open, busy, onConfirm, onCance
     >
       <div
         className="bg-warm-bg dark:bg-dark-bg border-warm-border dark:border-dark-border w-[460px] max-w-[90vw] overflow-hidden rounded-[10px] border font-sans"
-        style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
+        style={{ boxShadow: '0 18px 48px rgba(10,10,10,0.18), 0 2px 6px rgba(10,10,10,0.08)' }}
       >
         <div className="px-6 pt-5 pb-4">
           <div className="text-accent dark:text-accent-dark flex items-center gap-1.5 text-[12px] font-medium">

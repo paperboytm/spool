@@ -1,6 +1,6 @@
 # @spool-lab/cli
 
-CLI for publishing, reading, resuming, and managing agent Sessions with [Spool](https://spool.pro).
+CLI for publishing, reading, resuming, and managing agent Sessions with [Spool](https://spool.new).
 
 ## Run
 

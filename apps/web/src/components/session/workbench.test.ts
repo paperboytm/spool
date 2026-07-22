@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 
 import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
+import type { SessionRoute } from '../../lib/session-route'
 
 vi.mock('@spool-lab/session-view', () => ({
   MessageList: ({ useWindowScroll }: { useWindowScroll?: boolean }) =>
@@ -253,6 +254,7 @@ function renderWorkbench(
     view?: SessionViewV1 | null
     provider?: SessionProvider
     visibility?: HubSessionMeta['visibility']
+    route?: SessionRoute | null
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -266,6 +268,7 @@ function renderWorkbench(
       view: options.view === undefined ? view : options.view,
       provider: options.provider ?? 'claude',
       conversation: options.messages ?? conversation,
+      ...(options.route === undefined ? {} : { route: options.route }),
       isDark: false,
       initialRecordIndex: null,
       spoolDocument:
@@ -291,6 +294,69 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('Published full prompt')
     expect(html).toContain('<h1>Purpose</h1>')
     expect(html).not.toContain('>Files<')
+  })
+
+  it('never falls back to raw metadata when a curated title is blank', () => {
+    const document = spoolDocument([{ role: 'user', body: 'Published prompt' }])
+    document.conversation.title = '   '
+    const html = renderWorkbench({
+      spool: document,
+      messages: { ...conversation, title: 'Unpublished private title' },
+    })
+
+    expect(html).toContain('Shared session')
+    expect(html).not.toContain('Unpublished private title')
+  })
+
+  it('renders a projected route for a curated .spool timeline', () => {
+    const html = renderWorkbench({
+      spool: spoolDocument([
+        { role: 'user', body: 'Published first phase' },
+        { role: 'assistant', body: 'Work' },
+        { role: 'user', body: 'Published second phase' },
+      ]),
+      route: {
+        goal: 'Published first phase',
+        phases: [
+          {
+            recordIndex: 2,
+            turnIndex: 0,
+            timestamp: null,
+            isPrompt: true,
+            label: 'Published first phase',
+            tools: 1,
+            edits: 0,
+            commands: 0,
+            agents: 0,
+            errors: 0,
+            checkRuns: 0,
+            checkFails: 0,
+          },
+          {
+            recordIndex: 8,
+            turnIndex: 2,
+            timestamp: null,
+            isPrompt: true,
+            label: 'Published second phase',
+            tools: 2,
+            edits: 1,
+            commands: 0,
+            agents: 0,
+            errors: 0,
+            checkRuns: 0,
+            checkFails: 0,
+          },
+        ],
+        totalErrors: 0,
+        prUrl: null,
+        prLabel: null,
+      },
+    })
+
+    expect(html).toContain('id="session-route-title"')
+    expect(html).toContain('/goal')
+    expect(html).toContain('Published second phase')
+    expect(html).toContain('data-testid="timeline-body"')
   })
 
   it('uses update time only for Link-only sharing metadata', () => {

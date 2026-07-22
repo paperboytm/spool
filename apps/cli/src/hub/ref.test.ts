@@ -16,8 +16,8 @@ describe('resolveSessionRef', () => {
     ],
     [
       'share URL',
-      `https://spool.pro/session/${CLAUDE_SID}`,
-      { sid: CLAUDE_SID, provider: 'claude', hubUrl: 'https://spool.pro' },
+      `https://spool.new/session/${CLAUDE_SID}`,
+      { sid: CLAUDE_SID, provider: 'claude', hubUrl: 'https://spool.new' },
     ],
     [
       'share URL with position',
@@ -29,6 +29,14 @@ describe('resolveSessionRef', () => {
     expect(resolveSessionRef(input)).toEqual(expected)
   })
 
+  it('keeps legacy spool.pro Session URLs resumable', () => {
+    expect(resolveSessionRef(`https://spool.pro/session/${CLAUDE_SID}`)).toEqual({
+      sid: CLAUDE_SID,
+      provider: 'claude',
+      hubUrl: 'https://spool.pro',
+    })
+  })
+
   it.each([
     '',
     '11111111-2222-4333-8444-555555555555',
@@ -36,10 +44,10 @@ describe('resolveSessionRef', () => {
     'claude_not!a!uuid',
     `${CLAUDE_SID}@-1`,
     `${CLAUDE_SID}@1.5`,
-    `http://spool.pro/session/${CLAUDE_SID}`,
-    `https://spool.pro/s/${CLAUDE_SID}`,
-    `https://spool.pro/session/${CLAUDE_SID}?position=1`,
-    `https://spool.pro/session/${CLAUDE_SID}/extra`,
+    `http://spool.new/session/${CLAUDE_SID}`,
+    `https://spool.new/s/${CLAUDE_SID}`,
+    `https://spool.new/session/${CLAUDE_SID}?position=1`,
+    `https://spool.new/session/${CLAUDE_SID}/extra`,
   ])('rejects bad input: %s', (input) => {
     expect(() => resolveSessionRef(input)).toThrow('Invalid session reference')
   })

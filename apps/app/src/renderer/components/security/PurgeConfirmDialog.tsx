@@ -101,7 +101,7 @@ export default function PurgeConfirmDialog({
     >
       <div
         className={`bg-warm-bg dark:bg-dark-bg rounded-[10px] font-sans ${bulk ? 'w-[520px]' : 'w-[460px]'} border-warm-border dark:border-dark-border max-w-[90vw] overflow-hidden border`}
-        style={{ boxShadow: '0 18px 48px rgba(28,28,24,0.18), 0 2px 6px rgba(28,28,24,0.08)' }}
+        style={{ boxShadow: '0 18px 48px rgba(10,10,10,0.18), 0 2px 6px rgba(10,10,10,0.08)' }}
       >
         <div className="px-6 pt-5 pb-4">
           <div className="text-accent dark:text-accent-dark flex items-center gap-1.5 text-[12px] font-medium">

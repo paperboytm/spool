@@ -23,7 +23,7 @@ async function runWithMiddleware(
 
 describe('GET /api/health', () => {
   it('returns 200 + ok + version + time and the global security headers', async () => {
-    const r = await runWithMiddleware(new Request('https://spool.pro/api/health'))
+    const r = await runWithMiddleware(new Request('https://spool.new/api/health'))
     expect(r.status).toBe(200)
     expect(r.headers.get('x-robots-tag')).toBe('noindex')
     expect(r.headers.get('x-content-type-options')).toBe('nosniff')
@@ -37,7 +37,7 @@ describe('GET /api/health', () => {
   })
 
   it('surfaces BUILD_VERSION when set by the deploy', async () => {
-    const r = await runWithMiddleware(new Request('https://spool.pro/api/health'), {
+    const r = await runWithMiddleware(new Request('https://spool.new/api/health'), {
       BUILD_VERSION: 'abc1234',
     })
     const body = (await r.json()) as { version: string }

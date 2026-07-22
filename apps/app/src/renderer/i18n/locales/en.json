@@ -354,7 +354,7 @@
       "deleteConfirm_item_shares_prefix": "Every published share returns",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "Your handle is released and can be re-claimed by anyone",
-      "deleteConfirm_item_record": "Your account record is removed from spool.pro",
+      "deleteConfirm_item_record": "Your account record is removed from spool.new",
       "deleteConfirm_footnote": "You can cancel from this screen any time before the cool-off expires. Drafts on this device are unaffected — they live locally.",
       "deleteConfirm_confirm": "Schedule deletion",
       "deleteConfirm_scheduling": "Scheduling…",
@@ -636,7 +636,7 @@
       "publishUnredacted": "Publish with secrets visible",
       "publishing": "Publishing…",
       "tryAgain": "Try again",
-      "footerHint": "A snapshot uploads to spool.pro. Revoke any time.",
+      "footerHint": "A snapshot uploads to spool.new. Revoke any time.",
       "footerHint_published": "Snapshot lives at the link above. Revoke any time.",
       "error_sessionExpired": "Your session expired — sign in again to publish.",
       "error_rateLimited": "Too many publishes. Try again in a few minutes.",
@@ -670,7 +670,7 @@
       "downloading": "Exporting…"
     },
     "connectCard": {
-      "title": "Sign in to spool.pro",
+      "title": "Sign in to spool.new",
       "body": "Spool only ever uploads snapshots you explicitly publish. Drafts and your library never leave this machine.",
       "signInWithGoogle": "Sign in with Google",
       "waitingForBrowser": "Waiting for browser…",
@@ -680,7 +680,7 @@
       "title": "Unpublish this share?",
       "body_prefix": "This is permanent. The link will return",
       "body_emphasis": "410 Gone",
-      "body_suffix": ", the snapshot is deleted from spool.pro storage, and the URL can't be reused. To share this conversation again you'll need to publish a fresh copy — it will have a new URL.",
+      "body_suffix": ", the snapshot is deleted from spool.new storage, and the URL can't be reused. To share this conversation again you'll need to publish a fresh copy — it will have a new URL.",
       "confirm": "Yes, unpublish permanently",
       "confirming": "Unpublishing…"
     }
@@ -912,10 +912,10 @@
     "toggleOptions": "Show options"
   },
   "hubShare": {
-    "menuLabel": "Share to spool.pro",
-    "pretitle": "Share to spool.pro",
+    "menuLabel": "Share to spool.new",
+    "pretitle": "Share to spool.new",
     "title": "Publish this Session?",
-    "lead": "Publishes the full transcript ({{records}} records) as a Public Session on spool.pro. It can appear in Explore and search, and the source Session stays unchanged.",
+    "lead": "Publishes the full transcript ({{records}} records) as a Public Session on spool.new. It can appear in Explore and search, and the source Session stays unchanged.",
     "secretsWarning": "{{total}} potential secrets detected ({{high}} high severity). Sharing sends these values — review with Security Scan first if unsure.",
     "summaryLabel": "Summary (Markdown)",
     "publish": "Publish Session",
@@ -923,7 +923,7 @@
     "doneTitle": "Session published",
     "doneLead": "This Session is Public and can appear in Explore and search. The source Session stays unchanged.",
     "linkOnlyTitle": "Create a Link-only share?",
-    "linkOnlyLead": "This provider is not supported in Explore yet. Shares the full transcript ({{records}} records) at a Link-only URL on spool.pro; the source Session stays unchanged.",
+    "linkOnlyLead": "This provider is not supported in Explore yet. Shares the full transcript ({{records}} records) at a Link-only URL on spool.new; the source Session stays unchanged.",
     "linkOnlyPublish": "Share link",
     "linkOnlyPublishing": "Sharing…",
     "linkOnlyDoneTitle": "Link shared",

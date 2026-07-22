@@ -235,7 +235,7 @@ export default function SettingsPanel({
 }: Props) {
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const { t } = useTranslation()
-  // Account tab is the spool.pro identity surface (sign-in, handle,
+  // Account tab is the spool.new identity surface (sign-in, handle,
   // delete-account schedule). Sub-gated behind the share-publish flag
   // so the tab doesn't appear in pre-launch dev builds that don't
   // opt into the publish stack.

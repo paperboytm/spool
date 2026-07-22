@@ -239,7 +239,7 @@ export function FlowShow() {
           </span>
         </div>
         <div className="fs-pill">
-          <span className="fs-url">spool.pro/session/claude_7a55b1ee</span>
+          <span className="fs-url">spool.new/session/claude_7a55b1ee</span>
           <span className="fs-vis">Public</span>
         </div>
       </div>

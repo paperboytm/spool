@@ -16,28 +16,29 @@
 @source "./";
 
 @theme {
-  /* Warm palette — mirror of packages/app/src/renderer/styles.css @theme.
+  /* Legacy utility names mapped to the Void Index palette — mirror of
+   * packages/app/src/renderer/styles.css @theme.
    * Only the tokens these components reference. If the app palette
    * changes, change it here too (single-source extraction is a later
    * refactor). */
-  --color-warm-bg: #fafaf8;
-  --color-warm-surface: #f4f4f0;
-  --color-warm-surface2: #eeeee9;
-  --color-warm-border: #e8e8e2;
-  --color-warm-border2: #d8d8d0;
-  --color-warm-text: #1c1c18;
-  --color-warm-muted: #6b6b60;
-  --color-warm-faint: #adadaa;
-  --color-accent: #c85a00;
-  --color-dark-bg: #141410;
-  --color-dark-surface: #1c1c18;
-  --color-dark-surface2: #242420;
-  --color-dark-border: #2e2e28;
-  --color-dark-border2: #3a3a34;
-  --color-dark-text: #f2f2ec;
-  --color-dark-muted: #9a9a8e;
-  --color-dark-faint: #505048;
-  --color-accent-dark: #f07020;
+  --color-warm-bg: #ffffff;
+  --color-warm-surface: #f5f5f5;
+  --color-warm-surface2: #ececec;
+  --color-warm-border: #e5e5e5;
+  --color-warm-border2: #d4d4d4;
+  --color-warm-text: #0a0a0a;
+  --color-warm-muted: #666666;
+  --color-warm-faint: #a3a3a3;
+  --color-accent: #1387ff;
+  --color-dark-bg: #000000;
+  --color-dark-surface: #090909;
+  --color-dark-surface2: #111111;
+  --color-dark-border: #1f1f1f;
+  --color-dark-border2: #2e2e2e;
+  --color-dark-text: #ffffff;
+  --color-dark-muted: #a6a6a6;
+  --color-dark-faint: #555555;
+  --color-accent-dark: #5bb1f0;
 }
 
 /* Scrollbar plumbing the components rely on (mirrors the app's). */

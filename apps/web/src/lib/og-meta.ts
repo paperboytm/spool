@@ -6,6 +6,8 @@
 // the escaping. Kept pure (values in, values out, no fetch) so the
 // capping/fallback behaviour stays unit-testable in node.
 
+import { PUBLIC_SITE_HOST } from './site'
+
 export interface OgMeta {
   /** Snapshot conversation.title — gets length-capped. */
   title: string
@@ -35,7 +37,7 @@ export function snapshotOgHead(og: OgMeta): HeadFragment {
   const desc = og.description ?? DEFAULT_DESC
   return {
     meta: [
-      { title: `${title} · spool.pro` },
+      { title: `${title} · ${PUBLIC_SITE_HOST}` },
       { name: 'description', content: desc },
       { property: 'og:type', content: 'article' },
       { property: 'og:title', content: title },
@@ -69,7 +71,7 @@ export function sessionOgHead(og: SessionOgMeta): HeadFragment {
   const desc = og.description || 'A shared coding-agent session on Spool.'
   return {
     meta: [
-      { title: `${title} · spool.pro` },
+      { title: `${title} · ${PUBLIC_SITE_HOST}` },
       { name: 'description', content: desc },
       { property: 'og:type', content: 'article' },
       { property: 'og:title', content: title },

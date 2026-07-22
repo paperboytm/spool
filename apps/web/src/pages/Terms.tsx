@@ -1,6 +1,6 @@
 // Terms of service — static legal page. Keep every service and content
 // claim aligned with the publishing, visibility, withdrawal, and account
-// behavior implemented by spool.pro.
+// behavior implemented by spool.new.
 
 import { useEffect } from 'react'
 
@@ -10,7 +10,7 @@ const LAST_UPDATED = 'July 20, 2026'
 
 export function Terms() {
   useEffect(() => {
-    document.title = 'Terms · spool.pro'
+    document.title = 'Terms · spool.new'
   }, [])
 
   return (
@@ -18,12 +18,12 @@ export function Terms() {
       <Header />
       <main className="sw-main">
         <article className="sw-card sw-legal w-600">
-          <p className="sw-eyebrow">spool.pro</p>
+          <p className="sw-eyebrow">spool.new</p>
           <h1 className="sw-title">Terms of service</h1>
           <p className="sw-legal-date">Last updated: {LAST_UPDATED}</p>
 
           <p>
-            These terms cover spool.pro and its Session publishing, reading, Profile, Discovery, and
+            These terms cover spool.new and its Session publishing, reading, Profile, Discovery, and
             Resume services. By creating an account or sharing a Session, you agree to them. The
             short version: your content remains yours, you are responsible for what you disclose, do
             not use the service to harm people, and the service is provided as-is.
@@ -81,7 +81,7 @@ export function Terms() {
           </p>
 
           <h2>Use restrictions</h2>
-          <p>You may not use spool.pro to share, publish, or distribute:</p>
+          <p>You may not use spool.new to share, publish, or distribute:</p>
           <ul>
             <li>illegal content or material you do not have the right to disclose</li>
             <li>other people’s personal or confidential information without permission</li>
@@ -109,7 +109,7 @@ export function Terms() {
           <p>
             To the maximum extent permitted by law, we are not liable for indirect, incidental, or
             consequential damages arising from use of the service. Our total liability for a claim
-            is limited to the amount paid to use spool.pro during the previous twelve months—which
+            is limited to the amount paid to use spool.new during the previous twelve months—which
             is zero while the service is free.
           </p>
 

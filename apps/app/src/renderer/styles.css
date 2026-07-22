@@ -241,7 +241,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background-color: #f07020;
+  background-color: var(--sp-accent);
   pointer-events: none;
   border-radius: inherit;
   animation: spool-share-jump-flash 1600ms ease-out forwards;

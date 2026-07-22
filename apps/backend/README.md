@@ -1,6 +1,6 @@
 # @spool/backend
 
-Cloudflare Pages Functions backing spool.pro identity, Hub storage, Session reads, publication documents, Profiles, account management, media, and audit surfaces.
+Cloudflare Pages Functions backing spool.new identity, Hub storage, Session reads, publication documents, Profiles, account management, media, and audit surfaces.
 
 ## Responsibilities
 
@@ -86,7 +86,7 @@ For Backend + Web + Desktop together:
 Run the manual probe against staging before production promotion:
 
 ```bash
-TARGET=https://staging.spool.pro ./apps/backend/tests/pentest.sh
+TARGET=https://staging.spool.new ./apps/backend/tests/pentest.sh
 ```
 
 It checks security headers, unauthenticated access, identifier enumeration, and redirect handling.

@@ -347,7 +347,7 @@
       "deleteConfirm_item_shares_prefix": "公開済みのすべての共有は",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "ハンドルは解放され、誰でも再取得できます",
-      "deleteConfirm_item_record": "アカウントレコードは spool.pro から削除されます",
+      "deleteConfirm_item_record": "アカウントレコードは spool.new から削除されます",
       "deleteConfirm_footnote": "クールオフ終了前であればこの画面からいつでもキャンセルできます。このデバイス上の下書きは影響を受けません — ローカルに保存されています。",
       "deleteConfirm_confirm": "削除を予約",
       "deleteConfirm_scheduling": "予約中…",
@@ -606,7 +606,7 @@
       "publishUnredacted": "秘密情報を表示したまま公開",
       "publishing": "公開中…",
       "tryAgain": "再試行",
-      "footerHint": "スナップショットは spool.pro にアップロードされます。いつでも取り消せます。",
+      "footerHint": "スナップショットは spool.new にアップロードされます。いつでも取り消せます。",
       "footerHint_published": "スナップショットは上のリンクにあります。いつでも取り消せます。",
       "error_sessionExpired": "セッションの有効期限が切れました — 公開するには再度サインインしてください。",
       "error_rateLimited": "公開回数が多すぎます。数分後に再試行してください。",
@@ -637,7 +637,7 @@
       "downloading": "エクスポート中…"
     },
     "connectCard": {
-      "title": "spool.pro にサインイン",
+      "title": "spool.new にサインイン",
       "body": "Spool は明示的に公開したスナップショットのみをアップロードします。下書きとライブラリはこのマシンから出ることはありません。",
       "signInWithGoogle": "Google でサインイン",
       "waitingForBrowser": "ブラウザを待機中…",
@@ -647,7 +647,7 @@
       "title": "この共有の公開を取り消しますか？",
       "body_prefix": "この操作は取り消せません。リンクは",
       "body_emphasis": "410 Gone",
-      "body_suffix": " を返し、スナップショットは spool.pro のストレージから削除され、URL は再利用できなくなります。この会話を再度共有するには新しいコピーを公開する必要があり — 新しい URL になります。",
+      "body_suffix": " を返し、スナップショットは spool.new のストレージから削除され、URL は再利用できなくなります。この会話を再度共有するには新しいコピーを公開する必要があり — 新しい URL になります。",
       "confirm": "はい、永久に公開を取り消す",
       "confirming": "取り消し中…"
     }
@@ -870,10 +870,10 @@
     "toggleOptions": "オプション"
   },
   "hubShare": {
-    "menuLabel": "spool.pro に共有",
-    "pretitle": "spool.pro に共有",
+    "menuLabel": "spool.new に共有",
+    "pretitle": "spool.new に共有",
     "title": "このセッションを公開しますか？",
-    "lead": "完全なトランスクリプト（{{records}} 件のレコード）を spool.pro の公開セッションとして公開します。Explore と検索に表示される可能性があり、元のセッションは変更されません。",
+    "lead": "完全なトランスクリプト（{{records}} 件のレコード）を spool.new の公開セッションとして公開します。Explore と検索に表示される可能性があり、元のセッションは変更されません。",
     "secretsWarning": "{{total}} 件の機密情報の可能性が検出されました(うち {{high}} 件が高リスク)。共有するとこれらの値が送信されます。",
     "summaryLabel": "要約（Markdown）",
     "publish": "セッションを公開",
@@ -881,7 +881,7 @@
     "doneTitle": "セッションを公開しました",
     "doneLead": "このセッションは公開され、Explore と検索に表示される可能性があります。元のセッションは変更されません。",
     "linkOnlyTitle": "このセッションのリンク限定共有を作成しますか？",
-    "linkOnlyLead": "このプロバイダーはまだ Explore に対応していません。完全なトランスクリプト（{{records}} 件のレコード）を spool.pro のリンク限定 URL で共有し、元のセッションは変更されません。",
+    "linkOnlyLead": "このプロバイダーはまだ Explore に対応していません。完全なトランスクリプト（{{records}} 件のレコード）を spool.new のリンク限定 URL で共有し、元のセッションは変更されません。",
     "linkOnlyPublish": "リンクを共有",
     "linkOnlyPublishing": "共有中…",
     "linkOnlyDoneTitle": "リンクを共有しました",

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Spool Daemon installer — downloads the latest release and installs to /Applications
-# Usage: curl -fsSL https://spool.pro/install-daemon.sh | bash
+# Usage: curl -fsSL https://spool.new/install-daemon.sh | bash
 
 REPO="spool-lab/spool-daemon"
 APP_NAME="Spool Daemon.app"

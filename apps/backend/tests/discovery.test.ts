@@ -97,7 +97,7 @@ function seedDiscovery(
 }
 
 function engagementRequest(sid: string, body: unknown = { kind: 'qualified_read' }): Request {
-  return new Request(`https://spool.pro/api/discovery/v1/sessions/${sid}/engagement`, {
+  return new Request(`https://spool.new/api/discovery/v1/sessions/${sid}/engagement`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -218,7 +218,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const response = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?sort=recent'),
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
       env,
     )
     const body = (await response.json()) as {
@@ -247,7 +247,7 @@ describe('GET /api/discovery/v1/sessions', () => {
     env.state.users[0]!.avatar_visible = 0
     const hiddenAvatarResponse = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?sort=recent'),
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
       env,
     )
     const hiddenAvatarBody = (await hiddenAvatarResponse.json()) as {
@@ -281,7 +281,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const recommended = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?sort=recommended'),
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recommended'),
       env,
     )
     const recommendedItems = (await recommended.json()) as { items: Array<{ sid: string }> }
@@ -289,7 +289,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const search = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?q=refresh%20tokens&sort=trending'),
+      new Request('https://spool.new/api/discovery/v1/sessions?q=refresh%20tokens&sort=trending'),
       env,
     )
     const searchItems = (await search.json()) as { items: Array<{ sid: string }> }
@@ -304,7 +304,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const first = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?sort=recent&limit=1'),
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent&limit=1'),
       env,
     )
     const firstBody = (await first.json()) as {
@@ -317,7 +317,7 @@ describe('GET /api/discovery/v1/sessions', () => {
     const second = await invoke(
       sessionsGet,
       new Request(
-        `https://spool.pro/api/discovery/v1/sessions?sort=recent&limit=1&cursor=${firstBody.nextCursor}`,
+        `https://spool.new/api/discovery/v1/sessions?sort=recent&limit=1&cursor=${firstBody.nextCursor}`,
       ),
       env,
     )
@@ -329,12 +329,12 @@ describe('GET /api/discovery/v1/sessions', () => {
     expect(secondBody.nextCursor).toBeNull()
 
     const invalidUrls = [
-      'https://spool.pro/api/discovery/v1/sessions?q=',
-      'https://spool.pro/api/discovery/v1/sessions?sort=popular',
-      'https://spool.pro/api/discovery/v1/sessions?agent=gemini',
-      'https://spool.pro/api/discovery/v1/sessions?limit=0',
-      'https://spool.pro/api/discovery/v1/sessions?cursor=not.valid',
-      `https://spool.pro/api/discovery/v1/sessions?sort=trending&cursor=${firstBody.nextCursor}`,
+      'https://spool.new/api/discovery/v1/sessions?q=',
+      'https://spool.new/api/discovery/v1/sessions?sort=popular',
+      'https://spool.new/api/discovery/v1/sessions?agent=gemini',
+      'https://spool.new/api/discovery/v1/sessions?limit=0',
+      'https://spool.new/api/discovery/v1/sessions?cursor=not.valid',
+      `https://spool.new/api/discovery/v1/sessions?sort=trending&cursor=${firstBody.nextCursor}`,
     ]
     for (const url of invalidUrls) {
       const response = await invoke(sessionsGet, new Request(url), env)
@@ -357,7 +357,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const response = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?q=maya&agent=claude'),
+      new Request('https://spool.new/api/discovery/v1/sessions?q=maya&agent=claude'),
       env,
     )
     const body = (await response.json()) as { items: Array<{ sid: string }> }
@@ -365,7 +365,7 @@ describe('GET /api/discovery/v1/sessions', () => {
 
     const none = await invoke(
       sessionsGet,
-      new Request('https://spool.pro/api/discovery/v1/sessions?q=does-not-match'),
+      new Request('https://spool.new/api/discovery/v1/sessions?q=does-not-match'),
       env,
     )
     await expect(none.json()).resolves.toMatchObject({ items: [] })

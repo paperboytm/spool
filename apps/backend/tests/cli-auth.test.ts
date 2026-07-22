@@ -53,7 +53,7 @@ async function sessionCookie(env: Env, userId = 'u1'): Promise<string> {
 }
 
 async function startRequest(env: Env, label = 'devbox.local') {
-  const req = new Request('https://spool.pro/api/cli-auth/start', {
+  const req = new Request('https://spool.new/api/cli-auth/start', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ label }),
@@ -74,7 +74,7 @@ async function approveRequest(
   cookie: string,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const req = new Request('https://spool.pro/api/cli-auth/approve', {
+  const req = new Request('https://spool.new/api/cli-auth/approve', {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify(body),
@@ -83,7 +83,7 @@ async function approveRequest(
 }
 
 async function pollRequest(env: Env, deviceCode: string): Promise<Response> {
-  const req = new Request('https://spool.pro/api/cli-auth/poll', {
+  const req = new Request('https://spool.new/api/cli-auth/poll', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ device_code: deviceCode }),
@@ -109,7 +109,7 @@ describe('POST /api/cli-auth/start', () => {
     expect(body.device_code.length).toBeGreaterThanOrEqual(43)
     expect(body.user_code).toMatch(/^[BCDFGHJKMNPQRSTWXZ2-9]{4}-[BCDFGHJKMNPQRSTWXZ2-9]{4}$/)
     expect(body.verification_uri).toBe(
-      `https://spool.pro/cli-auth?code=${encodeURIComponent(body.user_code)}`,
+      `https://spool.new/cli-auth?code=${encodeURIComponent(body.user_code)}`,
     )
     expect(body.expires_in).toBe(15 * 60)
     expect(body.interval).toBe(3)
@@ -121,7 +121,7 @@ describe('POST /api/cli-auth/start', () => {
     await env.RATE.put(`rate/cli-auth-start/1.2.3.4/${slot}`, String(CLI_AUTH_START_RATE_MAX), {
       expirationTtl: CLI_AUTH_START_RATE_WINDOW_SEC,
     })
-    const req = new Request('https://spool.pro/api/cli-auth/start', {
+    const req = new Request('https://spool.new/api/cli-auth/start', {
       method: 'POST',
       headers: { 'cf-connecting-ip': '1.2.3.4' },
     })
@@ -134,7 +134,7 @@ describe('GET /api/cli-auth/approve (page metadata)', () => {
   it('401 without a session', async () => {
     const env = envFor()
     const { user_code } = await startRequest(env)
-    const req = new Request(`https://spool.pro/api/cli-auth/approve?code=${user_code}`)
+    const req = new Request(`https://spool.new/api/cli-auth/approve?code=${user_code}`)
     const res = await invoke(approveGet, req, env)
     expect(res.status).toBe(401)
   })
@@ -144,7 +144,7 @@ describe('GET /api/cli-auth/approve (page metadata)', () => {
     const cookie = await sessionCookie(env)
     const { user_code } = await startRequest(env)
     const req = new Request(
-      `https://spool.pro/api/cli-auth/approve?code=${user_code.toLowerCase()}`,
+      `https://spool.new/api/cli-auth/approve?code=${user_code.toLowerCase()}`,
       { headers: { cookie } },
     )
     const res = await invoke(approveGet, req, env)
@@ -157,7 +157,7 @@ describe('GET /api/cli-auth/approve (page metadata)', () => {
   it('404 on an unknown code', async () => {
     const env = envFor(stateWithUser())
     const cookie = await sessionCookie(env)
-    const req = new Request('https://spool.pro/api/cli-auth/approve?code=BBBB-BBBB', {
+    const req = new Request('https://spool.new/api/cli-auth/approve?code=BBBB-BBBB', {
       headers: { cookie },
     })
     const res = await invoke(approveGet, req, env)
@@ -234,7 +234,7 @@ describe('deny + failure modes', () => {
   it('401 approving without a session', async () => {
     const env = envFor(stateWithUser())
     const { user_code } = await startRequest(env)
-    const req = new Request('https://spool.pro/api/cli-auth/approve', {
+    const req = new Request('https://spool.new/api/cli-auth/approve', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ user_code, decision: 'approve' }),
@@ -258,7 +258,7 @@ describe('deny + failure modes', () => {
     })
     const env = envFor(state)
     const { user_code } = await startRequest(env)
-    const req = new Request('https://spool.pro/api/cli-auth/approve', {
+    const req = new Request('https://spool.new/api/cli-auth/approve', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -286,7 +286,7 @@ describe('deny + failure modes', () => {
     const env = envFor()
     const bad = await invoke(
       pollPost,
-      new Request('https://spool.pro/api/cli-auth/poll', {
+      new Request('https://spool.new/api/cli-auth/poll', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),

@@ -60,7 +60,7 @@ The current Share-focused surfaces are:
 ```text
 apps/
   cli/          CLI for indexing, sharing, reading, resuming, and automation
-  web/          spool.pro: homepage, docs, Profiles, account pages, and Session reader
+  web/          spool.new: homepage, docs, Profiles, account pages, and Session reader
   backend/      Hub, identity, publication, and media API on Cloudflare
 packages/
   core/         Local Session ingestion, organization, SQLite, and full-text search

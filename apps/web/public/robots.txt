@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://spool.pro/sitemap-index.xml
+Sitemap: https://spool.new/sitemap-index.xml

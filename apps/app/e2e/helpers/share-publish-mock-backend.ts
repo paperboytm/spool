@@ -1,4 +1,4 @@
-// Minimal in-process HTTP server that stands in for the spool.pro backend
+// Minimal in-process HTTP server that stands in for the spool.new backend
 // during e2e runs of the publish flow.
 //
 // The real backend (apps/backend) is a Cloudflare Pages Functions project: D1, KV, R2,
@@ -287,7 +287,7 @@ async function routeRequest(
         return json(res, 200, {
           id: s.id,
           version: s.version,
-          url: `https://mock.spool.pro/s/${s.id}`,
+          url: `https://mock.spool.new/s/${s.id}`,
         })
       }
     }
@@ -328,7 +328,7 @@ async function routeRequest(
     return json(res, 200, {
       id: slug,
       version,
-      url: `https://mock.spool.pro/s/${slug}`,
+      url: `https://mock.spool.new/s/${slug}`,
     })
   }
 

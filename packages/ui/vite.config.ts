@@ -10,6 +10,7 @@ export default defineConfig({
       build: {
         command: 'pnpm run clean && vp build',
         input: [{ auto: true }, '!dist/**', '!node_modules/**'],
+        output: ['dist/**'],
       },
     },
   },

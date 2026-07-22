@@ -717,7 +717,7 @@ export function runMigrations(db: Database.Database): void {
     // The editor recomputes the same hash on the live draft and
     // compares; a mismatch surfaces the "Unpublished edits" badge in
     // the manage view so the user knows their next Republish click
-    // will actually change something on spool.pro.
+    // will actually change something on spool.new.
     db.exec(`
       CREATE TABLE IF NOT EXISTS published_shares_cache (
         id                 TEXT PRIMARY KEY,

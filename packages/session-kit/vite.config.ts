@@ -6,6 +6,7 @@ export default defineConfig({
       build: {
         command: 'pnpm run clean && tsc',
         input: [{ auto: true }, '!dist/**', '!node_modules/**'],
+        output: ['dist/**'],
       },
     },
   },

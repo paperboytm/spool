@@ -63,7 +63,7 @@ describe('HubClient', () => {
   it('uploads object batches as NDJSON', async () => {
     const fetchMock = vi.fn(async () => Response.json({ stored: 2 }))
     const client = new HubClient({
-      hubUrl: 'https://spool.pro',
+      hubUrl: 'https://spool.new',
       token: 'token',
       fetch: fetchMock as typeof fetch,
     })
@@ -76,7 +76,7 @@ describe('HubClient', () => {
     ).resolves.toEqual({ stored: 2 })
 
     const [input, init] = fetchMock.mock.calls[0]!
-    expect(String(input)).toBe('https://spool.pro/api/hub/v1/objects/batch')
+    expect(String(input)).toBe('https://spool.new/api/hub/v1/objects/batch')
     expect(init?.body).toBe(
       '{"oid":"oid-a","data":"{\\"a\\":1}"}\n' + '{"oid":"oid-b","data":"{\\"b\\":2}"}\n',
     )
@@ -94,7 +94,7 @@ describe('HubClient', () => {
     })
     const fetchMock = vi.fn(async () => new Response(body, { status: 200 }))
     const client = new HubClient({
-      hubUrl: 'https://spool.pro',
+      hubUrl: 'https://spool.new',
       fetch: fetchMock as typeof fetch,
     })
 
@@ -108,20 +108,20 @@ describe('HubClient', () => {
       { i: 1, oid: 'b', data: 'two' },
     ])
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      `https://spool.pro/api/hub/v1/sessions/${SID}/records?from=0&to=2`,
+      `https://spool.new/api/hub/v1/sessions/${SID}/records?from=0&to=2`,
     )
   })
 
   it('POSTs to the contract token endpoint without requiring a request body', async () => {
     const fetchMock = vi.fn(async () => Response.json({ token: 'new-token' }))
     const client = new HubClient({
-      hubUrl: 'https://spool.pro',
+      hubUrl: 'https://spool.new',
       fetch: fetchMock as typeof fetch,
     })
 
     await expect(client.createToken()).resolves.toEqual({ token: 'new-token' })
     const [input, init] = fetchMock.mock.calls[0]!
-    expect(String(input)).toBe('https://spool.pro/api/hub/v1/tokens')
+    expect(String(input)).toBe('https://spool.new/api/hub/v1/tokens')
     expect(init).toMatchObject({ method: 'POST' })
     expect(init?.body).toBeUndefined()
   })
@@ -135,7 +135,7 @@ describe('HubClient', () => {
       async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }),
     )
     const client = new HubClient({
-      hubUrl: 'https://spool.pro',
+      hubUrl: 'https://spool.new',
       token: 'bad-token',
       fetch: fetchMock as typeof fetch,
     })

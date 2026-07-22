@@ -43,7 +43,7 @@ describe('workosProvider.buildAuthRequestUrl', () => {
         {
           state: 'S1',
           codeChallenge: 'unused-challenge',
-          redirectUri: 'https://spool.pro/api/auth/workos/callback',
+          redirectUri: 'https://spool.new/api/auth/workos/callback',
         },
         ENV,
       ),
@@ -53,7 +53,7 @@ describe('workosProvider.buildAuthRequestUrl', () => {
     expect(url.searchParams.get('provider')).toBe('authkit')
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('state')).toBe('S1')
-    expect(url.searchParams.get('redirect_uri')).toBe('https://spool.pro/api/auth/workos/callback')
+    expect(url.searchParams.get('redirect_uri')).toBe('https://spool.new/api/auth/workos/callback')
     // Confidential client: the PKCE challenge from /start must NOT be
     // forwarded — WorkOS rejects mixing code_challenge with client_secret.
     expect(url.searchParams.get('code_challenge')).toBeNull()
@@ -259,11 +259,11 @@ describe('workos web flow endpoints', () => {
   }
 
   it('returns a structured error instead of throwing when WorkOS is not configured', async () => {
-    const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')
+    const req = new Request('https://spool.new/api/auth/workos/start?next=/me')
     const res = await invoke(
       startGet,
       req,
-      { PUBLIC_BASE_URL: 'https://spool.pro' },
+      { PUBLIC_BASE_URL: 'https://spool.new' },
       { provider: 'workos' },
     )
 
@@ -277,7 +277,7 @@ describe('workos web flow endpoints', () => {
 
   it('start 302s to AuthKit with state + next baked into cookies', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')
+    const req = new Request('https://spool.new/api/auth/workos/start?next=/me')
     const res = await invoke(startGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     const loc = new URL(res.headers.get('location') ?? '')
@@ -318,7 +318,7 @@ describe('workos web flow endpoints', () => {
       throw new Error(`unexpected fetch: ${url}`)
     })
 
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=goodcode&state=S', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=goodcode&state=S', {
       headers: {
         cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
       },
@@ -348,7 +348,7 @@ describe('workos web flow endpoints', () => {
       }
       return jsonResponse({}, 500)
     })
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=c&state=S', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=c&state=S', {
       headers: {
         cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v',
       },

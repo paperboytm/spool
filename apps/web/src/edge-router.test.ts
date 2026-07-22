@@ -18,12 +18,12 @@ describe('edge router', () => {
       expect(request.url).toBe('https://spool-share-backend.pages.dev/api/health?full=1')
       expect(request.method).toBe('POST')
       expect(request.headers.get('authorization')).toBe('Bearer test')
-      expect(request.headers.get('x-forwarded-host')).toBe('spool.pro')
+      expect(request.headers.get('x-forwarded-host')).toBe('spool.new')
       expect(request.headers.get('x-forwarded-proto')).toBe('https')
       expect(await request.text()).toBe('payload')
       return new Response('api', { status: 201, headers: { 'x-upstream': 'backend' } })
     })
-    const request = new Request('https://spool.pro/api/health?full=1', {
+    const request = new Request('https://spool.new/api/health?full=1', {
       method: 'POST',
       headers: { authorization: 'Bearer test' },
       body: 'payload',
@@ -44,7 +44,7 @@ describe('edge router', () => {
   })
 
   it('passes web requests to TanStack Start unchanged', async () => {
-    const request = new Request('https://spool.pro/docs/installation')
+    const request = new Request('https://spool.new/docs/installation')
     const webFetch = vi.fn(async (received: Request) => {
       expect(received).toBe(request)
       return new Response('page', { headers: { 'cache-control': 'public, max-age=60' } })

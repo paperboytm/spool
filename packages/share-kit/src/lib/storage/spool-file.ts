@@ -111,7 +111,7 @@ function escapeRx(s: string): string {
 /** FNV-1a 32-bit hash for deterministic legacy-turn id backfill. We
  *  intentionally use FNV (not the redact-detect content hash) — it's
  *  the cheapest stable function that's portable across the renderer
- *  and the future spool.pro web reader. */
+ *  and the spool.new web reader. */
 function fnv1a32(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {

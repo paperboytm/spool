@@ -41,7 +41,7 @@ export function deepLinkHash(index: number): string {
   return `#r/${index}`
 }
 
-/** The sid alone resumes against the reader's configured hub (spool.pro
+/** The sid alone resumes against the reader's configured hub (spool.new
  *  by default) — shorter to copy than the full page URL, which stays
  *  accepted by the CLI for cross-hub cases. */
 export function resumeCommandFor(sid: string): string {

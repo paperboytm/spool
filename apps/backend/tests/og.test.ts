@@ -224,6 +224,20 @@ describe('renderOgPng', () => {
     expect(html).toMatch(/<\/div>$/)
     expect(html.match(/<div /g)?.length).toBe(4)
   })
+
+  it('uses the Paperboy blue and void light palette', async () => {
+    const { buildOgHtml } = await import('../src/publish/og')
+    const html = buildOgHtml({
+      conversation: { title: 'hello' },
+      publish: { published_at: new Date().toISOString() },
+      editor_opts: { template: 'forum', paper: 'cream', colorway: 'amber' },
+    })
+
+    expect(html).toContain('background:#FFFFFF')
+    expect(html).toContain('color:#1387FF')
+    expect(html).toContain('font-family:Geist')
+    expect(html).not.toMatch(/#C85A00|#141410|font-family:Inter/)
+  })
 })
 
 describe('GET /api/og/[id].png', () => {

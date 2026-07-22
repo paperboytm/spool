@@ -3,8 +3,8 @@ import { Toaster } from 'sonner'
 
 /**
  * App-wide toast surface. Wraps sonner's <Toaster /> with DESIGN.md tokens:
- * elevated warm card, type-specific tints + Lucide icons so status reads
- * at a glance, amber accent only on the action button.
+ * elevated neutral card, type-specific tints + Lucide icons so status reads
+ * at a glance, with the product accent reserved for the action button.
  */
 export default function AppToaster() {
   return (
@@ -24,14 +24,14 @@ export default function AppToaster() {
             'min-w-[260px] max-w-[380px] w-max px-3.5 py-2.5',
             'rounded-[10px]',
             // Default (neutral / non-typed) — elevated white card.
-            'bg-white dark:bg-[#2A2A24]',
+            'bg-white dark:bg-dark-surface2',
             'ring-1 ring-warm-border/70 dark:ring-white/[0.06]',
-            'shadow-[0_1px_2px_rgba(20,20,16,0.04),0_8px_28px_rgba(20,20,16,0.10)]',
+            'shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_28px_rgba(0,0,0,0.10)]',
             'dark:shadow-[0_2px_8px_rgba(0,0,0,0.35),0_16px_40px_rgba(0,0,0,0.45)]',
             'font-sans text-warm-text dark:text-dark-text',
           ].join(' '),
           // Per-type tints: light wash + tinted ring. Subtle enough to
-          // sit alongside warm palette, strong enough to read as status.
+          // stay subordinate to the product accent while still reading as status.
           success: [
             'bg-[#F1F8F1] dark:bg-[#1F2A1F]',
             'ring-[color:var(--color-status-success)]/30 dark:ring-[color:var(--color-status-success-dark)]/30',

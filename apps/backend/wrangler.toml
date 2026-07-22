@@ -71,7 +71,7 @@ ENV = "development"
 # Secrets (set ONCE per environment via wrangler — never commit):
 #   wrangler pages secret put WORKOS_CLIENT_ID         --project-name spool-share-backend
 #       (WorkOS AuthKit environment client id — web sign-in via /api/auth/workos/*;
-#        register https://spool.pro/api/auth/workos/callback as a redirect URI
+#        register https://spool.new/api/auth/workos/callback as a redirect URI
 #        in the WorkOS dashboard)
 #   wrangler pages secret put WORKOS_API_KEY           --project-name spool-share-backend
 #       (doubles as the OAuth client_secret and the identities-API Bearer key)
