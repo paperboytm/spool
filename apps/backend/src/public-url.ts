@@ -10,9 +10,30 @@
 export const DEFAULT_PUBLIC_BASE_URL = 'https://spool.new'
 export const LOCAL_PUBLIC_BASE_URL = 'http://localhost:3002'
 
-export function publicBaseUrl(env: { PUBLIC_BASE_URL?: string; ENV?: string }): string {
+type PublicUrlEnv = { PUBLIC_BASE_URL?: string; ENV?: string }
+
+export function publicBaseUrl(env: PublicUrlEnv): string {
   return (
     env.PUBLIC_BASE_URL ??
     (env.ENV === 'development' ? LOCAL_PUBLIC_BASE_URL : DEFAULT_PUBLIC_BASE_URL)
   )
+}
+
+/**
+ * OAuth state and verifier cookies are host-only. During the spool.pro →
+ * spool.new migration, a sign-in started on the legacy host must therefore
+ * return to that same host; otherwise the callback cannot read its cookies.
+ * Only the two owned production hosts are accepted from the edge's forwarded
+ * header. All other requests use the deployment's canonical base URL.
+ */
+export function oauthPublicBaseUrl(request: Request, env: PublicUrlEnv): string {
+  const forwardedHost = request.headers
+    .get('x-forwarded-host')
+    ?.split(',', 1)[0]
+    ?.trim()
+    .toLowerCase()
+  if (forwardedHost === 'spool.new' || forwardedHost === 'spool.pro') {
+    return `https://${forwardedHost}`
+  }
+  return publicBaseUrl(env)
 }
