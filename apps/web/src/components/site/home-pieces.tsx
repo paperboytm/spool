@@ -4,6 +4,7 @@
 import { Button, ButtonLink } from '@spool-lab/ui'
 import { useState } from 'react'
 
+import { SessionTape } from './session-tape'
 import { SpoolMark } from './spool-mark'
 
 export const SHARE_CMD = 'npx @spool-lab/cli share'
@@ -286,20 +287,23 @@ export function FlowShow() {
 export function FinalCTA({ centered = false }: { centered?: boolean } = {}) {
   return (
     <section className={`final reveal${centered ? ' final-center' : ''}`}>
-      <div className="big">
-        Make agent work
-        <br />
-        <em>team knowledge</em>
-        <span className="accent">.</span>
-      </div>
-      <div className="row">
-        <ShareCommandPill />
-        <ButtonLink href="/explore" className="hh-btn" variant="accent">
-          Explore Sessions →
-        </ButtonLink>
-        <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
-          Share yours →
-        </ButtonLink>
+      <SessionTape />
+      <div className="final-content">
+        <div className="big">
+          Make agent work
+          <br />
+          <em>team knowledge</em>
+          <span className="accent">.</span>
+        </div>
+        <div className="row">
+          <ShareCommandPill />
+          <ButtonLink href="/explore" className="hh-btn" variant="accent">
+            Explore Sessions →
+          </ButtonLink>
+          <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
+            Share yours →
+          </ButtonLink>
+        </div>
       </div>
     </section>
   )
