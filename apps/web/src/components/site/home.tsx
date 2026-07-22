@@ -2,7 +2,7 @@ import { ButtonLink } from '@spool-lab/ui'
 import { useEffect } from 'react'
 
 import { HeroSpace } from './hero-space'
-import { FinalCTA, FlowShow, GoalTrail, PillarHead, ShareCommandPill } from './home-pieces'
+import { FinalCTA, FlowShow, GoalTrail, InstallCommandPill, PillarHead } from './home-pieces'
 
 export default function HomePage() {
   useScrollReveal()
@@ -68,7 +68,7 @@ function Hero() {
         </p>
 
         <div className="hh-cta">
-          <ShareCommandPill />
+          <InstallCommandPill />
           <ButtonLink href="/explore" className="hh-btn" variant="accent">
             Explore Sessions →
           </ButtonLink>
@@ -116,9 +116,9 @@ function FlowSection() {
         }
         sub={
           <>
-            <code>spool share</code> reviews the exact record range and sensitive-data findings
-            before anything leaves the machine; supported Sessions are Public in Explore and search
-            by default. Teammates read the link, then continue the work in their own agent.
+            Run <code>spool</code> in a project. It refreshes the local index, reviews the exact
+            record range and sensitive-data findings, then publishes supported Sessions to Explore
+            and search by default. Teammates read the link, then continue in their own agent.
           </>
         }
       />

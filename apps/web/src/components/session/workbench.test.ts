@@ -404,7 +404,7 @@ describe('SessionWorkbench', () => {
     expect(html).not.toContain('This line belongs in the full title only</h1>')
   })
 
-  it('keeps the resume command compact and links browser-addressable remotes', () => {
+  it('puts a one-paste Resume command below the title and links browser-addressable remotes', () => {
     const html = renderWorkbench({
       cardJson: JSON.stringify({
         remotes: ['origin: git@github.com:paperboytm/spool.git'],
@@ -415,14 +415,22 @@ describe('SessionWorkbench', () => {
       }),
     })
 
-    expect(html).not.toContain('Resume in your own agent')
-    expect(html).not.toContain('Run this command locally to pick up where this session left off.')
-    expect(html).toContain('md:items-center')
-    expect(html).toContain('aria-label="Resume command"')
-    expect(html).toContain('npx @spool-lab/cli resume claude_test-session')
-    expect(html).toContain('No global install needed.')
-    expect(html).toContain('aria-haspopup="dialog"')
-    expect(html).toContain('>How npx works</button>')
+    const titleIndex = html.indexOf('id="sw-workbench-title"')
+    const resumeIndex = html.indexOf('id="resume-session-title"')
+    const timelineIndex = html.indexOf('id="session-timeline-title"')
+    expect(titleIndex).toBeGreaterThan(-1)
+    expect(resumeIndex).toBeGreaterThan(titleIndex)
+    expect(timelineIndex).toBeGreaterThan(resumeIndex)
+    expect(html).toContain('aria-label="One-command Session resume"')
+    expect(html).toContain('curl -fsSL https://spool.new/install.sh | sh &amp;&amp;')
+    expect(html).toContain('SPOOL_CLI_BIN_DIR:-$HOME/.local/bin')
+    expect(html).toContain('resume claude_test-session')
+    expect(html).toContain('font-mono text-sm whitespace-nowrap')
+    expect(html).toContain('Installs or updates the Spool CLI, then continues locally.')
+    expect(html).toContain('This published source stays unchanged.')
+    expect(html).toContain('data-variant="accent"')
+    expect(html).toContain('>Copy command</button>')
+    expect(html).not.toContain('How npx works')
     expect(html).toContain('href="https://github.com/paperboytm/spool"')
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
@@ -435,9 +443,9 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('data-variant="source-pi"')
     expect(html).toContain('>Pi</span>')
     expect(html).toContain('>Link-only</span>')
-    expect(html).not.toContain('npx @spool-lab/cli resume')
-    expect(html).not.toContain('aria-label="Resume command"')
-    expect(html).not.toContain('Don&#x27;t have the Spool CLI?')
+    expect(html).not.toContain('install.sh')
+    expect(html).not.toContain('id="resume-session-title"')
+    expect(html).not.toContain('aria-label="One-command Session resume"')
   })
 
   it('keeps the raw fallback usable without a summary, view, or messages', () => {

@@ -1,38 +1,39 @@
 ---
 title: Installation
-description: Run the Spool CLI with npx—no global install required.
+description: Install the Spool CLI once and use the spool command from any project.
 ---
 
-Use the CLI to prepare, share, read, and resume agent Sessions. It runs anywhere its Node.js dependencies are supported.
+Use the CLI to prepare, share, read, and resume agent Sessions. The installer supports macOS and Linux and requires Node.js 22.19 or newer with npm.
 
-## Run with npx
+## Install the CLI
 
-Run the CLI directly with npx. It downloads the package when needed, so no global install is required:
+Run the installer once:
 
 ```bash
-npx @spool-lab/cli --version
-npx @spool-lab/cli doctor
+curl -fsSL https://spool.new/install.sh | sh
 ```
 
-If you prefer the shorter `spool` command, install it globally once:
+Open a new terminal after the installer finishes, then verify that the command is available:
 
 ```bash
-npm install -g @spool-lab/cli
 spool --version
+spool doctor
 ```
+
+After installation, use `spool` directly instead of downloading the package for each command.
 
 ## Sign in for sharing
 
 The CLI uses a browser-approval flow that also works over SSH:
 
 ```bash
-npx @spool-lab/cli login
+spool login
 ```
 
 The terminal prints a short approval URL and waits for the browser confirmation.
 
 ## Local data and sharing
 
-Session preparation happens locally. Nothing is shared automatically. A durable URL is created only after you choose a Session, review the disclosure boundary, and confirm Share; supported Sessions are Public by default.
+Session preparation happens locally. Running bare `spool` in a project refreshes the local index, signs in if needed, and starts a Share for that project’s latest Session. Nothing is uploaded until you review the disclosure boundary and confirm Share; supported Sessions are Public by default.
 
 See [Quick Start](/docs/quick-start) to share your first Session.

@@ -151,7 +151,7 @@ describe('deep links and helpers', () => {
     expect(providerOf('opencode_abc12345')).toBe('opencode')
     expect(providerOf('pi_abc12345')).toBe('pi')
     expect(resumeCommandFor('claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69')).toBe(
-      'npx @spool-lab/cli resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69',
+      'curl -fsSL https://spool.new/install.sh | sh && "${SPOOL_CLI_BIN_DIR:-$HOME/.local/bin}/spool" resume claude_41eb99fe-e024-4fc6-9b87-4653ca6e7a69',
     )
   })
 

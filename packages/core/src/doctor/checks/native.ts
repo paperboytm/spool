@@ -1,4 +1,4 @@
-import { formatCliCommand } from '../../cli-command.js'
+import { CLI_INSTALL_DOCS_URL, formatCliCommand } from '../../cli-command.js'
 import { probeSqlite } from '../preflight.js'
 import type { Check, CheckResult } from '../types.js'
 
@@ -39,8 +39,8 @@ function summarizeAbiError(err: Error): string {
     const wanted = abiMatch[2]
     return (
       `Node ABI mismatch (compiled for v${compiled}, this Node wants v${wanted}). ` +
-      `Retry with \`${formatCliCommand('doctor')}\`. If you use a global install, reinstall with ` +
-      `\`npm install -g @spool-lab/cli\``
+      `Reinstall from ${CLI_INSTALL_DOCS_URL}, then retry with ` +
+      `\`${formatCliCommand('doctor')}\`.`
     )
   }
   const oneLine = msg.split('\n')[0] ?? msg

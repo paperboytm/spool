@@ -25,28 +25,37 @@ The three shared visibility levels are:
 
 ## Share from the terminal
 
+Install the CLI once:
+
 ```bash
-npx @spool-lab/cli sync
-npx @spool-lab/cli login
-npx @spool-lab/cli share <session-uuid>
+curl -fsSL https://spool.new/install.sh | sh
 ```
+
+Open a new terminal, then run the everyday flow from the project:
+
+```bash
+spool
+```
+
+Bare `spool` refreshes the local index, signs in if needed, and starts a Share for the latest Session in the current directory. Use `spool share` to choose a different Session or pass options.
 
 Useful options:
 
 ```bash
-npx @spool-lab/cli share <uuid>@12            # share only the first 12 records
-npx @spool-lab/cli share --summary "..."      # provide Summary Markdown directly
-npx @spool-lab/cli share --no-agent-summary   # skip the local Agent offer
-npx @spool-lab/cli share --spool-file x.spool # attach a curated document
+spool share <uuid>@12             # share only the first 12 records
+spool share --no-agent-summary    # skip the local Agent offer
+spool share --spool-file x.spool  # attach a curated document
 ```
 
-Without a Session argument, Spool uses the latest Session in the current directory.
+Without a Session argument, `spool share` uses the latest Session in the current directory.
 
 ## Summary
 
 A Summary is an optional Markdown overview attached to the Shared Session. It is interpretive, not authoritative. Session pages keep it visually separate from machine-derived evidence such as files, diff statistics, and tool activity.
 
-In an interactive terminal, Spool can detect a local Claude Code or Codex CLI installation and ask it to draft the Summary. The Agent uses your existing local configuration.
+In an interactive terminal, share the Session without a Summary flag. After the URL is live, Spool can detect a local Claude Code or Codex CLI installation and ask it to draft the Summary using your existing local configuration.
+
+`--summary <markdown>` is an advanced manual or automation input. It uploads exactly the Markdown supplied by the caller; it does not ask an Agent to generate a Summary.
 
 ## Sensitive-data gate
 
@@ -57,7 +66,7 @@ Sharing a prefix can reduce scope, but it is not a replacement for reviewing the
 ## Withdraw a share
 
 ```bash
-npx @spool-lab/cli withdraw <session-id-or-url>
+spool withdraw <session-id-or-url>
 ```
 
 Withdrawal immediately makes the current URL return `410 Gone`. It cannot revoke copies that a reader or Team member already downloaded or cached, so treat every share and visibility change as disclosure to its recipients.

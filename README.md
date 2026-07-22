@@ -6,29 +6,33 @@ Spool turns work done with coding agents into durable web pages that other peopl
 
 > **Early stage.** Claude Code and Codex CLI shares are Public by default and can appear in Explore and search. Gemini CLI, OpenCode, and Pi shares remain Link-only until Discovery supports them. Signed-in authors can move a Session into a Team, making it Team-only for current members, or let Team Owners and Admins publish the Team-owned asset more broadly. Native Resume currently works for Claude Code and Codex CLI. Feedback is welcome through [Issues](https://github.com/spool-lab/spool/issues) or [Discord](https://discord.gg/aqeDxQUs5E).
 
-## Use the CLI
+## Install the CLI
 
 ```bash
-npx @spool-lab/cli --version
+curl -fsSL https://spool.new/install.sh | sh
 ```
 
-No global install is required. If you prefer the shorter `spool` command, run
-`npm install -g @spool-lab/cli` once and use `spool …` afterward.
+Install once, open a new terminal, then use `spool` from any project.
 
 ## Share a Session
 
 ```bash
-npx @spool-lab/cli sync
-npx @spool-lab/cli login
-npx @spool-lab/cli share <session-uuid>
+cd /path/to/project
+spool
 ```
 
-Spool scans the selected Session for sensitive values, prepares an optional Summary, publishes the records to the Hub, and returns a durable URL.
+Bare `spool` refreshes the local index, signs in through the browser if needed, and selects the latest Session in the current project. It then shows what will be shared, scans for sensitive values, confirms the resulting visibility, publishes the records to the Hub, and returns a durable URL.
+
+Use the explicit form when you want to choose a Session or pass sharing options:
+
+```bash
+spool share <session-uuid>
+```
 
 A reader can open that URL without installing Spool. Claude Code and Codex CLI shares can also be continued locally:
 
 ```bash
-npx @spool-lab/cli resume <session-url>
+spool resume <session-url>
 ```
 
 Resume creates a new provider-native Session and preserves its relationship to the source. The shared source is never modified.
@@ -42,7 +46,7 @@ Resume creates a new provider-native Session and preserves its relationship to t
 - **Resume / Fork** creates new agent-native work with visible lineage.
 - **Withdraw** makes the current hosted copy return `410 Gone`. A personal author can later explicitly Share the same Session again; a Team-owned withdrawal by an Owner/Admin is permanent and cannot be revived by another member.
 
-Nothing leaves the machine until the author explicitly runs Share. The Share confirmation states the initial visibility before upload: supported Claude Code and Codex CLI Sessions are Public by default; other providers remain Link-only. After Share, the account page can move a Session to `Team · name`; Team-only access requires current membership.
+Nothing leaves the machine until the author confirms the Share flow started by `spool` or `spool share`. The confirmation states the initial visibility before upload: supported Claude Code and Codex CLI Sessions are Public by default; other providers remain Link-only. After Share, the account page can move a Session to `Team · name`; Team-only access requires current membership.
 
 ## What Spool Includes
 

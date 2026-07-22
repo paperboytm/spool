@@ -3,49 +3,47 @@ title: Quick Start
 description: Share an agent Session and let someone else continue it.
 ---
 
-With the no-install CLI path from [Installation](/docs/installation), you can turn a supported agent Session into a durable URL in a few minutes.
+Install the CLI once, then turn a supported agent Session into a durable URL with one everyday command.
 
-## 1. Prepare your Sessions
+## 1. Install the CLI
 
-Index Sessions from your terminal:
-
-```bash
-npx @spool-lab/cli sync
-```
-
-Spool reads supported agent Session files on your machine and groups them by project. This preparation step is local; it does not publish anything.
-
-## 2. Sign in
-
-Sign in from the terminal:
+Run the installer once:
 
 ```bash
-npx @spool-lab/cli login
+curl -fsSL https://spool.new/install.sh | sh
 ```
 
-The CLI opens a browser-approval flow and stores a revocable Hub credential on this machine.
+Open a new terminal after the installer finishes.
 
-## 3. Choose a Session
+## 2. Share the latest Session
 
-Find a Session and share it:
+From the project whose Session you want to share, run:
 
 ```bash
-npx @spool-lab/cli list -n 10
-npx @spool-lab/cli share <session-uuid>
+spool
 ```
 
-`npx @spool-lab/cli list` uses the current project by default. Run `npx @spool-lab/cli list --all` to see recent Sessions
+Bare `spool` refreshes the local index, opens browser sign-in if this machine needs a Hub credential, selects the latest Session in the current project, and starts the reviewed Share flow. Local indexing itself does not publish anything.
+
+To choose a different Session explicitly:
+
+```bash
+spool list -n 10
+spool share <session-uuid>
+```
+
+`spool list` uses the current project by default. Run `spool list --all` to see recent Sessions
 from every indexed project.
 
 Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared. Native Resume currently supports Claude Code and Codex CLI shares.
 
-## 4. Review before sharing
+## 3. Review before sharing
 
-Spool shows what will be shared, scans the records for likely sensitive values, and prepares an optional Summary. The Summary helps a reader understand the intent and outcome, but the original Session remains authoritative.
+Spool shows what will be shared and scans the records for likely sensitive values before upload. The original Session remains authoritative.
 
-For a CLI share, Spool can ask a detected local Agent to draft the Summary with your own provider and authentication settings.
+After the Session is shared, Spool can ask a detected local Agent to draft an optional Summary using your existing provider settings. The Summary helps a reader understand the intent and outcome, but it remains interpretive.
 
-## 5. Send the URL
+## 4. Send the URL
 
 A successful share returns a URL such as:
 
@@ -55,12 +53,12 @@ https://spool.new/session/claude_…
 
 Anyone with the URL can read the Shared Session without installing Spool. Claude Code and Codex CLI Shares are Public in Explore and search by default.
 
-## 6. Continue the work
+## 5. Continue the work
 
-A reader can create a new native Session from the shared point without a global install:
+A reader with the CLI installed can create a new native Session from the shared point:
 
 ```bash
-npx @spool-lab/cli resume <session-url>
+spool resume <session-url>
 ```
 
 Resume never modifies the source. It creates new work and preserves the relationship back to the Shared Session.

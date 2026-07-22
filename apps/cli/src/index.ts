@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { program } from 'commander'
 
+import { handleDefaultCommand } from './commands/default.js'
 import { doctorCommand } from './commands/doctor.js'
 import { listCommand } from './commands/list.js'
 import { loginCommand } from './commands/login.js'
@@ -27,6 +28,10 @@ program
   .name('spool')
   .description('Publish, read, resume, and manage agent sessions with Spool')
   .version(pkg.version)
+  .action(async () => {
+    const exitCode = await handleDefaultCommand()
+    if (exitCode !== 0) process.exitCode = exitCode
+  })
 
 program.addCommand(searchCommand)
 program.addCommand(syncCommand)

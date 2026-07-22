@@ -67,5 +67,8 @@
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   }
 }

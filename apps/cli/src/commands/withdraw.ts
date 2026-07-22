@@ -1,4 +1,4 @@
-import { formatCliCommand } from '@spool-lab/core'
+import { formatCliCommand, formatCliInstallHint } from '@spool-lab/core'
 import { Command } from 'commander'
 
 import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
@@ -29,6 +29,7 @@ export async function handleWithdrawCommand(
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
       ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
+      ui.info(formatCliInstallHint())
       return 1
     }
 
@@ -51,6 +52,7 @@ export async function handleWithdrawCommand(
   } catch (cause) {
     if (cause instanceof HubHttpError) {
       ui.error(friendlyHubError(cause, resolvedSid ?? input))
+      if (cause.status === 401) ui.info(formatCliInstallHint())
     } else {
       ui.error(errorMessage(cause))
     }

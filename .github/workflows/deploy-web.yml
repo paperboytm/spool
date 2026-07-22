@@ -44,6 +44,31 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Public pages and /install.sh must never advertise a CLI contract that
+      # npm does not serve yet. A normal main push may race the release job, so
+      # production waits for a matching version tag and registry package.
+      - name: Verify production CLI release
+        if: env.DEPLOY_TARGET == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version apps/cli/package.json)"
+          tag="v${version}"
+          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
+          if ! git diff --quiet "$tag" -- \
+            apps/cli \
+            packages/core \
+            packages/redact \
+            packages/session-kit; then
+            echo "::error::CLI sources differ from ${tag}. Publish the next CLI release before deploying production web."
+            exit 1
+          fi
+          published="$(npm view "@spool-lab/cli@${version}" version 2>/dev/null || true)"
+          if [ "$published" != "$version" ]; then
+            echo "::error::@spool-lab/cli@${version} is not available from npm yet."
+            exit 1
+          fi
+
       - name: Verify Cloudflare account target
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

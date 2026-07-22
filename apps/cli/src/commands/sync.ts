@@ -1,7 +1,41 @@
-import { getDB, Syncer, SpoolWatcher } from '@spool-lab/core'
+import { getDB, Syncer, SpoolWatcher, type SyncEventCallback } from '@spool-lab/core'
 import { Command } from 'commander'
 
-import { createClackUi } from '../ui.js'
+import { createClackUi, type CliUi } from '../ui.js'
+
+/** Refresh every supported provider into the local index. The bare `spool`
+ * entry point reuses this before choosing the current Session, so sharing does
+ * not depend on a separate, easy-to-forget `spool sync` step. */
+export function syncLocalSessions(
+  ui: CliUi,
+  dependencies: {
+    createSyncer?: (onProgress: SyncEventCallback) => Syncer
+  } = {},
+): Syncer | null {
+  const status = ui.spinner()
+  const onProgress: SyncEventCallback = (event) => {
+    if (event.phase === 'scanning') {
+      status.message(`Scanning ${event.total} session files`)
+    } else if (event.phase === 'syncing') {
+      status.message(`Indexing ${event.count}/${event.total} sessions`)
+    }
+  }
+
+  status.start('Scanning local Agent sessions')
+  try {
+    const syncer = dependencies.createSyncer?.(onProgress) ?? new Syncer(getDB(), onProgress)
+    const result = syncer.syncAll()
+    status.stop(
+      `Indexed ${result.added} new and ${result.updated} updated sessions` +
+        (result.errors > 0 ? ` (${result.errors} errors)` : ''),
+    )
+    return syncer
+  } catch (cause) {
+    status.error('Session sync failed')
+    ui.error(cause instanceof Error ? cause.message : String(cause))
+    return null
+  }
+}
 
 export const syncCommand = new Command('sync')
   .description('Sync AI sessions to the local index')
@@ -9,26 +43,8 @@ export const syncCommand = new Command('sync')
   .action((opts: { watch?: boolean }) => {
     const ui = createClackUi()
     ui.intro('Sync sessions')
-    const status = ui.spinner()
-    const db = getDB()
-    const syncer = new Syncer(db, (event) => {
-      if (event.phase === 'scanning') {
-        status.message(`Scanning ${event.total} session files`)
-      } else if (event.phase === 'syncing') {
-        status.message(`Indexing ${event.count}/${event.total} sessions`)
-      }
-    })
-
-    status.start('Scanning local Agent sessions')
-    try {
-      const result = syncer.syncAll()
-      status.stop(
-        `Indexed ${result.added} new and ${result.updated} updated sessions` +
-          (result.errors > 0 ? ` (${result.errors} errors)` : ''),
-      )
-    } catch (cause) {
-      status.error('Session sync failed')
-      ui.error(cause instanceof Error ? cause.message : String(cause))
+    const syncer = syncLocalSessions(ui)
+    if (syncer === null) {
       process.exitCode = 1
       return
     }

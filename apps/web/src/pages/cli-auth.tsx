@@ -1,4 +1,4 @@
-// CLI login approval page (/cli-auth?code=XXXX-XXXX). `npx @spool-lab/cli login`
+// CLI login approval page (/cli-auth?code=XXXX-XXXX). `spool login`
 // prints the same code it bakes into this URL; the user confirms the
 // two match and approves, which mints a scoped sph_ token the CLI then
 // claims by polling. Requires a web session — unauthenticated visitors
@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react'
 import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
 import { type CliAuthInfo, decideCliAuth, fetchCliAuthInfo } from '../lib/cli-auth'
 
-const CLI_LOGIN_COMMAND = 'npx @spool-lab/cli login'
+const CLI_LOGIN_COMMAND = 'spool login'
 
 interface Props {
   code: string | null

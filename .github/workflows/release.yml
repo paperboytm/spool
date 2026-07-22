@@ -4,161 +4,11 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build app (arm64 DMG + ZIP)
-        run: pnpm run package:mac
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Get version
-        id: version
-        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
-
-      - name: Rename artifacts
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
-          DMG=$(find apps/app/dist -name "*.dmg" ! -name "*.blockmap" | head -1)
-          mv "$DMG" "apps/app/dist/Spool-${VERSION}-arm64.dmg"
-
-          ZIP=$(find apps/app/dist -name "*.zip" | head -1)
-          mv "$ZIP" "apps/app/dist/Spool-${VERSION}-arm64-mac.zip"
-
-      - name: Upload mac artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mac-artifacts
-          path: |
-            apps/app/dist/Spool-*.dmg
-            apps/app/dist/Spool-*-mac.zip
-            apps/app/dist/latest-mac.yml
-
-  build-linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@v5
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build app (AppImage + tar.gz)
-        run: pnpm run package:linux
-
-      - name: Get version
-        id: version
-        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
-
-      - name: Rename artifacts
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
-          APPIMAGE=$(find apps/app/dist -name "*.AppImage" | head -1)
-          mv "$APPIMAGE" "apps/app/dist/Spool-${VERSION}-x86_64.AppImage"
-
-      - name: Upload linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: |
-            apps/app/dist/Spool-*.AppImage
-            apps/app/dist/latest-linux.yml
-
-  release:
-    needs: [build-mac, build-linux]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Get version
-        id: version
-        run: echo "version=$(jq -r .version apps/app/package.json)" >> "$GITHUB_OUTPUT"
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Generate release notes
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
-          if [[ -n "$PREV_TAG" ]]; then
-            COMMITS=$(git log "$PREV_TAG".."$TAG" --pretty=format:"- %s" --no-merges | grep -v "^- release:")
-          else
-            COMMITS=$(git log "$TAG" --pretty=format:"- %s" --no-merges -20 | grep -v "^- release:")
-          fi
-          {
-            echo "## What's new"
-            echo ""
-            echo "$COMMITS"
-            echo ""
-            echo "## Install"
-            echo ""
-            echo '**macOS (Apple Silicon)**'
-            echo '```bash'
-            echo 'curl -fsSL https://spool.new/install.sh | bash'
-            echo '```'
-            echo ""
-            echo '**Linux (x86_64)**'
-            echo 'Download the AppImage from the assets below.'
-            echo ""
-            echo '> This is an early release — feedback and bug reports welcome via [Issues](https://github.com/spool-lab/spool/issues).'
-          } > /tmp/release-notes.md
-
-      - name: Upload to existing release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          ASSETS=$(find artifacts -type f | tr '\n' ' ')
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" $ASSETS --clobber
-          else
-            gh release create "$TAG" $ASSETS \
-              --title "Spool ${{ steps.version.outputs.version }}" \
-              --notes-file /tmp/release-notes.md
-          fi
-
   publish-npm:
-    needs: [build-mac, build-linux]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -166,19 +16,43 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version apps/cli/package.json)"
+          expected_tag="v${version}"
+          if [ "$GITHUB_REF_TYPE" != 'tag' ] || [ "$GITHUB_REF_NAME" != "$expected_tag" ]; then
+            echo "::error::Release must run from ${expected_tag}, not ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+          if [ "$(git rev-list -n 1 "$expected_tag")" != "$GITHUB_SHA" ]; then
+            echo "::error::${expected_tag} does not resolve to the workflow commit."
+            exit 1
+          fi
+          for manifest in \
+            package.json \
+            packages/redact/package.json \
+            packages/session-kit/package.json \
+            packages/core/package.json \
+            apps/cli/package.json \
+            apps/web/package.json; do
+            if [ "$(jq -r .version "$manifest")" != "$version" ]; then
+              echo "::error::${manifest} is not synchronized at ${version}."
+              exit 1
+            fi
+          done
+
       - uses: pnpm/action-setup@v5
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 22.19.0
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
       # Fail fast if the npm token has expired or lost write scope. Granular
-      # @spool-lab tokens default to 30-day expiry on npmjs.com — without this
-      # check, the workflow would do a full pnpm install + build before
-      # discovering the auth is dead, and a re-dispatch costs another full
-      # mac + linux build cycle.
+      # @spool-lab tokens default to 30-day expiry on npmjs.com.
       - name: Verify npm auth
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
@@ -190,10 +64,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Build dist for every package we publish so the prepack step has a tree
-      # to ship. Order matters for redact/session-kit → core → cli because the
-      # upstream consumer reads dist/index.d.ts at typecheck time during
-      # downstream build.
+      # Build in dependency order so each downstream package sees the
+      # generated declarations from its workspace dependencies.
       - name: Build publish targets
         run: |
           pnpm -F @spool-lab/redact run prepack
@@ -201,11 +73,12 @@ jobs:
           pnpm -F @spool-lab/core run prepack
           pnpm -F @spool-lab/cli run prepack
 
-      # Publish in dependency order. Each step is idempotent: if the registry
-      # already has this version (re-run after a partial-fail), we skip rather
-      # than error. redact and session-kit are bumped in lockstep with core/cli
-      # by release.sh, so a fresh release always produces a new version per
-      # package.
+      - name: Verify CLI release
+        run: |
+          pnpm exec vp check
+          pnpm -F @spool-lab/core test
+          pnpm -F @spool-lab/cli test
+
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
@@ -227,3 +100,98 @@ jobs:
           publish_if_missing packages/session-kit
           publish_if_missing packages/core
           publish_if_missing apps/cli
+
+  release:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: echo "version=$(jq -r .version apps/cli/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
+          if [[ -n "$PREV_TAG" ]]; then
+            COMMITS=$(git log "$PREV_TAG".."$TAG" --pretty=format:"- %s" --no-merges | grep -v "^- release:")
+          else
+            COMMITS=$(git log "$TAG" --pretty=format:"- %s" --no-merges -20 | grep -v "^- release:")
+          fi
+          {
+            echo "## What's new"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "## Install the CLI"
+            echo ""
+            echo 'Requires Node.js 22.19 or newer on macOS or Linux.'
+            echo '```bash'
+            echo 'curl -fsSL https://spool.new/install.sh | sh'
+            echo '```'
+            echo ""
+            echo 'After installation, run `spool` in a project to share its latest Session.'
+            echo ""
+            echo '> This is an early release — feedback and bug reports welcome via [Issues](https://github.com/spool-lab/spool/issues).'
+          } > /tmp/release-notes.md
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "Spool ${{ steps.version.outputs.version }}" \
+              --notes-file /tmp/release-notes.md
+          else
+            gh release create "$TAG" \
+              --title "Spool ${{ steps.version.outputs.version }}" \
+              --notes-file /tmp/release-notes.md
+          fi
+
+      - name: Deploy the matching production web
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_ref="$GITHUB_REF_NAME"
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo '::error::origin/main advanced after this release tag; refusing to deploy an older revision.'
+            exit 1
+          fi
+          previous_run_id="$(gh run list \
+            --workflow=deploy-web.yml \
+            --commit="$GITHUB_SHA" \
+            --event=workflow_dispatch \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId' 2>/dev/null || true)"
+          gh workflow run deploy-web.yml --ref "$release_ref" -f target=production
+
+          run_id=''
+          for _ in $(seq 1 30); do
+            candidate="$(gh run list \
+              --workflow=deploy-web.yml \
+              --commit="$GITHUB_SHA" \
+              --event=workflow_dispatch \
+              --limit=1 \
+              --json databaseId \
+              --jq '.[0].databaseId' 2>/dev/null || true)"
+            if [ -n "$candidate" ] && [ "$candidate" != "$previous_run_id" ]; then
+              run_id="$candidate"
+              break
+            fi
+            sleep 2
+          done
+
+          if [ -z "$run_id" ]; then
+            echo '::error::Could not locate the production deployment run.'
+            exit 1
+          fi
+          gh run watch "$run_id" --exit-status

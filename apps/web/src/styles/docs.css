@@ -153,7 +153,7 @@
 .void-md td code,
 .void-md th code {
   font-family: 'Geist Mono', monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -161,14 +161,20 @@
   color: var(--text);
 }
 
-.void-md pre {
+.void-md .md-code-block {
+  position: relative;
   background: var(--surface) !important;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 18px;
   margin: 16px 0 24px;
+  overflow: hidden;
+}
+
+.void-md pre {
+  margin: 0;
+  padding: 16px 96px 16px 16px;
   overflow-x: auto;
-  font-size: 12.5px;
+  font-size: var(--sp-text-command);
   line-height: 1.6;
 }
 
@@ -178,6 +184,49 @@
   border: none;
   padding: 0;
   font-size: inherit;
+}
+
+.void-md .md-code-copy {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: 'Geist Variable', 'Geist', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 80ms,
+    color 80ms,
+    background 80ms;
+}
+
+.void-md .md-code-copy:hover,
+.void-md .md-code-copy:focus-visible,
+.void-md .md-code-copy.is-copied {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.void-md .md-code-copy:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-focus-ring);
+}
+
+.void-md .md-code-copy.is-copy-failed {
+  border-color: var(--sp-error);
+  color: var(--sp-error);
 }
 
 .void-md blockquote {
@@ -364,5 +413,12 @@
   }
   .docs-pager .next {
     text-align: left;
+  }
+  .void-md .md-code-copy {
+    min-height: 44px;
+    padding: 0 12px;
+  }
+  .void-md pre {
+    padding-right: 96px;
   }
 }
