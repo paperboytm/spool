@@ -5,7 +5,7 @@ import { createServerOnlyFn } from '@tanstack/react-start'
 const readBackendOrigin = createServerOnlyFn(() => process.env.ORIGIN_BACKEND)
 
 /** SSR calls the Pages backend directly rather than recursively fetching the
- * public spool.pro Worker route. */
+ * public spool.new Worker route. */
 export function apiOriginFor(backendOrigin: string): string {
   return new URL(backendOrigin).origin
 }

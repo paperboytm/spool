@@ -354,7 +354,7 @@
       "deleteConfirm_item_shares_prefix": "Jede veröffentlichte Freigabe liefert",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "Ihr Handle wird freigegeben und kann von beliebigen Nutzern beansprucht werden",
-      "deleteConfirm_item_record": "Ihr Kontodatensatz wird von spool.pro entfernt",
+      "deleteConfirm_item_record": "Ihr Kontodatensatz wird von spool.new entfernt",
       "deleteConfirm_footnote": "Sie können dies jederzeit vor Ablauf der Abkühlphase abbrechen. Entwürfe auf diesem Gerät bleiben unverändert — sie liegen lokal.",
       "deleteConfirm_confirm": "Löschung planen",
       "deleteConfirm_scheduling": "Plane…",
@@ -636,7 +636,7 @@
       "publishUnredacted": "Mit sichtbaren Geheimnissen veröffentlichen",
       "publishing": "Veröffentliche…",
       "tryAgain": "Erneut versuchen",
-      "footerHint": "Ein Snapshot wird auf spool.pro hochgeladen. Jederzeit widerrufbar.",
+      "footerHint": "Ein Snapshot wird auf spool.new hochgeladen. Jederzeit widerrufbar.",
       "footerHint_published": "Der Snapshot lebt unter dem Link oben. Jederzeit widerrufbar.",
       "error_sessionExpired": "Ihre Sitzung ist abgelaufen — bitte erneut anmelden, um zu veröffentlichen.",
       "error_rateLimited": "Zu viele Veröffentlichungen. Bitte in wenigen Minuten erneut versuchen.",
@@ -670,7 +670,7 @@
       "downloading": "Exportiere…"
     },
     "connectCard": {
-      "title": "Bei spool.pro anmelden",
+      "title": "Bei spool.new anmelden",
       "body": "Spool lädt nur Snapshots hoch, die Sie ausdrücklich veröffentlichen. Entwürfe und Ihre Bibliothek verlassen diesen Rechner nie.",
       "signInWithGoogle": "Mit Google anmelden",
       "waitingForBrowser": "Warte auf Browser…",
@@ -680,7 +680,7 @@
       "title": "Diese Freigabe zurückziehen?",
       "body_prefix": "Dies ist endgültig. Der Link liefert",
       "body_emphasis": "410 Gone",
-      "body_suffix": ", der Snapshot wird aus dem spool.pro-Speicher gelöscht und die URL kann nicht wiederverwendet werden. Um diese Konversation erneut zu teilen, müssen Sie eine neue Kopie veröffentlichen — sie erhält eine neue URL.",
+      "body_suffix": ", der Snapshot wird aus dem spool.new-Speicher gelöscht und die URL kann nicht wiederverwendet werden. Um diese Konversation erneut zu teilen, müssen Sie eine neue Kopie veröffentlichen — sie erhält eine neue URL.",
       "confirm": "Ja, endgültig zurückziehen",
       "confirming": "Ziehe zurück…"
     }
@@ -912,10 +912,10 @@
     "toggleOptions": "Optionen anzeigen"
   },
   "hubShare": {
-    "menuLabel": "Auf spool.pro teilen",
-    "pretitle": "Auf spool.pro teilen",
+    "menuLabel": "Auf spool.new teilen",
+    "pretitle": "Auf spool.new teilen",
     "title": "Diese Session veröffentlichen?",
-    "lead": "Veröffentlicht das vollständige Transkript ({{records}} Einträge) als Public Session auf spool.pro. Sie kann in Explore und der Suche erscheinen; die Quell-Session bleibt unverändert.",
+    "lead": "Veröffentlicht das vollständige Transkript ({{records}} Einträge) als Public Session auf spool.new. Sie kann in Explore und der Suche erscheinen; die Quell-Session bleibt unverändert.",
     "secretsWarning": "{{total}} mögliche Geheimnisse erkannt ({{high}} mit hohem Risiko). Beim Teilen werden diese Werte übertragen.",
     "summaryLabel": "Zusammenfassung (Markdown)",
     "publish": "Session veröffentlichen",
@@ -923,7 +923,7 @@
     "doneTitle": "Session veröffentlicht",
     "doneLead": "Diese Session ist Public und kann in Explore und der Suche erscheinen. Die Quell-Session bleibt unverändert.",
     "linkOnlyTitle": "Einen nur per Link erreichbaren Share erstellen?",
-    "linkOnlyLead": "Dieser Anbieter wird in Explore noch nicht unterstützt. Teilt das vollständige Transkript ({{records}} Einträge) über eine nur per Link erreichbare URL auf spool.pro; die Quell-Session bleibt unverändert.",
+    "linkOnlyLead": "Dieser Anbieter wird in Explore noch nicht unterstützt. Teilt das vollständige Transkript ({{records}} Einträge) über eine nur per Link erreichbare URL auf spool.new; die Quell-Session bleibt unverändert.",
     "linkOnlyPublish": "Link teilen",
     "linkOnlyPublishing": "Wird geteilt…",
     "linkOnlyDoneTitle": "Link geteilt",

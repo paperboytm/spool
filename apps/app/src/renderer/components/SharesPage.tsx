@@ -241,7 +241,7 @@ function PublishedList({
   )
 
   // Re-fetch the published list when this window regains focus — picks up
-  // remote revocations (user opened spool.pro/me on the web and revoked)
+  // remote revocations (user opened spool.new/me on the web and revoked)
   // that the desktop wouldn't otherwise see until a manual restart.
   useEffect(() => {
     if (!user) return
@@ -361,7 +361,7 @@ function PublishedList({
 
   // Stale banner — the last remote fetch failed, so the rows below are
   // the local cache and may be behind the backend (e.g. a revoke done
-  // on spool.pro/me). A persistent inline strip, not a toast: the
+  // on spool.new/me). A persistent inline strip, not a toast: the
   // condition persists until a refresh succeeds, and the focus-driven
   // refresh would re-toast on every window switch.
   const handleRetry = async () => {

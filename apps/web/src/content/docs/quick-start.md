@@ -50,7 +50,7 @@ For a CLI share, Spool can ask a detected local Agent to draft the Summary with 
 A successful share returns a URL such as:
 
 ```text
-https://spool.pro/session/claude_…
+https://spool.new/session/claude_…
 ```
 
 Anyone with the URL can read the Shared Session without installing Spool. Claude Code and Codex CLI Shares are Public in Explore and search by default.

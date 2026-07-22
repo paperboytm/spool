@@ -431,7 +431,7 @@ describe('POST /api/publish', () => {
     const body = (await res.json()) as { id: string; version: number; url: string }
     expect(isValidSlug(body.id)).toBe(true)
     expect(body.version).toBe(1)
-    expect(body.url).toBe(`https://spool.pro/s/${body.id}`)
+    expect(body.url).toBe(`https://spool.new/s/${body.id}`)
 
     expect(env._snapshots.has(`${body.id}.json`)).toBe(true)
     const metaRaw = await env.META.get(`meta/${body.id}`)

@@ -9,8 +9,9 @@ Key rules at a glance:
 - Public web is content-first: show real Sessions and authors before feature explanations
 - `Share` publishes supported Sessions as Public by default; providers not yet supported by Explore remain Link-only
 - Public metadata is author-attributed (`@handle · published 2h ago`), never first-person
-- Warm amber accent `#C85A00` (light) / `#F07020` (dark) — never blue or purple
-- Warm near-black `#141410` for dark mode — never pure `#000` or cold `#0A0A0A`
+- Paperboy electric blue accent `#1387FF` (light) / `#5BB1F0` (dark) is the sole product accent; amber is reserved for warning semantics, never primary branding
+- Void palette: `#000000` background with `#090909` surfaces in dark mode; white with neutral-gray surfaces in light mode
+- The homepage may use the approved WebGL knowledge-space hero and share → server → resume animation; product and reading surfaces keep motion minimal and functional
 - Geist Sans for UI chrome; Geist Mono for Session records, commands, URLs, and paths
 - Session pages separate interpretive Summary from machine-derived evidence
 - Visibility and continuation lineage must remain explicit trust signals

@@ -14,32 +14,32 @@ describe('snapshotOgHead', () => {
   it('emits a title, canonical link, and the OG + Twitter Card set', () => {
     const out = snapshotOgHead({
       title: 'My great chat',
-      ogImageUrl: 'https://spool.pro/api/og/abc.png',
-      canonicalUrl: 'https://spool.pro/s/abc',
+      ogImageUrl: 'https://spool.new/api/og/abc.png',
+      canonicalUrl: 'https://spool.new/s/abc',
     })
-    expect(out.meta[0]).toEqual({ title: 'My great chat · spool.pro' })
-    expect(out.links).toEqual([{ rel: 'canonical', href: 'https://spool.pro/s/abc' }])
+    expect(out.meta[0]).toEqual({ title: 'My great chat · spool.new' })
+    expect(out.links).toEqual([{ rel: 'canonical', href: 'https://spool.new/s/abc' }])
     expect(metaValue(out, 'property', 'og:type')).toBe('article')
     expect(metaValue(out, 'property', 'og:title')).toBe('My great chat')
-    expect(metaValue(out, 'property', 'og:image')).toBe('https://spool.pro/api/og/abc.png')
+    expect(metaValue(out, 'property', 'og:image')).toBe('https://spool.new/api/og/abc.png')
     expect(metaValue(out, 'property', 'og:image:width')).toBe('1200')
     expect(metaValue(out, 'property', 'og:image:height')).toBe('630')
-    expect(metaValue(out, 'property', 'og:url')).toBe('https://spool.pro/s/abc')
+    expect(metaValue(out, 'property', 'og:url')).toBe('https://spool.new/s/abc')
     expect(metaValue(out, 'name', 'twitter:card')).toBe('summary_large_image')
     expect(metaValue(out, 'name', 'twitter:title')).toBe('My great chat')
-    expect(metaValue(out, 'name', 'twitter:image')).toBe('https://spool.pro/api/og/abc.png')
+    expect(metaValue(out, 'name', 'twitter:image')).toBe('https://spool.new/api/og/abc.png')
   })
 
   it('truncates pathological titles to 200 chars', () => {
     const long = 'a'.repeat(500)
     const out = snapshotOgHead({ title: long, ogImageUrl: 'x', canonicalUrl: 'y' })
     expect(metaValue(out, 'property', 'og:title')).toHaveLength(200)
-    expect(out.meta[0]?.['title']).toBe(`${'a'.repeat(200)} · spool.pro`)
+    expect(out.meta[0]?.['title']).toBe(`${'a'.repeat(200)} · spool.new`)
   })
 
   it('falls back to a default title when the snapshot title is empty', () => {
     const out = snapshotOgHead({ title: '', ogImageUrl: 'x', canonicalUrl: 'y' })
-    expect(out.meta[0]).toEqual({ title: 'Shared conversation · spool.pro' })
+    expect(out.meta[0]).toEqual({ title: 'Shared conversation · spool.new' })
     expect(metaValue(out, 'property', 'og:title')).toBe('Shared conversation')
   })
 
@@ -65,19 +65,19 @@ describe('sessionOgHead', () => {
     const out = sessionOgHead({
       title: 'Fix the auth flow',
       description: 'A coding-agent session shared by @xy — 12 records.',
-      canonicalUrl: 'https://spool.pro/session/claude_abc12345',
+      canonicalUrl: 'https://spool.new/session/claude_abc12345',
     })
-    expect(out.meta[0]).toEqual({ title: 'Fix the auth flow · spool.pro' })
+    expect(out.meta[0]).toEqual({ title: 'Fix the auth flow · spool.new' })
     expect(metaValue(out, 'name', 'twitter:card')).toBe('summary')
     expect(out.meta.some((m) => m['property'] === 'og:image')).toBe(false)
     expect(out.links).toEqual([
-      { rel: 'canonical', href: 'https://spool.pro/session/claude_abc12345' },
+      { rel: 'canonical', href: 'https://spool.new/session/claude_abc12345' },
     ])
   })
 
   it('falls back to generic title and description', () => {
     const out = sessionOgHead({ title: '', description: '', canonicalUrl: 'x' })
-    expect(out.meta[0]).toEqual({ title: 'Shared session · spool.pro' })
+    expect(out.meta[0]).toEqual({ title: 'Shared session · spool.new' })
     expect(metaValue(out, 'name', 'description')).toBe('A shared coding-agent session on Spool.')
   })
 })

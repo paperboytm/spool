@@ -65,7 +65,7 @@ export function CliResumeDialog({ open, resumeCommand, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[rgba(20,20,16,0.48)] p-4 [[data-theme=dark]_&]:bg-[rgba(20,20,16,0.72)]"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4 [[data-theme=dark]_&]:bg-black/75"
       role="dialog"
       aria-modal="true"
       aria-labelledby="cli-resume-title"

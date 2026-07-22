@@ -59,7 +59,7 @@ export interface Conversation {
   title: string
   /** Public share URL when applicable. Null for file origins. */
   shareUrl: string | null
-  /** Hosted spool.pro short URL. Only present after publish (Phase 2+). */
+  /** Hosted spool.new short URL. Only present after publish (Phase 2+). */
   shortUrl?: string
   createdAt: string
   wordCount: number
@@ -280,7 +280,7 @@ export interface SpoolDocument {
 
 /** Wire-format snapshot served by the share-backend reader endpoint.
  *  Mirrors `apps/app/src/shared/share-publish.ts` — kept here so the
- *  `spool.pro` web reader can depend on share-kit alone. The desktop
+ *  `spool.new` web reader can depend on share-kit alone. The desktop
  *  publish IPC owns the editor-side authoritative copy; if the two ever
  *  drift, the backend's zod validator in
  *  `packages/share-backend/src/publish/validators.ts` is canonical. */

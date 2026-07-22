@@ -99,7 +99,7 @@ export default function SessionFindBar({
   return (
     <div
       ref={containerRef}
-      className="border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 animate-in fade-in focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 absolute top-8 right-4 z-20 flex w-[320px] items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2 shadow-[0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-[border-color,box-shadow] focus-within:shadow-[0_0_0_3px_rgba(200,90,0,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] dark:focus-within:shadow-[0_0_0_3px_rgba(240,112,32,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
+      className="border-warm-border dark:border-dark-border bg-warm-bg/95 dark:bg-dark-surface2/95 animate-in fade-in focus-within:border-accent/55 dark:focus-within:border-accent-dark/60 absolute top-8 right-4 z-20 flex w-[320px] items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2 shadow-[0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm transition-[border-color,box-shadow] focus-within:shadow-[0_0_0_3px_rgba(19,135,255,0.10),0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] dark:focus-within:shadow-[0_0_0_3px_rgba(91,177,240,0.15),0_4px_12px_rgba(0,0,0,0.4)]"
       role="search"
     >
       <input

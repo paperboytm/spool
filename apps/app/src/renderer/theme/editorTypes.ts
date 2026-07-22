@@ -32,6 +32,16 @@ export const LIGHT_PRESETS = THEME_PRESETS
 export const DARK_PRESETS = THEME_PRESETS
 
 const KNOWN_PRESETS = new Set<string>(THEME_PRESETS)
+const LEGACY_SPOOL_LIGHT = {
+  accent: '#C85A00',
+  background: '#FAFAF8',
+  foreground: '#1C1C18',
+} as const
+const LEGACY_SPOOL_DARK = {
+  accent: '#F07020',
+  background: '#141410',
+  foreground: '#F2F2EC',
+} as const
 
 export function normalizePresetId(raw: string): string {
   const preset = raw === 'forest' ? 'everforest' : raw
@@ -69,22 +79,56 @@ export function normalizeThemeEditorState(raw: unknown): ThemeEditorStateV1 | nu
   if (record['v'] !== 1) return null
 
   const defaults = defaultThemeEditorState()
-  return {
+  const normalized = {
     v: 1,
     light: normalizeThemeSide(
       record['light'] as Partial<ThemeSideConfig> | undefined,
       defaults.light,
     ),
     dark: normalizeThemeSide(record['dark'] as Partial<ThemeSideConfig> | undefined, defaults.dark),
+  } satisfies ThemeEditorStateV1
+
+  // The Paperboy rebrand changed the built-in Spool preset. Migrate only
+  // exact legacy defaults so a genuinely customized palette remains intact.
+  if (matchesLegacySpoolPreset(normalized.light, LEGACY_SPOOL_LIGHT)) {
+    const next = defaultLightSide()
+    normalized.light = {
+      ...normalized.light,
+      accent: next.accent,
+      background: next.background,
+      foreground: next.foreground,
+    }
   }
+  if (matchesLegacySpoolPreset(normalized.dark, LEGACY_SPOOL_DARK)) {
+    const next = defaultDarkSide()
+    normalized.dark = {
+      ...normalized.dark,
+      accent: next.accent,
+      background: next.background,
+      foreground: next.foreground,
+    }
+  }
+  return normalized
+}
+
+function matchesLegacySpoolPreset(
+  side: ThemeSideConfig,
+  legacy: typeof LEGACY_SPOOL_LIGHT | typeof LEGACY_SPOOL_DARK,
+): boolean {
+  return (
+    side.preset === 'spool' &&
+    side.accent.toUpperCase() === legacy.accent &&
+    side.background.toUpperCase() === legacy.background &&
+    side.foreground.toUpperCase() === legacy.foreground
+  )
 }
 
 export function defaultLightSide(): ThemeSideConfig {
   return {
     preset: 'spool',
-    accent: '#C85A00',
-    background: '#FAFAF8',
-    foreground: '#1C1C18',
+    accent: '#1387FF',
+    background: '#FFFFFF',
+    foreground: '#0A0A0A',
     uiFont: 'Geist Variable',
     codeFont: 'Geist Mono',
     translucentChrome: false,
@@ -95,9 +139,9 @@ export function defaultLightSide(): ThemeSideConfig {
 export function defaultDarkSide(): ThemeSideConfig {
   return {
     preset: 'spool',
-    accent: '#F07020',
-    background: '#141410',
-    foreground: '#F2F2EC',
+    accent: '#5BB1F0',
+    background: '#000000',
+    foreground: '#FFFFFF',
     uiFont: 'Geist Variable',
     codeFont: 'Geist Mono',
     translucentChrome: false,

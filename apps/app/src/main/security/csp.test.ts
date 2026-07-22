@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vite-plus/test'
 
 import { __cspFixtures, buildCsp, buildPfInferenceCsp, isPfInferenceDocument } from './csp.js'
 
-// We don't import installRendererCsp itself in tests — wiring it would
-// require an Electron `session` stub. The string fixtures cover the
-// actual product surface (drift in directives) without the harness.
+// `installRendererCsp` receives its Electron Session from the main-process
+// composition root, so importing this policy module does not load Electron.
+// The string fixtures cover directive drift without a runtime harness.
 const { DEV_CSP, PROD_CSP } = __cspFixtures
 
 function directives(csp: string): Map<string, string[]> {
@@ -101,8 +101,10 @@ describe('Renderer CSP policy', () => {
       expect(connect.every((src) => !src.includes('localhost'))).toBe(true)
     })
 
-    it('allows the spool.pro origin family on connect-src', () => {
+    it('allows both the canonical and legacy Spool origin families on connect-src', () => {
       const connect = directives(PROD_CSP).get('connect-src') ?? []
+      expect(connect).toContain('https://spool.new')
+      expect(connect).toContain('https://*.spool.new')
       expect(connect).toContain('https://spool.pro')
       expect(connect).toContain('https://*.spool.pro')
     })
@@ -158,11 +160,13 @@ describe('Renderer CSP policy', () => {
       })
     }
 
-    it('prod keeps the canonical spool.pro family alongside the override', () => {
-      // Published-share URLs and avatar links keep pointing at
-      // spool.pro even when the API origin is overridden.
+    it('prod keeps canonical and legacy Spool families alongside the override', () => {
+      // New published links point at spool.new while existing links and
+      // avatar URLs may still point at spool.pro.
       const connect =
         directives(buildCsp({ dev: false, backendOrigin: origin })).get('connect-src') ?? []
+      expect(connect).toContain('https://spool.new')
+      expect(connect).toContain('https://*.spool.new')
       expect(connect).toContain('https://spool.pro')
       expect(connect).toContain('https://*.spool.pro')
     })

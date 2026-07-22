@@ -24,16 +24,18 @@ describe('shared UI CSS contract', () => {
     expect(tokens).toContain('--sp-motion-hover: 80ms')
   })
 
-  it('implements the DESIGN.md warm palette for both supported dark roots', () => {
-    expect(tokens).toContain('--sp-bg-light: #fafaf8')
-    expect(tokens).toContain('--sp-bg-dark: #141410')
-    expect(tokens).toContain('--sp-bg: #fafaf8')
-    expect(tokens).toContain('--sp-accent: #c85a00')
+  it('implements the DESIGN.md void palette for both supported dark roots', () => {
+    expect(tokens).toContain('--sp-bg-light: #ffffff')
+    expect(tokens).toContain('--sp-bg-dark: #000000')
+    expect(tokens).toContain('--sp-bg: #ffffff')
+    expect(tokens).toContain('--sp-accent: #1387ff')
+    expect(tokens).toContain('--sp-accent-dm: #5bb1f0')
     expect(tokens).toContain('html.dark,')
     expect(tokens).toContain("html[data-theme='dark']")
-    expect(tokens).toContain('--sp-bg: #141410')
-    expect(tokens).toContain('--sp-accent: #f07020')
-    expect(tokens).not.toMatch(/Inter|#000(?:000)?\b|#[0a]0[a0]0[a0]\b/i)
+    expect(tokens).toContain('--sp-bg: #000000')
+    expect(tokens).toContain('--sp-surface: #090909')
+    expect(tokens).toContain('--sp-accent: #5bb1f0')
+    expect(tokens).not.toMatch(/Inter|#c85a00|#f07020/i)
   })
 
   it('keeps primitive dimensions and row spacing tied to package tokens', () => {

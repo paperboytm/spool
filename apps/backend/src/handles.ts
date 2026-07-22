@@ -18,7 +18,7 @@ export function profilesEnabled(env: { PROFILES_ENABLED?: string }): boolean {
 }
 
 // Two flavours of reserved name, merged into one set:
-//   1) URL-routing words that already mean something on spool.pro
+//   1) URL-routing words that already mean something on spool.new
 //      (collide with /api/*, /me, /settings, etc.)
 //   2) Brand / impersonation guards. Cheap to add now; expensive to
 //      take back from a squatter after launch.

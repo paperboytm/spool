@@ -1,4 +1,4 @@
-name: Deploy Web
+name: Deploy Production
 
 on:
   push:
@@ -33,7 +33,16 @@ jobs:
       - name: Build workspace dependencies
         run: pnpm vp run --filter '@spool/web^...' build
 
-      - name: Deploy to Cloudflare Workers
+      # The router proxies every /api request to Pages, so publish the backend
+      # first. If that deployment fails, the existing Worker stays pointed at
+      # the last healthy production backend.
+      - name: Deploy backend to Cloudflare Pages
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @spool/backend run deploy:prod
+
+      - name: Deploy web router to Cloudflare Workers
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

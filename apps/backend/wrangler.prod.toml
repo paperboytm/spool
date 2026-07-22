@@ -1,14 +1,8 @@
 # Production Pages deployment config with concrete resource identifiers.
 # Resource ids are not credentials; Wrangler authentication remains external.
 # Wrangler ≥4.9x refuses config-based Pages deploys without ids.
-# Deploy by temporarily swapping this in as wrangler.toml (Pages rejects
-# --config custom paths):
-#   mv wrangler.toml wrangler.toml.checked-in
-#   cp wrangler.prod.toml wrangler.toml
-#   wrangler pages deploy public
-#   mv -f wrangler.toml.checked-in wrangler.toml
-# PUBLIC_BASE_URL is deliberately unset in prod (code defaults to
-# https://spool.pro).
+# `pnpm run deploy:prod` selects this file through Wrangler's ephemeral
+# deploy-config redirect; the checked-in local wrangler.toml is never replaced.
 name = "spool-share-backend"
 pages_build_output_dir = "public"
 compatibility_date = "2026-05-01"
@@ -54,4 +48,5 @@ bucket_name = "spool-hub"
 
 [vars]
 ENV = "production"
+PUBLIC_BASE_URL = "https://spool.new"
 ABUSE_NOTIFY_EMAIL = "abuse@spool.pro"

@@ -1,4 +1,4 @@
-// Public edge dispatch for spool.pro. The web Worker is the entry Worker so
+// Public edge dispatch for spool.new. The web Worker is the entry Worker so
 // Cloudflare can serve its Vite-built static assets directly; only /api/* is
 // forwarded to the existing Pages backend.
 

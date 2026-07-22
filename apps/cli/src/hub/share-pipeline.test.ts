@@ -178,7 +178,7 @@ describe('prepareShare', () => {
 
 describe('materialize → share lineage round-trip', () => {
   const birth: BirthPayload = {
-    source: { sid: 'claude_abc-123', position: 4, url: 'https://spool.pro/session/claude_abc-123' },
+    source: { sid: 'claude_abc-123', position: 4, url: 'https://spool.new/session/claude_abc-123' },
   }
 
   it('materializes with rewritten sessionId, restored paths, and one birth record', async () => {

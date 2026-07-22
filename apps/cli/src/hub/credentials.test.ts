@@ -79,6 +79,7 @@ describe('hub credentials', () => {
   it('uses the production hub URL when no credentials exist', () => {
     const home = tempHome()
 
+    expect(DEFAULT_HUB_URL).toBe('https://spool.new')
     expect(hubCredentialsPath({ homeDir: home })).toBe(join(home, '.spool', 'hub-credentials.json'))
     expect(loadHubCredentials({ homeDir: home, env: {} })).toEqual({
       hubUrl: DEFAULT_HUB_URL,

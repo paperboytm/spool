@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { parseExploreSearch, type ExploreSearchState } from '../lib/discovery'
+import { PUBLIC_SITE_ORIGIN } from '../lib/site'
 import { ExplorePage } from '../pages/Explore'
 
 import '../styles/explore.css'
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/explore')({
         content: 'Find public Claude Code and Codex CLI Sessions with summaries and evidence.',
       },
     ],
-    links: [{ rel: 'canonical', href: 'https://spool.pro/explore' }],
+    links: [{ rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/explore` }],
   }),
   component: ExploreRoute,
 })

@@ -6,8 +6,8 @@
 // Dev runs the OAuth callback through the web app's Vite proxy (port 3002),
 // so development defaults to that origin even though Wrangler listens on
 // 8788. PUBLIC_BASE_URL can override any environment; production inherits
-// the spool.pro default.
-export const DEFAULT_PUBLIC_BASE_URL = 'https://spool.pro'
+// the spool.new default.
+export const DEFAULT_PUBLIC_BASE_URL = 'https://spool.new'
 export const LOCAL_PUBLIC_BASE_URL = 'http://localhost:3002'
 
 export function publicBaseUrl(env: { PUBLIC_BASE_URL?: string; ENV?: string }): string {

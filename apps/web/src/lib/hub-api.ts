@@ -112,11 +112,14 @@ export function parseNdjsonRecords(text: string): HubRecordLine[] {
 
 export type RangeFetcher = (from: number, to: number) => Promise<HubRecordLine[]>
 
-export function makeRangeFetcher(sid: string): RangeFetcher {
+export function makeRangeFetcher(sid: string, signal?: AbortSignal): RangeFetcher {
   return async (from, to) => {
     const r = await fetch(
       `/api/hub/v1/sessions/${encodeURIComponent(sid)}/records?from=${from}&to=${to}`,
-      { headers: { accept: 'application/x-ndjson' } },
+      {
+        headers: { accept: 'application/x-ndjson' },
+        ...(signal === undefined ? {} : { signal }),
+      },
     )
     if (r.status !== 200) throw new Error(`records fetch failed: HTTP ${r.status}`)
     return parseNdjsonRecords(await r.text())

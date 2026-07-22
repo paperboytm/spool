@@ -5,6 +5,7 @@ import {
   batchEventRanges,
   fetchHubSpoolFile,
   fetchRecordsExact,
+  makeRangeFetcher,
   parseNdjsonRecords,
   type HubRecordLine,
   type RangeFetcher,
@@ -74,6 +75,19 @@ describe('record fetching', () => {
   it('aborts instead of looping when the server makes no progress', async () => {
     const fetchRange: RangeFetcher = async () => []
     await expect(fetchRecordsExact(fetchRange, 0, 3)).rejects.toThrow(/no records/)
+  })
+
+  it('forwards AbortSignal to record fetches', async () => {
+    const abortController = new AbortController()
+    const fetchMock = vi.fn(async () => new Response(`${JSON.stringify(record(0))}\n`))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await makeRangeFetcher('claude_12345678', abortController.signal)(0, 1)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/hub/v1/sessions/claude_12345678/records?from=0&to=1',
+      expect.objectContaining({ signal: abortController.signal }),
+    )
   })
 
   it('batches event indices into ranges, bridging small gaps only', () => {
@@ -295,9 +309,9 @@ describe('session OG tags', () => {
     const fragment = sessionOgHead({
       title: 'Fix <PKCE> handling',
       description: 'A coding-agent session shared by @xy — 42 records.',
-      canonicalUrl: 'https://spool.pro/session/claude_x',
+      canonicalUrl: 'https://spool.new/session/claude_x',
     })
-    expect(fragment.meta[0]).toEqual({ title: 'Fix <PKCE> handling · spool.pro' })
+    expect(fragment.meta[0]).toEqual({ title: 'Fix <PKCE> handling · spool.new' })
     expect(fragment.meta.find((m) => m['name'] === 'twitter:card')?.['content']).toBe('summary')
     expect(fragment.meta.some((m) => m['property'] === 'og:image')).toBe(false)
   })

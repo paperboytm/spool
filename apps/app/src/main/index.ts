@@ -10,6 +10,7 @@ import {
   nativeTheme,
   nativeImage,
   net,
+  session,
   shell,
 } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
@@ -529,7 +530,7 @@ function createWindow(): BrowserWindow {
     height: 740,
     minWidth: 800,
     minHeight: 520,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#141410' : '#FAFAF8',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#FFFFFF',
     autoHideMenuBar: !isMac,
     // hiddenInset keeps the traffic lights but lets the renderer paint
     // up to y=0, so the app's top bar sits flush with the close/min/max
@@ -664,7 +665,7 @@ app
     // otherwise the first response slips through with whatever Vite (or
     // the bundled file:// loader) emits and Electron's "Insecure CSP"
     // warning fires once before our header takes over.
-    installRendererCsp({ dev: isDevMode })
+    installRendererCsp({ dev: isDevMode }, session.defaultSession)
 
     // Hydrate the agent-binary path cache from disk before anything has a
     // chance to call `cachedResolveAsync`. Without this every cold launch
@@ -772,7 +773,7 @@ app
     registerSharePublishIpc()
     // Share-profile IPC (display name + avatar upload / delete / visibility)
     registerShareProfileIpc()
-    // v2 hub share IPC (one-click records share to spool.pro)
+    // v2 hub share IPC (one-click records share to spool.new)
     registerHubShareIpc()
 
     // Auto-updater (only runs in packaged builds)

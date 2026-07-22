@@ -25,7 +25,7 @@ function envFor(dbState?: FakeDbState) {
 }
 
 function request(body: unknown): Request {
-  return new Request('https://spool.pro/api/auth/sign-in-with-code', {
+  return new Request('https://spool.new/api/auth/sign-in-with-code', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -156,7 +156,7 @@ describe('POST /api/auth/sign-in-with-code', () => {
     await env.RATE.put(`rate/signin/9.9.9.9/${slot}`, String(SIGNIN_RATE_MAX), {
       expirationTtl: SIGNIN_RATE_WINDOW_SEC * 2,
     })
-    const req = new Request('https://spool.pro/api/auth/sign-in-with-code', {
+    const req = new Request('https://spool.new/api/auth/sign-in-with-code', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'cf-connecting-ip': '9.9.9.9' },
       body: JSON.stringify({ provider: 'workos', code: 'c', code_verifier: 'v' }),

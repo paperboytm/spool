@@ -235,7 +235,7 @@ function Card({
   return (
     <div className="sw-card tight sw-signin w-420">
       <div className="sw-signin-emblem">{icon ?? <SpoolMark size={30} />}</div>
-      <div className="sw-eyebrow">spool.pro</div>
+      <div className="sw-eyebrow">spool.new</div>
       <h1 className="sw-signin-title">{title}</h1>
       <p className="sw-signin-sub">{sub}</p>
       {children}

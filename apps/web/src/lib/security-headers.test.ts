@@ -10,5 +10,7 @@ describe('Explore security headers', () => {
     expect(headers?.['X-Robots-Tag']).toBeUndefined()
     expect(headers?.['Content-Security-Policy']).toContain("script-src 'self' 'nonce-nonce-value'")
     expect(headers?.['Content-Security-Policy']).toContain("form-action 'self'")
+    expect(headers?.['Content-Security-Policy']).toContain('https://spool.new')
+    expect(headers?.['Content-Security-Policy']).toContain('https://spool.pro')
   })
 })

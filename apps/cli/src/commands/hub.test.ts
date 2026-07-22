@@ -64,7 +64,7 @@ describe('login command handler', () => {
           JSON.stringify({
             device_code: 'dev-secret',
             user_code: 'XKCD-2941',
-            verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+            verification_uri: 'https://spool.new/cli-auth?code=XKCD-2941',
             expires_in: 900,
             interval: 3,
           }),
@@ -101,10 +101,10 @@ describe('login command handler', () => {
     ).resolves.toBe(0)
 
     expect(JSON.parse(readFileSync(join(home, '.spool', 'hub-credentials.json'), 'utf8'))).toEqual({
-      hubUrl: 'https://spool.pro',
+      hubUrl: 'https://spool.new',
       token: 'sph_browser',
     })
-    expect(opened).toEqual(['https://spool.pro/cli-auth?code=XKCD-2941'])
+    expect(opened).toEqual(['https://spool.new/cli-auth?code=XKCD-2941'])
     expect(output[0]).toContain('XKCD-2941')
     // The start call carries the approval-page label.
     const startCall = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/api/cli-auth/start'))!
@@ -123,7 +123,7 @@ describe('login command handler', () => {
           JSON.stringify({
             device_code: 'dev-secret',
             user_code: 'XKCD-2941',
-            verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+            verification_uri: 'https://spool.new/cli-auth?code=XKCD-2941',
             expires_in: 900,
             interval: 3,
           }),
@@ -166,7 +166,7 @@ describe('login command handler', () => {
           JSON.stringify({
             device_code: 'dev-secret',
             user_code: 'XKCD-2941',
-            verification_uri: 'https://spool.pro/cli-auth?code=XKCD-2941',
+            verification_uri: 'https://spool.new/cli-auth?code=XKCD-2941',
             expires_in: 0, // deadline already passed → zero poll iterations
             interval: 3,
           }),
@@ -360,7 +360,7 @@ describe('withdraw command handler', () => {
     [410, `Session already withdrawn: ${SID}`],
   ])('prints a friendly HTTP %s error', async (status, expected) => {
     const home = tempHome()
-    saveHubCredentials({ hubUrl: 'https://spool.pro', token: 'owner-token' }, { homeDir: home })
+    saveHubCredentials({ hubUrl: 'https://spool.new', token: 'owner-token' }, { homeDir: home })
     const errors: string[] = []
     const fetchMock = vi.fn(async () => Response.json({ message: 'server detail' }, { status }))
 

@@ -32,7 +32,7 @@
   --color-accent-dark: var(--sp-accent);
 }
 
-/* spool.pro share-web — unified design system.
+/* spool.new share-web — unified design system.
  * Tokens are scoped to .sw-root so the page can opt into a per-paper
  * surface (Reader) without leaking into 3rd-party DOM. data-theme
  * controls light/dark; default reads from the html[data-theme] root
@@ -123,7 +123,7 @@ html[data-theme='dark'] .sw-root {
 }
 
 /* ── Header chrome ──────────────────────────────────────────── */
-/* Matches spool.pro landing — solid --bg, hairline bottom border, no
+/* Matches spool.new landing — solid --bg, hairline bottom border, no
  * blur, no semi-transparent overlay. Solid color reads as "site chrome"
  * across light + dark; the frosted-glass look fought with the warm
  * parchment palette and confused the reader's paper card. */
@@ -1099,8 +1099,8 @@ html[data-theme='dark'] .sw-root {
   max-width: 100%;
   border-radius: var(--sp-radius-card);
   box-shadow:
-    0 1px 2px rgba(40, 34, 26, 0.05),
-    0 18px 50px rgba(40, 34, 26, 0.1);
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 18px 50px rgba(0, 0, 0, 0.1);
 }
 html[data-theme='dark'] .reader-paper {
   box-shadow:
@@ -1112,7 +1112,7 @@ html[data-theme='dark'] .reader-paper {
 .sw-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 16, 0.45);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;

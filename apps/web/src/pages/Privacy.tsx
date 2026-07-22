@@ -11,7 +11,7 @@ const LAST_UPDATED = 'July 20, 2026'
 
 export function Privacy() {
   useEffect(() => {
-    document.title = 'Privacy · spool.pro'
+    document.title = 'Privacy · spool.new'
   }, [])
 
   return (
@@ -19,7 +19,7 @@ export function Privacy() {
       <Header />
       <main className="sw-main">
         <article className="sw-card sw-legal w-600">
-          <p className="sw-eyebrow">spool.pro</p>
+          <p className="sw-eyebrow">spool.new</p>
           <h1 className="sw-title">Privacy policy</h1>
           <p className="sw-legal-date">Last updated: {LAST_UPDATED}</p>
 
@@ -29,19 +29,19 @@ export function Privacy() {
               <li>Local Session preparation does not publish anything.</li>
               <li>
                 Only the Session, range, Summary, and publication document you explicitly share are
-                sent to spool.pro.
+                sent to spool.new.
               </li>
               <li>
                 Supported Sessions are Public in Explore and search by default after you confirm
                 Share; providers not yet supported by Explore remain Link-only.
               </li>
-              <li>spool.pro runs no ads, behavioral analytics, or third-party tracking cookies.</li>
+              <li>spool.new runs no ads, behavioral analytics, or third-party tracking cookies.</li>
             </ul>
           </div>
 
           <h2>Who we are</h2>
           <p>
-            spool.pro is the publishing service for <a href="https://spool.pro">Spool</a>, an
+            spool.new is the publishing service for <a href="https://spool.new">Spool</a>, an
             open-source platform for sharing and continuing agent Sessions. Contact us at{' '}
             <a href="mailto:hello@spool.pro">hello@spool.pro</a>.
           </p>
@@ -132,7 +132,7 @@ export function Privacy() {
 
           <h2>Children</h2>
           <p>
-            spool.pro is not directed at children under 13, and we do not knowingly collect their
+            spool.new is not directed at children under 13, and we do not knowingly collect their
             data.
           </p>
 

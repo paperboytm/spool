@@ -1,5 +1,5 @@
 // Pure display transform: a .spool document → the wire Snapshot the
-// reader renders. Used by the spool.pro session page to show the .spool
+// reader renders. Used by the spool.new session page to show the .spool
 // file attached to a hub share. No redaction here — attached documents
 // are sanitized at build time (buildSpoolDocument sanitize: true); this
 // mirrors the id-opaquing + hidden-turn blanking rules of the app's

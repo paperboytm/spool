@@ -18,7 +18,7 @@ describe('package build output', () => {
       })
 
       expect(readFileSync(join(outDir, 'styles.css'), 'utf8')).toContain("@import './tokens.css'")
-      expect(readFileSync(join(outDir, 'tokens.css'), 'utf8')).toContain('--sp-accent: #c85a00')
+      expect(readFileSync(join(outDir, 'tokens.css'), 'utf8')).toContain('--sp-accent: #1387ff')
     } finally {
       rmSync(outDir, { recursive: true, force: true })
     }

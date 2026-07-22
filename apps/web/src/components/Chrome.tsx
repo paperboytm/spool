@@ -1,4 +1,4 @@
-// Shared chrome composition for the spool.pro share-web pages. All five
+// Shared chrome composition for the spool.new share-web pages. All five
 // routes (Reader, Tombstone, Profile, Me, SignIn) compose Page + Header
 // + Footer here while reusable visual primitives come from @spool-lab/ui.
 //

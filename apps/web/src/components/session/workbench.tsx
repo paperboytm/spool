@@ -40,7 +40,9 @@ import {
   repositoryUrlForRemote,
   resumeCommandFor,
 } from '../../lib/session-page'
+import type { SessionRoute } from '../../lib/session-route'
 import { CliResumeDialog } from './cli-resume-dialog'
+import { SessionRouteMap } from './route-map'
 import { SessionSummary } from './session-summary'
 
 interface Props {
@@ -48,6 +50,7 @@ interface Props {
   view: SessionViewV1 | null
   provider: SessionProvider
   conversation: ParsedConversation
+  route?: SessionRoute | null
   isDark: boolean
   initialRecordIndex: number | null
   spoolDocument: SpoolDocument | null
@@ -135,6 +138,7 @@ export function SessionWorkbench({
   view,
   provider,
   conversation,
+  route,
   isDark,
   initialRecordIndex,
   spoolDocument,
@@ -151,7 +155,6 @@ export function SessionWorkbench({
   const listRef = useRef<MessageListHandle>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
   const focusedTurnRef = useRef<HTMLElement | null>(null)
-  const focusTimerRef = useRef<number | null>(null)
   const jumpFrameRef = useRef<number | null>(null)
 
   const card = parseWorkspaceCard(meta.cardJson)
@@ -180,11 +183,10 @@ export function SessionWorkbench({
   )
   const spoolTitle = spoolDocument?.conversation.title.trim() ?? ''
   const fullTitle =
-    (spoolDocument !== null && spoolDocument.opts.redact
-      ? redactPlainText(spoolTitle, spoolRedactList)
-      : spoolTitle) ||
-    conversation.title.trim() ||
-    'Shared session'
+    spoolDocument === null
+      ? conversation.title.trim() || 'Shared session'
+      : (spoolDocument.opts.redact ? redactPlainText(spoolTitle, spoolRedactList) : spoolTitle) ||
+        'Shared session'
   const title = compactSessionTitle(fullTitle)
   const spoolPrompts = useMemo(
     () => (spoolDocument === null ? [] : getSpoolPromptEntries(spoolDocument, spoolRedactList)),
@@ -230,27 +232,26 @@ export function SessionWorkbench({
       jumpFrameRef.current = null
 
       if (focusedTurnRef.current !== null && focusedTurnRef.current !== turn) {
-        focusedTurnRef.current.blur()
         focusedTurnRef.current.removeAttribute('tabindex')
       }
       focusedTurnRef.current = turn
       turn.tabIndex = -1
+      turn.addEventListener(
+        'blur',
+        () => {
+          turn.removeAttribute('tabindex')
+          if (focusedTurnRef.current === turn) focusedTurnRef.current = null
+        },
+        { once: true },
+      )
       turn.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
       turn.focus({ preventScroll: true })
-      if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current)
-      focusTimerRef.current = window.setTimeout(() => {
-        turn.blur()
-        turn.removeAttribute('tabindex')
-        if (focusedTurnRef.current === turn) focusedTurnRef.current = null
-        focusTimerRef.current = null
-      }, 1600)
     }
     focusTurn()
   }, [])
 
   useEffect(
     () => () => {
-      if (focusTimerRef.current !== null) window.clearTimeout(focusTimerRef.current)
       if (jumpFrameRef.current !== null) window.cancelAnimationFrame(jumpFrameRef.current)
       focusedTurnRef.current?.removeAttribute('tabindex')
     },
@@ -384,6 +385,27 @@ export function SessionWorkbench({
                       : 'turns'}
                 </span>
               </div>
+
+              {route && route.phases.length > 1 && (
+                <SessionRouteMap
+                  route={route}
+                  onJump={(recordIndex) => {
+                    if (spoolDocument !== null) {
+                      const turnIndex = route.phases.find(
+                        (phase) => phase.recordIndex === recordIndex,
+                      )?.turnIndex
+                      if (turnIndex !== undefined) jumpToTurn(turnIndex)
+                      return
+                    }
+                    const messageId = conversation.recordToMessageId.get(recordIndex)
+                    if (messageId !== undefined) {
+                      setTargetTurnIndex(null)
+                      setTargetMessageId(messageId)
+                      listRef.current?.scrollToMessageId(messageId)
+                    }
+                  }}
+                />
+              )}
 
               <div className="min-w-0 lg:grid lg:grid-cols-[24px_minmax(0,1fr)] lg:gap-4">
                 {prompts.length > 0 && (

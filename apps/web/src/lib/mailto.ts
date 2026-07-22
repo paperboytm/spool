@@ -8,7 +8,9 @@
 // just rely on the default — window.location.origin already gives the
 // right value at runtime.
 
-const DEFAULT_ORIGIN = 'https://spool.pro'
+import { PUBLIC_SITE_ORIGIN } from './site'
+
+const DEFAULT_ORIGIN = PUBLIC_SITE_ORIGIN
 
 function currentOrigin(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {

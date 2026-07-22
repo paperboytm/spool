@@ -1,6 +1,6 @@
 // Hub records → the exact message list the desktop renders. The parsing
 // brain is @spool-lab/session-kit's provider parsers (the same code the
-// desktop indexer wraps), so what you read on spool.pro is what you'd see
+// desktop indexer wraps), so what you read on spool.new is what you'd see
 // opening the session in the app.
 
 import { parseSessionText, type ParsedMessage, type SessionProvider } from '@spool-lab/session-kit'

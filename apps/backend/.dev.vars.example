@@ -30,7 +30,7 @@
 #   WorkOS. The checked-in development config defaults to the share-web
 #   Vite server below; keep this explicit when copying the file so custom
 #   local environments can override it. It must match the redirect URI
-#   registered in WorkOS. Unset in prod (defaults to https://spool.pro).
+#   registered in WorkOS. Unset in prod (defaults to https://spool.new).
 
 # DEV_WORKOS_API_URL (optional — normally injected by share-dev.sh)
 #   workerd ignores proxy envs (workers-sdk#4515); on proxy-only dev

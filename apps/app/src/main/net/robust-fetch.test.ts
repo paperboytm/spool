@@ -160,7 +160,7 @@ describe('loopback handling', () => {
   )
 
   it('public hosts are not loopback', () => {
-    expect(isLoopbackUrl('https://spool.pro/api')).toBe(false)
+    expect(isLoopbackUrl('https://spool.new/api')).toBe(false)
   })
 
   it('loopback targets skip the provided chain and go direct', async () => {

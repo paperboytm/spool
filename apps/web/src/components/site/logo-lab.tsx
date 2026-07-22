@@ -103,8 +103,8 @@ const VARIANTS: ReadonlyArray<{
 ]
 
 const THEMES = [
-  { key: 'dark', bg: '#141410', fg: '#f2f2ec', border: '#2e2e28', accent: '#f07020' },
-  { key: 'light', bg: '#fafaf8', fg: '#1c1c18', border: '#e8e8e2', accent: '#c85a00' },
+  { key: 'dark', bg: '#000000', fg: '#ffffff', border: '#1f1f1f', accent: '#5bb1f0' },
+  { key: 'light', bg: '#ffffff', fg: '#0a0a0a', border: '#e5e5e5', accent: '#1387ff' },
 ] as const
 
 export default function LogoLab() {

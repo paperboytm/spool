@@ -12,9 +12,9 @@
 ## Aesthetic Direction
 
 - **Direction:** Void Index — Framer-derived void black + electric blue over the Warm Index structure. Function-first but with personality.
-- **Decoration level:** Minimal. Typography, authentic Session content, and color warmth carry the page. No gradients or decorative blobs.
+- **Decoration level:** Minimal on product and reading surfaces. The marketing homepage may use one cinematic WebGL knowledge-space scene plus the choreographed share → server → resume flow; particles, bloom, and restrained light bands must explain that narrative rather than become generic decoration. No gradient buttons or interchangeable CSS blobs.
 - **Mood:** The feeling of finding a thoughtful piece of work in a well-kept public index. Intimate, focused, and trustworthy; never corporate or clinical.
-- **Differentiation:** Developer platforms default to cold grays, dense dashboards, or social-feed gloss. Spool's warm near-blacks and amber accent frame technical work as something worth reading without disguising its provenance.
+- **Differentiation:** Developer platforms default to undifferentiated gray dashboards or social-feed gloss. Spool's void palette and Paperboy electric blue frame technical work as something worth reading without disguising its provenance.
 
 ## Layout Philosophy
 
@@ -29,7 +29,7 @@ The public web must show the artifact before explaining the product. Real Sessio
 
 ### Public web
 
-- **Header:** Compact and persistent. Wordmark on the left; `Explore`, `Docs`, and search in the primary navigation; `Publish` and account state on the right. `Publish` uses the amber accent.
+- **Header:** Compact and persistent. Wordmark on the left; `Explore`, `Docs`, and search in the primary navigation; `Publish` and account state on the right. `Publish` uses the Paperboy blue accent.
 - **Homepage:** Featured-first editorial layout. The hero pairs a concise promise with one real featured Session—never a screenshot of the desktop app. Primary CTA is `Explore sessions`; secondary CTA is `Publish yours`. Search stays compact until the public corpus is large enough to make search-first discovery useful.
 - **Homepage feed:** Public Sessions appear immediately after the hero. Use information-rich rows or cards with author, agent, topic/project, Summary excerpt, evidence, and continuation state. Avoid equal-weight feature tiles.
 - **Discovery:** Search is prominent at the top, followed by clear filters for topic, agent, author, and recency. Results remain readable without opening each Session.
@@ -43,7 +43,7 @@ The public web must show the artifact before explaining the product. Real Sessio
 
 - **Core principle:** The desktop app is the author’s private preparation surface. Projects and Sessions are the home; search and publishing are actions within that context.
 - **Shell:** Persistent left sidebar (240px) + main pane. Sidebar lists projects derived from `project_groups_v` and remains visible across every main-pane state.
-- **Sidebar:** Warm surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label with a sort menu, then project rows. A divider separates derived projects from the always-last `Loose` entry.
+- **Sidebar:** Neutral surface background, soft right border. Top-left wordmark `Spool.`, then a `PROJECTS` section label with a sort menu, then project rows. A divider separates derived projects from the always-last `Loose` entry.
 - **Project row:** Display name on the left, faint source-color dots in the middle, monospace count on the right. Active and hover states use `surface2`.
 - **Home:** Pinned Sessions above a recent feed bucketed by date. Entry to search is ⌘K or the top-right trigger.
 - **Project view:** Recent feed of one project with sort and source filters. A `PINNED` segment surfaces project-pinned Sessions on top.
@@ -85,7 +85,7 @@ Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows a
 
 ## Color
 
-- **Approach:** Restrained — one amber accent, warm neutrals, color is rare and meaningful.
+- **Approach:** Restrained — one Paperboy blue accent over a black/white void palette; color is rare and meaningful.
 
 ### Light Mode
 
@@ -114,8 +114,8 @@ Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows a
 | `--text`      | `#FFFFFF` | Primary text                               |
 | `--muted`     | `#A6A6A6` | Secondary text                             |
 | `--faint`     | `#555555` | Placeholder, disabled                      |
-| `--accent`    | `#0099FF` | Accent brightened for dark — electric blue |
-| `--accent-bg` | `#002A44` | Accent backgrounds on dark                 |
+| `--accent`    | `#5BB1F0` | Accent brightened for dark — Paperboy blue |
+| `--accent-bg` | `#0E2740` | Accent backgrounds on dark                 |
 
 ### Source Badge Colors
 
@@ -132,13 +132,13 @@ Only currently-supported agent sources are listed. Add a row when a new source s
 
 ### Semantic States
 
-Status colors are warm-tuned to match the rest of the palette — never use Tailwind defaults (`green-500`, `red-500`).
+Semantic colors are tuned for contrast against the void palette — never use Tailwind defaults (`green-500`, `red-500`).
 
 | State                | Light                  | Dark      |
 | -------------------- | ---------------------- | --------- |
 | Success / synced     | `#6BAF6B` (warm green) | `#7DC07D` |
 | Warning / stale      | `#E4A640` (warm amber) | `#F0B854` |
-| Error / disconnected | `#C95A4F` (terracotta) | `#D67259` |
+| Error / disconnected | `#E5484D`              | `#FF6369` |
 
 ## Spacing
 
@@ -180,13 +180,14 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 
 ## Motion
 
-- **Approach:** Minimal-functional — only transitions that aid comprehension.
+- **Approach:** Minimal-functional on product surfaces. The homepage is the exception: its WebGL hero and share → server → resume sequence may use continuous, narrative motion to make cross-machine Session flow legible.
+- **Homepage motion:** Theme-aware particles, bloom, and light bands must remain visually subordinate to the promise and CTAs. Respect `prefers-reduced-motion` with a stable composed frame and no essential information hidden behind animation timing.
 - **⌘K overlay open/close:** Backdrop fades in (120ms), overlay card scales from 0.98 → 1 + fades in (140ms ease-out). Reverse on close.
 - **Main-pane state changes (Library Home ↔ Project View ↔ Session Detail):** Instant. No slide or crossfade — sidebar context already tells the user where they are.
 - **Results appear:** Fade + translate-y(4px) → 0. Duration 150ms, ease-out, staggered 20ms per item.
 - **Mode switch (Fast ↔ AI):** Overlay content area crossfade 200ms.
 - **Hover states:** Background 80ms, border-color 80ms — fast enough to feel instant.
-- **Nothing else moves.** No scroll-driven animations, no decorative motion.
+- **Nothing else moves on product surfaces.** No scroll-driven animation in readers, Discovery, Profiles, desktop preparation, or account flows.
 
 ## UI States
 
@@ -196,7 +197,7 @@ Status colors are warm-tuned to match the rest of the palette — never use Tail
 - **Session result:** Author avatar + handle, title or first-prompt-derived label, Summary excerpt, agent/source badge, publication time, touched-file or diff evidence, and fork/resume state.
 - **Empty query:** Show recent and featured Sessions, not an empty search page.
 - **Empty filter:** Explain which filters produced no results and offer one-click clearing.
-- **Loading:** Preserve card/row geometry with warm-neutral skeletons; do not replace the entire feed with a centered spinner.
+- **Loading:** Preserve card/row geometry with neutral skeletons; do not replace the entire feed with a centered spinner.
 
 ### Profile
 
@@ -378,7 +379,7 @@ In dense lists, prefer compact facts over repeated pronouns:
 - Ambiguous visibility controls, icon-only publish actions, or language that calls a Link-only URL private
 - Uniform bubbly border-radius on all elements
 - Gradient buttons
-- Cold grays (`#0A0A0A`, `#111111`)—always use warm near-blacks
+- Introducing dark-mode surface values outside the documented void token scale (`#000000`, `#090909`, `#111111`)
 - Inter, Roboto, or system fonts as primary UI typeface
 - Emoji in production UI—replace all with vector icons
 

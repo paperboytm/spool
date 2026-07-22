@@ -18,7 +18,8 @@
 // generated in src/start.ts and threaded to the router (router ssr
 // option) so the framework stamps it onto every inline script it emits.
 
-const IMG_SRC_READER = "'self' data: https://spool.pro https://lh3.googleusercontent.com"
+const IMG_SRC_READER =
+  "'self' data: https://spool.new https://spool.pro https://lh3.googleusercontent.com"
 
 function csp(
   nonce: string | undefined,

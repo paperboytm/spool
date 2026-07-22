@@ -63,8 +63,8 @@ const MAIN_INLINE_ENV: readonly string[] = [
   'SPOOL_WORKOS_CLIENT_ID',
   // Backend origin for `/api/auth/sign-in-with-code`, `/api/me`, etc.
   // In dev this is the local wrangler `http://localhost:8788`; in prod
-  // it's the spool.pro Pages deployment. Without this inlined the main
-  // bundle defaults to https://spool.pro and dev sign-in 404s.
+  // it's the spool.new Pages deployment. Without this inlined the main
+  // bundle defaults to https://spool.new and dev sign-in 404s.
   'SPOOL_SHARE_BACKEND',
 ]
 

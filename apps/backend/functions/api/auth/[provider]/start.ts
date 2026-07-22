@@ -20,7 +20,7 @@ type Env = {
   WORKOS_CLIENT_ID?: string
   // Public origin the provider must redirect back to — must exactly
   // match the value registered with the provider. Defaults to
-  // spool.pro; dev sets it to the web app's origin (e.g. http://localhost:3002).
+  // spool.new; dev sets it to the web app's origin (e.g. http://localhost:3002).
   PUBLIC_BASE_URL?: string
 }
 

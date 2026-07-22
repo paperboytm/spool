@@ -8,9 +8,9 @@ describe('publicBaseUrl', () => {
   })
 
   it('keeps explicit deployment origins and the production fallback', () => {
-    expect(publicBaseUrl({ ENV: 'staging', PUBLIC_BASE_URL: 'https://staging.spool.pro' })).toBe(
-      'https://staging.spool.pro',
+    expect(publicBaseUrl({ ENV: 'staging', PUBLIC_BASE_URL: 'https://staging.spool.new' })).toBe(
+      'https://staging.spool.new',
     )
-    expect(publicBaseUrl({ ENV: 'production' })).toBe('https://spool.pro')
+    expect(publicBaseUrl({ ENV: 'production' })).toBe('https://spool.new')
   })
 })

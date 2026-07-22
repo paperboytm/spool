@@ -347,7 +347,7 @@
       "deleteConfirm_item_shares_prefix": "所有已发布的分享将返回",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "你的 handle 将被释放，任何人都可以重新认领",
-      "deleteConfirm_item_record": "你的账户记录将从 spool.pro 删除",
+      "deleteConfirm_item_record": "你的账户记录将从 spool.new 删除",
       "deleteConfirm_footnote": "在冷却期结束前你可以随时在此界面取消。本机的草稿不受影响——它们保存在本地。",
       "deleteConfirm_confirm": "安排删除",
       "deleteConfirm_scheduling": "安排中…",
@@ -606,7 +606,7 @@
       "publishUnredacted": "公开发布敏感信息",
       "publishing": "发布中…",
       "tryAgain": "重试",
-      "footerHint": "快照将上传至 spool.pro，随时可撤销。",
+      "footerHint": "快照将上传至 spool.new，随时可撤销。",
       "footerHint_published": "快照位于上方链接，随时可撤销。",
       "error_sessionExpired": "登录已过期——请重新登录后再发布。",
       "error_rateLimited": "发布次数过多，请几分钟后重试。",
@@ -637,7 +637,7 @@
       "downloading": "导出中…"
     },
     "connectCard": {
-      "title": "登录 spool.pro",
+      "title": "登录 spool.new",
       "body": "Spool 只会上传你主动发布的快照。草稿和你的资料库永远不会离开本机。",
       "signInWithGoogle": "使用 Google 登录",
       "waitingForBrowser": "正在等待浏览器…",
@@ -647,7 +647,7 @@
       "title": "取消发布此分享？",
       "body_prefix": "此操作无法撤销。链接将返回",
       "body_emphasis": "410 Gone",
-      "body_suffix": "，快照将从 spool.pro 存储中删除，URL 无法重新使用。要再次分享此对话，需要重新发布一份——链接将是全新的。",
+      "body_suffix": "，快照将从 spool.new 存储中删除，URL 无法重新使用。要再次分享此对话，需要重新发布一份——链接将是全新的。",
       "confirm": "确认永久取消发布",
       "confirming": "取消发布中…"
     }
@@ -870,10 +870,10 @@
     "toggleOptions": "选项"
   },
   "hubShare": {
-    "menuLabel": "分享到 spool.pro",
-    "pretitle": "分享到 spool.pro",
+    "menuLabel": "分享到 spool.new",
+    "pretitle": "分享到 spool.new",
     "title": "发布这个会话？",
-    "lead": "将完整转录（{{records}} 条记录）作为公开会话发布到 spool.pro。它可以出现在 Explore 和搜索中，源会话不会被更改。",
+    "lead": "将完整转录（{{records}} 条记录）作为公开会话发布到 spool.new。它可以出现在 Explore 和搜索中，源会话不会被更改。",
     "secretsWarning": "检测到 {{total}} 处疑似敏感信息(其中 {{high}} 处高危)。分享会发送这些内容——不确定时请先用安全扫描检查。",
     "summaryLabel": "摘要（Markdown）",
     "publish": "发布会话",
@@ -881,7 +881,7 @@
     "doneTitle": "会话已发布",
     "doneLead": "该会话已公开，可以出现在 Explore 和搜索中。源会话不会被更改。",
     "linkOnlyTitle": "创建这个会话的仅链接分享？",
-    "linkOnlyLead": "Explore 尚未支持此提供商。将完整转录（{{records}} 条记录）通过 spool.pro 的仅链接 URL 分享；源会话不会被更改。",
+    "linkOnlyLead": "Explore 尚未支持此提供商。将完整转录（{{records}} 条记录）通过 spool.new 的仅链接 URL 分享；源会话不会被更改。",
     "linkOnlyPublish": "分享链接",
     "linkOnlyPublishing": "分享中…",
     "linkOnlyDoneTitle": "已分享链接",

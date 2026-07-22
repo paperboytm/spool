@@ -41,7 +41,7 @@ Requires Apple Silicon. The script quits any running Spool instance before repla
 apps/
   app/          Electron desktop app for preparing and sharing Sessions
   cli/          CLI for Session preparation, sharing, reading, and Resume
-  web/          spool.pro website, docs, Profiles, account pages, and Session reader
+  web/          spool.new website, docs, Profiles, account pages, and Session reader
   backend/      Hub, identity, publication, and media API on Cloudflare
 packages/
   core/         Local Session ingestion, organization, SQLite, and search

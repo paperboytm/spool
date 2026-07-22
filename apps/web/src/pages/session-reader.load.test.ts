@@ -5,7 +5,11 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 vi.mock('../components/session/workbench', () => ({ SessionWorkbench: () => null }))
 
 import type { HubRecordLine, HubSessionMeta, RangeFetcher } from '../lib/hub-api'
-import { loadSessionContent } from './session-reader'
+import {
+  loadSessionContent,
+  loadSessionRouteRecords,
+  MAX_ROUTE_EVIDENCE_RECORDS,
+} from './session-reader'
 
 const meta: HubSessionMeta = {
   sid: 'claude_12345678',
@@ -128,5 +132,75 @@ describe('loadSessionContent', () => {
 
     expect(fetchSpoolFile).not.toHaveBeenCalled()
     expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })
+  })
+})
+
+describe('loadSessionRouteRecords', () => {
+  it('does not download unbounded evidence for large curated sessions', async () => {
+    const makeRangeFetcher = vi.fn((): RangeFetcher => vi.fn())
+
+    const records = await loadSessionRouteRecords(meta.sid, MAX_ROUTE_EVIDENCE_RECORDS + 1, {
+      makeRangeFetcher,
+    })
+
+    expect(records).toBeNull()
+    expect(makeRangeFetcher).not.toHaveBeenCalled()
+  })
+
+  it('loads route evidence independently after the curated document has rendered', async () => {
+    const fetchRange = vi.fn<RangeFetcher>(async (from, to) =>
+      Array.from({ length: to - from }, (_, offset) => record(from + offset)),
+    )
+
+    const records = await loadSessionRouteRecords(meta.sid, 501, {
+      makeRangeFetcher: vi.fn(() => fetchRange),
+    })
+
+    expect(records).toHaveLength(501)
+    expect(fetchRange).toHaveBeenNthCalledWith(1, 0, 500)
+    expect(fetchRange).toHaveBeenNthCalledWith(2, 500, 501)
+  })
+
+  it('isolates route evidence failures from the curated reader', async () => {
+    const records = await loadSessionRouteRecords(meta.sid, 2, {
+      makeRangeFetcher: vi.fn(() => vi.fn(async () => Promise.reject(new Error('offline')))),
+    })
+
+    expect(records).toBeNull()
+  })
+
+  it('stops a stale route load after cancellation', async () => {
+    let cancelled = false
+    const fetchRange = vi.fn<RangeFetcher>(async (from, to) => {
+      cancelled = true
+      return Array.from({ length: to - from }, (_, offset) => record(from + offset))
+    })
+
+    const records = await loadSessionRouteRecords(
+      meta.sid,
+      501,
+      { makeRangeFetcher: vi.fn(() => fetchRange) },
+      { isCancelled: () => cancelled },
+    )
+
+    expect(records).toBeNull()
+    expect(fetchRange).toHaveBeenCalledOnce()
+  })
+
+  it('forwards an abort signal to the active range request', async () => {
+    const abortController = new AbortController()
+    const fetchRange = vi.fn<RangeFetcher>(async (from, to) =>
+      Array.from({ length: to - from }, (_, offset) => record(from + offset)),
+    )
+    const makeRangeFetcher = vi.fn(() => fetchRange)
+
+    await loadSessionRouteRecords(
+      meta.sid,
+      2,
+      { makeRangeFetcher },
+      { signal: abortController.signal },
+    )
+
+    expect(makeRangeFetcher).toHaveBeenCalledWith(meta.sid, abortController.signal)
   })
 })

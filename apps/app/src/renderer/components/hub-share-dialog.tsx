@@ -1,4 +1,4 @@
-// One-click share to spool.pro (the v2 records share). Prepare runs
+// One-click share to spool.new (the v2 records share). Prepare runs
 // locally and shows the honesty gate — record count, diffstat, redact
 // findings — before anything leaves the machine; Share runs the same
 // 3-step handshake the CLI uses. Mirrors RefreshFromSourceDialog's outer

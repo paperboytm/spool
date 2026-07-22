@@ -48,21 +48,21 @@ afterEach(() => {
 describe('GET /api/auth/workos/callback — plumbing edges', () => {
   it('400 when code or state query params are missing', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc')
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=abc')
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(400)
   })
 
   it('400 when state cookie is absent', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=xyz')
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=abc&state=xyz')
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(400)
   })
 
   it('403 when state cookie does not match query state', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=fromUrl', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=abc&state=fromUrl', {
       headers: {
         cookie: '__spool_oauth_state=otherState|/; __spool_oauth_verifier=v',
       },
@@ -82,7 +82,7 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
     await env.RATE.put(`rate/oauth-callback/8.8.8.8/${slot}`, String(RATE_MAX), {
       expirationTtl: RATE_WINDOW_SEC * 2,
     })
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=abc&state=xyz', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=abc&state=xyz', {
       headers: { 'CF-Connecting-IP': '8.8.8.8' },
     })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
@@ -94,7 +94,7 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('{"error":"invalid_grant"}', { status: 400 }),
     )
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=bad&state=S', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=bad&state=S', {
       headers: { cookie: '__spool_oauth_state=S|/me; __spool_oauth_verifier=v' },
     })
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
@@ -114,7 +114,7 @@ describe('GET /api/auth/workos/callback — plumbing edges', () => {
       if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
       return res
     })
-    const req = new Request('https://spool.pro/api/auth/workos/callback?code=c&state=S', {
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=c&state=S', {
       headers: {
         cookie: '__spool_oauth_state=S|/me%E3%80%82%E8%BF%99%E6%AC%A1; __spool_oauth_verifier=v',
       },
@@ -164,7 +164,7 @@ describe('POST /api/auth/sign-out', () => {
 describe('start endpoint', () => {
   it('redirects to AuthKit and sets both oauth cookies', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/start?next=/me')
+    const req = new Request('https://spool.new/api/auth/workos/start?next=/me')
     const res = await invoke(startGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(302)
     const loc = res.headers.get('location') ?? ''
@@ -177,7 +177,7 @@ describe('start endpoint', () => {
 
   it('coerces an unsafe next param back to /', async () => {
     const env = envFor()
-    const req = new Request('https://spool.pro/api/auth/workos/start?next=//evil.example.com')
+    const req = new Request('https://spool.new/api/auth/workos/start?next=//evil.example.com')
     const res = await invoke(startGet, req, env, { provider: 'workos' })
     const stateCookie = getSetCookies(res).find((c) => c.includes('__spool_oauth_state=')) ?? ''
     // The cookie value is `${state}|${next}`. Ensure the next half is `/`.
@@ -187,7 +187,7 @@ describe('start endpoint', () => {
   it('404s on an unknown provider (no scanner enumeration)', async () => {
     const env = envFor()
     for (const provider of ['github', 'google']) {
-      const req = new Request(`https://spool.pro/api/auth/${provider}/start`)
+      const req = new Request(`https://spool.new/api/auth/${provider}/start`)
       const res = await invoke(startGet, req, env, { provider })
       expect(res.status).toBe(404)
     }
@@ -196,7 +196,7 @@ describe('start endpoint', () => {
   it('callback 404s on an unknown provider', async () => {
     const env = envFor()
     for (const provider of ['github', 'google']) {
-      const req = new Request(`https://spool.pro/api/auth/${provider}/callback?code=x&state=y`)
+      const req = new Request(`https://spool.new/api/auth/${provider}/callback?code=x&state=y`)
       const res = await invoke(callbackGet, req, env, { provider })
       expect(res.status).toBe(404)
     }

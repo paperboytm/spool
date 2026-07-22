@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'n
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-export const DEFAULT_HUB_URL = 'https://spool.pro'
+export const DEFAULT_HUB_URL = 'https://spool.new'
 
 export interface StoredHubCredentials {
   hubUrl: string

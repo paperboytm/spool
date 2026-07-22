@@ -347,7 +347,7 @@
       "deleteConfirm_item_shares_prefix": "게시된 모든 공유가 다음을 반환합니다:",
       "deleteConfirm_item_shares_emphasis": "410 Gone",
       "deleteConfirm_item_handle": "핸들이 해제되어 누구나 다시 등록할 수 있습니다",
-      "deleteConfirm_item_record": "계정 기록이 spool.pro에서 제거됩니다",
+      "deleteConfirm_item_record": "계정 기록이 spool.new에서 제거됩니다",
       "deleteConfirm_footnote": "쿨오프 만료 전에는 이 화면에서 언제든지 취소할 수 있습니다. 이 기기의 초안은 영향을 받지 않으며 — 로컬에 보관됩니다.",
       "deleteConfirm_confirm": "삭제 예약",
       "deleteConfirm_scheduling": "예약 중…",
@@ -606,7 +606,7 @@
       "publishUnredacted": "비밀 정보를 노출한 채 게시",
       "publishing": "게시 중…",
       "tryAgain": "다시 시도",
-      "footerHint": "스냅샷이 spool.pro에 업로드됩니다. 언제든 취소할 수 있습니다.",
+      "footerHint": "스냅샷이 spool.new에 업로드됩니다. 언제든 취소할 수 있습니다.",
       "footerHint_published": "스냅샷은 위 링크에 있습니다. 언제든 취소할 수 있습니다.",
       "error_sessionExpired": "세션이 만료되었습니다 — 게시하려면 다시 로그인하세요.",
       "error_rateLimited": "게시 횟수가 너무 많습니다. 몇 분 후 다시 시도하세요.",
@@ -637,7 +637,7 @@
       "downloading": "내보내는 중…"
     },
     "connectCard": {
-      "title": "spool.pro에 로그인",
+      "title": "spool.new에 로그인",
       "body": "Spool은 사용자가 명시적으로 게시한 스냅샷만 업로드합니다. 초안과 라이브러리는 이 기기를 벗어나지 않습니다.",
       "signInWithGoogle": "Google로 로그인",
       "waitingForBrowser": "브라우저를 기다리는 중…",
@@ -647,7 +647,7 @@
       "title": "이 공유의 게시를 취소하시겠어요?",
       "body_prefix": "되돌릴 수 없습니다. 링크는",
       "body_emphasis": "410 Gone",
-      "body_suffix": " 을 반환하며, 스냅샷은 spool.pro 저장소에서 삭제되고 URL은 재사용할 수 없습니다. 이 대화를 다시 공유하려면 새 사본을 게시해야 하며 — 새 URL이 생성됩니다.",
+      "body_suffix": " 을 반환하며, 스냅샷은 spool.new 저장소에서 삭제되고 URL은 재사용할 수 없습니다. 이 대화를 다시 공유하려면 새 사본을 게시해야 하며 — 새 URL이 생성됩니다.",
       "confirm": "예, 영구적으로 게시 취소",
       "confirming": "취소하는 중…"
     }
@@ -870,10 +870,10 @@
     "toggleOptions": "옵션"
   },
   "hubShare": {
-    "menuLabel": "spool.pro에 공유",
-    "pretitle": "spool.pro에 공유",
+    "menuLabel": "spool.new에 공유",
+    "pretitle": "spool.new에 공유",
     "title": "이 세션을 공개할까요?",
-    "lead": "전체 트랜스크립트({{records}}개 레코드)를 spool.pro의 공개 세션으로 게시합니다. Explore와 검색에 표시될 수 있으며 원본 세션은 변경되지 않습니다.",
+    "lead": "전체 트랜스크립트({{records}}개 레코드)를 spool.new의 공개 세션으로 게시합니다. Explore와 검색에 표시될 수 있으며 원본 세션은 변경되지 않습니다.",
     "secretsWarning": "민감 정보로 의심되는 항목 {{total}}건이 감지되었습니다(고위험 {{high}}건). 공유하면 해당 값이 전송됩니다.",
     "summaryLabel": "요약 (Markdown)",
     "publish": "세션 게시",
@@ -881,7 +881,7 @@
     "doneTitle": "세션 게시됨",
     "doneLead": "이 세션은 공개 상태이며 Explore와 검색에 표시될 수 있습니다. 원본 세션은 변경되지 않습니다.",
     "linkOnlyTitle": "이 세션의 링크 전용 공유를 만들까요?",
-    "linkOnlyLead": "이 제공자는 아직 Explore에서 지원되지 않습니다. 전체 트랜스크립트({{records}}개 레코드)를 spool.pro의 링크 전용 URL로 공유하며 원본 세션은 변경되지 않습니다.",
+    "linkOnlyLead": "이 제공자는 아직 Explore에서 지원되지 않습니다. 전체 트랜스크립트({{records}}개 레코드)를 spool.new의 링크 전용 URL로 공유하며 원본 세션은 변경되지 않습니다.",
     "linkOnlyPublish": "링크 공유",
     "linkOnlyPublishing": "공유 중…",
     "linkOnlyDoneTitle": "링크 공유됨",

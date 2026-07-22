@@ -120,7 +120,7 @@ describe('share-publish:publish size gate', () => {
     const body = makeBody('hello world')
     authedFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ id: 's1', url: 'https://spool.pro/s/s1', version: 1 }),
+      json: async () => ({ id: 's1', url: 'https://spool.new/s/s1', version: 1 }),
     })
 
     const res = (await publish(body)) as { ok: boolean }

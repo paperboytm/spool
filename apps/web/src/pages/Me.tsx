@@ -633,7 +633,7 @@ export function Me() {
   }, [])
 
   useEffect(() => {
-    document.title = 'Your account · spool.pro'
+    document.title = 'Your account · spool.new'
     void load()
   }, [load])
 

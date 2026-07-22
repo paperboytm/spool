@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Spool installer — downloads the latest release and installs to /Applications
-# Usage: curl -fsSL https://spool.pro/install.sh | bash
+# Usage: curl -fsSL https://spool.new/install.sh | bash
 
 REPO="spool-lab/spool"
 APP_NAME="Spool.app"

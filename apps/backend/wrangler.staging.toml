@@ -1,9 +1,8 @@
 # Staging Pages deployment config with concrete resource identifiers.
 # Resource ids are not credentials; Wrangler authentication remains external.
 # Wrangler ≥4.9x refuses config-based Pages deploys without ids, so
-# `pnpm run deploy:staging` can no longer ride the id-less wrangler.toml.
-# Deploy with:
-#   wrangler pages deploy public --config wrangler.staging.toml
+# `pnpm run deploy:staging` selects this file through Wrangler's ephemeral
+# deploy-config redirect; the checked-in local wrangler.toml is never replaced.
 name = "spool-share-backend-staging"
 pages_build_output_dir = "public"
 compatibility_date = "2026-05-01"
@@ -49,5 +48,5 @@ bucket_name = "spool-hub-staging"
 
 [vars]
 ENV = "staging"
-PUBLIC_BASE_URL = "https://staging.spool.pro"
+PUBLIC_BASE_URL = "https://staging.spool.new"
 ABUSE_NOTIFY_EMAIL = "abuse@spool.pro"
