@@ -30,6 +30,8 @@ describe('TeamList', () => {
     expect(html).toContain('Paperboy')
     expect(html).toContain('3 members')
     expect(html).toContain('Owner')
+    expect(html).toContain('sw-teams-list-role')
+    expect(html).toContain('sw-teams-list-arrow')
   })
 })
 

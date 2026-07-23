@@ -5,6 +5,8 @@ import { Footer, Header, Icon, Page } from '../components/Chrome'
 import { ManagedSessionsSection } from '../components/ManagedSessionsSection'
 import { ProfileEditor } from '../components/ProfileEditor'
 import { TeamsSection } from '../components/TeamsSection'
+
+import '../styles/me.css'
 import {
   cancelAccountDeletion,
   checkHandle,
@@ -455,7 +457,7 @@ function ModalShell({
   if (!open) return null
   return (
     <div
-      className="sw-modal-overlay"
+      className="sw-modal-overlay sw-me-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onClose()
       }}
@@ -463,7 +465,7 @@ function ModalShell({
       aria-modal="true"
       aria-labelledby={labelledBy}
     >
-      <div className="sw-modal">{children}</div>
+      <div className="sw-modal sw-me-modal">{children}</div>
     </div>
   )
 }
@@ -755,7 +757,7 @@ export function Me() {
     return (
       <Page>
         <Header />
-        <main className="sw-main center" aria-busy="true">
+        <main className="sw-main sw-me-main center" aria-busy="true">
           <div className="sw-loading">
             <span className="sw-spin sw-spin-anim" />
             Loading account
@@ -770,8 +772,8 @@ export function Me() {
     return (
       <Page>
         <Header />
-        <main className="sw-main center">
-          <div className="sw-card tight w-480">
+        <main className="sw-main sw-me-main center">
+          <div className="sw-card sw-me-card tight w-480">
             <div className="sw-rule" style={{ marginBottom: 20 }}>
               <span className="tag err">Error</span>
               <span className="line" />
@@ -848,24 +850,28 @@ export function Me() {
   return (
     <Page>
       <Header />
-      <main className="sw-main gap">
+      <main className="sw-main sw-me-main gap">
         {pending && (
-          <div className="sw-banner pending" role="alert">
+          <div className="sw-banner sw-me-banner pending" role="alert">
             <span className="ico">
               <Icon name="alert" size={16} />
             </span>
-            <span>
-              <strong>Account deletion is pending.</strong>{' '}
-              {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null}{' '}
-              <Button type="button" size="sm" variant="ghost" onClick={openDelete}>
-                Cancel deletion
-              </Button>{' '}
-              to restore access.
+            <span className="sw-me-banner-copy">
+              <span>
+                <strong>Account deletion is pending.</strong>{' '}
+                {pendingUntil ? `Scheduled for ${humanDateTime(pendingUntil)}.` : null}
+              </span>
+              <span className="sw-me-banner-action">
+                <Button type="button" size="sm" variant="ghost" onClick={openDelete}>
+                  Cancel deletion
+                </Button>
+                <span>to restore access.</span>
+              </span>
             </span>
           </div>
         )}
 
-        <div className="sw-card w-600">
+        <div className="sw-card sw-me-card w-600">
           {pending ? (
             // Pending deletion: identity is read-only. Skip the editable
             // ProfileEditor entirely so the surface communicates that

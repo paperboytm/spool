@@ -9,7 +9,14 @@ describe('Header', () => {
 
     expect(html).toContain('class="sw-header sw-header-sticky"')
     expect(html).toContain('aria-label="Toggle light or dark"')
+    expect(html).toContain('href="/explore"')
+    expect(html).toContain('href="/docs/installation"')
+    expect(html).toContain('aria-label="Docs"')
+    expect(html).toContain('aria-label="Search Sessions"')
+    expect(html).toContain('href="/docs/quick-start"')
+    expect(html).toContain('>Publish</a>')
     expect(html).toContain('href="/sign-in"')
+    expect(html).not.toContain('href="/me"')
     expect(html).toContain('Spool')
   })
 
@@ -31,5 +38,6 @@ describe('Header', () => {
     expect(html).toContain('href="/teams/team%2Fa"')
     expect(html).toContain('>Paperboy</span>')
     expect(html).toContain('href="/me"')
+    expect(html).not.toContain('href="/sign-in"')
   })
 })

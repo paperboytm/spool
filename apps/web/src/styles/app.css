@@ -145,6 +145,24 @@ html[data-theme='dark'] .sw-root {
 .sw-session-sticky {
   top: calc(var(--sw-header-height) + 24px);
 }
+.sw-header-left,
+.sw-header-nav {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.sw-header-left {
+  gap: var(--sp-space-3);
+}
+.sw-header-brand {
+  min-height: 32px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.sw-header-nav {
+  gap: var(--sp-space-1);
+}
 .sw-header-right {
   display: flex;
   align-items: center;
@@ -152,6 +170,13 @@ html[data-theme='dark'] .sw-root {
 }
 .sw-account-link {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--sp-radius-pill);
+}
+.sw-account-link:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-focus-ring);
 }
 .sw-team-quick {
   min-width: 0;
@@ -185,6 +210,9 @@ html[data-theme='dark'] .sw-root {
   white-space: nowrap;
 }
 .sw-signin-link {
+  flex: none;
+}
+.sw-publish-link {
   flex: none;
 }
 
@@ -1676,21 +1704,50 @@ html[data-theme='dark'] .sw-root {
   .sw-header {
     padding: 0 var(--sp-space-3);
   }
-  .sw-header-right {
-    gap: var(--sp-space-1);
+  .sw-header-left {
+    gap: 0;
   }
-  .sw-header-right > .sp-icon-button,
-  .sw-account-link,
+  .sw-header-brand {
+    min-height: 44px;
+  }
+  .sw-header-nav {
+    gap: 0;
+  }
+  .sw-header-nav .sp-nav-item {
+    min-height: 44px;
+  }
+  .sw-header-docs {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .sw-header-docs .sp-nav-item__label {
+    display: none;
+  }
+  .sw-header-search {
+    display: none;
+  }
+  .sw-header-right {
+    gap: 0;
+  }
+  .sw-header-theme,
   .sw-team-quick {
+    display: none;
+  }
+  .sw-publish-link,
+  .sw-signin-link {
+    min-height: 44px;
+    padding-inline: var(--sp-space-2);
+  }
+  .sw-account-link,
+  .sw-header-right > .sp-icon-button {
     width: 44px;
     min-width: 44px;
     height: 44px;
     align-items: center;
     justify-content: center;
     padding: 0;
-  }
-  .sw-team-quick span {
-    display: none;
   }
   .sw-account-link .sp-avatar {
     width: 32px;

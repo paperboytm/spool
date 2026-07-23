@@ -2,7 +2,7 @@
 // from `api.ts` so `api.ts` can call `invalidateAuthCache()` on
 // sign-out / 401 without creating a circular module graph. The
 // `resolveAuthState` wrapper that actually calls `fetchMe` lives in
-// `components/Chrome.tsx`.
+// `auth-state.ts` so marketing and product chrome share one request.
 
 export type AuthIdentity = 'out' | { name: string | null; src: string | null }
 
@@ -22,6 +22,14 @@ export function getCachedAuth(): Promise<AuthIdentity> | null {
 
 export function setCachedAuth(p: Promise<AuthIdentity> | null): void {
   cached = p
+}
+
+/**
+ * Clear a failed in-flight resolver without erasing a newer identity that
+ * another `/api/me` request may already have committed.
+ */
+export function clearCachedAuthIf(expected: Promise<AuthIdentity>): void {
+  if (cached === expected) cached = null
 }
 
 /** Replace the resolved identity memo and notify every mounted Header.
