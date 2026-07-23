@@ -176,6 +176,25 @@ describe('_middleware security headers', () => {
     expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
+  it('does NOT override an explicit Referrer-Policy from a handler', async () => {
+    const { onRequest } = await import('../functions/_middleware')
+    const inner = new Response(null, {
+      status: 302,
+      headers: {
+        location: 'https://x/api/auth/workos/start',
+        'referrer-policy': 'no-referrer',
+      },
+    })
+    const req = new Request('https://x/api/auth/workos/callback?code=secret', { method: 'GET' })
+    const res = await (
+      onRequest as unknown as (c: {
+        request: Request
+        next: () => Promise<Response>
+      }) => Promise<Response>
+    )({ request: req, next: async () => inner })
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer')
+  })
+
   it('does NOT override an explicit Cache-Control on a mutation', async () => {
     const { onRequest } = await import('../functions/_middleware')
     const inner = new Response('{"ok":true}', {
