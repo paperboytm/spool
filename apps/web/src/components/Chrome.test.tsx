@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { Header } from './Chrome'
+import { Footer, Header } from './Chrome'
 
 describe('Header', () => {
   it('can stay visible while a session page uses document scrolling', () => {
@@ -10,14 +10,14 @@ describe('Header', () => {
     expect(html).toContain('class="sw-header sw-header-sticky"')
     expect(html).toContain('aria-label="Toggle light or dark"')
     expect(html).toContain('href="/explore"')
-    expect(html).toContain('href="/docs/installation"')
-    expect(html).toContain('aria-label="Docs"')
+    expect(html).not.toContain('aria-label="Docs"')
     expect(html).toContain('aria-label="Search Sessions"')
     expect(html).toContain('href="/docs/quick-start"')
     expect(html).toContain('>Publish</a>')
     expect(html).toContain('sw-header-mobile-menu')
     expect(html).toContain('aria-label="Mobile navigation"')
     expect(html).toContain('>Search Sessions</span>')
+    expect(html).not.toContain('>Docs</span>')
     expect(html).toContain('Use dark theme')
     expect(html).toContain('href="/sign-in"')
     expect(html).not.toContain('href="/me"')
@@ -43,7 +43,19 @@ describe('Header', () => {
     expect(html).toContain('>Paperboy</span>')
     expect(html).toContain('sw-header-desktop-actions')
     expect(html).toContain('sw-header-mobile-menu-items')
+    expect(html).toContain('href="/my-sessions"')
     expect(html).toContain('href="/me"')
     expect(html).not.toContain('href="/sign-in"')
+  })
+})
+
+describe('Footer', () => {
+  it('groups Docs with legal and repository resources', () => {
+    const html = renderToStaticMarkup(<Footer />)
+
+    expect(html).toContain('href="/docs/installation"')
+    expect(html).toContain('href="/terms"')
+    expect(html).toContain('href="/privacy"')
+    expect(html).toContain('https://github.com/paperboytm/spool')
   })
 })

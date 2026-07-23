@@ -122,12 +122,19 @@ describe('team API client', () => {
   })
 
   it('loads the team-scoped Session feed', async () => {
-    respond(200, { sessions: [] })
+    respond(200, { sessions: [], next_cursor: 'opaque/next+cursor' })
 
     await fetchTeamSessions('team-1')
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/teams/team-1/sessions',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+
+    respond(200, { sessions: [], next_cursor: null })
+    await fetchTeamSessions('team/a', 'opaque/next+cursor')
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/teams/team%2Fa/sessions?cursor=opaque%2Fnext%2Bcursor',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
   })

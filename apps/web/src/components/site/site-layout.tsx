@@ -9,7 +9,7 @@ import {
   Wordmark,
 } from '@spool-lab/ui'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { BookOpen, Moon, Search, Sun, Users } from 'lucide-react'
+import { Library, Moon, Search, Sun, Users } from 'lucide-react'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { AUTH_IDENTITY_CHANGED, type AuthIdentity } from '../../lib/auth-cache'
@@ -47,19 +47,6 @@ export default function SiteLayout({
               }
             >
               Explore
-            </NavItem>
-            <NavItem
-              className="site-docs-link"
-              href="/docs/installation"
-              aria-label="Docs"
-              leading={<BookOpen aria-hidden="true" />}
-              onClick={(event) =>
-                routeInApp(event, () =>
-                  navigate({ to: '/docs/$', params: { _splat: 'installation' } }),
-                )
-              }
-            >
-              Docs
             </NavItem>
             <IconLink
               className="site-search-link"
@@ -120,6 +107,8 @@ export default function SiteLayout({
             <Link to="/docs/$" params={{ _splat: 'installation' }}>
               Docs
             </Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/privacy">Privacy</Link>
             <a href="https://github.com/paperboytm/spool">GitHub</a>
             <a href="https://discord.gg/aqeDxQUs5E">Discord</a>
             <a href="https://x.com/spoollabs">X</a>
@@ -147,7 +136,7 @@ export function SiteAccountActions({ auth }: { auth: AuthIdentity }) {
 
   return (
     <>
-      <a className="site-team-link" href="/me#teams" title="Open your teams">
+      <a className="site-team-link" href="/teams" title="Open your teams">
         <Users size={14} strokeWidth={1.7} aria-hidden="true" />
         <span>Teams</span>
       </a>
@@ -172,9 +161,6 @@ export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
     >
       <nav className="site-mobile-menu-items" aria-label="Mobile navigation">
         <NavItem href="/explore?sort=recommended">Explore</NavItem>
-        <NavItem href="/docs/installation" leading={<BookOpen aria-hidden="true" />}>
-          Docs
-        </NavItem>
         <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
           Search Sessions
         </NavItem>
@@ -184,9 +170,14 @@ export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
         </ButtonLink>
         <ThemeToggle className="site-mobile-theme-toggle" showLabel />
         {auth === 'out' ? null : (
-          <NavItem href="/me#teams" leading={<Users aria-hidden="true" />}>
-            Teams
-          </NavItem>
+          <>
+            <NavItem href="/my-sessions" leading={<Library aria-hidden="true" />}>
+              My Sessions
+            </NavItem>
+            <NavItem href="/teams" leading={<Users aria-hidden="true" />}>
+              Teams
+            </NavItem>
+          </>
         )}
       </nav>
     </MobileMenu>

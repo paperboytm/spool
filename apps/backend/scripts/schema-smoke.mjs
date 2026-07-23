@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { incrementQualifiedReadIfLive, listDiscoveryPage } from '../src/discovery/store.ts'
+
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)))
 const migrationsDir = join(appDir, 'migrations')
 const migrationNames = (await readdir(migrationsDir, { withFileTypes: true }))
@@ -84,6 +86,80 @@ async function expectD1Failure(stateDir, command, expectedMessage) {
   throw new Error(`Expected D1 command to fail: ${command}`)
 }
 
+async function discoverySql(options) {
+  let captured = null
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...params) {
+          return {
+            async all() {
+              captured = { params, sql }
+              return { results: [] }
+            },
+          }
+        },
+      }
+    },
+  }
+  await listDiscoveryPage(db, options)
+  if (captured === null) throw new Error('Discovery query was not prepared')
+
+  let parameterIndex = 0
+  const sql = captured.sql.replaceAll('?', () => {
+    if (parameterIndex >= captured.params.length) {
+      throw new Error('Discovery SQL has more placeholders than bound parameters')
+    }
+    return sqlLiteral(captured.params[parameterIndex++])
+  })
+  if (parameterIndex !== captured.params.length) {
+    throw new Error('Discovery SQL has fewer placeholders than bound parameters')
+  }
+  return sql
+}
+
+async function engagementSql(sid, day) {
+  let captured = null
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...params) {
+          return {
+            async run() {
+              captured = { params, sql }
+              return { meta: { changes: 0 } }
+            },
+          }
+        },
+      }
+    },
+  }
+  await incrementQualifiedReadIfLive(db, sid, day)
+  if (captured === null) throw new Error('Discovery engagement query was not prepared')
+
+  let parameterIndex = 0
+  const sql = captured.sql.replaceAll('?', () => {
+    if (parameterIndex >= captured.params.length) {
+      throw new Error('Discovery engagement SQL has more placeholders than bound parameters')
+    }
+    return sqlLiteral(captured.params[parameterIndex++])
+  })
+  if (parameterIndex !== captured.params.length) {
+    throw new Error('Discovery engagement SQL has fewer placeholders than bound parameters')
+  }
+  return sql
+}
+
+function sqlLiteral(value) {
+  if (value === null) return 'NULL'
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('Cannot bind a non-finite SQL number')
+    return String(value)
+  }
+  if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`
+  throw new Error(`Unsupported discovery SQL binding: ${typeof value}`)
+}
+
 const stateDir = await mkdtemp(join(tmpdir(), 'spool-d1-schema-smoke-'))
 
 try {
@@ -152,6 +228,151 @@ try {
      INSERT INTO workos_user_denials (workos_user_id,denied_at,event_id)
        VALUES ('workos_deleted',1,'event_user_deleted');`,
   )
+
+  const discoveryIndexes = await executeJson(
+    stateDir,
+    "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('hub_discovery_agent_published_sid','hub_discovery_published_sid') ORDER BY name;",
+  )
+  if (discoveryIndexes.length !== 2) {
+    throw new Error(`Missing Discovery keyset indexes: ${JSON.stringify(discoveryIndexes)}`)
+  }
+  await executeJson(
+    stateDir,
+    `INSERT INTO hub_sessions
+       (sid,owner_user_id,root,record_count,visibility,created_at,updated_at)
+       VALUES (
+         'claude_00000000-0000-4000-8000-000000000001',
+         'durable-user',
+         '${'a'.repeat(64)}',
+         12,
+         'unlisted',
+         1,
+         1
+       );
+     INSERT INTO hub_session_discovery
+       (sid,agent,title,summary_text,search_text,message_count,tool_call_count,file_count,
+        additions,deletions,quality_score,published_at,updated_at)
+       VALUES (
+         'claude_00000000-0000-4000-8000-000000000001',
+         'claude',
+         'Durable result',
+         'A durable discovery result.',
+         'durable result claude',
+         2,
+         1,
+         1,
+         4,
+         0,
+         20,
+         1,
+         1
+       );
+     INSERT INTO hub_session_engagement_daily (sid,day,qualified_reads)
+       VALUES ('claude_00000000-0000-4000-8000-000000000001','1970-01-01',5);
+     INSERT INTO handles (handle,user_id,claimed_at,released_at)
+       VALUES
+         ('zeta-durable','durable-user',1,NULL),
+         ('alpha-durable','durable-user',2,NULL);`,
+  )
+  const rankedDiscoverySql = await discoverySql({
+    query: 'durable',
+    tokens: ['durable'],
+    sort: 'recommended',
+    agent: null,
+    rankedAt: 10_000,
+    engagementFromDay: '1970-01-01',
+    engagementToDayExclusive: '1970-01-02',
+    after: null,
+    limit: 20,
+  })
+  const rankedDiscoveryRows = await executeJson(stateDir, rankedDiscoverySql)
+  if (
+    rankedDiscoveryRows.length !== 1 ||
+    rankedDiscoveryRows[0]?.sid !== 'claude_00000000-0000-4000-8000-000000000001' ||
+    rankedDiscoveryRows[0]?.handle !== 'alpha-durable' ||
+    typeof rankedDiscoveryRows[0]?.sort_score !== 'number'
+  ) {
+    throw new Error(
+      `Discovery ranked SQL returned unexpected rows: ${JSON.stringify(rankedDiscoveryRows)}`,
+    )
+  }
+  await executeJson(
+    stateDir,
+    await engagementSql('claude_00000000-0000-4000-8000-000000000001', '1970-01-02'),
+  )
+  const acceptedEngagement = await executeJson(
+    stateDir,
+    `SELECT qualified_reads
+     FROM hub_session_engagement_daily
+     WHERE sid='claude_00000000-0000-4000-8000-000000000001' AND day='1970-01-02';`,
+  )
+  if (acceptedEngagement[0]?.qualified_reads !== 1) {
+    throw new Error(
+      `Discovery conditional engagement did not count a Public Session: ${JSON.stringify(acceptedEngagement)}`,
+    )
+  }
+  const exhaustedDiscoverySql = await discoverySql({
+    query: 'durable',
+    tokens: ['durable'],
+    sort: 'recommended',
+    agent: null,
+    rankedAt: 10_000,
+    engagementFromDay: '1970-01-01',
+    engagementToDayExclusive: '1970-01-02',
+    after: {
+      rankedAt: 10_000,
+      relevanceScore: rankedDiscoveryRows[0].relevance_score,
+      sortScore: rankedDiscoveryRows[0].sort_score,
+      publishedAt: rankedDiscoveryRows[0].published_at,
+      sid: rankedDiscoveryRows[0].sid,
+    },
+    limit: 20,
+  })
+  const exhaustedDiscoveryRows = await executeJson(stateDir, exhaustedDiscoverySql)
+  if (exhaustedDiscoveryRows.length !== 0) {
+    throw new Error(
+      `Discovery keyset did not exhaust after its only row: ${JSON.stringify(exhaustedDiscoveryRows)}`,
+    )
+  }
+  const recentDiscoveryRows = await executeJson(
+    stateDir,
+    await discoverySql({
+      query: null,
+      tokens: [],
+      sort: 'recent',
+      agent: 'claude',
+      rankedAt: 10_000,
+      engagementFromDay: '1970-01-01',
+      engagementToDayExclusive: '1970-01-02',
+      after: null,
+      limit: 20,
+    }),
+  )
+  if (recentDiscoveryRows.length !== 1 || recentDiscoveryRows[0]?.sort_score !== null) {
+    throw new Error(
+      `Discovery Recent SQL returned unexpected rows: ${JSON.stringify(recentDiscoveryRows)}`,
+    )
+  }
+  await executeJson(
+    stateDir,
+    `DELETE FROM hub_session_discovery
+     WHERE sid='claude_00000000-0000-4000-8000-000000000001';`,
+  )
+  await executeJson(
+    stateDir,
+    await engagementSql('claude_00000000-0000-4000-8000-000000000001', '1970-01-02'),
+  )
+  const rejectedEngagement = await executeJson(
+    stateDir,
+    `SELECT qualified_reads
+     FROM hub_session_engagement_daily
+     WHERE sid='claude_00000000-0000-4000-8000-000000000001' AND day='1970-01-02';`,
+  )
+  if (rejectedEngagement[0]?.qualified_reads !== 1) {
+    throw new Error(
+      `Discovery engagement changed without a Public projection: ${JSON.stringify(rejectedEngagement)}`,
+    )
+  }
 
   const quota = 5 * 1024 * 1024 * 1024
   await executeJson(

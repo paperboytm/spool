@@ -12,9 +12,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
-import { Footer, Header, Page } from '../components/Chrome'
 import { ManagedSessionList, withoutManagedSession } from '../components/ManagedSessionList'
+import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { humanDate } from '../lib/dates'
+import { appendUniqueManagedSessions } from '../lib/hub-management-api'
 import {
   archiveTeam,
   createTeamInvitation,
@@ -36,6 +37,8 @@ import {
   type TeamSession,
   type TeamSummary,
 } from '../lib/team-api'
+
+import '../styles/app.css'
 
 export type TeamTab = 'sessions' | 'members' | 'settings'
 
@@ -129,9 +132,8 @@ export function TeamPage({ teamId }: { teamId: string }) {
 
   const { team } = state
   return (
-    <Page>
-      <Header contextTeam={{ id: team.id, name: team.name }} />
-      <main className="sw-team-main">
+    <WorkspaceFrame active="teams" layout="wide" mainClassName="sw-team-workspace-main">
+      <div className="sw-team-main">
         <div className="sw-team-shell">
           <header className="sw-team-heading">
             <div className="sw-team-heading-icon" aria-hidden="true">
@@ -140,7 +142,7 @@ export function TeamPage({ teamId }: { teamId: string }) {
             <div className="sw-team-heading-copy">
               <p className="sw-team-eyebrow">Team workspace</p>
               <h1>{team.name}</h1>
-              <p>Team-owned Sessions live here; each row states who can read it.</p>
+              <p>Recent Team-owned Sessions live here; each row states who can read it.</p>
             </div>
             {team.role ? <Badge>{roleLabel(team.role)}</Badge> : null}
           </header>
@@ -162,9 +164,8 @@ export function TeamPage({ teamId }: { teamId: string }) {
             ) : null}
           </div>
         </div>
-      </main>
-      <Footer />
-    </Page>
+      </div>
+    </WorkspaceFrame>
   )
 }
 
@@ -180,18 +181,16 @@ function TeamStatus({
   action?: ReactNode
 }) {
   return (
-    <Page>
-      <Header />
-      <main className="sw-main center" aria-busy={busy || undefined}>
+    <WorkspaceFrame active="teams" layout="wide" mainClassName="sw-team-workspace-main">
+      <div className="sw-main center" aria-busy={busy || undefined}>
         <div className="sw-card tight sw-team-status sw-card--480">
           {busy ? <span className="sw-spin sw-spin-anim" aria-hidden="true" /> : null}
           <h1 className="sw-title">{title}</h1>
           {body ? <p className="sw-lede muted">{body}</p> : null}
           {action ? <div className="sw-team-status-action">{action}</div> : null}
         </div>
-      </main>
-      <Footer />
-    </Page>
+      </div>
+    </WorkspaceFrame>
   )
 }
 
@@ -319,7 +318,13 @@ export function TeamMemberActions({
 function TeamSessionsPanel({ team }: { team: TeamSummary }) {
   const [state, setState] = useState<
     | { kind: 'loading' }
-    | { kind: 'ready'; sessions: TeamSession[] }
+    | {
+        kind: 'ready'
+        sessions: TeamSession[]
+        nextCursor: string | null
+        loadingMore: boolean
+        moreError: string | null
+      }
     | { kind: 'error'; message: string }
   >({ kind: 'loading' })
 
@@ -333,7 +338,13 @@ function TeamSessionsPanel({ team }: { team: TeamSummary }) {
         message: failureMessage(result, 'Could not load Sessions.'),
       })
     }
-    setState({ kind: 'ready', sessions: result.data.sessions })
+    setState({
+      kind: 'ready',
+      sessions: result.data.sessions,
+      nextCursor: result.data.next_cursor ?? null,
+      loadingMore: false,
+      moreError: null,
+    })
   }, [team.id])
 
   useEffect(() => void load(), [load])
@@ -342,7 +353,7 @@ function TeamSessionsPanel({ team }: { team: TeamSummary }) {
     setState((current) =>
       current.kind === 'ready'
         ? {
-            kind: 'ready',
+            ...current,
             sessions: current.sessions.map((item) => (item.sid === session.sid ? session : item)),
           }
         : current,
@@ -352,16 +363,54 @@ function TeamSessionsPanel({ team }: { team: TeamSummary }) {
   function removeSession(sid: string) {
     setState((current) =>
       current.kind === 'ready'
-        ? { kind: 'ready', sessions: withoutManagedSession(current.sessions, sid) }
+        ? { ...current, sessions: withoutManagedSession(current.sessions, sid) }
+        : current,
+    )
+  }
+
+  async function loadMore() {
+    if (state.kind !== 'ready' || state.nextCursor === null || state.loadingMore) return
+    const cursor = state.nextCursor
+    setState({ ...state, loadingMore: true, moreError: null })
+
+    const result = await fetchTeamSessions(team.id, cursor)
+    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind !== 'ok') {
+      return setState((current) =>
+        current.kind === 'ready' && current.nextCursor === cursor
+          ? {
+              ...current,
+              loadingMore: false,
+              moreError: failureMessage(result, 'Could not load more Sessions.'),
+            }
+          : current,
+      )
+    }
+    setState((current) =>
+      current.kind === 'ready' && current.nextCursor === cursor
+        ? {
+            ...current,
+            sessions: appendUniqueManagedSessions(current.sessions, result.data.sessions),
+            nextCursor: result.data.next_cursor ?? null,
+            loadingMore: false,
+            moreError: null,
+          }
         : current,
     )
   }
 
   return (
     <section id="team-panel-sessions" role="tabpanel" aria-label="Team Sessions">
-      <SectionLabel count={state.kind === 'ready' ? state.sessions.length || undefined : undefined}>
-        Team-owned Sessions
+      <SectionLabel
+        className="sw-team-session-label"
+        count={state.kind === 'ready' ? state.sessions.length || undefined : undefined}
+      >
+        Recent Sessions
       </SectionLabel>
+      <p className="sw-team-session-help">
+        Newest activity first. Sessions stay here when their author leaves because the Team owns
+        them.
+      </p>
       {state.kind === 'loading' ? <PanelLoading label="Loading Sessions" /> : null}
       {state.kind === 'error' ? <PanelError message={state.message} onRetry={load} /> : null}
       {state.kind === 'ready' && state.sessions.length === 0 ? (
@@ -381,6 +430,23 @@ function TeamSessionsPanel({ team }: { team: TeamSummary }) {
           onSessionChanged={replaceSession}
           onSessionWithdrawn={removeSession}
         />
+      ) : null}
+      {state.kind === 'ready' && state.nextCursor !== null ? (
+        <div className="sw-team-status sw-team-status-action">
+          <Button
+            variant="outline"
+            loading={state.loadingMore}
+            loadingLabel="Loading Sessions…"
+            onClick={() => void loadMore()}
+          >
+            Load more Sessions
+          </Button>
+          {state.moreError ? (
+            <p className="sw-managed-session-error" role="alert">
+              {state.moreError}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </section>
   )

@@ -1,5 +1,5 @@
 // Security headers for the runtime-SSR'd app surfaces (/s/*, /session/*,
-// /@*, /explore, /me, /teams/*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
+// /@*, /explore, /me, /my-sessions, /teams*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
 // file from the standalone share-web era — same values, same per-route
 // CSP split — applied by the request middleware in src/start.ts because
 // the merged app serves these routes through the TanStack Start worker
@@ -53,7 +53,7 @@ const BASE_HEADERS: Record<string, string> = {
  *  path that falls through to the tombstone — the latter still gets
  *  the noindex defaults. */
 const READER_PREFIXES = ['/s/', '/session/', '/@']
-const ACCOUNT_PATHS = ['/me', '/sign-in', '/cli-auth']
+const ACCOUNT_PATHS = ['/me', '/my-sessions', '/teams', '/sign-in', '/cli-auth']
 const ACCOUNT_PREFIXES = ['/teams/']
 const PUBLIC_APP_PATHS = ['/explore']
 const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']

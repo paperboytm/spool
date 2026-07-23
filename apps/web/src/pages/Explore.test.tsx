@@ -2,7 +2,7 @@ import type { DiscoverySessionItem } from '@spool-lab/session-kit'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { DiscoveryRow, ExplorePage } from './Explore'
+import { clearedExploreSearch, DiscoveryRow, ExplorePage, submittedExploreSearch } from './Explore'
 
 const item: DiscoverySessionItem = {
   sid: 'claude_abc12345',
@@ -56,9 +56,28 @@ describe('Explore controls', () => {
     expect(html).toContain('aria-controls="explore-results"')
     expect(html).toContain('id="explore-results"')
     expect(html).toContain('role="tabpanel"')
-    for (const label of ['Home', 'Explore', 'Docs', 'Account']) {
+    for (const label of ['Explore', 'My Sessions', 'Teams']) {
       expect(html).toContain(`aria-label="${label}"`)
     }
+    expect(html).not.toContain('aria-label="Home"')
+    expect(html).not.toContain('aria-label="Docs"')
+    expect(html).toContain('>Top</')
+    expect(html).toContain('>Recent</')
+    expect(html).not.toContain('>For you</')
+    expect(html).not.toContain('>Trending</')
+    expect(html).not.toContain('>Latest</')
+    expect(html).toContain('href="/docs/installation"')
     expect(html).not.toContain('Share a Session')
+  })
+
+  it('keeps the selected order while submitting or clearing a search', () => {
+    const search = { q: 'old', sort: 'recent' as const, agent: 'codex' as const }
+
+    expect(submittedExploreSearch(search, '  refresh   races ')).toEqual({
+      q: 'refresh races',
+      sort: 'recent',
+      agent: 'codex',
+    })
+    expect(clearedExploreSearch(search)).toEqual({ sort: 'recent', agent: 'codex' })
   })
 })

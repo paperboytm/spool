@@ -14,6 +14,7 @@ import { Route as SiteRouteImport } from './routes/_site'
 import { Route as CliAuthRouteImport } from './routes/cli-auth'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as MeRouteImport } from './routes/me'
+import { Route as MySessionsRouteImport } from './routes/my-sessions'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -24,6 +25,7 @@ import { Route as SiteLogoLabRouteImport } from './routes/_site.logo-lab'
 import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SessionSidRouteImport } from './routes/session.$sid'
+import { Route as TeamsIndexRouteImport } from './routes/teams.index'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
 import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
@@ -51,6 +53,11 @@ const ExploreRoute = ExploreRouteImport.update({
 const MeRoute = MeRouteImport.update({
   id: '/me',
   path: '/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MySessionsRoute = MySessionsRouteImport.update({
+  id: '/my-sessions',
+  path: '/my-sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -103,6 +110,11 @@ const SessionSidRoute = SessionSidRouteImport.update({
   path: '/session/$sid',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsIndexRoute = TeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
   id: '/teams/$teamId',
   path: '/teams/$teamId',
@@ -130,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
+  '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
@@ -140,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/teams/': typeof TeamsIndexRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
   '/blog/': typeof SiteBlogIndexRoute
@@ -149,6 +163,7 @@ export interface FileRoutesByTo {
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
+  '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
@@ -160,6 +175,7 @@ export interface FileRoutesByTo {
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/': typeof SiteIndexRoute
+  '/teams': typeof TeamsIndexRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
   '/blog': typeof SiteBlogIndexRoute
@@ -171,6 +187,7 @@ export interface FileRoutesById {
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
+  '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
@@ -182,6 +199,7 @@ export interface FileRoutesById {
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
   '/_site/': typeof SiteIndexRoute
+  '/teams/': typeof TeamsIndexRoute
   '/_site/blog/$slug': typeof SiteBlogSlugRoute
   '/_site/docs/$': typeof SiteDocsSplatRoute
   '/_site/blog/': typeof SiteBlogIndexRoute
@@ -194,6 +212,7 @@ export interface FileRouteTypes {
     | '/cli-auth'
     | '/explore'
     | '/me'
+    | '/my-sessions'
     | '/privacy'
     | '/sign-in'
     | '/terms'
@@ -204,6 +223,7 @@ export interface FileRouteTypes {
     | '/s/$slug'
     | '/session/$sid'
     | '/teams/$teamId'
+    | '/teams/'
     | '/blog/$slug'
     | '/docs/$'
     | '/blog/'
@@ -213,6 +233,7 @@ export interface FileRouteTypes {
     | '/cli-auth'
     | '/explore'
     | '/me'
+    | '/my-sessions'
     | '/privacy'
     | '/sign-in'
     | '/terms'
@@ -224,6 +245,7 @@ export interface FileRouteTypes {
     | '/session/$sid'
     | '/teams/$teamId'
     | '/'
+    | '/teams'
     | '/blog/$slug'
     | '/docs/$'
     | '/blog'
@@ -234,6 +256,7 @@ export interface FileRouteTypes {
     | '/cli-auth'
     | '/explore'
     | '/me'
+    | '/my-sessions'
     | '/privacy'
     | '/sign-in'
     | '/terms'
@@ -245,6 +268,7 @@ export interface FileRouteTypes {
     | '/session/$sid'
     | '/teams/$teamId'
     | '/_site/'
+    | '/teams/'
     | '/_site/blog/$slug'
     | '/_site/docs/$'
     | '/_site/blog/'
@@ -256,6 +280,7 @@ export interface RootRouteChildren {
   CliAuthRoute: typeof CliAuthRoute
   ExploreRoute: typeof ExploreRoute
   MeRoute: typeof MeRoute
+  MySessionsRoute: typeof MySessionsRoute
   PrivacyRoute: typeof PrivacyRoute
   SignInRoute: typeof SignInRoute
   TermsRoute: typeof TermsRoute
@@ -263,6 +288,7 @@ export interface RootRouteChildren {
   SSlugRoute: typeof SSlugRoute
   SessionSidRoute: typeof SessionSidRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
+  TeamsIndexRoute: typeof TeamsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -300,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me'
       preLoaderRoute: typeof MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-sessions': {
+      id: '/my-sessions'
+      path: '/my-sessions'
+      fullPath: '/my-sessions'
+      preLoaderRoute: typeof MySessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -372,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionSidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/': {
+      id: '/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof TeamsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/$teamId': {
       id: '/teams/$teamId'
       path: '/teams/$teamId'
@@ -431,6 +471,7 @@ const rootRouteChildren: RootRouteChildren = {
   CliAuthRoute: CliAuthRoute,
   ExploreRoute: ExploreRoute,
   MeRoute: MeRoute,
+  MySessionsRoute: MySessionsRoute,
   PrivacyRoute: PrivacyRoute,
   SignInRoute: SignInRoute,
   TermsRoute: TermsRoute,
@@ -438,6 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   SSlugRoute: SSlugRoute,
   SessionSidRoute: SessionSidRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
+  TeamsIndexRoute: TeamsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -25,7 +25,7 @@ removes its projection and engagement rows before the visibility change reports 
 
 - `hub_sessions` remains authoritative for ownership, lifecycle, Summary, lineage, and record count.
 - R2 Hub view objects remain authoritative for machine-derived evidence.
-- A new D1 projection, `hub_session_discovery`, makes list/search reads bounded and prevents N R2
+- A new D1 projection, `hub_session_discovery`, keeps list/search reads inside D1 and prevents N R2
   reads per Explore request.
 - A new daily aggregate, `hub_session_engagement_daily`, stores privacy-reduced qualified-read
   counts used only for ranking. Explore does not display raw view counts.
@@ -67,10 +67,15 @@ CREATE TABLE hub_session_engagement_daily (
 CREATE INDEX hub_engagement_day ON hub_session_engagement_daily(day, sid);
 ```
 
+Migration `0010_discovery_pagination.sql` extends the two Discovery publication indexes with
+`sid ASC`, completing the deterministic Recent keyset for both the all-agent and agent-filtered
+paths.
+
 D1's documented baseline search mechanism is `LIKE`; v1 therefore uses a bounded, normalized
-`search_text` projection rather than assuming FTS5. Limit the query to five non-empty tokens and
-candidate reads to a small bounded set. A dedicated full-text or semantic index can replace the
-retrieval stage later without changing the response contract.
+`search_text` projection rather than assuming FTS5. Limit the query to five non-empty tokens.
+Filtering and ordering apply to the full eligible projection before keyset pagination; there is no
+intermediate “most recent N” candidate window. A dedicated full-text or semantic index can replace
+the retrieval stage later without changing the response contract.
 
 ### Projection materialization
 
@@ -162,14 +167,18 @@ Rules:
 - Only live Public Hub Sessions are returned: `visibility = 'unlisted'`, a live Discovery
   projection, `withdrawn_at IS NULL`, and owner account not deleted. A Team-owned Public Session
   may qualify; a Team-only Session never does.
-- Author values are resolved at read time so profile edits do not require reindexing.
+- Author values are resolved at read time so profile edits do not require reindexing. If corrupted
+  legacy state contains more than one active handle for an author, reads collapse it to one
+  deterministic handle rather than duplicating the Session row.
 - `summaryExcerpt` is plain text and bounded to 360 characters.
-- Cursors are opaque to clients. v1 may encode an offset plus a fingerprint of `q/sort/agent`; a
-  cursor cannot be reused with different filters.
+- Cursors are opaque to clients. The current cursor is a filter-bound keyset containing the frozen
+  ranking instant and the last row's relevance, sort, publication, and SID keys. Publications and
+  projection rewrites after that instant stay outside the walk; current visibility is still checked
+  on every page. A cursor cannot be reused with different `q` / `sort` / `agent` filters.
 - Do not return internal rank scores, raw search text, visibility, owner IDs, IP-derived data, or
   full Markdown.
-- Set a short public cache policy (for example 30 seconds plus stale-while-revalidate). Withdrawal
-  must disappear after that bounded window.
+- Set `Cache-Control: no-store`. Withdrawal and Public-to-Team visibility changes must disappear on
+  the next request rather than after a shared-cache window.
 - Errors use the repository envelope: `{ "error": "BAD_REQUEST", "detail": "…" }`.
 
 ### Qualified-read signal
@@ -199,27 +208,36 @@ Every Promise must be awaited or passed to the request context's `waitUntil`; no
 
 ## Ranking v1
 
-Ranking happens after a bounded candidate retrieval.
+Filtering, ranking, and keyset pagination happen in one D1 statement over the full eligible Public
+set. Queries request `limit + 1` rows to determine whether another page exists. A cursor freezes
+`rankedAt` and excludes newer publications or projection rewrites so ordinary page walks remain
+stable without hiding visibility changes. Read-time profile edits may legitimately change which
+author-search results match between requests.
 
 ### Recommended
 
 ```text
 quality_score
-+ 8 × ln(1 + qualified_reads_last_7_days)
++ 8 × ln(1 + qualified_reads_last_7_completed_UTC_days)
 + 12 × 2 ^ (-age_in_days / 14)
 ```
 
-Tie-break: `published_at DESC`, then `sid ASC`.
+The implementation stores the score as a deterministic integer scaled by 1,000,000. Tie-break:
+`published_at DESC`, then `sid ASC`.
 
 ### Trending
 
+Compatibility-only in API v1. The current web product does not expose this order; old web URLs that
+request it settle on Top.
+
 ```text
-ln(1 + qualified_reads_last_7_days)
+ln(1 + qualified_reads_last_7_completed_UTC_days)
 × 2 ^ (-age_in_days / 7)
 + 0.05 × quality_score
 ```
 
-Tie-break: `published_at DESC`, then `sid ASC`.
+The implementation uses the same integer scaling and keyset rules as Top. Tie-break:
+`published_at DESC`, then `sid ASC`.
 
 ### Recent
 
@@ -227,19 +245,24 @@ Tie-break: `published_at DESC`, then `sid ASC`.
 
 ### Search
 
-When `q` is present, relevance is primary and the selected sort is the tie-breaker. Match title,
-Summary, first/last excerpts, file paths, agent label, handle, and display name. Exact/title matches
-must outrank popularity. Search must never return a nonmatching Session merely because it is
-popular.
+When `q` is present, first filter to matching title, Summary, first/last excerpts, file paths, agent
+label, handle, or display name. Under Top, relevance is primary and the quality rank is the
+tie-breaker; exact/title matches must outrank popularity. Under Recent, matching Sessions remain
+strictly `published_at DESC, sid ASC`. Search must never return a nonmatching Session merely because
+it is popular.
 
 ## Frontend behavior
 
 `/explore` uses the user-approved X-style discovery shell within Spool's Void Index visual system:
 
-- Desktop: fixed left navigation, 640–720px bordered center feed, 300–320px right utility rail.
-- Center header: sticky search input, followed by `For you`, `Trending`, `Recent` tabs.
-- Search state: same shell and feed rows; tabs become `Top` and `Latest`. The right rail carries
-  agent filters.
+- Desktop: fixed `Explore`, `My Sessions`, and `Teams` left navigation, a 640–720px bordered center
+  feed, and a compact 220–240px right utility rail. The wordmark is the only route back to the
+  homepage.
+- Center header: sticky search input followed by the same `Top` and `Recent` tabs in both browsing
+  and search states. `Top` maps to the API's global `recommended` order; `Recent` maps to `recent`.
+  The product does not claim personalization and does not expose Trending.
+- The right rail carries agent filters. `Docs` sits with `Terms`, `Privacy`, and `GitHub` as a
+  utility resource rather than primary navigation.
 - Feed rows are edge-to-edge with 1px dividers, not floating cards. Each row shows author
   attribution, title, 2–3 lines of Summary, source agent, machine evidence, and lineage when present.
 - No likes, reposts, generic view counts, fake trends, emoji, gradients, extra product accents, or
@@ -248,8 +271,9 @@ popular.
 - Empty query renders recommended content immediately. Empty search/filter states explain the
   active constraint and provide a clear reset.
 - Loading preserves row geometry with neutral skeletons.
-- On narrower layouts, progressively remove the right rail and collapse left navigation without
-  removing search or the feed.
+- On narrower layouts, progressively remove the right rail. Through 768px, the header keeps the
+  wordmark, current account action, and one 44px disclosure containing
+  `Explore` / `My Sessions` / `Teams`; utility resources remain grouped inside that disclosure.
 
 Frontend requests are same-origin, use URL parameters as page state, treat the cursor as opaque,
 and abort stale searches. The API client imports the shared wire types from

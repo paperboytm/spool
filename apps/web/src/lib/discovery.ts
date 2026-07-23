@@ -7,14 +7,18 @@ import type {
 } from '@spool-lab/session-kit'
 
 export type DiscoveryAgentFilter = DiscoverySessionItem['agent']
+export type ExploreSort = Exclude<DiscoverySort, 'trending'>
 
 export interface ExploreSearchState {
   q?: string
-  sort: DiscoverySort
+  sort: ExploreSort
   agent?: DiscoveryAgentFilter
 }
 
-export interface DiscoveryRequestOptions extends ExploreSearchState {
+export interface DiscoveryRequestOptions {
+  q?: string
+  sort: DiscoverySort
+  agent?: DiscoveryAgentFilter
   cursor?: string | null
   limit?: number
   signal?: AbortSignal
@@ -43,12 +47,10 @@ function cleanQuery(value: unknown): string | undefined {
 export function parseExploreSearch(search: Record<string, unknown>): ExploreSearchState {
   const q = cleanQuery(search['q'])
   const sortValue = search['sort']
-  const requestedSort: DiscoverySort =
-    sortValue === 'trending' || sortValue === 'recent' || sortValue === 'recommended'
-      ? sortValue
-      : 'recommended'
-  // Search has Top/Latest states only; an old Trending URL settles on Top.
-  const sort: DiscoverySort = q && requestedSort === 'trending' ? 'recommended' : requestedSort
+  // Trending remains accepted by the v1 API for old clients, but the public
+  // product exposes one global quality order (Top) and one time order
+  // (Recent). Old Trending URLs therefore settle safely on Top.
+  const sort: ExploreSort = sortValue === 'recent' ? 'recent' : 'recommended'
   const agentValue = search['agent']
   const agent = agentValue === 'claude' || agentValue === 'codex' ? agentValue : undefined
 

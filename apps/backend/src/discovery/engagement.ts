@@ -5,7 +5,7 @@ import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { ApiError } from '../errors'
 import { checkRate } from '../rate-limit'
 import { clientIp } from '../request'
-import { incrementQualifiedRead, isDiscoverySessionLive } from './store'
+import { incrementQualifiedReadIfLive, isDiscoverySessionLive } from './store'
 
 const MAX_BODY_BYTES = 1024
 const DEDUPE_TTL_SEC = 2 * 24 * 60 * 60
@@ -36,11 +36,15 @@ export async function recordQualifiedRead(
 
   const dedupeDigest = base64urlFromBuffer(await sha256(`${ip}\n${userAgent}\n${sid}\n${day}`))
   const dedupeKey = `discovery/qualified-read/${day}/${dedupeDigest}`
-  if ((await kv.get(dedupeKey)) !== null) return { accepted: false }
+  if ((await kv.get(dedupeKey)) !== null) {
+    if (!(await isDiscoverySessionLive(db, sid))) throw new ApiError('NOT_FOUND')
+    return { accepted: false }
+  }
 
   await kv.put(dedupeKey, '1', { expirationTtl: DEDUPE_TTL_SEC })
+  let accepted: boolean
   try {
-    await incrementQualifiedRead(db, sid, day)
+    accepted = await incrementQualifiedReadIfLive(db, sid, day)
   } catch (error) {
     // Let a retry count if D1 failed after the KV reservation.
     try {
@@ -49,6 +53,17 @@ export async function recordQualifiedRead(
       // The original D1 error remains the actionable failure.
     }
     throw error
+  }
+  if (!accepted) {
+    // The disclosure changed between the optimistic live check and the
+    // atomic write. Release the reservation, but preserve the fail-closed
+    // 404 even if KV cleanup itself is temporarily unavailable.
+    try {
+      await kv.delete(dedupeKey)
+    } catch {
+      // The short-lived reservation contains no disclosure-sensitive data.
+    }
+    throw new ApiError('NOT_FOUND')
   }
   return { accepted: true }
 }
