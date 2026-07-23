@@ -49,8 +49,8 @@ export function nativeBindingOptions(
 
 /**
  * Opens SQLite with a runtime-specific native addon when one has been cached.
- * Node and Electron use different module ABIs, so relying on the package's
- * mutable build/Release file makes one runtime overwrite the other.
+ * The CLI cache is keyed by platform, architecture, and Node module ABI instead
+ * of relying on the package's mutable build/Release output.
  */
 export function openDatabase(
   filename: string | Buffer,

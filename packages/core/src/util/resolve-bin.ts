@@ -151,8 +151,8 @@ export function clearResolveCache(name: string): void {
 // ── Async API ─────────────────────────────────────────────────────────────
 // The sync variants above use execFileSync('<shell>', ['-ilc', ...]) which spawns a
 // fresh interactive login shell and can take seconds when the user's
-// .zshrc is heavy. Awaiting calls to those from the Electron main process
-// stalls the event loop and produces a launch beachball. Async callers
+// .zshrc is heavy. Awaiting calls from latency-sensitive Node consumers
+// stalls their event loop. Async callers
 // should prefer this set: it both removes the main-thread block and lets
 // independent resolves run concurrently via Promise.all.
 //

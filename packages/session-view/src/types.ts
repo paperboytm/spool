@@ -1,7 +1,7 @@
 /**
  * The minimal message shape the conversation views need. Structurally a
- * subset of @spool-lab/core's `Message`, so the desktop app passes its
- * rows straight through; the web reader assembles the same shape from hub
+ * subset of @spool-lab/core's `Message`, so local preparation code can pass
+ * rows straight through; the Web reader assembles the same shape from Hub
  * records via @spool-lab/session-kit.
  */
 export interface ConversationMessage {

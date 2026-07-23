@@ -1,17 +1,14 @@
 packages:
   - 'apps/*'
+  - '!apps/app'
   - 'packages/*'
   - 'workers/*'
 
 allowBuilds:
   better-sqlite3: true
-  electron: true
   esbuild: true
   workerd: true
-  electron-winstaller: false
   msgpackr-extract: false
-  onnxruntime-node: false
-  protobufjs: false
   sharp: false
 
 peerDependencyRules:

@@ -896,7 +896,7 @@ describe('republish + revoke', () => {
 
   it('revoke is idempotent on an already-revoked share — 200, original revoked_at preserved', async () => {
     // Cross-device unpublish: user revokes on web at T0, opens the
-    // desktop app at T1 with a stale cache showing the share as live,
+    // legacy desktop installation at T1 with a stale cache showing the share as live,
     // clicks Unpublish → backend must return 200 (so the desktop UI
     // doesn't toast an error for a no-op the user already performed)
     // AND must NOT overwrite the original revoked_at (preserves the

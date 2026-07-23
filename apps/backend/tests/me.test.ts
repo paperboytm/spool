@@ -394,7 +394,7 @@ describe('GET /api/me', () => {
 
   it('200 (not 403) when deletion is pending, surfaces deletion_pending_until', async () => {
     // Cross-device case: the user scheduled deletion on web, then opened
-    // the desktop app. /api/me must still answer so the app can render
+    // a legacy desktop installation. /api/me must still answer so it can render
     // the Cancel-deletion CTA — every other endpoint stays locked.
     const env = envFor()
     const pendingUntil = Date.now() + 12 * 3600 * 1000

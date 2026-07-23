@@ -8,10 +8,6 @@ packages/*/dist/
 apps/*/dist/
 packages/*/out/
 apps/*/out/
-apps/app/out/
-
-# Electron build
-dist-electron/
 
 # Turbo cache
 .turbo/
@@ -59,9 +55,8 @@ e2e-output/
 .worktrees/
 .claude/worktrees/
 
-# Native binaries (rebuilt per-platform via electron-rebuild)
+# Native binaries
 build/
-!apps/app/build/
 *.node
 
 # Compiled artifacts that may end up in src/ by mistake
@@ -84,9 +79,6 @@ playwright-report/
 # Superpowers (agent-generated plans/specs)
 .superpowers/
 docs/superpowers/
-
-# Demo capture artifacts (rebuilt per release video; not source)
-apps/app/artifacts/
 
 # Release video build outputs (per-release; never committed)
 # Source of truth is index.html + scripts. Assets (clips, audio, logos) are

@@ -4,7 +4,8 @@ Cloudflare Pages Functions backing spool.new identity, Hub storage, Session read
 
 ## Responsibilities
 
-- authenticate Web, Desktop, and CLI clients;
+- authenticate Web and CLI clients while preserving the retired Desktop sign-in endpoint for
+  existing installations;
 - store content-addressed Session records, views, and attached `.spool` documents;
 - enforce owner-scoped writes, Link-only reads, withdrawal, quotas, and rate limits;
 - serve public Session metadata and ranged records;
@@ -17,8 +18,9 @@ The Hub does not modify provider Session content. Canonical records are verified
 ## Authentication
 
 - **Web** — WorkOS AuthKit authorization-code flow through `/api/auth/workos/{start,callback}`
-- **Desktop** — WorkOS PKCE public client with the `spool://auth/callback` custom scheme; the app exchanges the code through `/api/auth/sign-in-with-code`
 - **CLI** — provider-independent browser approval through `/api/cli-auth/{start,approve,poll}`; the polling terminal receives a revocable `sph_` API token
+- **Legacy Desktop compatibility** — existing installations may still exchange a WorkOS PKCE code
+  through `/api/auth/sign-in-with-code`; no new Desktop client is built or distributed
 
 `spool logout` revokes the active CLI token through `DELETE /api/hub/v1/tokens`.
 
@@ -54,11 +56,10 @@ cp apps/backend/.dev.vars.example apps/backend/.dev.vars
 $EDITOR apps/backend/.dev.vars
 ```
 
-Register these redirect URIs in the WorkOS development environment:
+Register this redirect URI in the WorkOS development environment:
 
 ```text
 http://localhost:3002/api/auth/workos/callback
-spool://auth/callback
 ```
 
 Apply every migration to the persistent local-development D1 database:
@@ -75,7 +76,7 @@ corepack pnpm dev
 
 Wrangler serves on `http://localhost:8788` and persists emulated data under `apps/backend/.wrangler/state/`.
 
-For Backend + Web + Desktop together:
+For Backend + Web together:
 
 ```bash
 ./scripts/share-dev.sh

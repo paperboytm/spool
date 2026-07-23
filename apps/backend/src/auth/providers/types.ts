@@ -3,9 +3,9 @@
 // an identity. The route handlers stay provider-agnostic; adding a
 // provider is registering one more object, no new endpoints.
 //
-// Native surfaces (desktop app, CLI) do NOT go through a provider —
-// they authenticate via the cli-auth broker (functions/api/cli-auth/),
-// which rides on an approved web session instead of talking OAuth.
+// The CLI does not go through a provider; it uses the browser-approval broker.
+// The retired Desktop endpoint separately preserves its short-lived exchange
+// for existing installations.
 
 export type ProviderId = 'workos'
 
@@ -75,9 +75,9 @@ export interface OAuthProvider {
   buildAuthRequestUrl(params: BuildAuthRequestParams, env: ProviderEnv): string
   /** Web callback: exchange auth code for tokens, return IdentityClaim. */
   exchangeCode(params: ExchangeCodeParams, env: ProviderEnv): Promise<IdentityClaim>
-  /** Native (desktop) sign-in: redeem a PKCE authorization code minted
-   *  by a public client — code_verifier instead of client_secret. The
-   *  desktop app posts {code, verifier} to /api/auth/sign-in-with-code;
+  /** Legacy Desktop sign-in: redeem a PKCE authorization code minted
+   *  by a public client — code_verifier instead of client_secret. Existing
+   *  installations post {code, verifier} to /api/auth/sign-in-with-code;
    *  providers without a public-client flow simply omit this. */
   exchangeNativeCode?(params: ExchangeNativeCodeParams, env: ProviderEnv): Promise<IdentityClaim>
   /** Optional migration hook. Called by the sign-in flows only when

@@ -33,7 +33,7 @@ export default defineConfig({
     '*': 'vp check --fix',
   },
   fmt: {
-    ignorePatterns: ['apps/web/src/routeTree.gen.ts'],
+    ignorePatterns: ['apps/app/**', 'apps/web/src/routeTree.gen.ts'],
     singleQuote: true,
     semi: false,
     sortImports: {},
@@ -54,8 +54,8 @@ export default defineConfig({
       '**/out/**',
       '**/test-results/**',
       '**/.turbo/**',
+      'apps/app/**',
       'apps/web/src/routeTree.gen.ts',
-      'apps/app/release/**',
       'packages/connectors/**/dist/**',
     ],
     rules: {
@@ -67,41 +67,6 @@ export default defineConfig({
       ],
       'vite-plus/prefer-vite-plus-imports': 'error',
     },
-    overrides: [
-      {
-        files: ['apps/app/src/main/**/*.ts'],
-        rules: {
-          'no-restricted-imports': [
-            'error',
-            {
-              paths: [
-                {
-                  name: 'node:child_process',
-                  importNames: ['execSync', 'spawnSync', 'execFileSync'],
-                  message:
-                    'Sync child_process APIs block the main-process event loop and produce a launch beachball. Use the async equivalents (and Promise.all when multiple lookups are independent), or move the work into a worker_thread.',
-                },
-                {
-                  name: 'child_process',
-                  importNames: ['execSync', 'spawnSync', 'execFileSync'],
-                  message:
-                    'Sync child_process APIs block the main-process event loop and produce a launch beachball. Use the async equivalents (and Promise.all when multiple lookups are independent), or move the work into a worker_thread.',
-                },
-              ],
-            },
-          ],
-        },
-      },
-      {
-        files: [
-          'apps/app/src/main/e2e-mode/e2e-mode-clean.test.ts',
-          'apps/app/src/main/terminal.test.ts',
-        ],
-        rules: {
-          'no-restricted-imports': 'off',
-        },
-      },
-    ],
     options: {
       typeAware: true,
       // Package tsconfigs intentionally exclude tests and generated files.

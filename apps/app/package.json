@@ -1,6 +1,7 @@
 {
   "name": "@spool/app",
   "version": "0.6.3",
+  "description": "Archived Electron implementation reference; not built, tested, packaged, or distributed.",
   "private": true,
   "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
@@ -17,40 +18,6 @@
   },
   "funding": "https://github.com/sponsors/xinyao27",
   "main": "./out/main/index.mjs",
-  "scripts": {
-    "ensure:electron-runtime": "node -e \"require('electron')\"",
-    "rebuild:native": "pnpm run rebuild:native:electron",
-    "rebuild:native:electron": "electron-rebuild -f -w better-sqlite3",
-    "build:core": "vp run --filter @spool-lab/core build",
-    "build:redact": "vp run --filter @spool-lab/redact build",
-    "build:session-kit": "vp run --filter @spool-lab/session-kit build",
-    "build:cli": "vp run --filter @spool-lab/cli build",
-    "build:share-kit": "vp run --filter @spool/share-kit build",
-    "build:session-view": "vp run --filter @spool-lab/session-view build",
-    "build:ui": "vp run --filter @spool-lab/ui build",
-    "build:deps": "pnpm run build:redact && pnpm run build:session-kit && pnpm run build:core && pnpm run build:cli && pnpm run build:share-kit && pnpm run build:session-view && pnpm run build:ui",
-    "dev": "pnpm run ensure:electron-runtime && pnpm run build:deps && node ../../scripts/with-electron-native.mjs node scripts/dev.mjs",
-    "dev:reset-db": "node scripts/dev-reset-db.mjs",
-    "dev:seed-from-prod": "node scripts/dev-seed-from-prod.mjs",
-    "build": "electron-vite build && pnpm run build:workers",
-    "build:workers": "electron-vite build --config electron.workers.vite.config.ts",
-    "build:electron": "pnpm run build:deps && pnpm run build",
-    "package": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --publish never",
-    "package:mac": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --mac --arm64 --publish never",
-    "package:linux": "node ../../scripts/with-electron-native.mjs pnpm exec electron-builder --linux --publish never",
-    "smoke:native:electron": "node ../../scripts/with-electron-native.mjs pnpm exec electron ../../scripts/check-electron-native.cjs",
-    "report:package-size": "node scripts/package-size-report.mjs",
-    "smoke:packaged": "node scripts/smoke-packaged.mjs",
-    "preview": "electron-vite preview",
-    "clean": "rm -rf out dist-electron",
-    "typecheck": "tsc --noEmit",
-    "pretest": "pnpm run ensure:electron-runtime",
-    "test": "vp test run --no-file-parallelism",
-    "rebuild:native:node": "node ../../scripts/rebuild-better-sqlite3-node.mjs",
-    "pretest:e2e": "pnpm run ensure:electron-runtime",
-    "test:e2e": "node ../../scripts/with-electron-native.mjs pnpm run test:e2e:raw",
-    "test:e2e:raw": "pnpm run build:deps && SPOOL_E2E_TEST=1 VITE_FEATURE_SHAREPUBLISH=1 pnpm run build && playwright test --config e2e/playwright.config.ts"
-  },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",
     "@fontsource-variable/fraunces": "^5.2.9",
@@ -95,8 +62,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@electron/asar": "^4.2.0",
-    "@electron/rebuild": "^4.2.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^7.6.13",
@@ -106,98 +71,11 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.3",
     "electron": "^43.1.1",
-    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^4.3.3",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
-  },
-  "build": {
-    "appId": "com.linkclaw.spool",
-    "productName": "Spool",
-    "executableName": "Spool",
-    "npmRebuild": false,
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "spool-lab",
-        "repo": "spool"
-      }
-    ],
-    "files": [
-      "**/*",
-      "!e2e/**/*",
-      "!artifacts/**/*",
-      "!src/**/*",
-      "!**/*.map",
-      "!node_modules/onnxruntime-node",
-      "!node_modules/onnxruntime-node/**"
-    ],
-    "asarUnpack": [
-      "node_modules/better-sqlite3/**",
-      "node_modules/bindings/**",
-      "node_modules/file-uri-to-path/**",
-      "node_modules/acp-extension-claude/**",
-      "node_modules/acp-extension-codex/**",
-      "node_modules/acp-extension-core/**",
-      "node_modules/pi-acp/**",
-      "node_modules/@agentclientprotocol/**",
-      "node_modules/@anthropic-ai/claude-agent-sdk/**",
-      "node_modules/@openai/codex/**",
-      "node_modules/@openai/codex-*/**",
-      "node_modules/zod/**"
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "resources/icon.icns",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": true,
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64"
-          ]
-        }
-      ]
-    },
-    "linux": {
-      "category": "Development",
-      "icon": "resources/icon.png",
-      "target": [
-        {
-          "target": "AppImage"
-        }
-      ]
-    },
-    "afterAllArtifactBuild": "build/notarize-dmg.js",
-    "dmg": {
-      "sign": true,
-      "title": "Spool",
-      "iconSize": 80,
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    }
   },
   "productName": "Spool"
 }

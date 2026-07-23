@@ -90,7 +90,7 @@ export function ManagedSessionsSection() {
           <ShieldCheck size={20} strokeWidth={1.6} aria-hidden="true" />
           <div>
             <h2>No uploaded Sessions yet</h2>
-            <p>Sessions shared from the desktop app or CLI will appear here.</p>
+            <p>Sessions shared from the CLI will appear here.</p>
           </div>
         </div>
       ) : null}

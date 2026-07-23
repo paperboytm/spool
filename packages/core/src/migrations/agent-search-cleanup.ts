@@ -10,8 +10,8 @@ import type { SessionSource } from '../types.js'
  * Pre-#151 agent search relied on the next sync to pick up the JSONL the
  * downstream agent (Claude / Codex) wrote on its own. The JSONL was full of
  * noise (Claude Code's <local-command-caveat>, /model default slash command,
- * Spool's own giant system prompt) and landed in whatever folder Electron's
- * process.cwd() pointed at — usually "/" in prod, packages/app in dev.
+ * Spool's own giant system prompt) and landed in whatever folder the process
+ * cwd pointed at — usually "/" in prod, packages/app in dev.
  * Result: every old agent-search session sits under a synthetic project
  * named "(root)" or similar, with a derived title that's just
  * "Caveat: The messages below..." or "You have access to a local

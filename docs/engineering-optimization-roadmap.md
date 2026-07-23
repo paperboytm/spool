@@ -6,6 +6,10 @@
 > checklist moved to CONTRIBUTING.md ("Verifying changes"). Baseline
 > numbers referenced below were measured against `main@049c4b2`
 > (2026-07-11) and are not maintained.
+>
+> Retirement note (2026-07-23): Electron build, package, native-ABI, signing, and packaged-smoke
+> automation described below has been removed. Those entries remain only as historical context and
+> are not current contributor instructions or quality gates.
 
 ## What shipped
 
