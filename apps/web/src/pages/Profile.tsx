@@ -43,7 +43,7 @@ export function Profile({ handle }: { handle: string }) {
       <Page>
         <Header />
         <main className="sw-main">
-          <div className="sw-card w-600">
+          <div className="sw-card sw-card--600">
             <div className="sw-identity">
               <span className="sw-skel" style={{ width: 54, height: 54, borderRadius: '50%' }} />
               <div className="body">
@@ -72,7 +72,7 @@ export function Profile({ handle }: { handle: string }) {
       <Page>
         <Header />
         <main className="sw-main">
-          <div className="sw-card tight w-600">
+          <div className="sw-card tight sw-card--600">
             <div className="sw-rule" style={{ marginBottom: 22 }}>
               <span className="tag muted">Profile not found</span>
               <span className="line" />
@@ -91,7 +91,7 @@ export function Profile({ handle }: { handle: string }) {
     <Page>
       <Header />
       <main className="sw-main">
-        <div className="sw-card w-600">
+        <div className="sw-card sw-card--600">
           <div className="sw-identity">
             <Avatar src={profile.avatar_url} name={profile.name} alt="" size="lg" />
             <div className="body">

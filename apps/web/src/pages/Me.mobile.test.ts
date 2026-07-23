@@ -25,4 +25,12 @@ describe('/me mobile layout contract', () => {
     expect(css).toMatch(/\.sw-me-card \.sp-icon-button[\s\S]*?min-width: 44px/)
     expect(css).toMatch(/\.sw-me-modal \.sw-modal-actions \.sp-button[\s\S]*?min-height: 44px/)
   })
+
+  it('gives the Create team action its own full-width row at 320px', () => {
+    const phoneCss = css.split('@media (max-width: 360px)')[1] ?? ''
+
+    expect(phoneCss).toContain('.sw-me-card .sw-teams-section .sp-section-label__action')
+    expect(phoneCss).toContain('grid-column: 1 / -1')
+    expect(phoneCss).toMatch(/\.sw-me-card \.sw-teams-create-trigger\s*\{[^}]*width: 100%/)
+  })
 })

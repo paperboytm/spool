@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <!-- The generator passes repository-owned Geist files directly to Pango.
+       An explicit empty config keeps host fonts out of the render and avoids
+       platform-specific fontconfig discovery warnings. -->
+</fontconfig>

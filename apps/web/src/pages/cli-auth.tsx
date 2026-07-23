@@ -233,7 +233,7 @@ function Card({
   children?: React.ReactNode
 }) {
   return (
-    <div className="sw-card tight sw-signin w-420">
+    <div className="sw-card tight sw-signin sw-card--420">
       <div className="sw-signin-emblem">{icon ?? <SpoolMark size={30} />}</div>
       <div className="sw-eyebrow">spool.new</div>
       <h1 className="sw-signin-title">{title}</h1>

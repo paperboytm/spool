@@ -37,8 +37,10 @@ consumer overrides.
 
 ## Components
 
-- `Button` / `ButtonLink`: `ghost`, `outline`, or `accent`; `sm` or `md`.
+- `Button` / `ButtonLink`: `ghost`, `outline`, `accent`, or `danger`; `sm`, `md`, or `lg`.
+  `Button` also exposes a distinct accessible loading state.
 - `IconButton` / `IconLink`: `sm` or `md`, with a required `aria-label`.
+- `MobileMenu`: a zero-configuration 44px disclosure trigger with Escape and outside-click closing.
 - `SearchField`: controlled value and change handler, plus an optional clear callback.
 - `Tabs`: controlled string value and accessible tab items.
 - `NavItem`: renders an anchor when `href` is supplied and a button otherwise.

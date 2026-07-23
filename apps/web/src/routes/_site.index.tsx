@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import HomePage from '../components/site/home'
-import { PUBLIC_SITE_ORIGIN } from '../lib/site'
+import { PUBLIC_SITE_ORIGIN, siteOgImageMeta } from '../lib/site'
 
 const TITLE = 'Spool — One shared space for agent sessions'
 const DESC =
@@ -26,14 +26,10 @@ export const Route = createFileRoute('/_site/')({
       { property: 'og:url', content: `${PUBLIC_SITE_ORIGIN}/` },
       { property: 'og:title', content: TITLE },
       { property: 'og:description', content: DESC },
-      { property: 'og:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
-      { property: 'og:image:width', content: '1200' },
-      { property: 'og:image:height', content: '630' },
+      ...siteOgImageMeta(),
       { property: 'og:site_name', content: 'Spool' },
-      { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },
       { name: 'twitter:description', content: DESC },
-      { name: 'twitter:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
     ],
     links: [
       { rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/` },

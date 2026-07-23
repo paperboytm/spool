@@ -115,6 +115,9 @@ html[data-theme='dark'] .sw-root {
 
 /* ── Page frame ─────────────────────────────────────────────── */
 .sw-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -167,6 +170,24 @@ html[data-theme='dark'] .sw-root {
   display: flex;
   align-items: center;
   gap: var(--sp-space-3);
+}
+.sw-header-desktop-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-3);
+}
+.sp-mobile-menu.sw-header-mobile-menu {
+  display: none;
+}
+.sw-header-mobile-menu-items {
+  display: grid;
+  gap: var(--sp-space-1);
+}
+.sw-header-mobile-menu-items .sp-nav-item,
+.sw-header-mobile-menu-items .sp-button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
 }
 .sw-account-link {
   display: inline-flex;
@@ -248,6 +269,9 @@ html[data-theme='dark'] .sw-root {
 
 /* ── Content scroll area ────────────────────────────────────── */
 .sw-main {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -275,13 +299,13 @@ html[data-theme='dark'] .sw-root {
 .sw-card.tight {
   padding: 32px 32px;
 }
-.sw-card.w-600 {
+.sw-card.sw-card--600 {
   max-width: 600px;
 }
-.sw-card.w-420 {
+.sw-card.sw-card--420 {
   max-width: 420px;
 }
-.sw-card.w-480 {
+.sw-card.sw-card--480 {
   max-width: 480px;
 }
 
@@ -1589,9 +1613,6 @@ html[data-theme='dark'] .sw-root {
 .sw-team-invite-controls label {
   min-width: 0;
 }
-.sw-team-invite-controls .sp-button {
-  height: 48px;
-}
 .sw-team-members-block,
 .sw-team-invitations-block {
   margin-top: var(--sp-space-6);
@@ -1653,15 +1674,6 @@ html[data-theme='dark'] .sw-root {
   width: 112px;
   height: 32px;
 }
-.sw-team-danger-button {
-  color: var(--err);
-}
-.sw-team-danger-button:hover:not(:disabled),
-.sw-team-danger-button:focus-visible {
-  border-color: var(--err);
-  background: var(--err-soft);
-  color: var(--err);
-}
 .sw-team-action-error {
   margin: var(--sp-space-3) 0 0;
   color: var(--err);
@@ -1711,37 +1723,19 @@ html[data-theme='dark'] .sw-root {
     min-height: 44px;
   }
   .sw-header-nav {
-    gap: 0;
-  }
-  .sw-header-nav .sp-nav-item {
-    min-height: 44px;
-  }
-  .sw-header-docs {
-    width: 44px;
-    min-width: 44px;
-    justify-content: center;
-    padding: 0;
-  }
-  .sw-header-docs .sp-nav-item__label {
-    display: none;
-  }
-  .sw-header-search {
     display: none;
   }
   .sw-header-right {
-    gap: 0;
+    gap: var(--sp-space-1);
   }
-  .sw-header-theme,
-  .sw-team-quick {
+  .sw-header-desktop-actions {
     display: none;
   }
-  .sw-publish-link,
   .sw-signin-link {
     min-height: 44px;
     padding-inline: var(--sp-space-2);
   }
-  .sw-account-link,
-  .sw-header-right > .sp-icon-button {
+  .sw-account-link {
     width: 44px;
     min-width: 44px;
     height: 44px;
@@ -1752,6 +1746,10 @@ html[data-theme='dark'] .sw-root {
   .sw-account-link .sp-avatar {
     width: 32px;
     height: 32px;
+  }
+  .sp-mobile-menu.sw-header-mobile-menu {
+    display: inline-flex;
+    flex: none;
   }
   .sw-team-main {
     padding: var(--sp-space-8) var(--sp-space-3) var(--sp-space-6);

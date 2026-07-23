@@ -114,6 +114,8 @@ pnpm --filter @spool-lab/cli test
 pnpm --filter @spool/backend test
 pnpm --filter @spool/web test
 pnpm --filter @spool/web build
+pnpm --filter @spool/web exec playwright install chromium
+pnpm test:e2e
 ```
 
 ## What to work on

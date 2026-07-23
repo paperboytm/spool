@@ -283,13 +283,15 @@ function ManagedSessionRow({
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              className="sw-managed-session-withdraw sw-team-danger-button"
-              disabled={busy !== 'idle'}
+              variant="danger"
+              className="sw-managed-session-withdraw"
+              loading={busy === 'withdraw'}
+              loadingLabel="Withdrawing…"
+              disabled={busy !== 'idle' && busy !== 'withdraw'}
               onClick={() => void withdraw()}
             >
               <CircleOff size={14} strokeWidth={1.8} aria-hidden="true" />
-              {busy === 'withdraw' ? 'Withdrawing…' : 'Withdraw'}
+              Withdraw
             </Button>
           </div>
         ) : null}

@@ -183,7 +183,7 @@ function TeamStatus({
     <Page>
       <Header />
       <main className="sw-main center" aria-busy={busy || undefined}>
-        <div className="sw-card tight sw-team-status w-480">
+        <div className="sw-card tight sw-team-status sw-card--480">
           {busy ? <span className="sw-spin sw-spin-anim" aria-hidden="true" /> : null}
           <h1 className="sw-title">{title}</h1>
           {body ? <p className="sw-lede muted">{body}</p> : null}
@@ -265,11 +265,13 @@ export function teamDuringOwnerMutation(
 export function TeamMemberActions({
   member,
   busy,
+  removing = false,
   onRoleChange,
   onRemove,
 }: {
   member: TeamMember
   busy: boolean
+  removing?: boolean
   onRoleChange: (role: TeamRole) => void
   onRemove: () => void
 }) {
@@ -300,9 +302,10 @@ export function TeamMemberActions({
       )}
       {canRemove ? (
         <Button
-          variant="ghost"
-          className="sw-team-danger-button"
-          disabled={busy}
+          variant="danger"
+          loading={removing}
+          loadingLabel="Removing…"
+          disabled={busy && !removing}
           onClick={onRemove}
         >
           <UserMinus aria-hidden="true" />
@@ -450,7 +453,7 @@ function TeamMembersPanel({
 
   async function changeRole(member: TeamMember, role: TeamRole) {
     if (!window.confirm(memberRoleConfirmation(team.name, member, role))) return
-    setBusyKey(`member:${member.user_id}`)
+    setBusyKey(`member:${member.user_id}:role`)
     setActionError(null)
     const result = await updateTeamMember(team.id, member.user_id, role)
     if (result.kind === 'unauthenticated') {
@@ -495,7 +498,7 @@ function TeamMembersPanel({
     if (!window.confirm(memberRemovalConfirmation(team.name, member))) {
       return
     }
-    setBusyKey(`member:${member.user_id}`)
+    setBusyKey(`member:${member.user_id}:remove`)
     setActionError(null)
     const result = await removeTeamMember(team.id, member.user_id)
     if (result.kind === 'unauthenticated') return redirectToSignIn()
@@ -527,7 +530,7 @@ function TeamMembersPanel({
     ) {
       return
     }
-    setBusyKey(`invite:${invitation.id}`)
+    setBusyKey(`invite:${invitation.id}:${action}`)
     setActionError(null)
     const result =
       action === 'resend'
@@ -593,11 +596,14 @@ function TeamMembersPanel({
             </label>
             <Button
               variant="accent"
+              size="lg"
               type="submit"
-              disabled={busyKey !== null || email.trim() === ''}
+              loading={busyKey === 'invite'}
+              loadingLabel="Sending…"
+              disabled={busyKey !== 'invite' && (busyKey !== null || email.trim() === '')}
             >
               <MailPlus aria-hidden="true" />
-              {busyKey === 'invite' ? 'Sending…' : 'Send invite'}
+              Send invite
             </Button>
           </div>
         </form>
@@ -632,7 +638,8 @@ function TeamMembersPanel({
                 </div>
                 <TeamMemberActions
                   member={member}
-                  busy={busyKey === `member:${member.user_id}`}
+                  busy={busyKey?.startsWith(`member:${member.user_id}:`) ?? false}
+                  removing={busyKey === `member:${member.user_id}:remove`}
                   onRoleChange={(role) => void changeRole(member, role)}
                   onRemove={() => void remove(member)}
                 />
@@ -661,16 +668,25 @@ function TeamMembersPanel({
                 <div className="sw-team-member-actions">
                   <Button
                     variant="ghost"
-                    disabled={busyKey === `invite:${invitation.id}`}
+                    loading={busyKey === `invite:${invitation.id}:resend`}
+                    loadingLabel="Resending…"
+                    disabled={
+                      (busyKey?.startsWith(`invite:${invitation.id}:`) ?? false) &&
+                      busyKey !== `invite:${invitation.id}:resend`
+                    }
                     onClick={() => void actOnInvite(invitation, 'resend')}
                   >
                     <RefreshCw aria-hidden="true" />
                     Resend
                   </Button>
                   <Button
-                    variant="ghost"
-                    className="sw-team-danger-button"
-                    disabled={busyKey === `invite:${invitation.id}`}
+                    variant="danger"
+                    loading={busyKey === `invite:${invitation.id}:revoke`}
+                    loadingLabel="Revoking…"
+                    disabled={
+                      (busyKey?.startsWith(`invite:${invitation.id}:`) ?? false) &&
+                      busyKey !== `invite:${invitation.id}:revoke`
+                    }
                     onClick={() => void actOnInvite(invitation, 'revoke')}
                   >
                     <Trash2 aria-hidden="true" />
@@ -768,11 +784,17 @@ function TeamSettingsPanel({
             </label>
             <Button
               variant="outline"
+              size="lg"
               type="submit"
-              disabled={busy !== null || name.trim() === '' || name.trim() === team.name}
+              loading={busy === 'rename'}
+              loadingLabel="Saving…"
+              disabled={
+                busy !== 'rename' &&
+                (busy !== null || name.trim() === '' || name.trim() === team.name)
+              }
             >
               <Settings2 aria-hidden="true" />
-              {busy === 'rename' ? 'Saving…' : 'Save name'}
+              Save name
             </Button>
           </form>
         ) : (
@@ -788,20 +810,27 @@ function TeamSettingsPanel({
           </div>
           <div className="sw-team-danger-actions">
             {canLeave ? (
-              <Button variant="outline" disabled={busy !== null} onClick={() => void leave()}>
+              <Button
+                variant="danger"
+                loading={busy === 'leave'}
+                loadingLabel="Leaving…"
+                disabled={busy !== null && busy !== 'leave'}
+                onClick={() => void leave()}
+              >
                 <UserMinus aria-hidden="true" />
-                {busy === 'leave' ? 'Leaving…' : 'Leave team'}
+                Leave team
               </Button>
             ) : null}
             {canArchive ? (
               <Button
-                variant="outline"
-                className="sw-team-danger-button"
-                disabled={busy !== null}
+                variant="danger"
+                loading={busy === 'archive'}
+                loadingLabel="Archiving…"
+                disabled={busy !== null && busy !== 'archive'}
                 onClick={() => void archive()}
               >
                 <Archive aria-hidden="true" />
-                {busy === 'archive' ? 'Archiving…' : 'Archive team'}
+                Archive team
               </Button>
             ) : null}
           </div>

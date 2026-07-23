@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vite-plus/test'
 
@@ -9,12 +11,15 @@ import {
   IconButton,
   IconLink,
   ListRow,
+  MobileMenu,
   NavItem,
   SearchField,
   SectionLabel,
   Tabs,
   Wordmark,
 } from './index.js'
+
+const componentSource = readFileSync(new URL('./components.tsx', import.meta.url), 'utf8')
 
 describe('button primitives', () => {
   it('render the correct semantic elements and visual variants', () => {
@@ -28,6 +33,11 @@ describe('button primitives', () => {
         Explore
       </ButtonLink>,
     )
+    const danger = renderToStaticMarkup(
+      <Button variant="danger" size="lg">
+        Delete
+      </Button>,
+    )
 
     expect(button).toContain('<button')
     expect(button).toContain('type="button"')
@@ -35,6 +45,27 @@ describe('button primitives', () => {
     expect(button).toContain('data-size="sm"')
     expect(link).toContain('<a href="/explore"')
     expect(link).toContain('data-variant="outline"')
+    expect(danger).toContain('data-variant="danger"')
+    expect(danger).toContain('data-size="lg"')
+  })
+
+  it('models loading separately from an unavailable action', () => {
+    const loading = renderToStaticMarkup(
+      <Button variant="accent" loading loadingLabel="Sending…">
+        Send invite
+      </Button>,
+    )
+    const disabled = renderToStaticMarkup(<Button disabled>Save name</Button>)
+
+    expect(loading).toContain('aria-busy="true"')
+    expect(loading).toContain('disabled=""')
+    expect(loading).toContain('data-state="loading"')
+    expect(loading).toContain('sp-button__spinner')
+    expect(loading).toContain('Sending…')
+    expect(loading).not.toContain('Send invite')
+    expect(disabled).toContain('disabled=""')
+    expect(disabled).not.toContain('aria-busy="true"')
+    expect(disabled).not.toContain('data-state="loading"')
   })
 
   it('requires and forwards accessible labels for icon controls', () => {
@@ -49,6 +80,49 @@ describe('button primitives', () => {
     expect(button).toContain('<button')
     expect(link).toContain('aria-label="Open session"')
     expect(link).toContain('<a')
+  })
+})
+
+describe('MobileMenu', () => {
+  it('renders a labelled 44px disclosure trigger and keeps its panel in the DOM', () => {
+    const html = renderToStaticMarkup(
+      <MobileMenu
+        className="site-menu"
+        triggerLabel="Open navigation"
+        closeLabel="Close navigation"
+      >
+        <nav aria-label="Mobile navigation">
+          <a href="/explore">Explore</a>
+        </nav>
+      </MobileMenu>,
+    )
+    const defaults = renderToStaticMarkup(
+      <MobileMenu>
+        <span>Menu content</span>
+      </MobileMenu>,
+    )
+
+    expect(html).toContain('sp-mobile-menu site-menu')
+    expect(html).toContain('class="sp-mobile-menu__trigger"')
+    expect(html).toContain('aria-label="Open navigation"')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toMatch(/aria-controls="sp-mobile-menu-panel-[^"]+"/)
+    const triggerId = html.match(/id="(sp-mobile-menu-trigger-[^"]+)"/)?.[1]
+    expect(triggerId).toBeDefined()
+    expect(html).toContain(`aria-labelledby="${triggerId}"`)
+    expect(html).toContain('class="sp-mobile-menu__panel"')
+    expect(html).toContain('hidden=""')
+    expect(html).toContain('Mobile navigation')
+    expect(html).toContain('Explore')
+    expect(defaults).toContain('aria-label="Open menu"')
+  })
+
+  it('dismisses after menu actions as well as Escape and outside pointer presses', () => {
+    expect(componentSource).toContain('onClickCapture')
+    expect(componentSource).toContain("target.closest('a,button')")
+    expect(componentSource).toContain("document.addEventListener('pointerdown'")
+    expect(componentSource).toContain("event.key !== 'Escape'")
+    expect(componentSource).toContain("closeLabel = 'Close menu'")
   })
 })
 

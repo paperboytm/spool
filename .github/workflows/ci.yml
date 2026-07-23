@@ -65,3 +65,16 @@ jobs:
       - name: Build web
         if: runner.os == 'Linux'
         run: pnpm --filter @spool/web build
+      - name: Install Chromium
+        if: runner.os == 'Linux'
+        run: pnpm --filter @spool/web exec playwright install --with-deps chromium
+      - name: Test web end-to-end
+        if: runner.os == 'Linux'
+        run: pnpm test:e2e
+      - name: Upload web E2E results on failure
+        if: failure() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-test-results
+          path: apps/web/test-results/
+          retention-days: 7

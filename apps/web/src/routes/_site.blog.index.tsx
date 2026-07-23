@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { blogPosts } from '../lib/content'
-import { PUBLIC_SITE_ORIGIN } from '../lib/site'
+import { PUBLIC_SITE_ORIGIN, siteOgImageMeta } from '../lib/site'
 
 const TITLE = 'Blog — Spool'
 const DESC = 'Updates, technical deep-dives, and product announcements from the Spool team.'
@@ -15,12 +15,10 @@ export const Route = createFileRoute('/_site/blog/')({
       { property: 'og:url', content: `${PUBLIC_SITE_ORIGIN}/blog/` },
       { property: 'og:title', content: TITLE },
       { property: 'og:description', content: DESC },
-      { property: 'og:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
+      ...siteOgImageMeta(),
       { property: 'og:site_name', content: 'Spool' },
-      { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: TITLE },
       { name: 'twitter:description', content: DESC },
-      { name: 'twitter:image', content: `${PUBLIC_SITE_ORIGIN}/og-image.png` },
     ],
     links: [
       { rel: 'canonical', href: `${PUBLIC_SITE_ORIGIN}/blog/` },

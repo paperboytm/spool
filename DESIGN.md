@@ -59,6 +59,39 @@ The Electron source remains only as legacy implementation reference while it is 
 
 Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows and buttons, and 4px for badges. Pill radius is reserved for focused search inputs and compact toggles.
 
+### Responsive shell contract
+
+- **Phone (`320–640px`):** Product and marketing headers show the Wordmark, the current account action (`Sign in` or avatar), and one 44px navigation disclosure. `Explore`, `Docs`, search, `Publish`, theme, and Team navigation remain available inside that disclosure; do not compress the complete desktop header into one row.
+- **Compact (`641–768px`):** The same disclosure remains available so touch targets do not compete for width. Page content may use two columns only when each control still has its intended minimum width.
+- **Desktop (`769px+`):** The full persistent navigation is visible. Marketing and Team shells remain capped near 1120px; account forms keep their narrower reading width.
+- **Overflow invariant:** At 320, 451, 768, and 1024px, `scrollWidth` must not exceed the viewport. Long Team names, emails, badges, and action labels wrap, truncate, or move below identity instead of widening an ancestor.
+- **Touch invariant:** Phone and compact navigation, form actions, and row actions use at least 44×44px targets. A 48px form control is allowed at every breakpoint and is preferred when aligned with text inputs.
+
+### Button contract
+
+Buttons express both hierarchy and state; page-level height or opacity patches are not a substitute for the shared primitive.
+
+| Variant   | Purpose                                     | Default treatment                                      |
+| --------- | ------------------------------------------- | ------------------------------------------------------ |
+| `accent`  | One primary action in the current scope     | Paperboy blue fill + `--on-accent` text                |
+| `outline` | Secondary, reversible, or lower-priority    | Transparent fill + strong neutral border               |
+| `ghost`   | Compact tertiary actions and navigation     | Transparent until hover/focus                          |
+| `danger`  | Destructive membership or workspace changes | Error text/border; restrained error-tinted hover state |
+
+- **Sizes:** `sm = 28px`, `md = 32px`, `lg = 48px`. Input-adjacent actions use `lg`; phone/compact adaptations raise any smaller actionable control to at least 44px.
+- **Accent text:** `--sp-on-accent` maintains at least 4.5:1 contrast against the light and dark accent tokens; do not assume white text is readable on Paperboy blue.
+- **Disabled:** Disabled buttons use neutral surface, border, and muted text tokens. Never lower the opacity of the entire button, and never leave faint text on an accent fill.
+- **Loading:** Loading preserves the button’s hierarchy, swaps its leading icon for a spinner, sets `aria-busy="true"`, and blocks repeat submission. It does not visually collapse into the disabled treatment.
+- **Danger:** Destructive styling belongs to the shared `danger` variant, not a page-specific red-text class.
+
+### Social preview contract
+
+- Marketing OG images are deterministic 1200×630 artifacts built from the same Geist, void, and Paperboy-blue tokens as the site.
+- A brand or positioning change creates a new content-versioned pathname. Do not overwrite a long-lived OG URL or rely on query parameters: social crawlers cache preview assets independently of the page.
+- A legacy preview pathname may remain only as a compatibility copy of the current artifact; canonical metadata always points at the content-versioned pathname.
+- The homepage preview leads with the current product promise and `spool.new`; it must not carry legacy `spool.pro`, amber branding, or desktop-product screenshots.
+- Session and Team privacy rules still apply: Public previews may describe the artifact and author; Team-only routes never emit Session or tenant OG metadata.
+
 ## Typography
 
 - **Logo/Display:** Geist Sans 700 — large, tight letter-spacing (−0.04em), the period after "Spool" in accent color.

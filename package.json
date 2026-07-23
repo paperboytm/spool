@@ -18,6 +18,7 @@
     "typecheck": "vp run -r typecheck",
     "pretest": "pnpm run rebuild:native:node",
     "test": "vp run -r --concurrency-limit 1 test",
+    "test:e2e": "pnpm --filter @spool/web test:e2e",
     "test:core": "pnpm --filter @spool-lab/core test",
     "test:share-backend": "pnpm --filter @spool/backend test",
     "rebuild:native:node": "pnpm --filter @spool-lab/core run rebuild:native:node",
