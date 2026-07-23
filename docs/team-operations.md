@@ -21,7 +21,14 @@ Configure the application that owns `WORKOS_CLIENT_ID` under **Applications → 
 - App homepage: `https://spool.new/`
 - Sign-in endpoint: `https://spool.new/api/auth/workos/start`
 
-The sign-in endpoint deliberately starts a fresh state-protected AuthKit flow. It is needed when WorkOS initiates authentication outside Spool, such as from an email flow. Do not point WorkOS directly at the callback: a callback without Spool's state cookies is rejected. Leave custom sign-up, user-invitation, and password-reset URLs unset unless Spool implements matching routes; WorkOS-hosted flows remain the source of truth for those actions.
+The sign-in endpoint deliberately starts a fresh state-protected AuthKit flow. It is needed when WorkOS initiates authentication outside Spool, such as from an email flow. Do not point WorkOS directly at the callback: a callback without Spool's state cookies cannot establish a Spool session and enters only the controlled recovery described below. Leave custom sign-up, user-invitation, and password-reset URLs unset unless Spool implements matching routes; WorkOS-hosted flows remain the source of truth for those actions.
+
+AuthKit's hosted invitation flow may still return an authorization code without
+the application state created by Spool. The callback redeems that code only to
+finish WorkOS's hosted ceremony, discards its unbound identity result, and
+restarts through the sign-in endpoint. A code-only callback must never create a
+Spool browser session; the second callback must pass the normal state-cookie
+checks before membership reconciliation runs.
 
 ## Required production secrets
 

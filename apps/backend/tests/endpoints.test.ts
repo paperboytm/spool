@@ -52,11 +52,117 @@ afterEach(() => {
 })
 
 describe('GET /api/auth/workos/callback — plumbing edges', () => {
-  it('400 when code or state query params are missing', async () => {
+  it('400 when the authorization code is missing', async () => {
     const env = envFor()
-    const req = new Request('https://spool.new/api/auth/workos/callback?code=abc')
+    const req = new Request('https://spool.new/api/auth/workos/callback?state=abc')
     const res = await invoke(callbackGet, req, env, { provider: 'workos' })
     expect(res.status).toBe(400)
+  })
+
+  it('restarts a state-bound flow after a hosted invitation code-only callback', async () => {
+    const env = envFor()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const res = workosOk(String(input))
+      if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
+      return res
+    })
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=invitation-code')
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('https://spool.new/api/auth/workos/start?next=%2Fme')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer')
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toMatch(/\/user_management\/authenticate$/)
+    const exchangeBody = JSON.parse(String(fetchSpy.mock.calls[0]?.[1]?.body)) as {
+      code: string
+      client_secret: string
+      code_verifier?: string
+    }
+    expect(exchangeBody).toMatchObject({
+      code: 'invitation-code',
+      client_secret: 'sk_test',
+    })
+    expect(exchangeBody).not.toHaveProperty('code_verifier')
+    expect(getSetCookies(res).join('\n')).not.toMatch(/spool_session=/)
+    expect(env.state.users).toHaveLength(0)
+  })
+
+  it('still restarts safely when a stale hosted invitation code cannot be redeemed', async () => {
+    const env = envFor()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":"invalid_grant"}', { status: 400 }),
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const req = new Request('https://spool.new/api/auth/workos/callback?code=expired-code')
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('https://spool.new/api/auth/workos/start?next=%2Fme')
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('hosted AuthKit callback completion failed'),
+    )
+    expect(env.state.users).toHaveLength(0)
+  })
+
+  it('creates a browser session only after the restarted callback passes state checks', async () => {
+    const env = envFor()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const res = workosOk(String(input))
+      if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
+      return res
+    })
+
+    const recovery = await invoke(
+      callbackGet,
+      new Request('https://spool.new/api/auth/workos/callback?code=invitation-code'),
+      env,
+      { provider: 'workos' },
+    )
+    const start = await invoke(startGet, new Request(recovery.headers.get('location') ?? ''), env, {
+      provider: 'workos',
+    })
+    const authorize = new URL(start.headers.get('location') ?? '')
+    const state = authorize.searchParams.get('state')
+    expect(state).toBeTruthy()
+    const cookie = getSetCookies(start)
+      .map((value) => value.split(';', 1)[0])
+      .join('; ')
+
+    const callback = await invoke(
+      callbackGet,
+      new Request(
+        `https://spool.new/api/auth/workos/callback?code=stateful-code&state=${encodeURIComponent(state ?? '')}`,
+        { headers: { cookie } },
+      ),
+      env,
+      { provider: 'workos' },
+    )
+
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toBe('/me')
+    expect(getSetCookies(callback).join('\n')).toMatch(/spool_session=/)
+    expect(
+      fetchSpy.mock.calls.filter(([input]) => String(input).endsWith('/authenticate')),
+    ).toHaveLength(2)
+    expect(env.state.users).toHaveLength(1)
+  })
+
+  it('canonicalizes a legacy-host invitation recovery onto PUBLIC_BASE_URL', async () => {
+    const env = { ...envFor(), PUBLIC_BASE_URL: 'https://spool.new' }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const res = workosOk(String(input))
+      if (!res) throw new Error(`unexpected fetch: ${String(input)}`)
+      return res
+    })
+    const req = new Request('https://spool.pro/api/auth/workos/callback?code=invitation-code', {
+      headers: { 'x-forwarded-host': 'spool.pro' },
+    })
+    const res = await invoke(callbackGet, req, env, { provider: 'workos' })
+
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('https://spool.new/api/auth/workos/start?next=%2Fme')
   })
 
   it('400 when state cookie is absent', async () => {

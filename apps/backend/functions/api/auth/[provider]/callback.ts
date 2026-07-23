@@ -17,7 +17,7 @@ import { safeNext } from '../../../../src/auth/next'
 import { getProvider } from '../../../../src/auth/providers/registry'
 import { MAX_TTL_SEC, createSession } from '../../../../src/auth/session'
 import { ApiError, jsonError } from '../../../../src/errors'
-import { oauthPublicBaseUrl } from '../../../../src/public-url'
+import { oauthPublicBaseUrl, publicBaseUrl } from '../../../../src/public-url'
 import { checkRate } from '../../../../src/rate-limit'
 import { clientIp } from '../../../../src/request'
 import { CC_NO_STORE } from '../../../../src/security/cache-control'
@@ -59,7 +59,50 @@ export const onRequestGet: PagesFunction<Env, 'provider'> = async (ctx) => {
     const url = new URL(ctx.request.url)
     const code = url.searchParams.get('code')
     const state = url.searchParams.get('state')
-    if (!code || !state) throw new ApiError('BAD_REQUEST')
+    if (!code) throw new ApiError('BAD_REQUEST')
+
+    // AuthKit's hosted invitation flow is allowed to return directly to the
+    // application's redirect URI with only an authorization code. Spool must
+    // not use that unbound result to create a browser session because the flow
+    // did not originate at /start and therefore has no state cookie to bind
+    // the browser to the authorization request. Doing so would make login CSRF
+    // / session swapping possible.
+    //
+    // Redeem the one-time code with the confidential-client secret so WorkOS
+    // can finish any hosted invitation bookkeeping, but deliberately discard
+    // the returned identity instead of creating a Spool session from an
+    // unbound browser request. If a stale/expired callback can no longer be
+    // redeemed, a fresh sign-in is still the safest recovery path.
+    //
+    // Then restart a normal Spool-owned authorization flow. The fresh /start
+    // request mints state, and the user's new AuthKit session normally makes
+    // the second round trip immediate. Canonicalizing through PUBLIC_BASE_URL
+    // also moves legacy spool.pro invitations onto spool.new.
+    if (!state) {
+      const redirectUri = `${publicBaseUrl(ctx.env)}/api/auth/${provider.id}/callback`
+      try {
+        await provider.exchangeCode({ code, codeVerifier: '', redirectUri }, ctx.env)
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            message: 'hosted AuthKit callback completion failed before stateful restart',
+            provider: provider.id,
+            error: error instanceof ApiError ? error.code : 'INTERNAL',
+          }),
+        )
+      }
+
+      const restart = new URL(`/api/auth/${provider.id}/start`, publicBaseUrl(ctx.env))
+      restart.searchParams.set('next', '/me')
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: restart.toString(),
+          'Cache-Control': CC_NO_STORE,
+          'Referrer-Policy': 'no-referrer',
+        },
+      })
+    }
 
     const stateCookie = readCookie(ctx.request, OAUTH_STATE_COOKIE)
     const verifier = readCookie(ctx.request, OAUTH_VERIFIER_COOKIE)
