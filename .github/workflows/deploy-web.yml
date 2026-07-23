@@ -22,8 +22,75 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-gate:
+    name: Check deployment eligibility
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      deploy: ${{ steps.eligibility.outputs.deploy }}
+    env:
+      DEPLOY_TARGET: ${{ github.event_name == 'push' && 'production' || inputs.target }}
+    steps:
+      - uses: actions/checkout@v6
+
+      # Public pages and /install.sh must never advertise a CLI contract that
+      # npm does not serve yet. Main may advance before its matching release;
+      # that is an expected no-op for automatic production deployment, while
+      # an explicit production dispatch remains a hard release failure.
+      - name: Check matching CLI release
+        id: eligibility
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stop_deployment() {
+            local reason="$1"
+            if [ "$GITHUB_EVENT_NAME" = 'push' ]; then
+              echo "::notice::${reason} Skipping automatic production deployment."
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+              {
+                echo '### Production deployment skipped'
+                echo
+                echo "$reason"
+                echo
+                echo 'Production can advance after the matching CLI release is published.'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            echo "::error::${reason}"
+            exit 1
+          }
+
+          if [ "$DEPLOY_TARGET" = 'staging' ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          version="$(jq -r .version apps/cli/package.json)"
+          tag="v${version}"
+          if ! git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}" 2>/dev/null; then
+            stop_deployment "The matching CLI tag ${tag} does not exist."
+          fi
+          if ! git diff --quiet "$tag" -- \
+            apps/cli \
+            packages/core \
+            packages/redact \
+            packages/session-kit; then
+            stop_deployment "CLI sources differ from ${tag}."
+          fi
+          published="$(npm view "@spool-lab/cli@${version}" version 2>/dev/null || true)"
+          if [ "$published" != "$version" ]; then
+            stop_deployment "@spool-lab/cli@${version} is not available from npm yet."
+          fi
+
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+
   deploy:
     name: Deploy ${{ github.event_name == 'push' && 'production' || inputs.target }}
+    needs: release-gate
+    if: needs.release-gate.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -44,39 +111,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Public pages and /install.sh must never advertise a CLI contract that
-      # npm does not serve yet. A normal main push may race the release job, so
-      # production waits for a matching version tag and registry package.
-      - name: Verify production CLI release
-        if: env.DEPLOY_TARGET == 'production'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(jq -r .version apps/cli/package.json)"
-          tag="v${version}"
-          git fetch --force origin "refs/tags/${tag}:refs/tags/${tag}"
-          if ! git diff --quiet "$tag" -- \
-            apps/cli \
-            packages/core \
-            packages/redact \
-            packages/session-kit; then
-            echo "::error::CLI sources differ from ${tag}. Publish the next CLI release before deploying production web."
-            exit 1
-          fi
-          published="$(npm view "@spool-lab/cli@${version}" version 2>/dev/null || true)"
-          if [ "$published" != "$version" ]; then
-            echo "::error::@spool-lab/cli@${version} is not available from npm yet."
-            exit 1
-          fi
-
       - name: Verify Cloudflare account target
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: test "$CLOUDFLARE_ACCOUNT_ID" = "$EXPECTED_CLOUDFLARE_ACCOUNT_ID"
 
-      # Keep the release self-gating. The separate E2E workflow may still be
-      # running when a main push arrives, so every non-E2E check required by
-      # this deployment runs before the first remote mutation.
+      # Fail before the expensive source checks if the CI token cannot reach
+      # the D1 database that this deployment will migrate.
+      - name: Verify Cloudflare D1 access
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$DEPLOY_TARGET" = 'production' ]; then
+            database='spool-share-db'
+            config='wrangler.prod.toml'
+          else
+            database='spool-share-db-staging'
+            config='wrangler.staging.toml'
+          fi
+          pnpm --filter @spool/backend exec wrangler d1 info "$database" --config "$config" >/dev/null
+
+      # Keep every eligible deployment self-gating. The separate E2E workflow
+      # may still be running, so every non-E2E check required by this release
+      # runs before the first remote mutation.
       - name: Check source
         run: pnpm exec vp check
 

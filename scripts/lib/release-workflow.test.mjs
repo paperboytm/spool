@@ -43,8 +43,22 @@ describe('npm release workflow', () => {
   })
 
   test('blocks production web until the matching CLI package is published', () => {
-    expect(deployWorkflow).toContain('Verify production CLI release')
+    expect(deployWorkflow).toContain('Check matching CLI release')
     expect(deployWorkflow).toContain('git diff --quiet "$tag"')
     expect(deployWorkflow).toContain('npm view "@spool-lab/cli@${version}" version')
+  })
+
+  test('skips only ineligible automatic production deployments', () => {
+    const gateJob = deployWorkflow.match(/  release-gate:[\s\S]*?(?=\n  deploy:)/)?.[0]
+    const deployJob = deployWorkflow.match(/^  deploy:[\s\S]*?steps:/m)?.[0]
+
+    expect(deployWorkflow).toContain('push:\n    branches: [main]')
+    expect(gateJob).toBeDefined()
+    expect(gateJob).toContain('if [ "$GITHUB_EVENT_NAME" = \'push\' ]')
+    expect(gateJob).toContain('echo "deploy=false" >> "$GITHUB_OUTPUT"')
+    expect(gateJob).toContain('echo "::error::${reason}"')
+    expect(deployJob).toContain('needs: release-gate')
+    expect(deployJob).toContain("if: needs.release-gate.outputs.deploy == 'true'")
+    expect(deployWorkflow).toContain('Verify Cloudflare D1 access')
   })
 })
