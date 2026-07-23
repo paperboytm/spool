@@ -12,7 +12,9 @@ const packageDir = join(scriptDir, '..')
 const sourceAsset = join(packageDir, 'src', 'assets', 'site-og.png')
 const compatibilityAsset = join(packageDir, 'public', 'og-image.png')
 const checkOnly = process.argv.includes('--check')
-process.env.FONTCONFIG_FILE ??= join(scriptDir, 'site-og-fontconfig.xml')
+if (process.platform === 'darwin') {
+  process.env.FONTCONFIG_FILE ??= join(scriptDir, 'site-og-fontconfig.xml')
+}
 
 // Keep typography tied to the exact self-hosted faces used by the app.
 // sharp hands these files directly to Pango, so the host's installed fonts
