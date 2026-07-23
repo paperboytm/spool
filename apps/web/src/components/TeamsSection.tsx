@@ -78,11 +78,16 @@ export function TeamList({ teams }: { teams: TeamSummary[] }) {
               </span>
             </div>
             {team.role ? (
-              <Badge>
+              <Badge className="sw-teams-list-role">
                 {team.role === 'owner' ? 'Owner' : team.role === 'admin' ? 'Admin' : 'Member'}
               </Badge>
             ) : null}
-            <ArrowRight size={14} strokeWidth={1.7} aria-hidden="true" />
+            <ArrowRight
+              className="sw-teams-list-arrow"
+              size={14}
+              strokeWidth={1.7}
+              aria-hidden="true"
+            />
           </a>
         </li>
       ))}

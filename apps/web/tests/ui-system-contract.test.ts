@@ -62,4 +62,22 @@ describe('Web shared UI contract', () => {
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
     )
   })
+
+  it('keeps public and product navigation reachable with mobile-size targets', () => {
+    const appCss = source('src/styles/app.css')
+    const appMobile = appCss.split('@media (max-width: 768px)')[1] ?? ''
+    const siteCss = source('src/styles/global.css')
+    const siteMobile = siteCss.split('@media (max-width: 720px)')[1] ?? ''
+
+    expect(appMobile).toMatch(/\.sw-header-nav \.sp-nav-item\s*\{[^}]*min-height:\s*44px;/)
+    expect(appMobile).toMatch(/\.sw-publish-link,\s*\.sw-signin-link\s*\{[^}]*min-height:\s*44px;/)
+    expect(appMobile).toMatch(/\.sw-account-link,[^{]*\{[^}]*width:\s*44px;/)
+
+    expect(siteMobile).toMatch(/\.site-main-nav \.sp-nav-item\s*\{[^}]*min-height:\s*44px;/)
+    expect(siteMobile).toMatch(
+      /\.site-publish-link,\s*\.site-signin-link\s*\{[^}]*min-height:\s*44px;/,
+    )
+    expect(siteMobile).toMatch(/\.site-account-link\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/)
+    expect(siteMobile).toMatch(/\.brand\s*\{[^}]*min-height:\s*44px;/)
+  })
 })

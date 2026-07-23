@@ -425,6 +425,13 @@ section.sect:last-of-type {
   flex-wrap: wrap;
 }
 
+.home-page .hh-btn {
+  height: var(--sp-space-12);
+  padding-inline: var(--sp-space-5);
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .hh-install {
   max-width: 100%;
   font-size: var(--sp-text-command);
@@ -1047,7 +1054,7 @@ section.sect:last-of-type {
   margin-top: 40px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--sp-space-2);
   align-items: center;
 }
 .home-page .final .row {
@@ -1082,6 +1089,13 @@ section.sect:last-of-type {
         transparent 80%,
         color-mix(in srgb, var(--surface) 64%, transparent)
       );
+  }
+}
+@media (max-width: 520px) {
+  .home-page .hh-cta .hh-btn,
+  .home-page .final .row .hh-btn {
+    flex: 1 0 100%;
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,256 @@
+/*
+ * /me account shell
+ *
+ * app.css keeps the compact desktop account surface. These selectors are
+ * intentionally rooted in /me-only class names so the 320px reflow does not
+ * change public Profiles, Team workspaces, or the global navigation.
+ */
+
+.sw-me-main,
+.sw-me-card,
+.sw-me-card > *,
+.sw-me-card section,
+.sw-me-card ul,
+.sw-me-card li {
+  min-width: 0;
+}
+
+.sw-me-main {
+  width: 100%;
+}
+
+.sw-me-banner-copy {
+  min-width: 0;
+}
+
+.sw-me-banner-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-space-1);
+  margin-left: var(--sp-space-1);
+}
+
+.sw-teams-list-role,
+.sw-teams-list-arrow {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .sw-main.sw-me-main {
+    padding: var(--sp-space-8) var(--sp-space-3) var(--sp-space-2);
+  }
+
+  .sw-card.sw-me-card {
+    padding: var(--sp-space-6) var(--sp-space-4) var(--sp-space-5);
+  }
+
+  .sw-me-card .sp-button,
+  .sw-me-card .sp-icon-button {
+    min-height: 44px;
+  }
+
+  .sw-me-card .sp-icon-button {
+    min-width: 44px;
+  }
+
+  .sw-me-card .sw-me-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sw-me-card .sw-me-header > .sp-button {
+    width: 100%;
+  }
+
+  .sw-me-card > .sw-identity {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sp-space-3);
+  }
+
+  .sw-me-card > .sw-identity > .sp-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .sw-me-card .sw-profile-row {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: var(--sp-space-4);
+  }
+
+  .sw-me-card .sw-avatar-remove {
+    width: 44px;
+    height: 44px;
+    top: -12px;
+    right: -12px;
+    opacity: 1;
+  }
+
+  .sw-me-card .sw-name-input {
+    min-height: 44px;
+  }
+
+  .sw-me-card .sw-profile-email-value {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .sw-me-card .sp-section-label {
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: var(--sp-space-2);
+  }
+
+  .sw-me-card .sp-section-label__action {
+    min-width: 0;
+  }
+
+  .sw-me-card .sw-team-create-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .sw-me-card .sw-teams-list a {
+    display: grid;
+    grid-template-areas:
+      'icon copy arrow'
+      '. role role';
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-space-2) var(--sp-space-3);
+  }
+
+  .sw-me-card .sw-teams-list-icon {
+    grid-area: icon;
+  }
+
+  .sw-me-card .sw-teams-list-copy {
+    grid-area: copy;
+  }
+
+  .sw-me-card .sw-teams-list-role {
+    grid-area: role;
+    justify-self: start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sw-me-card .sw-teams-list-arrow {
+    grid-area: arrow;
+  }
+
+  .sw-me-card .sw-teams-empty,
+  .sw-me-card .sw-team-empty {
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .sw-me-card .sw-managed-session-list > li {
+    padding: var(--sp-space-3);
+  }
+
+  .sw-me-card .sw-managed-session-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-me-card .sw-managed-session-titleline {
+    display: grid;
+    justify-content: stretch;
+    gap: var(--sp-space-2);
+  }
+
+  .sw-me-card .sw-managed-session-titleline .sp-badge {
+    justify-self: start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sw-me-card .sw-managed-session-meta {
+    align-items: flex-start;
+    overflow: visible;
+  }
+
+  .sw-me-card .sw-managed-session-meta > span:not([aria-hidden='true']) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .sw-me-card .sw-share {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .sw-me-card .sw-share-link {
+    width: 100%;
+  }
+
+  .sw-me-card .sw-rowmenu {
+    justify-self: end;
+    margin-top: 0;
+    opacity: 1;
+  }
+
+  .sw-me-card .sw-rowmenu-pop {
+    max-width: calc(100vw - var(--sp-space-8));
+  }
+
+  .sw-me-card .sw-signed-in-as {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--sp-space-2);
+  }
+
+  .sw-me-card .sw-signed-in-as .sw-link-quiet {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sw-me-banner {
+    padding: var(--sp-space-3);
+  }
+
+  .sw-me-banner-copy {
+    display: grid;
+    gap: var(--sp-space-2);
+  }
+
+  .sw-me-banner-action {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-space-2);
+    margin-left: 0;
+  }
+
+  .sw-me-banner-action .sp-button {
+    min-height: 44px;
+  }
+
+  .sw-me-modal-overlay {
+    align-items: flex-end;
+    padding: var(--sp-space-3);
+  }
+
+  .sw-modal.sw-me-modal {
+    max-height: calc(100dvh - var(--sp-space-6));
+    overflow-y: auto;
+    padding: var(--sp-space-5) var(--sp-space-4);
+  }
+
+  .sw-me-modal .sw-modal-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-me-modal .sw-modal-actions .sp-button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

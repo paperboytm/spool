@@ -288,10 +288,10 @@ export function FinalCTA({ centered = false }: { centered?: boolean } = {}) {
         <div className="row">
           <InstallCommandPill />
           <ButtonLink href="/explore" className="hh-btn" variant="accent">
-            Explore Sessions →
+            Explore Sessions
           </ButtonLink>
           <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">
-            Share yours →
+            Share Yours
           </ButtonLink>
         </div>
       </div>

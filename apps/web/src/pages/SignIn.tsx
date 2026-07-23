@@ -11,7 +11,8 @@
 import { ButtonLink } from '@spool-lab/ui'
 import { useEffect, useState, type ReactNode } from 'react'
 
-import { Footer, Header, Icon, Page, SpoolMark } from '../components/Chrome'
+import { Footer, Header, Icon, Page } from '../components/Chrome'
+import { SpoolMark } from '../components/site/spool-mark'
 import { fetchMe } from '../lib/api'
 import { nextSafe } from '../lib/route'
 
@@ -33,6 +34,14 @@ interface ProviderEntry {
 const PROVIDERS: readonly ProviderEntry[] = [
   { id: 'workos', label: 'Continue to sign in', icon: <Icon name="arrow-right" size={16} /> },
 ]
+
+export function SignInEmblem() {
+  return (
+    <div className="sw-signin-emblem">
+      <SpoolMark size={30} />
+    </div>
+  )
+}
 
 function authStartHref(provider: ProviderId, dest: string): string {
   return `/api/auth/${provider}/start?next=${encodeURIComponent(dest)}`
@@ -107,9 +116,7 @@ export function SignIn({ next }: Props) {
       <Header auth="out" />
       <main className="sw-main center">
         <div className="sw-card tight sw-signin w-420">
-          <div className="sw-signin-emblem">
-            <SpoolMark size={30} />
-          </div>
+          <SignInEmblem />
           <div className="sw-eyebrow">spool.new</div>
           <h1 className="sw-signin-title">Sign in</h1>
           <p className="sw-signin-sub">Publish, manage, and unpublish your shares.</p>

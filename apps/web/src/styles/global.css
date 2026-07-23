@@ -137,11 +137,12 @@ code,
 .top-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--sp-space-3);
   height: 56px;
 }
 .brand {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: var(--sp-space-2);
 }
@@ -151,20 +152,109 @@ code,
   color: var(--accent);
   display: inline-block;
 }
-.top nav.links {
+.site-main-nav,
+.site-nav-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--sp-space-1);
 }
-
-.top nav.links .sep {
-  width: 1px;
-  height: 14px;
-  background: var(--border);
+.site-main-nav {
+  margin-left: var(--sp-space-3);
+}
+.site-nav-actions {
+  margin-left: auto;
+}
+.site-publish-link,
+.site-signin-link {
+  flex: none;
+}
+.site-team-link {
+  min-width: 0;
+  max-width: 160px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-space-1-5);
+  padding: 0 var(--sp-space-2);
+  border-radius: var(--sp-radius-control);
+  color: var(--muted);
+  font-size: var(--sp-text-ui);
+  font-weight: 500;
+  transition:
+    background-color var(--sp-motion-hover),
+    color var(--sp-motion-hover);
+}
+.site-team-link:hover,
+.site-team-link:focus-visible {
+  background: var(--surface2);
+  color: var(--text);
+}
+.site-team-link:focus-visible,
+.site-account-link:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-focus-ring);
+}
+.site-team-link span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.site-account-link {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--sp-radius-pill);
 }
 @media (max-width: 720px) {
-  .top nav.links a.nav-hideable {
+  .top-inner {
+    gap: 0;
+  }
+  .brand .brand-mark {
     display: none;
+  }
+  .brand {
+    min-height: 44px;
+  }
+  .site-main-nav {
+    margin-left: var(--sp-space-1);
+    gap: 0;
+  }
+  .site-main-nav .nav-hideable,
+  .site-nav-actions .nav-hideable,
+  .site-team-link {
+    display: none;
+  }
+  .site-main-nav .sp-nav-item {
+    min-height: 44px;
+  }
+  .site-docs-link {
+    width: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .site-docs-link .sp-nav-item__label {
+    display: none;
+  }
+  .site-search-link {
+    display: none;
+  }
+  .site-nav-actions {
+    gap: 0;
+  }
+  .site-publish-link,
+  .site-signin-link {
+    min-height: 44px;
+    padding-inline: var(--sp-space-2);
+  }
+  .site-account-link {
+    width: 44px;
+    height: 44px;
   }
 }
 

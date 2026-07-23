@@ -8,8 +8,8 @@
 // the inline script in routes/__root.tsx before React runs, so there's
 // no flash.
 
-import { Avatar, ButtonLink, IconButton, Wordmark } from '@spool-lab/ui'
-import { Users } from 'lucide-react'
+import { Avatar, ButtonLink, IconButton, IconLink, NavItem, Wordmark } from '@spool-lab/ui'
+import { BookOpen, Search, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -21,31 +21,12 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 // responsive utilities.
 import '../styles/app.css'
 
-import { fetchMe } from '../lib/api'
-import {
-  AUTH_IDENTITY_CHANGED,
-  type AuthIdentity,
-  getCachedAuth,
-  setCachedAuth,
-} from '../lib/auth-cache'
+import { AUTH_IDENTITY_CHANGED } from '../lib/auth-cache'
+import { resolveAuthState, type AuthState } from '../lib/auth-state'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 
-export type AuthState = AuthIdentity | 'auto'
-
-async function resolveAuthState(): Promise<AuthIdentity> {
-  const existing = getCachedAuth()
-  if (existing) return existing
-  const p = (async () => {
-    const r = await fetchMe()
-    if (r.kind === 'ok') {
-      return { name: r.me.display_name, src: r.me.avatar_url } as AuthIdentity
-    }
-    return 'out' as AuthIdentity
-  })()
-  setCachedAuth(p)
-  return p
-}
+export type { AuthState } from '../lib/auth-state'
 
 export function Page({
   children,
@@ -219,7 +200,7 @@ export function Icon({
   }
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string } = {}) {
   // Lazy + SSR-guarded: /terms and /privacy prerender this component at
   // build time where there is no document.
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -231,7 +212,13 @@ export function ThemeToggle() {
     setTheme(next)
   }, [theme])
   return (
-    <IconButton size="sm" onClick={toggle} title="Toggle theme" aria-label="Toggle light or dark">
+    <IconButton
+      className={className}
+      size="sm"
+      onClick={toggle}
+      title="Toggle theme"
+      aria-label="Toggle light or dark"
+    >
       <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={15} />
     </IconButton>
   )
@@ -281,12 +268,36 @@ export function Header({
 
   return (
     <header className={`sw-header${sticky ? ' sw-header-sticky' : ''}`}>
-      {/* Same-origin since the landing/share merge — works in dev too. */}
-      <a href="/" aria-label="Spool home">
-        <Wordmark />
-      </a>
+      <div className="sw-header-left">
+        {/* Same-origin since the landing/share merge — works in dev too. */}
+        <a className="sw-header-brand" href="/" aria-label="Spool home">
+          <Wordmark />
+        </a>
+        <nav className="sw-header-nav" aria-label="Primary">
+          <NavItem href="/explore">Explore</NavItem>
+          <NavItem
+            className="sw-header-docs"
+            href="/docs/installation"
+            aria-label="Docs"
+            leading={<BookOpen aria-hidden="true" />}
+          >
+            Docs
+          </NavItem>
+          <IconLink
+            className="sw-header-search"
+            href="/explore"
+            size="sm"
+            aria-label="Search Sessions"
+          >
+            <Search aria-hidden="true" />
+          </IconLink>
+        </nav>
+      </div>
       <div className="sw-header-right">
-        <ThemeToggle />
+        <ButtonLink className="sw-publish-link" href="/docs/quick-start" size="sm" variant="accent">
+          Publish
+        </ButtonLink>
+        <ThemeToggle className="sw-header-theme" />
         {resolved === 'out' || resolved === 'auto' ? (
           <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
             Sign in
