@@ -115,7 +115,7 @@ export function SignIn({ next }: Props) {
     <Page>
       <Header auth="out" />
       <main className="sw-main center">
-        <div className="sw-card tight sw-signin w-420">
+        <div className="sw-card tight sw-signin sw-card--420">
           <SignInEmblem />
           <div className="sw-eyebrow">spool.new</div>
           <h1 className="sw-signin-title">Sign in</h1>

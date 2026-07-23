@@ -22,13 +22,13 @@ describe('CLI + Web product boundary', () => {
       'package',
       'package:mac',
       'package:linux',
-      'test:e2e',
       'rebuild:native:electron',
       'dev:install:mac',
     ]) {
       expect(rootManifest.scripts).not.toHaveProperty(script)
     }
 
+    expect(rootManifest.scripts['test:e2e']).toBe('pnpm --filter @spool/web test:e2e')
     expect(Object.values(rootManifest.scripts).join('\n')).not.toMatch(/electron|@spool\/app/i)
     expect(rootManifest.devDependencies).not.toHaveProperty('node-abi')
   })
@@ -51,6 +51,8 @@ describe('CLI + Web product boundary', () => {
     expect(ciWorkflow).toContain('pnpm --filter @spool-lab/cli test')
     expect(ciWorkflow).toContain('pnpm --filter @spool/backend test')
     expect(ciWorkflow).toContain('pnpm --filter @spool/web test')
+    expect(ciWorkflow).toContain('pnpm test:e2e')
+    expect(ciWorkflow).toContain('playwright install --with-deps chromium')
     expect(ciWorkflow).not.toMatch(/electron|@spool\/app|xvfb|apps\/app/i)
     expect(existsSync(new URL('.github/workflows/e2e.yml', repoRoot))).toBe(false)
   })

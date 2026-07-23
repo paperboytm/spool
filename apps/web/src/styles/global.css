@@ -75,12 +75,16 @@ body {
    wrapper grows to fill remaining height, pushing footer to viewport
    bottom on short pages (docs/blog). */
 .page-shell {
+  width: 100%;
+  min-width: 0;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  overflow-x: clip;
 }
 .page-shell > .page-content {
+  min-width: 0;
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
@@ -165,6 +169,19 @@ code,
 .site-nav-actions {
   margin-left: auto;
 }
+.sp-mobile-menu.site-mobile-menu {
+  display: none;
+}
+.site-mobile-menu-items {
+  display: grid;
+  gap: var(--sp-space-1);
+}
+.site-mobile-menu-items .sp-nav-item,
+.site-mobile-menu-items .sp-button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+}
 .site-publish-link,
 .site-signin-link {
   flex: none;
@@ -210,7 +227,7 @@ code,
   justify-content: center;
   border-radius: var(--sp-radius-pill);
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .top-inner {
     gap: 0;
   }
@@ -221,33 +238,16 @@ code,
     min-height: 44px;
   }
   .site-main-nav {
-    margin-left: var(--sp-space-1);
-    gap: 0;
+    display: none;
   }
-  .site-main-nav .nav-hideable,
-  .site-nav-actions .nav-hideable,
+  .site-publish-link,
+  .site-theme-toggle,
   .site-team-link {
     display: none;
   }
-  .site-main-nav .sp-nav-item {
-    min-height: 44px;
-  }
-  .site-docs-link {
-    width: 44px;
-    min-width: 44px;
-    justify-content: center;
-    padding: 0;
-  }
-  .site-docs-link .sp-nav-item__label {
-    display: none;
-  }
-  .site-search-link {
-    display: none;
-  }
   .site-nav-actions {
-    gap: 0;
+    gap: var(--sp-space-1);
   }
-  .site-publish-link,
   .site-signin-link {
     min-height: 44px;
     padding-inline: var(--sp-space-2);
@@ -255,6 +255,10 @@ code,
   .site-account-link {
     width: 44px;
     height: 44px;
+  }
+  .sp-mobile-menu.site-mobile-menu {
+    display: inline-flex;
+    flex: none;
   }
 }
 
@@ -308,6 +312,8 @@ footer.wrap {
   color: var(--accent);
 }
 .foot-links {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -318,4 +324,10 @@ footer.wrap {
 }
 .foot-links a:hover {
   color: var(--text);
+}
+@media (max-width: 700px) {
+  .foot-links {
+    flex-wrap: wrap;
+    gap: var(--sp-space-2) var(--sp-space-5);
+  }
 }

@@ -8,7 +8,16 @@
 // the inline script in routes/__root.tsx before React runs, so there's
 // no flash.
 
-import { Avatar, ButtonLink, IconButton, IconLink, NavItem, Wordmark } from '@spool-lab/ui'
+import {
+  Avatar,
+  Button,
+  ButtonLink,
+  IconButton,
+  IconLink,
+  MobileMenu,
+  NavItem,
+  Wordmark,
+} from '@spool-lab/ui'
 import { BookOpen, Search, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
@@ -200,7 +209,13 @@ export function Icon({
   }
 }
 
-export function ThemeToggle({ className }: { className?: string } = {}) {
+export function ThemeToggle({
+  className,
+  showLabel = false,
+}: {
+  className?: string
+  showLabel?: boolean
+} = {}) {
   // Lazy + SSR-guarded: /terms and /privacy prerender this component at
   // build time where there is no document.
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -211,6 +226,15 @@ export function ThemeToggle({ className }: { className?: string } = {}) {
     writeThemeAttr(next)
     setTheme(next)
   }, [theme])
+  const label = theme === 'dark' ? 'Use light theme' : 'Use dark theme'
+  if (showLabel) {
+    return (
+      <Button className={className} size="lg" variant="ghost" onClick={toggle} aria-label={label}>
+        <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={15} />
+        <span>{label}</span>
+      </Button>
+    )
+  }
   return (
     <IconButton
       className={className}
@@ -266,6 +290,11 @@ export function Header({
     return () => window.removeEventListener(AUTH_IDENTITY_CHANGED, onIdentityChanged)
   }, [auth])
 
+  const identity = resolved === 'out' || resolved === 'auto' ? null : resolved
+  const signedIn = identity !== null
+  const teamHref = contextTeam ? `/teams/${encodeURIComponent(contextTeam.id)}` : '/me#teams'
+  const teamLabel = contextTeam?.name ?? 'Teams'
+
   return (
     <header className={`sw-header${sticky ? ' sw-header-sticky' : ''}`}>
       <div className="sw-header-left">
@@ -294,34 +323,65 @@ export function Header({
         </nav>
       </div>
       <div className="sw-header-right">
-        <ButtonLink className="sw-publish-link" href="/docs/quick-start" size="sm" variant="accent">
-          Publish
-        </ButtonLink>
-        <ThemeToggle className="sw-header-theme" />
-        {resolved === 'out' || resolved === 'auto' ? (
+        <div className="sw-header-desktop-actions">
+          <ButtonLink
+            className="sw-publish-link"
+            href="/docs/quick-start"
+            size="sm"
+            variant="accent"
+          >
+            Publish
+          </ButtonLink>
+          <ThemeToggle className="sw-header-theme" />
+          {signedIn ? (
+            <a
+              className="sw-team-quick"
+              href={teamHref}
+              title={contextTeam ? `Open ${contextTeam.name}` : 'Open your teams'}
+            >
+              <Users size={14} strokeWidth={1.7} aria-hidden="true" />
+              <span>{teamLabel}</span>
+            </a>
+          ) : null}
+        </div>
+        {identity === null ? (
           <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
             Sign in
           </ButtonLink>
         ) : (
-          <>
-            <a
-              className="sw-team-quick"
-              href={contextTeam ? `/teams/${encodeURIComponent(contextTeam.id)}` : '/me#teams'}
-              title={contextTeam ? `Open ${contextTeam.name}` : 'Open your teams'}
-            >
-              <Users size={14} strokeWidth={1.7} aria-hidden="true" />
-              <span>{contextTeam?.name ?? 'Teams'}</span>
-            </a>
-            <a
-              className="sw-account-link"
-              href="/me"
-              title="Your account"
-              aria-label="Open your account"
-            >
-              <Avatar src={resolved.src} name={resolved.name} alt="" size="md" />
-            </a>
-          </>
+          <a
+            className="sw-account-link"
+            href="/me"
+            title="Your account"
+            aria-label="Open your account"
+          >
+            <Avatar src={identity.src} name={identity.name} alt="" size="md" />
+          </a>
         )}
+        <MobileMenu
+          className="sw-header-mobile-menu"
+          triggerLabel="Open navigation"
+          closeLabel="Close navigation"
+        >
+          <nav className="sw-header-mobile-menu-items" aria-label="Mobile navigation">
+            <NavItem href="/explore">Explore</NavItem>
+            <NavItem href="/docs/installation" leading={<BookOpen aria-hidden="true" />}>
+              Docs
+            </NavItem>
+            <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
+              Search Sessions
+            </NavItem>
+            <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
+              Publish
+            </ButtonLink>
+            <ThemeToggle className="sw-header-mobile-theme" showLabel />
+            {signedIn ? (
+              <NavItem href={teamHref} leading={<Users aria-hidden="true" />}>
+                {teamLabel}
+              </NavItem>
+            ) : null}
+          </nav>
+        </MobileMenu>
       </div>
     </header>
   )

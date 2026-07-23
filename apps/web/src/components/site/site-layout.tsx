@@ -1,4 +1,13 @@
-import { Avatar, ButtonLink, IconButton, IconLink, NavItem, Wordmark } from '@spool-lab/ui'
+import {
+  Avatar,
+  Button,
+  ButtonLink,
+  IconButton,
+  IconLink,
+  MobileMenu,
+  NavItem,
+  Wordmark,
+} from '@spool-lab/ui'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { BookOpen, Moon, Search, Sun, Users } from 'lucide-react'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
@@ -85,6 +94,7 @@ export default function SiteLayout({
             </ButtonLink>
             <ThemeToggle className="nav-hideable site-theme-toggle" />
             <SiteAccountActions auth={resolvedAuth} />
+            <SiteMobileNavigation auth={resolvedAuth} />
           </div>
         </div>
       </header>
@@ -153,6 +163,36 @@ export function SiteAccountActions({ auth }: { auth: AuthIdentity }) {
   )
 }
 
+export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
+  return (
+    <MobileMenu
+      className="site-mobile-menu"
+      triggerLabel="Open navigation"
+      closeLabel="Close navigation"
+    >
+      <nav className="site-mobile-menu-items" aria-label="Mobile navigation">
+        <NavItem href="/explore?sort=recommended">Explore</NavItem>
+        <NavItem href="/docs/installation" leading={<BookOpen aria-hidden="true" />}>
+          Docs
+        </NavItem>
+        <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
+          Search Sessions
+        </NavItem>
+        <NavItem href="/blog">Blog</NavItem>
+        <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
+          Publish
+        </ButtonLink>
+        <ThemeToggle className="site-mobile-theme-toggle" showLabel />
+        {auth === 'out' ? null : (
+          <NavItem href="/me#teams" leading={<Users aria-hidden="true" />}>
+            Teams
+          </NavItem>
+        )}
+      </nav>
+    </MobileMenu>
+  )
+}
+
 function useSiteAuth(auth: AuthState): AuthIdentity {
   // The server and hydration frame both render signed-out chrome. Once
   // mounted, the local identity cache paints immediately while `/api/me`
@@ -201,7 +241,13 @@ function routeInApp(event: MouseEvent<HTMLAnchorElement>, navigate: () => void |
   void navigate()
 }
 
-function ThemeToggle({ className }: { className?: string } = {}) {
+function ThemeToggle({
+  className,
+  showLabel = false,
+}: {
+  className?: string
+  showLabel?: boolean
+} = {}) {
   const [isDark, setIsDark] = useState(false)
   useEffect(() => {
     setIsDark(readThemeAttr() === 'dark')
@@ -210,6 +256,15 @@ function ThemeToggle({ className }: { className?: string } = {}) {
     const next = isDark ? 'light' : 'dark'
     writeThemeAttr(next)
     setIsDark(!isDark)
+  }
+  const label = isDark ? 'Use light theme' : 'Use dark theme'
+  if (showLabel) {
+    return (
+      <Button className={className} size="lg" variant="ghost" onClick={onClick} aria-label={label}>
+        {isDark ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
+        <span>{label}</span>
+      </Button>
+    )
   }
   return (
     <IconButton

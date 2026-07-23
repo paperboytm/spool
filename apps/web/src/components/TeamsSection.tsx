@@ -189,8 +189,14 @@ export function TeamsSection() {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="accent" disabled={createBusy || name.trim() === ''}>
-              {createBusy ? 'Creating…' : 'Create team'}
+            <Button
+              type="submit"
+              variant="accent"
+              loading={createBusy}
+              loadingLabel="Creating…"
+              disabled={!createBusy && name.trim() === ''}
+            >
+              Create team
             </Button>
           </div>
           {createError ? (

@@ -773,7 +773,7 @@ export function Me() {
       <Page>
         <Header />
         <main className="sw-main sw-me-main center">
-          <div className="sw-card sw-me-card tight w-480">
+          <div className="sw-card sw-me-card tight sw-card--480">
             <div className="sw-rule" style={{ marginBottom: 20 }}>
               <span className="tag err">Error</span>
               <span className="line" />
@@ -871,7 +871,7 @@ export function Me() {
           </div>
         )}
 
-        <div className="sw-card sw-me-card w-600">
+        <div className="sw-card sw-me-card sw-card--600">
           {pending ? (
             // Pending deletion: identity is read-only. Skip the editable
             // ProfileEditor entirely so the surface communicates that

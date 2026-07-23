@@ -51,32 +51,68 @@ describe('Web shared UI contract', () => {
     expect(coarsePointerCss).toMatch(/min-height:\s*44px/)
   })
 
-  it('keeps every control in the Team invitation row the same height on desktop', () => {
+  it('uses shared large/loading buttons beside 48px Team form controls', () => {
     const css = source('src/styles/app.css')
     const desktopCss = css.split('@media (max-width: 768px)')[0] ?? ''
+    const teamPage = source('src/pages/Team.tsx')
 
     expect(desktopCss).toMatch(
       /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*48px;[^}]*\}/,
     )
-    expect(desktopCss).toMatch(
+    expect(desktopCss).not.toMatch(
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
     )
+    expect(teamPage.match(/size="lg"/g)).toHaveLength(2)
+    expect(teamPage).toContain("loading={busyKey === 'invite'}")
+    expect(teamPage).toContain("loading={busy === 'rename'}")
+  })
+
+  it('uses the shared danger hierarchy instead of private Team color patches', () => {
+    const teamPage = source('src/pages/Team.tsx')
+    const managedSessions = source('src/components/ManagedSessionList.tsx')
+    const css = source('src/styles/app.css')
+
+    expect(teamPage.match(/variant="danger"/g)?.length).toBeGreaterThanOrEqual(4)
+    expect(managedSessions).toContain('variant="danger"')
+    expect(css).not.toContain('.sw-team-danger-button')
+  })
+
+  it('keeps semantic card widths out of Tailwind numeric utility names', () => {
+    const appSource = filesUnder(resolve(webRoot, 'src'))
+      .filter((file) => /\.(?:ts|tsx|css)$/.test(file))
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n')
+
+    // Tailwind interprets `w-600` as a generated width utility and marks it
+    // important, which overrides the responsive `width: 100%` card rule.
+    expect(appSource).not.toMatch(/\bw-(?:420|480|600)\b/)
+    expect(source('src/styles/app.css')).toContain('.sw-card.sw-card--600')
   })
 
   it('keeps public and product navigation reachable with mobile-size targets', () => {
     const appCss = source('src/styles/app.css')
     const appMobile = appCss.split('@media (max-width: 768px)')[1] ?? ''
     const siteCss = source('src/styles/global.css')
-    const siteMobile = siteCss.split('@media (max-width: 720px)')[1] ?? ''
+    const siteMobile = siteCss.split('@media (max-width: 768px)')[1] ?? ''
 
-    expect(appMobile).toMatch(/\.sw-header-nav \.sp-nav-item\s*\{[^}]*min-height:\s*44px;/)
-    expect(appMobile).toMatch(/\.sw-publish-link,\s*\.sw-signin-link\s*\{[^}]*min-height:\s*44px;/)
-    expect(appMobile).toMatch(/\.sw-account-link,[^{]*\{[^}]*width:\s*44px;/)
-
-    expect(siteMobile).toMatch(/\.site-main-nav \.sp-nav-item\s*\{[^}]*min-height:\s*44px;/)
-    expect(siteMobile).toMatch(
-      /\.site-publish-link,\s*\.site-signin-link\s*\{[^}]*min-height:\s*44px;/,
+    expect(appCss).toMatch(
+      /\.sw-header-mobile-menu-items \.sp-nav-item,[^{]*\{[^}]*min-height:\s*44px;/,
     )
+    expect(appMobile).toMatch(/\.sw-header-nav\s*\{[^}]*display:\s*none;/)
+    expect(appMobile).toMatch(
+      /\.sp-mobile-menu\.sw-header-mobile-menu\s*\{[^}]*display:\s*inline-flex;/,
+    )
+    expect(appMobile).toMatch(/\.sw-signin-link\s*\{[^}]*min-height:\s*44px;/)
+    expect(appMobile).toMatch(/\.sw-account-link\s*\{[^}]*width:\s*44px;/)
+
+    expect(siteMobile).toMatch(/\.site-main-nav\s*\{[^}]*display:\s*none;/)
+    expect(siteCss).toMatch(
+      /\.site-mobile-menu-items \.sp-nav-item,[^{]*\{[^}]*min-height:\s*44px;/,
+    )
+    expect(siteMobile).toMatch(
+      /\.sp-mobile-menu\.site-mobile-menu\s*\{[^}]*display:\s*inline-flex;/,
+    )
+    expect(siteMobile).toMatch(/\.site-signin-link\s*\{[^}]*min-height:\s*44px;/)
     expect(siteMobile).toMatch(/\.site-account-link\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/)
     expect(siteMobile).toMatch(/\.brand\s*\{[^}]*min-height:\s*44px;/)
   })

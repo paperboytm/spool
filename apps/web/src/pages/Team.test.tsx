@@ -78,7 +78,24 @@ describe('TeamMemberActions', () => {
     expect(html).toContain('<select')
     expect(html).toContain('Admin')
     expect(html).toContain('Remove')
+    expect(html).toContain('data-variant="danger"')
     expect(html).not.toContain('<option value="owner">Owner</option>')
+  })
+
+  it('preserves destructive hierarchy while a removal is running', () => {
+    const html = renderToStaticMarkup(
+      <TeamMemberActions
+        member={member({ permissions: ['remove'] })}
+        busy
+        removing
+        onRoleChange={() => undefined}
+        onRemove={() => undefined}
+      />,
+    )
+
+    expect(html).toContain('data-variant="danger"')
+    expect(html).toContain('aria-busy="true"')
+    expect(html).toContain('Removing…')
   })
 })
 

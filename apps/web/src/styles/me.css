@@ -254,3 +254,20 @@
     min-height: 44px;
   }
 }
+
+@media (max-width: 360px) {
+  .sw-me-card .sw-teams-section .sp-section-label {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sw-me-card .sw-teams-section .sp-section-label__action {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sw-me-card .sw-teams-create-trigger {
+    width: 100%;
+  }
+}

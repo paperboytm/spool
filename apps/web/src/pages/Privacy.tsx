@@ -18,7 +18,7 @@ export function Privacy() {
     <Page>
       <Header />
       <main className="sw-main">
-        <article className="sw-card sw-legal w-600">
+        <article className="sw-card sw-legal sw-card--600">
           <p className="sw-eyebrow">spool.new</p>
           <h1 className="sw-title">Privacy policy</h1>
           <p className="sw-legal-date">Last updated: {LAST_UPDATED}</p>

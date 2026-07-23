@@ -1,6 +1,9 @@
-import { Search, X } from 'lucide-react'
+import { LoaderCircle, Menu, Search, X } from 'lucide-react'
 import {
   createElement,
+  useEffect,
+  useId,
+  useRef,
   useState,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
@@ -13,25 +16,53 @@ import {
 
 import { cx } from './cx.js'
 
-export type ButtonVariant = 'ghost' | 'outline' | 'accent'
+export type ButtonVariant = 'ghost' | 'outline' | 'accent' | 'danger'
 export type ControlSize = 'sm' | 'md'
+export type ButtonSize = ControlSize | 'lg'
 
 type ButtonVisualProps = {
   variant?: ButtonVariant
-  size?: ControlSize
+  size?: ButtonSize
 }
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & ButtonVisualProps
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
+  ButtonVisualProps & {
+    loading?: boolean
+    loadingLabel?: ReactNode
+  }
 
-export function Button({ className, variant = 'ghost', size = 'md', type, ...props }: ButtonProps) {
+export function Button({
+  'aria-busy': ariaBusy,
+  children,
+  className,
+  disabled,
+  loading = false,
+  loadingLabel = 'Loading…',
+  variant = 'ghost',
+  size = 'md',
+  type,
+  ...props
+}: ButtonProps) {
   return (
     <button
       {...props}
       type={type ?? 'button'}
       className={cx('sp-button', `sp-button--${variant}`, `sp-button--${size}`, className)}
+      aria-busy={loading ? true : ariaBusy}
+      disabled={disabled || loading}
       data-variant={variant}
       data-size={size}
-    />
+      data-state={loading ? 'loading' : undefined}
+    >
+      {loading ? (
+        <>
+          <LoaderCircle className="sp-button__spinner" aria-hidden="true" />
+          <span>{loadingLabel}</span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
   )
 }
 
@@ -85,6 +116,88 @@ export function IconLink({ className, size = 'sm', ...props }: IconLinkProps) {
       className={cx('sp-icon-button', `sp-icon-button--${size}`, className)}
       data-size={size}
     />
+  )
+}
+
+export type MobileMenuProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+  children: ReactNode
+  triggerLabel?: string
+  closeLabel?: string
+}
+
+export function MobileMenu({
+  children,
+  className,
+  triggerLabel = 'Open menu',
+  closeLabel = 'Close menu',
+  ...props
+}: MobileMenuProps) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const id = useId().replace(/:/g, '')
+  const triggerId = `sp-mobile-menu-trigger-${id}`
+  const panelId = `sp-mobile-menu-panel-${id}`
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const root = rootRef.current
+      if (root && event.target && !root.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div
+      {...props}
+      ref={rootRef}
+      className={cx('sp-mobile-menu', className)}
+      data-state={open ? 'open' : 'closed'}
+    >
+      <button
+        ref={triggerRef}
+        id={triggerId}
+        className="sp-mobile-menu__trigger"
+        type="button"
+        aria-label={open ? closeLabel : triggerLabel}
+        aria-controls={panelId}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+      </button>
+      <div
+        id={panelId}
+        className="sp-mobile-menu__panel"
+        data-state={open ? 'open' : 'closed'}
+        aria-labelledby={triggerId}
+        hidden={!open}
+        onClickCapture={(event) => {
+          const target = event.target
+          if (target instanceof Element && target.closest('a,button')) {
+            setOpen(false)
+          }
+        }}
+      >
+        {children}
+      </div>
+    </div>
   )
 }
 

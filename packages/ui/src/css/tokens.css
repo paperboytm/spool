@@ -15,7 +15,7 @@
   --sp-faint: #a3a3a3;
   --sp-accent: #1387ff;
   --sp-accent-bg: #e7f2ff;
-  --sp-on-accent: #ffffff;
+  --sp-on-accent: #0b1520;
   /* Brand accent as rendered on dark surfaces (terminal mockups, dark
      theme). One knob: change this + the light/dark --sp-accent values
      above/below to retheme the whole site. */
@@ -30,6 +30,7 @@
   --sp-success: #6baf6b;
   --sp-warning: #e4a640;
   --sp-error: #e5484d;
+  --sp-error-bg: #fff0f1;
 
   --sp-font-sans: 'Geist Variable', 'Geist', sans-serif;
   --sp-font-mono: 'Geist Mono', monospace;
@@ -42,6 +43,7 @@
 
   --sp-control-button-sm: 28px;
   --sp-control-button-md: 32px;
+  --sp-control-button-lg: 48px;
   --sp-control-icon-sm: 24px;
   --sp-control-icon-md: 32px;
   --sp-control-search: 36px;
@@ -69,6 +71,7 @@
 
   --sp-motion-hover: 80ms;
   --sp-focus-ring: 0 0 0 2px var(--sp-accent-bg), 0 0 0 3px var(--sp-accent);
+  --sp-shadow-popover: 0 12px 32px rgb(0 0 0 / 0.14);
 }
 
 html.dark,
@@ -95,6 +98,8 @@ html[data-theme='dark'] {
   --sp-success: #7dc07d;
   --sp-warning: #f0b854;
   --sp-error: #ff6369;
+  --sp-error-bg: #2a1113;
+  --sp-shadow-popover: 0 12px 32px rgb(0 0 0 / 0.64);
 }
 
 * {
