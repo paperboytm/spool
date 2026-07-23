@@ -27,11 +27,23 @@ interface Rgb {
   b: number
 }
 
-function parseCssColor(value: string, fallback: Rgb): Rgb {
+export function parseCssColor(value: string, fallback: Rgb): Rgb {
   const v = value.trim()
-  const hex = /^#([0-9a-f]{6})$/i.exec(v)
+  const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(v)
   if (hex) {
-    const n = parseInt(hex[1]!, 16)
+    /* Production CSS minification shortens values such as #ffffff to
+     * #fff. Alpha-bearing forms are valid computed token values too; the
+     * scene palette only needs their RGB channels. */
+    const raw = hex[1]!
+    const rgbHex =
+      raw.length <= 4
+        ? raw
+            .slice(0, 3)
+            .split('')
+            .map((channel) => channel + channel)
+            .join('')
+        : raw.slice(0, 6)
+    const n = parseInt(rgbHex, 16)
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
   }
   const rgb = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(v)
