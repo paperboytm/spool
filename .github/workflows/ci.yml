@@ -35,11 +35,8 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build CLI test dependencies
-        run: |
-          pnpm -F @spool-lab/redact run prepack
-          pnpm -F @spool-lab/session-kit run prepack
-          pnpm -F @spool-lab/core run prepack
+      - name: Build CLI and test dependencies
+        run: pnpm vp run --no-cache --filter '@spool-lab/cli...' build
       - name: Build Web and Backend test dependencies
         if: runner.os == 'Linux'
         run: |
@@ -57,8 +54,6 @@ jobs:
         run: |
           pnpm --filter @spool-lab/core test
           pnpm --filter @spool-lab/cli test
-      - name: Build CLI
-        run: pnpm --filter @spool-lab/cli run prepack
       - name: Test repository contracts
         if: runner.os == 'Linux'
         run: pnpm exec vp test run scripts/lib/*.test.mjs
