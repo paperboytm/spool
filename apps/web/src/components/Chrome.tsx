@@ -18,7 +18,7 @@ import {
   NavItem,
   Wordmark,
 } from '@spool-lab/ui'
-import { BookOpen, Search, Users } from 'lucide-react'
+import { Library, Search, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -292,7 +292,7 @@ export function Header({
 
   const identity = resolved === 'out' || resolved === 'auto' ? null : resolved
   const signedIn = identity !== null
-  const teamHref = contextTeam ? `/teams/${encodeURIComponent(contextTeam.id)}` : '/me#teams'
+  const teamHref = contextTeam ? `/teams/${encodeURIComponent(contextTeam.id)}` : '/teams'
   const teamLabel = contextTeam?.name ?? 'Teams'
 
   return (
@@ -304,14 +304,6 @@ export function Header({
         </a>
         <nav className="sw-header-nav" aria-label="Primary">
           <NavItem href="/explore">Explore</NavItem>
-          <NavItem
-            className="sw-header-docs"
-            href="/docs/installation"
-            aria-label="Docs"
-            leading={<BookOpen aria-hidden="true" />}
-          >
-            Docs
-          </NavItem>
           <IconLink
             className="sw-header-search"
             href="/explore"
@@ -365,9 +357,6 @@ export function Header({
         >
           <nav className="sw-header-mobile-menu-items" aria-label="Mobile navigation">
             <NavItem href="/explore">Explore</NavItem>
-            <NavItem href="/docs/installation" leading={<BookOpen aria-hidden="true" />}>
-              Docs
-            </NavItem>
             <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
               Search Sessions
             </NavItem>
@@ -376,9 +365,14 @@ export function Header({
             </ButtonLink>
             <ThemeToggle className="sw-header-mobile-theme" showLabel />
             {signedIn ? (
-              <NavItem href={teamHref} leading={<Users aria-hidden="true" />}>
-                {teamLabel}
-              </NavItem>
+              <>
+                <NavItem href="/my-sessions" leading={<Library aria-hidden="true" />}>
+                  My Sessions
+                </NavItem>
+                <NavItem href={teamHref} leading={<Users aria-hidden="true" />}>
+                  {teamLabel}
+                </NavItem>
+              </>
             ) : null}
           </nav>
         </MobileMenu>
@@ -405,9 +399,13 @@ export function Footer({ report, reportHref }: { report?: boolean; reportHref?: 
           <span className="sep">·</span>
         </>
       )}
+      <a href="/docs/installation">Docs</a>
+      <span className="sep">·</span>
       <a href="/terms">Terms</a>
       <span className="sep">·</span>
       <a href="/privacy">Privacy</a>
+      <span className="sep">·</span>
+      <a href="https://github.com/paperboytm/spool">GitHub</a>
     </footer>
   )
 }

@@ -2,27 +2,42 @@ import { Button, SectionLabel } from '@spool-lab/ui'
 import { ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { fetchMySessions, type ManagedSession } from '../lib/hub-management-api'
+import {
+  appendUniqueManagedSessions,
+  fetchMySessions,
+  type ManagedSession,
+} from '../lib/hub-management-api'
 import { fetchTeams, type TeamSummary } from '../lib/team-api'
 import { ManagedSessionList, withoutManagedSession } from './ManagedSessionList'
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'ready'; sessions: ManagedSession[]; teams: TeamSummary[] }
+  | {
+      kind: 'ready'
+      sessions: ManagedSession[]
+      teams: TeamSummary[]
+      nextCursor: string | null
+      loadingMore: boolean
+      moreError: string | null
+    }
   | { kind: 'error' }
 
-function redirectToSignIn(): void {
-  window.location.assign('/sign-in?next=/me')
+function redirectToSignIn(next: string): void {
+  window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`)
 }
 
-export function ManagedSessionsSection() {
+export function ManagedSessionsSection({
+  signInNext = '/me',
+}: {
+  signInNext?: string
+} = {}) {
   const [state, setState] = useState<State>({ kind: 'loading' })
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' })
     const [sessionResult, teamResult] = await Promise.all([fetchMySessions(), fetchTeams()])
     if (sessionResult.kind === 'unauthenticated' || teamResult.kind === 'unauthenticated') {
-      return redirectToSignIn()
+      return redirectToSignIn(signInNext)
     }
     if (sessionResult.kind !== 'ok' || teamResult.kind !== 'ok') {
       return setState({ kind: 'error' })
@@ -31,8 +46,11 @@ export function ManagedSessionsSection() {
       kind: 'ready',
       sessions: sessionResult.data.sessions,
       teams: teamResult.data.teams,
+      nextCursor: sessionResult.data.next_cursor ?? null,
+      loadingMore: false,
+      moreError: null,
     })
-  }, [])
+  }, [signInNext])
 
   useEffect(() => void load(), [load])
 
@@ -51,6 +69,37 @@ export function ManagedSessionsSection() {
     setState((current) =>
       current.kind === 'ready'
         ? { ...current, sessions: withoutManagedSession(current.sessions, sid) }
+        : current,
+    )
+  }
+
+  async function loadMore() {
+    if (state.kind !== 'ready' || state.nextCursor === null || state.loadingMore) return
+    const cursor = state.nextCursor
+    setState({ ...state, loadingMore: true, moreError: null })
+
+    const result = await fetchMySessions(cursor)
+    if (result.kind === 'unauthenticated') return redirectToSignIn(signInNext)
+    if (result.kind !== 'ok') {
+      return setState((current) =>
+        current.kind === 'ready' && current.nextCursor === cursor
+          ? {
+              ...current,
+              loadingMore: false,
+              moreError: 'Could not load more Sessions. Your current list is unchanged.',
+            }
+          : current,
+      )
+    }
+    setState((current) =>
+      current.kind === 'ready' && current.nextCursor === cursor
+        ? {
+            ...current,
+            sessions: appendUniqueManagedSessions(current.sessions, result.data.sessions),
+            nextCursor: result.data.next_cursor ?? null,
+            loadingMore: false,
+            moreError: null,
+          }
         : current,
     )
   }
@@ -102,6 +151,23 @@ export function ManagedSessionsSection() {
           onSessionChanged={replaceSession}
           onSessionWithdrawn={removeSession}
         />
+      ) : null}
+      {state.kind === 'ready' && state.nextCursor !== null ? (
+        <div className="sw-team-status sw-team-status-action">
+          <Button
+            variant="outline"
+            loading={state.loadingMore}
+            loadingLabel="Loading Sessions…"
+            onClick={() => void loadMore()}
+          >
+            Load more Sessions
+          </Button>
+          {state.moreError ? (
+            <p className="sw-managed-session-error" role="alert">
+              {state.moreError}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </section>
   )

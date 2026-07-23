@@ -25,7 +25,12 @@ describe('Web shared UI contract', () => {
   })
 
   it('adapts legacy Web palette names to shared tokens instead of redeclaring the palette', () => {
-    for (const file of ['src/styles/app.css', 'src/styles/global.css', 'src/styles/explore.css']) {
+    for (const file of [
+      'src/styles/app.css',
+      'src/styles/global.css',
+      'src/styles/explore.css',
+      'src/styles/workspace.css',
+    ]) {
       const css = source(file)
       expect(css, file).toContain('--bg: var(--sp-bg)')
       expect(css, file).toContain('--accent: var(--sp-accent)')
@@ -37,8 +42,8 @@ describe('Web shared UI contract', () => {
 
   it('keeps Explore desktop chrome compact and reserves 44px targets for adaptations', () => {
     const css = source('src/styles/explore.css')
-    const desktopCss = css.split('@media (max-width: 760px)')[0] ?? ''
-    const mobileCss = (css.split('@media (max-width: 760px)')[1] ?? '').split(
+    const desktopCss = css.split('@media (max-width: 768px)')[0] ?? ''
+    const mobileCss = (css.split('@media (max-width: 768px)')[1] ?? '').split(
       '@media (max-width: 480px)',
     )[0]
     const coarsePointerCss = (css.split('@media (pointer: coarse)')[1] ?? '').split(
@@ -94,6 +99,8 @@ describe('Web shared UI contract', () => {
     const appMobile = appCss.split('@media (max-width: 768px)')[1] ?? ''
     const siteCss = source('src/styles/global.css')
     const siteMobile = siteCss.split('@media (max-width: 768px)')[1] ?? ''
+    const workspaceCss = source('src/styles/workspace.css')
+    const workspaceMobile = workspaceCss.split('@media (max-width: 768px)')[1] ?? ''
 
     expect(appCss).toMatch(
       /\.sw-header-mobile-menu-items \.sp-nav-item,[^{]*\{[^}]*min-height:\s*44px;/,
@@ -115,5 +122,12 @@ describe('Web shared UI contract', () => {
     expect(siteMobile).toMatch(/\.site-signin-link\s*\{[^}]*min-height:\s*44px;/)
     expect(siteMobile).toMatch(/\.site-account-link\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/)
     expect(siteMobile).toMatch(/\.brand\s*\{[^}]*min-height:\s*44px;/)
+
+    expect(workspaceMobile).toMatch(/\.workspace-mobile-menu\s*\{[^}]*display:\s*inline-flex;/)
+    expect(workspaceMobile).toMatch(
+      /\.workspace-mobile-menu-primary \.sp-nav-item,[^{]*\{[^}]*min-height:\s*44px;/,
+    )
+    expect(workspaceCss).toMatch(/\.workspace-mobile-account\s*\{[^}]*width:\s*44px;/)
+    expect(workspaceCss).not.toContain('@media (max-width: 980px)')
   })
 })

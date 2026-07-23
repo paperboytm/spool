@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import { onRequestGet as sessionsGet } from '../functions/api/discovery/v1/sessions'
 import { onRequestPost as engagementPost } from '../functions/api/discovery/v1/sessions/[sid]/engagement'
 import { buildDiscoveryProjection } from '../src/discovery/projection'
+import { incrementQualifiedReadIfLive, isDiscoverySessionLive } from '../src/discovery/store'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, type FakeDbState } from './_helpers/fakes'
 
@@ -16,6 +17,10 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const CLAUDE_SID = 'claude_11111111-2222-4333-8444-555555555555'
 const CODEX_SID = 'codex_aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 const TEAM_ID = 'team_discovery_0001'
+
+function indexedSid(index: number, agent: 'claude' | 'codex' = 'claude'): string {
+  return `${agent}_00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`
+}
 
 function makeEnv() {
   const { db, state } = makeDb(emptyState())
@@ -431,6 +436,243 @@ describe('GET /api/discovery/v1/sessions', () => {
     }
   })
 
+  it('walks every Recent Session past the former 200-row boundary without duplicates', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    const expected: string[] = []
+    for (let index = 0; index < 251; index += 1) {
+      const sid = indexedSid(index)
+      expected.push(sid)
+      // Equal timestamps exercise the stable SID tie-break across pages.
+      seedDiscovery(env.state, { sid, publishedAt: NOW })
+    }
+    expected.sort()
+
+    const seen: string[] = []
+    let cursor: string | null = null
+    let pageCount = 0
+    do {
+      const suffix = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`
+      const response = await invoke(
+        sessionsGet,
+        new Request(`https://spool.new/api/discovery/v1/sessions?sort=recent&limit=50${suffix}`),
+        env,
+      )
+      expect(response.status).toBe(200)
+      const body = (await response.json()) as {
+        items: Array<{ sid: string }>
+        nextCursor: string | null
+      }
+      seen.push(...body.items.map((item) => item.sid))
+      cursor = body.nextCursor
+      pageCount += 1
+      expect(pageCount).toBeLessThanOrEqual(6)
+    } while (cursor !== null)
+
+    expect(pageCount).toBe(6)
+    expect(seen).toEqual(expected)
+    expect(new Set(seen).size).toBe(251)
+  })
+
+  it('keeps a projection rewrite from moving an already-seen row behind the cursor', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      title: 'First page',
+      quality: 20,
+      publishedAt: NOW - DAY_MS,
+    })
+    seedDiscovery(env.state, {
+      sid: CODEX_SID,
+      title: 'Second page',
+      quality: 1,
+      publishedAt: NOW - 2 * DAY_MS,
+    })
+
+    const first = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recommended&limit=1'),
+      env,
+    )
+    const firstBody = (await first.json()) as {
+      items: Array<{ sid: string }>
+      nextCursor: string
+    }
+    expect(firstBody.items.map((item) => item.sid)).toEqual([CLAUDE_SID])
+
+    const rewritten = env.state.hub_session_discovery.find((row) => row.sid === CLAUDE_SID)!
+    rewritten.quality_score = 0
+    rewritten.updated_at = NOW + 1
+
+    const second = await invoke(
+      sessionsGet,
+      new Request(
+        'https://spool.new/api/discovery/v1/sessions?sort=recommended&limit=1' +
+          `&cursor=${encodeURIComponent(firstBody.nextCursor)}`,
+      ),
+      env,
+    )
+    const secondBody = (await second.json()) as {
+      items: Array<{ sid: string }>
+      nextCursor: string | null
+    }
+    expect(secondBody.items.map((item) => item.sid)).toEqual([CODEX_SID])
+    expect(secondBody.nextCursor).toBeNull()
+  })
+
+  it('ranks and paginates Top globally instead of preselecting the newest 200', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    for (let index = 0; index < 205; index += 1) {
+      seedDiscovery(env.state, {
+        sid: indexedSid(1_000 + index),
+        title: `Recent low-signal ${index}`,
+        quality: 0,
+        publishedAt: NOW - index,
+      })
+    }
+    const olderTopSid = indexedSid(9_999, 'codex')
+    seedDiscovery(env.state, {
+      sid: olderTopSid,
+      title: 'Older durable result',
+      quality: 20,
+      publishedAt: NOW - 30 * DAY_MS,
+      agent: 'codex',
+    })
+    env.state.hub_session_engagement_daily.push({
+      sid: olderTopSid,
+      day: '2026-07-18',
+      qualified_reads: 10_000,
+    })
+
+    const seen: string[] = []
+    let cursor: string | null = null
+    do {
+      const suffix = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`
+      const response = await invoke(
+        sessionsGet,
+        new Request(
+          `https://spool.new/api/discovery/v1/sessions?sort=recommended&limit=50${suffix}`,
+        ),
+        env,
+      )
+      const body = (await response.json()) as {
+        items: Array<{ sid: string }>
+        nextCursor: string | null
+      }
+      seen.push(...body.items.map((item) => item.sid))
+      cursor = body.nextCursor
+    } while (cursor !== null)
+
+    expect(seen[0]).toBe(olderTopSid)
+    expect(seen).toHaveLength(206)
+    expect(new Set(seen).size).toBe(206)
+  })
+
+  it('searches and paginates the full matching set with exact-title relevance first in Top', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    for (let index = 0; index < 205; index += 1) {
+      seedDiscovery(env.state, {
+        sid: indexedSid(2_000 + index),
+        title: `Refresh tokens result ${index}`,
+        publishedAt: NOW - index,
+      })
+    }
+    const exactSid = indexedSid(8_888, 'codex')
+    seedDiscovery(env.state, {
+      sid: exactSid,
+      title: 'Refresh tokens',
+      publishedAt: NOW - 60 * DAY_MS,
+      agent: 'codex',
+    })
+
+    const seen: string[] = []
+    let cursor: string | null = null
+    do {
+      const suffix = cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`
+      const response = await invoke(
+        sessionsGet,
+        new Request(
+          'https://spool.new/api/discovery/v1/sessions' +
+            `?q=refresh%20tokens&sort=recommended&limit=50${suffix}`,
+        ),
+        env,
+      )
+      const body = (await response.json()) as {
+        items: Array<{ sid: string }>
+        nextCursor: string | null
+      }
+      seen.push(...body.items.map((item) => item.sid))
+      cursor = body.nextCursor
+    } while (cursor !== null)
+
+    expect(seen[0]).toBe(exactSid)
+    expect(seen).toHaveLength(206)
+    expect(new Set(seen).size).toBe(206)
+  })
+
+  it('keeps Recent strictly chronological while search is active', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      title: 'Refresh tokens in a recent workflow',
+      publishedAt: NOW - DAY_MS,
+    })
+    seedDiscovery(env.state, {
+      sid: CODEX_SID,
+      title: 'Refresh tokens',
+      publishedAt: NOW - 30 * DAY_MS,
+    })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?q=refresh%20tokens&sort=recent'),
+      env,
+    )
+    const body = (await response.json()) as { items: Array<{ sid: string }> }
+
+    expect(body.items.map((item) => item.sid)).toEqual([CLAUDE_SID, CODEX_SID])
+  })
+
+  it('collapses multiple active handles to one deterministic author row', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    env.state.handles.push(
+      { handle: 'zeta', user_id: 'user-1', claimed_at: NOW, released_at: null },
+      { handle: 'alpha', user_id: 'user-1', claimed_at: NOW + 1, released_at: null },
+    )
+    seedDiscovery(env.state, { sid: CLAUDE_SID })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+      env,
+    )
+    const body = (await response.json()) as {
+      items: Array<{ sid: string; author: { handle: string | null } }>
+    }
+
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        sid: CLAUDE_SID,
+        author: expect.objectContaining({ handle: 'alpha' }),
+      }),
+    ])
+  })
+
   it('filters against agent and read-time author fields without returning nonmatches', async () => {
     const env = makeEnv()
     seedUser(env.state, 'user-1', { display_name: 'Maya Chen' })
@@ -515,5 +757,33 @@ describe('POST /api/discovery/v1/sessions/:sid/engagement', () => {
     })
     expect(limited.status).toBe(429)
     await expect(limited.json()).resolves.toMatchObject({ error: 'TOO_MANY_REQUESTS' })
+  })
+
+  it('rejects Link-only Sessions without a Public projection', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, { sid: CLAUDE_SID })
+    env.state.hub_session_discovery = []
+
+    const response = await invoke(engagementPost, engagementRequest(CLAUDE_SID), env, {
+      sid: CLAUDE_SID,
+    })
+
+    expect(response.status).toBe(404)
+    expect(env.state.hub_session_engagement_daily).toEqual([])
+  })
+
+  it('closes the Public-to-Team race inside the conditional engagement write', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, { sid: CLAUDE_SID })
+
+    await expect(isDiscoverySessionLive(env.DB, CLAUDE_SID)).resolves.toBe(true)
+    env.state.hub_session_discovery = []
+
+    await expect(incrementQualifiedReadIfLive(env.DB, CLAUDE_SID, '2026-07-19')).resolves.toBe(
+      false,
+    )
+    expect(env.state.hub_session_engagement_daily).toEqual([])
   })
 })

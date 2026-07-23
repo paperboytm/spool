@@ -1,41 +1,26 @@
-import type { DiscoverySessionItem, DiscoverySort } from '@spool-lab/session-kit'
+import type { DiscoverySessionItem } from '@spool-lab/session-kit'
+import { Avatar, Badge, Button, ListRow, SearchField, SectionLabel, Tabs } from '@spool-lab/ui'
 import {
-  Avatar,
-  Badge,
-  Button,
-  IconButton,
-  ListRow,
-  NavItem,
-  SearchField,
-  SectionLabel,
-  Tabs,
-  Wordmark,
-} from '@spool-lab/ui'
-import {
-  BookOpen,
   Bot,
-  Compass,
   FileCode2,
   GitFork,
-  Home,
   LoaderCircle,
   MessageSquareText,
   RotateCcw,
   Search,
-  SunMoon,
-  UserRound,
   Wrench,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { relativeDate } from '../lib/dates'
 import {
   DiscoveryRequestError,
   fetchDiscoverySessions,
   type DiscoveryAgentFilter,
+  type ExploreSort,
   type ExploreSearchState,
 } from '../lib/discovery'
-import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 
 interface ExplorePageProps {
   search: ExploreSearchState
@@ -62,6 +47,25 @@ function filterKey(search: ExploreSearchState): string {
   return `${search.q ?? ''}\u0000${search.sort}\u0000${search.agent ?? ''}`
 }
 
+export function submittedExploreSearch(
+  search: ExploreSearchState,
+  query: string,
+): ExploreSearchState {
+  const q = query.trim().replace(/\s+/g, ' ')
+  return {
+    ...(q ? { q } : {}),
+    sort: search.sort,
+    ...(search.agent ? { agent: search.agent } : {}),
+  }
+}
+
+export function clearedExploreSearch(search: ExploreSearchState): ExploreSearchState {
+  return {
+    sort: search.sort,
+    ...(search.agent ? { agent: search.agent } : {}),
+  }
+}
+
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError'
 }
@@ -78,57 +82,6 @@ function agentLabel(agent: DiscoverySessionItem['agent']): string {
 function compactNumber(value: number): string {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(
     value,
-  )
-}
-
-function ExploreThemeButton() {
-  return (
-    <IconButton
-      size="sm"
-      className="explore-icon-button"
-      title="Toggle light or dark theme"
-      aria-label="Toggle light or dark theme"
-      onClick={() => writeThemeAttr(readThemeAttr() === 'dark' ? 'light' : 'dark')}
-    >
-      <SunMoon size={18} strokeWidth={1.7} aria-hidden="true" />
-    </IconButton>
-  )
-}
-
-function LeftNavigation() {
-  return (
-    <aside className="explore-left" aria-label="Primary navigation">
-      <a className="explore-wordmark" href="/" aria-label="Spool home">
-        <Wordmark />
-      </a>
-      <nav className="explore-nav">
-        <NavItem aria-label="Home" href="/" leading={<Home aria-hidden="true" />}>
-          Home
-        </NavItem>
-        <NavItem
-          aria-label="Explore"
-          href="/explore"
-          active
-          leading={<Compass aria-hidden="true" />}
-        >
-          Explore
-        </NavItem>
-        <NavItem
-          aria-label="Docs"
-          href="/docs/installation"
-          leading={<BookOpen aria-hidden="true" />}
-        >
-          Docs
-        </NavItem>
-        <NavItem aria-label="Account" href="/me" leading={<UserRound aria-hidden="true" />}>
-          Account
-        </NavItem>
-      </nav>
-      <div className="explore-left-footer">
-        <ExploreThemeButton />
-        <span>Void Index</span>
-      </div>
-    </aside>
   )
 }
 
@@ -190,12 +143,13 @@ function RightRail({
           About Explore
         </SectionLabel>
         <p>
-          Public Sessions from real agent work, ranked by useful evidence, recency, and qualified
-          reading—not vanity metrics.
+          Top balances useful evidence, recency, and qualified reading. Recent shows the newest
+          Public Sessions first.
         </p>
         <a href="/docs/guides/reading-resuming">How Session reading works</a>
       </section>
       <nav className="explore-legal" aria-label="Legal">
+        <a href="/docs/installation">Docs</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
         <a href="https://github.com/paperboytm/spool">GitHub</a>
@@ -218,29 +172,16 @@ function SearchHeader({
   onQueryChange: (value: string) => void
   onSubmit: () => void
   onClear: () => void
-  onSortChange: (sort: DiscoverySort) => void
+  onSortChange: (sort: ExploreSort) => void
   onAgentChange: (agent?: DiscoveryAgentFilter) => void
 }) {
-  const searching = Boolean(search.q)
-  const tabs: Array<{ label: string; sort: DiscoverySort }> = searching
-    ? [
-        { label: 'Top', sort: 'recommended' },
-        { label: 'Latest', sort: 'recent' },
-      ]
-    : [
-        { label: 'For you', sort: 'recommended' },
-        { label: 'Trending', sort: 'trending' },
-        { label: 'Recent', sort: 'recent' },
-      ]
+  const tabs: Array<{ label: string; sort: ExploreSort }> = [
+    { label: 'Top', sort: 'recommended' },
+    { label: 'Recent', sort: 'recent' },
+  ]
 
   return (
     <header className="explore-center-header">
-      <div className="explore-mobile-brand">
-        <a href="/" aria-label="Spool home">
-          <Wordmark />
-        </a>
-        <ExploreThemeButton />
-      </div>
       <form
         className="explore-search"
         role="search"
@@ -264,14 +205,14 @@ function SearchHeader({
       </form>
       <Tabs
         className="explore-tabs"
-        aria-label={searching ? 'Search result order' : 'Explore order'}
+        aria-label={search.q ? 'Search result order' : 'Explore order'}
         value={search.sort}
         items={tabs.map((tab) => ({
           value: tab.sort,
           label: tab.label,
           ariaControls: 'explore-results',
         }))}
-        onValueChange={(sort) => onSortChange(sort as DiscoverySort)}
+        onValueChange={(sort) => onSortChange(sort as ExploreSort)}
       />
       <div className="explore-inline-filters" aria-label="Agent filters">
         <AgentFilters compact selected={search.agent} onChange={onAgentChange} />
@@ -508,85 +449,75 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
   }
 
   return (
-    <div className="explore-root">
-      <div className="explore-shell">
-        <LeftNavigation />
-        <main className="explore-center">
-          <SearchHeader
-            search={search}
-            query={query}
-            onQueryChange={setQuery}
-            onSubmit={() => {
-              const q = query.trim().replace(/\s+/g, ' ')
-              onSearchChange({
-                ...(q ? { q } : {}),
-                sort: q ? 'recommended' : search.sort,
-                ...(search.agent ? { agent: search.agent } : {}),
-              })
-            }}
-            onClear={() => {
-              setQuery('')
-              onSearchChange({
-                sort: 'recommended',
-                ...(search.agent ? { agent: search.agent } : {}),
-              })
-            }}
-            onSortChange={(sort) => onSearchChange({ ...search, sort })}
-            onAgentChange={changeAgent}
-          />
+    <WorkspaceFrame
+      active="explore"
+      layout="feed"
+      rootClassName="explore-root"
+      mainClassName="explore-center"
+      rightRail={<RightRail search={search} onAgentChange={changeAgent} />}
+    >
+      <SearchHeader
+        search={search}
+        query={query}
+        onQueryChange={setQuery}
+        onSubmit={() => onSearchChange(submittedExploreSearch(search, query))}
+        onClear={() => {
+          setQuery('')
+          onSearchChange(clearedExploreSearch(search))
+        }}
+        onSortChange={(sort) => onSearchChange({ ...search, sort })}
+        onAgentChange={changeAgent}
+      />
 
-          <section
-            id="explore-results"
-            className="explore-feed"
-            role="tabpanel"
-            aria-label="Public Sessions"
-            aria-live="polite"
+      <section
+        id="explore-results"
+        className="explore-feed"
+        role="tabpanel"
+        aria-label="Public Sessions"
+        aria-live="polite"
+      >
+        {feed.loading ? (
+          <FeedSkeleton />
+        ) : feed.items.length === 0 && !feed.error ? (
+          <EmptyFeed search={search} onReset={reset} />
+        ) : (
+          feed.items.map((item) => <DiscoveryRow key={item.sid} item={item} />)
+        )}
+
+        {feed.error && (
+          <div className="explore-feed-error" role="alert">
+            <p>{feed.error}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRetryToken((value) => value + 1)}
+            >
+              <RotateCcw size={15} strokeWidth={1.7} aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {!feed.loading && feed.nextCursor && (
+          <Button
+            type="button"
+            className="explore-load-more"
+            variant="outline"
+            disabled={feed.loadingMore}
+            onClick={loadMore}
           >
-            {feed.loading ? (
-              <FeedSkeleton />
-            ) : feed.items.length === 0 && !feed.error ? (
-              <EmptyFeed search={search} onReset={reset} />
-            ) : (
-              feed.items.map((item) => <DiscoveryRow key={item.sid} item={item} />)
+            {feed.loadingMore && (
+              <LoaderCircle
+                className="explore-spin"
+                size={16}
+                strokeWidth={1.7}
+                aria-hidden="true"
+              />
             )}
-
-            {feed.error && (
-              <div className="explore-feed-error" role="alert">
-                <p>{feed.error}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRetryToken((value) => value + 1)}
-                >
-                  <RotateCcw size={15} strokeWidth={1.7} aria-hidden="true" />
-                  Try again
-                </Button>
-              </div>
-            )}
-
-            {!feed.loading && feed.nextCursor && (
-              <Button
-                type="button"
-                className="explore-load-more"
-                variant="outline"
-                disabled={feed.loadingMore}
-                onClick={loadMore}
-              >
-                {feed.loadingMore && (
-                  <LoaderCircle
-                    className="explore-spin"
-                    size={16}
-                    strokeWidth={1.7}
-                    aria-hidden="true"
-                  />
-                )}
-                {feed.loadingMore ? 'Loading Sessions…' : 'Load more Sessions'}
-              </Button>
-            )}
-          </section>
-        </main>
-        <RightRail search={search} onAgentChange={changeAgent} />
-      </div>
-    </div>
+            {feed.loadingMore ? 'Loading Sessions…' : 'Load more Sessions'}
+          </Button>
+        )}
+      </section>
+    </WorkspaceFrame>
   )
 }

@@ -20,6 +20,11 @@ export interface ManagedSession {
   author: ManagedSessionAuthor
 }
 
+export interface ManagedSessionPage {
+  sessions: ManagedSession[]
+  next_cursor: string | null
+}
+
 export type HubManagementFailure =
   | { kind: 'unauthenticated' }
   | { kind: 'forbidden'; detail?: string }
@@ -73,8 +78,25 @@ async function requestJson<T>(
   }
 }
 
-export function fetchMySessions(): Promise<HubManagementResult<{ sessions: ManagedSession[] }>> {
-  return requestJson('/api/me/sessions')
+export function fetchMySessions(
+  cursor: string | null = null,
+): Promise<HubManagementResult<ManagedSessionPage>> {
+  const query = cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`
+  return requestJson(`/api/me/sessions${query}`)
+}
+
+export function appendUniqueManagedSessions(
+  current: readonly ManagedSession[],
+  incoming: readonly ManagedSession[],
+): ManagedSession[] {
+  const seen = new Set(current.map((session) => session.sid))
+  const merged = [...current]
+  for (const session of incoming) {
+    if (seen.has(session.sid)) continue
+    seen.add(session.sid)
+    merged.push(session)
+  }
+  return merged
 }
 
 export function updateManagedSessionVisibility(
