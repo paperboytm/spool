@@ -7,7 +7,9 @@ export const onRequest: PagesFunction = async (ctx) => {
   const headers = new Headers(res.headers)
   headers.set('X-Robots-Tag', 'noindex')
   headers.set('X-Content-Type-Options', 'nosniff')
-  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  if (!headers.has('referrer-policy')) {
+    headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  }
 
   const url = new URL(ctx.request.url)
   if (url.pathname.startsWith('/api/')) {
