@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-  <!-- macOS has no system fontconfig file in standard locations. The generator
-       passes repository-owned Geist files directly to Pango, so an empty local
-       config suppresses discovery warnings without affecting rendered glyphs. -->
-</fontconfig>

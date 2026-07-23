@@ -12,15 +12,13 @@ const packageDir = join(scriptDir, '..')
 const sourceAsset = join(packageDir, 'src', 'assets', 'site-og.png')
 const compatibilityAsset = join(packageDir, 'public', 'og-image.png')
 const checkOnly = process.argv.includes('--check')
-if (process.platform === 'darwin') {
-  process.env.FONTCONFIG_FILE ??= join(scriptDir, 'site-og-fontconfig.xml')
-}
 
-// Keep typography tied to the exact self-hosted faces used by the app.
-// sharp hands these files directly to Pango, so the host's installed fonts
-// never affect the generated pixels.
-const geistSans = require.resolve('@fontsource-variable/geist/files/geist-latin-wght-normal.woff2')
-const geistMono = require.resolve('@fontsource/geist-mono/files/geist-mono-latin-500-normal.woff2')
+// Satori accepts WOFF and converts every glyph to an SVG path before Resvg
+// rasterizes it. This keeps output independent of host fonts and fontconfig.
+const geistRegular = require.resolve('@fontsource/geist/files/geist-latin-400-normal.woff')
+const geistSemibold = require.resolve('@fontsource/geist/files/geist-latin-600-normal.woff')
+const geistBold = require.resolve('@fontsource/geist/files/geist-latin-700-normal.woff')
+const geistMono = require.resolve('@fontsource/geist-mono/files/geist-mono-latin-500-normal.woff')
 
 const WIDTH = 1200
 const HEIGHT = 630
@@ -115,110 +113,239 @@ const geometry = Buffer.from(`
 </svg>
 `)
 
-function textInput(text, { font, fontfile, size, width, spacing = 0 }) {
+function element(type, props, ...children) {
   return {
-    text: {
-      text,
-      font: `${font} ${size}`,
-      fontfile,
-      ...(width ? { width } : {}),
-      spacing,
-      rgba: true,
-      dpi: 72,
+    type,
+    props: {
+      ...props,
+      children: children.length === 1 ? children[0] : children,
     },
   }
 }
 
-async function renderText(sharp, text, options) {
-  return sharp(textInput(text, options)).png().toBuffer()
+function textStyle({ left, top, right, color, size, weight, family = 'Geist', spacing = 0 }) {
+  const style = {
+    position: 'absolute',
+    display: 'flex',
+    top,
+    color,
+    fontFamily: family,
+    fontSize: size,
+    fontWeight: weight,
+    letterSpacing: spacing,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+  }
+  if (left !== undefined) style.left = left
+  if (right !== undefined) style.right = right
+  return style
 }
 
 async function buildPng() {
-  // Load sharp lazily so this script stays importable by small contract tools
-  // without initializing libvips until generation is actually requested.
-  const { default: sharp } = await import('sharp')
-
-  const [
-    wordmark,
-    eyebrow,
-    headlineOne,
-    headlineTwo,
-    subhead,
-    footer,
-    origin,
-    localLabel,
-    sharedLabel,
-    resumeLabel,
-  ] = await Promise.all([
-    renderText(
-      sharp,
-      `<span foreground="${TEXT}" font_weight="700">Spool</span><span foreground="${BLUE}" font_weight="700">.</span>`,
-      { font: 'Geist', fontfile: geistSans, size: 42 },
-    ),
-    renderText(
-      sharp,
-      `<span foreground="${BLUE}" font_weight="600" letter_spacing="1700">PUBLIC AGENT WORK, END TO END</span>`,
-      { font: 'Geist', fontfile: geistSans, size: 13 },
-    ),
-    renderText(
-      sharp,
-      `<span foreground="${TEXT}" font_weight="600" letter_spacing="-650">One shared space</span>`,
-      { font: 'Geist', fontfile: geistSans, size: 64 },
-    ),
-    renderText(
-      sharp,
-      `<span foreground="${TEXT}" font_weight="600" letter_spacing="-650">for agent sessions</span><span foreground="${BLUE}" font_weight="600">.</span>`,
-      { font: 'Geist', fontfile: geistSans, size: 64 },
-    ),
-    renderText(
-      sharp,
-      `<span foreground="${MUTED}" font_weight="400">Real Sessions. Shared knowledge. Resumable work.</span>`,
-      { font: 'Geist', fontfile: geistSans, size: 21 },
-    ),
-    renderText(
-      sharp,
-      `<span foreground="${BLUE}" letter_spacing="1400">READ  ·  SEARCH  ·  RESUME</span>`,
-      { font: 'Geist Mono', fontfile: geistMono, size: 13 },
-    ),
-    renderText(sharp, `<span foreground="${MUTED}">spool.new</span>`, {
-      font: 'Geist Mono',
-      fontfile: geistMono,
-      size: 14,
-    }),
-    renderText(sharp, `<span foreground="${MUTED}" letter_spacing="900">LOCAL</span>`, {
-      font: 'Geist Mono',
-      fontfile: geistMono,
-      size: 10,
-    }),
-    renderText(sharp, `<span foreground="${BLUE}" letter_spacing="900">SHARED</span>`, {
-      font: 'Geist Mono',
-      fontfile: geistMono,
-      size: 10,
-    }),
-    renderText(sharp, `<span foreground="${MUTED}" letter_spacing="900">RESUME</span>`, {
-      font: 'Geist Mono',
-      fontfile: geistMono,
-      size: 10,
-    }),
+  const [{ default: satori }, { Resvg }, regular, semibold, bold, mono] = await Promise.all([
+    import('satori'),
+    import('@resvg/resvg-js'),
+    readFile(geistRegular),
+    readFile(geistSemibold),
+    readFile(geistBold),
+    readFile(geistMono),
   ])
 
-  const originMeta = await sharp(origin).metadata()
+  const geometryUrl = `data:image/svg+xml;base64,${geometry.toString('base64')}`
+  const tree = element(
+    'div',
+    {
+      lang: 'en-US',
+      style: {
+        position: 'relative',
+        display: 'flex',
+        width: WIDTH,
+        height: HEIGHT,
+        overflow: 'hidden',
+        backgroundColor: VOID,
+        fontFamily: 'Geist',
+      },
+    },
+    element('img', {
+      src: geometryUrl,
+      width: WIDTH,
+      height: HEIGHT,
+      style: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: WIDTH,
+        height: HEIGHT,
+      },
+    }),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 112,
+          top: 63,
+          color: TEXT,
+          size: 42,
+          weight: 700,
+        }),
+      },
+      element('span', null, 'Spool'),
+      element('span', { style: { color: BLUE } }, '.'),
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 66,
+          top: 169,
+          color: BLUE,
+          size: 13,
+          weight: 600,
+          spacing: 1.7,
+        }),
+      },
+      'PUBLIC AGENT WORK, END TO END',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 62,
+          top: 215,
+          color: TEXT,
+          size: 64,
+          weight: 600,
+          spacing: -0.65,
+        }),
+      },
+      'One shared space',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 62,
+          top: 291,
+          color: TEXT,
+          size: 64,
+          weight: 600,
+          spacing: -0.65,
+        }),
+      },
+      element('span', null, 'for agent sessions'),
+      element('span', { style: { color: BLUE } }, '.'),
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 66,
+          top: 408,
+          color: MUTED,
+          size: 21,
+          weight: 400,
+        }),
+      },
+      'Real Sessions. Shared knowledge. Resumable work.',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 66,
+          top: 558,
+          color: BLUE,
+          size: 13,
+          weight: 500,
+          family: 'Geist Mono',
+          spacing: 1.4,
+        }),
+      },
+      'READ  ·  SEARCH  ·  RESUME',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          right: 66,
+          top: 555,
+          color: MUTED,
+          size: 14,
+          weight: 500,
+          family: 'Geist Mono',
+        }),
+      },
+      'spool.new',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 813,
+          top: 447,
+          color: MUTED,
+          size: 10,
+          weight: 500,
+          family: 'Geist Mono',
+          spacing: 0.9,
+        }),
+      },
+      'LOCAL',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 947,
+          top: 487,
+          color: BLUE,
+          size: 10,
+          weight: 500,
+          family: 'Geist Mono',
+          spacing: 0.9,
+        }),
+      },
+      'SHARED',
+    ),
+    element(
+      'div',
+      {
+        style: textStyle({
+          left: 1080,
+          top: 447,
+          color: MUTED,
+          size: 10,
+          weight: 500,
+          family: 'Geist Mono',
+          spacing: 0.9,
+        }),
+      },
+      'RESUME',
+    ),
+  )
 
-  return sharp(geometry)
-    .composite([
-      { input: wordmark, left: 112, top: 63 },
-      { input: eyebrow, left: 66, top: 169 },
-      { input: headlineOne, left: 62, top: 215 },
-      { input: headlineTwo, left: 62, top: 291 },
-      { input: subhead, left: 66, top: 408 },
-      { input: footer, left: 66, top: 558 },
-      { input: origin, left: 1134 - (originMeta.width ?? 0), top: 555 },
-      { input: localLabel, left: 813, top: 447 },
-      { input: sharedLabel, left: 947, top: 487 },
-      { input: resumeLabel, left: 1080, top: 447 },
-    ])
-    .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })
-    .toBuffer()
+  const svg = await satori(tree, {
+    width: WIDTH,
+    height: HEIGHT,
+    fonts: [
+      { name: 'Geist', data: regular, weight: 400, style: 'normal' },
+      { name: 'Geist', data: semibold, weight: 600, style: 'normal' },
+      { name: 'Geist', data: bold, weight: 700, style: 'normal' },
+      { name: 'Geist Mono', data: mono, weight: 500, style: 'normal' },
+    ],
+  })
+
+  const rendered = new Resvg(svg, {
+    background: VOID,
+    fitTo: { mode: 'width', value: WIDTH },
+    font: { loadSystemFonts: false },
+  }).render()
+
+  if (rendered.width !== WIDTH || rendered.height !== HEIGHT) {
+    throw new Error(`site OG rendered at ${rendered.width}x${rendered.height}`)
+  }
+
+  return Buffer.from(rendered.asPng())
 }
 
 function digest(buffer) {
