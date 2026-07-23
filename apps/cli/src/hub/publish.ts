@@ -36,10 +36,10 @@ export type PublishPreparedShareOptions = PublishPreparedShareBaseOptions &
 /**
  * Commit a prepared session through the Hub's push → upload → head protocol.
  *
- * This is the single upload seam used by both `spool share` and Desktop.
- * Callers prepare/review locally, then pass the accepted Markdown Summary;
- * transport ordering, head construction, and object batching stay owned by
- * the CLI package.
+ * This is the single upload seam used by `spool share` and Hub library
+ * consumers. Callers prepare/review locally, then pass the accepted Markdown
+ * Summary; transport ordering, head construction, and object batching stay
+ * owned by the CLI package.
  */
 export async function publishPreparedShare(
   client: Pick<HubClient, 'pushSession' | 'uploadObjects' | 'commitSessionHead'>,

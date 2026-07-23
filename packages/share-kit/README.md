@@ -2,7 +2,9 @@
 
 Internal React library for curated Spool publication documents and export surfaces.
 
-The desktop app uses these primitives to prepare a readable `.spool` document alongside authoritative Session records. The web reader uses the same document to present selected turns with consistent typography, redaction, and provenance.
+The Web reader uses these primitives to present selected turns with consistent typography,
+redaction, and provenance. The browser-safe document and export boundaries remain available to Web
+publication flows.
 
 ## Responsibilities
 

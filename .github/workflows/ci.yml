@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'videos/**'
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+    paths-ignore:
+      - 'videos/**'
+      - '**/*.md'
+      - 'docs/**'
+
+# Checks only read the repository.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # The installed CLI supports both platforms. Keep its native SQLite
+        # path covered on every change; browser and Worker tests stay on Linux.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build CLI and test dependencies
+        run: pnpm vp run --no-cache --filter '@spool-lab/cli...' build
+      - name: Build Web and Backend test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          pnpm vp run --filter '@spool/backend^...' build
+          pnpm vp run --filter '@spool/web^...' build
+      - name: Verify backend D1 migrations
+        if: runner.os == 'Linux'
+        run: pnpm --filter @spool/backend run schema:smoke
+      - name: Check source
+        run: pnpm exec vp check
+      - name: Typecheck active workspace
+        if: runner.os == 'Linux'
+        run: pnpm exec vp run -r typecheck
+      - name: Test CLI and local Session engine
+        run: |
+          pnpm --filter @spool-lab/core test
+          pnpm --filter @spool-lab/cli test
+      - name: Test repository contracts
+        if: runner.os == 'Linux'
+        run: pnpm exec vp test run scripts/lib/*.test.mjs
+      - name: Test backend and web
+        if: runner.os == 'Linux'
+        run: |
+          pnpm --filter @spool/backend test
+          pnpm --filter @spool/web test
+      - name: Build web
+        if: runner.os == 'Linux'
+        run: pnpm --filter @spool/web build

@@ -16,9 +16,9 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 // (Reader, session reader, Profile, Me, SignIn, Tombstone, legal), so
 // importing here scopes the share-web design system to those routes —
 // the marketing surface never loads it (see routes/_site.tsx for its
-// counterpart). app.css scans session-view's shared component source, just
-// like the desktop app does, so both surfaces compile one Tailwind pass and
-// avoid competing copies of base and responsive utilities.
+// counterpart). app.css scans session-view's shared component source so every
+// Web route compiles one Tailwind pass and avoids competing copies of base and
+// responsive utilities.
 import '../styles/app.css'
 
 import { fetchMe } from '../lib/api'

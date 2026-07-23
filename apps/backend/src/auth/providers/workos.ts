@@ -6,14 +6,12 @@
 // client_secret, so no PKCE params are sent on the authorize URL and
 // the codeVerifier from /start is ignored.
 //
-// Native surfaces split:
-//   - Desktop app: PKCE public client (WorkOS's blessed Electron shape —
-//     github.com/workos/electron-authkit-example). The app runs authorize
-//     in the system browser with code_challenge + a spool:// callback and
-//     posts {code, verifier} to /api/auth/sign-in-with-code, which lands
-//     in exchangeNativeCode below. code_verifier replaces client_secret;
-//     the docs don't define sending both, so the native exchange omits
-//     the API key entirely.
+// Native compatibility surfaces split:
+//   - Legacy Desktop: PKCE public client. Existing installations run
+//     authorize in the system browser with code_challenge + a spool://
+//     callback and post {code, verifier} to /api/auth/sign-in-with-code,
+//     which lands in exchangeNativeCode below. code_verifier replaces
+//     client_secret, so the native exchange omits the API key entirely.
 //   - CLI: never touches WorkOS — the cli-auth broker
 //     (functions/api/cli-auth/) rides on an approved web session.
 

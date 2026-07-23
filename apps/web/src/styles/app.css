@@ -1945,7 +1945,7 @@ html[data-theme='dark'] .sw-modal-overlay {
 /* Markdown-table scroller emitted by share-kit's Body component:
  * thumb hidden until the pointer is over the table. Sibling copies
  * live in share-kit global.css (which we deliberately don't import —
- * it pulls in Tailwind) and the desktop app's styles.css. */
+ * it pulls in Tailwind) and the historical renderer stylesheet. */
 .spool-md-scroll {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;

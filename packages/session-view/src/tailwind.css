@@ -1,10 +1,6 @@
-/* Prebuilt stylesheet for consumers that do NOT run Tailwind themselves
- * (share-web). The desktop app does not import this file — it compiles
- * the same component sources through its own Tailwind pass (see the
- * @source entry in packages/app/src/renderer/styles.css), which keeps
- * a single set of utilities there and lets its `dark:` variant follow
- * the OS. Here `dark:` is bound to html[data-theme="dark"], matching
- * share-web's theme toggle.
+/* Prebuilt stylesheet for consumers that do NOT run Tailwind themselves.
+ * `dark:` is bound to html[data-theme="dark"], matching Spool Web's theme
+ * toggle.
  *
  * No preflight on purpose: share-web owns its own reset. */
 

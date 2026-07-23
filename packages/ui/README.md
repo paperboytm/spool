@@ -1,8 +1,9 @@
 # `@spool-lab/ui`
 
-Shared browser-safe React chrome for Spool Desktop and Web. The package implements the compact
-component and token contract in `docs/ui-architecture.md`; it contains no routing, application
-state, localization, or Session-domain behavior.
+Shared browser-safe React chrome for Spool Web. The package implements the compact component and
+token contract in `docs/ui-architecture.md`; it contains no routing, application state,
+localization, or Session-domain behavior. The retired Electron source remains an archived
+reference, not a maintained consumer.
 
 ## Usage
 

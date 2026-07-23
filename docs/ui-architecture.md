@@ -1,18 +1,22 @@
 # Shared UI architecture
 
-`@spool-lab/ui` is the executable visual-system seam shared by Desktop and Web. `DESIGN.md`
-remains the product-level source of truth; this package turns its recurring chrome rules into one
-interface so individual surfaces cannot invent their own button, input, tab, navigation, badge,
-avatar, and list-row scales.
+`@spool-lab/ui` is the executable visual-system seam for Spool Web. `DESIGN.md` remains the
+product-level source of truth; this package turns its recurring chrome rules into one interface so
+individual Web surfaces cannot invent their own button, input, tab, navigation, badge, avatar, and
+list-row scales.
+
+> The Electron source under `apps/app` is a frozen implementation reference. It is excluded from
+> the workspace and all automation; Desktop notes below document historical decisions rather than
+> an active migration or verification target.
 
 ## Goals
 
-- Desktop and Web application chrome use the same components and compact density.
+- Web application surfaces use the same components and compact density.
 - Marketing content may keep editorial display typography and section spacing, but its navigation,
   buttons, inputs, badges, avatars, and public Session rows use the shared primitives.
 - One token file owns color, typography, control dimensions, spacing, radius, and motion values.
-- Theme adapters support both existing roots: Desktop's `.dark` class and Web's
-  `html[data-theme='dark']` attribute.
+- Theme adapters retain both the historical `.dark` root and Web's `html[data-theme='dark']`
+  attribute so the archived implementation remains legible.
 - Consumers may control layout and content, not restyle primitive dimensions per page.
 
 ## Package interface
@@ -83,13 +87,12 @@ once a surface migrates.
 
 ## Migration ownership
 
-### Desktop
+### Legacy Desktop reference
 
-- Import shared styles from the renderer root.
-- Set Tailwind palette/font aliases to shared tokens.
-- Migrate Sidebar navigation/search triggers, common action buttons, section labels, and
-  `SessionRow` layout to shared primitives.
-- Preserve Electron drag regions, localization, menus, virtualization, and local behavior.
+- No new migration work is planned.
+- Existing source may be consulted for local Session, rendering, and interaction patterns.
+- Do not add product behavior or restore build/test/package automation without an explicit product
+  decision that also updates `DESIGN.md`.
 
 ### Web
 
@@ -106,8 +109,8 @@ once a surface migrates.
 
 - Package component tests assert semantic element/ARIA/variant behavior.
 - A CSS contract test asserts the canonical compact dimensions and theme selectors.
-- Desktop and Web typechecks and focused unit suites must pass.
+- Web typechecks and focused unit suites must pass.
 - Web production build must pass.
 - No E2E tests are run during local development.
-- Visual QA compares Desktop and `/explore` at desktop width, then checks the responsive collapse
+- Visual QA checks the relevant Web route at desktop width, then checks the responsive collapse
   separately.

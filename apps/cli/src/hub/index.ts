@@ -1,6 +1,5 @@
-// Share/Hub surface shared beyond the CLI process: Desktop consumes the
-// prompt builder, prepare pipeline, and publisher through this subpath so the
-// command and app do not grow parallel implementations.
+// Share/Hub library surface used by CLI commands and programmatic consumers.
+// Prompt building, preparation, and publishing stay behind one implementation.
 export * from './agent-summary-prompt.js'
 export * from './birth.js'
 export * from './client.js'
