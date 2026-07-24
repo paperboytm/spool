@@ -1,6 +1,6 @@
 ---
 title: CLI Commands
-description: Reference for sharing, reading, resuming, and managing Sessions with the spool CLI.
+description: Reference for sharing, subscribing, reading, resuming, and managing Sessions with the spool CLI.
 ---
 
 Install the CLI once:
@@ -11,7 +11,7 @@ curl -fsSL https://spool.new/install.sh | sh
 
 Open a new terminal, then verify the installation with `spool --version`.
 
-The CLI stores prepared Sessions in the local Spool data directory and provides the stable shell interface for users, agents, and automation.
+The CLI stores prepared Sessions in the local Spool data directory and provides the stable shell interface for users, agents, and automation. The everyday command set is deliberately small: configure trust once (`login`, `subscribe`), keep the `daemon` running, and handle exceptions explicitly (`share`, `visibility`, `withdraw`, `resume`). Browsing lives under `spool sessions`.
 
 ## `spool`
 
@@ -21,7 +21,7 @@ Run the default flow from a project directory:
 spool
 ```
 
-This refreshes the local index, signs in through the browser if needed, and starts a Share for the latest Session in the current project. Spool still shows the selected records, sensitive-data findings, and resulting visibility before upload. Use `spool share` when you need to select a Session or pass options.
+In a subscribed directory this refreshes the local index and runs one catch-up publish pass. Elsewhere it refreshes the index, signs in through the browser if needed, and starts a Share for the latest Session in the current project. Spool still shows the selected records, sensitive-data findings, and resulting visibility before upload. Use `spool share` when you need to select a Session or pass options.
 
 ## `spool login`
 
@@ -42,11 +42,44 @@ spool logout
 
 If the Hub is unreachable, the local credential is still removed. Revoke the server-side token from the account surface later.
 
+## `spool subscribe`
+
+Record the one-time decision that Sessions from a directory — including its git worktrees and worktrees managed by tools like superset or orca — publish automatically:
+
+```bash
+spool subscribe                        # current directory, interactive disclosure choice
+spool subscribe <dir> --team <name-or-id>  # Team · {name}: current members only
+spool subscribe <dir> --link-only      # anyone with the URL
+spool subscribe <dir> --public         # explicit opt-in to Explore and search
+spool subscribe <dir> --link-only --yes  # non-interactive
+```
+
+The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public. There is no implicit default and Public is never preselected; interactive runs list your Teams first. Non-interactive callers must pass exactly one disclosure flag.
+
+Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
+
+```bash
+spool unsubscribe [dir]   # stop auto-publishing; published Sessions stay live
+spool subscriptions       # list subscribed directories and their disclosure
+```
+
+## `spool daemon`
+
+The always-on half of continuous publishing — a watcher plus auto-publish loop supervised by the OS service manager (launchd on macOS, a systemd user unit on Linux):
+
+```bash
+spool daemon start    # register and start at login, restart on failure
+spool daemon stop     # stop and unregister
+spool daemon status   # heartbeat, subscriptions, log location
+spool daemon logs     # print the log tail (-n <count>)
+spool daemon run      # the same loop in the foreground
+```
+
 ## `spool share`
 
 Create a durable Shared Session URL. Claude Code and Codex CLI Sessions are Public in Explore and search by default; providers not yet supported by Explore remain Link-only. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure. Non-interactive callers must pass `--visibility-confirmed`, which acknowledges visibility without bypassing sensitive-data findings.
 
-The CLI reports this initial Public or Link-only result. Team transfer is a separate, confirmed action on [your account page](/me): choosing `Team · name` makes the hosted asset Team-owned and limits reading to current members until a Team Owner or Admin changes its visibility.
+The CLI reports this initial Public or Link-only result. Use `spool visibility` or [your account page](/me) to move a Session to `Team · name` afterward: that makes the hosted asset Team-owned and limits reading to current members until a Team Owner or Admin changes its visibility.
 
 ```bash
 spool share                        # latest Session in the current directory
@@ -65,6 +98,18 @@ In an interactive terminal, omit Summary options. After the Session URL is live,
 `--summary <markdown>` is an advanced manual or automation input. It uploads exactly the Markdown supplied by the caller after the Session is shared; it does not generate a Summary.
 
 `--yes` is intended for controlled automation. It accepts visibility and sensitive-data findings; it does not remove sensitive values.
+
+## `spool visibility`
+
+Change a published Session’s disclosure without re-uploading records. Disclosure changes are named, confirmed actions:
+
+```bash
+spool visibility <sid|url> public                 # Team → Public keeps Team ownership
+spool visibility <sid|url> link-only
+spool visibility <sid|url> team --team <name-or-id>
+```
+
+Changing a Team-owned Session requires a Team Owner or Admin role. Moving a personal Session into a Team transfers ownership of the hosted asset to the Team. Public → Team removes all public discovery projections before the change is reported complete.
 
 ## `spool withdraw`
 
@@ -91,102 +136,58 @@ Native Resume currently supports Claude Code and Codex CLI shares. Gemini CLI, O
 
 Resume never modifies the source Shared Session.
 
-## `spool show`
+## `spool sessions`
 
-Read a local or Shared Session at different depths:
+Browse, search, and read prepared local Sessions. Browsing never publishes anything.
 
-```bash
-spool show <uuid>                 # local conversation
-spool show <session-id-or-url>    # Shared Session overview
-spool show <session> --log        # record timeline
-spool show <session> --diff       # composed net diff
-spool show <session>@r3           # specific record
-spool show <session> --json       # machine-readable output
-```
-
-## `spool sync`
-
-Prepare Sessions from supported local agent sources:
+### `spool sessions show`
 
 ```bash
-spool sync
-spool sync --watch
+spool sessions show <uuid>                 # local conversation
+spool sessions show <session-id-or-url>    # Shared Session overview
+spool sessions show <session> --log        # record timeline
+spool sessions show <session> --diff       # composed net diff
+spool sessions show <session>@r3           # specific record
+spool sessions show <session> --json       # machine-readable output
 ```
 
-Sync is local and does not publish anything.
-
-## `spool list`
+### `spool sessions list`
 
 List recent local Sessions for the project containing the current working directory:
 
 ```bash
-spool list
-spool list -s codex -n 10
-spool list --json
-spool list --all
+spool sessions list
+spool sessions list -s codex -n 10
+spool sessions list --json
+spool sessions list --all
 ```
 
 `--all` ignores the current-project scope and lists recent Sessions across every project. It
 still respects `--limit`; combine it with `--project <path>` to query a different project.
 
-## `spool projects`
-
-List projects across sources or Sessions within one project:
+### `spool sessions search`
 
 ```bash
-spool projects
-spool projects spool
-spool projects spool -n 50
-spool projects spool --json
-```
-
-A query can match project name, identity, path, or Session working directory. Exact names win over partial matches.
-
-## `spool search`
-
-Search prepared local Sessions:
-
-```bash
-spool search "auth middleware"
-spool search "auth middleware" --source claude
-spool search "fix" --since 7d
-spool search "auth" --json -n 10
-spool search '"auth middleware"' # exact phrase only
+spool sessions search "auth middleware"
+spool sessions search "auth middleware" --source claude
+spool sessions search "fix" --since 7d
+spool sessions search "auth" --json -n 10
+spool sessions search '"auth middleware"' # exact phrase only
 ```
 
 Whitespace-separated terms use all-term matching with exact-phrase hits ranked first. Wrap the query in FTS quotes for phrase-only matching.
 
-## Pins
-
-Pins are private local organization state:
-
-```bash
-spool pin <uuid>
-spool unpin <uuid>
-spool pinned
-spool pinned --json
-```
-
-Pins do not affect Public Profile order or Discovery ranking.
-
-## `spool status`
-
-Show local preparation statistics:
-
-```bash
-spool status
-```
-
 ## `spool doctor`
 
-Diagnose local data, native dependencies, and configuration:
+Diagnose local data, native dependencies, configuration, and the daemon:
 
 ```bash
 spool doctor
 spool doctor db.integrity
+spool doctor daemon.heartbeat
 spool doctor --json
 spool doctor --fix
 spool doctor --fix --force
 ```
 
-`--fix --force` may apply destructive repairs; review the reported check before using it.
+`spool doctor` includes the daemon heartbeat and local index statistics (previously `spool status`). `--fix --force` may apply destructive repairs; review the reported check before using it.

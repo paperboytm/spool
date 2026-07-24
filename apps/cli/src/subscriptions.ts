@@ -7,13 +7,19 @@ import type { HubCredentialOptions } from './hub/credentials.js'
 // A subscription marks a project directory whose Sessions — including those
 // recorded from its git worktrees — publish automatically on every sync. The
 // visibility decision is made once, at subscribe time, so continuous syncing
-// never has to prompt again.
+// never has to prompt again. There is deliberately no implicit default:
+// Public is always an explicit choice, never a fallback.
+
+export type SubscriptionVisibility = 'public' | 'link-only' | 'team'
 
 export interface Subscription {
   /** Absolute, symlink-resolved directory path. */
   path: string
-  /** 'provider-default' follows the Public/Link-only provider rules. */
-  visibility: 'provider-default' | 'link-only'
+  visibility: SubscriptionVisibility
+  /** Required when visibility is 'team'. */
+  teamId?: string
+  /** Display-only; the id is authoritative. */
+  teamName?: string
   addedAt: string
 }
 
@@ -79,11 +85,13 @@ export function addSubscription(
   const existing = loadSubscriptions(options)
   const found = existing.find((entry) => entry.path === subscription.path)
   if (found) {
-    if (found.visibility === subscription.visibility) {
+    if (found.visibility === subscription.visibility && found.teamId === subscription.teamId) {
       return { added: false, subscriptions: existing }
     }
     const updated = existing.map((entry) =>
-      entry.path === subscription.path ? { ...entry, visibility: subscription.visibility } : entry,
+      entry.path === subscription.path
+        ? { ...subscription, addedAt: entry.addedAt || subscription.addedAt }
+        : entry,
     )
     saveSubscriptions(updated, options)
     return { added: false, subscriptions: updated }
@@ -108,9 +116,26 @@ function parseSubscription(value: unknown, index: number, path: string): Subscri
   if (!isRecord(value) || typeof value['path'] !== 'string' || value['path'].trim() === '') {
     throw new Error(`Invalid subscriptions file at ${path}: entry ${index} has no path`)
   }
-  const visibility = value['visibility'] === 'link-only' ? 'link-only' : 'provider-default'
+  // Unknown visibility values (from a newer or older CLI) degrade to the
+  // safest disclosure rather than the widest.
+  const teamId =
+    typeof value['teamId'] === 'string' && value['teamId'] ? value['teamId'] : undefined
+  const visibility: SubscriptionVisibility =
+    value['visibility'] === 'public'
+      ? 'public'
+      : value['visibility'] === 'team' && teamId !== undefined
+        ? 'team'
+        : 'link-only'
+  const teamName =
+    typeof value['teamName'] === 'string' && value['teamName'] ? value['teamName'] : undefined
   const addedAt = typeof value['addedAt'] === 'string' ? value['addedAt'] : ''
-  return { path: value['path'], visibility, addedAt }
+  return {
+    path: value['path'],
+    visibility,
+    ...(visibility === 'team' && teamId !== undefined ? { teamId } : {}),
+    ...(visibility === 'team' && teamName !== undefined ? { teamName } : {}),
+    addedAt,
+  }
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

@@ -26,10 +26,10 @@ A record deep link opens a precise point in the Session with surrounding context
 ## Read from the CLI
 
 ```bash
-spool show <session-id-or-url>        # first-screen overview
-spool show <session-id-or-url> --log  # record timeline
-spool show <session-id-or-url> --diff # composed net diff
-spool show <session-id-or-url>@r3     # one record
+spool sessions show <session-id-or-url>        # first-screen overview
+spool sessions show <session-id-or-url> --log  # record timeline
+spool sessions show <session-id-or-url> --diff # composed net diff
+spool sessions show <session-id-or-url>@r3     # one record
 ```
 
 ## Resume the Session

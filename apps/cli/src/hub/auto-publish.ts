@@ -4,7 +4,11 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import { getDB, getSessionWithMessages, serializeIndexedSession } from '@spool-lab/core'
-import { isResumableSessionProvider, type SessionProvider } from '@spool-lab/session-kit'
+import {
+  isDiscoverySessionProvider,
+  isResumableSessionProvider,
+  type SessionProvider,
+} from '@spool-lab/session-kit'
 
 import { loadSubscriptions, type Subscription } from '../subscriptions.js'
 import type { CliUi } from '../ui.js'
@@ -169,7 +173,7 @@ export async function runAutoPublish(
       const published = await publish(client, prepared, {
         card: buildWorkspaceCard(detectWorkspaceRoot(candidate.cwd)),
         summary,
-        ...(subscription.visibility === 'link-only' ? { visibility: 'link-only' as const } : {}),
+        ...publishTarget(subscription, candidate.provider),
       })
       state.sessions[sid] = { fingerprint, url: published.url }
       result.published.push({ sid, url: published.url })
@@ -193,6 +197,27 @@ export function reportAutoPublish(ui: CliUi, result: AutoPublishResult | null): 
     ui.warn(
       `${result.failed} subscribed session${result.failed === 1 ? '' : 's'} failed to publish.`,
     )
+  }
+}
+
+/** Map the subscribed disclosure to a publish target. Public is only sent
+ *  for providers Explore supports; the hub rejects it otherwise, so degrade
+ *  to Link-only instead of failing every pass. */
+export function publishTarget(
+  subscription: Subscription,
+  provider: SessionProvider,
+): { visibility: 'public' | 'link-only' } | { visibility: 'team'; teamId: string } {
+  switch (subscription.visibility) {
+    case 'team':
+      return subscription.teamId !== undefined
+        ? { visibility: 'team', teamId: subscription.teamId }
+        : { visibility: 'link-only' }
+    case 'public':
+      return isDiscoverySessionProvider(provider)
+        ? { visibility: 'public' }
+        : { visibility: 'link-only' }
+    case 'link-only':
+      return { visibility: 'link-only' }
   }
 }
 

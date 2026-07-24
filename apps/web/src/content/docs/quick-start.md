@@ -28,11 +28,11 @@ Bare `spool` refreshes the local index, opens browser sign-in if this machine ne
 To choose a different Session explicitly:
 
 ```bash
-spool list -n 10
+spool sessions list -n 10
 spool share <session-uuid>
 ```
 
-`spool list` uses the current project by default. Run `spool list --all` to see recent Sessions
+`spool sessions list` uses the current project by default. Run `spool sessions list --all` to see recent Sessions
 from every indexed project.
 
 Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared. Native Resume currently supports Claude Code and Codex CLI shares.

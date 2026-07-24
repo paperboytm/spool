@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { Subscription } from '../subscriptions.js'
 import { createTextUi } from '../ui.js'
 import {
+  publishTarget,
   runAutoPublish,
   type AutoPublishCandidate,
   type AutoPublishDependencies,
@@ -41,7 +42,7 @@ function capturingUi() {
 const LOGGED_IN_ENV = { SPOOL_HUB_URL: 'https://hub.test', SPOOL_HUB_TOKEN: 'test-token' }
 const SUBSCRIPTION: Subscription = {
   path: '/repos/spool',
-  visibility: 'provider-default',
+  visibility: 'public',
   addedAt: '2026-07-24T00:00:00.000Z',
 }
 
@@ -194,7 +195,7 @@ describe('runAutoPublish', () => {
     expect(secondOutput).toEqual([])
   })
 
-  it('passes the subscribed Link-only visibility through to publishing', async () => {
+  it('passes the subscribed disclosure through to publishing', async () => {
     const { ui } = capturingUi()
     const seen: unknown[] = []
     const publish = vi.fn(async (_client: unknown, _prepared: unknown, options: unknown) => {
@@ -211,8 +212,33 @@ describe('runAutoPublish', () => {
     expect(seen[0]).toMatchObject({ visibility: 'link-only' })
 
     seen.length = 0
+    await runAutoPublish(
+      ui,
+      engineDeps({
+        publish: publish as never,
+        loadSubscriptions: () => [
+          { ...SUBSCRIPTION, visibility: 'team', teamId: 'team_00000001', teamName: 'Paperboy' },
+        ],
+      }),
+    )
+    expect(seen[0]).toMatchObject({ visibility: 'team', teamId: 'team_00000001' })
+
+    seen.length = 0
     await runAutoPublish(ui, engineDeps({ publish: publish as never }))
-    expect(seen[0]).not.toHaveProperty('visibility')
+    expect(seen[0]).toMatchObject({ visibility: 'public' })
+  })
+
+  it('maps disclosure targets per provider support', () => {
+    expect(publishTarget(SUBSCRIPTION, 'claude')).toEqual({ visibility: 'public' })
+    // Public subscriptions degrade to Link-only for providers Explore
+    // does not support yet, instead of failing every pass.
+    expect(publishTarget(SUBSCRIPTION, 'gemini')).toEqual({ visibility: 'link-only' })
+    expect(
+      publishTarget({ ...SUBSCRIPTION, visibility: 'team', teamId: 'team_00000001' }, 'gemini'),
+    ).toEqual({ visibility: 'team', teamId: 'team_00000001' })
+    expect(publishTarget({ ...SUBSCRIPTION, visibility: 'link-only' }, 'claude')).toEqual({
+      visibility: 'link-only',
+    })
   })
 
   it('counts publish failures without aborting the pass', async () => {

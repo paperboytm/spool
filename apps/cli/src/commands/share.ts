@@ -468,7 +468,7 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
   const found = getSessionWithMessages(db, uuid)
   if (!found) {
     throw new Error(
-      `Session not found in the local index: ${uuid} (run \`${formatCliCommand('sync')}\`?)`,
+      `Session not found in the local index: ${uuid} (run \`spool\` to refresh the index?)`,
     )
   }
   const { session } = found
@@ -506,7 +506,7 @@ export function latestSessionUuidFor(db: ReturnType<typeof getDB>, cwd: string):
   if (matching) return matching.session_uuid
 
   throw new Error(
-    `No indexed sessions for ${cwd}. Pass a session UUID or run \`${formatCliCommand('sync')}\`.`,
+    `No indexed sessions for ${cwd}. Pass a session UUID or run \`spool\` to refresh the index.`,
   )
 }
 

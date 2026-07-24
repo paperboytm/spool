@@ -1,12 +1,13 @@
-import { getDB, Syncer, SpoolWatcher, type SyncEventCallback } from '@spool-lab/core'
-import { Command } from 'commander'
+import { getDB, Syncer, type SyncEventCallback } from '@spool-lab/core'
 
 import { reportAutoPublish, runAutoPublish, type AutoPublishResult } from '../hub/auto-publish.js'
-import { createClackUi, type CliUi } from '../ui.js'
+import type { CliUi } from '../ui.js'
 
-/** Refresh every supported provider into the local index. The bare `spool`
- * entry point reuses this before choosing the current Session, so sharing does
- * not depend on a separate, easy-to-forget `spool sync` step. */
+// Indexing is no longer a user-facing command: bare `spool` refreshes the
+// index before sharing, and `spool daemon` keeps it continuously fresh. The
+// routines live on here for both callers.
+
+/** Refresh every supported provider into the local index. */
 export function syncLocalSessions(
   ui: CliUi,
   dependencies: {
@@ -75,44 +76,3 @@ export function createAutoPublisher(
     return active
   }
 }
-
-export const syncCommand = new Command('sync')
-  .description('Sync AI sessions to the local index')
-  .option('--watch', 'Stay running and watch for new sessions')
-  .action(async (opts: { watch?: boolean }) => {
-    const ui = createClackUi()
-    ui.intro('Sync sessions')
-    const syncer = syncLocalSessions(ui)
-    if (syncer === null) {
-      process.exitCode = 1
-      return
-    }
-    const autoPublish = createAutoPublisher(ui)
-
-    if (!opts.watch) {
-      await autoPublish()
-      ui.outro('Local index is up to date.')
-      return
-    }
-
-    ui.info('Watching for new sessions. Press Ctrl+C to stop.')
-    const watcher = new SpoolWatcher(syncer)
-    watcher.on('new-sessions', (_event, data) => {
-      ui.success(`${data.count} new session${data.count === 1 ? '' : 's'} indexed`)
-      void autoPublish()
-    })
-    watcher.on('error', (_event, data) => {
-      ui.error(
-        `Watcher error: ${data.error}${data.root === undefined ? '' : ` (root=${data.root})`}`,
-      )
-    })
-    watcher.start()
-    // Catch up on anything indexed while the watcher was not running.
-    void autoPublish()
-
-    process.once('SIGINT', () => {
-      watcher.stop()
-      ui.outro('Stopped watching.')
-      process.exitCode = 0
-    })
-  })

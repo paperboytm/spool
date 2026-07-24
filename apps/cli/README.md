@@ -10,6 +10,40 @@ curl -fsSL https://spool.new/install.sh | sh
 
 Install once, open a new terminal, then verify the command with `spool --version`. After that, use `spool` from any project.
 
+## Everyday Commands
+
+The everyday surface is deliberately small. Configure trust once, keep the daemon running, and handle exceptions explicitly:
+
+```bash
+spool login                      # one-time hub credential
+spool subscribe [dir]            # one-time disclosure decision per project
+spool daemon start               # continuous publishing survives reboots
+spool                            # in a subscribed dir: catch-up pass; elsewhere: share latest
+spool share <session-uuid>       # explicit one-off share
+spool visibility <sid|url> <target>  # change a published Session's disclosure
+spool withdraw <session-id-or-url>
+spool resume <session-id-or-url>
+spool doctor                     # health: index, daemon, credentials, environment
+spool logout
+```
+
+## Continuous Publishing
+
+```bash
+spool subscribe [dir] --team <name-or-id>   # Team · {name}: current members only
+spool subscribe [dir] --link-only           # anyone with the URL
+spool subscribe [dir] --public              # explicit opt-in to Explore/search
+spool unsubscribe [dir]
+spool subscriptions
+spool daemon start|stop|status|logs|run
+```
+
+Subscribing a directory is the one-time disclosure decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public; **there is no implicit default and Public is never preselected**. Interactive `spool subscribe` offers your Teams first.
+
+`spool daemon start` registers the watcher with launchd (macOS) or a systemd user unit (Linux) so it runs at login and restarts on failure. `spool daemon run` is the same loop in the foreground.
+
+Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
+
 ## Share and Continue
 
 ```bash
@@ -19,9 +53,7 @@ spool resume <session-id-or-url>
 spool withdraw <session-id-or-url>
 ```
 
-Bare `spool` is the everyday path: it refreshes the local index, signs in if needed, and shares the latest Session in the current project. `spool share` is the explicit form for selecting a Session or passing options. Both flows check records for likely sensitive values, confirm the resulting visibility, create a durable URL, and can ask a detected local Agent to draft the optional Summary. Claude Code and Codex CLI Sessions are Public in Explore by default; providers not yet supported by Explore remain Link-only. Non-interactive callers must pass `--visibility-confirmed`; this does not bypass sensitive-data findings.
-
-Public or Link-only is the initial CLI Share result. After sharing, use the spool.new account surface to move a Session to `Team · name`. That transfers control of the hosted asset to the Team and limits reading to current members until a Team Owner or Admin changes its visibility.
+Bare `spool` adapts to context: in a subscribed directory it refreshes the index and runs one catch-up publish pass; elsewhere it refreshes the index, signs in if needed, and shares the latest Session in the current project. `spool share` is the explicit form for selecting a Session or passing options. Both flows check records for likely sensitive values, confirm the resulting visibility, create a durable URL, and can ask a detected local Agent to draft the optional Summary. Claude Code and Codex CLI Sessions are Public in Explore by default; providers not yet supported by Explore remain Link-only. Non-interactive callers must pass `--visibility-confirmed`; this does not bypass sensitive-data findings.
 
 Useful publishing options:
 
@@ -37,49 +69,29 @@ For the normal interactive flow, omit Summary options. After the Session URL is 
 
 For Claude Code and Codex CLI shares, Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.
 
-## Read Sessions
+## Change Disclosure Later
 
 ```bash
-spool show <uuid>                 # local conversation
-spool show <session-id-or-url>    # Shared Session overview
-spool show <session> --log        # record timeline
-spool show <session> --diff       # composed net diff
-spool show <session>@r3           # specific record
-spool show <session> --json       # machine-readable output
+spool visibility <sid|url> public            # Team → Public keeps Team ownership
+spool visibility <sid|url> link-only
+spool visibility <sid|url> team --team <name-or-id>
 ```
 
-## Prepare and Find Local Sessions
+Disclosure changes are named, confirmed actions and never re-upload records. Changing a Team-owned Session requires a Team Owner or Admin role; moving a personal Session into a Team transfers ownership to the Team. The same control exists on spool.new under your account's Sessions list.
+
+## Browse Local Sessions
 
 ```bash
-spool sync [--watch]
-spool list [-s <source>] [-p <path>] [-n <count>] [-a|--all] [--json]
-spool projects [name] [-n <count>] [--json]
-spool search <query> [-s <source>] [--since 7d] [-n 10] [--json]
-spool status
+spool sessions list [-s <source>] [-p <path>] [-n <count>] [-a|--all] [--json]
+spool sessions search <query> [-s <source>] [--since 7d] [-n 10] [--json]
+spool sessions show <uuid>                 # local conversation
+spool sessions show <session-id-or-url>    # Shared Session overview
+spool sessions show <session> --log        # record timeline
+spool sessions show <session> --diff       # composed net diff
+spool sessions show <session>@r3           # specific record
 ```
 
-Local preparation supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Sync and search do not publish anything unless you have subscribed directories for continuous publishing.
-
-## Continuous Publishing
-
-```bash
-spool subscribe [dir] [--link-only] [--yes]   # auto-publish this directory's Sessions
-spool unsubscribe [dir]
-spool subscriptions
-spool sync --watch                            # keep subscribed Sessions continuously published
-```
-
-Subscribing a directory is the one-time visibility decision: from then on, every `spool sync` (and continuously under `--watch`) publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. Supported providers publish Public by default; pass `--link-only` to keep a subscription Link-only. Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
-
-## Private Organization
-
-```bash
-spool pin <uuid>
-spool unpin <uuid>
-spool pinned [--json]
-```
-
-Pin state is local and does not affect Public Profile order or Discovery ranking.
+Local indexing supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Browsing never publishes anything; only subscriptions and explicit shares do.
 
 ## Diagnostics
 
@@ -91,6 +103,8 @@ spool doctor --fix
 spool doctor --fix --force
 ```
 
+`spool doctor` includes the daemon heartbeat and local index status (previously `spool status`).
+
 ## Local Data
 
 The CLI uses `~/.spool/` by default:
@@ -99,6 +113,7 @@ The CLI uses `~/.spool/` by default:
 - `hub-credentials.json` — revocable Hub credential from `spool login`
 - `subscriptions.json` — directories subscribed for continuous publishing
 - `auto-publish-state.json` — per-Session fingerprints that keep auto-publish incremental
+- `daemon.json` / `daemon.log` — daemon heartbeat and log
 
 Set `SPOOL_DATA_DIR` to isolate a different data directory.
 

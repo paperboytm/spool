@@ -35,7 +35,9 @@ describe('subscriptions store', () => {
     const home = tempDir('spool-subs-')
     const subscription = {
       path: '/repos/spool',
-      visibility: 'provider-default' as const,
+      visibility: 'team' as const,
+      teamId: 'team_00000001',
+      teamName: 'Paperboy',
       addedAt: '2026-07-24T00:00:00.000Z',
     }
     const savedPath = saveSubscriptions([subscription], { homeDir: home })
@@ -48,15 +50,21 @@ describe('subscriptions store', () => {
     const home = tempDir('spool-subs-')
     const base = {
       path: '/repos/spool',
-      visibility: 'provider-default' as const,
+      visibility: 'link-only' as const,
       addedAt: '2026-07-24T00:00:00.000Z',
     }
     expect(addSubscription(base, { homeDir: home }).added).toBe(true)
     expect(addSubscription(base, { homeDir: home }).added).toBe(false)
 
-    const updated = addSubscription({ ...base, visibility: 'link-only' }, { homeDir: home })
+    const updated = addSubscription(
+      { ...base, visibility: 'team', teamId: 'team_00000001', addedAt: 'later' },
+      { homeDir: home },
+    )
     expect(updated.added).toBe(false)
-    expect(loadSubscriptions({ homeDir: home })).toEqual([{ ...base, visibility: 'link-only' }])
+    // The original subscription date survives a settings update.
+    expect(loadSubscriptions({ homeDir: home })).toEqual([
+      { ...base, visibility: 'team', teamId: 'team_00000001' },
+    ])
 
     expect(removeSubscription('/repos/other', { homeDir: home }).removed).toBe(false)
     expect(removeSubscription('/repos/spool', { homeDir: home }).removed).toBe(true)

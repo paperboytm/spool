@@ -1,30 +1,42 @@
 import { formatCliCommand } from '@spool-lab/core'
 import { Command } from 'commander'
 
-import type { HubCredentialOptions } from '../hub/credentials.js'
+import { HubClient, type HubFetch, type HubTeam } from '../hub/client.js'
+import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import {
   addSubscription,
   canonicalSubscriptionPath,
   loadSubscriptions,
   removeSubscription,
   type Subscription,
+  type SubscriptionVisibility,
 } from '../subscriptions.js'
 import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // `spool subscribe [dir]` records the one-time decision that Sessions from a
-// directory — and from its git worktrees — publish automatically on every
-// sync. All later syncing is prompt-free; `spool sync --watch` keeps the hub
-// continuously up to date.
+// directory — and from its git worktrees — publish automatically. The
+// disclosure target is always an explicit choice among Team, Link-only, and
+// Public; there is no implicit default and Public is never preselected.
 
 export interface SubscribeCommandOptions {
+  team?: string
   linkOnly?: boolean
+  public?: boolean
   yes?: boolean
 }
 
 export interface SubscribeCommandDependencies extends HubCredentialOptions {
   ui?: CliUi
   cwd?: string
+  fetch?: HubFetch
+  listTeams?: () => Promise<HubTeam[]>
   now?: () => string
+}
+
+interface VisibilityTarget {
+  visibility: SubscriptionVisibility
+  teamId?: string
+  teamName?: string
 }
 
 export async function handleSubscribeCommand(
@@ -36,45 +48,141 @@ export async function handleSubscribeCommand(
   const cwd = dependencies.cwd ?? process.cwd()
   ui.intro('Subscribe a directory')
   try {
-    const path = canonicalSubscriptionPath(directory ?? cwd, cwd)
-    const visibility = options.linkOnly === true ? 'link-only' : 'provider-default'
+    const flagCount = [options.team, options.linkOnly, options.public].filter(
+      (value) => value !== undefined && value !== false,
+    ).length
+    if (flagCount > 1) {
+      ui.error('Pick exactly one of `--team`, `--link-only`, or `--public`.')
+      return 1
+    }
 
-    // The whole point of a subscription is that this is the last prompt:
-    // the visibility outcome is acknowledged here, once, and every future
-    // auto-publish inherits it.
-    const disclosure =
-      visibility === 'link-only'
-        ? 'Sessions from this directory and its worktrees will auto-publish as Link-only on every sync.'
-        : 'Sessions from this directory and its worktrees will auto-publish on every sync — Public for supported providers (visible in Explore and search), Link-only otherwise.'
+    const path = canonicalSubscriptionPath(directory ?? cwd, cwd)
+    const target = await resolveVisibilityTarget(ui, options, dependencies)
+    if (target === null) return 1
+
     if (options.yes !== true) {
       if (!ui.interactive) {
         ui.error('Cannot confirm auto-publish visibility without a TTY. Re-run with `--yes`.')
         return 1
       }
-      ui.info(disclosure)
+      ui.info(disclosureCopy(target))
       const approved = await ui.confirm(`Subscribe ${path}?`, true)
       if (approved !== true) {
         ui.cancel('Nothing subscribed.')
         return 1
       }
     } else {
-      ui.info(disclosure)
+      ui.info(disclosureCopy(target))
     }
 
     const subscription: Subscription = {
       path,
-      visibility,
+      visibility: target.visibility,
+      ...(target.teamId === undefined ? {} : { teamId: target.teamId }),
+      ...(target.teamName === undefined ? {} : { teamName: target.teamName }),
       addedAt: (dependencies.now ?? (() => new Date().toISOString()))(),
     }
     const { added } = addSubscription(subscription, pickCredentialOptions(dependencies))
     ui.success(added ? `Subscribed ${path}` : `Already subscribed: ${path} (settings updated)`)
     ui.outro(
-      `Run \`${formatCliCommand('sync --watch')}\` to keep subscribed sessions continuously published.`,
+      `Run \`${formatCliCommand('daemon start')}\` to keep subscribed sessions continuously published.`,
     )
     return 0
   } catch (cause) {
     ui.error(cause instanceof Error ? cause.message : String(cause))
     return 1
+  }
+}
+
+/** Resolve the disclosure target from flags, or interactively. Returns null
+ *  after reporting the reason the choice could not be made. */
+async function resolveVisibilityTarget(
+  ui: CliUi,
+  options: SubscribeCommandOptions,
+  dependencies: SubscribeCommandDependencies,
+): Promise<VisibilityTarget | null> {
+  if (options.linkOnly === true) return { visibility: 'link-only' }
+  if (options.public === true) return { visibility: 'public' }
+
+  const listTeams = dependencies.listTeams ?? (() => listTeamsFromHub(dependencies))
+
+  if (options.team !== undefined) {
+    const teams = await listTeams()
+    const wanted = options.team.trim()
+    const team = teams.find((entry) => entry.id === wanted || entry.name === wanted)
+    if (!team) {
+      ui.error(
+        teams.length === 0
+          ? 'You are not a member of any Team (or you are not logged in).'
+          : `No Team matches "${wanted}". Your Teams: ${teams.map((entry) => entry.name).join(', ')}`,
+      )
+      return null
+    }
+    return { visibility: 'team', teamId: team.id, teamName: team.name }
+  }
+
+  // No flag: the disclosure is a real decision, so it must be asked. In a
+  // non-interactive context there is nothing safe to assume.
+  if (!ui.interactive) {
+    ui.error('Choose a disclosure: `--team <name-or-id>`, `--link-only`, or `--public`.')
+    return null
+  }
+
+  let teams: HubTeam[] = []
+  try {
+    teams = await listTeams()
+  } catch {
+    ui.warn('Could not load your Teams; log in with `spool login` to target a Team.')
+  }
+  const choices = [
+    ...teams.map((team) => ({
+      value: `team:${team.id}`,
+      label: `Team · ${team.name}`,
+      hint: 'current members only; the Team owns the Sessions',
+    })),
+    { value: 'link-only', label: 'Link-only', hint: 'anyone with the URL can read' },
+    { value: 'public', label: 'Public', hint: 'can appear in Explore and search' },
+  ]
+  const selected = await ui.select({
+    message: 'How should auto-published Sessions be shared?',
+    choices,
+    // Never preselect Public: the safest listed disclosure leads.
+    initialValue: choices[0]!.value,
+  })
+  if (selected === null) {
+    ui.cancel('Nothing subscribed.')
+    return null
+  }
+  if (selected.startsWith('team:')) {
+    const teamId = selected.slice('team:'.length)
+    const team = teams.find((entry) => entry.id === teamId)
+    return { visibility: 'team', teamId, ...(team === undefined ? {} : { teamName: team.name }) }
+  }
+  return { visibility: selected as 'public' | 'link-only' }
+}
+
+async function listTeamsFromHub(dependencies: SubscribeCommandDependencies): Promise<HubTeam[]> {
+  const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
+  if (!credentials.token) return []
+  const client = new HubClient({
+    hubUrl: credentials.hubUrl,
+    token: credentials.token,
+    ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+  })
+  return client.listTeams()
+}
+
+function disclosureCopy(target: VisibilityTarget): string {
+  switch (target.visibility) {
+    case 'team':
+      return (
+        `Sessions from this directory and its worktrees will auto-publish to Team · ${target.teamName ?? target.teamId}. ` +
+        'Only current members can read them, and the Team owns the resulting Sessions.'
+      )
+    case 'link-only':
+      return 'Sessions from this directory and its worktrees will auto-publish as Link-only. Anyone with the URL can read them.'
+    case 'public':
+      return 'Sessions from this directory and its worktrees will auto-publish as Public. They can appear in Explore and search.'
   }
 }
 
@@ -122,8 +230,7 @@ export function handleSubscriptionsCommand(dependencies: SubscribeCommandDepende
       return 0
     }
     for (const subscription of subscriptions) {
-      const visibility = subscription.visibility === 'link-only' ? 'Link-only' : 'provider default'
-      ui.info(`${subscription.path}  (${visibility})`)
+      ui.info(`${subscription.path}  (${subscriptionLabel(subscription)})`)
     }
     return 0
   } catch (cause) {
@@ -132,22 +239,42 @@ export function handleSubscriptionsCommand(dependencies: SubscribeCommandDepende
   }
 }
 
+export function subscriptionLabel(subscription: Subscription): string {
+  switch (subscription.visibility) {
+    case 'team':
+      return `Team · ${subscription.teamName ?? subscription.teamId ?? 'unknown'}`
+    case 'link-only':
+      return 'Link-only'
+    case 'public':
+      return 'Public'
+  }
+}
+
 export const subscribeCommand = new Command('subscribe')
-  .description('Auto-publish sessions from a directory and its worktrees on every sync')
+  .description('Auto-publish sessions from a directory and its worktrees')
   .argument('[dir]', 'Directory to subscribe; defaults to the current directory')
-  .option('--link-only', 'Always publish subscribed sessions as Link-only')
+  .option('--team <name-or-id>', 'Publish subscribed sessions to this Team')
+  .option('--link-only', 'Publish subscribed sessions as Link-only')
+  .option('--public', 'Publish subscribed sessions as Public (explicit opt-in)')
   .option('--yes', 'Skip the one-time visibility confirmation')
-  .action(async (dir: string | undefined, opts: { linkOnly?: boolean; yes?: boolean }) => {
-    const exitCode = await handleSubscribeCommand(
-      dir,
-      {
-        ...(opts.linkOnly === undefined ? {} : { linkOnly: opts.linkOnly }),
-        ...(opts.yes === undefined ? {} : { yes: opts.yes }),
-      },
-      { ui: createClackUi() },
-    )
-    if (exitCode !== 0) process.exitCode = exitCode
-  })
+  .action(
+    async (
+      dir: string | undefined,
+      opts: { team?: string; linkOnly?: boolean; public?: boolean; yes?: boolean },
+    ) => {
+      const exitCode = await handleSubscribeCommand(
+        dir,
+        {
+          ...(opts.team === undefined ? {} : { team: opts.team }),
+          ...(opts.linkOnly === undefined ? {} : { linkOnly: opts.linkOnly }),
+          ...(opts.public === undefined ? {} : { public: opts.public }),
+          ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+        },
+        { ui: createClackUi() },
+      )
+      if (exitCode !== 0) process.exitCode = exitCode
+    },
+  )
 
 export const unsubscribeCommand = new Command('unsubscribe')
   .description('Stop auto-publishing sessions from a subscribed directory')
