@@ -22,15 +22,9 @@ import {
 import { useQualifiedRead } from '../lib/qualified-read'
 import { parseHubConversation } from '../lib/session-messages'
 import { deepLinkIndex, providerOf } from '../lib/session-page'
-import { deriveSessionRoute, projectSessionRouteToSpool } from '../lib/session-route'
 import { Tombstone } from './Tombstone'
 
 const FETCH_PAGE = 500
-/** Curated publications already contain their readable timeline. Raw records
- * only enrich the optional Route with machine evidence, so keep that
- * best-effort request bounded instead of re-downloading arbitrarily large
- * Sessions in the background. */
-export const MAX_ROUTE_EVIDENCE_RECORDS = 2_000
 
 export interface LoadedSessionContent {
   view: SessionViewV1 | null
@@ -79,26 +73,6 @@ async function loadRawRecords(
     options.onRecordProgress?.(records.length, total)
   }
   return records
-}
-
-/**
- * Best-effort evidence load for the route map on curated .spool pages.
- * It is deliberately separate from loadSessionContent: the publication can
- * render as soon as its compact document arrives, and a raw-record failure
- * only suppresses the optional map instead of failing the reader.
- */
-export async function loadSessionRouteRecords(
-  sid: string,
-  total: number,
-  deps: Pick<SessionContentDeps, 'makeRangeFetcher'> = defaultSessionContentDeps,
-  options: Pick<SessionContentLoadOptions, 'isCancelled' | 'signal'> = {},
-): Promise<HubRecordLine[] | null> {
-  if (total > MAX_ROUTE_EVIDENCE_RECORDS) return null
-  try {
-    return await loadRawRecords(sid, total, deps.makeRangeFetcher, options)
-  } catch {
-    return null
-  }
 }
 
 /**
@@ -169,10 +143,6 @@ function useIsDark(): boolean {
 
 export function SessionReader({ sid }: { sid: string }) {
   const [state, setState] = useState<PageState>({ phase: 'loading', loaded: 0, total: null })
-  const [routeRecords, setRouteRecords] = useState<{
-    sid: string
-    records: HubRecordLine[]
-  } | null>(null)
   const isDark = useIsDark()
 
   const provider = providerOf(sid)
@@ -185,7 +155,6 @@ export function SessionReader({ sid }: { sid: string }) {
   useEffect(() => {
     let cancelled = false
     const abortController = new AbortController()
-    setRouteRecords(null)
     setState({ phase: 'loading', loaded: 0, total: null })
     void (async () => {
       const meta = await fetchHubMeta(sid)
@@ -216,50 +185,12 @@ export function SessionReader({ sid }: { sid: string }) {
     }
   }, [initialRecordIndex, sid])
 
-  const routeRecordTotal =
-    state.phase === 'ready' &&
-    state.meta.sid === sid &&
-    state.spoolDocument !== null &&
-    state.records.length === 0 &&
-    state.meta.count <= MAX_ROUTE_EVIDENCE_RECORDS
-      ? state.meta.count
-      : null
-
-  useEffect(() => {
-    if (routeRecordTotal === null || routeRecordTotal === 0) return
-    let cancelled = false
-    const abortController = new AbortController()
-    void loadSessionRouteRecords(sid, routeRecordTotal, defaultSessionContentDeps, {
-      isCancelled: () => cancelled,
-      signal: abortController.signal,
-    }).then((records) => {
-      if (!cancelled && records !== null) setRouteRecords({ sid, records })
-    })
-    return () => {
-      cancelled = true
-      abortController.abort()
-    }
-  }, [routeRecordTotal, sid])
-
-  const effectiveRecords =
-    state.phase === 'ready' && state.records.length === 0 && routeRecords?.sid === sid
-      ? routeRecords.records
-      : state.phase === 'ready'
-        ? state.records
-        : []
+  const readyRecords = state.phase === 'ready' ? state.records : null
 
   const conversation = useMemo(
-    () => (state.phase === 'ready' ? parseHubConversation(provider, effectiveRecords) : null),
-    [effectiveRecords, state.phase, provider],
+    () => (readyRecords === null ? null : parseHubConversation(provider, readyRecords)),
+    [provider, readyRecords],
   )
-
-  const route = useMemo(() => {
-    if (state.phase !== 'ready') return null
-    const rawRoute = deriveSessionRoute(effectiveRecords)
-    return state.spoolDocument === null
-      ? rawRoute
-      : projectSessionRouteToSpool(rawRoute, state.spoolDocument)
-  }, [effectiveRecords, state])
 
   if (state.phase === 'not-found') return <Tombstone reason="not-found" />
 
@@ -284,7 +215,7 @@ export function SessionReader({ sid }: { sid: string }) {
               account to continue.
             </p>
             <a
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 text-[13px] font-semibold text-white no-underline hover:opacity-90"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent-fill)] px-4 text-[13px] font-semibold text-[var(--accent-ink)] no-underline hover:opacity-90"
               href={`/sign-in?next=${encodeURIComponent(next)}`}
             >
               Sign in
@@ -353,7 +284,6 @@ export function SessionReader({ sid }: { sid: string }) {
           view={state.view}
           provider={provider}
           conversation={conversation}
-          route={route}
           spoolDocument={state.spoolDocument}
           isDark={isDark}
           initialRecordIndex={initialRecordIndex}

@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 import HomePage from '../components/site/home'
+import { fetchMe, type MeFetchResult } from '../lib/api'
 import { PUBLIC_SITE_ORIGIN, siteOgImageMeta } from '../lib/site'
 
 const TITLE = 'Spool — One shared space for agent sessions'
@@ -37,5 +39,36 @@ export const Route = createFileRoute('/_site/')({
     ],
     scripts: [{ type: 'application/ld+json', children: JSON_LD }],
   }),
-  component: HomePage,
+  component: HomeRoute,
 })
+
+/**
+ * Signed-in visitors land on the Sessions feed: the marketing page is for
+ * people who don't have an account yet (and for crawlers, which always see
+ * the signed-out render). Only a fresh `/api/me` response may trigger the
+ * redirect; local identity caches are presentation hints, not proof that the
+ * browser still has a valid session.
+ */
+export async function hasFreshHomeSession(
+  fetchCurrentMe: () => Promise<{ kind: MeFetchResult['kind'] }> = fetchMe,
+): Promise<boolean> {
+  return (await fetchCurrentMe()).kind === 'ok'
+}
+
+function HomeRoute() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    let alive = true
+    void hasFreshHomeSession().then((isSignedIn) => {
+      if (alive && isSignedIn) {
+        void navigate({ to: '/sessions', search: { sort: 'recommended' }, replace: true })
+      }
+    })
+    return () => {
+      alive = false
+    }
+  }, [navigate])
+
+  return <HomePage />
+}

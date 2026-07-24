@@ -16,8 +16,9 @@ import { AUTH_IDENTITY_CHANGED, type AuthIdentity } from '../lib/auth-cache'
 import { resolveAuthState } from '../lib/auth-state'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
+import { AccountMenu } from './AccountMenu'
 
-export type WorkspaceDestination = 'explore' | 'sessions' | 'teams'
+export type WorkspaceDestination = 'feed' | 'library' | 'teams'
 
 interface WorkspaceFrameProps {
   active: WorkspaceDestination
@@ -34,8 +35,8 @@ const PRIMARY_DESTINATIONS: ReadonlyArray<{
   label: string
   icon: typeof Compass
 }> = [
-  { id: 'explore', href: '/explore?sort=recommended', label: 'Explore', icon: Compass },
-  { id: 'sessions', href: '/my-sessions', label: 'My Sessions', icon: Library },
+  { id: 'feed', href: '/sessions', label: 'Sessions', icon: Compass },
+  { id: 'library', href: '/my-sessions', label: 'My Sessions', icon: Library },
   { id: 'teams', href: '/teams', label: 'Teams', icon: Users },
 ]
 
@@ -178,7 +179,7 @@ function WorkspaceSidebar({
   )
 }
 
-function WorkspaceMobileHeader({
+export function WorkspaceMobileHeader({
   active,
   identity,
 }: {
@@ -196,14 +197,7 @@ function WorkspaceMobileHeader({
             Sign in
           </ButtonLink>
         ) : (
-          <a
-            className="workspace-mobile-account"
-            href="/me"
-            title="Your account"
-            aria-label="Open your account"
-          >
-            <Avatar src={identity.src} name={identity.name} alt="" size="md" />
-          </a>
+          <AccountMenu name={identity.name} src={identity.src} />
         )}
         <MobileMenu
           className="workspace-mobile-menu"
@@ -216,7 +210,7 @@ function WorkspaceMobileHeader({
             label="Mobile workspace navigation"
           />
           <nav className="workspace-mobile-menu-utilities" aria-label="Mobile resources">
-            <NavItem href="/explore?sort=recommended" leading={<Search aria-hidden="true" />}>
+            <NavItem href="/sessions" leading={<Search aria-hidden="true" />}>
               Search Sessions
             </NavItem>
             <ButtonLink href="/docs/quick-start" size="lg" variant="accent">

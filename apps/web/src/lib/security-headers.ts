@@ -1,5 +1,5 @@
 // Security headers for the runtime-SSR'd app surfaces (/s/*, /session/*,
-// /@*, /explore, /me, /my-sessions, /teams*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
+// /@*, /explore, /sessions, /me, /my-sessions, /teams*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
 // file from the standalone share-web era — same values, same per-route
 // CSP split — applied by the request middleware in src/start.ts because
 // the merged app serves these routes through the TanStack Start worker
@@ -55,7 +55,7 @@ const BASE_HEADERS: Record<string, string> = {
 const READER_PREFIXES = ['/s/', '/session/', '/@']
 const ACCOUNT_PATHS = ['/me', '/my-sessions', '/teams', '/sign-in', '/cli-auth']
 const ACCOUNT_PREFIXES = ['/teams/']
-const PUBLIC_APP_PATHS = ['/explore']
+const PUBLIC_APP_PATHS = ['/explore', '/sessions']
 const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']
 
 function isAccountPath(pathname: string): boolean {
@@ -65,10 +65,30 @@ function isAccountPath(pathname: string): boolean {
   )
 }
 
+type RequestTarget = string | URL
+
+function requestUrl(target: RequestTarget): URL {
+  return target instanceof URL ? target : new URL(target, 'https://spool.new')
+}
+
+/**
+ * `/sessions` is public by default, but its authenticated scopes render
+ * account- or tenant-owned data after hydration. Inspect every repeated scope
+ * value so `?scope=public&scope=team` cannot weaken the response policy.
+ */
+function isPrivateSessionsScope(url: URL, path: string): boolean {
+  return (
+    path === '/sessions' &&
+    url.searchParams.getAll('scope').some((scope) => scope === 'mine' || scope === 'team')
+  )
+}
+
 export function securityHeadersFor(
-  pathname: string,
+  target: RequestTarget,
   nonce?: string,
 ): Record<string, string> | null {
+  const url = requestUrl(target)
+  const pathname = url.pathname
   const path = pathname.replace(/\/+$/, '') || '/'
 
   if (READER_PREFIXES.some((p) => pathname.startsWith(p))) {
@@ -79,7 +99,7 @@ export function securityHeadersFor(
     }
   }
 
-  if (isAccountPath(pathname)) {
+  if (isAccountPath(pathname) || isPrivateSessionsScope(url, path)) {
     return {
       ...BASE_HEADERS,
       'X-Robots-Tag': 'noindex',
@@ -108,8 +128,17 @@ export function securityHeadersFor(
  *  Team, and v2 Session documents are always private/no-store because the
  *  middleware cannot safely infer a Session's tenant visibility from the
  *  final HTML response. Other routes keep their default cache behavior. */
-export function cacheHeaderFor(pathname: string, status: number): string | null {
-  if (isAccountPath(pathname) || pathname.startsWith('/session/')) return 'private, no-store'
+export function cacheHeaderFor(target: RequestTarget, status: number): string | null {
+  const url = requestUrl(target)
+  const pathname = url.pathname
+  const path = pathname.replace(/\/+$/, '') || '/'
+  if (
+    isAccountPath(pathname) ||
+    isPrivateSessionsScope(url, path) ||
+    pathname.startsWith('/session/')
+  ) {
+    return 'private, no-store'
+  }
   if (!READER_PREFIXES.some((p) => pathname.startsWith(p))) return null
   return status === 200 ? 'public, max-age=30, s-maxage=30, must-revalidate' : 'no-store'
 }

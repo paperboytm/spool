@@ -31,10 +31,11 @@ The public web must show the artifact before explaining the product. Real Sessio
 
 ### Public web
 
-- **Header:** Compact and persistent on marketing and reading surfaces. Wordmark is the only route back to the homepage; `Explore` and search are primary, while `Publish` and account state sit on the right. `Docs` is a utility link grouped with `Terms`, `Privacy`, and `GitHub`, not a primary destination. Signed-out visitors see `Sign in`; signed-in users see Team access and their account avatar. On mobile, every retained action uses a 44px target.
-- **Homepage:** Featured-first editorial layout. The hero pairs a concise promise with one real featured Session—never a screenshot of the desktop app. Primary CTA is `Explore Sessions`; secondary CTA is `Share Yours`. Both are prominent 48px controls without directional-arrow decoration. Search stays compact until the public corpus is large enough to make search-first discovery useful.
+- **Header:** Compact and persistent on marketing and reading surfaces. The grouping rule is strict: the left side answers "where can I go" (Wordmark home + at most `Sessions` and `Docs`), the right side keeps exactly one primary action (`Publish`) plus one identity affordance (`Sign in` when signed out; the avatar menu when signed in). Search never appears in the header — it belongs inside the Sessions feed. `Blog` lives in the footer. Theme, `My Sessions`, `Teams`, account, and sign-out live inside the avatar menu, never as parallel header icons. On mobile, every retained action uses a 44px target.
+- **Avatar menu:** The avatar opens a popover menu (`Account`, `My Sessions`, `Teams` — or the contextual `Team · {name}` shortcut — a theme toggle, and `Sign out`). It is navigation only; authorization still comes from the server.
+- **Homepage:** Featured-first editorial layout for signed-out visitors and crawlers; a signed-in visitor landing on `/` is redirected to `/sessions`, because the feed is their workspace. The hero pairs a concise promise with one real featured Session—never a screenshot of the desktop app. Primary CTA is `Explore Sessions` (linking to `/sessions`); secondary CTA is `Share Yours`. Both are prominent 48px controls without directional-arrow decoration. Search stays compact until the public corpus is large enough to make search-first discovery useful.
 - **Homepage feed:** Public Sessions appear immediately after the hero. Use information-rich rows or cards with author, agent, topic/project, Summary excerpt, evidence, and continuation state. Avoid equal-weight feature tiles.
-- **Discovery:** Search is prominent at the top, followed by clear agent and query filters. Its persistent product navigation is `Explore`, `My Sessions`, and `Teams`; the wordmark alone returns home. Public results use exactly two orders: `Top` (global quality, useful evidence, qualified reading, and recency) and `Recent` (newest first). Do not label a global ranking `For you`, and do not expose a separate `Trending` tab. Results remain readable without opening each Session.
+- **Discovery:** One unified feed at `/sessions` with a scope switcher: `Public`, `Team · {name}` (one per membership), and `Mine`. Scope tabs render only after the server confirms membership — Team names never come from navigation state alone, and the Team scope is served `private, no-store` like every Team surface. `/explore` remains a compatibility redirect into `/sessions`. Search is prominent at the top of the Public scope, followed by clear agent and query filters. The persistent product navigation is `Sessions`, `My Sessions`, and `Teams`; the wordmark alone returns home. Public results use exactly two orders: `Top` (global quality, useful evidence, qualified reading, and recency) and `Recent` (newest first). Do not label a global ranking `For you`, and do not expose a separate `Trending` tab. Results remain readable without opening each Session.
 - **Profile:** Author identity and recurring topics come first, followed by Public Sessions. Counts support the content; they are not the hero.
 - **Session page:** Summary establishes intent and outcome; conversation/tool activity shows process; files and diff show evidence; Resume/Fork is the primary action after reading. Source and continuation lineage remain visible.
 - **Visibility:** `Link-only`, `Team · {name}`, `Public`, and `Withdrawn` are explicit text labels with icons. Never communicate visibility by icon alone at the publishing boundary.
@@ -61,7 +62,7 @@ Border radius remains restrained: 10px for cards, 8px for inputs, 6px for rows a
 
 ### Responsive shell contract
 
-- **Phone (`320–640px`):** Product and marketing headers show the Wordmark, the current account action (`Sign in` or avatar), and one 44px navigation disclosure. `Explore`, `My Sessions`, `Teams`, search, `Publish`, theme, and utility resources remain available inside that disclosure; do not compress the complete desktop header into one row.
+- **Phone (`320–640px`):** Product and marketing headers show the Wordmark, the current account action (`Sign in` or avatar), and one 44px navigation disclosure. `Sessions`, `Docs`, `Publish`, theme, and — signed in — `My Sessions` and `Teams` remain available inside that disclosure; do not compress the complete desktop header into one row.
 - **Compact (`641–768px`):** The same disclosure remains available so touch targets do not compete for width. Page content may use two columns only when each control still has its intended minimum width.
 - **Desktop (`769px+`):** The full persistent navigation is visible. Marketing and Team shells remain capped near 1120px; account forms keep their narrower reading width.
 - **Overflow invariant:** At 320, 451, 768, and 1024px, `scrollWidth` must not exceed the viewport. Long Team names, emails, badges, and action labels wrap, truncate, or move below identity instead of widening an ancestor.
@@ -73,13 +74,13 @@ Buttons express both hierarchy and state; page-level height or opacity patches a
 
 | Variant   | Purpose                                     | Default treatment                                      |
 | --------- | ------------------------------------------- | ------------------------------------------------------ |
-| `accent`  | One primary action in the current scope     | Paperboy blue fill + `--on-accent` text                |
+| `accent`  | One primary action in the current scope     | `--sp-accent-fill` blue + `--sp-on-accent` text        |
 | `outline` | Secondary, reversible, or lower-priority    | Transparent fill + strong neutral border               |
 | `ghost`   | Compact tertiary actions and navigation     | Transparent until hover/focus                          |
 | `danger`  | Destructive membership or workspace changes | Error text/border; restrained error-tinted hover state |
 
 - **Sizes:** `sm = 28px`, `md = 32px`, `lg = 48px`. Input-adjacent actions use `lg`; phone/compact adaptations raise any smaller actionable control to at least 44px.
-- **Accent text:** `--sp-on-accent` maintains at least 4.5:1 contrast against the light and dark accent tokens; do not assume white text is readable on Paperboy blue.
+- **Accent fill:** Buttons fill with `--sp-accent-fill` (light `#0B6BDB` + white ink; dark `#5BB1F0` + `#0B1520` ink), not the raw brand accent. `--sp-on-accent` maintains at least 4.5:1 against `--sp-accent-fill` in both themes. The brand `--sp-accent` (`#1387FF`/`#5BB1F0`) stays for links, text, icons, and borders — white text on light-mode `#1387FF` is only 3.5:1 and is never allowed.
 - **Disabled:** Disabled buttons use neutral surface, border, and muted text tokens. Never lower the opacity of the entire button, and never leave faint text on an accent fill.
 - **Loading:** Loading preserves the button’s hierarchy, swaps its leading icon for a spinner, sets `aria-busy="true"`, and blocks repeat submission. It does not visually collapse into the disabled treatment.
 - **Danger:** Destructive styling belongs to the shared `danger` variant, not a page-specific red-text class.
@@ -127,33 +128,35 @@ Buttons express both hierarchy and state; page-level height or opacity patches a
 
 ### Light Mode
 
-| Token         | Hex       | Usage                                                 |
-| ------------- | --------- | ----------------------------------------------------- |
-| `--bg`        | `#FFFFFF` | App background — pure white                           |
-| `--surface`   | `#F5F5F5` | Cards, titlebar, status bar                           |
-| `--surface2`  | `#ECECEC` | Hovered surfaces, mode pill background                |
-| `--border`    | `#E5E5E5` | Dividers, card borders                                |
-| `--border2`   | `#D4D4D4` | Input borders, focused-adjacent                       |
-| `--text`      | `#0A0A0A` | Primary text                                          |
-| `--muted`     | `#666666` | Secondary text, labels                                |
-| `--faint`     | `#A3A3A3` | Placeholder text, disabled state                      |
-| `--accent`    | `#1387FF` | Primary accent — Paperboy wing blue                   |
-| `--accent-bg` | `#E7F2FF` | Accent-tinted backgrounds (selected state, AI answer) |
+| Token           | Hex       | Usage                                                    |
+| --------------- | --------- | -------------------------------------------------------- |
+| `--bg`          | `#FFFFFF` | App background — pure white                              |
+| `--surface`     | `#F5F5F5` | Cards, titlebar, status bar                              |
+| `--surface2`    | `#ECECEC` | Hovered surfaces, mode pill background                   |
+| `--border`      | `#E5E5E5` | Dividers, card borders                                   |
+| `--border2`     | `#D4D4D4` | Input borders, focused-adjacent                          |
+| `--text`        | `#0A0A0A` | Primary text                                             |
+| `--muted`       | `#666666` | Secondary text, labels                                   |
+| `--faint`       | `#A3A3A3` | Placeholder text, disabled state                         |
+| `--accent`      | `#1387FF` | Primary accent — Paperboy wing blue (links, text, icons) |
+| `--accent-fill` | `#0B6BDB` | Accent button/CTA fill; pairs with white `--on-accent`   |
+| `--accent-bg`   | `#E7F2FF` | Accent-tinted backgrounds (selected state, AI answer)    |
 
 ### Dark Mode
 
-| Token         | Hex       | Usage                                      |
-| ------------- | --------- | ------------------------------------------ |
-| `--bg`        | `#000000` | Void black                                 |
-| `--surface`   | `#090909` | Cards, titlebar, status bar                |
-| `--surface2`  | `#111111` | Hovered surfaces                           |
-| `--border`    | `#1F1F1F` | Dividers                                   |
-| `--border2`   | `#2E2E2E` | Input borders                              |
-| `--text`      | `#FFFFFF` | Primary text                               |
-| `--muted`     | `#A6A6A6` | Secondary text                             |
-| `--faint`     | `#555555` | Placeholder, disabled                      |
-| `--accent`    | `#5BB1F0` | Accent brightened for dark — Paperboy blue |
-| `--accent-bg` | `#0E2740` | Accent backgrounds on dark                 |
+| Token           | Hex       | Usage                                                |
+| --------------- | --------- | ---------------------------------------------------- |
+| `--bg`          | `#000000` | Void black                                           |
+| `--surface`     | `#090909` | Cards, titlebar, status bar                          |
+| `--surface2`    | `#111111` | Hovered surfaces                                     |
+| `--border`      | `#1F1F1F` | Dividers                                             |
+| `--border2`     | `#2E2E2E` | Input borders                                        |
+| `--text`        | `#FFFFFF` | Primary text                                         |
+| `--muted`       | `#A6A6A6` | Secondary text                                       |
+| `--faint`       | `#555555` | Placeholder, disabled                                |
+| `--accent`      | `#5BB1F0` | Accent brightened for dark — Paperboy blue           |
+| `--accent-fill` | `#5BB1F0` | Accent button fill on dark; pairs with `#0B1520` ink |
+| `--accent-bg`   | `#0E2740` | Accent backgrounds on dark                           |
 
 ### Source Badge Colors
 
@@ -248,7 +251,9 @@ Semantic colors are tuned for contrast against the void palette — never use Ta
 - **Header:** Author attribution, agent/source, `Public` label, publication time, and lineage when present.
 - **First screen:** Summary and machine-derived evidence are visually separated. Summary is interpretive; files, diffstat, and tool activity are evidence.
 - **Reading depth:** Summary → conversation/tool timeline → files/diff → record deep link.
-- **Primary continuation action:** `Resume session` or `Fork with [agent]`. Explain that this creates new work and leaves the source unchanged.
+- **Primary continuation action:** one accent `Resume in [agent]` button that opens a clone-style popup (GitHub `Code` button pattern). The popup offers one command per situation — `Spool CLI installed` (`spool resume <sid>`) as the default tab, and `First time — install Spool` (install script + resume) one tab away — each with its own copy action. Never force the curl bootstrap inline on the page. Explain that resuming creates new work and leaves the source unchanged.
+- **Session titles:** the reading surface prefers the summary-derived task title (what the Session accomplished), falling back to the first-prompt-derived label only for legacy Sessions. Titles are stored bilingually (`title` English, `title_zh` Simplified Chinese, ≤96 chars, generated by the author's local agent from the summary front-matter standard) and picked by the reader's locale.
+- **Token cost:** when recorded usage exists, show the estimated API cost as quiet mono metadata (`$1.87 · 2.4M tokens`) beside publication facts — evidence, not a vanity metric. Costs are computed at publish time from a vendored model-pricing snapshot (LiteLLM-style, refreshed by editing the file); the read path never fetches pricing.
 - **Link-only Session:** Same reader, but label it `Link-only` and exclude discovery navigation that implies public listing.
 - **Withdrawn:** Keep a stable unavailable page with no leaked title, Summary, author, or content.
 
@@ -458,5 +463,11 @@ In dense lists, prefer compact facts over repeated pronouns:
 | 2026-07-22 | CLI replaces the distributed desktop app        | Local preparation and continuation ship through the installed `spool` command; `/install.sh`, npm, GitHub releases, and production web advance as one CLI-first release train.                                                                                                                                                                 |
 | 2026-07-23 | Web navigation is login-aware and continuous    | Landing, product, account, and publishing-guide surfaces keep `Explore`, `Docs`, and `Publish` discoverable while the right-side account action changes from `Sign in` to Teams plus the user avatar. Homepage CTAs use `Explore Sessions` and `Share Yours` without arrows.                                                                   |
 | 2026-07-23 | Discovery owns the product workspace navigation | Supersedes the primary-Docs portion of the earlier navigation decision: the product rail is `Explore`, `My Sessions`, and `Teams`; the wordmark alone returns home; `Docs` moves beside legal/resource links. Explore exposes only honest global `Top` and chronological `Recent` orders, and Team Sessions default to a recent activity feed. |
+| 2026-07-24 | `--sp-accent-fill` owns button fills            | Near-black ink on `#1387FF` read as a rendering bug. Buttons now fill with `#0B6BDB` + white ink in light mode (5.07:1) while `#1387FF` stays the brand accent for links/text/icons; dark mode keeps `#5BB1F0` + `#0B1520` ink (7.87:1). White on light-mode `#1387FF` (3.5:1) remains forbidden.                                              |
+| 2026-07-24 | `/sessions` is the one feed with scopes         | `/explore` and `/teams` split one content type (a Session feed) across two surfaces. `/sessions` unifies them behind `Public` / `Team · {name}` / `Mine` scope tabs; `/explore` stays as a redirect; `/teams/{id}` keeps Members/Settings management. Scope tabs render only after the server confirms membership.                             |
+| 2026-07-24 | Header keeps one action + one identity entry    | Left side: Wordmark plus at most `Sessions` and `Docs`. Right side: `Publish` plus `Sign in`/avatar. Search moved into the feed, `Blog` into the footer, and theme/`My Sessions`/`Teams`/sign-out into the avatar menu. Signed-in visits to `/` land on `/sessions`.                                                                           |
+| 2026-07-24 | Session route map retired                       | The bezier "goal trail" on Session pages shipped before it was ready and read as noise; the timeline, prompts rail, and diff evidence already carry the reading depth. Remove rather than iterate in public.                                                                                                                                   |
+| 2026-07-24 | Resume is a clone-style popup                   | One inline curl command punished users who already had the CLI. The accent `Resume in [agent]` trigger opens options per situation (installed → `spool resume`, first-time → install + resume), mirroring GitHub's Code button.                                                                                                                |
+| 2026-07-24 | Titles are bilingual task outcomes; cost shown  | The local summary agent emits front-matter (`title` en / `title_zh` zh, ≤96 chars) describing what the Session accomplished — never the first prompt. Readers get their locale's title. Token usage is aggregated at share time and priced from a vendored snapshot; `$ · tokens` renders as quiet mono evidence.                              |
 | 2026-07-18 | Geist Sans for chrome; Geist Mono for records   | The font split distinguishes product interface from authentic Session content, commands, paths, and URLs.                                                                                                                                                                                                                                      |
 | 2026-07-18 | Icons follow adjacent-role sizing               | Local consistency within a row or toolbar matters more than a rigid global icon whitelist.                                                                                                                                                                                                                                                     |

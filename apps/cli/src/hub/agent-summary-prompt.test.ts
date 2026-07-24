@@ -66,11 +66,43 @@ describe('buildSessionSummaryPrompt', () => {
     expect(result.prompt).toContain('Do not default to English')
     expect(result.prompt).toContain('Treat the first substantive user prompt')
     expect(result.prompt).toContain('Write like a polished GitHub README')
-    expect(result.prompt).toContain('Start with `# <specific title>`')
+    expect(result.prompt).toContain('start the body with `# <specific title>`')
     expect(result.prompt).toContain('`## What happened`')
     expect(result.prompt).toContain('`## Outcome`')
     expect(result.prompt).not.toContain('compact visual progress map using arrows')
     expect(result.authoredTitle).toBe('Summary: Fix the cache race')
+  })
+
+  it('demands machine-readable bilingual title front-matter at the very start of the output', () => {
+    const result = buildSessionSummaryPrompt(session, [
+      message(1, 'user', 'Please fix the cache race.'),
+    ])
+
+    // Regression: the output contract requires the summary to START with `---` front-matter.
+    expect(result.prompt).toContain(
+      'the output must START with this exact block, before any other text:\n---',
+    )
+    expect(result.prompt).not.toContain('before any other text:\n```\n---')
+    expect(result.prompt).toContain('---\ntitle: <task-outcome title in English>')
+    expect(result.prompt).toContain('title_zh: <同一任务的简体中文标题>\n---')
+
+    // Both title rules: fixed languages plus the 96-character single-line cap.
+    expect(result.prompt).toContain('`title` is ALWAYS English')
+    expect(result.prompt).toContain('`title_zh` is ALWAYS Simplified Chinese')
+    expect(result.prompt).toContain('at most 96 characters')
+    expect(result.prompt).toContain('no trailing period')
+
+    // At least one good/bad example pair in both languages.
+    expect(result.prompt).toContain('Fix daemon reconnect loop after macOS sleep/wake')
+    expect(result.prompt).toContain('修复 macOS 休眠唤醒后 daemon 重连死循环')
+    expect(result.prompt).toContain('帮我看看这个 bug` (prompt echo)')
+    expect(result.prompt).toContain('A productive coding session` (vague)')
+
+    // Titles must never echo the first prompt, and the body heading follows body language.
+    expect(result.prompt).toContain('Never echo or paraphrase the first user prompt')
+    expect(result.prompt).toContain(
+      'Use `title_zh` as this heading when the body language is Chinese, otherwise use `title`',
+    )
   })
 
   it('escapes transcript and title markers so indexed agent sessions stay clean', () => {

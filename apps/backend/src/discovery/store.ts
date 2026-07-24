@@ -4,6 +4,9 @@ import type { DiscoverySort, SessionProvider } from '@spool-lab/session-kit'
 export type DiscoveryCandidateRow = {
   sid: string
   title: string
+  title_json: string | null
+  cost_usd: number | null
+  total_tokens: number | null
   summary_text: string | null
   search_text: string
   agent: SessionProvider
@@ -212,6 +215,9 @@ export async function listDiscoveryPage(
          SELECT
            d.sid,
            d.title,
+           d.title_json,
+           d.cost_usd,
+           d.total_tokens,
            d.summary_text,
            d.search_text,
            d.agent,
@@ -280,6 +286,9 @@ export async function listDiscoveryPage(
        SELECT
          d.sid,
          d.title,
+         d.title_json,
+         d.cost_usd,
+         d.total_tokens,
          d.summary_text,
          d.search_text,
          d.agent,

@@ -26,6 +26,8 @@ export interface HubSessionMeta {
   createdAt: number
   updatedAt: number
   visibility: 'public' | 'link-only' | 'team'
+  /** Cost snapshot persisted when this head was published. */
+  cost?: { usd: number | null; totalTokens: number } | null
   team?: { id: string; name: string } | null
   author: HubAuthor
 }

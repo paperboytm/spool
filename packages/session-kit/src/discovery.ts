@@ -25,6 +25,10 @@ export interface DiscoveryLineage {
 export interface DiscoverySessionItem {
   sid: string
   title: string
+  /** Bilingual task-outcome titles from the summary front-matter. */
+  titles?: { en?: string; zh?: string }
+  /** Estimated API cost from recorded token usage; absent for legacy rows. */
+  cost?: { usd: number | null; totalTokens: number } | null
   /** Plain text, bounded for feed rendering; never Markdown. */
   summaryExcerpt: string | null
   agent: SessionProvider

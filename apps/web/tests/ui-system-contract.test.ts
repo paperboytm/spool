@@ -110,7 +110,6 @@ describe('Web shared UI contract', () => {
       /\.sp-mobile-menu\.sw-header-mobile-menu\s*\{[^}]*display:\s*inline-flex;/,
     )
     expect(appMobile).toMatch(/\.sw-signin-link\s*\{[^}]*min-height:\s*44px;/)
-    expect(appMobile).toMatch(/\.sw-account-link\s*\{[^}]*width:\s*44px;/)
 
     expect(siteMobile).toMatch(/\.site-main-nav\s*\{[^}]*display:\s*none;/)
     expect(siteCss).toMatch(
@@ -120,14 +119,37 @@ describe('Web shared UI contract', () => {
       /\.sp-mobile-menu\.site-mobile-menu\s*\{[^}]*display:\s*inline-flex;/,
     )
     expect(siteMobile).toMatch(/\.site-signin-link\s*\{[^}]*min-height:\s*44px;/)
-    expect(siteMobile).toMatch(/\.site-account-link\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/)
     expect(siteMobile).toMatch(/\.brand\s*\{[^}]*min-height:\s*44px;/)
+
+    // The avatar-anchored account menu replaced the old per-header account
+    // links; its trigger and rows keep the 44px phone/compact targets.
+    const accountMenuCss = source('src/styles/account-menu.css')
+    const accountMenuMobile = accountMenuCss.split('@media (max-width: 768px)')[1] ?? ''
+    expect(accountMenuMobile).toMatch(
+      /\.account-menu-trigger\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/,
+    )
+    expect(accountMenuMobile).toMatch(/\.account-menu-item\s*\{[^}]*min-height:\s*44px;/)
 
     expect(workspaceMobile).toMatch(/\.workspace-mobile-menu\s*\{[^}]*display:\s*inline-flex;/)
     expect(workspaceMobile).toMatch(
       /\.workspace-mobile-menu-primary \.sp-nav-item,[^{]*\{[^}]*min-height:\s*44px;/,
     )
-    expect(workspaceCss).toMatch(/\.workspace-mobile-account\s*\{[^}]*width:\s*44px;/)
+    expect(workspaceCss).not.toContain('.workspace-mobile-account')
     expect(workspaceCss).not.toContain('@media (max-width: 980px)')
+  })
+
+  it('contains long or numerous Session scope tabs inside the viewport', () => {
+    const exploreCss = source('src/styles/explore.css')
+    const exploreMobile = exploreCss.split('@media (max-width: 768px)')[1] ?? ''
+
+    expect(exploreCss).toMatch(
+      /\.sessions-scope-tabs\s*\{[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-inline:\s*contain;/,
+    )
+    expect(exploreCss).toMatch(
+      /\.sessions-scope-tabs \.sp-tabs__tab\s*\{[^}]*flex:\s*0 0 auto;[^}]*max-width:\s*min\(280px,\s*calc\(100vw - var\(--sp-space-8\)\)\);[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/,
+    )
+    expect(exploreMobile).toMatch(
+      /\.sessions-scope-tabs \.sp-tabs__tab,[^{]*\{[^}]*min-height:\s*44px;/,
+    )
   })
 })

@@ -204,6 +204,10 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
             publishedAt: session.created_at,
             updatedAt: now,
             view,
+            costOverride:
+              session.total_tokens !== null && session.total_tokens > 0
+                ? { usd: session.cost_usd, totalTokens: session.total_tokens }
+                : null,
           }),
           projectionGate,
         ),

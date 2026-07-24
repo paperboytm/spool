@@ -69,7 +69,7 @@ function Hero() {
 
         <div className="hh-cta">
           <InstallCommandPill />
-          <ButtonLink href="/explore" className="hh-btn" variant="accent">
+          <ButtonLink href="/sessions" className="hh-btn" variant="accent">
             Explore Sessions
           </ButtonLink>
           <ButtonLink href="/docs/quick-start" className="hh-btn" variant="outline">

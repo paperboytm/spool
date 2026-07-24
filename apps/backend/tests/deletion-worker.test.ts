@@ -101,6 +101,8 @@ async function seedHubData(
     lineage_json: null,
     view_oid: options.oids[0] ?? null,
     spool_file_oid: null,
+    cost_usd: null,
+    total_tokens: null,
     visibility: 'unlisted',
     withdrawn_at: null,
     created_at: now,

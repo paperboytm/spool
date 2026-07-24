@@ -2,10 +2,12 @@ import type { KVNamespace } from '@cloudflare/workers-types'
 import {
   canonicalizeRecord,
   composeSessionDiff,
+  costForUsage,
   deriveView,
   extractEditEvents,
   sequenceRoot,
   type CanonicalRecord,
+  type SessionUsageV1,
 } from '@spool-lab/session-kit'
 import { describe, expect, it, vi } from 'vite-plus/test'
 
@@ -160,6 +162,27 @@ async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) 
     viewOid: view.oid,
   }
   return { records, view, viewValue, head, entries: [...records, view] }
+}
+
+async function replaceFixtureView(fixture: Fixture, viewValue: unknown): Promise<void> {
+  const view = await canonicalizeRecord(JSON.stringify(viewValue))
+  fixture.view = view
+  fixture.head.viewOid = view.oid
+  fixture.entries = [...fixture.records, view]
+}
+
+function pricedUsage(): SessionUsageV1 {
+  return {
+    models: {
+      'claude-sonnet-4-5-20250929': {
+        input: 1_000_000,
+        output: 100_000,
+        cacheRead: 50_000,
+        cacheWrite: 10_000,
+      },
+    },
+    records: 1,
+  }
 }
 
 function tokensDeleteRequest(token: string): Request {
@@ -561,6 +584,121 @@ describe('hub head and withdrawal', () => {
     await expect(response.json()).resolves.toMatchObject({ detail: 'invalid session view' })
     expect(env.state.hub_sessions).toHaveLength(0)
     expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('rejects untrusted usage shapes and token totals before advancing the head', async () => {
+    const counts = { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }
+    const missingFieldCases = (['input', 'output', 'cacheRead', 'cacheWrite'] as const).map(
+      (field) => {
+        const incomplete: Record<string, number> = { ...counts }
+        delete incomplete[field]
+        return [`missing ${field}`, { models: { model: incomplete }, records: 1 }] as const
+      },
+    )
+    const invalidUsages: ReadonlyArray<readonly [string, unknown]> = [
+      ['models is not an object', { models: [], records: 0 }],
+      [
+        'too many models',
+        {
+          models: Object.fromEntries(
+            Array.from({ length: 1_001 }, (_, index) => [`model-${index}`, counts]),
+          ),
+          records: 1,
+        },
+      ],
+      ['blank model id', { models: { ' ': counts }, records: 1 }],
+      ['model id with whitespace', { models: { 'model id': counts }, records: 1 }],
+      ['oversized model id', { models: { ['m'.repeat(257)]: counts }, records: 1 }],
+      ['negative records', { models: { model: counts }, records: -1 }],
+      ['fractional records', { models: { model: counts }, records: 1.5 }],
+      ['too many usage records', { models: { model: counts }, records: 100_001 }],
+      ['unsafe records', { models: { model: counts }, records: Number.MAX_SAFE_INTEGER + 1 }],
+      ['negative tokens', { models: { model: { ...counts, input: -1 } }, records: 1 }],
+      ['fractional tokens', { models: { model: { ...counts, output: 1.5 } }, records: 1 }],
+      [
+        'cumulative token overflow',
+        {
+          models: {
+            first: {
+              input: Number.MAX_SAFE_INTEGER,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+            },
+            second: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+          records: 2,
+        },
+      ],
+      ...missingFieldCases,
+    ]
+
+    for (const [label, usage] of invalidUsages) {
+      const env = envFor()
+      await seedUsers(env)
+      const fixture = await makeFixture()
+      await replaceFixtureView(fixture, { ...fixture.viewValue, usage })
+
+      const response = await uploadAndCommit(env, fixture)
+
+      expect(response.status, label).toBe(422)
+      await expect(response.json()).resolves.toMatchObject({ detail: 'invalid session view' })
+      expect(env.state.hub_sessions, label).toHaveLength(0)
+      expect(env.state.hub_session_discovery, label).toHaveLength(0)
+    }
+  })
+
+  it('freezes validated usage cost on the Hub row and exposes it through metadata', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const usage = pricedUsage()
+    const expected = costForUsage(usage)
+    expect(expected).not.toBeNull()
+    await replaceFixtureView(fixture, { ...fixture.viewValue, usage })
+
+    const response = await uploadAndCommit(env, fixture)
+
+    expect(response.status).toBe(200)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      cost_usd: expected!.usd,
+      total_tokens: expected!.totalTokens,
+    })
+    expect(env.state.hub_session_discovery[0]).toMatchObject({
+      cost_usd: expected!.usd,
+      total_tokens: expected!.totalTokens,
+    })
+
+    const metadata = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(metadata.status).toBe(200)
+    await expect(metadata.json()).resolves.toMatchObject({
+      cost: { usd: expected!.usd, totalTokens: expected!.totalTokens },
+    })
+  })
+
+  it('reuses the Hub-frozen cost when visibility publishes an existing Session', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    await replaceFixtureView(fixture, { ...fixture.viewValue, usage: pricedUsage() })
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    expect((await changeVisibility(env, { visibility: 'link-only' })).status).toBe(200)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+
+    // A sentinel persisted value makes a repricing regression observable:
+    // recomputing from the immutable view would produce a different result.
+    Object.assign(env.state.hub_sessions[0]!, {
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
+
+    const published = await changeVisibility(env, { visibility: 'public' })
+
+    expect(published.status).toBe(200)
+    expect(env.state.hub_session_discovery[0]).toMatchObject({
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
   })
 
   it('commits a portable-provider head as Link-only without a Discovery projection', async () => {
@@ -1848,6 +1986,8 @@ describe('Team-only Hub isolation', () => {
       lineage_json: null,
       view_oid: null,
       spool_file_oid: null,
+      cost_usd: null,
+      total_tokens: null,
       visibility: 'private',
       team_id: otherTeamId,
       withdrawn_at: null,

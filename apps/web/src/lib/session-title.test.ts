@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vite-plus/test'
+
+import { formatSessionCost, pickLocalizedTitle } from './session-title'
+
+const TITLES = { en: 'Fix refresh-token race across tabs', zh: '修复跨标签页刷新令牌竞态' }
+
+describe('pickLocalizedTitle', () => {
+  it('prefers the locale title and falls back sensibly', () => {
+    expect(pickLocalizedTitle(TITLES, 'fallback', 'zh-CN')).toBe(TITLES.zh)
+    expect(pickLocalizedTitle(TITLES, 'fallback', 'zh-TW')).toBe(TITLES.zh)
+    expect(pickLocalizedTitle(TITLES, 'fallback', 'en-US')).toBe(TITLES.en)
+    expect(pickLocalizedTitle(TITLES, 'fallback', 'de')).toBe(TITLES.en)
+    expect(pickLocalizedTitle({ en: TITLES.en }, 'fallback', 'zh-CN')).toBe(TITLES.en)
+    expect(pickLocalizedTitle({ zh: TITLES.zh }, 'fallback', 'en-US')).toBe('fallback')
+    expect(pickLocalizedTitle(null, 'fallback', 'zh-CN')).toBe('fallback')
+    expect(pickLocalizedTitle({ en: '   ' }, 'fallback', 'en-US')).toBe('fallback')
+  })
+
+  it('defaults to English when no navigator locale exists (SSR)', () => {
+    // vitest node environment has no navigator; must not throw.
+    expect(pickLocalizedTitle(TITLES, 'fallback')).toBe(TITLES.en)
+  })
+})
+
+describe('formatSessionCost', () => {
+  it('formats dollars and compact token counts', () => {
+    expect(formatSessionCost({ usd: 1.87, totalTokens: 2_400_000 })).toBe('$1.87 · 2.4M tokens')
+    expect(formatSessionCost({ usd: 0.004, totalTokens: 900 })).toBe('<$0.01 · 900 tokens')
+    expect(formatSessionCost({ usd: 0, totalTokens: 500 })).toBe('$0.00 · 500 tokens')
+    expect(formatSessionCost({ usd: null, totalTokens: 1_200 })).toBe('1.2K tokens')
+  })
+
+  it('renders nothing for legacy sessions without recorded usage', () => {
+    expect(formatSessionCost(null)).toBeNull()
+    expect(formatSessionCost(undefined)).toBeNull()
+    expect(formatSessionCost({ usd: 3, totalTokens: 0 })).toBeNull()
+  })
+})

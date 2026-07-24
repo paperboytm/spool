@@ -54,6 +54,8 @@ export type {
   ResumableSessionProvider,
   SessionRecord,
   SessionRecordsOptions,
+  SessionUsageModelTotals,
+  SessionUsageV1,
   SessionViewV1,
   TextReplacement,
   ViewFileEntry,
@@ -72,3 +74,8 @@ export {
   isResumableSessionProvider,
   isSessionProvider,
 } from './types.js'
+
+export { parseSummaryFrontMatter } from './summary.js'
+export type { ParsedSummary, SessionTitles } from './summary.js'
+export { costForUsage, MODEL_PRICING } from './pricing.js'
+export type { ModelPricing, SessionCost } from './pricing.js'

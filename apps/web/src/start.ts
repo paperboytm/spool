@@ -10,16 +10,20 @@ import { createMiddleware, createStart } from '@tanstack/react-start'
 
 import { cacheHeaderFor, generateCspNonce, securityHeadersFor } from './lib/security-headers'
 
-const securityHeaders = createMiddleware().server(async ({ next, pathname }) => {
+const securityHeaders = createMiddleware().server(async ({ next, pathname, request }) => {
   const cspNonce = generateCspNonce()
   const result = await next({ context: { cspNonce } })
-  const headers = securityHeadersFor(pathname, cspNonce)
+  const requestUrl = new URL(request.url)
+  // `pathname` is Start's normalized/rewrite-aware path; the Request carries
+  // the query string needed to distinguish public and authenticated scopes.
+  requestUrl.pathname = pathname
+  const headers = securityHeadersFor(requestUrl, cspNonce)
   if (headers) {
     for (const [name, value] of Object.entries(headers)) {
       result.response.headers.set(name, value)
     }
   }
-  const cache = cacheHeaderFor(pathname, result.response.status)
+  const cache = cacheHeaderFor(requestUrl, result.response.status)
   if (cache) result.response.headers.set('Cache-Control', cache)
   return result
 })

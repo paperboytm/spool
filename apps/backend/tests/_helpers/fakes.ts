@@ -110,6 +110,8 @@ type HubSessionRow = {
   lineage_json: string | null
   view_oid: string | null
   spool_file_oid: string | null
+  cost_usd: number | null
+  total_tokens: number | null
   visibility: string
   // Added in migration 0007. Optional keeps pre-Team fixtures readable while
   // still letting deletion tests distinguish personal and Team-owned rows.
@@ -161,6 +163,9 @@ type HubSessionDiscoveryRow = {
   sid: string
   agent: SessionProvider
   title: string
+  title_json: string | null
+  cost_usd: number | null
+  total_tokens: number | null
   summary_text: string | null
   search_text: string
   message_count: number
@@ -806,6 +811,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
             qualityScore,
             publishedAt,
             updatedAt,
+            titleJson,
+            costUsd,
+            totalTokens,
           ] = params as [
             string,
             SessionProvider,
@@ -821,8 +829,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             number,
             number,
             number,
+            string | null,
+            number | null,
+            number | null,
           ]
-          if (!authorizedProjectionGateAllows(params, 14)) {
+          if (!authorizedProjectionGateAllows(params, 17)) {
             return { success: true, meta: { changes: 0 } }
           }
           const existing = state.hub_session_discovery.find((row) => row.sid === sid)
@@ -840,6 +851,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
               lineage_source_sid: lineageSourceSid,
               quality_score: qualityScore,
               updated_at: updatedAt,
+              title_json: titleJson,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
             })
           } else {
             state.hub_session_discovery.push({
@@ -857,6 +871,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
               quality_score: qualityScore,
               published_at: publishedAt,
               updated_at: updatedAt,
+              title_json: titleJson,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
             })
           }
           return { success: true, meta: { changes: 1 } }
@@ -900,6 +917,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
             qualityScore,
             publishedAt,
             updatedAt,
+            titleJson,
+            costUsd,
+            totalTokens,
           ] = params as [
             string,
             SessionProvider,
@@ -915,6 +935,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
             number,
             number,
             number,
+            string | null,
+            number | null,
+            number | null,
           ]
           const existing = state.hub_session_discovery.find((row) => row.sid === sid)
           if (existing) {
@@ -931,6 +954,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
               lineage_source_sid: lineageSourceSid,
               quality_score: qualityScore,
               updated_at: updatedAt,
+              title_json: titleJson,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
             })
           } else {
             state.hub_session_discovery.push({
@@ -948,6 +974,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
               quality_score: qualityScore,
               published_at: publishedAt,
               updated_at: updatedAt,
+              title_json: titleJson,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
             })
           }
           return { success: true, meta: { changes: 1 } }
@@ -993,6 +1022,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
             lineageJson,
             viewOid,
             spoolFileOid,
+            costUsd,
+            totalTokens,
             targetVisibility,
             targetTeamId,
             createdAt,
@@ -1024,6 +1055,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string | null,
             string,
             string | null,
+            number | null,
+            number | null,
             string,
             string | null,
             number,
@@ -1074,6 +1107,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
               lineage_json: lineageJson,
               view_oid: viewOid,
               spool_file_oid: spoolFileOid,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
               visibility: targetVisibility,
               team_id: targetTeamId,
               withdrawn_at: null,
@@ -1103,6 +1138,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
           existing.lineage_json = lineageJson
           existing.view_oid = viewOid
           existing.spool_file_oid = spoolFileOid
+          existing.cost_usd = costUsd
+          existing.total_tokens = totalTokens
           if (changeAccess === 1) {
             existing.visibility = targetVisibility
             existing.team_id = targetTeamId
@@ -1233,7 +1270,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
           return { success: true, meta: { changes: 1 } }
         }
         if (
-          /^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(
+          /^INSERT INTO hub_sessions \(sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens, visibility, withdrawn_at, created_at, updated_at\) VALUES \(\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,\?,'unlisted',NULL,\?,\?\) ON CONFLICT\(sid\) DO UPDATE SET root=excluded\.root, record_count=excluded\.record_count, sig=excluded\.sig, card_json=excluded\.card_json, note_md=excluded\.note_md, lineage_json=excluded\.lineage_json, view_oid=excluded\.view_oid, spool_file_oid=excluded\.spool_file_oid, cost_usd=excluded\.cost_usd, total_tokens=excluded\.total_tokens, withdrawn_at=NULL, updated_at=excluded\.updated_at$/i.test(
             sql,
           )
         ) {
@@ -1248,6 +1285,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
             lineageJson,
             viewOid,
             spoolFileOid,
+            costUsd,
+            totalTokens,
             createdAt,
             updatedAt,
           ] = params as [
@@ -1261,6 +1300,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string | null,
             string,
             string | null,
+            number | null,
+            number | null,
             number,
             number,
           ]
@@ -1274,6 +1315,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
             existing.lineage_json = lineageJson
             existing.view_oid = viewOid
             existing.spool_file_oid = spoolFileOid
+            existing.cost_usd = costUsd
+            existing.total_tokens = totalTokens
             existing.withdrawn_at = null
             existing.updated_at = updatedAt
           } else {
@@ -1288,6 +1331,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
               lineage_json: lineageJson,
               view_oid: viewOid,
               spool_file_oid: spoolFileOid,
+              cost_usd: costUsd,
+              total_tokens: totalTokens,
               visibility: 'unlisted',
               team_id: null,
               withdrawn_at: null,

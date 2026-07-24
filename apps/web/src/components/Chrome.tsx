@@ -8,17 +8,8 @@
 // the inline script in routes/__root.tsx before React runs, so there's
 // no flash.
 
-import {
-  Avatar,
-  Button,
-  ButtonLink,
-  IconButton,
-  IconLink,
-  MobileMenu,
-  NavItem,
-  Wordmark,
-} from '@spool-lab/ui'
-import { Library, Search, Users } from 'lucide-react'
+import { Button, ButtonLink, IconButton, MobileMenu, NavItem, Wordmark } from '@spool-lab/ui'
+import { Library, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -34,6 +25,7 @@ import { AUTH_IDENTITY_CHANGED } from '../lib/auth-cache'
 import { resolveAuthState, type AuthState } from '../lib/auth-state'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
+import { AccountMenu } from './AccountMenu'
 
 export type { AuthState } from '../lib/auth-state'
 
@@ -303,15 +295,7 @@ export function Header({
           <Wordmark />
         </a>
         <nav className="sw-header-nav" aria-label="Primary">
-          <NavItem href="/explore">Explore</NavItem>
-          <IconLink
-            className="sw-header-search"
-            href="/explore"
-            size="sm"
-            aria-label="Search Sessions"
-          >
-            <Search aria-hidden="true" />
-          </IconLink>
+          <NavItem href="/sessions">Sessions</NavItem>
         </nav>
       </div>
       <div className="sw-header-right">
@@ -324,31 +308,17 @@ export function Header({
           >
             Publish
           </ButtonLink>
-          <ThemeToggle className="sw-header-theme" />
-          {signedIn ? (
-            <a
-              className="sw-team-quick"
-              href={teamHref}
-              title={contextTeam ? `Open ${contextTeam.name}` : 'Open your teams'}
-            >
-              <Users size={14} strokeWidth={1.7} aria-hidden="true" />
-              <span>{teamLabel}</span>
-            </a>
-          ) : null}
         </div>
         {identity === null ? (
           <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
             Sign in
           </ButtonLink>
         ) : (
-          <a
-            className="sw-account-link"
-            href="/me"
-            title="Your account"
-            aria-label="Open your account"
-          >
-            <Avatar src={identity.src} name={identity.name} alt="" size="md" />
-          </a>
+          <AccountMenu
+            name={identity.name}
+            src={identity.src}
+            {...(contextTeam ? { contextTeam: { href: teamHref, label: teamLabel } } : {})}
+          />
         )}
         <MobileMenu
           className="sw-header-mobile-menu"
@@ -356,10 +326,8 @@ export function Header({
           closeLabel="Close navigation"
         >
           <nav className="sw-header-mobile-menu-items" aria-label="Mobile navigation">
-            <NavItem href="/explore">Explore</NavItem>
-            <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
-              Search Sessions
-            </NavItem>
+            <NavItem href="/sessions">Sessions</NavItem>
+            <NavItem href="/docs/installation">Docs</NavItem>
             <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
               Publish
             </ButtonLink>
@@ -400,6 +368,8 @@ export function Footer({ report, reportHref }: { report?: boolean; reportHref?: 
         </>
       )}
       <a href="/docs/installation">Docs</a>
+      <span className="sep">·</span>
+      <a href="/blog">Blog</a>
       <span className="sep">·</span>
       <a href="/terms">Terms</a>
       <span className="sep">·</span>

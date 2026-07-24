@@ -151,7 +151,12 @@ describe('controlled primitives', () => {
         value="summary"
         onValueChange={vi.fn()}
         items={[
-          { value: 'summary', label: 'Summary', ariaControls: 'summary-panel' },
+          {
+            value: 'summary',
+            label: 'Summary',
+            id: 'summary-tab',
+            ariaControls: 'summary-panel',
+          },
           { value: 'record', label: 'Record', disabled: true },
         ]}
       />,
@@ -160,6 +165,7 @@ describe('controlled primitives', () => {
     expect(html).toContain('role="tablist"')
     expect(html).toContain('aria-label="Session views"')
     expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('id="summary-tab"')
     expect(html).toContain('aria-controls="summary-panel"')
     expect(html).toContain('disabled=""')
   })

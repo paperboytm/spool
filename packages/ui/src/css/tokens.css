@@ -14,8 +14,11 @@
   --sp-muted: #666666;
   --sp-faint: #a3a3a3;
   --sp-accent: #1387ff;
+  /* Button/CTA fill: slightly deeper blue so --sp-on-accent (white) text
+     clears 4.5:1. --sp-accent stays the brand color for links/text/icons. */
+  --sp-accent-fill: #0b6bdb;
   --sp-accent-bg: #e7f2ff;
-  --sp-on-accent: #0b1520;
+  --sp-on-accent: #ffffff;
   /* Brand accent as rendered on dark surfaces (terminal mockups, dark
      theme). One knob: change this + the light/dark --sp-accent values
      above/below to retheme the whole site. */
@@ -87,6 +90,7 @@ html[data-theme='dark'] {
   --sp-muted: #a6a6a6;
   --sp-faint: #555555;
   --sp-accent: #5bb1f0;
+  --sp-accent-fill: #5bb1f0;
   --sp-accent-bg: #0e2740;
   --sp-on-accent: #0b1520;
 

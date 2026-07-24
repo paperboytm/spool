@@ -1,21 +1,13 @@
-import {
-  Avatar,
-  Button,
-  ButtonLink,
-  IconButton,
-  IconLink,
-  MobileMenu,
-  NavItem,
-  Wordmark,
-} from '@spool-lab/ui'
+import { Button, ButtonLink, IconButton, MobileMenu, NavItem, Wordmark } from '@spool-lab/ui'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Library, Moon, Search, Sun, Users } from 'lucide-react'
+import { Library, Moon, Sun, Users } from 'lucide-react'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { AUTH_IDENTITY_CHANGED, type AuthIdentity } from '../../lib/auth-cache'
 import { resolveAuthState, type AuthState } from '../../lib/auth-state'
 import { readCachedMe } from '../../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../../lib/theme'
+import { AccountMenu } from '../AccountMenu'
 import { SpoolMark } from './spool-mark'
 
 export default function SiteLayout({
@@ -39,34 +31,17 @@ export default function SiteLayout({
 
           <nav className="site-main-nav" aria-label="Primary">
             <NavItem
-              href="/explore?sort=recommended"
+              href="/sessions"
               onClick={(event) =>
                 routeInApp(event, () =>
-                  navigate({ to: '/explore', search: { sort: 'recommended' } }),
+                  navigate({ to: '/sessions', search: { sort: 'recommended' } }),
                 )
               }
             >
-              Explore
+              Sessions
             </NavItem>
-            <IconLink
-              className="site-search-link"
-              href="/explore"
-              size="sm"
-              aria-label="Search Sessions"
-              onClick={(event) =>
-                routeInApp(event, () =>
-                  navigate({ to: '/explore', search: { sort: 'recommended' } }),
-                )
-              }
-            >
-              <Search aria-hidden="true" />
-            </IconLink>
-            <NavItem
-              className="nav-hideable"
-              href="/blog"
-              onClick={(event) => routeInApp(event, () => navigate({ to: '/blog' }))}
-            >
-              Blog
+            <NavItem className="nav-hideable" href="/docs/installation">
+              Docs
             </NavItem>
           </nav>
 
@@ -79,7 +54,6 @@ export default function SiteLayout({
             >
               Publish
             </ButtonLink>
-            <ThemeToggle className="nav-hideable site-theme-toggle" />
             <SiteAccountActions auth={resolvedAuth} />
             <SiteMobileNavigation auth={resolvedAuth} />
           </div>
@@ -98,8 +72,8 @@ export default function SiteLayout({
             <span className="foot-by">by Paperboy</span>
           </a>
           <div className="foot-links">
-            <Link to="/explore" search={{ sort: 'recommended' }}>
-              Explore
+            <Link to="/sessions" search={{ sort: 'recommended' }}>
+              Sessions
             </Link>
             <Link to="/docs/$" params={{ _splat: 'quick-start' }}>
               Publish
@@ -123,7 +97,8 @@ export default function SiteLayout({
 /**
  * The account affordance is deliberately separate from the primary links:
  * login changes identity, not which Sessions the visitor is authorized to
- * read. Team and account links are navigation shortcuts only.
+ * read. Everything account-shaped (library, Teams, theme, sign out) lives
+ * behind the avatar so the header keeps one action and one identity entry.
  */
 export function SiteAccountActions({ auth }: { auth: AuthIdentity }) {
   if (auth === 'out') {
@@ -134,22 +109,7 @@ export function SiteAccountActions({ auth }: { auth: AuthIdentity }) {
     )
   }
 
-  return (
-    <>
-      <a className="site-team-link" href="/teams" title="Open your teams">
-        <Users size={14} strokeWidth={1.7} aria-hidden="true" />
-        <span>Teams</span>
-      </a>
-      <a
-        className="site-account-link"
-        href="/me"
-        title="Your account"
-        aria-label="Open your account"
-      >
-        <Avatar src={auth.src} name={auth.name} alt="" size="md" />
-      </a>
-    </>
-  )
+  return <AccountMenu name={auth.name} src={auth.src} />
 }
 
 export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
@@ -160,11 +120,8 @@ export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
       closeLabel="Close navigation"
     >
       <nav className="site-mobile-menu-items" aria-label="Mobile navigation">
-        <NavItem href="/explore?sort=recommended">Explore</NavItem>
-        <NavItem href="/explore" leading={<Search aria-hidden="true" />}>
-          Search Sessions
-        </NavItem>
-        <NavItem href="/blog">Blog</NavItem>
+        <NavItem href="/sessions">Sessions</NavItem>
+        <NavItem href="/docs/installation">Docs</NavItem>
         <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
           Publish
         </ButtonLink>

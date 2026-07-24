@@ -1,6 +1,8 @@
 import type { D1Database, D1PreparedStatement, R2Bucket } from '@cloudflare/workers-types'
 import {
+  costForUsage,
   isDiscoverySessionProvider,
+  parseSummaryFrontMatter,
   type SessionProvider,
   type SessionViewV1,
 } from '@spool-lab/session-kit'
@@ -12,6 +14,9 @@ import { SID_RE } from '../hub/wire'
 
 const MAX_VIEW_BYTES = 8 * 1024 * 1024
 const MAX_VIEW_ENTRIES = 100_000
+const MAX_USAGE_MODELS = 1_000
+const MAX_MODEL_ID_BYTES = 256
+const MODEL_ID_RE = /^[^\s\u0000-\u001f\u007f]+$/u
 const MAX_TITLE_CHARS = 200
 const MAX_SUMMARY_CHARS = 4_000
 const MAX_SEARCH_BYTES = 16 * 1024
@@ -21,6 +26,9 @@ export type DiscoveryProjection = {
   sid: string
   agent: SessionProvider
   title: string
+  titleJson: string | null
+  costUsd: number | null
+  totalTokens: number | null
   summaryText: string | null
   searchText: string
   messageCount: number
@@ -32,6 +40,11 @@ export type DiscoveryProjection = {
   qualityScore: number
   publishedAt: number
   updatedAt: number
+}
+
+type ProjectionCost = {
+  usd: number | null
+  totalTokens: number
 }
 
 export async function readDiscoveryView(
@@ -72,14 +85,23 @@ export function buildDiscoveryProjection(args: {
   publishedAt: number
   updatedAt: number
   view: SessionViewV1
+  /** A head commit freezes pricing once. Later projection rebuilds must pass
+   *  that persisted value instead of repricing the immutable view. */
+  costOverride?: ProjectionCost | null
 }): DiscoveryProjection {
   const agent = providerFromSid(args.sid)
-  const summaryTextValue = markdownToPlainText(args.summaryMd ?? '')
+  // The summary is stored verbatim (front-matter included) so shares
+  // round-trip losslessly; the projection is where titles split out and the
+  // plain-text body feeds excerpts and search.
+  const { titles, body: summaryBody } = parseSummaryFrontMatter(args.summaryMd)
+  const summaryTextValue = markdownToPlainText(summaryBody)
   const summaryText = summaryTextValue ? boundCharacters(summaryTextValue, MAX_SUMMARY_CHARS) : null
+  const frontMatterTitle = titles?.en ?? titles?.zh ?? ''
   const promptTitle = firstNonEmptyLine(args.view.firstPrompt)
-  const summaryTitle = firstMeaningfulSummaryLine(args.summaryMd)
-  const contentTitle = promptTitle || summaryTitle
+  const summaryTitle = firstMeaningfulSummaryLine(summaryBody)
+  const contentTitle = frontMatterTitle || promptTitle || summaryTitle
   const title = boundCharacters(contentTitle || fallbackTitle(agent), MAX_TITLE_CHARS)
+  const cost = args.costOverride === undefined ? costForUsage(args.view.usage) : args.costOverride
   const messageCount = args.view.index.filter(
     (entry) => entry.kind === 'user' || entry.kind === 'assistant',
   ).length
@@ -98,6 +120,7 @@ export function buildDiscoveryProjection(args: {
 
   const searchText = boundedSearchText([
     title,
+    titles?.zh ?? '',
     summaryText ?? '',
     args.view.firstPrompt,
     args.view.lastReply,
@@ -109,6 +132,9 @@ export function buildDiscoveryProjection(args: {
     sid: args.sid,
     agent,
     title,
+    titleJson: titles ? JSON.stringify(titles) : null,
+    costUsd: cost ? cost.usd : null,
+    totalTokens: cost ? cost.totalTokens : null,
     summaryText,
     searchText,
     messageCount,
@@ -131,9 +157,9 @@ export function prepareDiscoveryProjectionUpsert(
     .prepare(
       '/* discovery:upsert-projection */ ' +
         'INSERT INTO hub_session_discovery ' +
-        '(sid, agent, title, summary_text, search_text, message_count, tool_call_count, file_count, additions, deletions, lineage_source_sid, quality_score, published_at, updated_at) ' +
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
-        'ON CONFLICT(sid) DO UPDATE SET agent=excluded.agent, title=excluded.title, summary_text=excluded.summary_text, search_text=excluded.search_text, message_count=excluded.message_count, tool_call_count=excluded.tool_call_count, file_count=excluded.file_count, additions=excluded.additions, deletions=excluded.deletions, lineage_source_sid=excluded.lineage_source_sid, quality_score=excluded.quality_score, updated_at=excluded.updated_at',
+        '(sid, agent, title, summary_text, search_text, message_count, tool_call_count, file_count, additions, deletions, lineage_source_sid, quality_score, published_at, updated_at, title_json, cost_usd, total_tokens) ' +
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+        'ON CONFLICT(sid) DO UPDATE SET agent=excluded.agent, title=excluded.title, summary_text=excluded.summary_text, search_text=excluded.search_text, message_count=excluded.message_count, tool_call_count=excluded.tool_call_count, file_count=excluded.file_count, additions=excluded.additions, deletions=excluded.deletions, lineage_source_sid=excluded.lineage_source_sid, quality_score=excluded.quality_score, updated_at=excluded.updated_at, title_json=excluded.title_json, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens',
     )
     .bind(
       projection.sid,
@@ -150,6 +176,9 @@ export function prepareDiscoveryProjectionUpsert(
       projection.qualityScore,
       projection.publishedAt,
       projection.updatedAt,
+      projection.titleJson,
+      projection.costUsd,
+      projection.totalTokens,
     )
 }
 
@@ -227,8 +256,9 @@ export function prepareAuthorizedDiscoveryProjectionUpsert(
        INSERT INTO hub_session_discovery
          (sid, agent, title, summary_text, search_text, message_count,
           tool_call_count, file_count, additions, deletions,
-          lineage_source_sid, quality_score, published_at, updated_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+          lineage_source_sid, quality_score, published_at, updated_at,
+          title_json, cost_usd, total_tokens)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
        WHERE ${AUTHORIZED_SESSION_PROJECTION_GATE}
        ON CONFLICT(sid) DO UPDATE SET
          agent=excluded.agent,
@@ -242,7 +272,10 @@ export function prepareAuthorizedDiscoveryProjectionUpsert(
          deletions=excluded.deletions,
          lineage_source_sid=excluded.lineage_source_sid,
          quality_score=excluded.quality_score,
-         updated_at=excluded.updated_at`,
+         updated_at=excluded.updated_at,
+         title_json=excluded.title_json,
+         cost_usd=excluded.cost_usd,
+         total_tokens=excluded.total_tokens`,
     )
     .bind(
       projection.sid,
@@ -259,6 +292,9 @@ export function prepareAuthorizedDiscoveryProjectionUpsert(
       projection.qualityScore,
       projection.publishedAt,
       projection.updatedAt,
+      projection.titleJson,
+      projection.costUsd,
+      projection.totalTokens,
       ...authorizedProjectionGateValues(gate),
     )
 }
@@ -467,7 +503,36 @@ function isSessionViewV1(value: unknown): value is SessionViewV1 {
   if (!value['index'].every(isViewIndexEntry)) return false
   if (!value['files'].every(isViewFileEntry)) return false
   if (!value['outline'].every(isViewOutlineEntry)) return false
+  if (value['usage'] !== undefined && !isSessionUsageV1(value['usage'])) return false
   return isDiffstat(value['diffstat'])
+}
+
+function isSessionUsageV1(value: unknown): boolean {
+  if (!isObject(value) || !isObject(value['models'])) return false
+  if (!isNonNegativeInteger(value['records']) || value['records'] > MAX_VIEW_ENTRIES) return false
+
+  const models = Object.entries(value['models'])
+  if (models.length > MAX_USAGE_MODELS) return false
+
+  let totalTokens = 0
+  for (const [modelId, totals] of models) {
+    if (
+      modelId.length === 0 ||
+      modelId !== modelId.trim() ||
+      encoder.encode(modelId).byteLength > MAX_MODEL_ID_BYTES ||
+      !MODEL_ID_RE.test(modelId) ||
+      !isObject(totals)
+    ) {
+      return false
+    }
+    for (const field of ['input', 'output', 'cacheRead', 'cacheWrite'] as const) {
+      const tokens = totals[field]
+      if (!isNonNegativeInteger(tokens)) return false
+      if (tokens > Number.MAX_SAFE_INTEGER - totalTokens) return false
+      totalTokens += tokens
+    }
+  }
+  return true
 }
 
 function isViewIndexEntry(value: unknown): boolean {
