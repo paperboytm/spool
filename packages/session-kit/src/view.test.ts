@@ -203,6 +203,42 @@ describe('deriveView', () => {
     })
   })
 
+  it('treats prototype-like model names as data without polluting Object.prototype', () => {
+    const records = [
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_proto_1',
+          role: 'assistant',
+          model: '__proto__',
+          content: [{ type: 'text', text: 'first' }],
+          usage: { input_tokens: 10, output_tokens: 2 },
+        },
+      }),
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_proto_2',
+          role: 'assistant',
+          model: '__proto__',
+          content: [{ type: 'text', text: 'second' }],
+          usage: { input_tokens: 5, output_tokens: 3 },
+        },
+      }),
+    ]
+
+    const view = deriveView('claude', records)
+
+    expect(Object.prototype.hasOwnProperty.call(view.usage?.models, '__proto__')).toBe(true)
+    expect(view.usage?.models['__proto__']).toEqual({
+      input: 15,
+      output: 5,
+      cacheRead: 0,
+      cacheWrite: 0,
+    })
+    expect(({} as { input?: number }).input).toBeUndefined()
+  })
+
   it('leaves usage undefined when no record carries usage data', () => {
     const records = [
       line({ type: 'user', message: { role: 'user', content: 'hello' } }),

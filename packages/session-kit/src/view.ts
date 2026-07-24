@@ -309,9 +309,9 @@ function deriveUsage(
   const samples = [...anonymous, ...byMessageId.values()]
   if (samples.length === 0) return undefined
 
-  const models: Record<string, SessionUsageModelTotals> = {}
+  const models = new Map<string, SessionUsageModelTotals>()
   for (const sample of samples) {
-    const existing = models[sample.model]
+    const existing = models.get(sample.model)
     if (existing) {
       const input = safeTokenAdd(existing.input, sample.totals.input)
       const output = safeTokenAdd(existing.output, sample.totals.output)
@@ -320,12 +320,12 @@ function deriveUsage(
       if (input === null || output === null || cacheRead === null || cacheWrite === null) {
         return undefined
       }
-      Object.assign(existing, { input, output, cacheRead, cacheWrite })
+      models.set(sample.model, { input, output, cacheRead, cacheWrite })
     } else {
-      models[sample.model] = { ...sample.totals }
+      models.set(sample.model, { ...sample.totals })
     }
   }
-  return { models, records: samples.length }
+  return { models: Object.fromEntries(models), records: samples.length }
 }
 
 function extractClaudeUsage(record: UnknownRecord): (UsageSample & { id?: string }) | null {
