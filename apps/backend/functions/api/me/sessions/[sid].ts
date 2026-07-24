@@ -3,7 +3,6 @@ import { isDiscoverySessionSid } from '@spool-lab/session-kit'
 import { z } from 'zod'
 
 import { auditAfterCommit } from '../../../../src/audit-after-commit'
-import { requireUser } from '../../../../src/auth/require'
 import {
   buildDiscoveryProjection,
   filterLineageForAudience,
@@ -14,6 +13,7 @@ import {
   readDiscoveryView,
 } from '../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
+import { requireHubUser } from '../../../../src/hub/auth'
 import { activeTeamRole, type HubEnv } from '../../../../src/hub/head'
 import { serializeManagedSession } from '../../../../src/hub/management'
 import { readManifest } from '../../../../src/hub/packs'
@@ -39,7 +39,9 @@ const VisibilityBody = z
 
 export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
   try {
-    const user = await requireUser(ctx.request, ctx.env)
+    // Disclosure changes are a named CLI action too (`spool visibility`), so
+    // accept the hub API token in addition to the web session.
+    const user = await requireHubUser(ctx.request, ctx.env)
     const sid = requireSid(ctx.params.sid)
     const body = VisibilityBody.safeParse(await readJson(ctx.request))
     if (!body.success) {

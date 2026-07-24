@@ -32,9 +32,7 @@ export const searchCommand = new Command('search')
 
       if (results.length === 0) {
         console.log('No results found.')
-        console.log(
-          `Tip: run \`${formatCliCommand('sync')}\` to index new sessions, or try broader search terms.`,
-        )
+        console.log(`Tip: run \`spool\` to index new sessions, or try broader search terms.`)
         return
       }
 

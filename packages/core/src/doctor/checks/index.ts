@@ -1,5 +1,6 @@
 import type { Check } from '../types.js'
 import { configChecks } from './config.js'
+import { daemonChecks } from './daemon.js'
 import { dbChecks } from './db.js'
 import { envChecks } from './env.js'
 import { nativeChecks } from './native.js'
@@ -11,4 +12,5 @@ export const allChecks: Check[] = [
   ...versionChecks,
   ...dbChecks,
   ...configChecks,
+  ...daemonChecks,
 ]

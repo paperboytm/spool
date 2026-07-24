@@ -109,13 +109,21 @@ function c(code: keyof typeof COLORS, s: string): string {
   return useColor ? `${COLORS[code]}${s}${COLORS.reset}` : s
 }
 
-const CATEGORY_ORDER: CheckResult['category'][] = ['env', 'versions', 'db', 'config', 'native']
+const CATEGORY_ORDER: CheckResult['category'][] = [
+  'env',
+  'versions',
+  'db',
+  'config',
+  'native',
+  'daemon',
+]
 const CATEGORY_LABEL: Record<CheckResult['category'], string> = {
   env: 'Environment',
   versions: 'Versions',
   db: 'Database',
   config: 'Config',
   native: 'Native',
+  daemon: 'Daemon',
 }
 
 function printHuman(results: CheckResult[], verbose: boolean): void {

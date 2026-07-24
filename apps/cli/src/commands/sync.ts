@@ -1,11 +1,13 @@
-import { getDB, Syncer, SpoolWatcher, type SyncEventCallback } from '@spool-lab/core'
-import { Command } from 'commander'
+import { getDB, Syncer, type SyncEventCallback } from '@spool-lab/core'
 
-import { createClackUi, type CliUi } from '../ui.js'
+import { reportAutoPublish, runAutoPublish, type AutoPublishResult } from '../hub/auto-publish.js'
+import type { CliUi } from '../ui.js'
 
-/** Refresh every supported provider into the local index. The bare `spool`
- * entry point reuses this before choosing the current Session, so sharing does
- * not depend on a separate, easy-to-forget `spool sync` step. */
+// Indexing is no longer a user-facing command: bare `spool` refreshes the
+// index before sharing, and `spool daemon` keeps it continuously fresh. The
+// routines live on here for both callers.
+
+/** Refresh every supported provider into the local index. */
 export function syncLocalSessions(
   ui: CliUi,
   dependencies: {
@@ -37,38 +39,40 @@ export function syncLocalSessions(
   }
 }
 
-export const syncCommand = new Command('sync')
-  .description('Sync AI sessions to the local index')
-  .option('--watch', 'Stay running and watch for new sessions')
-  .action((opts: { watch?: boolean }) => {
-    const ui = createClackUi()
-    ui.intro('Sync sessions')
-    const syncer = syncLocalSessions(ui)
-    if (syncer === null) {
-      process.exitCode = 1
-      return
+/** Auto-publish subscribed directories after an index pass. Serialized so
+ * overlapping watcher flushes coalesce into one trailing pass instead of
+ * racing the hub with the same sessions. */
+export function createAutoPublisher(
+  ui: CliUi,
+  dependencies: {
+    run?: (ui: CliUi) => Promise<AutoPublishResult | null>
+  } = {},
+): () => Promise<void> {
+  const run = dependencies.run ?? ((forUi: CliUi) => runAutoPublish(forUi))
+  let active: Promise<void> | null = null
+  let rerun = false
+
+  const pass = async (): Promise<void> => {
+    try {
+      reportAutoPublish(ui, await run(ui))
+    } catch (cause) {
+      ui.warn(`Auto-publish failed: ${cause instanceof Error ? cause.message : String(cause)}`)
     }
+  }
 
-    if (!opts.watch) {
-      ui.outro('Local index is up to date.')
-      return
+  return async () => {
+    if (active) {
+      rerun = true
+      return active
     }
-
-    ui.info('Watching for new sessions. Press Ctrl+C to stop.')
-    const watcher = new SpoolWatcher(syncer)
-    watcher.on('new-sessions', (_event, data) => {
-      ui.success(`${data.count} new session${data.count === 1 ? '' : 's'} indexed`)
+    active = (async () => {
+      do {
+        rerun = false
+        await pass()
+      } while (rerun)
+    })().finally(() => {
+      active = null
     })
-    watcher.on('error', (_event, data) => {
-      ui.error(
-        `Watcher error: ${data.error}${data.root === undefined ? '' : ` (root=${data.root})`}`,
-      )
-    })
-    watcher.start()
-
-    process.once('SIGINT', () => {
-      watcher.stop()
-      ui.outro('Stopped watching.')
-      process.exitCode = 0
-    })
-  })
+    return active
+  }
+}

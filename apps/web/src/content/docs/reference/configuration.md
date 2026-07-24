@@ -18,7 +18,7 @@ Spool stores local application data under `~/.spool/` by default.
 Override the directory for development or isolated automation:
 
 ```bash
-SPOOL_DATA_DIR=/some/path spool sync
+SPOOL_DATA_DIR=/some/path spool
 ```
 
 ## Source locations

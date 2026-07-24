@@ -25,7 +25,7 @@ export const dbChecks: Check[] = [
           category: 'db',
           title: 'Database file',
           severity: 'warn',
-          message: `Not found at ${DB_PATH} — run \`${formatCliCommand('sync')}\` to create it`,
+          message: `Not found at ${DB_PATH} — run \`spool\` to create it`,
           details: { path: DB_PATH },
         }
       }

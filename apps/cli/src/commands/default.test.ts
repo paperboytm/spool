@@ -3,12 +3,15 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 import { createTextUi } from '../ui.js'
 import { handleDefaultCommand } from './default.js'
 
+const UNSUBSCRIBED = { findSubscription: () => null }
+
 describe('bare spool command', () => {
   it('refreshes the index and shares without repeating login', async () => {
     const steps: string[] = []
 
     await expect(
       handleDefaultCommand({
+        ...UNSUBSCRIBED,
         ui: createTextUi(),
         sync: () => {
           steps.push('sync')
@@ -31,6 +34,7 @@ describe('bare spool command', () => {
 
     await expect(
       handleDefaultCommand({
+        ...UNSUBSCRIBED,
         ui: createTextUi(),
         sync: () => {
           steps.push('sync')
@@ -59,6 +63,7 @@ describe('bare spool command', () => {
 
     await expect(
       handleDefaultCommand({
+        ...UNSUBSCRIBED,
         ui: createTextUi(),
         sync: () => {
           steps.push('sync')
@@ -87,6 +92,7 @@ describe('bare spool command', () => {
 
     await expect(
       handleDefaultCommand({
+        ...UNSUBSCRIBED,
         ui,
         sync: () => 0,
         isLoggedIn: () => {
@@ -105,11 +111,45 @@ describe('bare spool command', () => {
   it('returns the share failure exit code', async () => {
     await expect(
       handleDefaultCommand({
+        ...UNSUBSCRIBED,
         ui: createTextUi(),
         sync: () => 0,
         isLoggedIn: () => true,
         share: async () => 1,
       }),
     ).resolves.toBe(1)
+  })
+
+  it('runs a catch-up publish pass instead of sharing in a subscribed directory', async () => {
+    const steps: string[] = []
+    const output: string[] = []
+    const share = vi.fn(async () => 0 as const)
+
+    await expect(
+      handleDefaultCommand({
+        ui: createTextUi((message) => output.push(message)),
+        cwd: '/repos/spool/src',
+        sync: () => {
+          steps.push('sync')
+          return 0
+        },
+        findSubscription: () => ({
+          path: '/repos/spool',
+          visibility: 'team',
+          teamId: 'team_0001',
+          teamName: 'Paperboy',
+          addedAt: '2026-07-24T00:00:00.000Z',
+        }),
+        autoPublish: async () => {
+          steps.push('auto-publish')
+          return 0
+        },
+        share,
+      }),
+    ).resolves.toBe(0)
+
+    expect(steps).toEqual(['sync', 'auto-publish'])
+    expect(share).not.toHaveBeenCalled()
+    expect(output.join('\n')).toContain('Team · Paperboy')
   })
 })

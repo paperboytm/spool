@@ -14,6 +14,7 @@ export * from './parsers/spool-prelude.js'
 export * from './sync/syncer.js'
 export * from './sync/watcher.js'
 export * from './projects/groups.js'
+export { DEFAULT_RESOLVERS, type WorktreeUpstreamResolver } from './projects/worktree-resolvers.js'
 export * from './projects/local-identity.js'
 export * from './projects/sessions.js'
 export {

@@ -1,6 +1,6 @@
 export type Severity = 'ok' | 'warn' | 'error'
 
-export type Category = 'env' | 'versions' | 'db' | 'config' | 'native'
+export type Category = 'env' | 'versions' | 'db' | 'config' | 'native' | 'daemon'
 
 export interface FixDescriptor {
   description: string

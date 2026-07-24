@@ -48,9 +48,9 @@ Resume creates a new native Session and keeps the source relationship intact.
 The same skill can search local Sessions when you ask about earlier decisions:
 
 ```bash
-spool search "refresh token rotation" --json -n 5
-spool show <uuid> --diff
-spool show <uuid> --log
+spool sessions search "refresh token rotation" --json -n 5
+spool sessions show <uuid> --diff
+spool sessions show <uuid> --log
 ```
 
 Search results include source, project, time, snippet, and Session identifier. The agent can load only the depth needed for the current question instead of injecting every prior conversation.

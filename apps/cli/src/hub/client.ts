@@ -85,6 +85,23 @@ export interface HubCliAuthPollResponse {
   interval?: number
 }
 
+export interface HubTeam {
+  id: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+  permissions: string[]
+  member_count: number
+  archived_at: number | null
+}
+
+/** Management row returned by disclosure changes. */
+export interface HubManagedSession {
+  sid: string
+  visibility: 'public' | 'link-only' | 'team'
+  team_id: string | null
+  team_name: string | null
+}
+
 export interface HubRecord {
   i: number
   oid: string
@@ -169,6 +186,28 @@ export class HubClient {
       ...meta,
       summaryMd: meta.summaryMd ?? noteMd ?? null,
     }
+  }
+
+  /** Teams the authenticated user belongs to (hub-token authenticated). */
+  async listTeams(): Promise<HubTeam[]> {
+    return (await this.getJson<{ teams: HubTeam[] }>('/api/hub/v1/teams')).teams
+  }
+
+  /** Change a published Session's disclosure without re-pushing records. */
+  async updateSessionVisibility(
+    sid: string,
+    visibility: 'public' | 'link-only' | 'team',
+    teamId?: string,
+  ): Promise<HubManagedSession> {
+    const response = await this.request(`/api/me/sessions/${encodeURIComponent(sid)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        visibility,
+        ...(teamId === undefined ? {} : { team_id: teamId }),
+      }),
+    })
+    return (await parseJsonResponse<{ session: HubManagedSession }>(response)).session
   }
 
   getSessionView<TView = unknown>(sid: string): Promise<TView> {

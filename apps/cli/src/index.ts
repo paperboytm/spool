@@ -4,19 +4,16 @@ import { fileURLToPath } from 'node:url'
 
 import { program } from 'commander'
 
+import { daemonCommand } from './commands/daemon.js'
 import { handleDefaultCommand } from './commands/default.js'
 import { doctorCommand } from './commands/doctor.js'
-import { listCommand } from './commands/list.js'
 import { loginCommand } from './commands/login.js'
 import { logoutCommand } from './commands/logout.js'
-import { pinCommand, unpinCommand, pinnedCommand } from './commands/pin.js'
-import { projectsCommand } from './commands/projects.js'
 import { resumeCommand } from './commands/resume.js'
-import { searchCommand } from './commands/search.js'
+import { sessionsCommand } from './commands/sessions.js'
 import { shareCommand } from './commands/share.js'
-import { showCommand } from './commands/show.js'
-import { statusCommand } from './commands/status.js'
-import { syncCommand } from './commands/sync.js'
+import { subscribeCommand, subscriptionsCommand, unsubscribeCommand } from './commands/subscribe.js'
+import { visibilityCommand } from './commands/visibility.js'
 import { withdrawCommand } from './commands/withdraw.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -33,20 +30,20 @@ program
     if (exitCode !== 0) process.exitCode = exitCode
   })
 
-program.addCommand(searchCommand)
-program.addCommand(syncCommand)
-program.addCommand(listCommand)
-program.addCommand(statusCommand)
-program.addCommand(showCommand)
-program.addCommand(pinCommand)
-program.addCommand(unpinCommand)
-program.addCommand(pinnedCommand)
-program.addCommand(projectsCommand)
+// The everyday set stays small: configure trust once (login, subscribe),
+// keep the daemon running, and handle exceptions explicitly (share,
+// visibility, withdraw, resume). Browsing lives under `spool sessions`.
+program.addCommand(subscribeCommand)
+program.addCommand(unsubscribeCommand)
+program.addCommand(subscriptionsCommand)
+program.addCommand(daemonCommand)
+program.addCommand(shareCommand)
+program.addCommand(visibilityCommand)
+program.addCommand(withdrawCommand)
+program.addCommand(resumeCommand)
+program.addCommand(sessionsCommand)
 program.addCommand(doctorCommand)
 program.addCommand(loginCommand)
 program.addCommand(logoutCommand)
-program.addCommand(shareCommand)
-program.addCommand(resumeCommand)
-program.addCommand(withdrawCommand)
 
 await program.parseAsync()

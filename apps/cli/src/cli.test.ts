@@ -270,14 +270,35 @@ describe('cli entry point', () => {
     expect(mode & 0o111).toBeGreaterThan(0)
   })
 
-  it('--help prints usage', () => {
+  it('--help prints the small everyday command set', () => {
     const out = run(['--help'])
     expect(out).toContain('Usage: spool')
-    expect(out).toContain('search')
-    expect(out).toContain('sync')
+    expect(out).toContain('subscribe')
+    expect(out).toContain('daemon')
+    expect(out).toContain('sessions')
+    expect(out).toContain('visibility')
+    expect(out).toContain('share')
     expect(out).toContain('login')
+    expect(out).toContain('logout')
     expect(out).toContain('withdraw')
     expect(out).toContain('Usage: spool [options] [command]')
+    // Deprecated top-level commands must not resurface.
+    expect(out).not.toContain('projects')
+    expect(out).not.toContain('pinned')
+  })
+
+  it('sessions --help groups the browse commands', () => {
+    const out = run(['sessions', '--help'])
+    expect(out).toContain('list')
+    expect(out).toContain('search')
+    expect(out).toContain('show')
+  })
+
+  it('daemon --help lists lifecycle subcommands', () => {
+    const out = run(['daemon', '--help'])
+    for (const sub of ['start', 'stop', 'status', 'logs', 'run']) {
+      expect(out).toContain(sub)
+    }
   })
 
   it('--version prints version from package.json', () => {
@@ -293,7 +314,7 @@ describe('cli entry point', () => {
   })
 })
 
-describe('status', () => {
+describe('doctor index status (replaces `spool status`)', () => {
   let seeded: ReturnType<typeof createSeededDir>
   beforeAll(() => {
     seeded = createSeededDir()
@@ -302,22 +323,10 @@ describe('status', () => {
     seeded.cleanup()
   })
 
-  it('prints session counts and DB path', () => {
-    const out = run(['status'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('Sessions:')
-    expect(out).toContain('claude: 2')
-    expect(out).toContain(seeded.dir)
-  })
-
-  it('shows zero counts on fresh DB', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-empty-'))
-    try {
-      const out = run(['status'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Sessions:     0 total')
-      expect(out).toContain('Last synced:  never')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+  it('reports session counts through the daemon.index check', () => {
+    const out = run(['doctor', 'daemon.index'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('sessions indexed')
+    expect(out).toContain('claude 2')
   })
 })
 
@@ -402,7 +411,7 @@ describe('list', () => {
 
   it('defaults to sessions for the current cwd project', () => {
     const out = run(
-      ['list'],
+      ['sessions', 'list'],
       { SPOOL_DATA_DIR: seeded.dir },
       join(currentProjectDir, 'packages', 'cli'),
     )
@@ -412,43 +421,43 @@ describe('list', () => {
   })
 
   it('--all ignores cwd and lists sessions from every project', () => {
-    const out = run(['list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Current project session')
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain('Refactoring database queries')
   })
 
   it('prints an actionable short id per row (what spool share/show consume)', () => {
-    const out = run(['list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'list', '--all'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain(SESSION_UUID_1.slice(0, 8))
     expect(out).not.toMatch(/^#[0-9a-f]{8}\b/m)
   })
 
   it('limits results with -n', () => {
-    const out = run(['list', '--all', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'list', '--all', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Refactoring database queries')
     expect(out).not.toContain('Debugging authentication flow')
   })
 
   it('filters by source', () => {
-    const out = run(['list', '--all', '-s', 'codex'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'list', '--all', '-s', 'codex'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('No sessions found')
   })
 
   it('hints at --all when the current project has no matching sessions', () => {
-    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('spool list --all')
+    const out = run(['sessions', 'list'], { SPOOL_DATA_DIR: seeded.dir })
+    expect(out).toContain('spool sessions list --all')
     expect(out).not.toContain('spool sync')
   })
 
   it('does not treat a child project as the project containing cwd', () => {
-    const out = run(['list'], { SPOOL_DATA_DIR: seeded.dir }, seeded.dir)
+    const out = run(['sessions', 'list'], { SPOOL_DATA_DIR: seeded.dir }, seeded.dir)
     expect(out).not.toContain('Current project session')
-    expect(out).toContain('spool list --all')
+    expect(out).toContain('spool sessions list --all')
   })
 
   it('outputs JSON', () => {
-    const out = run(['list', '--all', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'list', '--all', '--json'], { SPOOL_DATA_DIR: seeded.dir })
     const parsed = JSON.parse(out)
     expect(Array.isArray(parsed)).toBe(true)
     expect(parsed.length).toBe(3)
@@ -458,7 +467,7 @@ describe('list', () => {
   it('prints empty message when no sessions', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spool-cli-empty-'))
     try {
-      const out = run(['list'], { SPOOL_DATA_DIR: dir })
+      const out = run(['sessions', 'list'], { SPOOL_DATA_DIR: dir })
       expect(out).toContain('No sessions found')
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -476,7 +485,7 @@ describe('show', () => {
   })
 
   it('prints session with messages', () => {
-    const out = run(['show', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'show', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain('authentication middleware')
     expect(out).toContain('USER')
@@ -484,25 +493,27 @@ describe('show', () => {
   })
 
   it('accepts the unique short id printed by list', () => {
-    const out = run(['show', SESSION_UUID_1.slice(0, 8)], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'show', SESSION_UUID_1.slice(0, 8)], {
+      SPOOL_DATA_DIR: seeded.dir,
+    })
     expect(out).toContain('Debugging authentication flow')
     expect(out).toContain(`UUID:    ${SESSION_UUID_1}`)
   })
 
   it('shows tool names', () => {
-    const out = run(['show', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'show', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Read, Edit')
   })
 
   it('outputs JSON', () => {
-    const out = run(['show', SESSION_UUID_1, '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'show', SESSION_UUID_1, '--json'], { SPOOL_DATA_DIR: seeded.dir })
     const parsed = JSON.parse(out)
     expect(parsed.session.sessionUuid).toBe(SESSION_UUID_1)
     expect(parsed.messages.length).toBe(3)
   })
 
   it('exits with error for unknown UUID', () => {
-    const out = runFail(['show', 'nonexistent-uuid'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = runFail(['sessions', 'show', 'nonexistent-uuid'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('not found')
   })
 })
@@ -517,23 +528,25 @@ describe('search', () => {
   })
 
   it('finds matching sessions', () => {
-    const out = run(['search', 'authentication'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'search', 'authentication'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('authentication')
     expect(out).toContain('claude')
   })
 
   it('prints no-results message', () => {
-    const out = run(['search', 'xyznonexistent'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'search', 'xyznonexistent'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('No results found')
   })
 
   it('limits results with -n', () => {
-    const out = run(['search', 'the', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'search', 'the', '-n', '1'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('Result 1/1')
   })
 
   it('outputs JSON', () => {
-    const out = run(['search', 'authentication', '--json'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = run(['sessions', 'search', 'authentication', '--json'], {
+      SPOOL_DATA_DIR: seeded.dir,
+    })
     const parsed = JSON.parse(out)
     expect(Array.isArray(parsed)).toBe(true)
     expect(parsed.length).toBeGreaterThan(0)
@@ -541,147 +554,88 @@ describe('search', () => {
   })
 
   it('exits with error when query is missing', () => {
-    const out = runFail(['search'], { SPOOL_DATA_DIR: seeded.dir })
+    const out = runFail(['sessions', 'search'], { SPOOL_DATA_DIR: seeded.dir })
     expect(out).toContain('missing required argument')
   })
 })
 
-describe('pin / unpin / pinned', () => {
-  let seeded: ReturnType<typeof createSeededDir>
-  beforeEach(() => {
-    seeded = createSeededDir()
-  })
-  afterEach(() => {
-    seeded.cleanup()
-  })
-
-  it('pins a session and pinned lists it', () => {
-    const pinOut = run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    expect(pinOut).toContain('Pinned')
-    expect(pinOut).toContain('Debugging authentication flow')
-
-    const listed = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(listed).toContain('Debugging authentication flow')
-    expect(listed).not.toContain('Refactoring database queries')
-  })
-
-  it('is idempotent when already pinned', () => {
-    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    const again = run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    expect(again).toContain('Already pinned')
-  })
-
-  it('unpin removes a session from the pinned list', () => {
-    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    const unpinOut = run(['unpin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    expect(unpinOut).toContain('Unpinned')
-
-    const listed = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(listed).toContain('No pinned sessions')
-  })
-
-  it('pin exits with error for unknown UUID', () => {
-    const out = runFail(['pin', 'nonexistent-uuid'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('not found')
-  })
-
-  it('unpin reports when a session was not pinned', () => {
-    const out = run(['unpin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('Not pinned')
-  })
-
-  it('pinned outputs JSON', () => {
-    run(['pin', SESSION_UUID_1], { SPOOL_DATA_DIR: seeded.dir })
-    const out = run(['pinned', '--json'], { SPOOL_DATA_DIR: seeded.dir })
-    const parsed = JSON.parse(out)
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.length).toBe(1)
-    expect(parsed[0].sessionUuid).toBe(SESSION_UUID_1)
-  })
-
-  it('pinned prints empty message when nothing pinned', () => {
-    const out = run(['pinned'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('No pinned sessions')
-  })
-})
-
-describe('projects', () => {
-  let seeded: ReturnType<typeof createSeededDir>
-  beforeAll(() => {
-    seeded = createSeededDir()
-  })
-  afterAll(() => {
-    seeded.cleanup()
-  })
-
-  it('lists project groups with session counts', () => {
-    const out = run(['projects'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('my-project')
-    expect(out).toContain('claude')
-    expect(out).toMatch(/\b2\b/)
-  })
-
-  it('outputs JSON', () => {
-    const out = run(['projects', '--json'], { SPOOL_DATA_DIR: seeded.dir })
-    const parsed = JSON.parse(out)
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.length).toBe(1)
-    expect(parsed[0].displayName).toBe('my-project')
-    expect(parsed[0].sessionCount).toBe(2)
-    expect(parsed[0].sources).toContain('claude')
-  })
-
-  it('prints empty message when no projects', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-empty-'))
+describe('subscriptions', () => {
+  it('lists nothing and hints at subscribe on a fresh HOME', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
     try {
-      const out = run(['projects'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('No projects found')
+      const out = run(['subscriptions'], { HOME: home })
+      expect(out).toContain('No subscribed directories')
+      expect(out).toContain('spool subscribe')
     } finally {
-      rmSync(dir, { recursive: true, force: true })
+      rmSync(home, { recursive: true, force: true })
     }
   })
 
-  it('lists the sessions in a project when given a query', () => {
-    const out = run(['projects', 'my-project'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('Debugging authentication flow')
-    expect(out).toContain('Refactoring database queries')
+  it('subscribe requires an explicit disclosure without a TTY', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
+    try {
+      const out = runFail(['subscribe', home, '--yes'], { HOME: home })
+      expect(out).toContain('Choose a disclosure')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
-  it('matches a project by display path', () => {
-    const out = run(['projects', '/Users/test/my-project'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('Debugging authentication flow')
-    expect(out).toContain('Refactoring database queries')
-  })
+  it('subscribe --link-only --yes records and unsubscribe removes', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
+    const project = mkdtempSync(join(tmpdir(), 'spool-cli-project-'))
+    try {
+      const out = run(['subscribe', project, '--link-only', '--yes'], { HOME: home })
+      expect(out).toContain('Subscribed')
+      expect(out).toContain('Link-only')
 
-  it('matches a project by session cwd', () => {
-    const out = run(['projects', 'packages/api'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('Debugging authentication flow')
-    expect(out).toContain('Refactoring database queries')
-  })
+      const listed = run(['subscriptions'], { HOME: home })
+      expect(listed).toContain('Link-only')
 
-  it('outputs project sessions as JSON', () => {
-    const out = run(['projects', 'my-project', '--json'], { SPOOL_DATA_DIR: seeded.dir })
-    const parsed = JSON.parse(out)
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed.length).toBe(2)
-    expect(parsed[0].sessionUuid).toBeTruthy()
-  })
-
-  it('errors when no project matches the query', () => {
-    const out = runFail(['projects', 'zzz-no-such-project'], { SPOOL_DATA_DIR: seeded.dir })
-    expect(out).toContain('No project matching')
+      const removed = run(['unsubscribe', project], { HOME: home })
+      expect(removed).toContain('Unsubscribed')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+      rmSync(project, { recursive: true, force: true })
+    }
   })
 })
 
-describe('sync', () => {
-  it('runs against empty session dirs', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spool-cli-sync-'))
+describe('daemon', () => {
+  it('status reports not running and no subscriptions on a fresh HOME', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
     try {
-      const out = run(['sync'], { SPOOL_DATA_DIR: dir })
-      expect(out).toContain('Sync sessions')
-      expect(out).toContain('Local index is up to date')
+      const out = run(['daemon', 'status'], { HOME: home })
+      expect(out).toContain('Daemon not running')
+      expect(out).toContain('No subscribed directories')
     } finally {
-      rmSync(dir, { recursive: true, force: true })
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('logs reports a missing log file', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
+    try {
+      const out = run(['daemon', 'logs'], { HOME: home })
+      expect(out).toContain('No daemon log')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('visibility', () => {
+  it('requires login before changing disclosure', () => {
+    const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
+    try {
+      const out = runFail(['visibility', 'claude_abc12345678', 'public', '--yes'], {
+        HOME: home,
+        SPOOL_HUB_URL: '',
+        SPOOL_HUB_TOKEN: '',
+      })
+      expect(out).toContain('Not logged in')
+    } finally {
+      rmSync(home, { recursive: true, force: true })
     }
   })
 })

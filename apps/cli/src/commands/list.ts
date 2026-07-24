@@ -60,11 +60,11 @@ export async function handleListCommand(
   if (sessions.length === 0) {
     if (!opts.all && listRecentSessionsPage(db, { limit: 1 }).sessions.length > 0) {
       console.log(
-        `No sessions found for the current project. Run \`${formatCliCommand('list --all')}\` to search all projects.`,
+        `No sessions found for the current project. Run \`${formatCliCommand('sessions list --all')}\` to search all projects.`,
       )
       return 0
     }
-    console.log(`No sessions found. Run \`${formatCliCommand('sync')}\` to index sessions.`)
+    console.log(`No sessions found. Run \`spool\` to index sessions.`)
     return 0
   }
 
