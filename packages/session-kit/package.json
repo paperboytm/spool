@@ -1,6 +1,6 @@
 {
   "name": "@spool-lab/session-kit",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and Session diffs for Spool.",
   "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
