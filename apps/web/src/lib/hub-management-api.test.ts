@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
+  appendUniqueManagedSessions,
   fetchMySessions,
+  type ManagedSession,
   updateManagedSessionVisibility,
   withdrawManagedSession,
 } from './hub-management-api'
@@ -19,13 +21,52 @@ function respond(status: number, body: unknown): void {
 
 describe('Hub Session management API', () => {
   it('loads the signed-in author Session list', async () => {
-    respond(200, { sessions: [] })
+    respond(200, { sessions: [], next_cursor: null })
 
-    expect(await fetchMySessions()).toEqual({ kind: 'ok', data: { sessions: [] } })
+    expect(await fetchMySessions()).toEqual({
+      kind: 'ok',
+      data: { sessions: [], next_cursor: null },
+    })
     expect(fetch).toHaveBeenCalledWith(
       '/api/me/sessions',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
+  })
+
+  it('keeps the opaque cursor intact when loading another page', async () => {
+    respond(200, { sessions: [], next_cursor: null })
+
+    await fetchMySessions('opaque/next+cursor')
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/me/sessions?cursor=opaque%2Fnext%2Bcursor',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+  })
+
+  it('appends new pages without duplicating a Session already loaded', () => {
+    const session = (sid: string, title: string): ManagedSession => ({
+      sid,
+      title,
+      summary: null,
+      provider: 'claude',
+      created_at: 1,
+      updated_at: 1,
+      visibility: 'link-only',
+      team_id: null,
+      team_name: null,
+      can_manage_visibility: true,
+      author: { handle: null, display_name: null, avatar_url: null },
+    })
+    const current = [session('claude_1', 'Current')]
+
+    expect(
+      appendUniqueManagedSessions(current, [
+        session('claude_1', 'Stale duplicate'),
+        session('claude_2', 'Next'),
+        session('claude_2', 'Duplicate within page'),
+      ]),
+    ).toEqual([current[0], expect.objectContaining({ sid: 'claude_2', title: 'Next' })])
   })
 
   it('sends an explicit Team ownership target', async () => {

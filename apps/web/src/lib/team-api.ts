@@ -1,4 +1,4 @@
-import type { ManagedSession } from './hub-management-api'
+import type { ManagedSession, ManagedSessionPage } from './hub-management-api'
 
 // Typed browser client for the account/team management surface. Authorization
 // remains entirely server-side: UI affordances read the `permissions` array
@@ -204,6 +204,8 @@ export async function revokeTeamInvitation(
 
 export async function fetchTeamSessions(
   teamId: string,
-): Promise<TeamApiResult<{ sessions: TeamSession[] }>> {
-  return requestJson(teamPath(teamId, '/sessions'))
+  cursor: string | null = null,
+): Promise<TeamApiResult<ManagedSessionPage>> {
+  const query = cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`
+  return requestJson(`${teamPath(teamId, '/sessions')}${query}`)
 }

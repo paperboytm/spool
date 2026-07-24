@@ -25,7 +25,10 @@ describe('Explore URL state', () => {
     })
   })
 
-  it('uses Top instead of the unavailable Trending state during search', () => {
+  it('uses Top instead of the retired Trending state with or without search', () => {
+    expect(parseExploreSearch({ sort: 'trending' })).toEqual({
+      sort: 'recommended',
+    })
     expect(parseExploreSearch({ q: 'tokens', sort: 'trending' })).toEqual({
       q: 'tokens',
       sort: 'recommended',

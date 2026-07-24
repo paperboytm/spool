@@ -101,17 +101,19 @@ async function installAccountApi(page: Page) {
           ? { shares: [] }
           : path === '/api/me/sessions'
             ? { sessions: [] }
-            : path === '/api/teams'
-              ? { teams: [team] }
-              : path === '/api/teams/team-paperboy'
-                ? { team }
-                : path === '/api/teams/team-paperboy/sessions'
-                  ? { sessions: [] }
-                  : path === '/api/teams/team-paperboy/members'
-                    ? { members }
-                    : path === '/api/teams/team-paperboy/invitations'
-                      ? { invitations }
-                      : null
+            : path === '/api/discovery/v1/sessions'
+              ? { version: 1, items: [], nextCursor: null }
+              : path === '/api/teams'
+                ? { teams: [team] }
+                : path === '/api/teams/team-paperboy'
+                  ? { team }
+                  : path === '/api/teams/team-paperboy/sessions'
+                    ? { sessions: [] }
+                    : path === '/api/teams/team-paperboy/members'
+                      ? { members }
+                      : path === '/api/teams/team-paperboy/invitations'
+                        ? { invitations }
+                        : null
 
     if (body === null) {
       await route.fulfill({
@@ -360,5 +362,46 @@ for (const viewport of VIEWPORTS) {
     }
     await expectNoHorizontalOverflow(page)
     await capture(page, testInfo, `team-settings-${viewport.name}`)
+  })
+
+  test(`workspace navigation fits ${viewport.width}px`, async ({ page }, testInfo) => {
+    await installAccountApi(page)
+    await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+
+    await page.goto('/explore?sort=recommended')
+    await expect(page.getByRole('tab', { name: 'Top' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Recent' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'For you' })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: 'Trending' })).toHaveCount(0)
+
+    const desktopNavigation = page.getByRole('navigation', { name: 'Primary navigation' })
+    const mobileNavigation = page.getByRole('navigation', {
+      name: 'Mobile workspace navigation',
+    })
+    const mobileMenuTrigger = page.getByRole('button', { name: 'Open navigation' })
+    if (viewport.width <= 768) {
+      await expect(desktopNavigation).toBeHidden()
+      await expect(mobileMenuTrigger).toBeVisible()
+      await mobileMenuTrigger.click()
+      await expect(mobileNavigation).toBeVisible()
+    } else {
+      await expect(desktopNavigation).toBeVisible()
+      await expect(mobileNavigation).toBeHidden()
+      await expect(mobileMenuTrigger).toBeHidden()
+    }
+    await expectNoHorizontalOverflow(page)
+
+    await page.goto('/my-sessions')
+    await expect(page.getByRole('heading', { name: 'My Sessions' })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+
+    await page.goto('/teams')
+    await expect(
+      page.locator('.workspace-page-header').getByRole('heading', { name: 'Teams', exact: true }),
+    ).toBeVisible()
+    await expect(page.getByText('Paperboy', { exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `workspace-${viewport.name}`)
   })
 }

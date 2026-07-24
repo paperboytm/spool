@@ -17,8 +17,8 @@ function teamFailureMessage(result: TeamApiFailure): string {
   return 'The Team service is unavailable. Try again.'
 }
 
-function redirectToSignIn(): void {
-  window.location.assign('/sign-in?next=/me')
+function redirectToSignIn(next: string): void {
+  window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`)
 }
 
 export type TeamCreateIntent = {
@@ -95,7 +95,7 @@ export function TeamList({ teams }: { teams: TeamSummary[] }) {
   )
 }
 
-export function TeamsSection() {
+export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {}) {
   const [state, setState] = useState<TeamsState>({ kind: 'loading' })
   const [creating, setCreating] = useState(false)
   const [createBusy, setCreateBusy] = useState(false)
@@ -106,12 +106,12 @@ export function TeamsSection() {
 
   const load = useCallback(async () => {
     const result = await fetchTeams()
-    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind === 'unauthenticated') return redirectToSignIn(signInNext)
     if (result.kind !== 'ok') {
       return setState({ kind: 'error', message: teamFailureMessage(result) })
     }
     setState({ kind: 'ready', teams: result.data.teams })
-  }, [])
+  }, [signInNext])
 
   useEffect(() => void load(), [load])
 
@@ -125,7 +125,7 @@ export function TeamsSection() {
     const result = await createTeam(trimmed, createIntent.currentKey())
     submitting.current = false
     setCreateBusy(false)
-    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind === 'unauthenticated') return redirectToSignIn(signInNext)
     if (result.kind !== 'ok') return setCreateError(teamFailureMessage(result))
     createIntent.succeeded()
     window.location.assign(`/teams/${encodeURIComponent(result.data.team.id)}`)

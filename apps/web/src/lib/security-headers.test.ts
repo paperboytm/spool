@@ -23,6 +23,8 @@ describe('Explore security headers', () => {
     expect(headers?.['Content-Security-Policy']).toContain('https://images.workoscdn.com')
     expect(headers?.['X-Robots-Tag']).toBe('noindex')
     expect(cacheHeaderFor('/teams/team_123', 200)).toBe('private, no-store')
+    expect(cacheHeaderFor('/teams', 200)).toBe('private, no-store')
+    expect(cacheHeaderFor('/my-sessions', 200)).toBe('private, no-store')
   })
 
   it('never shares a Session reader document through a public cache', () => {

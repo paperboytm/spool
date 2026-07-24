@@ -8,22 +8,22 @@ import type {
 
 import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { ApiError } from '../errors'
-import { listDiscoveryCandidates, type DiscoveryCandidateRow } from './store'
+import { listDiscoveryPage, type DiscoveryCandidateRow, type DiscoveryPageKey } from './store'
 
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
-const CANDIDATE_LIMIT = 200
 const SUMMARY_EXCERPT_CHARS = 360
 const DAY_MS = 24 * 60 * 60 * 1000
-const CURSOR_VERSION = 1
+const CURSOR_VERSION = 2
 
 type ListOptions = {
   q: string | null
   sort: DiscoverySort
   agent: SessionProvider | null
   limit: number
-  offset: number
   fingerprint: string
+  rankedAt: number
+  after: DiscoveryPageKey | null
 }
 
 // Discovery contains disclosure-sensitive metadata. A Public -> Team change
@@ -36,23 +36,37 @@ export async function listDiscoverySessions(
   request: Request,
   now = Date.now(),
 ): Promise<DiscoverySessionsResponse> {
-  const options = await parseListOptions(new URL(request.url))
+  const options = await parseListOptions(new URL(request.url), now)
   const tokens = options.q === null ? [] : tokenize(options.q)
-  const rows = await listDiscoveryCandidates(db, {
-    sinceDay: utcDay(now - 6 * DAY_MS),
-    agent: options.agent,
+  const rows = await listDiscoveryPage(db, {
+    query: options.q,
     tokens,
-    limit: CANDIDATE_LIMIT,
+    sort: options.sort,
+    agent: options.agent,
+    rankedAt: options.rankedAt,
+    // Using the seven completed UTC days makes every score stable for the
+    // lifetime of a cursor while retaining the intended seven-day signal.
+    engagementFromDay: utcDay(options.rankedAt - 7 * DAY_MS),
+    engagementToDayExclusive: utcDay(options.rankedAt),
+    after: options.after,
+    limit: options.limit,
   })
 
-  const ranked = rows
-    .slice()
-    .sort((left, right) => compareCandidates(left, right, options.sort, options.q, tokens, now))
-  const page = ranked.slice(options.offset, options.offset + options.limit)
-  const nextOffset = options.offset + page.length
+  const hasMore = rows.length > options.limit
+  const page = hasMore ? rows.slice(0, options.limit) : rows
+  const last = page.at(-1)
   const nextCursor =
-    page.length > 0 && nextOffset < ranked.length
-      ? encodeCursor(nextOffset, options.fingerprint)
+    hasMore && last
+      ? encodeCursor(
+          {
+            rankedAt: options.rankedAt,
+            relevanceScore: last.relevance_score,
+            sortScore: last.sort_score,
+            publishedAt: last.published_at,
+            sid: last.sid,
+          },
+          options.fingerprint,
+        )
       : null
 
   return {
@@ -62,7 +76,7 @@ export async function listDiscoverySessions(
   }
 }
 
-async function parseListOptions(url: URL): Promise<ListOptions> {
+async function parseListOptions(url: URL, now: number): Promise<ListOptions> {
   rejectDuplicate(url, 'q')
   rejectDuplicate(url, 'sort')
   rejectDuplicate(url, 'agent')
@@ -71,7 +85,7 @@ async function parseListOptions(url: URL): Promise<ListOptions> {
 
   let q: string | null = null
   if (url.searchParams.has('q')) {
-    q = (url.searchParams.get('q') ?? '').trim()
+    q = (url.searchParams.get('q') ?? '').trim().normalize('NFKC').toLowerCase()
     const length = Array.from(q).length
     if (length < 1 || length > 120) {
       throw new ApiError('BAD_REQUEST', 'q must be between 1 and 120 characters')
@@ -103,8 +117,16 @@ async function parseListOptions(url: URL): Promise<ListOptions> {
 
   const fingerprint = await queryFingerprint(q, sortValue, agent)
   const cursorValue = url.searchParams.get('cursor')
-  const offset = cursorValue === null ? 0 : decodeCursor(cursorValue, fingerprint)
-  return { q, sort: sortValue, agent, limit, offset, fingerprint }
+  const after = cursorValue === null ? null : decodeCursor(cursorValue, fingerprint, sortValue, now)
+  return {
+    q,
+    sort: sortValue,
+    agent,
+    limit,
+    fingerprint,
+    rankedAt: after?.rankedAt ?? now,
+    after,
+  }
 }
 
 function rejectDuplicate(url: URL, name: string): void {
@@ -125,16 +147,29 @@ async function queryFingerprint(
   return base64urlFromBuffer(await sha256(JSON.stringify([q, sort, agent]))).slice(0, 16)
 }
 
-function encodeCursor(offset: number, fingerprint: string): string {
+function encodeCursor(key: DiscoveryPageKey, fingerprint: string): string {
   const bytes = new TextEncoder().encode(
-    JSON.stringify({ v: CURSOR_VERSION, o: offset, f: fingerprint }),
+    JSON.stringify({
+      v: CURSOR_VERSION,
+      f: fingerprint,
+      a: key.rankedAt,
+      r: key.relevanceScore,
+      s: key.sortScore,
+      p: key.publishedAt,
+      i: key.sid,
+    }),
   )
   const buffer = new ArrayBuffer(bytes.byteLength)
   new Uint8Array(buffer).set(bytes)
   return base64urlFromBuffer(buffer)
 }
 
-function decodeCursor(value: string, expectedFingerprint: string): number {
+function decodeCursor(
+  value: string,
+  expectedFingerprint: string,
+  sort: DiscoverySort,
+  now: number,
+): DiscoveryPageKey {
   if (value.length > 512 || !/^[A-Za-z0-9_-]+$/.test(value)) {
     throw new ApiError('BAD_REQUEST', 'malformed cursor')
   }
@@ -153,82 +188,29 @@ function decodeCursor(value: string, expectedFingerprint: string): number {
   if (
     !isObject(decoded) ||
     decoded['v'] !== CURSOR_VERSION ||
-    !Number.isSafeInteger(decoded['o']) ||
-    typeof decoded['o'] !== 'number' ||
-    decoded['o'] < 0 ||
-    decoded['o'] > CANDIDATE_LIMIT ||
-    decoded['f'] !== expectedFingerprint
+    decoded['f'] !== expectedFingerprint ||
+    !isNonNegativeSafeInteger(decoded['a']) ||
+    decoded['a'] > now + 5 * 60 * 1000 ||
+    !isNonNegativeSafeInteger(decoded['r']) ||
+    !isNonNegativeSafeInteger(decoded['p']) ||
+    typeof decoded['i'] !== 'string' ||
+    decoded['i'].length < 1 ||
+    decoded['i'].length > 128 ||
+    (sort === 'recent' ? decoded['s'] !== null : !isNonNegativeSafeInteger(decoded['s']))
   ) {
     throw new ApiError('BAD_REQUEST', 'malformed or mismatched cursor')
   }
-  return decoded['o']
+  return {
+    rankedAt: decoded['a'],
+    relevanceScore: decoded['r'],
+    sortScore: sort === 'recent' ? null : (decoded['s'] as number),
+    publishedAt: decoded['p'],
+    sid: decoded['i'],
+  }
 }
 
-function compareCandidates(
-  left: DiscoveryCandidateRow,
-  right: DiscoveryCandidateRow,
-  sort: DiscoverySort,
-  query: string | null,
-  tokens: readonly string[],
-  now: number,
-): number {
-  if (query !== null) {
-    const relevance = relevanceScore(right, query, tokens) - relevanceScore(left, query, tokens)
-    if (relevance !== 0) return relevance
-  }
-  return compareSelectedSort(left, right, sort, now)
-}
-
-function compareSelectedSort(
-  left: DiscoveryCandidateRow,
-  right: DiscoveryCandidateRow,
-  sort: DiscoverySort,
-  now: number,
-): number {
-  if (sort !== 'recent') {
-    const leftScore = rankingScore(left, sort, now)
-    const rightScore = rankingScore(right, sort, now)
-    if (leftScore !== rightScore) return rightScore - leftScore
-  }
-  if (left.published_at !== right.published_at) return right.published_at - left.published_at
-  return left.sid.localeCompare(right.sid)
-}
-
-function rankingScore(
-  row: DiscoveryCandidateRow,
-  sort: Exclude<DiscoverySort, 'recent'>,
-  now: number,
-): number {
-  const ageDays = Math.max(0, (now - row.published_at) / DAY_MS)
-  const reads = Math.max(0, row.qualified_reads_7d)
-  if (sort === 'recommended') {
-    return row.quality_score + 8 * Math.log1p(reads) + 12 * 2 ** (-ageDays / 14)
-  }
-  return Math.log1p(reads) * 2 ** (-ageDays / 7) + 0.05 * row.quality_score
-}
-
-function relevanceScore(
-  row: DiscoveryCandidateRow,
-  query: string,
-  tokens: readonly string[],
-): number {
-  const phrase = query.normalize('NFKC').toLowerCase()
-  const title = row.title.toLowerCase()
-  const summary = (row.summary_text ?? '').toLowerCase()
-  const author = `${row.handle ?? ''} ${row.display_name ?? row.name ?? ''}`.toLowerCase()
-  let score = 0
-  if (title === phrase) score += 10_000
-  else if (title.includes(phrase)) score += 5_000
-  if (summary.includes(phrase)) score += 1_000
-  if (author.trim() === phrase) score += 2_000
-  else if (author.includes(phrase)) score += 500
-  for (const token of tokens) {
-    if (title.includes(token)) score += 200
-    if (summary.includes(token)) score += 80
-    if (author.includes(token)) score += 100
-    if (row.search_text.includes(token)) score += 20
-  }
-  return score
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem {

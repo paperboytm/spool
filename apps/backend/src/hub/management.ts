@@ -1,7 +1,34 @@
 import type { D1Database } from '@cloudflare/workers-types'
 
+import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { isPublishedToDiscovery } from '../discovery/projection'
+import { ApiError } from '../errors'
+import type { TeamRole } from './head'
 import { getHubAuthor, type HubSessionRow } from './store'
+import { SID_RE } from './wire'
+
+const DEFAULT_PAGE_LIMIT = 50
+const MAX_PAGE_LIMIT = 100
+const CURSOR_VERSION = 1
+
+export type ManagedHubSessionPageOptions = {
+  cursor: string | null
+  limit: number
+}
+
+export type ManagedHubSessionPage = {
+  sessions: ManagedHubSession[]
+  next_cursor: string | null
+}
+
+type ManagedHubSessionPageKey = {
+  updatedAt: number
+  sid: string
+}
+
+type ManagedHubSessionScope =
+  | { kind: 'owner'; actorUserId: string }
+  | { kind: 'team'; actorUserId: string; teamId: string }
 
 export type ManagedHubSession = {
   sid: string
@@ -24,20 +51,40 @@ export type ManagedHubSession = {
 export async function listOwnerHubSessions(
   db: D1Database,
   userId: string,
-): Promise<ManagedHubSession[]> {
+  options: ManagedHubSessionPageOptions = {
+    cursor: null,
+    limit: DEFAULT_PAGE_LIMIT,
+  },
+): Promise<ManagedHubSessionPage> {
+  const scope = { kind: 'owner' as const, actorUserId: userId }
+  const fingerprint = await scopeFingerprint(scope)
+  const after = decodeCursor(options.cursor, fingerprint)
   const rows = await db
     .prepare(
-      'SELECT s.*, t.name AS team_name, m.role AS team_role FROM hub_sessions s ' +
+      'SELECT s.*, t.name AS team_name, m.role AS team_role FROM users actor ' +
+        'JOIN hub_sessions s ON s.owner_user_id=actor.id ' +
         'LEFT JOIN teams t ON t.id=s.team_id ' +
-        'LEFT JOIN team_memberships m ON m.team_id=s.team_id AND m.user_id=? ' +
-        'WHERE s.owner_user_id=? AND s.withdrawn_at IS NULL ' +
-        'AND (s.team_id IS NULL OR (m.user_id IS NOT NULL AND t.archived_at IS NULL)) ' +
-        'ORDER BY s.updated_at DESC LIMIT 200',
+        'LEFT JOIN team_memberships m ON m.team_id=s.team_id AND m.user_id=actor.id ' +
+        'WHERE actor.id=? AND actor.deleted_at IS NULL ' +
+        'AND actor.deletion_pending_until IS NULL AND s.withdrawn_at IS NULL ' +
+        'AND (s.team_id IS NULL OR (m.user_id IS NOT NULL AND t.archived_at IS NULL ' +
+        'AND t.deletion_pending_until IS NULL)) ' +
+        'AND (?=0 OR s.updated_at<? OR (s.updated_at=? AND s.sid>?)) ' +
+        'ORDER BY s.updated_at DESC, s.sid ASC LIMIT ?',
     )
-    .bind(userId, userId)
+    .bind(
+      userId,
+      after === null ? 0 : 1,
+      after?.updatedAt ?? 0,
+      after?.updatedAt ?? 0,
+      after?.sid ?? '',
+      options.limit + 1,
+    )
     .all<HubSessionRow & { team_name: string | null; team_role: string | null }>()
-  return Promise.all(
-    rows.results.map((row) =>
+  const hasMore = rows.results.length > options.limit
+  const pageRows = hasMore ? rows.results.slice(0, options.limit) : rows.results
+  const sessions = await Promise.all(
+    pageRows.map((row) =>
       serializeManagedSession(
         db,
         row,
@@ -45,24 +92,172 @@ export async function listOwnerHubSessions(
       ),
     ),
   )
+  return {
+    sessions,
+    next_cursor: hasMore ? encodeCursor(pageKey(pageRows.at(-1)!), fingerprint) : null,
+  }
 }
 
 export async function listTeamHubSessions(
   db: D1Database,
   teamId: string,
-  canManageVisibility: boolean,
-): Promise<ManagedHubSession[]> {
+  actorUserId: string,
+  options: ManagedHubSessionPageOptions = {
+    cursor: null,
+    limit: DEFAULT_PAGE_LIMIT,
+  },
+): Promise<ManagedHubSessionPage | null> {
+  const scope = { kind: 'team' as const, actorUserId, teamId }
+  const fingerprint = await scopeFingerprint(scope)
+  const after = decodeCursor(options.cursor, fingerprint)
   const rows = await db
     .prepare(
-      'SELECT s.*, t.name AS team_name FROM hub_sessions s ' +
-        'JOIN teams t ON t.id=s.team_id WHERE s.team_id=? AND s.withdrawn_at IS NULL ' +
-        'ORDER BY s.updated_at DESC LIMIT 200',
+      `/* hub:list-team-sessions-authorized */
+       WITH current_team AS (
+         SELECT t.id, t.name, m.role
+         FROM teams t
+         JOIN team_memberships m ON m.team_id=t.id
+         JOIN users actor ON actor.id=m.user_id
+         WHERE t.id=? AND m.user_id=?
+           AND t.archived_at IS NULL
+           AND t.deletion_pending_until IS NULL
+           AND actor.deleted_at IS NULL
+           AND actor.deletion_pending_until IS NULL
+       )
+       SELECT s.*, current_team.name AS team_name, current_team.role AS team_role
+       FROM current_team
+       LEFT JOIN hub_sessions s
+         ON s.team_id=current_team.id AND s.withdrawn_at IS NULL
+         AND (?=0 OR s.updated_at<? OR (s.updated_at=? AND s.sid>?))
+       ORDER BY s.updated_at DESC, s.sid ASC
+       LIMIT ?`,
     )
-    .bind(teamId)
-    .all<HubSessionRow & { team_name: string | null }>()
-  return Promise.all(
-    rows.results.map((row) => serializeManagedSession(db, row, canManageVisibility)),
+    .bind(
+      teamId,
+      actorUserId,
+      after === null ? 0 : 1,
+      after?.updatedAt ?? 0,
+      after?.updatedAt ?? 0,
+      after?.sid ?? '',
+      options.limit + 1,
+    )
+    .all<
+      { [K in keyof HubSessionRow]: HubSessionRow[K] | null } & {
+        team_name: string
+        team_role: TeamRole
+      }
+    >()
+  if (rows.results.length === 0) return null
+
+  const sessionRows = rows.results.filter((row) => row.sid !== null)
+  const hasMore = sessionRows.length > options.limit
+  const pageRows = hasMore ? sessionRows.slice(0, options.limit) : sessionRows
+  const sessions = await Promise.all(
+    pageRows.map((row) =>
+      serializeManagedSession(
+        db,
+        row as HubSessionRow & { team_name: string },
+        row.team_role === 'owner' || row.team_role === 'admin',
+      ),
+    ),
   )
+  return {
+    sessions,
+    next_cursor: hasMore
+      ? encodeCursor(pageKey(pageRows.at(-1)! as HubSessionRow), fingerprint)
+      : null,
+  }
+}
+
+export function parseManagedHubSessionPageOptions(request: Request): ManagedHubSessionPageOptions {
+  const url = new URL(request.url)
+  rejectDuplicate(url, 'cursor')
+  rejectDuplicate(url, 'limit')
+
+  const cursor = url.searchParams.get('cursor')
+  const limitValue = url.searchParams.get('limit')
+  if (limitValue === null) return { cursor, limit: DEFAULT_PAGE_LIMIT }
+  if (!/^\d+$/.test(limitValue)) {
+    throw new ApiError('BAD_REQUEST', `limit must be an integer from 1 to ${MAX_PAGE_LIMIT}`)
+  }
+  const limit = Number(limitValue)
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+    throw new ApiError('BAD_REQUEST', `limit must be an integer from 1 to ${MAX_PAGE_LIMIT}`)
+  }
+  return { cursor, limit }
+}
+
+function rejectDuplicate(url: URL, name: string): void {
+  if (url.searchParams.getAll(name).length > 1) {
+    throw new ApiError('BAD_REQUEST', `${name} must be provided at most once`)
+  }
+}
+
+async function scopeFingerprint(scope: ManagedHubSessionScope): Promise<string> {
+  const key =
+    scope.kind === 'owner'
+      ? [scope.kind, scope.actorUserId]
+      : [scope.kind, scope.actorUserId, scope.teamId]
+  return base64urlFromBuffer(await sha256(JSON.stringify(key))).slice(0, 16)
+}
+
+function encodeCursor(key: ManagedHubSessionPageKey, fingerprint: string): string {
+  const bytes = new TextEncoder().encode(
+    JSON.stringify({
+      v: CURSOR_VERSION,
+      f: fingerprint,
+      u: key.updatedAt,
+      i: key.sid,
+    }),
+  )
+  const buffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(buffer).set(bytes)
+  return base64urlFromBuffer(buffer)
+}
+
+function pageKey(row: Pick<HubSessionRow, 'updated_at' | 'sid'>): ManagedHubSessionPageKey {
+  return { updatedAt: row.updated_at, sid: row.sid }
+}
+
+function decodeCursor(
+  value: string | null,
+  expectedFingerprint: string,
+): ManagedHubSessionPageKey | null {
+  if (value === null) return null
+  if (value.length > 512 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new ApiError('BAD_REQUEST', 'malformed cursor')
+  }
+
+  let decoded: unknown
+  try {
+    const standard = value.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = standard.padEnd(Math.ceil(standard.length / 4) * 4, '=')
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    decoded = JSON.parse(new TextDecoder().decode(bytes)) as unknown
+  } catch {
+    throw new ApiError('BAD_REQUEST', 'malformed cursor')
+  }
+
+  if (
+    !isObject(decoded) ||
+    decoded['v'] !== CURSOR_VERSION ||
+    decoded['f'] !== expectedFingerprint ||
+    !isNonNegativeSafeInteger(decoded['u']) ||
+    typeof decoded['i'] !== 'string' ||
+    !SID_RE.test(decoded['i'])
+  ) {
+    throw new ApiError('BAD_REQUEST', 'malformed or mismatched cursor')
+  }
+  return { updatedAt: decoded['u'], sid: decoded['i'] }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 export async function serializeManagedSession(

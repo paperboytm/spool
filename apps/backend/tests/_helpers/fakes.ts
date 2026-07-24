@@ -354,7 +354,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const session = state.hub_sessions.find(
             (row) => row.sid === sid && row.visibility === 'unlisted' && row.withdrawn_at === null,
           )
-          if (!session) return null
+          if (
+            !session ||
+            !state.hub_session_discovery.some((projection) => projection.sid === sid)
+          ) {
+            return null
+          }
           const owner = state.users.find((row) => row.id === session.owner_user_id)
           if (!owner) return null
           const team = session.team_id
@@ -947,8 +952,28 @@ export function makeDb(state: FakeDbState = emptyState()): {
           }
           return { success: true, meta: { changes: 1 } }
         }
-        if (sql.includes('/* discovery:increment-engagement */')) {
-          const [sid, day] = params as [string, string]
+        if (sql.includes('/* discovery:increment-engagement-if-live */')) {
+          const [day, sid] = params as [string, string]
+          const session = state.hub_sessions.find(
+            (row) => row.sid === sid && row.visibility === 'unlisted' && row.withdrawn_at === null,
+          )
+          const owner = session
+            ? state.users.find((row) => row.id === session.owner_user_id)
+            : undefined
+          const team = session?.team_id
+            ? state.teams.find(
+                (row) =>
+                  row.id === session.team_id &&
+                  row.archived_at === null &&
+                  row.deletion_pending_until === null,
+              )
+            : null
+          const live =
+            session !== undefined &&
+            owner !== undefined &&
+            state.hub_session_discovery.some((projection) => projection.sid === sid) &&
+            ((session.team_id == null && owner.deleted_at === null) || team !== null)
+          if (!live) return { success: true, meta: { changes: 0 } }
           const existing = state.hub_session_engagement_daily.find(
             (row) => row.sid === sid && row.day === day,
           )
@@ -2003,19 +2028,46 @@ export function makeDb(state: FakeDbState = emptyState()): {
             .slice(0, limit)
           return { results: items as T[] }
         }
-        if (sql.includes('/* discovery:list */')) {
+        if (sql.includes('/* discovery:list-page ')) {
+          const marker = sql.match(
+            /\/\* discovery:list-page sort=(recommended|trending|recent) query=([01]) tokens=(\d+) agent=(all|claude|codex) \*\//,
+          )
+          if (!marker) throw new Error(`Malformed discovery fake marker: ${sql}`)
+          const sort = marker[1] as 'recommended' | 'trending' | 'recent'
+          const hasQuery = marker[2] === '1'
+          const tokenCount = Number(marker[3])
+          const markerAgent = marker[4]
           let parameterIndex = 0
-          const sinceDay = params[parameterIndex] as string
-          parameterIndex += 1
-          const hasAgent = sql.includes('d.agent = ?')
-          const agent = hasAgent ? (params[parameterIndex] as SessionProvider) : null
-          if (hasAgent) parameterIndex += 1
-          const tokenCount = sql.match(/d\.search_text LIKE \?/g)?.length ?? 0
+          const ranked = sort !== 'recent'
+          const engagementFromDay = ranked ? (params[parameterIndex++] as string) : null
+          const engagementToDayExclusive = ranked ? (params[parameterIndex++] as string) : null
+          const agent = markerAgent === 'all' ? null : (params[parameterIndex++] as SessionProvider)
           const tokens: string[] = []
           for (let index = 0; index < tokenCount; index += 1) {
-            tokens.push(likePatternValue(params[parameterIndex] as string))
+            tokens.push(params[parameterIndex] as string)
             parameterIndex += 3
           }
+          const rankedAt = params[parameterIndex++] as number
+          const projectionRankedAt = params[parameterIndex++] as number
+          if (projectionRankedAt !== rankedAt) {
+            throw new Error('Discovery fake received mismatched projection timestamps')
+          }
+          const ranksByRelevance = hasQuery && sort !== 'recent'
+          const query = ranksByRelevance ? (params[parameterIndex] as string) : null
+          if (ranksByRelevance) {
+            parameterIndex += 5 + tokenCount * 4
+          }
+          if (ranked) {
+            const scoreRankedAt = params[parameterIndex++] as number
+            if (scoreRankedAt !== rankedAt) {
+              throw new Error('Discovery fake received mismatched ranking timestamps')
+            }
+          }
+          const hasAfter = params[parameterIndex++] === 1
+          const afterRelevance = params[parameterIndex++] as number
+          const afterSortScore = params[parameterIndex++] as number
+          const afterPublishedAt = params[parameterIndex++] as number
+          const afterSid = params[parameterIndex++] as string
           const limit = params[parameterIndex] as number
 
           const items = state.hub_session_discovery
@@ -2040,16 +2092,21 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 : null
               if (
                 (session.team_id == null && user.deleted_at !== null) ||
-                (session.team_id != null && !owningTeam)
+                (session.team_id != null && !owningTeam) ||
+                discovery.published_at > rankedAt ||
+                discovery.updated_at > rankedAt
               ) {
                 return []
               }
               const identityLive = user.deleted_at === null
               const handle =
                 (identityLive
-                  ? state.handles.find(
-                      (row) => row.user_id === session.owner_user_id && row.released_at === null,
-                    )?.handle
+                  ? state.handles
+                      .filter(
+                        (row) => row.user_id === session.owner_user_id && row.released_at === null,
+                      )
+                      .map((row) => row.handle)
+                      .sort()[0]
                   : null) ?? null
               const displayName = identityLive ? (user.display_name ?? user.name ?? '') : ''
               if (
@@ -2062,9 +2119,28 @@ export function makeDb(state: FakeDbState = emptyState()): {
               ) {
                 return []
               }
-              const qualifiedReads = state.hub_session_engagement_daily
-                .filter((row) => row.sid === discovery.sid && row.day >= sinceDay)
-                .reduce((sum, row) => sum + row.qualified_reads, 0)
+              const qualifiedReads =
+                ranked && engagementFromDay !== null && engagementToDayExclusive !== null
+                  ? state.hub_session_engagement_daily
+                      .filter(
+                        (row) =>
+                          row.sid === discovery.sid &&
+                          row.day >= engagementFromDay &&
+                          row.day < engagementToDayExclusive,
+                      )
+                      .reduce((sum, row) => sum + row.qualified_reads, 0)
+                  : 0
+              const normalizedAuthor = identityLive
+                ? `${handle ?? ''} ${displayName}`.trim().toLowerCase()
+                : ''
+              const relevanceScore =
+                query === null
+                  ? 0
+                  : fakeDiscoveryRelevance(discovery, normalizedAuthor, query, tokens)
+              const sortScore =
+                sort === 'recent'
+                  ? null
+                  : fakeDiscoverySortScore(discovery, sort, qualifiedReads, rankedAt)
               const lineageSourceSid = (() => {
                 if (!discovery.lineage_source_sid) return null
                 const sourceProjection = state.hub_session_discovery.find(
@@ -2103,13 +2179,45 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   custom_avatar_id: identityLive ? (user.custom_avatar_id ?? null) : null,
                   avatar_visible: identityLive ? (user.avatar_visible ?? 1) : 0,
                   qualified_reads_7d: qualifiedReads,
+                  relevance_score: relevanceScore,
+                  sort_score: sortScore,
                 },
               ]
             })
-            .sort(
-              (left, right) =>
-                right.published_at - left.published_at || left.sid.localeCompare(right.sid),
-            )
+            .filter((item) => {
+              if (!hasAfter) return true
+              if (item.relevance_score !== afterRelevance) {
+                return item.relevance_score < afterRelevance
+              }
+              if (
+                sort !== 'recent' &&
+                item.sort_score !== null &&
+                item.sort_score !== afterSortScore
+              ) {
+                return item.sort_score < afterSortScore
+              }
+              if (item.published_at !== afterPublishedAt) {
+                return item.published_at < afterPublishedAt
+              }
+              return item.sid > afterSid
+            })
+            .sort((left, right) => {
+              if (left.relevance_score !== right.relevance_score) {
+                return right.relevance_score - left.relevance_score
+              }
+              if (
+                sort !== 'recent' &&
+                left.sort_score !== null &&
+                right.sort_score !== null &&
+                left.sort_score !== right.sort_score
+              ) {
+                return right.sort_score - left.sort_score
+              }
+              if (left.published_at !== right.published_at) {
+                return right.published_at - left.published_at
+              }
+              return left.sid < right.sid ? -1 : left.sid > right.sid ? 1 : 0
+            })
             .slice(0, limit)
           return { results: items as T[] }
         }
@@ -2393,6 +2501,40 @@ export function makeR2(): {
   return { bucket: bucket as unknown as R2Bucket, store }
 }
 
-function likePatternValue(pattern: string): string {
-  return pattern.slice(1, -1).replace(/\\([\\%_])/g, '$1')
+function fakeDiscoveryRelevance(
+  discovery: HubSessionDiscoveryRow,
+  normalizedAuthor: string,
+  query: string,
+  tokens: readonly string[],
+): number {
+  const title = discovery.title.toLowerCase()
+  const summary = (discovery.summary_text ?? '').toLowerCase()
+  let score = 0
+  if (title === query) score += 10_000
+  else if (title.includes(query)) score += 5_000
+  if (summary.includes(query)) score += 1_000
+  if (normalizedAuthor === query) score += 2_000
+  else if (normalizedAuthor.includes(query)) score += 500
+  for (const token of tokens) {
+    if (title.includes(token)) score += 200
+    if (summary.includes(token)) score += 80
+    if (normalizedAuthor.includes(token)) score += 100
+    if (discovery.search_text.includes(token)) score += 20
+  }
+  return score
+}
+
+function fakeDiscoverySortScore(
+  discovery: HubSessionDiscoveryRow,
+  sort: 'recommended' | 'trending',
+  qualifiedReads: number,
+  rankedAt: number,
+): number {
+  const ageDays = Math.max(0, (rankedAt - discovery.published_at) / (24 * 60 * 60 * 1000))
+  const reads = Math.max(0, qualifiedReads)
+  const score =
+    sort === 'recommended'
+      ? discovery.quality_score + 8 * Math.log1p(reads) + 12 * 2 ** (-ageDays / 14)
+      : Math.log1p(reads) * 2 ** (-ageDays / 7) + 0.05 * discovery.quality_score
+  return Math.round(score * 1_000_000)
 }

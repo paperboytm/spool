@@ -1342,6 +1342,10 @@ html[data-theme='dark'] .sw-root {
   font-size: var(--sp-text-meta);
 }
 
+.sw-team-workspace-main {
+  display: flex;
+  flex-direction: column;
+}
 .sw-team-main {
   flex: 1 1 auto;
   padding: var(--sp-space-12, 48px) var(--sp-space-6) var(--sp-space-8);
@@ -1415,6 +1419,15 @@ html[data-theme='dark'] .sw-root {
 }
 .sw-team-panel > section > .sp-section-label {
   margin-bottom: var(--sp-space-4);
+}
+.sw-team-panel > section > .sw-team-session-label {
+  margin-bottom: var(--sp-space-2);
+}
+.sw-team-session-help {
+  margin: 0 0 var(--sp-space-4);
+  color: var(--muted);
+  font-size: var(--sp-text-ui);
+  line-height: 1.5;
 }
 .sw-team-panel-message {
   min-height: 96px;
