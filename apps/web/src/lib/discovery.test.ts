@@ -16,10 +16,10 @@ const response: DiscoverySessionsResponse = {
 }
 
 describe('Explore URL state', () => {
-  it('normalizes query, sort, and agent without forwarding unknown values', () => {
+  it('normalizes query and sort without retaining retired Agent filters', () => {
     expect(
       parseExploreSearch({ q: '  refresh   races  ', sort: 'recent', agent: 'claude' }),
-    ).toEqual({ q: 'refresh races', sort: 'recent', agent: 'claude' })
+    ).toEqual({ q: 'refresh races', sort: 'recent' })
     expect(parseExploreSearch({ sort: 'popular', agent: 'gemini' })).toEqual({
       sort: 'recommended',
     })

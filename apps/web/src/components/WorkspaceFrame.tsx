@@ -23,8 +23,6 @@ export type WorkspaceDestination = 'feed' | 'library' | 'teams'
 interface WorkspaceFrameProps {
   active: WorkspaceDestination
   children: ReactNode
-  rightRail?: ReactNode
-  layout?: 'feed' | 'wide'
   mainClassName?: string
   rootClassName?: string
 }
@@ -233,28 +231,21 @@ export function WorkspaceMobileHeader({
 export function WorkspaceFrame({
   active,
   children,
-  rightRail,
-  layout = 'wide',
   mainClassName,
   rootClassName,
 }: WorkspaceFrameProps) {
   const identity = useWorkspaceIdentity()
-  const withRightRail = rightRail !== undefined
-  const shellClassName = ['workspace-shell', `is-${layout}`, withRightRail ? 'has-right-rail' : '']
-    .filter(Boolean)
-    .join(' ')
   const rootClasses = ['sw-root', 'workspace-root', rootClassName].filter(Boolean).join(' ')
   const mainClasses = ['workspace-main', mainClassName].filter(Boolean).join(' ')
 
   return (
     <div className={rootClasses}>
-      <div className={shellClassName}>
+      <div className="workspace-shell">
         <WorkspaceSidebar active={active} identity={identity} />
         <main className={mainClasses}>
           <WorkspaceMobileHeader active={active} identity={identity} />
           {children}
         </main>
-        {rightRail}
       </div>
     </div>
   )

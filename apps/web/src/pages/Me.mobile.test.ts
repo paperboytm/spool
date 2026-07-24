@@ -15,8 +15,7 @@ describe('/me mobile layout contract', () => {
   it('reflows account controls and rows to minmax-safe single columns', () => {
     expect(css).toContain('grid-template-columns: auto minmax(0, 1fr)')
     expect(css).toContain("'. role role'")
-    expect(css).toContain('.sw-me-card .sw-managed-session-row')
-    expect(css).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(css).toContain('.sw-me-card .session-feed-row')
     expect(css).toContain('.sw-me-card .sw-share')
   })
 

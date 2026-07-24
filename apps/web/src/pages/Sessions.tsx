@@ -1,11 +1,11 @@
 import { Tabs } from '@spool-lab/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { ManagedSessionsSection } from '../components/ManagedSessionsSection'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
-import { type DiscoveryAgentFilter, type SessionsSearchState } from '../lib/discovery'
+import { type SessionsSearchState } from '../lib/discovery'
 import { fetchTeams, type TeamSummary } from '../lib/team-api'
-import { changedAgentSearch, PublicFeed, PublicFeedRail } from './Explore'
+import { PublicFeed } from './Explore'
 import { TeamSessionsPanel } from './Team'
 
 import '../styles/app.css'
@@ -56,11 +56,19 @@ export function scopeTabValue(search: SessionsSearchState): string {
 }
 
 export function scopeSearchForTab(value: string): SessionsSearchState {
-  if (value === 'mine') return { sort: 'recommended', scope: 'mine' }
+  if (value === 'mine') return { sort: 'recent', scope: 'mine' }
   if (value.startsWith('team:')) {
-    return { sort: 'recommended', scope: 'team', team: value.slice('team:'.length) }
+    return { sort: 'recent', scope: 'team', team: value.slice('team:'.length) }
   }
   return { sort: 'recommended' }
+}
+
+function scopeTabId(value: string): string {
+  return `sessions-scope-${encodeURIComponent(value)}-tab`
+}
+
+function scopePanelId(value: string): string {
+  return `sessions-scope-${encodeURIComponent(value)}-panel`
 }
 
 function ScopeTabs({
@@ -75,12 +83,28 @@ function ScopeTabs({
   if (membership.kind !== 'ready') return null
 
   const items = [
-    { value: 'public', label: 'Public' },
+    {
+      value: 'public',
+      label: 'Public',
+      id: scopeTabId('public'),
+      ariaControls: scopePanelId('public'),
+    },
     ...membership.teams.map((team) => ({
       value: `team:${team.id}`,
-      label: `Team · ${team.name}`,
+      label: (
+        <span className="sessions-scope-tab-label" title={`Team · ${team.name}`}>
+          Team · {team.name}
+        </span>
+      ),
+      id: scopeTabId(`team:${team.id}`),
+      ariaControls: scopePanelId(`team:${team.id}`),
     })),
-    { value: 'mine', label: 'Mine' },
+    {
+      value: 'mine',
+      label: 'Mine',
+      id: scopeTabId('mine'),
+      ariaControls: scopePanelId('mine'),
+    },
   ]
 
   return (
@@ -91,6 +115,27 @@ function ScopeTabs({
       items={items}
       onValueChange={(value) => onSearchChange(scopeSearchForTab(value))}
     />
+  )
+}
+
+function ScopePanel({
+  value,
+  labelled,
+  children,
+}: {
+  value: string
+  labelled: boolean
+  children: ReactNode
+}) {
+  return (
+    <div
+      id={scopePanelId(value)}
+      className="sessions-scope-panel"
+      role={labelled ? 'tabpanel' : undefined}
+      aria-labelledby={labelled ? scopeTabId(value) : undefined}
+    >
+      {children}
+    </div>
   )
 }
 
@@ -122,37 +167,60 @@ function TeamScopeBody({ teamId, membership }: { teamId: string; membership: Sco
     )
   }
 
-  return <TeamSessionsPanel team={team} />
+  return <TeamSessionsPanel team={team} presentation="feed" />
+}
+
+function RecentFeedHeader() {
+  return (
+    <div className="sessions-feed-order" aria-label="Session order">
+      <span>Recent</span>
+    </div>
+  )
 }
 
 export function SessionsPage({ search, onSearchChange }: SessionsPageProps) {
   const membership = useScopeMembership()
-  const scope = search.scope ?? 'public'
-  const isPublic = scope === 'public'
+  const requestedScope = search.scope ?? 'public'
+  const invalidTeamScope =
+    requestedScope === 'team' &&
+    Boolean(search.team) &&
+    membership.kind === 'ready' &&
+    !membership.teams.some((team) => team.id === search.team)
+  const normalizedTeamRef = useRef<string | null>(null)
 
-  const changeAgent = (agent?: DiscoveryAgentFilter) => {
-    onSearchChange(changedAgentSearch(search, agent))
-  }
+  useEffect(() => {
+    if (!invalidTeamScope || !search.team) {
+      normalizedTeamRef.current = null
+      return
+    }
+    if (normalizedTeamRef.current === search.team) return
+    normalizedTeamRef.current = search.team
+    onSearchChange({ sort: 'recommended' })
+  }, [invalidTeamScope, onSearchChange, search.team])
+
+  const scope = invalidTeamScope ? 'public' : requestedScope
+  const activeSearch: SessionsSearchState = invalidTeamScope ? { sort: 'recommended' } : search
+  const hasScopeTabs = membership.kind === 'ready'
 
   return (
-    <WorkspaceFrame
-      active="feed"
-      layout={isPublic ? 'feed' : 'wide'}
-      rootClassName="explore-root"
-      mainClassName={isPublic ? 'explore-center' : 'workspace-content-main'}
-      {...(isPublic
-        ? { rightRail: <PublicFeedRail search={search} onAgentChange={changeAgent} /> }
-        : {})}
-    >
-      <ScopeTabs search={search} membership={membership} onSearchChange={onSearchChange} />
-      {scope === 'public' ? <PublicFeed search={search} onSearchChange={onSearchChange} /> : null}
+    <WorkspaceFrame active="feed" rootClassName="explore-root" mainClassName="explore-center">
+      <ScopeTabs search={activeSearch} membership={membership} onSearchChange={onSearchChange} />
+      {scope === 'public' ? (
+        <ScopePanel value="public" labelled={hasScopeTabs}>
+          <PublicFeed search={activeSearch} onSearchChange={onSearchChange} />
+        </ScopePanel>
+      ) : null}
       {scope === 'mine' ? (
-        <section aria-label="Your Sessions">
-          <ManagedSessionsSection signInNext="/sessions?scope=mine" />
-        </section>
+        <ScopePanel value="mine" labelled={hasScopeTabs}>
+          <RecentFeedHeader />
+          <ManagedSessionsSection presentation="feed" signInNext="/sessions?scope=mine" />
+        </ScopePanel>
       ) : null}
       {scope === 'team' && search.team ? (
-        <TeamScopeBody teamId={search.team} membership={membership} />
+        <ScopePanel value={hasScopeTabs ? `team:${search.team}` : 'team'} labelled={hasScopeTabs}>
+          <RecentFeedHeader />
+          <TeamScopeBody teamId={search.team} membership={membership} />
+        </ScopePanel>
       ) : null}
     </WorkspaceFrame>
   )

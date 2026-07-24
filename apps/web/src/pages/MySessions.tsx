@@ -5,7 +5,7 @@ import '../styles/app.css'
 
 export function MySessionsPage() {
   return (
-    <WorkspaceFrame active="library" layout="wide" mainClassName="workspace-content-main">
+    <WorkspaceFrame active="library" mainClassName="workspace-content-main">
       <header className="workspace-page-header">
         <p className="workspace-page-eyebrow">Your library</p>
         <h1>My Sessions</h1>

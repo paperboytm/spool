@@ -19,17 +19,10 @@
 
 .workspace-shell {
   display: grid;
+  grid-template-columns: 240px minmax(0, 880px);
   justify-content: center;
   min-height: 100dvh;
   margin: 0 auto;
-}
-
-.workspace-shell.is-feed.has-right-rail {
-  grid-template-columns: 240px minmax(640px, 680px) 240px;
-}
-
-.workspace-shell.is-wide {
-  grid-template-columns: 240px minmax(0, 880px);
 }
 
 .workspace-sidebar {
@@ -196,16 +189,8 @@
   padding: var(--sp-space-6);
 }
 
-@media (max-width: 1260px) {
-  .workspace-shell.is-feed.has-right-rail {
-    grid-template-columns: 240px minmax(0, 680px);
-  }
-}
-
 @media (max-width: 768px) {
-  .workspace-shell,
-  .workspace-shell.is-feed.has-right-rail,
-  .workspace-shell.is-wide {
+  .workspace-shell {
     display: block;
   }
 

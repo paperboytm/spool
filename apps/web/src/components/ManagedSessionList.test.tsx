@@ -27,7 +27,7 @@ const session: ManagedSession = {
 }
 
 describe('ManagedSessionList', () => {
-  it('shows explicit visibility and every available Team target', () => {
+  it('uses the shared feed hierarchy and keeps management behind a quiet trigger', () => {
     const html = renderToStaticMarkup(
       <ManagedSessionList
         sessions={[session]}
@@ -41,11 +41,13 @@ describe('ManagedSessionList', () => {
       />,
     )
 
+    expect(html).toContain('session-feed-row')
+    expect(html).toContain('@alice')
+    expect(html).toContain('Codex CLI')
     expect(html).toContain('Public')
-    expect(html).toContain('Team · Paperboy')
-    expect(html).toContain('Team · Docs')
-    expect(html).toContain('Withdraw')
-    expect(html).toContain('lucide-circle-off')
+    expect(html).toContain('Manage Ship Team workspaces')
+    expect(html).not.toContain('<select')
+    expect(html).not.toContain('Withdraw')
     expect(html).toContain('href="/session/codex_1"')
   })
 
@@ -70,6 +72,7 @@ describe('ManagedSessionList', () => {
 
     expect(html).toContain('Team · Paperboy')
     expect(html).not.toContain('<select')
+    expect(html).not.toContain('Manage Ship Team workspaces')
     expect(html).not.toContain('Withdraw')
   })
 
@@ -85,6 +88,7 @@ describe('ManagedSessionList', () => {
     )
 
     expect(html).not.toContain('<select')
+    expect(html).not.toContain('Manage Ship Team workspaces')
     expect(html).not.toContain('Withdraw')
   })
 
@@ -116,6 +120,7 @@ describe('ManagedSessionList', () => {
       />,
     )
     expect(html).not.toContain('<select')
+    expect(html).not.toContain('Manage Ship Team workspaces')
     expect(html).not.toContain('Withdraw')
   })
 
@@ -137,8 +142,9 @@ describe('ManagedSessionList', () => {
         onSessionWithdrawn={() => undefined}
       />,
     )
-    expect(html).not.toContain('<option value="public">')
-    expect(html).toContain('<option value="link-only" selected="">Link-only</option>')
+    expect(html).toContain('Link-only')
+    expect(html).toContain('Gemini CLI')
+    expect(html).not.toContain('<select')
   })
 })
 

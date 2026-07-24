@@ -5,7 +5,7 @@ import '../styles/app.css'
 
 export function TeamsPage() {
   return (
-    <WorkspaceFrame active="teams" layout="wide" mainClassName="workspace-content-main">
+    <WorkspaceFrame active="teams" mainClassName="workspace-content-main">
       <header className="workspace-page-header">
         <p className="workspace-page-eyebrow">Shared workspaces</p>
         <h1>Teams</h1>

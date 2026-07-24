@@ -1,9 +1,8 @@
 import { isDiscoverySessionSid } from '@spool-lab/session-kit'
-import { Avatar, Badge, Button } from '@spool-lab/ui'
-import { CircleOff, Globe2, Link2, Users } from 'lucide-react'
-import { useState } from 'react'
+import { Badge, Button, IconButton } from '@spool-lab/ui'
+import { CircleOff, Globe2, Link2, MoreHorizontal, Users } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 
-import { humanDate } from '../lib/dates'
 import {
   updateManagedSessionVisibility,
   withdrawManagedSession,
@@ -12,6 +11,7 @@ import {
   type ManagedSessionVisibility,
 } from '../lib/hub-management-api'
 import type { TeamSummary } from '../lib/team-api'
+import { SessionFeedRow, SessionSourceBadge } from './SessionFeedRow'
 
 type VisibilityChoice =
   | { visibility: Exclude<ManagedSessionVisibility, 'team'> }
@@ -160,7 +160,7 @@ export function ManagedSessionList({
   onSessionWithdrawn: (sid: string) => void
 }) {
   return (
-    <ul className="sw-managed-session-list">
+    <ul className="managed-session-list">
       {sessions.map((session) => (
         <ManagedSessionRow
           key={session.sid}
@@ -190,7 +190,34 @@ function ManagedSessionRow({
 }) {
   const [busy, setBusy] = useState<'idle' | 'visibility' | 'withdraw'>('idle')
   const [error, setError] = useState<string | null>(null)
-  const authorName = session.author.display_name || session.author.handle || 'Team member'
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const menuId = useId()
+  const title = session.title || 'Shared Session'
+
+  useEffect(() => {
+    if (!open) return
+    menuRef.current?.querySelector<HTMLElement>('select')?.focus()
+
+    function closeOnOutsidePointer(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false)
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      requestAnimationFrame(() => {
+        menuRef.current?.querySelector<HTMLButtonElement>('.managed-session-menu-trigger')?.focus()
+      })
+    }
+
+    document.addEventListener('mousedown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [open])
 
   async function changeVisibility(value: string) {
     const choice = parseChoice(value, teams)
@@ -214,11 +241,31 @@ function ManagedSessionRow({
       setError(failureMessage(result))
       return
     }
+    setOpen(false)
+    requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>('.managed-session-menu-trigger')?.focus()
+    })
     onSessionChanged(result.data.session)
   }
 
   async function withdraw() {
     if (busy !== 'idle' || !window.confirm(withdrawalConfirmation(session))) return
+
+    function finishWithdrawal() {
+      const currentRow = menuRef.current?.closest('.managed-session-item')
+      const adjacentRow = currentRow?.nextElementSibling ?? currentRow?.previousElementSibling
+      const focusTarget =
+        adjacentRow?.querySelector<HTMLElement>('.sp-list-row__title a') ??
+        document.querySelector<HTMLElement>(
+          '.sessions-scope-tabs [role="tab"][aria-selected="true"]',
+        ) ??
+        document.querySelector<HTMLElement>('a[href="/sessions"]')
+
+      onSessionWithdrawn(session.sid)
+      requestAnimationFrame(() => {
+        if (focusTarget?.isConnected) focusTarget.focus()
+      })
+    }
 
     setBusy('withdraw')
     setError(null)
@@ -230,74 +277,121 @@ function ManagedSessionRow({
       return
     }
     if (result.kind === 'gone') {
-      onSessionWithdrawn(session.sid)
+      finishWithdrawal()
       return
     }
     if (result.kind !== 'ok') {
       setError(withdrawalFailureMessage(result))
       return
     }
-    onSessionWithdrawn(session.sid)
+    finishWithdrawal()
   }
 
-  return (
-    <li>
-      <div className="sw-managed-session-row">
-        <a className="sw-managed-session-link" href={`/session/${encodeURIComponent(session.sid)}`}>
-          <div className="sw-managed-session-titleline">
-            <h3>{session.title || 'Shared session'}</h3>
-            <VisibilityBadge session={session} />
-          </div>
-          {session.summary ? <p>{session.summary}</p> : null}
-          <div className="sw-managed-session-meta">
-            <Avatar src={session.author.avatar_url} name={authorName} alt="" size="sm" />
-            <span>{authorName}</span>
-            <span aria-hidden="true">·</span>
-            <span>{session.provider}</span>
-            <span aria-hidden="true">·</span>
-            <time dateTime={new Date(session.updated_at).toISOString()}>
-              updated {humanDate(session.updated_at)}
-            </time>
-          </div>
-        </a>
-
-        {canManageSession(session, teams, canManageVisibility) ? (
-          <div className="sw-managed-session-actions" aria-busy={busy !== 'idle' || undefined}>
-            <label className="sw-managed-session-visibility">
-              <span>{busy === 'visibility' ? 'Updating…' : 'Visibility'}</span>
-              <select
-                value={currentChoice(session)}
-                disabled={busy !== 'idle'}
-                aria-label={`Visibility for ${session.title || 'Shared session'}`}
-                onChange={(event) => void changeVisibility(event.target.value)}
-              >
-                {canPublishManagedSession(session) ? <option value="public">Public</option> : null}
-                <option value="link-only">Link-only</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={`team:${team.id}`}>
-                    Team · {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              type="button"
-              size="sm"
-              variant="danger"
-              className="sw-managed-session-withdraw"
-              loading={busy === 'withdraw'}
-              loadingLabel="Withdrawing…"
-              disabled={busy !== 'idle' && busy !== 'withdraw'}
-              onClick={() => void withdraw()}
+  const canManage = canManageSession(session, teams, canManageVisibility)
+  const managementMenu = canManage ? (
+    <div
+      ref={menuRef}
+      className="managed-session-menu"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false)
+      }}
+    >
+      <IconButton
+        type="button"
+        className="managed-session-menu-trigger"
+        aria-label={`Manage ${title}`}
+        title={`Manage ${title}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => {
+          setError(null)
+          setOpen((current) => !current)
+        }}
+      >
+        <MoreHorizontal size={15} strokeWidth={1.8} aria-hidden="true" />
+      </IconButton>
+      {open ? (
+        <div
+          id={menuId}
+          className="managed-session-popover"
+          role="dialog"
+          aria-label={`Manage ${title}`}
+          aria-busy={busy !== 'idle' || undefined}
+        >
+          <label className="managed-session-visibility">
+            <span>{busy === 'visibility' ? 'Updating…' : 'Visibility'}</span>
+            <select
+              value={currentChoice(session)}
+              disabled={busy !== 'idle'}
+              aria-label={`Visibility for ${title}`}
+              onChange={(event) => void changeVisibility(event.target.value)}
             >
-              <CircleOff size={14} strokeWidth={1.8} aria-hidden="true" />
-              Withdraw
-            </Button>
+              {canPublishManagedSession(session) ? <option value="public">Public</option> : null}
+              <option value="link-only">Link-only</option>
+              {teams.map((team) => (
+                <option key={team.id} value={`team:${team.id}`}>
+                  Team · {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            type="button"
+            size="sm"
+            variant="danger"
+            className="managed-session-withdraw"
+            loading={busy === 'withdraw'}
+            loadingLabel="Withdrawing…"
+            disabled={busy !== 'idle' && busy !== 'withdraw'}
+            onClick={() => void withdraw()}
+          >
+            <CircleOff size={14} strokeWidth={1.8} aria-hidden="true" />
+            Withdraw
+          </Button>
+          {error ? (
+            <p className="managed-session-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null
+
+  return (
+    <li className="managed-session-item">
+      <SessionFeedRow
+        as="div"
+        sid={session.sid}
+        title={title}
+        summary={session.summary}
+        author={{
+          handle: session.author.handle,
+          displayName: session.author.display_name,
+          avatarUrl: session.author.avatar_url,
+        }}
+        timestamp={session.updated_at}
+        timestampVerb="updated"
+        metadata={
+          <div className="session-feed-row-meta">
+            <SessionSourceBadge provider={session.provider} />
+            <VisibilityBadge session={session} />
+            {session.team_id && session.visibility !== 'team' ? (
+              <span
+                className="managed-session-owner"
+                title={`Owned by Team · ${sessionTeamName(session)}`}
+              >
+                <Users size={13} strokeWidth={1.7} aria-hidden="true" />
+                <span>Owned by Team · {sessionTeamName(session)}</span>
+              </span>
+            ) : null}
+            {managementMenu}
           </div>
-        ) : null}
-      </div>
-      {error ? (
-        <p className="sw-managed-session-error" role="alert">
+        }
+      />
+      {error && !open ? (
+        <p className="managed-session-error managed-session-row-error" role="alert">
           {error}
         </p>
       ) : null}
@@ -309,9 +403,9 @@ function VisibilityBadge({ session }: { session: ManagedSession }) {
   const Icon =
     session.visibility === 'public' ? Globe2 : session.visibility === 'team' ? Users : Link2
   return (
-    <Badge title={visibilityLabel(session)}>
+    <Badge className="managed-session-visibility-badge" title={visibilityLabel(session)}>
       <Icon size={12} strokeWidth={1.7} aria-hidden="true" />
-      {visibilityLabel(session)}
+      <span>{visibilityLabel(session)}</span>
     </Badge>
   )
 }

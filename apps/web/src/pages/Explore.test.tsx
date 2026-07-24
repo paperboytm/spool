@@ -2,13 +2,7 @@ import type { DiscoverySessionItem } from '@spool-lab/session-kit'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
-import {
-  changedAgentSearch,
-  clearedExploreSearch,
-  DiscoveryRow,
-  PublicFeed,
-  submittedExploreSearch,
-} from './Explore'
+import { clearedExploreSearch, DiscoveryRow, PublicFeed, submittedExploreSearch } from './Explore'
 
 const item: DiscoverySessionItem = {
   sid: 'claude_abc12345',
@@ -60,12 +54,13 @@ describe('DiscoveryRow', () => {
 })
 
 describe('Public feed controls', () => {
-  it('exposes pressed filters and associates sort tabs with the result panel', () => {
+  it('associates the two honest sort tabs with the result panel', () => {
     const html = renderToStaticMarkup(
       <PublicFeed search={{ sort: 'recommended' }} onSearchChange={() => {}} />,
     )
 
-    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>All agents<\/button>/)
+    expect(html).not.toContain('All agents')
+    expect(html).not.toContain('Agent filters')
     expect(html).toContain('aria-controls="explore-results"')
     expect(html).toContain('id="explore-results"')
     expect(html).toContain('role="tabpanel"')
@@ -78,19 +73,12 @@ describe('Public feed controls', () => {
   })
 
   it('keeps the selected order while submitting or clearing a search', () => {
-    const search = { q: 'old', sort: 'recent' as const, agent: 'codex' as const }
+    const search = { q: 'old', sort: 'recent' as const }
 
     expect(submittedExploreSearch(search, '  refresh   races ')).toEqual({
       q: 'refresh races',
       sort: 'recent',
-      agent: 'codex',
     })
-    expect(clearedExploreSearch(search)).toEqual({ sort: 'recent', agent: 'codex' })
-    expect(changedAgentSearch(search, 'claude')).toEqual({
-      q: 'old',
-      sort: 'recent',
-      agent: 'claude',
-    })
-    expect(changedAgentSearch(search)).toEqual({ q: 'old', sort: 'recent' })
+    expect(clearedExploreSearch(search)).toEqual({ sort: 'recent' })
   })
 })

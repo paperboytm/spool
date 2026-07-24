@@ -9,6 +9,7 @@ import {
 } from '../lib/hub-management-api'
 import { fetchTeams, type TeamSummary } from '../lib/team-api'
 import { ManagedSessionList, withoutManagedSession } from './ManagedSessionList'
+import { SessionFeedSkeleton } from './SessionFeedRow'
 
 type State =
   | { kind: 'loading' }
@@ -28,10 +29,13 @@ function redirectToSignIn(next: string): void {
 
 export function ManagedSessionsSection({
   signInNext = '/me',
+  presentation = 'management',
 }: {
   signInNext?: string
+  presentation?: 'management' | 'feed'
 } = {}) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  const isFeed = presentation === 'feed'
 
   const load = useCallback(async () => {
     setState({ kind: 'loading' })
@@ -105,29 +109,43 @@ export function ManagedSessionsSection({
   }
 
   return (
-    <section className="sw-managed-sessions" aria-labelledby="sessions-heading">
-      <SectionLabel
-        id="sessions-heading"
-        role="heading"
-        aria-level={2}
-        count={
-          state.kind === 'ready' && state.sessions.length > 0 ? state.sessions.length : undefined
-        }
-      >
-        Sessions
-      </SectionLabel>
-      <p className="sw-section-help">
-        Manage who can read each uploaded Session. Team moves transfer durable ownership.
-      </p>
+    <section
+      className={isFeed ? 'session-feed sessions-managed-feed' : 'sw-managed-sessions'}
+      aria-labelledby={isFeed ? undefined : 'sessions-heading'}
+      aria-label={isFeed ? 'Your Sessions' : undefined}
+    >
+      {!isFeed ? (
+        <>
+          <SectionLabel
+            id="sessions-heading"
+            role="heading"
+            aria-level={2}
+            count={
+              state.kind === 'ready' && state.sessions.length > 0
+                ? state.sessions.length
+                : undefined
+            }
+          >
+            Sessions
+          </SectionLabel>
+          <p className="sw-section-help">
+            Manage who can read each uploaded Session. Team moves transfer durable ownership.
+          </p>
+        </>
+      ) : null}
 
       {state.kind === 'loading' ? (
-        <div className="sw-team-panel-message" aria-busy="true">
-          <span className="sw-spin sw-spin-anim" aria-hidden="true" />
-          <span>Loading Sessions</span>
-        </div>
+        isFeed ? (
+          <SessionFeedSkeleton rows={3} />
+        ) : (
+          <div className="sw-team-panel-message" aria-busy="true">
+            <span className="sw-spin sw-spin-anim" aria-hidden="true" />
+            <span>Loading Sessions</span>
+          </div>
+        )
       ) : null}
       {state.kind === 'error' ? (
-        <div className="sw-team-panel-error" role="alert">
+        <div className={isFeed ? 'session-feed-error' : 'sw-team-panel-error'} role="alert">
           <p>Could not load your Sessions and Team options.</p>
           <Button variant="outline" onClick={() => void load()}>
             Try again
@@ -135,11 +153,11 @@ export function ManagedSessionsSection({
         </div>
       ) : null}
       {state.kind === 'ready' && state.sessions.length === 0 ? (
-        <div className="sw-team-empty">
+        <div className={isFeed ? 'session-feed-state' : 'sw-team-empty'}>
           <ShieldCheck size={20} strokeWidth={1.6} aria-hidden="true" />
           <div>
             <h2>No uploaded Sessions yet</h2>
-            <p>Sessions shared from the CLI will appear here.</p>
+            <p>Share a Session from the CLI to see it here.</p>
           </div>
         </div>
       ) : null}
@@ -153,8 +171,9 @@ export function ManagedSessionsSection({
         />
       ) : null}
       {state.kind === 'ready' && state.nextCursor !== null ? (
-        <div className="sw-team-status sw-team-status-action">
+        <div className={isFeed ? undefined : 'sw-team-status sw-team-status-action'}>
           <Button
+            className={isFeed ? 'session-feed-load-more' : undefined}
             variant="outline"
             loading={state.loadingMore}
             loadingLabel="Loading Sessions…"
@@ -163,7 +182,7 @@ export function ManagedSessionsSection({
             Load more Sessions
           </Button>
           {state.moreError ? (
-            <p className="sw-managed-session-error" role="alert">
+            <p className="managed-session-error" role="alert">
               {state.moreError}
             </p>
           ) : null}
