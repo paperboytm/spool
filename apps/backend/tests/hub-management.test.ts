@@ -20,6 +20,8 @@ const TEAM_SESSION: HubSessionRow = {
   lineage_json: null,
   view_oid: 'view',
   spool_file_oid: null,
+  cost_usd: null,
+  total_tokens: null,
   visibility: 'private',
   team_id: 'team_1',
   withdrawn_at: null,

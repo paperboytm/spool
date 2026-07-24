@@ -318,7 +318,7 @@ for (const viewport of VIEWPORTS) {
     await expect(sendInvite).toBeEnabled()
     await expect
       .poll(() => sendInvite.evaluate((element) => getComputedStyle(element).backgroundColor))
-      .toMatch(/^rgb\((?:19, 135, 255|91, 177, 240)\)$/)
+      .toMatch(/^rgb\((?:11, 107, 219|91, 177, 240)\)$/)
     expect(
       await contrastRatio(page, '.sw-team-invite-controls .sp-button--accent'),
     ).toBeGreaterThanOrEqual(4.5)
@@ -369,7 +369,7 @@ for (const viewport of VIEWPORTS) {
     await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
     await page.setViewportSize({ width: viewport.width, height: viewport.height })
 
-    await page.goto('/explore?sort=recommended')
+    await page.goto('/sessions?sort=recommended')
     await expect(page.getByRole('tab', { name: 'Top' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Recent' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'For you' })).toHaveCount(0)

@@ -44,6 +44,32 @@ function cleanQuery(value: unknown): string | undefined {
   return query === '' ? undefined : query.slice(0, 120)
 }
 
+/**
+ * `/sessions` is one feed with three scopes. `public` is the default and the
+ * only scope that carries Discovery filters; `mine` and `team` are
+ * authenticated pools whose authorization always comes from the server.
+ */
+export type SessionsScope = 'public' | 'mine' | 'team'
+
+export interface SessionsSearchState extends ExploreSearchState {
+  scope?: Exclude<SessionsScope, 'public'>
+  team?: string
+}
+
+const TEAM_ID_PATTERN = /^[\w.-]{1,128}$/
+
+export function parseSessionsSearch(search: Record<string, unknown>): SessionsSearchState {
+  const base = parseExploreSearch(search)
+  const scopeValue = search['scope']
+  const teamValue = search['team']
+  const team =
+    typeof teamValue === 'string' && TEAM_ID_PATTERN.test(teamValue) ? teamValue : undefined
+
+  if (scopeValue === 'mine') return { ...base, scope: 'mine' }
+  if (scopeValue === 'team' && team) return { ...base, scope: 'team', team }
+  return base
+}
+
 export function parseExploreSearch(search: Record<string, unknown>): ExploreSearchState {
   const q = cleanQuery(search['q'])
   const sortValue = search['sort']

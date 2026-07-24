@@ -140,4 +140,221 @@ describe('deriveView', () => {
     expect(view.index[1]).toMatchObject({ kind: 'edit', excerpt: 'I made the requested change.' })
     expect(view.lastReply).toBe('I made the requested change.')
   })
+
+  it('accumulates per-model Claude usage, deduping streamed chunks by message id', () => {
+    const records = [
+      line({ type: 'user', message: { role: 'user', content: 'do the thing' } }),
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_1',
+          role: 'assistant',
+          model: 'claude-sonnet-4-5-20250929',
+          content: [{ type: 'text', text: 'chunk one' }],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 5,
+            cache_read_input_tokens: 40,
+            cache_creation_input_tokens: 10,
+          },
+        },
+      }),
+      // Streamed continuation of the same message id: cumulative totals win.
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_1',
+          role: 'assistant',
+          model: 'claude-sonnet-4-5-20250929',
+          content: [{ type: 'text', text: 'chunk two' }],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 25,
+            cache_read_input_tokens: 40,
+            cache_creation_input_tokens: 10,
+          },
+        },
+      }),
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_2',
+          role: 'assistant',
+          model: 'claude-haiku-4-5-20251001',
+          content: [{ type: 'text', text: 'fast reply' }],
+          usage: {
+            input_tokens: 7,
+            output_tokens: 3,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        },
+      }),
+    ]
+
+    const view = deriveView('claude', records)
+
+    expect(view.usage).toEqual({
+      models: {
+        'claude-sonnet-4-5-20250929': { input: 100, output: 25, cacheRead: 40, cacheWrite: 10 },
+        'claude-haiku-4-5-20251001': { input: 7, output: 3, cacheRead: 0, cacheWrite: 0 },
+      },
+      records: 2,
+    })
+  })
+
+  it('leaves usage undefined when no record carries usage data', () => {
+    const records = [
+      line({ type: 'user', message: { role: 'user', content: 'hello' } }),
+      line({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+      }),
+    ]
+
+    const view = deriveView('claude', records)
+
+    expect(view.usage).toBeUndefined()
+    expect('usage' in view).toBe(false)
+  })
+
+  it('skips malformed usage values without throwing', () => {
+    const records = [
+      // All fields malformed: record does not count as carrying usage.
+      line({
+        type: 'assistant',
+        message: {
+          id: 'msg_bad',
+          role: 'assistant',
+          model: 'claude-sonnet-4-5-20250929',
+          content: [{ type: 'text', text: 'bad usage' }],
+          usage: {
+            input_tokens: 'many',
+            output_tokens: -3,
+            cache_read_input_tokens: Number.NaN,
+          },
+        },
+      }),
+      // usage present but model missing: skipped.
+      line({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'no model' }],
+          usage: { input_tokens: 10, output_tokens: 2 },
+        },
+      }),
+      // usage is not an object: skipped.
+      line({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-5-20250929',
+          content: [{ type: 'text', text: 'string usage' }],
+          usage: 'lots',
+        },
+      }),
+      // Partially malformed: bad fields count as 0, good fields survive.
+      line({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-5-20250929',
+          content: [{ type: 'text', text: 'partial' }],
+          usage: { input_tokens: 12, output_tokens: 'oops', cache_read_input_tokens: -1 },
+        },
+      }),
+    ]
+
+    const view = deriveView('claude', records)
+
+    expect(view.usage).toEqual({
+      models: {
+        'claude-sonnet-4-5-20250929': { input: 12, output: 0, cacheRead: 0, cacheWrite: 0 },
+      },
+      records: 1,
+    })
+  })
+
+  it('accumulates Codex token_count events against the active turn_context model', () => {
+    const records = [
+      line({
+        timestamp: '2026-04-05T12:00:01Z',
+        type: 'turn_context',
+        payload: { model: 'gpt-5.4', cwd: '/tmp/project' },
+      }),
+      line({
+        timestamp: '2026-04-05T12:00:02Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'Count some tokens.' },
+      }),
+      line({
+        timestamp: '2026-04-05T12:00:03Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: { input_tokens: 900, output_tokens: 90, cached_input_tokens: 800 },
+            last_token_usage: { input_tokens: 500, output_tokens: 40, cached_input_tokens: 450 },
+          },
+        },
+      }),
+      line({
+        timestamp: '2026-04-05T12:00:04Z',
+        type: 'turn_context',
+        payload: { model: 'gpt-5.4-mini', cwd: '/tmp/project' },
+      }),
+      line({
+        timestamp: '2026-04-05T12:00:05Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            last_token_usage: { input_tokens: 100, output_tokens: 10, cached_input_tokens: 60 },
+          },
+        },
+      }),
+      // token_count with null info (e.g. context compaction): skipped.
+      line({
+        timestamp: '2026-04-05T12:00:06Z',
+        type: 'event_msg',
+        payload: { type: 'token_count', info: null },
+      }),
+    ]
+
+    const view = deriveView('codex', records)
+
+    expect(view.usage).toEqual({
+      models: {
+        'gpt-5.4': { input: 50, output: 40, cacheRead: 450, cacheWrite: 0 },
+        'gpt-5.4-mini': { input: 40, output: 10, cacheRead: 60, cacheWrite: 0 },
+      },
+      records: 2,
+    })
+  })
+
+  it('leaves usage undefined for Codex sessions without token_count events', () => {
+    const records = [
+      line({
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'No usage here.' },
+      }),
+      line({
+        type: 'event_msg',
+        payload: { type: 'agent_message', message: 'Indeed.' },
+      }),
+      // token_count before any turn_context: no model to attribute, skipped.
+      line({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: { last_token_usage: { input_tokens: 5, output_tokens: 1 } },
+        },
+      }),
+    ]
+
+    const view = deriveView('codex', records)
+
+    expect(view.usage).toBeUndefined()
+  })
 })

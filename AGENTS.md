@@ -7,7 +7,7 @@ Do not deviate without explicit user approval.
 Key rules at a glance:
 
 - Public web is content-first: show real Sessions and authors before feature explanations
-- Product navigation is `Explore`, `My Sessions`, and `Teams`; the wordmark alone returns home, while `Docs` sits with legal/resource links
+- Product navigation is `Sessions`, `My Sessions`, and `Teams`; the wordmark alone returns home, while `Docs` sits with legal/resource links
 - Explore exposes only honest global `Top` and chronological `Recent` orders; never label the global ranking `For you`
 - `Share` publishes supported Sessions as Public by default; providers not yet supported by Explore remain Link-only
 - Public metadata is author-attributed (`@handle · published 2h ago`), never first-person

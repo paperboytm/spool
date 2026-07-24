@@ -83,8 +83,27 @@ describe('sessionOgHead', () => {
 })
 
 describe('sessionOgTitle', () => {
-  it('takes the first line of the Summary', () => {
+  it('uses the generated Summary title instead of exposing the front-matter delimiter', () => {
+    expect(
+      sessionOgTitle(
+        [
+          '---',
+          'title: Fix cached authentication redirects',
+          'title_zh: 修复缓存身份导致的错误跳转',
+          '---',
+          'Longer body',
+        ].join('\n'),
+      ),
+    ).toBe('Fix cached authentication redirects')
+  })
+
+  it('falls back to a Chinese generated title when no English title is present', () => {
+    expect(sessionOgTitle('---\ntitle_zh: 修复会话标题\n---\nLonger body')).toBe('修复会话标题')
+  })
+
+  it('takes the first meaningful line of a legacy Summary and strips heading syntax', () => {
     expect(sessionOgTitle('Fix the auth flow\n\nLonger body')).toBe('Fix the auth flow')
+    expect(sessionOgTitle('\n# Ship the auth fix\n\nLonger body')).toBe('Ship the auth fix')
   })
 
   it('trims whitespace', () => {
@@ -95,6 +114,6 @@ describe('sessionOgTitle', () => {
     expect(sessionOgTitle('')).toBe('Shared session')
     expect(sessionOgTitle(null)).toBe('Shared session')
     expect(sessionOgTitle(undefined)).toBe('Shared session')
-    expect(sessionOgTitle('\nbody only')).toBe('Shared session')
+    expect(sessionOgTitle('\nbody only')).toBe('body only')
   })
 })

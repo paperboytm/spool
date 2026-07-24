@@ -6,6 +6,8 @@
 // the escaping. Kept pure (values in, values out, no fetch) so the
 // capping/fallback behaviour stays unit-testable in node.
 
+import { parseSummaryFrontMatter } from '@spool-lab/session-kit'
+
 import { PUBLIC_SITE_HOST } from './site'
 
 export interface OgMeta {
@@ -85,9 +87,15 @@ export function sessionOgHead(og: SessionOgMeta): HeadFragment {
   }
 }
 
-/** First line of the session Summary, or the generic fallback. Shared by
- *  the /session/<sid> loader and its tests. */
+/** Front-matter title or first meaningful Summary heading, shared by the
+ *  /session/<sid> loader and its tests. */
 export function sessionOgTitle(summaryMd: string | null | undefined): string {
-  const firstLine = summaryMd?.split('\n', 1)[0]?.trim()
-  return firstLine || 'Shared session'
+  const { body, titles } = parseSummaryFrontMatter(summaryMd)
+  const frontMatterTitle = titles?.en ?? titles?.zh
+  if (frontMatterTitle) return frontMatterTitle
+  const firstLine = body
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean)
+  return firstLine?.replace(/^#{1,6}\s+/, '') || 'Shared session'
 }

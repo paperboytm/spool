@@ -77,8 +77,8 @@
 }
 
 .sp-button--accent {
-  border-color: var(--sp-accent);
-  background: var(--sp-accent);
+  border-color: var(--sp-accent-fill);
+  background: var(--sp-accent-fill);
   color: var(--sp-on-accent);
 }
 
@@ -140,8 +140,8 @@
 }
 
 .sp-button--accent[data-state='loading']:disabled {
-  border-color: var(--sp-accent);
-  background: var(--sp-accent);
+  border-color: var(--sp-accent-fill);
+  background: var(--sp-accent-fill);
   color: var(--sp-on-accent);
 }
 

@@ -62,6 +62,40 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.sessions-scope-tabs {
+  display: flex;
+  gap: var(--sp-space-1);
+  padding: var(--sp-space-3) var(--sp-space-4) 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: var(--sp-space-4);
+}
+
+.sessions-scope-tabs .sp-tabs__tab {
+  flex: 0 0 auto;
+  max-width: min(280px, calc(100vw - var(--sp-space-8)));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessions-scope-state {
+  padding: var(--sp-space-12) var(--sp-space-4);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sessions-scope-state h2 {
+  margin: 0 0 var(--sp-space-2);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sessions-scope-state a {
+  color: var(--accent);
+}
+
 .explore-search {
   margin: var(--sp-space-3) var(--sp-space-4);
 }
@@ -155,6 +189,14 @@ body {
 
 .explore-source.is-codex svg {
   color: var(--source-codex);
+}
+
+.explore-cost {
+  font-family: var(--sp-font-mono);
+  font-size: var(--sp-text-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .explore-diff span:first-child {
@@ -406,6 +448,7 @@ body {
   }
 
   .explore-search-field,
+  .sessions-scope-tabs .sp-tabs__tab,
   .explore-tabs .sp-tabs__tab,
   .explore-agent-filters.is-compact .sp-button,
   .explore-feed-state .sp-button,

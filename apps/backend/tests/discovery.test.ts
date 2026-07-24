@@ -62,6 +62,9 @@ function seedDiscovery(
     visibility?: string
     withdrawnAt?: number | null
     teamId?: string | null
+    titleJson?: string | null
+    costUsd?: number | null
+    totalTokens?: number | null
   },
 ): void {
   const owner = options.owner ?? 'user-1'
@@ -79,6 +82,8 @@ function seedDiscovery(
     lineage_json: null,
     view_oid: 'b'.repeat(64),
     spool_file_oid: null,
+    cost_usd: options.costUsd ?? null,
+    total_tokens: options.totalTokens ?? null,
     visibility: options.visibility ?? 'unlisted',
     team_id: options.teamId ?? null,
     withdrawn_at: options.withdrawnAt ?? null,
@@ -90,6 +95,9 @@ function seedDiscovery(
     sid: options.sid,
     agent,
     title,
+    title_json: options.titleJson ?? null,
+    cost_usd: options.costUsd ?? null,
+    total_tokens: options.totalTokens ?? null,
     summary_text: summary,
     search_text: (options.search ?? `${title} ${summary ?? ''} ${agent}`).toLowerCase(),
     message_count: 4,
@@ -161,6 +169,75 @@ describe('Explore projection', () => {
     })
     expect(projection.searchText).toContain('src/auth.ts')
     expect(projection.searchText).not.toContain('**')
+    // Legacy shares (no front-matter, no usage) keep null projections.
+    expect(projection.titleJson).toBeNull()
+    expect(projection.costUsd).toBeNull()
+    expect(projection.totalTokens).toBeNull()
+  })
+
+  it('prefers front-matter task titles and prices recorded usage', () => {
+    const view: SessionViewV1 = {
+      v: 1,
+      index: [
+        { i: 0, kind: 'user', size: 10 },
+        { i: 1, kind: 'assistant', size: 10 },
+      ],
+      files: [],
+      outline: [],
+      firstPrompt: 'please look at this bug',
+      lastReply: 'Fixed.',
+      diffstat: { files: 0, adds: 0, dels: 0 },
+      usage: {
+        models: {
+          // 1M input on sonnet-4 pricing = $3
+          'claude-sonnet-4-5-20250929': {
+            input: 1_000_000,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+          },
+        },
+        records: 1,
+      },
+    }
+    const projection = buildDiscoveryProjection({
+      sid: CLAUDE_SID,
+      summaryMd:
+        '---\ntitle: Fix refresh-token race across tabs\ntitle_zh: 修复跨标签页刷新令牌竞态\n---\n\n# Fix refresh-token race across tabs\n\n## Goal\nStop double refresh.',
+      lineageJson: null,
+      recordCount: 4,
+      publishedAt: NOW - DAY_MS,
+      updatedAt: NOW,
+      view,
+    })
+
+    // The agent-authored task title beats the first-prompt echo.
+    expect(projection.title).toBe('Fix refresh-token race across tabs')
+    expect(JSON.parse(projection.titleJson ?? '{}')).toEqual({
+      en: 'Fix refresh-token race across tabs',
+      zh: '修复跨标签页刷新令牌竞态',
+    })
+    expect(projection.costUsd).toBeCloseTo(3, 4)
+    expect(projection.totalTokens).toBe(1_000_000)
+    // Front-matter never leaks into excerpts or search.
+    expect(projection.summaryText).not.toContain('title_zh')
+    expect(projection.summaryText).toContain('Stop double refresh.')
+    // The Chinese title is findable in search.
+    expect(projection.searchText).toContain('修复跨标签页刷新令牌竞态')
+  })
+
+  it('ships the titles/cost columns migration', () => {
+    const migration = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../migrations/0011_titles_cost.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('ALTER TABLE hub_session_discovery ADD COLUMN title_json TEXT;')
+    expect(migration).toContain('ALTER TABLE hub_sessions ADD COLUMN cost_usd REAL;')
+    expect(migration).toContain('ALTER TABLE hub_sessions ADD COLUMN total_tokens INTEGER;')
+    expect(migration).toContain('ALTER TABLE hub_session_discovery ADD COLUMN cost_usd REAL;')
+    expect(migration).toContain(
+      'ALTER TABLE hub_session_discovery ADD COLUMN total_tokens INTEGER;',
+    )
   })
 
   it('ships the projection, aggregate, indexes, and live-unlisted backfill migration', () => {
@@ -187,6 +264,48 @@ describe('Explore projection', () => {
 })
 
 describe('GET /api/discovery/v1/sessions', () => {
+  it('emits bilingual titles and cost only for rows that carry them', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      title: 'Fix refresh-token race across tabs',
+      titleJson: JSON.stringify({
+        en: 'Fix refresh-token race across tabs',
+        zh: '修复跨标签页刷新令牌竞态',
+      }),
+      costUsd: 3.0125,
+      totalTokens: 1_200_000,
+      publishedAt: NOW,
+    })
+    seedDiscovery(env.state, {
+      sid: CODEX_SID,
+      title: 'Legacy row',
+      publishedAt: NOW - 1,
+    })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+      env,
+    )
+    const body = (await response.json()) as {
+      items: Array<Record<string, unknown>>
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.items[0]).toMatchObject({
+      sid: CLAUDE_SID,
+      titles: {
+        en: 'Fix refresh-token race across tabs',
+        zh: '修复跨标签页刷新令牌竞态',
+      },
+      cost: { usd: 3.0125, totalTokens: 1_200_000 },
+    })
+    expect(body.items[1]).not.toHaveProperty('titles')
+    expect(body.items[1]).not.toHaveProperty('cost')
+  })
+
   it('returns only live Sessions with live owners and resolves author fields at read time', async () => {
     const env = makeEnv()
     seedUser(env.state, 'user-1', {

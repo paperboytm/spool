@@ -1,6 +1,7 @@
 import {
   SESSION_PROVIDER_LABELS,
   isResumableSessionProvider,
+  parseSummaryFrontMatter,
   type SessionProvider,
   type SessionViewV1,
 } from '@spool-lab/session-kit'
@@ -9,7 +10,7 @@ import {
   type ConversationMessage,
   type MessageListHandle,
 } from '@spool-lab/session-view'
-import { Avatar, Badge, Button } from '@spool-lab/ui'
+import { Avatar, Badge } from '@spool-lab/ui'
 import type { SpoolDocument } from '@spool/share-kit'
 import {
   TimelineBody,
@@ -20,31 +21,22 @@ import {
   type RedactReplacement,
 } from '@spool/share-kit/timeline'
 import {
-  Check,
   Clock3,
-  Copy,
   GitBranch,
   GitCommitHorizontal,
   Globe2,
   Link2,
   MessageSquareText,
-  SquareTerminal,
   UsersRound,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { copyCommandText, type CopyCommandState } from '../../lib/cli-command'
 import { humanDateTime, relativeDate } from '../../lib/dates'
 import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
-import {
-  authorLabel,
-  parseWorkspaceCard,
-  repositoryUrlForRemote,
-  resumeCommandFor,
-} from '../../lib/session-page'
-import type { SessionRoute } from '../../lib/session-route'
-import { SessionRouteMap } from './route-map'
+import { authorLabel, parseWorkspaceCard, repositoryUrlForRemote } from '../../lib/session-page'
+import { formatSessionCost, useLocalizedSessionTitle } from '../../lib/session-title'
+import { ResumeMenu } from './resume-menu'
 import { SessionSummary } from './session-summary'
 
 interface Props {
@@ -52,7 +44,6 @@ interface Props {
   view: SessionViewV1 | null
   provider: SessionProvider
   conversation: ParsedConversation
-  route?: SessionRoute | null
   isDark: boolean
   initialRecordIndex: number | null
   spoolDocument: SpoolDocument | null
@@ -140,7 +131,6 @@ export function SessionWorkbench({
   view,
   provider,
   conversation,
-  route,
   isDark,
   initialRecordIndex,
   spoolDocument,
@@ -151,7 +141,6 @@ export function SessionWorkbench({
       : (conversation.recordToMessageId.get(initialRecordIndex) ?? null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
   const [targetTurnIndex, setTargetTurnIndex] = useState<number | null>(null)
-  const [copyState, setCopyState] = useState<CopyCommandState>('idle')
   const [previewPromptKey, setPreviewPromptKey] = useState<string | null>(null)
   const listRef = useRef<MessageListHandle>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -159,7 +148,6 @@ export function SessionWorkbench({
   const jumpFrameRef = useRef<number | null>(null)
 
   const card = parseWorkspaceCard(meta.cardJson)
-  const resume = resumeCommandFor(meta.sid)
   const resumable = isResumableSessionProvider(provider)
   const providerLabel = SESSION_PROVIDER_LABELS[provider]
   const isPublic = meta.visibility === 'public'
@@ -183,13 +171,19 @@ export function SessionWorkbench({
         : [],
     [spoolDocument],
   )
+  // The stored summary carries the bilingual task titles as front-matter;
+  // parse both out once so the H1 gets the reader's language and the
+  // Summary card renders only the body.
+  const parsedSummary = useMemo(() => parseSummaryFrontMatter(meta.summaryMd), [meta.summaryMd])
   const spoolTitle = spoolDocument?.conversation.title.trim() ?? ''
-  const fullTitle =
+  const derivedTitle =
     spoolDocument === null
       ? conversation.title.trim() || 'Shared session'
       : (spoolDocument.opts.redact ? redactPlainText(spoolTitle, spoolRedactList) : spoolTitle) ||
         'Shared session'
+  const fullTitle = useLocalizedSessionTitle(parsedSummary.titles, derivedTitle)
   const title = compactSessionTitle(fullTitle)
+  const costLabel = formatSessionCost(meta.cost)
   const spoolPrompts = useMemo(
     () => (spoolDocument === null ? [] : getSpoolPromptEntries(spoolDocument, spoolRedactList)),
     [spoolDocument, spoolRedactList],
@@ -260,15 +254,6 @@ export function SessionWorkbench({
     [],
   )
 
-  const copy = async () => {
-    const state = await copyCommandText(resume)
-    setCopyState(state)
-    window.setTimeout(() => setCopyState('idle'), state === 'copied' ? 1400 : 2600)
-  }
-
-  const copied = copyState === 'copied'
-  const copyFailed = copyState === 'failed'
-
   const jumpToMessage = (messageId: number) => {
     setTargetMessageId(messageId)
     listRef.current?.scrollToMessageId(messageId)
@@ -317,6 +302,14 @@ export function SessionWorkbench({
               <span title={humanDateTime(visibilityTimestamp)}>
                 {isPublic ? 'Published' : 'Shared'} {relativeDate(visibilityTimestamp)}
               </span>
+              {costLabel && (
+                <span
+                  className="font-mono text-[11px] text-[var(--muted)] tabular-nums"
+                  title="Estimated API cost from recorded token usage"
+                >
+                  {costLabel}
+                </span>
+              )}
             </div>
             <h1
               id="sw-workbench-title"
@@ -333,83 +326,17 @@ export function SessionWorkbench({
               className="mt-4 w-full max-w-[720px] min-w-0"
               aria-labelledby="resume-session-title"
             >
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2
-                  id="resume-session-title"
-                  className="m-0 inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text)]"
-                >
-                  <SquareTerminal
-                    className="text-[var(--accent)]"
-                    size={14}
-                    strokeWidth={1.7}
-                    aria-hidden="true"
-                  />
-                  Resume in {providerLabel}
-                </h2>
-                <span className="text-[11px] leading-4 text-[var(--muted)]">
-                  Installs or updates the Spool CLI, then continues locally.
-                </span>
-              </div>
-              <div
-                className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row"
-                aria-label="One-command Session resume"
-              >
-                <code
-                  className="flex h-11 min-w-0 flex-1 items-center overflow-x-auto rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-sm whitespace-nowrap text-[var(--text)] sm:h-8"
-                  title={resume}
-                >
-                  {resume}
-                </code>
-                <Button
-                  type="button"
-                  className="h-11 shrink-0 sm:h-8"
-                  variant="accent"
-                  title={
-                    copied
-                      ? 'Copied'
-                      : copyFailed
-                        ? 'Copy failed; try again'
-                        : 'Copy resume command'
-                  }
-                  aria-label={
-                    copied
-                      ? 'Resume command copied'
-                      : copyFailed
-                        ? 'Copy failed; try resume command again'
-                        : 'Copy resume command'
-                  }
-                  onClick={() => void copy()}
-                >
-                  {copied ? (
-                    <Check size={14} strokeWidth={1.8} aria-hidden="true" />
-                  ) : (
-                    <Copy size={14} strokeWidth={1.8} aria-hidden="true" />
-                  )}
-                  <span className="sr-only" aria-live="polite">
-                    {copied
-                      ? 'Copied'
-                      : copyFailed
-                        ? 'Copy failed; select the command manually'
-                        : ''}
-                  </span>
-                  {copied ? 'Copied' : copyFailed ? 'Try again' : 'Copy command'}
-                </Button>
-              </div>
-              <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
-                Resume creates a new local Session. This published source stays unchanged.
-                {copyFailed && (
-                  <span className="ml-2 text-[var(--error)]">
-                    Copy failed — select the command manually.
-                  </span>
-                )}
-              </p>
+              <h2 id="resume-session-title" className="sr-only">
+                Resume in {providerLabel}
+              </h2>
+              <ResumeMenu sid={meta.sid} providerLabel={providerLabel} />
             </section>
           )}
         </header>
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,720px)_280px] lg:items-start lg:gap-8">
           <div className="min-w-0">
-            <SessionSummary markdown={meta.summaryMd} className="mb-6" />
+            <SessionSummary markdown={parsedSummary.body || null} className="mb-6" />
 
             <section aria-labelledby="session-timeline-title">
               <div className="mb-4 flex items-baseline justify-between gap-4">
@@ -430,27 +357,6 @@ export function SessionWorkbench({
                       : 'turns'}
                 </span>
               </div>
-
-              {route && route.phases.length > 1 && (
-                <SessionRouteMap
-                  route={route}
-                  onJump={(recordIndex) => {
-                    if (spoolDocument !== null) {
-                      const turnIndex = route.phases.find(
-                        (phase) => phase.recordIndex === recordIndex,
-                      )?.turnIndex
-                      if (turnIndex !== undefined) jumpToTurn(turnIndex)
-                      return
-                    }
-                    const messageId = conversation.recordToMessageId.get(recordIndex)
-                    if (messageId !== undefined) {
-                      setTargetTurnIndex(null)
-                      setTargetMessageId(messageId)
-                      listRef.current?.scrollToMessageId(messageId)
-                    }
-                  }}
-                />
-              )}
 
               <div className="min-w-0 lg:grid lg:grid-cols-[24px_minmax(0,1fr)] lg:gap-4">
                 {prompts.length > 0 && (

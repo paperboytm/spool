@@ -48,6 +48,10 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
         lineageJson,
         viewOid: session.view_oid,
         spoolFileOid: session.spool_file_oid,
+        cost:
+          session.total_tokens !== null && session.total_tokens > 0
+            ? { usd: session.cost_usd, totalTokens: session.total_tokens }
+            : null,
         createdAt: session.created_at,
         updatedAt: session.updated_at,
         visibility: teamOnly ? 'team' : published ? 'public' : 'link-only',

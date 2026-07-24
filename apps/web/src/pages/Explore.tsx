@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { relativeDate } from '../lib/dates'
 import {
   DiscoveryRequestError,
@@ -21,8 +20,9 @@ import {
   type ExploreSort,
   type ExploreSearchState,
 } from '../lib/discovery'
+import { formatSessionCost, useLocalizedSessionTitle } from '../lib/session-title'
 
-interface ExplorePageProps {
+interface PublicFeedProps {
   search: ExploreSearchState
   onSearchChange: (next: ExploreSearchState) => void
 }
@@ -63,6 +63,17 @@ export function clearedExploreSearch(search: ExploreSearchState): ExploreSearchS
   return {
     sort: search.sort,
     ...(search.agent ? { agent: search.agent } : {}),
+  }
+}
+
+export function changedAgentSearch(
+  search: ExploreSearchState,
+  agent?: DiscoveryAgentFilter,
+): ExploreSearchState {
+  return {
+    ...(search.q ? { q: search.q } : {}),
+    sort: search.sort,
+    ...(agent ? { agent } : {}),
   }
 }
 
@@ -123,7 +134,7 @@ function AgentFilters({
   )
 }
 
-function RightRail({
+export function PublicFeedRail({
   search,
   onAgentChange,
 }: {
@@ -225,6 +236,8 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
   const profileHref = item.author.handle ? `/@${encodeURIComponent(item.author.handle)}` : null
   const published = relativeDate(item.publishedAt).toLowerCase()
   const avatarName = item.author.displayName ?? item.author.handle ?? 'Spool author'
+  const title = useLocalizedSessionTitle(item.titles, item.title)
+  const costLabel = formatSessionCost(item.cost)
 
   return (
     <ListRow
@@ -248,7 +261,7 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
       }
       title={
         <h2>
-          <a href={`/session/${encodeURIComponent(item.sid)}`}>{item.title}</a>
+          <a href={`/session/${encodeURIComponent(item.sid)}`}>{title}</a>
         </h2>
       }
       summary={
@@ -285,6 +298,11 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
             <span className="explore-diff" title="Machine-derived diffstat">
               <span>+{compactNumber(item.evidence.additions)}</span>
               <span>−{compactNumber(item.evidence.deletions)}</span>
+            </span>
+          )}
+          {costLabel && (
+            <span className="explore-cost" title="Estimated API cost from recorded token usage">
+              {costLabel}
             </span>
           )}
         </div>
@@ -344,7 +362,7 @@ function EmptyFeed({ search, onReset }: { search: ExploreSearchState; onReset: (
   )
 }
 
-export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
+export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
   const [query, setQuery] = useState(search.q ?? '')
   const [feed, setFeed] = useState<FeedState>(INITIAL_FEED)
   const [retryToken, setRetryToken] = useState(0)
@@ -398,11 +416,7 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
   }, [currentFilterKey, retryToken])
 
   const changeAgent = (agent?: DiscoveryAgentFilter) => {
-    onSearchChange({
-      ...(search.q ? { q: search.q } : {}),
-      sort: search.sort,
-      ...(agent ? { agent } : {}),
-    })
+    onSearchChange(changedAgentSearch(search, agent))
   }
 
   const reset = () => {
@@ -449,13 +463,7 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
   }
 
   return (
-    <WorkspaceFrame
-      active="explore"
-      layout="feed"
-      rootClassName="explore-root"
-      mainClassName="explore-center"
-      rightRail={<RightRail search={search} onAgentChange={changeAgent} />}
-    >
+    <>
       <SearchHeader
         search={search}
         query={query}
@@ -518,6 +526,6 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
           </Button>
         )}
       </section>
-    </WorkspaceFrame>
+    </>
   )
 }

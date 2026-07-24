@@ -8,6 +8,40 @@ export function resumeBootstrapCommand(sid: string): string {
   return `${CLI_INSTALL_COMMAND} && ${INSTALLED_CLI_PATH} resume ${sid}`
 }
 
+/** The short form for people who already have `spool` on PATH. */
+export function resumeInstalledCommand(sid: string): string {
+  return `spool resume ${sid}`
+}
+
+export interface ResumeCommandOption {
+  id: 'installed' | 'bootstrap'
+  label: string
+  description: string
+  command: string
+}
+
+/**
+ * The Resume popup offers one command per situation instead of forcing the
+ * curl bootstrap on everyone: an installed CLI resumes with the plain
+ * `spool` binary, a first-time visitor gets install + resume in one paste.
+ */
+export function resumeCommandOptions(sid: string): ResumeCommandOption[] {
+  return [
+    {
+      id: 'installed',
+      label: 'Spool CLI installed',
+      description: 'Continues this Session locally with your existing install.',
+      command: resumeInstalledCommand(sid),
+    },
+    {
+      id: 'bootstrap',
+      label: 'First time — install Spool',
+      description: 'Installs or updates the Spool CLI, then continues locally.',
+      command: resumeBootstrapCommand(sid),
+    },
+  ]
+}
+
 export type CopyCommandState = 'idle' | 'copied' | 'failed'
 
 export async function copyCommandText(

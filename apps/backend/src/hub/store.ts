@@ -20,6 +20,9 @@ export type HubSessionRow = {
   lineage_json: string | null
   view_oid: string | null
   spool_file_oid: string | null
+  /** Publish-time estimate frozen from the validated Session view. */
+  cost_usd: number | null
+  total_tokens: number | null
   visibility: string
   /** Resource tenant. NULL means personal; a value means the Team owns the
    *  Session and its object index even when the Team later publishes it. */
@@ -55,6 +58,8 @@ export type HubSessionUpsert = {
   lineageJson: string | null
   viewOid: string
   spoolFileOid: string | null
+  costUsd: number | null
+  totalTokens: number | null
   now: number
 }
 
@@ -67,9 +72,9 @@ export function prepareHubSessionUpsert(
   // re-publish decision.
   return db
     .prepare(
-      'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, visibility, withdrawn_at, created_at, updated_at) ' +
-        "VALUES (?,?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) " +
-        'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, spool_file_oid=excluded.spool_file_oid, withdrawn_at=NULL, updated_at=excluded.updated_at',
+      'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens, visibility, withdrawn_at, created_at, updated_at) ' +
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) " +
+        'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, spool_file_oid=excluded.spool_file_oid, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens, withdrawn_at=NULL, updated_at=excluded.updated_at',
     )
     .bind(
       row.sid,
@@ -82,6 +87,8 @@ export function prepareHubSessionUpsert(
       row.lineageJson,
       row.viewOid,
       row.spoolFileOid,
+      row.costUsd,
+      row.totalTokens,
       row.now,
       row.now,
     )
@@ -126,9 +133,10 @@ export function prepareAuthorizedHeadUpsert(
       `/* hub:authorized-head-upsert */
        INSERT INTO hub_sessions
          (sid, owner_user_id, root, record_count, sig, card_json, note_md,
-          lineage_json, view_oid, spool_file_oid, visibility, team_id,
+          lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens,
+          visibility, team_id,
           withdrawn_at, created_at, updated_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?
        WHERE EXISTS (
          SELECT 1 FROM users actor
          WHERE actor.id=? AND actor.deleted_at IS NULL
@@ -153,6 +161,8 @@ export function prepareAuthorizedHeadUpsert(
          lineage_json=excluded.lineage_json,
          view_oid=excluded.view_oid,
          spool_file_oid=excluded.spool_file_oid,
+         cost_usd=excluded.cost_usd,
+         total_tokens=excluded.total_tokens,
          visibility=CASE WHEN ?=1 THEN excluded.visibility ELSE hub_sessions.visibility END,
          team_id=CASE WHEN ?=1 THEN excluded.team_id ELSE hub_sessions.team_id END,
          withdrawn_at=CASE WHEN ?=1 THEN NULL ELSE hub_sessions.withdrawn_at END,
@@ -185,6 +195,8 @@ export function prepareAuthorizedHeadUpsert(
       row.lineageJson,
       row.viewOid,
       row.spoolFileOid,
+      row.costUsd,
+      row.totalTokens,
       row.targetVisibility,
       row.targetTeamId,
       row.now,

@@ -16,6 +16,7 @@ import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as MySessionsRouteImport } from './routes/my-sessions'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SiteIndexRouteImport } from './routes/_site.index'
@@ -63,6 +64,11 @@ const MySessionsRoute = MySessionsRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/me': typeof MeRoute
   '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
+  '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
   '/connectors': typeof SiteConnectorsRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/me': typeof MeRoute
   '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
+  '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
   '/connectors': typeof SiteConnectorsRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/me': typeof MeRoute
   '/my-sessions': typeof MySessionsRoute
   '/privacy': typeof PrivacyRoute
+  '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
   '/_site/connectors': typeof SiteConnectorsRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/my-sessions'
     | '/privacy'
+    | '/sessions'
     | '/sign-in'
     | '/terms'
     | '/connectors'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/my-sessions'
     | '/privacy'
+    | '/sessions'
     | '/sign-in'
     | '/terms'
     | '/connectors'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/my-sessions'
     | '/privacy'
+    | '/sessions'
     | '/sign-in'
     | '/terms'
     | '/_site/connectors'
@@ -282,6 +294,7 @@ export interface RootRouteChildren {
   MeRoute: typeof MeRoute
   MySessionsRoute: typeof MySessionsRoute
   PrivacyRoute: typeof PrivacyRoute
+  SessionsRoute: typeof SessionsRoute
   SignInRoute: typeof SignInRoute
   TermsRoute: typeof TermsRoute
   BlogRssDotxmlRoute: typeof BlogRssDotxmlRoute
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -473,6 +493,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeRoute: MeRoute,
   MySessionsRoute: MySessionsRoute,
   PrivacyRoute: PrivacyRoute,
+  SessionsRoute: SessionsRoute,
   SignInRoute: SignInRoute,
   TermsRoute: TermsRoute,
   BlogRssDotxmlRoute: BlogRssDotxmlRoute,

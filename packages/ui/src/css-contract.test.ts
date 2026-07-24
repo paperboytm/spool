@@ -53,8 +53,18 @@ describe('shared UI CSS contract', () => {
     expect(tokens).toContain('--sp-bg: #ffffff')
     expect(tokens).toContain('--sp-accent: #1387ff')
     expect(tokens).toContain('--sp-accent-dm: #5bb1f0')
+    // Regression: light-mode buttons use white ink on a dedicated deeper
+    // fill (white on --sp-accent #1387ff is only ~3.54:1).
+    expect(readHexToken(tokens, '--sp-on-accent')).toBe('#ffffff')
+    expect(readHexToken(tokens, '--sp-accent-fill')).not.toBe(readHexToken(tokens, '--sp-accent'))
     expect(
-      contrastRatio(readHexToken(tokens, '--sp-on-accent'), readHexToken(tokens, '--sp-accent')),
+      contrastRatio(
+        readHexToken(tokens, '--sp-on-accent'),
+        readHexToken(tokens, '--sp-accent-fill'),
+      ),
+    ).toBeGreaterThanOrEqual(4.5)
+    expect(
+      contrastRatio('#ffffff', readHexToken(tokens, '--sp-accent-fill')),
     ).toBeGreaterThanOrEqual(4.5)
     expect(tokens).toContain('html.dark,')
     expect(tokens).toContain("html[data-theme='dark']")
@@ -65,7 +75,7 @@ describe('shared UI CSS contract', () => {
     expect(
       contrastRatio(
         readHexToken(darkTokens, '--sp-on-accent'),
-        readHexToken(darkTokens, '--sp-accent'),
+        readHexToken(darkTokens, '--sp-accent-fill'),
       ),
     ).toBeGreaterThanOrEqual(4.5)
     expect(tokens).not.toMatch(/Inter|#c85a00|#f07020/i)

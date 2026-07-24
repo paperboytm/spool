@@ -126,6 +126,20 @@ export interface Diffstat {
   dels: number
 }
 
+export interface SessionUsageModelTotals {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+export interface SessionUsageV1 {
+  /** Totals per model id, e.g. "claude-sonnet-4-5-20250929". */
+  models: Record<string, SessionUsageModelTotals>
+  /** Number of records that carried usage data. */
+  records: number
+}
+
 export interface SessionViewV1 {
   v: 1
   index: ViewIndexEntry[]
@@ -134,6 +148,8 @@ export interface SessionViewV1 {
   firstPrompt: string
   lastReply: string
   diffstat: Diffstat
+  /** Present only when at least one record carried token usage data. */
+  usage?: SessionUsageV1
 }
 
 export type DiffLineKind = 'context' | 'add' | 'del'

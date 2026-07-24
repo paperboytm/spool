@@ -1,5 +1,5 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
-import { isDiscoverySessionSid } from '@spool-lab/session-kit'
+import { costForUsage, isDiscoverySessionSid } from '@spool-lab/session-kit'
 
 import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
 import {
@@ -116,6 +116,9 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       body.viewOid,
       teamId && !aliasOids.includes(body.viewOid) ? teamId : null,
     )
+    // Pricing is part of the publication event, not the read path. Persist
+    // this one calculation on the Hub row and reuse it for the projection.
+    const cost = costForUsage(view.usage)
 
     if (teamId && aliasOids.length > 0) {
       const [used, incoming] = await Promise.all([
@@ -139,6 +142,8 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       lineageJson: safeLineageJson,
       viewOid: body.viewOid,
       spoolFileOid: body.spoolFileOid,
+      costUsd: cost?.usd ?? null,
+      totalTokens: cost?.totalTokens ?? null,
       now,
       actorUserId: user.id,
       expectedTeamId: existing?.team_id ?? null,
@@ -194,6 +199,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
             publishedAt: existing?.created_at ?? now,
             updatedAt: now,
             view,
+            costOverride: cost,
           }),
           projectionGate,
         ),

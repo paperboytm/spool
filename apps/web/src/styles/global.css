@@ -186,47 +186,6 @@ code,
 .site-signin-link {
   flex: none;
 }
-.site-team-link {
-  min-width: 0;
-  max-width: 160px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-space-1-5);
-  padding: 0 var(--sp-space-2);
-  border-radius: var(--sp-radius-control);
-  color: var(--muted);
-  font-size: var(--sp-text-ui);
-  font-weight: 500;
-  transition:
-    background-color var(--sp-motion-hover),
-    color var(--sp-motion-hover);
-}
-.site-team-link:hover,
-.site-team-link:focus-visible {
-  background: var(--surface2);
-  color: var(--text);
-}
-.site-team-link:focus-visible,
-.site-account-link:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-focus-ring);
-}
-.site-team-link span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.site-account-link {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--sp-radius-pill);
-}
 @media (max-width: 768px) {
   .top-inner {
     gap: 0;
@@ -240,9 +199,7 @@ code,
   .site-main-nav {
     display: none;
   }
-  .site-publish-link,
-  .site-theme-toggle,
-  .site-team-link {
+  .site-publish-link {
     display: none;
   }
   .site-nav-actions {
@@ -251,10 +208,6 @@ code,
   .site-signin-link {
     min-height: 44px;
     padding-inline: var(--sp-space-2);
-  }
-  .site-account-link {
-    width: 44px;
-    height: 44px;
   }
   .sp-mobile-menu.site-mobile-menu {
     display: inline-flex;

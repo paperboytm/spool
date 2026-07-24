@@ -315,7 +315,7 @@ export function TeamMemberActions({
   )
 }
 
-function TeamSessionsPanel({ team }: { team: TeamSummary }) {
+export function TeamSessionsPanel({ team }: { team: TeamSummary }) {
   const [state, setState] = useState<
     | { kind: 'loading' }
     | {

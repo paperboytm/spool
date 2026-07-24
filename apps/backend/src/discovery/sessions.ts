@@ -220,9 +220,14 @@ function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem {
     : row.custom_avatar_id
       ? `/api/avatars/${encodeURIComponent(row.owner_user_id)}?v=${encodeURIComponent(row.custom_avatar_id)}`
       : row.avatar_url
+  const titles = parseTitleJson(row.title_json)
   return {
     sid: row.sid,
     title: row.title,
+    ...(titles ? { titles } : {}),
+    ...(row.total_tokens !== null && row.total_tokens > 0
+      ? { cost: { usd: row.cost_usd, totalTokens: row.total_tokens } }
+      : {}),
     summaryExcerpt:
       row.summary_text === null
         ? null
@@ -257,4 +262,19 @@ function isDiscoverySort(value: string): value is DiscoverySort {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function parseTitleJson(titleJson: string | null): { en?: string; zh?: string } | null {
+  if (!titleJson) return null
+  let value: unknown
+  try {
+    value = JSON.parse(titleJson) as unknown
+  } catch {
+    return null
+  }
+  if (!isObject(value)) return null
+  const titles: { en?: string; zh?: string } = {}
+  if (typeof value['en'] === 'string' && value['en'].trim()) titles.en = value['en']
+  if (typeof value['zh'] === 'string' && value['zh'].trim()) titles.zh = value['zh']
+  return titles.en || titles.zh ? titles : null
 }

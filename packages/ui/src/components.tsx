@@ -245,6 +245,7 @@ export function SearchField({
 export type TabItem = {
   value: string
   label: ReactNode
+  id?: string
   disabled?: boolean
   ariaControls?: string
 }
@@ -290,6 +291,7 @@ export function Tabs({ className, items, value, onValueChange, onKeyDown, ...pro
             type="button"
             role="tab"
             key={item.value}
+            id={item.id}
             data-value={item.value}
             aria-controls={item.ariaControls}
             aria-selected={selected}

@@ -70,6 +70,9 @@ body {
   --faint: var(--sp-faint);
   --accent: var(--sp-accent);
   --accent-ink: var(--sp-on-accent);
+  /* Pair --accent-ink text with --accent-fill backgrounds only; the raw
+     light-mode --accent no longer clears 4.5:1 under white ink. */
+  --accent-fill: var(--sp-accent-fill);
   --accent-soft: var(--sp-accent-bg);
   --accent-line: color-mix(in srgb, var(--sp-accent) 30%, transparent);
   --ok: var(--sp-success);
@@ -188,47 +191,6 @@ html[data-theme='dark'] .sw-root {
   width: 100%;
   min-height: 44px;
   justify-content: flex-start;
-}
-.sw-account-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--sp-radius-pill);
-}
-.sw-account-link:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-focus-ring);
-}
-.sw-team-quick {
-  min-width: 0;
-  max-width: 160px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-space-1-5);
-  padding: 0 var(--sp-space-2);
-  border-radius: var(--sp-radius-control);
-  color: var(--muted);
-  font-size: var(--sp-text-ui);
-  font-weight: 500;
-  transition:
-    background-color var(--sp-motion-hover),
-    color var(--sp-motion-hover);
-}
-.sw-team-quick:hover,
-.sw-team-quick:focus-visible {
-  background: var(--card-2);
-  color: var(--text);
-}
-.sw-team-quick:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-focus-ring);
-}
-.sw-team-quick span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .sw-signin-link {
   flex: none;
@@ -1747,18 +1709,6 @@ html[data-theme='dark'] .sw-root {
   .sw-signin-link {
     min-height: 44px;
     padding-inline: var(--sp-space-2);
-  }
-  .sw-account-link {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-  }
-  .sw-account-link .sp-avatar {
-    width: 32px;
-    height: 32px;
   }
   .sp-mobile-menu.sw-header-mobile-menu {
     display: inline-flex;

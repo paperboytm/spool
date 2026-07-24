@@ -8,16 +8,20 @@ describe('Header', () => {
     const html = renderToStaticMarkup(<Header auth="out" sticky />)
 
     expect(html).toContain('class="sw-header sw-header-sticky"')
-    expect(html).toContain('aria-label="Toggle light or dark"')
-    expect(html).toContain('href="/explore"')
+    expect(html).toContain('href="/sessions"')
+    expect(html).not.toContain('href="/explore')
     expect(html).not.toContain('aria-label="Docs"')
-    expect(html).toContain('aria-label="Search Sessions"')
+    // Search belongs to the Sessions feed; the header keeps one action
+    // (Publish) plus the account affordance.
+    expect(html).not.toContain('aria-label="Search Sessions"')
+    expect(html).not.toContain('aria-label="Toggle light or dark"')
     expect(html).toContain('href="/docs/quick-start"')
     expect(html).toContain('>Publish</a>')
     expect(html).toContain('sw-header-mobile-menu')
     expect(html).toContain('aria-label="Mobile navigation"')
-    expect(html).toContain('>Search Sessions</span>')
-    expect(html).not.toContain('>Docs</span>')
+    expect(html).not.toContain('>Search Sessions</span>')
+    expect(html).toContain('href="/docs/installation"')
+    expect(html).toContain('>Docs</span>')
     expect(html).toContain('Use dark theme')
     expect(html).toContain('href="/sign-in"')
     expect(html).not.toContain('href="/me"')
@@ -31,7 +35,7 @@ describe('Header', () => {
     expect(html).not.toContain('sw-header-sticky')
   })
 
-  it('shows a usable team shortcut for signed-in account chrome', () => {
+  it('keeps signed-in account chrome behind the avatar menu', () => {
     const html = renderToStaticMarkup(
       <Header
         auth={{ name: 'Alice', src: null }}
@@ -39,12 +43,14 @@ describe('Header', () => {
       />,
     )
 
-    expect(html).toContain('href="/teams/team%2Fa"')
-    expect(html).toContain('>Paperboy</span>')
+    expect(html).toContain('aria-label="Open account menu"')
+    expect(html).toContain('aria-haspopup="menu"')
     expect(html).toContain('sw-header-desktop-actions')
+    // The mobile disclosure still exposes the workspace shortcuts.
     expect(html).toContain('sw-header-mobile-menu-items')
     expect(html).toContain('href="/my-sessions"')
-    expect(html).toContain('href="/me"')
+    expect(html).toContain('href="/teams/team%2Fa"')
+    expect(html).toContain('>Paperboy</span>')
     expect(html).not.toContain('href="/sign-in"')
   })
 })
@@ -54,6 +60,7 @@ describe('Footer', () => {
     const html = renderToStaticMarkup(<Footer />)
 
     expect(html).toContain('href="/docs/installation"')
+    expect(html).toContain('href="/blog"')
     expect(html).toContain('href="/terms"')
     expect(html).toContain('href="/privacy"')
     expect(html).toContain('https://github.com/paperboytm/spool')

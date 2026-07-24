@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 
 import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
-import type { SessionRoute } from '../../lib/session-route'
 
 vi.mock('@spool-lab/session-view', () => ({
   MessageList: ({ useWindowScroll }: { useWindowScroll?: boolean }) =>
@@ -226,6 +225,7 @@ const meta: HubSessionMeta = {
   createdAt: Date.UTC(2026, 6, 10, 6),
   updatedAt: Date.UTC(2026, 6, 17, 7),
   visibility: 'public',
+  cost: null,
   author: { handle: 'dev-user', displayName: 'Dev User', avatarUrl: null },
 }
 
@@ -254,7 +254,7 @@ function renderWorkbench(
     view?: SessionViewV1 | null
     provider?: SessionProvider
     visibility?: HubSessionMeta['visibility']
-    route?: SessionRoute | null
+    cost?: HubSessionMeta['cost']
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -264,11 +264,11 @@ function renderWorkbench(
         summaryMd: options.summaryMd === undefined ? meta.summaryMd : options.summaryMd,
         cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
         visibility: options.visibility ?? meta.visibility,
+        cost: options.cost === undefined ? (meta.cost ?? null) : options.cost,
       },
       view: options.view === undefined ? view : options.view,
       provider: options.provider ?? 'claude',
       conversation: options.messages ?? conversation,
-      ...(options.route === undefined ? {} : { route: options.route }),
       isDark: false,
       initialRecordIndex: null,
       spoolDocument:
@@ -308,55 +308,27 @@ describe('SessionWorkbench', () => {
     expect(html).not.toContain('Unpublished private title')
   })
 
-  it('renders a projected route for a curated .spool timeline', () => {
+  it('prefers the front-matter task title, strips it from the Summary, and shows cost', () => {
     const html = renderWorkbench({
-      spool: spoolDocument([
-        { role: 'user', body: 'Published first phase' },
-        { role: 'assistant', body: 'Work' },
-        { role: 'user', body: 'Published second phase' },
-      ]),
-      route: {
-        goal: 'Published first phase',
-        phases: [
-          {
-            recordIndex: 2,
-            turnIndex: 0,
-            timestamp: null,
-            isPrompt: true,
-            label: 'Published first phase',
-            tools: 1,
-            edits: 0,
-            commands: 0,
-            agents: 0,
-            errors: 0,
-            checkRuns: 0,
-            checkFails: 0,
-          },
-          {
-            recordIndex: 8,
-            turnIndex: 2,
-            timestamp: null,
-            isPrompt: true,
-            label: 'Published second phase',
-            tools: 2,
-            edits: 1,
-            commands: 0,
-            agents: 0,
-            errors: 0,
-            checkRuns: 0,
-            checkFails: 0,
-          },
-        ],
-        totalErrors: 0,
-        prUrl: null,
-        prLabel: null,
-      },
+      summaryMd:
+        '---\ntitle: Fix refresh-token race across tabs\ntitle_zh: 修复跨标签页刷新令牌竞态\n---\n\n## Goal\nStop double refresh.',
+      cost: { usd: 3, totalTokens: 1_000_000 },
     })
 
-    expect(html).toContain('id="session-route-title"')
-    expect(html).toContain('/goal')
-    expect(html).toContain('Published second phase')
-    expect(html).toContain('data-testid="timeline-body"')
+    // Node has no navigator, so the English title is the deterministic pick.
+    expect(html).toContain('Fix refresh-token race across tabs')
+    expect(html).toContain('$3.00 · 1M tokens')
+    expect(html).toContain('Stop double refresh.')
+    // Front-matter never renders as Summary content.
+    expect(html).not.toContain('title_zh')
+    expect(html).not.toContain('修复跨标签页刷新令牌竞态')
+  })
+
+  it('keeps the derived title and omits cost for legacy sessions', () => {
+    const html = renderWorkbench({ view })
+
+    expect(html).toContain('Shared session')
+    expect(html).not.toContain('tokens</span>')
   })
 
   it('uses update time only for Link-only sharing metadata', () => {
@@ -404,7 +376,7 @@ describe('SessionWorkbench', () => {
     expect(html).not.toContain('This line belongs in the full title only</h1>')
   })
 
-  it('puts a one-paste Resume command below the title and links browser-addressable remotes', () => {
+  it('puts the Resume control below the title and links browser-addressable remotes', () => {
     const html = renderWorkbench({
       cardJson: JSON.stringify({
         remotes: ['origin: git@github.com:paperboytm/spool.git'],
@@ -421,15 +393,13 @@ describe('SessionWorkbench', () => {
     expect(titleIndex).toBeGreaterThan(-1)
     expect(resumeIndex).toBeGreaterThan(titleIndex)
     expect(timelineIndex).toBeGreaterThan(resumeIndex)
-    expect(html).toContain('aria-label="One-command Session resume"')
-    expect(html).toContain('curl -fsSL https://spool.new/install.sh | sh &amp;&amp;')
-    expect(html).toContain('SPOOL_CLI_BIN_DIR:-$HOME/.local/bin')
-    expect(html).toContain('resume claude_test-session')
-    expect(html).toContain('font-mono text-sm whitespace-nowrap')
-    expect(html).toContain('Installs or updates the Spool CLI, then continues locally.')
-    expect(html).toContain('This published source stays unchanged.')
+    // The commands live inside the popup now; the closed control shows one
+    // labeled trigger and never forces the curl bootstrap inline.
+    expect(html).toContain('Resume in Claude Code')
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).not.toContain('curl -fsSL')
     expect(html).toContain('data-variant="accent"')
-    expect(html).toContain('>Copy command</button>')
     expect(html).not.toContain('How npx works')
     expect(html).toContain('href="https://github.com/paperboytm/spool"')
     expect(html).toContain('target="_blank"')
@@ -445,7 +415,7 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('>Link-only</span>')
     expect(html).not.toContain('install.sh')
     expect(html).not.toContain('id="resume-session-title"')
-    expect(html).not.toContain('aria-label="One-command Session resume"')
+    expect(html).not.toContain('Resume in ')
   })
 
   it('keeps the raw fallback usable without a summary, view, or messages', () => {

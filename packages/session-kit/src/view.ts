@@ -6,6 +6,8 @@ import type {
   SessionProvider,
   SessionRecord,
   SessionRecordsOptions,
+  SessionUsageModelTotals,
+  SessionUsageV1,
   SessionViewV1,
   ViewIndexEntry,
   ViewRecordKind,
@@ -77,6 +79,7 @@ export function deriveView(
   }
 
   const diff = composeSessionDiff(editEvents)
+  const usage = deriveUsage(provider, parsed)
   const view: SessionViewV1 = {
     v: 1,
     index,
@@ -90,6 +93,7 @@ export function deriveView(
     firstPrompt,
     lastReply,
     diffstat: diff.diffstat,
+    ...(usage === undefined ? {} : { usage }),
   }
 
   if (textEncoder.encode(JSON.stringify(view)).byteLength > VIEW_BYTES) {
@@ -259,6 +263,138 @@ function codexResponseText(content: unknown): string {
     .map((item) => stringAt(item, 'text') ?? '')
     .filter(Boolean)
     .join('\n')
+}
+
+interface UsageSample {
+  model: string
+  totals: SessionUsageModelTotals
+}
+
+/**
+ * Accumulates per-model token usage from raw provider records. Returns
+ * undefined when no record carried usable usage data so `usage` stays
+ * absent from the wire view.
+ */
+function deriveUsage(
+  provider: SessionProvider,
+  parsed: readonly (UnknownRecord | null)[],
+): SessionUsageV1 | undefined {
+  const anonymous: UsageSample[] = []
+  /** Claude streaming chunks repeat usage per message id; the LAST usage
+   * seen for an id carries the cumulative totals, so it wins. */
+  const byMessageId = new Map<string, UsageSample>()
+  let codexModel = ''
+
+  for (const record of parsed) {
+    if (!record) continue
+    if (provider === 'claude') {
+      const sample = extractClaudeUsage(record)
+      if (!sample) continue
+      if (sample.id !== undefined) byMessageId.set(sample.id, sample)
+      else anonymous.push(sample)
+    } else if (provider === 'codex') {
+      const turnModel =
+        record['type'] === 'turn_context'
+          ? stringAt(objectAt(record, 'payload'), 'model')
+          : undefined
+      if (turnModel) {
+        codexModel = turnModel
+        continue
+      }
+      const sample = extractCodexUsage(record, codexModel)
+      if (sample) anonymous.push(sample)
+    }
+  }
+
+  const samples = [...anonymous, ...byMessageId.values()]
+  if (samples.length === 0) return undefined
+
+  const models: Record<string, SessionUsageModelTotals> = {}
+  for (const sample of samples) {
+    const existing = models[sample.model]
+    if (existing) {
+      const input = safeTokenAdd(existing.input, sample.totals.input)
+      const output = safeTokenAdd(existing.output, sample.totals.output)
+      const cacheRead = safeTokenAdd(existing.cacheRead, sample.totals.cacheRead)
+      const cacheWrite = safeTokenAdd(existing.cacheWrite, sample.totals.cacheWrite)
+      if (input === null || output === null || cacheRead === null || cacheWrite === null) {
+        return undefined
+      }
+      Object.assign(existing, { input, output, cacheRead, cacheWrite })
+    } else {
+      models[sample.model] = { ...sample.totals }
+    }
+  }
+  return { models, records: samples.length }
+}
+
+function extractClaudeUsage(record: UnknownRecord): (UsageSample & { id?: string }) | null {
+  const message = objectAt(record, 'message')
+  const usage = objectAt(message, 'usage')
+  const model = stringAt(message, 'model')
+  if (!usage || !model) return null
+  const totals = readUsageTotals(usage, {
+    input: 'input_tokens',
+    output: 'output_tokens',
+    cacheRead: 'cache_read_input_tokens',
+    cacheWrite: 'cache_creation_input_tokens',
+  })
+  if (!totals) return null
+  const id = stringAt(message, 'id')
+  return { model, totals, ...(id === undefined ? {} : { id }) }
+}
+
+/** Codex CLI rollout JSONL: `event_msg` payloads of type `token_count`
+ * carry `info.last_token_usage` per-turn deltas; the active model comes
+ * from the most recent `turn_context` record. */
+function extractCodexUsage(record: UnknownRecord, model: string): UsageSample | null {
+  if (!model || record['type'] !== 'event_msg') return null
+  const payload = objectAt(record, 'payload')
+  if (!payload || payload['type'] !== 'token_count') return null
+  const last = objectAt(objectAt(payload, 'info'), 'last_token_usage')
+  if (!last) return null
+  const totals = readUsageTotals(last, {
+    input: 'input_tokens',
+    output: 'output_tokens',
+    cacheRead: 'cached_input_tokens',
+    cacheWrite: '',
+  })
+  if (!totals) return null
+  // Codex reports cached_input_tokens as a subset of input_tokens. Store
+  // uncached input separately so totals and pricing never count cache hits
+  // twice.
+  const cachedInput = Math.min(totals.input, totals.cacheRead)
+  totals.input -= cachedInput
+  totals.cacheRead = cachedInput
+  return { model, totals }
+}
+
+/** Reads token fields defensively: non-integer, negative, or non-number
+ * values count as 0; returns null when no field is usable. */
+function readUsageTotals(
+  source: UnknownRecord,
+  keys: Record<keyof SessionUsageModelTotals, string>,
+): SessionUsageModelTotals | null {
+  let sawUsable = false
+  const read = (key: string): number => {
+    if (!key) return 0
+    const value = source[key]
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return 0
+    sawUsable = true
+    return value
+  }
+  const totals: SessionUsageModelTotals = {
+    input: read(keys.input),
+    output: read(keys.output),
+    cacheRead: read(keys.cacheRead),
+    cacheWrite: read(keys.cacheWrite),
+  }
+  return sawUsable ? totals : null
+}
+
+function safeTokenAdd(left: number, right: number): number | null {
+  const sum = left + right
+  return Number.isSafeInteger(sum) ? sum : null
 }
 
 function truncateUtf8(value: string, maxBytes: number): string {

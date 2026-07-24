@@ -120,14 +120,6 @@
   gap: var(--sp-space-1);
 }
 
-.workspace-mobile-account {
-  display: inline-flex;
-  width: 44px;
-  height: 44px;
-  align-items: center;
-  justify-content: center;
-}
-
 .workspace-mobile-menu-primary,
 .workspace-mobile-menu-utilities {
   display: grid;
