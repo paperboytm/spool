@@ -16,6 +16,7 @@ import { searchCommand } from './commands/search.js'
 import { shareCommand } from './commands/share.js'
 import { showCommand } from './commands/show.js'
 import { statusCommand } from './commands/status.js'
+import { subscribeCommand, subscriptionsCommand, unsubscribeCommand } from './commands/subscribe.js'
 import { syncCommand } from './commands/sync.js'
 import { withdrawCommand } from './commands/withdraw.js'
 
@@ -46,6 +47,9 @@ program.addCommand(doctorCommand)
 program.addCommand(loginCommand)
 program.addCommand(logoutCommand)
 program.addCommand(shareCommand)
+program.addCommand(subscribeCommand)
+program.addCommand(unsubscribeCommand)
+program.addCommand(subscriptionsCommand)
 program.addCommand(resumeCommand)
 program.addCommand(withdrawCommand)
 

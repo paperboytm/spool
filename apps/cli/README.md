@@ -58,7 +58,18 @@ spool search <query> [-s <source>] [--since 7d] [-n 10] [--json]
 spool status
 ```
 
-Local preparation supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Sync and search do not publish anything.
+Local preparation supports Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi. Sync and search do not publish anything unless you have subscribed directories for continuous publishing.
+
+## Continuous Publishing
+
+```bash
+spool subscribe [dir] [--link-only] [--yes]   # auto-publish this directory's Sessions
+spool unsubscribe [dir]
+spool subscriptions
+spool sync --watch                            # keep subscribed Sessions continuously published
+```
+
+Subscribing a directory is the one-time visibility decision: from then on, every `spool sync` (and continuously under `--watch`) publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. Supported providers publish Public by default; pass `--link-only` to keep a subscription Link-only. Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
 
 ## Private Organization
 
@@ -86,6 +97,8 @@ The CLI uses `~/.spool/` by default:
 
 - `spool.db` — local Session metadata, messages, search, and state
 - `hub-credentials.json` — revocable Hub credential from `spool login`
+- `subscriptions.json` — directories subscribed for continuous publishing
+- `auto-publish-state.json` — per-Session fingerprints that keep auto-publish incremental
 
 Set `SPOOL_DATA_DIR` to isolate a different data directory.
 
