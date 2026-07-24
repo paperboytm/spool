@@ -23,6 +23,7 @@ import {
 } from '../functions/api/hub/v1/tokens'
 import { onRequestPatch as visibilityPatch } from '../functions/api/me/sessions/[sid]'
 import type { SessionRecord } from '../src/auth/session'
+import { sha256Hex } from '../src/hub/auth'
 import { TEAM_QUOTA_BYTES } from '../src/hub/wire'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
@@ -965,6 +966,27 @@ describe('Hub final live-user authorization gates', () => {
       visibility: original.visibility,
       updated_at: original.updated_at,
     })
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+  })
+
+  it('accepts the CLI API token for visibility changes', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const apiToken = 'cli-token-for-visibility-change-tests'
+    env.state.api_tokens.push({
+      id: 'token-1',
+      user_id: 'user-a',
+      token_hash: await sha256Hex(apiToken),
+      label: 'cli',
+      created_at: Date.now(),
+      last_used_at: null,
+    })
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+
+    const changed = await changeVisibility(env, { visibility: 'link-only' }, apiToken)
+
+    expect(changed.status).toBe(200)
     expect(env.state.hub_session_discovery).toHaveLength(0)
   })
 })
