@@ -35,8 +35,11 @@ spool subscribe [dir] --link-only           # anyone with the URL
 spool subscribe [dir] --public              # explicit opt-in to Explore/search
 spool unsubscribe [dir]
 spool subscriptions
+spool teams                                 # list the Teams you belong to
 spool daemon start|stop|status|logs|run
 ```
+
+`--team` accepts a Team name (or id when two Teams share a name); `spool teams` shows exactly the names to use.
 
 Subscribing a directory is the one-time disclosure decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public; **there is no implicit default and Public is never preselected**. Interactive `spool subscribe` offers your Teams first.
 

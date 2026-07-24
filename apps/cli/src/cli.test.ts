@@ -274,6 +274,7 @@ describe('cli entry point', () => {
     const out = run(['--help'])
     expect(out).toContain('Usage: spool')
     expect(out).toContain('subscribe')
+    expect(out).toContain('teams')
     expect(out).toContain('daemon')
     expect(out).toContain('sessions')
     expect(out).toContain('visibility')
