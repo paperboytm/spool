@@ -63,6 +63,17 @@ spool unsubscribe [dir]   # stop auto-publishing; published Sessions stay live
 spool subscriptions       # list subscribed directories and their disclosure
 ```
 
+## `spool teams`
+
+List the Teams you belong to, with your role and the member count:
+
+```bash
+spool teams
+spool teams --json
+```
+
+Every `--team` option (`spool subscribe`, `spool visibility`) accepts a Team name as printed here; the id is only needed when two Teams share a name.
+
 ## `spool daemon`
 
 The always-on half of continuous publishing — a watcher plus auto-publish loop supervised by the OS service manager (launchd on macOS, a systemd user unit on Linux):

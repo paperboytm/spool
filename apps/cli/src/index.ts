@@ -13,6 +13,7 @@ import { resumeCommand } from './commands/resume.js'
 import { sessionsCommand } from './commands/sessions.js'
 import { shareCommand } from './commands/share.js'
 import { subscribeCommand, subscriptionsCommand, unsubscribeCommand } from './commands/subscribe.js'
+import { teamsCommand } from './commands/teams.js'
 import { visibilityCommand } from './commands/visibility.js'
 import { withdrawCommand } from './commands/withdraw.js'
 
@@ -36,6 +37,7 @@ program
 program.addCommand(subscribeCommand)
 program.addCommand(unsubscribeCommand)
 program.addCommand(subscriptionsCommand)
+program.addCommand(teamsCommand)
 program.addCommand(daemonCommand)
 program.addCommand(shareCommand)
 program.addCommand(visibilityCommand)
