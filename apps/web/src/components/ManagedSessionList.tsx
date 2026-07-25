@@ -10,10 +10,11 @@ import {
   type ManagedSession,
   type ManagedSessionVisibility,
 } from '../lib/hub-management-api'
+import { sessionLanguageTag, useSessionLanguage } from '../lib/language'
 import {
   formatSessionCost,
-  useLocalizedSessionSummary,
-  useLocalizedSessionTitle,
+  resolveLocalizedSessionSummary,
+  resolveLocalizedTitle,
 } from '../lib/session-title'
 import type { TeamSummary } from '../lib/team-api'
 import { SessionFeedRow, SessionSourceBadge } from './SessionFeedRow'
@@ -204,8 +205,19 @@ function ManagedSessionRow({
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuId = useId()
-  const title = useLocalizedSessionTitle(session.titles, session.title || 'Shared Session')
-  const summary = useLocalizedSessionSummary(session.summaries, session.summary)
+  const language = useSessionLanguage()
+  const localizedTitle = resolveLocalizedTitle(
+    session.titles,
+    session.title || 'Shared Session',
+    language,
+  )
+  const localizedSummary = resolveLocalizedSessionSummary(
+    session.summaries,
+    session.summary,
+    language,
+  )
+  const title = localizedTitle.text ?? session.title ?? 'Shared Session'
+  const summary = localizedSummary.text
   const localizedSession = title === session.title ? session : { ...session, title }
   const costLabel = formatSessionCost(session.cost)
   const starCount = session.star_count ?? 0
@@ -381,6 +393,12 @@ function ManagedSessionRow({
         sid={session.sid}
         title={title}
         summary={summary}
+        titleLanguage={
+          localizedTitle.language ? sessionLanguageTag(localizedTitle.language) : undefined
+        }
+        summaryLanguage={
+          localizedSummary.language ? sessionLanguageTag(localizedSummary.language) : undefined
+        }
         author={{
           handle: session.author.handle,
           displayName: session.author.display_name,

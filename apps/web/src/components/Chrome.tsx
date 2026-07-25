@@ -26,6 +26,7 @@ import { resolveAuthState, type AuthState } from '../lib/auth-state'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 import { AccountMenu } from './AccountMenu'
+import { SessionLanguageToggle } from './SessionLanguageToggle'
 
 export type { AuthState } from '../lib/auth-state'
 
@@ -308,6 +309,7 @@ export function Header({
           >
             Publish
           </ButtonLink>
+          <SessionLanguageToggle className="sw-header-language-toggle" />
         </div>
         {identity === null ? (
           <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
@@ -332,6 +334,7 @@ export function Header({
               Publish
             </ButtonLink>
             <ThemeToggle className="sw-header-mobile-theme" showLabel />
+            <SessionLanguageToggle className="sw-header-mobile-language" showLabel />
             {signedIn ? (
               <>
                 <NavItem href="/my-sessions" leading={<Library aria-hidden="true" />}>

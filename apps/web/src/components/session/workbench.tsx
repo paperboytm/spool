@@ -40,12 +40,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { humanDateTime, relativeDate } from '../../lib/dates'
 import { fetchRecordsByIndices, makeRangeFetcher, type HubSessionMeta } from '../../lib/hub-api'
+import { sessionLanguageTag, useSessionLanguage } from '../../lib/language'
+import { normalizeTabTitle } from '../../lib/page-title'
 import type { ParsedConversation } from '../../lib/session-messages'
 import { authorLabel, parseWorkspaceCard, repositoryUrlForRemote } from '../../lib/session-page'
 import {
   formatSessionCost,
-  useLocalizedSessionSummary,
-  useLocalizedSessionTitle,
+  resolveLocalizedSessionSummary,
+  resolveLocalizedTitle,
 } from '../../lib/session-title'
 import { SessionActions } from './session-actions'
 import { SessionMarkdown, SessionSummary } from './session-summary'
@@ -283,11 +285,14 @@ export function SessionWorkbench({
         'Shared session'
       : (spoolDocument.opts.redact ? redactPlainText(spoolTitle, spoolRedactList) : spoolTitle) ||
         'Shared session'
-  const fullTitle = useLocalizedSessionTitle(parsedSummary.titles, derivedTitle)
-  const localizedSummary = useLocalizedSessionSummary(
+  const language = useSessionLanguage()
+  const localizedTitle = resolveLocalizedTitle(parsedSummary.titles, derivedTitle, language)
+  const localizedSummary = resolveLocalizedSessionSummary(
     parsedSummary.summaries,
     parsedSummary.body || null,
+    language,
   )
+  const fullTitle = localizedTitle.text ?? derivedTitle
   const title = compactSessionTitle(fullTitle)
   const costLabel = formatSessionCost(meta.cost)
   const spoolPrompts = useMemo(
@@ -335,6 +340,10 @@ export function SessionWorkbench({
     localGuidanceTurns.length === 0
       ? 'Preparing guidance'
       : `${guidanceCount} human ${guidanceCount === 1 ? 'instruction' : 'instructions'}`
+
+  useEffect(() => {
+    document.title = `${normalizeTabTitle(fullTitle)} · spool.new`
+  }, [fullTitle])
 
   useEffect(() => {
     if (
@@ -457,6 +466,9 @@ export function SessionWorkbench({
             </div>
             <h1
               id="sw-workbench-title"
+              lang={
+                localizedTitle.language ? sessionLanguageTag(localizedTitle.language) : undefined
+              }
               className="m-0 max-w-[760px] text-2xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-[var(--text)]"
               title={fullTitle}
             >
@@ -485,7 +497,15 @@ export function SessionWorkbench({
 
         <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,720px)_280px] lg:items-start lg:gap-8">
           <div className="min-w-0">
-            <SessionSummary markdown={localizedSummary} className="mb-6" />
+            <SessionSummary
+              markdown={localizedSummary.text}
+              language={
+                localizedSummary.language
+                  ? sessionLanguageTag(localizedSummary.language)
+                  : undefined
+              }
+              className="mb-6"
+            />
 
             <section aria-labelledby="session-timeline-title">
               <div className="mb-4 flex items-baseline justify-between gap-4">

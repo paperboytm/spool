@@ -1,42 +1,44 @@
 import type { SessionSummaries, SessionTitles } from '@spool-lab/session-kit'
-import { useSyncExternalStore } from 'react'
 
-const getServerLocale = () => 'en'
-const getBrowserLocale = () =>
-  typeof navigator === 'undefined' ? getServerLocale() : navigator.language || 'en'
-const subscribeToLocale = (onStoreChange: () => void) => {
-  if (typeof window === 'undefined') return () => {}
-  window.addEventListener('languagechange', onStoreChange)
-  return () => window.removeEventListener('languagechange', onStoreChange)
+import type { SessionLanguage } from './language'
+
+export interface LocalizedSessionText {
+  text: string | null
+  language: SessionLanguage | null
+}
+
+export function resolveLocalizedTitle(
+  titles: SessionTitles | null | undefined,
+  fallback: string,
+  locale: SessionLanguage,
+): LocalizedSessionText {
+  const en = cleanValue(titles?.en)
+  const zh = cleanValue(titles?.zh)
+  if (locale === 'zh') {
+    if (zh) return { text: zh, language: 'zh' }
+    if (en) return { text: en, language: 'en' }
+  } else {
+    if (en) return { text: en, language: 'en' }
+    if (zh) return { text: zh, language: 'zh' }
+  }
+  return { text: fallback, language: null }
 }
 
 /**
  * Titles are stored bilingually (en + zh); readers get the one matching
- * their browser locale. Chinese locales prefer the zh title, everything
- * else the English one; both fall back to the legacy derived title.
+ * their selected Session language. A missing translation falls back to the
+ * other stored language before the legacy derived title.
  */
 export function pickLocalizedTitle(
   titles: SessionTitles | null | undefined,
   fallback: string,
   locale?: string,
 ): string {
-  const en = cleanValue(titles?.en)
-  const zh = cleanValue(titles?.zh)
-  const resolved = locale ?? 'en'
-  const preferred = resolved.toLowerCase().startsWith('zh') ? (zh ?? en) : en
-  return preferred ?? fallback
-}
-
-/**
- * Hydration-safe locale selection: SSR and the hydration pass both use
- * English, then React reconciles to the browser locale after subscribing.
- */
-export function useLocalizedSessionTitle(
-  titles: SessionTitles | null | undefined,
-  fallback: string,
-): string {
-  const locale = useSyncExternalStore(subscribeToLocale, getBrowserLocale, getServerLocale)
-  return pickLocalizedTitle(titles, fallback, locale)
+  return resolveLocalizedTitle(
+    titles,
+    fallback,
+    locale?.toLowerCase().startsWith('zh') ? 'zh' : 'en',
+  ).text!
 }
 
 /** Select the Summary body with the same locale and fallback contract as titles. */
@@ -45,21 +47,28 @@ export function pickLocalizedSummary(
   fallback: string | null | undefined,
   locale?: string,
 ): string | null {
-  const en = cleanValue(summaries?.en)
-  const zh = cleanValue(summaries?.zh)
-  const legacy = cleanValue(fallback ?? undefined)
-  const resolved = locale ?? 'en'
-  const preferred = resolved.toLowerCase().startsWith('zh') ? (zh ?? en) : (en ?? zh)
-  return preferred ?? legacy ?? null
+  return resolveLocalizedSessionSummary(
+    summaries,
+    fallback,
+    locale?.toLowerCase().startsWith('zh') ? 'zh' : 'en',
+  ).text
 }
 
-/** Hydration-safe locale selection for bilingual Summary bodies. */
-export function useLocalizedSessionSummary(
+export function resolveLocalizedSessionSummary(
   summaries: SessionSummaries | null | undefined,
   fallback: string | null | undefined,
-): string | null {
-  const locale = useSyncExternalStore(subscribeToLocale, getBrowserLocale, getServerLocale)
-  return pickLocalizedSummary(summaries, fallback, locale)
+  locale: SessionLanguage,
+): LocalizedSessionText {
+  const en = cleanValue(summaries?.en)
+  const zh = cleanValue(summaries?.zh)
+  if (locale === 'zh') {
+    if (zh) return { text: zh, language: 'zh' }
+    if (en) return { text: en, language: 'en' }
+  } else {
+    if (en) return { text: en, language: 'en' }
+    if (zh) return { text: zh, language: 'zh' }
+  }
+  return { text: cleanValue(fallback ?? undefined) ?? null, language: null }
 }
 
 function cleanValue(value: string | undefined): string | undefined {

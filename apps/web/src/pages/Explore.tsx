@@ -22,10 +22,11 @@ import {
   type ExploreSort,
   type ExploreSearchState,
 } from '../lib/discovery'
+import { sessionLanguageTag, useSessionLanguage } from '../lib/language'
 import {
   formatSessionCost,
-  useLocalizedSessionSummary,
-  useLocalizedSessionTitle,
+  resolveLocalizedSessionSummary,
+  resolveLocalizedTitle,
 } from '../lib/session-title'
 
 interface PublicFeedProps {
@@ -137,8 +138,15 @@ function SearchHeader({
 }
 
 export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
-  const title = useLocalizedSessionTitle(item.titles, item.title)
-  const summary = useLocalizedSessionSummary(item.summaryExcerpts, item.summaryExcerpt)
+  const language = useSessionLanguage()
+  const localizedTitle = resolveLocalizedTitle(item.titles, item.title, language)
+  const localizedSummary = resolveLocalizedSessionSummary(
+    item.summaryExcerpts,
+    item.summaryExcerpt,
+    language,
+  )
+  const title = localizedTitle.text ?? item.title
+  const summary = localizedSummary.text
   const costLabel = formatSessionCost(item.cost)
   const starCount = item.starCount ?? 0
 
@@ -147,6 +155,12 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
       sid={item.sid}
       title={title}
       summary={summary}
+      titleLanguage={
+        localizedTitle.language ? sessionLanguageTag(localizedTitle.language) : undefined
+      }
+      summaryLanguage={
+        localizedSummary.language ? sessionLanguageTag(localizedSummary.language) : undefined
+      }
       author={item.author}
       timestamp={item.publishedAt}
       timestampVerb="published"

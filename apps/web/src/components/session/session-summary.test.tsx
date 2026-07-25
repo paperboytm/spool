@@ -44,6 +44,16 @@ describe('SessionSummary', () => {
     expect(html).not.toContain('bg-[var(--card)]')
   })
 
+  it('marks localized Summary prose without changing the English UI heading', () => {
+    const html = renderToStaticMarkup(
+      <SessionSummary markdown="中文背景、动机和结果。" language="zh-CN" />,
+    )
+
+    expect(html).toContain('<h2 id="session-summary-title"')
+    expect(html).toContain('lang="zh-CN"')
+    expect(html).toContain('中文背景、动机和结果。')
+  })
+
   it('opens external links in a new tab without sharing the opener', () => {
     const html = render('[Spool](https://spool.dev/docs)')
     const anchor = html.match(/<a\b[^>]*>/)?.[0]

@@ -37,6 +37,8 @@ describe('SiteMobileNavigation', () => {
     expect(html).toContain('>Docs</span>')
     expect(html).toContain('>Publish</a>')
     expect(html).toContain('Use dark theme')
+    expect(html).toContain('aria-label="Session language"')
+    expect(html).toContain('<span>Session language</span>')
     // Search lives inside the Sessions feed now; Blog moved to the footer.
     expect(html).not.toContain('Search Sessions')
     expect(html).not.toContain('>Blog</span>')

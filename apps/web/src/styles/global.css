@@ -183,7 +183,8 @@ code,
   justify-content: flex-start;
 }
 .site-publish-link,
-.site-signin-link {
+.site-signin-link,
+.site-language-toggle {
   flex: none;
 }
 @media (max-width: 768px) {
@@ -200,6 +201,9 @@ code,
     display: none;
   }
   .site-publish-link {
+    display: none;
+  }
+  .site-language-toggle {
     display: none;
   }
   .site-nav-actions {

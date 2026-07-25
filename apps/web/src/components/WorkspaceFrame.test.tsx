@@ -28,6 +28,9 @@ describe('WorkspaceFrame', () => {
     expect(html).toContain('href="/terms"')
     expect(html).toContain('href="/privacy"')
     expect(html).toContain('https://github.com/paperboytm/spool')
+    expect(html).toContain('aria-label="Reading preferences"')
+    expect(html).toContain('aria-label="Session language"')
+    expect(html).toContain('aria-label="Show Sessions in English" aria-pressed="true"')
   })
 
   it('uses the shared account menu for the signed-in mobile identity affordance', () => {
