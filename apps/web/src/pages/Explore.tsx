@@ -1,7 +1,6 @@
 import type { DiscoverySessionItem } from '@spool-lab/session-kit'
-import { Avatar, Badge, Button, ListRow, SearchField, SectionLabel, Tabs } from '@spool-lab/ui'
+import { Button, SearchField, Tabs } from '@spool-lab/ui'
 import {
-  Bot,
   FileCode2,
   GitFork,
   LoaderCircle,
@@ -12,11 +11,14 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { relativeDate } from '../lib/dates'
+import {
+  SessionFeedRow,
+  SessionFeedSkeleton,
+  SessionSourceBadge,
+} from '../components/SessionFeedRow'
 import {
   DiscoveryRequestError,
   fetchDiscoverySessions,
-  type DiscoveryAgentFilter,
   type ExploreSort,
   type ExploreSearchState,
 } from '../lib/discovery'
@@ -44,7 +46,7 @@ const INITIAL_FEED: FeedState = {
 }
 
 function filterKey(search: ExploreSearchState): string {
-  return `${search.q ?? ''}\u0000${search.sort}\u0000${search.agent ?? ''}`
+  return `${search.q ?? ''}\u0000${search.sort}`
 }
 
 export function submittedExploreSearch(
@@ -55,117 +57,20 @@ export function submittedExploreSearch(
   return {
     ...(q ? { q } : {}),
     sort: search.sort,
-    ...(search.agent ? { agent: search.agent } : {}),
   }
 }
 
 export function clearedExploreSearch(search: ExploreSearchState): ExploreSearchState {
-  return {
-    sort: search.sort,
-    ...(search.agent ? { agent: search.agent } : {}),
-  }
-}
-
-export function changedAgentSearch(
-  search: ExploreSearchState,
-  agent?: DiscoveryAgentFilter,
-): ExploreSearchState {
-  return {
-    ...(search.q ? { q: search.q } : {}),
-    sort: search.sort,
-    ...(agent ? { agent } : {}),
-  }
+  return { sort: search.sort }
 }
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError'
 }
 
-function authorLabel(item: DiscoverySessionItem): string {
-  if (item.author.handle) return `@${item.author.handle}`
-  return item.author.displayName ?? 'Spool author'
-}
-
-function agentLabel(agent: DiscoverySessionItem['agent']): string {
-  return agent === 'claude' ? 'Claude Code' : 'Codex CLI'
-}
-
 function compactNumber(value: number): string {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(
     value,
-  )
-}
-
-function AgentFilters({
-  selected,
-  onChange,
-  compact = false,
-}: {
-  selected: DiscoveryAgentFilter | undefined
-  onChange: (agent?: DiscoveryAgentFilter) => void
-  compact?: boolean
-}) {
-  return (
-    <div className={compact ? 'explore-agent-filters is-compact' : 'explore-agent-filters'}>
-      <Button
-        variant={!selected ? 'outline' : 'ghost'}
-        aria-pressed={!selected}
-        onClick={() => onChange(undefined)}
-      >
-        All agents
-      </Button>
-      <Button
-        variant={selected === 'claude' ? 'outline' : 'ghost'}
-        aria-pressed={selected === 'claude'}
-        onClick={() => onChange('claude')}
-      >
-        <span className="explore-source-dot is-claude" aria-hidden="true" />
-        Claude Code
-      </Button>
-      <Button
-        variant={selected === 'codex' ? 'outline' : 'ghost'}
-        aria-pressed={selected === 'codex'}
-        onClick={() => onChange('codex')}
-      >
-        <span className="explore-source-dot is-codex" aria-hidden="true" />
-        Codex CLI
-      </Button>
-    </div>
-  )
-}
-
-export function PublicFeedRail({
-  search,
-  onAgentChange,
-}: {
-  search: ExploreSearchState
-  onAgentChange: (agent?: DiscoveryAgentFilter) => void
-}) {
-  return (
-    <aside className="explore-right" aria-label="Explore filters">
-      <section>
-        <SectionLabel role="heading" aria-level={2}>
-          Agent
-        </SectionLabel>
-        <AgentFilters selected={search.agent} onChange={onAgentChange} />
-      </section>
-      <section className="explore-about">
-        <SectionLabel role="heading" aria-level={2}>
-          About Explore
-        </SectionLabel>
-        <p>
-          Top balances useful evidence, recency, and qualified reading. Recent shows the newest
-          Public Sessions first.
-        </p>
-        <a href="/docs/guides/reading-resuming">How Session reading works</a>
-      </section>
-      <nav className="explore-legal" aria-label="Legal">
-        <a href="/docs/installation">Docs</a>
-        <a href="/terms">Terms</a>
-        <a href="/privacy">Privacy</a>
-        <a href="https://github.com/paperboytm/spool">GitHub</a>
-      </nav>
-    </aside>
   )
 }
 
@@ -176,7 +81,6 @@ function SearchHeader({
   onSubmit,
   onClear,
   onSortChange,
-  onAgentChange,
 }: {
   search: ExploreSearchState
   query: string
@@ -184,7 +88,6 @@ function SearchHeader({
   onSubmit: () => void
   onClear: () => void
   onSortChange: (sort: ExploreSort) => void
-  onAgentChange: (agent?: DiscoveryAgentFilter) => void
 }) {
   const tabs: Array<{ label: string; sort: ExploreSort }> = [
     { label: 'Top', sort: 'recommended' },
@@ -225,63 +128,25 @@ function SearchHeader({
         }))}
         onValueChange={(sort) => onSortChange(sort as ExploreSort)}
       />
-      <div className="explore-inline-filters" aria-label="Agent filters">
-        <AgentFilters compact selected={search.agent} onChange={onAgentChange} />
-      </div>
     </header>
   )
 }
 
 export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
-  const profileHref = item.author.handle ? `/@${encodeURIComponent(item.author.handle)}` : null
-  const published = relativeDate(item.publishedAt).toLowerCase()
-  const avatarName = item.author.displayName ?? item.author.handle ?? 'Spool author'
   const title = useLocalizedSessionTitle(item.titles, item.title)
   const costLabel = formatSessionCost(item.cost)
 
   return (
-    <ListRow
-      className="explore-row"
-      leading={<Avatar src={item.author.avatarUrl} name={avatarName} alt="" size="md" />}
-      attribution={
-        <>
-          {profileHref ? (
-            <a href={profileHref}>{authorLabel(item)}</a>
-          ) : (
-            <span>{authorLabel(item)}</span>
-          )}
-          <span aria-hidden="true">·</span>
-          <time
-            dateTime={new Date(item.publishedAt).toISOString()}
-            title={new Date(item.publishedAt).toLocaleString()}
-          >
-            published {published}
-          </time>
-        </>
-      }
-      title={
-        <h2>
-          <a href={`/session/${encodeURIComponent(item.sid)}`}>{title}</a>
-        </h2>
-      }
-      summary={
-        item.summaryExcerpt ? (
-          item.summaryExcerpt
-        ) : (
-          <span className="explore-summary is-missing">
-            No Summary provided. Open the Session to inspect the source record.
-          </span>
-        )
-      }
+    <SessionFeedRow
+      sid={item.sid}
+      title={title}
+      summary={item.summaryExcerpt}
+      author={item.author}
+      timestamp={item.publishedAt}
+      timestampVerb="published"
       metadata={
-        <div className="explore-row-meta">
-          <Badge
-            className={`explore-source is-${item.agent}`}
-            variant={item.agent === 'claude' ? 'source-claude' : 'source-codex'}
-          >
-            <Bot size={13} strokeWidth={1.7} aria-hidden="true" />
-            {agentLabel(item.agent)}
-          </Badge>
+        <div className="session-feed-row-meta">
+          <SessionSourceBadge provider={item.agent} />
           <span title={`${item.evidence.messages} messages`}>
             <MessageSquareText size={13} strokeWidth={1.7} aria-hidden="true" />
             {compactNumber(item.evidence.messages)} messages
@@ -295,13 +160,16 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
             {compactNumber(item.evidence.files)} files
           </span>
           {(item.evidence.additions > 0 || item.evidence.deletions > 0) && (
-            <span className="explore-diff" title="Machine-derived diffstat">
+            <span className="session-feed-diff" title="Machine-derived diffstat">
               <span>+{compactNumber(item.evidence.additions)}</span>
               <span>−{compactNumber(item.evidence.deletions)}</span>
             </span>
           )}
           {costLabel && (
-            <span className="explore-cost" title="Estimated API cost from recorded token usage">
+            <span
+              className="session-feed-cost"
+              title="Estimated API cost from recorded token usage"
+            >
               {costLabel}
             </span>
           )}
@@ -310,7 +178,7 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
       lineage={
         item.lineage ? (
           <a
-            className="explore-lineage"
+            className="session-feed-lineage"
             href={`/session/${encodeURIComponent(item.lineage.sourceSid)}`}
           >
             <GitFork size={13} strokeWidth={1.7} aria-hidden="true" />
@@ -322,40 +190,21 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
   )
 }
 
-function FeedSkeleton() {
-  return (
-    <div className="explore-skeleton-list" aria-label="Loading Sessions" aria-busy="true">
-      {Array.from({ length: 4 }, (_, index) => (
-        <div className="explore-skeleton-row" key={index} aria-hidden="true">
-          <span className="explore-skeleton-avatar" />
-          <span className="explore-skeleton-copy">
-            <span className="explore-skeleton-line is-meta" />
-            <span className="explore-skeleton-line is-title" />
-            <span className="explore-skeleton-line" />
-            <span className="explore-skeleton-line is-short" />
-            <span className="explore-skeleton-line is-evidence" />
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function EmptyFeed({ search, onReset }: { search: ExploreSearchState; onReset: () => void }) {
-  const constrained = Boolean(search.q || search.agent)
+  const constrained = Boolean(search.q)
   return (
-    <div className="explore-feed-state">
+    <div className="session-feed-state">
       <Search size={22} strokeWidth={1.6} aria-hidden="true" />
-      <h2>{constrained ? 'No Sessions match these filters' : 'Explore is quiet right now'}</h2>
+      <h2>{constrained ? 'No Sessions match this search' : 'No Public Sessions yet'}</h2>
       <p>
         {constrained
-          ? `Try a broader search${search.agent ? ' or include every agent' : ''}.`
+          ? 'Try a broader search.'
           : 'Public Sessions will appear here as authors share their work.'}
       </p>
       {constrained && (
         <Button type="button" variant="outline" onClick={onReset}>
           <RotateCcw size={15} strokeWidth={1.7} aria-hidden="true" />
-          Clear search and filters
+          Clear search
         </Button>
       )}
     </div>
@@ -404,7 +253,7 @@ export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
           error:
             error instanceof DiscoveryRequestError
               ? error.message
-              : 'Could not load Explore. Check your connection and try again.',
+              : 'Could not load Sessions. Check your connection and try again.',
         })
       })
 
@@ -414,10 +263,6 @@ export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
       requestRef.current = null
     }
   }, [currentFilterKey, retryToken])
-
-  const changeAgent = (agent?: DiscoveryAgentFilter) => {
-    onSearchChange(changedAgentSearch(search, agent))
-  }
 
   const reset = () => {
     setQuery('')
@@ -474,18 +319,17 @@ export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
           onSearchChange(clearedExploreSearch(search))
         }}
         onSortChange={(sort) => onSearchChange({ ...search, sort })}
-        onAgentChange={changeAgent}
       />
 
       <section
         id="explore-results"
-        className="explore-feed"
+        className="session-feed"
         role="tabpanel"
         aria-label="Public Sessions"
         aria-live="polite"
       >
         {feed.loading ? (
-          <FeedSkeleton />
+          <SessionFeedSkeleton />
         ) : feed.items.length === 0 && !feed.error ? (
           <EmptyFeed search={search} onReset={reset} />
         ) : (
@@ -493,7 +337,7 @@ export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
         )}
 
         {feed.error && (
-          <div className="explore-feed-error" role="alert">
+          <div className="session-feed-error" role="alert">
             <p>{feed.error}</p>
             <Button
               type="button"
@@ -509,7 +353,7 @@ export function PublicFeed({ search, onSearchChange }: PublicFeedProps) {
         {!feed.loading && feed.nextCursor && (
           <Button
             type="button"
-            className="explore-load-more"
+            className="session-feed-load-more"
             variant="outline"
             disabled={feed.loadingMore}
             onClick={loadMore}

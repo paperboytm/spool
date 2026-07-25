@@ -147,36 +147,9 @@
     flex-direction: column;
   }
 
-  .sw-me-card .sw-managed-session-list > li {
-    padding: var(--sp-space-3);
-  }
-
-  .sw-me-card .sw-managed-session-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-me-card .sw-managed-session-titleline {
-    display: grid;
-    justify-content: stretch;
-    gap: var(--sp-space-2);
-  }
-
-  .sw-me-card .sw-managed-session-titleline .sp-badge {
-    justify-self: start;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .sw-me-card .sw-managed-session-meta {
-    align-items: flex-start;
-    overflow: visible;
-  }
-
-  .sw-me-card .sw-managed-session-meta > span:not([aria-hidden='true']) {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    white-space: normal;
+  .sw-me-card .session-feed-row {
+    padding-right: 0;
+    padding-left: 0;
   }
 
   .sw-me-card .sw-share {

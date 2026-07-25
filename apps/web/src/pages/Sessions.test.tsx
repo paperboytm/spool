@@ -5,18 +5,20 @@ import { parseSessionsSearch } from '../lib/discovery'
 import { scopeSearchForTab, scopeTabValue, SessionsPage } from './Sessions'
 
 describe('sessions search parsing', () => {
-  it('defaults to the public scope and keeps Discovery filters', () => {
+  it('defaults to the public scope and drops the retired Agent filter', () => {
     expect(parseSessionsSearch({ q: ' token  races ', sort: 'recent', agent: 'codex' })).toEqual({
       q: 'token races',
       sort: 'recent',
-      agent: 'codex',
     })
   })
 
   it('accepts mine and team scopes, rejecting malformed team ids', () => {
-    expect(parseSessionsSearch({ scope: 'mine' })).toEqual({ sort: 'recommended', scope: 'mine' })
-    expect(parseSessionsSearch({ scope: 'team', team: 'team_123' })).toEqual({
-      sort: 'recommended',
+    expect(parseSessionsSearch({ scope: 'mine', q: 'ignored' })).toEqual({
+      sort: 'recent',
+      scope: 'mine',
+    })
+    expect(parseSessionsSearch({ scope: 'team', team: 'team_123', sort: 'recommended' })).toEqual({
+      sort: 'recent',
       scope: 'team',
       team: 'team_123',
     })
@@ -34,9 +36,9 @@ describe('scope tab mapping', () => {
     expect(scopeTabValue({ sort: 'recommended', scope: 'team', team: 't1' })).toBe('team:t1')
 
     expect(scopeSearchForTab('public')).toEqual({ sort: 'recommended' })
-    expect(scopeSearchForTab('mine')).toEqual({ sort: 'recommended', scope: 'mine' })
+    expect(scopeSearchForTab('mine')).toEqual({ sort: 'recent', scope: 'mine' })
     expect(scopeSearchForTab('team:t1')).toEqual({
-      sort: 'recommended',
+      sort: 'recent',
       scope: 'team',
       team: 't1',
     })

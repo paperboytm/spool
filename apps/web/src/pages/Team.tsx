@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 import { ManagedSessionList, withoutManagedSession } from '../components/ManagedSessionList'
+import { SessionFeedSkeleton } from '../components/SessionFeedRow'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { humanDate } from '../lib/dates'
 import { appendUniqueManagedSessions } from '../lib/hub-management-api'
@@ -132,7 +133,7 @@ export function TeamPage({ teamId }: { teamId: string }) {
 
   const { team } = state
   return (
-    <WorkspaceFrame active="teams" layout="wide" mainClassName="sw-team-workspace-main">
+    <WorkspaceFrame active="teams" mainClassName="sw-team-workspace-main">
       <div className="sw-team-main">
         <div className="sw-team-shell">
           <header className="sw-team-heading">
@@ -181,7 +182,7 @@ function TeamStatus({
   action?: ReactNode
 }) {
   return (
-    <WorkspaceFrame active="teams" layout="wide" mainClassName="sw-team-workspace-main">
+    <WorkspaceFrame active="teams" mainClassName="sw-team-workspace-main">
       <div className="sw-main center" aria-busy={busy || undefined}>
         <div className="sw-card tight sw-team-status sw-card--480">
           {busy ? <span className="sw-spin sw-spin-anim" aria-hidden="true" /> : null}
@@ -315,7 +316,14 @@ export function TeamMemberActions({
   )
 }
 
-export function TeamSessionsPanel({ team }: { team: TeamSummary }) {
+export function TeamSessionsPanel({
+  team,
+  presentation = 'management',
+}: {
+  team: TeamSummary
+  presentation?: 'management' | 'feed'
+}) {
+  const isFeed = presentation === 'feed'
   const [state, setState] = useState<
     | { kind: 'loading' }
     | {
@@ -400,25 +408,45 @@ export function TeamSessionsPanel({ team }: { team: TeamSummary }) {
   }
 
   return (
-    <section id="team-panel-sessions" role="tabpanel" aria-label="Team Sessions">
-      <SectionLabel
-        className="sw-team-session-label"
-        count={state.kind === 'ready' ? state.sessions.length || undefined : undefined}
-      >
-        Recent Sessions
-      </SectionLabel>
-      <p className="sw-team-session-help">
-        Newest activity first. Sessions stay here when their author leaves because the Team owns
-        them.
-      </p>
-      {state.kind === 'loading' ? <PanelLoading label="Loading Sessions" /> : null}
-      {state.kind === 'error' ? <PanelError message={state.message} onRetry={load} /> : null}
+    <section
+      id={isFeed ? undefined : 'team-panel-sessions'}
+      className={isFeed ? 'session-feed sessions-managed-feed' : undefined}
+      role={isFeed ? undefined : 'tabpanel'}
+      aria-label="Team Sessions"
+    >
+      {!isFeed ? (
+        <SectionLabel
+          className="sw-team-session-label"
+          count={state.kind === 'ready' ? state.sessions.length || undefined : undefined}
+        >
+          Recent Sessions
+        </SectionLabel>
+      ) : null}
+      {state.kind === 'loading' ? (
+        isFeed ? (
+          <SessionFeedSkeleton rows={3} />
+        ) : (
+          <PanelLoading label="Loading Sessions" />
+        )
+      ) : null}
+      {state.kind === 'error' ? (
+        isFeed ? (
+          <div className="session-feed-error" role="alert">
+            <p>{state.message}</p>
+            <Button variant="outline" onClick={() => void load()}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <PanelError message={state.message} onRetry={load} />
+        )
+      ) : null}
       {state.kind === 'ready' && state.sessions.length === 0 ? (
-        <div className="sw-team-empty">
+        <div className={isFeed ? 'session-feed-state' : 'sw-team-empty'}>
           <ShieldCheck size={20} strokeWidth={1.6} aria-hidden="true" />
           <div>
-            <h2>No Team Sessions yet</h2>
-            <p>Move a Session into this Team to give the workspace durable ownership.</p>
+            <h2>{isFeed ? 'No Sessions in this Team yet' : 'No Team Sessions yet'}</h2>
+            <p>Move a Session here when the Team should own it.</p>
           </div>
         </div>
       ) : null}
@@ -432,8 +460,9 @@ export function TeamSessionsPanel({ team }: { team: TeamSummary }) {
         />
       ) : null}
       {state.kind === 'ready' && state.nextCursor !== null ? (
-        <div className="sw-team-status sw-team-status-action">
+        <div className={isFeed ? undefined : 'sw-team-status sw-team-status-action'}>
           <Button
+            className={isFeed ? 'session-feed-load-more' : undefined}
             variant="outline"
             loading={state.loadingMore}
             loadingLabel="Loading Sessions…"
@@ -442,7 +471,7 @@ export function TeamSessionsPanel({ team }: { team: TeamSummary }) {
             Load more Sessions
           </Button>
           {state.moreError ? (
-            <p className="sw-managed-session-error" role="alert">
+            <p className="managed-session-error" role="alert">
               {state.moreError}
             </p>
           ) : null}

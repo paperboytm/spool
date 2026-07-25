@@ -12,7 +12,6 @@ export type ExploreSort = Exclude<DiscoverySort, 'trending'>
 export interface ExploreSearchState {
   q?: string
   sort: ExploreSort
-  agent?: DiscoveryAgentFilter
 }
 
 export interface DiscoveryRequestOptions {
@@ -65,8 +64,8 @@ export function parseSessionsSearch(search: Record<string, unknown>): SessionsSe
   const team =
     typeof teamValue === 'string' && TEAM_ID_PATTERN.test(teamValue) ? teamValue : undefined
 
-  if (scopeValue === 'mine') return { ...base, scope: 'mine' }
-  if (scopeValue === 'team' && team) return { ...base, scope: 'team', team }
+  if (scopeValue === 'mine') return { sort: 'recent', scope: 'mine' }
+  if (scopeValue === 'team' && team) return { sort: 'recent', scope: 'team', team }
   return base
 }
 
@@ -77,13 +76,10 @@ export function parseExploreSearch(search: Record<string, unknown>): ExploreSear
   // product exposes one global quality order (Top) and one time order
   // (Recent). Old Trending URLs therefore settle safely on Top.
   const sort: ExploreSort = sortValue === 'recent' ? 'recent' : 'recommended'
-  const agentValue = search['agent']
-  const agent = agentValue === 'claude' || agentValue === 'codex' ? agentValue : undefined
 
   return {
     ...(q ? { q } : {}),
     sort,
-    ...(agent ? { agent } : {}),
   }
 }
 
