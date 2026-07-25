@@ -3,7 +3,11 @@
 // where it matters (NDJSON parsing, continuation, range batching) so it
 // tests without a DOM or a worker.
 
-import type { SessionViewV1 } from '@spool-lab/session-kit'
+import {
+  isSessionGuidanceV1,
+  type SessionGuidanceV1,
+  type SessionViewV1,
+} from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
 import { parseSpoolDocument } from '@spool/share-kit/spool-document'
 
@@ -22,6 +26,8 @@ export interface HubSessionMeta {
   cardJson: string | null
   lineageJson: string | null
   viewOid: string | null
+  /** Human-guidance projection; absent only during a rolling backend upgrade. */
+  guidance?: SessionGuidanceV1 | null
   spoolFileOid?: string | null
   createdAt: number
   updatedAt: number
@@ -65,6 +71,7 @@ export async function fetchHubMeta(sid: string): Promise<HubMetaResult> {
           ...meta,
           summaryMd: meta.summaryMd ?? noteMd ?? null,
           visibility: meta.visibility ?? 'link-only',
+          guidance: isSessionGuidanceV1(meta.guidance) ? meta.guidance : null,
         },
       }
     }
@@ -183,13 +190,38 @@ export function batchEventRanges(
 export async function fetchRecordsByIndices(
   fetchRange: RangeFetcher,
   indices: readonly number[],
+  options: {
+    concurrency?: number
+    onRecords?: (records: readonly HubRecordLine[]) => void
+  } = {},
 ): Promise<HubRecordLine[]> {
   const wanted = new Set(indices)
+  const ranges = batchEventRanges(indices)
+  const completed = new Array<HubRecordLine[]>(ranges.length)
+  let nextRange = 0
+  const concurrency = Math.max(
+    1,
+    Math.min(8, Math.floor(options.concurrency ?? 8), ranges.length || 1),
+  )
+
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (nextRange < ranges.length) {
+        const rangeIndex = nextRange
+        nextRange += 1
+        const range = ranges[rangeIndex]!
+        const records = await fetchRecordsExact(fetchRange, range.from, range.to)
+        const selected = records.filter((record) => wanted.has(record.i))
+        completed[rangeIndex] = selected
+        options.onRecords?.(selected)
+      }
+    }),
+  )
+
   const out: HubRecordLine[] = []
-  for (const range of batchEventRanges(indices)) {
-    const records = await fetchRecordsExact(fetchRange, range.from, range.to)
-    for (const record of records) {
-      if (wanted.has(record.i)) out.push(record)
+  for (const records of completed) {
+    if (records) {
+      out.push(...records)
     }
   }
   return out

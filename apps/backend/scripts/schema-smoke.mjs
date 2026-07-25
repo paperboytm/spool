@@ -236,6 +236,33 @@ try {
   if (discoveryIndexes.length !== 2) {
     throw new Error(`Missing Discovery keyset indexes: ${JSON.stringify(discoveryIndexes)}`)
   }
+  const discoveryColumns = await executeJson(stateDir, 'PRAGMA table_info(hub_session_discovery);')
+  if (!discoveryColumns.some((column) => column.name === 'summary_text_zh')) {
+    throw new Error('hub_session_discovery.summary_text_zh was not migrated')
+  }
+  const guidanceColumns = await executeJson(stateDir, 'PRAGMA table_info(hub_session_guidance);')
+  const guidanceColumnNames = guidanceColumns.map((column) => column.name)
+  if (
+    JSON.stringify(guidanceColumnNames) !==
+    JSON.stringify(['sid', 'root', 'guidance_json', 'generated_at'])
+  ) {
+    throw new Error(`Missing Session guidance schema: ${JSON.stringify(guidanceColumnNames)}`)
+  }
+  const guidanceForeignKeys = await executeJson(
+    stateDir,
+    'PRAGMA foreign_key_list(hub_session_guidance);',
+  )
+  if (
+    guidanceForeignKeys.length !== 1 ||
+    guidanceForeignKeys[0]?.table !== 'hub_sessions' ||
+    guidanceForeignKeys[0]?.from !== 'sid' ||
+    guidanceForeignKeys[0]?.to !== 'sid' ||
+    guidanceForeignKeys[0]?.on_delete !== 'CASCADE'
+  ) {
+    throw new Error(
+      `Session guidance foreign key is invalid: ${JSON.stringify(guidanceForeignKeys)}`,
+    )
+  }
   const socialSchema = await executeJson(
     stateDir,
     "SELECT type,name FROM sqlite_master WHERE (type='table' AND name IN ('hub_session_stars','hub_session_resume_grants','hub_session_verified_forks')) OR (type='index' AND name IN ('hub_session_stars_user_created','hub_discovery_lineage_source_sid','hub_resume_grants_source_expires','hub_resume_grants_unclaimed_expires','hub_verified_forks_source_verified')) ORDER BY type,name;",
@@ -273,7 +300,14 @@ try {
      INSERT INTO hub_session_stars (sid,user_id,created_at)
        VALUES ('codex_00000000-0000-4000-8000-000000000099','social-viewer',1);
      INSERT OR IGNORE INTO hub_session_stars (sid,user_id,created_at)
-       VALUES ('codex_00000000-0000-4000-8000-000000000099','social-viewer',2);`,
+       VALUES ('codex_00000000-0000-4000-8000-000000000099','social-viewer',2);
+     INSERT INTO hub_session_guidance (sid,root,guidance_json,generated_at)
+       VALUES (
+         'codex_00000000-0000-4000-8000-000000000099',
+         '${'c'.repeat(64)}',
+         '{"v":1,"turns":[]}',
+         1
+       );`,
   )
   const idempotentStars = await executeJson(
     stateDir,
@@ -293,6 +327,13 @@ try {
   if (cascadedStars[0]?.count !== 0) {
     throw new Error(`Session star target cascade failed: ${JSON.stringify(cascadedStars)}`)
   }
+  const cascadedGuidance = await executeJson(
+    stateDir,
+    "SELECT COUNT(*) AS count FROM hub_session_guidance WHERE sid='codex_00000000-0000-4000-8000-000000000099';",
+  )
+  if (cascadedGuidance[0]?.count !== 0) {
+    throw new Error(`Session guidance target cascade failed: ${JSON.stringify(cascadedGuidance)}`)
+  }
   await executeJson(
     stateDir,
     `INSERT INTO hub_sessions
@@ -307,13 +348,14 @@ try {
          1
        );
      INSERT INTO hub_session_discovery
-       (sid,agent,title,summary_text,search_text,message_count,tool_call_count,file_count,
-        additions,deletions,quality_score,published_at,updated_at)
+       (sid,agent,title,summary_text,summary_text_zh,search_text,message_count,tool_call_count,
+        file_count,additions,deletions,quality_score,published_at,updated_at)
        VALUES (
          'claude_00000000-0000-4000-8000-000000000001',
          'claude',
          'Durable result',
          'A durable discovery result.',
+         '一个可靠的发现结果。',
          'durable result claude',
          2,
          1,
@@ -322,6 +364,13 @@ try {
          0,
          20,
          1,
+         1
+       );
+     INSERT INTO hub_session_guidance (sid,root,guidance_json,generated_at)
+       VALUES (
+         'claude_00000000-0000-4000-8000-000000000001',
+         '${'a'.repeat(64)}',
+         '{"v":1,"turns":[{"promptRecord":0,"replyRecords":[1],"replyChars":12,"toolCalls":1}]}',
          1
        );
      INSERT INTO hub_session_engagement_daily (sid,day,qualified_reads)
@@ -408,6 +457,20 @@ try {
     throw new Error(
       `Discovery ranked SQL returned unexpected rows: ${JSON.stringify(rankedDiscoveryRows)}`,
     )
+  }
+  const guidanceRows = await executeJson(
+    stateDir,
+    `SELECT root,guidance_json,generated_at
+     FROM hub_session_guidance
+     WHERE sid='claude_00000000-0000-4000-8000-000000000001';`,
+  )
+  if (
+    guidanceRows.length !== 1 ||
+    guidanceRows[0]?.root !== 'a'.repeat(64) ||
+    guidanceRows[0]?.generated_at !== 1 ||
+    JSON.parse(guidanceRows[0]?.guidance_json ?? 'null')?.v !== 1
+  ) {
+    throw new Error(`Session guidance row did not round-trip: ${JSON.stringify(guidanceRows)}`)
   }
   await executeJson(
     stateDir,

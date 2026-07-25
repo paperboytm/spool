@@ -12,6 +12,7 @@ import {
   canonicalizeRecord,
   isDiscoverySessionProvider,
   isResumableSessionProvider,
+  parseSummaryFrontMatter,
   parseSessionText,
   SESSION_PROVIDERS,
   type SessionProvider,
@@ -107,6 +108,10 @@ export async function handleShareCommand(
 
     if (options.summary !== undefined && options.summary.trim() === '') {
       ui.error('`--summary` cannot be empty. Omit it to use the local Agent flow.')
+      return 1
+    }
+    if (options.summary !== undefined && Buffer.byteLength(options.summary, 'utf8') > 64 * 1024) {
+      ui.error('`--summary` exceeds the 64 KiB UTF-8 limit.')
       return 1
     }
 
@@ -288,6 +293,10 @@ export async function handleShareCommand(
         buildPreparedSummaryPrompt(target, prepared)
       const summary = (await summarize(agent, prompt)).trim()
       if (!summary) throw new Error(`${agent.name} returned an empty Summary.`)
+      const invalidSummary = bilingualSummaryValidationError(summary)
+      if (invalidSummary) {
+        throw new Error(`${agent.name} returned an invalid bilingual Summary: ${invalidSummary}`)
+      }
       generation.message('Uploading generated Summary')
       await publishPreparedShare(client, prepared, {
         card,
@@ -316,6 +325,41 @@ export async function handleShareCommand(
     }
     return 1
   }
+}
+
+export function bilingualSummaryValidationError(summary: string): string | null {
+  if (Buffer.byteLength(summary, 'utf8') > 64 * 1024) {
+    return 'the UTF-8 document exceeds 64 KiB'
+  }
+  const parsed = parseSummaryFrontMatter(summary)
+  if (parsed.titleOverflow) {
+    return '`title` and `title_zh` must each be at most 96 characters'
+  }
+  if (!parsed.titles?.en || !parsed.titles.zh) {
+    return 'both `title` and `title_zh` are required in leading front-matter'
+  }
+  if (!parsed.summaries?.en || !parsed.summaries.zh) {
+    return 'both English and Simplified Chinese bodies must use the required Summary delimiters'
+  }
+  if (
+    repeatsTitleAsFirstHeading(parsed.summaries.en, parsed.titles.en) ||
+    repeatsTitleAsFirstHeading(parsed.summaries.zh, parsed.titles.zh)
+  ) {
+    return 'Summary bodies must not repeat the Session title as their first H1'
+  }
+  return null
+}
+
+function repeatsTitleAsFirstHeading(markdown: string, title: string): boolean {
+  const first = markdown.split(/\r?\n/).find((line) => line.trim() !== '')
+  if (!first || !/^\s{0,3}#\s+/.test(first)) return false
+  const heading = first
+    .replace(/^\s{0,3}#\s+/, '')
+    .replace(/\s+#+\s*$/, '')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return heading === title
 }
 
 async function announceShareComplete(

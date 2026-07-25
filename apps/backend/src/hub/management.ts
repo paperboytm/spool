@@ -1,5 +1,9 @@
 import type { D1Database } from '@cloudflare/workers-types'
-import { parseSummaryFrontMatter, type SessionTitles } from '@spool-lab/session-kit'
+import {
+  parseSummaryFrontMatter,
+  type SessionSummaries,
+  type SessionTitles,
+} from '@spool-lab/session-kit'
 
 import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { isPublishedToDiscovery } from '../discovery/projection'
@@ -37,6 +41,12 @@ export type ManagedHubSession = {
   /** Canonical bilingual task-outcome titles from Summary front-matter. */
   titles: SessionTitles | null
   summary: string | null
+  /** Canonical bilingual Summary bodies; null for legacy single-language notes. */
+  summaries: SessionSummaries | null
+  /** Publish-time estimate from recorded token usage. */
+  cost: { usd: number | null; totalTokens: number } | null
+  /** Stars exist only while a Session is currently Public. */
+  star_count: number
   provider: string
   created_at: number
   updated_at: number
@@ -64,7 +74,9 @@ export async function listOwnerHubSessions(
   const after = decodeCursor(options.cursor, fingerprint)
   const rows = await db
     .prepare(
-      'SELECT s.*, t.name AS team_name, m.role AS team_role FROM users actor ' +
+      'SELECT s.*, t.name AS team_name, m.role AS team_role, ' +
+        '(SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count ' +
+        'FROM users actor ' +
         'JOIN hub_sessions s ON s.owner_user_id=actor.id ' +
         'LEFT JOIN teams t ON t.id=s.team_id ' +
         'LEFT JOIN team_memberships m ON m.team_id=s.team_id AND m.user_id=actor.id ' +
@@ -83,7 +95,13 @@ export async function listOwnerHubSessions(
       after?.sid ?? '',
       options.limit + 1,
     )
-    .all<HubSessionRow & { team_name: string | null; team_role: string | null }>()
+    .all<
+      HubSessionRow & {
+        team_name: string | null
+        team_role: string | null
+        star_count: number
+      }
+    >()
   const hasMore = rows.results.length > options.limit
   const pageRows = hasMore ? rows.results.slice(0, options.limit) : rows.results
   const sessions = await Promise.all(
@@ -127,7 +145,8 @@ export async function listTeamHubSessions(
            AND actor.deleted_at IS NULL
            AND actor.deletion_pending_until IS NULL
        )
-       SELECT s.*, current_team.name AS team_name, current_team.role AS team_role
+       SELECT s.*, current_team.name AS team_name, current_team.role AS team_role,
+         (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count
        FROM current_team
        LEFT JOIN hub_sessions s
          ON s.team_id=current_team.id AND s.withdrawn_at IS NULL
@@ -148,6 +167,7 @@ export async function listTeamHubSessions(
       { [K in keyof HubSessionRow]: HubSessionRow[K] | null } & {
         team_name: string
         team_role: TeamRole
+        star_count: number
       }
     >()
   if (rows.results.length === 0) return null
@@ -265,12 +285,13 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
 
 export async function serializeManagedSession(
   db: D1Database,
-  row: HubSessionRow & { team_name?: string | null },
+  row: HubSessionRow & { team_name?: string | null; star_count?: number },
   canManageVisibility = true,
 ): Promise<ManagedHubSession> {
-  const [author, published] = await Promise.all([
+  const [author, published, starCount] = await Promise.all([
     getHubAuthor(db, row.owner_user_id),
     row.visibility === 'unlisted' ? isPublishedToDiscovery(db, row.sid) : Promise.resolve(false),
+    row.star_count === undefined ? sessionStarCount(db, row.sid) : Promise.resolve(row.star_count),
   ])
   const parsedSummary = parseSummaryFrontMatter(row.note_md)
   return {
@@ -278,6 +299,12 @@ export async function serializeManagedSession(
     title: sessionTitle(row, parsedSummary.titles),
     titles: parsedSummary.titles,
     summary: row.note_md === null ? null : parsedSummary.body,
+    summaries: parsedSummary.summaries ?? null,
+    cost:
+      row.total_tokens !== null && row.total_tokens > 0
+        ? { usd: row.cost_usd, totalTokens: row.total_tokens }
+        : null,
+    star_count: Math.max(0, Number(starCount)),
     provider: row.sid.slice(0, row.sid.indexOf('_')),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -292,6 +319,14 @@ export async function serializeManagedSession(
       avatar_url: author.avatarUrl,
     },
   }
+}
+
+async function sessionStarCount(db: D1Database, sid: string): Promise<number> {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS star_count FROM hub_session_stars WHERE sid=?')
+    .bind(sid)
+    .first<{ star_count: number }>()
+  return Number(row?.star_count ?? 0)
 }
 
 function sessionTitle(

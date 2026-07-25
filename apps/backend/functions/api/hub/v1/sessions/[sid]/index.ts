@@ -5,6 +5,7 @@ import {
   isPublishedToDiscovery,
 } from '../../../../../../src/discovery/projection'
 import { jsonError, jsonOk } from '../../../../../../src/errors'
+import { getSessionGuidance } from '../../../../../../src/hub/guidance'
 import {
   isTeamOnlySession,
   requireReadableSession,
@@ -30,6 +31,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     const teamOnly = isTeamOnlySession(session)
     const published = teamOnly ? false : await isPublishedToDiscovery(ctx.env.DB, sid)
     const summaryMd = session.note_md
+    const guidance = await getSessionGuidance(ctx.env.DB, session)
     const lineageJson = await filterLineageForAudience(
       ctx.env.DB,
       session.lineage_json,
@@ -47,6 +49,7 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
         cardJson: session.card_json,
         lineageJson,
         viewOid: session.view_oid,
+        guidance,
         spoolFileOid: session.spool_file_oid,
         cost:
           session.total_tokens !== null && session.total_tokens > 0

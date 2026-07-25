@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   batchEventRanges,
+  fetchHubMeta,
   fetchHubSpoolFile,
+  fetchRecordsByIndices,
   fetchRecordsExact,
   makeRangeFetcher,
   parseNdjsonRecords,
@@ -100,6 +102,90 @@ describe('record fetching', () => {
     ])
     // Duplicates and disorder are tolerated.
     expect(batchEventRanges([7, 3, 3], 8)).toEqual([{ from: 3, to: 8 }])
+  })
+
+  it('fetches sparse ranges with bounded concurrency and reports progressive results', async () => {
+    let active = 0
+    let maxActive = 0
+    const batches: number[][] = []
+    const fetchRange: RangeFetcher = async (from) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      active -= 1
+      return [record(from)]
+    }
+
+    const records = await fetchRecordsByIndices(fetchRange, [0, 100, 200, 300], {
+      concurrency: 2,
+      onRecords: (received) => batches.push(received.map((item) => item.i)),
+    })
+
+    expect(maxActive).toBe(2)
+    expect(records.map((item) => item.i)).toEqual([0, 100, 200, 300])
+    expect(batches).toHaveLength(4)
+    expect(batches.flat().sort((a, b) => a - b)).toEqual([0, 100, 200, 300])
+  })
+})
+
+describe('hub metadata guidance contract', () => {
+  const meta = {
+    sid: 'claude_12345678',
+    root: 'a'.repeat(64),
+    count: 2,
+    sig: null,
+    summaryMd: null,
+    cardJson: null,
+    lineageJson: null,
+    viewOid: 'b'.repeat(64),
+    createdAt: 1,
+    updatedAt: 2,
+    visibility: 'public',
+    author: { handle: 'alice', displayName: 'Alice', avatarUrl: null },
+  }
+
+  it('preserves a validated guidance projection from Session meta', async () => {
+    const guidance = {
+      v: 1,
+      turns: [{ promptRecord: 0, replyRecords: [1], replyChars: 12, toolCalls: 3 }],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ ...meta, guidance }), { status: 200 })),
+    )
+
+    await expect(fetchHubMeta(meta.sid)).resolves.toMatchObject({
+      kind: 'ok',
+      meta: { guidance },
+    })
+  })
+
+  it('normalizes missing or malformed guidance to null', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(meta), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...meta,
+            guidance: {
+              v: 1,
+              turns: [{ promptRecord: 0, replyRecords: [0], replyChars: 1, toolCalls: 0 }],
+            },
+          }),
+          { status: 200 },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchHubMeta(meta.sid)).resolves.toMatchObject({
+      kind: 'ok',
+      meta: { guidance: null },
+    })
+    await expect(fetchHubMeta(meta.sid)).resolves.toMatchObject({
+      kind: 'ok',
+      meta: { guidance: null },
+    })
   })
 })
 

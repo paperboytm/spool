@@ -19,7 +19,11 @@ import type { HubFetch } from '../hub/client.js'
 import type { LocalSummaryAgent } from '../hub/local-summary-agent.js'
 import type { CliSpinner, CliUi } from '../ui.js'
 import { handleResumeCommand } from './resume.js'
-import { handleShareCommand, latestSessionUuidFor } from './share.js'
+import {
+  bilingualSummaryValidationError,
+  handleShareCommand,
+  latestSessionUuidFor,
+} from './share.js'
 
 // Command-level round trip against an in-memory hub that implements the
 // same wire contract as the backend. `spool share` seeds it, then
@@ -27,6 +31,20 @@ import { handleShareCommand, latestSessionUuidFor } from './share.js'
 
 const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
 const HUB_URL = 'https://hub.test'
+const BILINGUAL_SUMMARY = [
+  '---',
+  'title: Rename alpha to beta',
+  'title_zh: 将 alpha 重命名为 beta',
+  '---',
+  '',
+  '<!-- spool:summary:en -->',
+  'The demo now uses the requested beta name.',
+  '<!-- /spool:summary -->',
+  '',
+  '<!-- spool:summary:zh -->',
+  '演示项目现在使用要求的 beta 名称。',
+  '<!-- /spool:summary -->',
+].join('\n')
 
 interface StoredHead {
   root: string
@@ -264,6 +282,22 @@ function shareDeps(
 }
 
 describe('spool share local Agent Summary flow', () => {
+  it('rejects overlong titles and repeated title headings before upload', () => {
+    expect(
+      bilingualSummaryValidationError(
+        BILINGUAL_SUMMARY.replace('title: Rename alpha to beta', `title: ${'a'.repeat(97)}`),
+      ),
+    ).toMatch(/at most 96 characters/)
+    expect(
+      bilingualSummaryValidationError(
+        BILINGUAL_SUMMARY.replace(
+          '<!-- spool:summary:en -->\n',
+          '<!-- spool:summary:en -->\n# Rename alpha to beta\n\n',
+        ),
+      ),
+    ).toMatch(/must not repeat the Session title/)
+  })
+
   it('shows the installer when an npx caller does not have the spool command yet', async () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-share-login-home-'))
     const events: string[] = []
@@ -294,6 +328,25 @@ describe('spool share local Agent Summary flow', () => {
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
+  })
+
+  it('keeps legacy manual Summary Markdown source-compatible', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-manual-legacy-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-manual-legacy-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const summary = '## Outcome\n\nUploaded exactly by an existing automation.'
+
+    const exit = await handleShareCommand(
+      undefined,
+      { summary, visibilityConfirmed: true },
+      share.deps,
+    )
+
+    expect(exit).toBe(0)
+    expect(share.errors).toEqual([])
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(summary)
   })
 
   it('confirms the Public Session URL and copies it in an interactive terminal', async () => {
@@ -401,16 +454,14 @@ describe('spool share local Agent Summary flow', () => {
           expect(agent.id).toBe('codex')
           expect(prompt).toContain('rename alpha to beta in the demo file')
           expect(prompt).not.toContain('Done: renamed alpha to beta.')
-          return '## Outcome\n\nThe rename is ready.'
+          return BILINGUAL_SUMMARY
         },
       },
     )
 
     expect(exit).toBe(0)
     expect(generatedAfterUpload).toBe(true)
-    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
-      '## Outcome\n\nThe rename is ready.',
-    )
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(BILINGUAL_SUMMARY)
     expect(events.findIndex((event) => event.startsWith('note:Public Session URL:'))).toBeLessThan(
       events.findIndex((event) => event.startsWith('confirm:Generate a Summary')),
     )
@@ -468,7 +519,7 @@ describe('spool share local Agent Summary flow', () => {
     expect(
       await handleShareCommand(
         undefined,
-        { summary: '## Existing\n\nKeep this Summary.', visibilityConfirmed: true },
+        { summary: BILINGUAL_SUMMARY, visibilityConfirmed: true },
         share.deps,
       ),
     ).toBe(0)
@@ -488,9 +539,7 @@ describe('spool share local Agent Summary flow', () => {
     )
 
     expect(exit).toBe(0)
-    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(
-      '## Existing\n\nKeep this Summary.',
-    )
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBe(BILINGUAL_SUMMARY)
   })
 
   it('leaves the uploaded session live when the user declines generation', async () => {
@@ -610,7 +659,7 @@ describe('spool share → spool resume round trip', () => {
     const filePath = writeFixtureSession(authorWs)
     const share = shareDeps(hub, authorWs, filePath, authorHome)
 
-    const summary = '## Outcome\n\nReady for review.'
+    const summary = BILINGUAL_SUMMARY
     const shareExit = await handleShareCommand(
       undefined,
       { summary, visibilityConfirmed: true },

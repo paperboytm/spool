@@ -1,12 +1,12 @@
 import type { DiscoverySessionItem } from '@spool-lab/session-kit'
 import { Button, SearchField, Tabs } from '@spool-lab/ui'
 import {
-  FileCode2,
   GitFork,
   LoaderCircle,
   MessageSquareText,
   RotateCcw,
   Search,
+  Star,
   Wrench,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -22,7 +22,11 @@ import {
   type ExploreSort,
   type ExploreSearchState,
 } from '../lib/discovery'
-import { formatSessionCost, useLocalizedSessionTitle } from '../lib/session-title'
+import {
+  formatSessionCost,
+  useLocalizedSessionSummary,
+  useLocalizedSessionTitle,
+} from '../lib/session-title'
 
 interface PublicFeedProps {
   search: ExploreSearchState
@@ -134,13 +138,15 @@ function SearchHeader({
 
 export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
   const title = useLocalizedSessionTitle(item.titles, item.title)
+  const summary = useLocalizedSessionSummary(item.summaryExcerpts, item.summaryExcerpt)
   const costLabel = formatSessionCost(item.cost)
+  const starCount = item.starCount ?? 0
 
   return (
     <SessionFeedRow
       sid={item.sid}
       title={title}
-      summary={item.summaryExcerpt}
+      summary={summary}
       author={item.author}
       timestamp={item.publishedAt}
       timestampVerb="published"
@@ -155,22 +161,22 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
             <Wrench size={13} strokeWidth={1.7} aria-hidden="true" />
             {compactNumber(item.evidence.toolCalls)} tools
           </span>
-          <span title={`${item.evidence.files} files changed`}>
-            <FileCode2 size={13} strokeWidth={1.7} aria-hidden="true" />
-            {compactNumber(item.evidence.files)} files
-          </span>
-          {(item.evidence.additions > 0 || item.evidence.deletions > 0) && (
-            <span className="session-feed-diff" title="Machine-derived diffstat">
-              <span>+{compactNumber(item.evidence.additions)}</span>
-              <span>−{compactNumber(item.evidence.deletions)}</span>
-            </span>
-          )}
           {costLabel && (
             <span
               className="session-feed-cost"
               title="Estimated API cost from recorded token usage"
             >
               {costLabel}
+            </span>
+          )}
+          <span title={`${starCount} ${starCount === 1 ? 'star' : 'stars'}`}>
+            <Star size={13} strokeWidth={1.7} aria-hidden="true" />
+            {compactNumber(starCount)} {starCount === 1 ? 'star' : 'stars'}
+          </span>
+          {(item.evidence.additions > 0 || item.evidence.deletions > 0) && (
+            <span className="session-feed-diff" title="Machine-derived diffstat">
+              <span>+{compactNumber(item.evidence.additions)}</span>
+              <span>−{compactNumber(item.evidence.deletions)}</span>
             </span>
           )}
         </div>

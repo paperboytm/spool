@@ -140,6 +140,70 @@ export interface SessionUsageV1 {
   records: number
 }
 
+/**
+ * One human-authored instruction and the primary agent activity that followed
+ * it, ending immediately before the next human instruction. Record indices
+ * keep the projection compact: readers fetch prompts in one sparse batch and
+ * fetch the full agent prose only when its disclosure is opened.
+ */
+export interface SessionGuidanceTurnV1 {
+  promptRecord: number
+  replyRecords: number[]
+  /** Unicode code points across the trimmed, human-visible agent replies. */
+  replyChars: number
+  /** Provider tool-call records only; result/output records are excluded. */
+  toolCalls: number
+}
+
+export interface SessionGuidanceV1 {
+  v: 1
+  turns: SessionGuidanceTurnV1[]
+}
+
+/**
+ * Runtime guard for guidance loaded independently of a current Session view
+ * (including legacy database projections). Besides field types, enforce the
+ * sequence invariants sparse range reads rely on.
+ */
+export function isSessionGuidanceV1(value: unknown): value is SessionGuidanceV1 {
+  if (!isUnknownRecord(value) || value['v'] !== 1 || !Array.isArray(value['turns'])) return false
+
+  const turns = value['turns']
+  let previousPrompt = -1
+  for (let turnIndex = 0; turnIndex < turns.length; turnIndex += 1) {
+    const turn = turns[turnIndex]
+    if (
+      !isUnknownRecord(turn) ||
+      !isNonNegativeSafeInteger(turn['promptRecord']) ||
+      !Array.isArray(turn['replyRecords']) ||
+      !isNonNegativeSafeInteger(turn['replyChars']) ||
+      !isNonNegativeSafeInteger(turn['toolCalls'])
+    ) {
+      return false
+    }
+
+    const promptRecord = turn['promptRecord']
+    if (promptRecord <= previousPrompt) return false
+    previousPrompt = promptRecord
+
+    let previousReply = promptRecord
+    for (const replyRecord of turn['replyRecords']) {
+      if (!isNonNegativeSafeInteger(replyRecord) || replyRecord <= previousReply) return false
+      previousReply = replyRecord
+    }
+  }
+
+  for (let turnIndex = 0; turnIndex + 1 < turns.length; turnIndex += 1) {
+    const turn = turns[turnIndex] as Record<string, unknown>
+    const next = turns[turnIndex + 1] as Record<string, unknown>
+    const nextPrompt = next['promptRecord'] as number
+    const replyRecords = turn['replyRecords'] as number[]
+    if (replyRecords.some((replyRecord) => replyRecord >= nextPrompt)) return false
+  }
+
+  return true
+}
+
 export interface SessionViewV1 {
   v: 1
   index: ViewIndexEntry[]
@@ -150,6 +214,16 @@ export interface SessionViewV1 {
   diffstat: Diffstat
   /** Present only when at least one record carried token usage data. */
   usage?: SessionUsageV1
+  /** Additive in v1 so older published view objects remain readable. */
+  guidance?: SessionGuidanceV1
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 export type DiffLineKind = 'context' | 'add' | 'del'

@@ -48,10 +48,6 @@ interface SessionContentLoadOptions {
   initialRecords?: readonly HubRecordLine[]
   signal?: AbortSignal
   onRecordProgress?: (loaded: number, total: number, records: readonly HubRecordLine[]) => void
-  /** Preserve record-addressed URLs by using the legacy MessageList, whose
-   * record-to-message mapping is exact. Curated turns cannot be mapped back
-   * to raw tool records reliably. */
-  preferRawRecords?: boolean
 }
 
 const defaultSessionContentDeps: SessionContentDeps = {
@@ -106,13 +102,11 @@ export async function loadSessionContent(
   // below still preserves the normal error path.
   void viewPromise.catch(() => undefined)
 
-  if (meta.spoolFileOid != null && !options.preferRawRecords) {
+  if (meta.spoolFileOid != null) {
     const spoolDocument = await deps.fetchSpoolFile(sid)
     if (isCancelled()) return null
-    if (spoolDocument !== null) {
-      const view = await viewPromise
-      return isCancelled() ? null : { view, spoolDocument, records: [] }
-    }
+    const view = await viewPromise
+    return isCancelled() ? null : { view, spoolDocument, records: [] }
   }
 
   const records = await loadRawRecords(sid, meta.count, deps.makeRangeFetcher, options)
@@ -132,6 +126,7 @@ type PageState =
       phase: 'ready'
       meta: HubSessionMeta
       view: SessionViewV1 | null
+      viewResolved: boolean
       spoolDocument: SpoolDocument | null
       records: HubRecordLine[]
       history: SessionHistoryState
@@ -177,11 +172,12 @@ export function SessionReader({ sid }: { sid: string }) {
       if (meta.kind === 'withdrawn') return setState({ phase: 'withdrawn', at: meta.at })
       if (meta.kind === 'error') return setState({ phase: 'error' })
 
-      const shouldLoadPublication = initialRecordIndex === null && meta.meta.spoolFileOid != null
+      const shouldLoadPublication = meta.meta.spoolFileOid != null
       setState({
         phase: 'ready',
         meta: meta.meta,
         view: null,
+        viewResolved: false,
         spoolDocument: null,
         records: [],
         history: shouldLoadPublication
@@ -198,7 +194,7 @@ export function SessionReader({ sid }: { sid: string }) {
       if (cancelled) return
       setState((current) =>
         current.phase === 'ready' && current.meta.sid === meta.meta.sid
-          ? { ...current, view }
+          ? { ...current, view, viewResolved: true }
           : current,
       )
     })()
@@ -236,12 +232,20 @@ export function SessionReader({ sid }: { sid: string }) {
             return
           }
 
-          // A stale or invalid optional publication attachment must not force
-          // an eager multi-megabyte fallback. Keep the Summary visible and
-          // let the reader explicitly load the raw history.
+          // A declared publication attachment is the visibility boundary.
+          // Never fall back to raw records when it is unavailable: retry the
+          // curated artifact instead.
           setState((current) =>
             current.phase === 'ready' && current.meta.sid === meta.sid
-              ? { ...current, history: { phase: 'idle', total: meta.count } }
+              ? {
+                  ...current,
+                  history: {
+                    phase: 'error',
+                    source: 'publication',
+                    loaded: 0,
+                    total: meta.count,
+                  },
+                }
               : current,
           )
           return
@@ -287,6 +291,7 @@ export function SessionReader({ sid }: { sid: string }) {
                 ...current,
                 history: {
                   phase: 'error',
+                  source: activeHistorySource,
                   loaded: current.records.length,
                   total: meta.count,
                 },
@@ -313,7 +318,7 @@ export function SessionReader({ sid }: { sid: string }) {
             ...current,
             history: {
               phase: 'loading',
-              source: 'records',
+              source: current.meta.spoolFileOid == null ? 'records' : 'publication',
               loaded: current.records.length,
               total: current.meta.count,
             },
@@ -422,6 +427,7 @@ export function SessionReader({ sid }: { sid: string }) {
           key={sid}
           meta={state.meta}
           view={state.view}
+          viewResolved={state.viewResolved}
           provider={provider}
           conversation={conversation}
           spoolDocument={state.spoolDocument}

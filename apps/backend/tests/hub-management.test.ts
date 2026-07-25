@@ -73,6 +73,9 @@ describe('Team Session management feed', () => {
     expect(sql).toContain('t.archived_at IS NULL')
     expect(sql).toContain('t.deletion_pending_until IS NULL')
     expect(sql).toContain('ON s.team_id=current_team.id AND s.withdrawn_at IS NULL')
+    expect(sql).toContain(
+      '(SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count',
+    )
     expect(sql).toContain('s.updated_at<?')
     expect(sql).toContain('ORDER BY s.updated_at DESC, s.sid ASC')
     expect(unauthorized.bindLog[0]).toEqual(['team_1', 'user_1', 0, 0, 0, '', 51])
@@ -113,7 +116,11 @@ describe('Team Session management feed', () => {
       {
         ...TEAM_SESSION,
         note_md:
-          '---\ntitle: Ship Team workspaces\ntitle_zh: 交付团队工作区\n---\n\n## Outcome\n\nDone.',
+          '---\ntitle: Ship Team workspaces\ntitle_zh: 交付团队工作区\n---\n\n' +
+          '<!-- spool:summary:en -->\nEnglish background and outcome.\n' +
+          '<!-- /spool:summary -->\n\n' +
+          '<!-- spool:summary:zh -->\n中文背景、动机和结果。\n' +
+          '<!-- /spool:summary -->',
         team_name: 'Paperboy',
         team_role: 'member',
       },
@@ -124,7 +131,31 @@ describe('Team Session management feed', () => {
     expect(page?.sessions[0]).toMatchObject({
       title: 'Ship Team workspaces',
       titles: { en: 'Ship Team workspaces', zh: '交付团队工作区' },
-      summary: '## Outcome\n\nDone.',
+      summary: 'English background and outcome.',
+      summaries: {
+        en: 'English background and outcome.',
+        zh: '中文背景、动机和结果。',
+      },
+    })
+  })
+
+  it('returns publish-time token cost and the live star count in managed feeds', async () => {
+    const authorized = mockDatabase([
+      {
+        ...TEAM_SESSION,
+        cost_usd: 1.25,
+        total_tokens: 800_000,
+        star_count: 3,
+        team_name: 'Paperboy',
+        team_role: 'member',
+      },
+    ])
+
+    const page = await listTeamHubSessions(authorized.db, 'team_1', 'user_1')
+
+    expect(page?.sessions[0]).toMatchObject({
+      cost: { usd: 1.25, totalTokens: 800_000 },
+      star_count: 3,
     })
   })
 

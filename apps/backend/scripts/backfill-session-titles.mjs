@@ -9,7 +9,7 @@ export const TARGET = Object.freeze({
   accountId: '6898ecdad1e8341d3e09d4b46124d72e',
   databaseId: 'fa7aa980-e646-4ebe-8c2f-bf5d5d30ab9d',
   databaseName: 'spool-share-db',
-  migration: '0011_titles_cost.sql',
+  migration: '0013_bilingual_summaries.sql',
 })
 
 const EXPECTED_LIVE_SESSIONS = 9
@@ -19,6 +19,14 @@ const MAX_MAPPING_BYTES = 2 * 1024 * 1024
 const MAX_TITLE_CHARACTERS = 96
 const MAX_SUMMARY_CHARACTERS = 4_000
 const MAX_SEARCH_BYTES = 16 * 1024
+const MAX_NOTE_BYTES = 64 * 1024
+const MAX_USAGE_MODELS = 1_000
+const MAX_MODEL_ID_BYTES = 256
+const MAX_GUIDANCE_BYTES = 128 * 1024
+const MAX_GUIDANCE_TURNS = 2_048
+const MAX_GUIDANCE_REPLY_RECORDS = 8_192
+const MODEL_ID_RE = /^[^\s\u0000-\u001f\u007f]+$/u
+const SUMMARY_SECTION_END = '<!-- /spool:summary -->'
 const SHA256_RE = /^[0-9a-f]{64}$/i
 const SID_RE = /^(?:claude|codex|pi)_[0-9A-Za-z-]{8,64}$/
 const ROOT_RE = /^[0-9a-f]{64}$/
@@ -43,6 +51,7 @@ const projectionKeys = Object.freeze([
   'qualityScore',
   'searchText',
   'summaryText',
+  'summaryTextZh',
   'title',
   'titleJson',
   'toolCallCount',
@@ -55,14 +64,20 @@ function usage() {
   node scripts/backfill-session-titles.mjs --mapping /absolute/private/mapping.json
   node scripts/backfill-session-titles.mjs --mapping /absolute/private/mapping.json \\
     --apply --mapping-sha <sha256>
+  node scripts/backfill-session-titles.mjs --mapping /absolute/private/mapping.json \\
+    --verify
+  node scripts/backfill-session-titles.mjs --mapping /absolute/private/mapping.json \\
+    --rollback --mapping-sha <sha256>
 
-The default is a remote, read-only dry-run. The mapping must be outside the
-repository and readable only by its owner. --apply requires the SHA-256 printed
-by a dry-run of those exact mapping bytes. Run this script with Node 22.
+The default is a remote, read-only dry-run. --verify is also read-only.
+The mapping must be outside the repository and readable only by its owner.
+Mutation modes require the SHA-256 printed by a dry-run of those exact bytes,
+take a fresh full backup, execute guarded atomic SQL, and verify the result.
+Run this script with Node 22.
 
 Private mapping schema (exact keys; 9 Sessions, 7 with projections):
 {
-  "version": 1,
+  "version": 2,
   "target": {
     "accountId": "${TARGET.accountId}",
     "databaseId": "${TARGET.databaseId}",
@@ -74,16 +89,23 @@ Private mapping schema (exact keys; 9 Sessions, 7 with projections):
     "expected": {
       "root": "<sha256>", "updatedAt": 0, "visibility": "unlisted",
       "teamId": null, "withdrawnAt": null,
+      "recordCount": 1, "costUsd": null, "totalTokens": null,
       "noteSha256": "<sha256 of raw UTF-8 note; null hashes as empty bytes>",
       "noteMd": "<full current preimage or null>",
-      "projection": "<full current projection object or null>"
+      "projection": "<full current projection object or null>",
+      "guidance": "<full current guidance row or null>"
     },
     "replacement": {
       "titles": { "en": "<task outcome>", "zh": "<task outcome>" },
-      "summaryBodyMd": "<summary body without front matter>",
+      "summaries": { "enMd": "<English Markdown>", "zhMd": "<中文 Markdown>" },
+      "usage": { "records": 1, "models": {
+        "<model>": { "input": 1, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+      }},
+      "cost": { "usd": 0.0, "totalTokens": 1 },
+      "guidance": { "generatedAt": 0, "value": { "v": 1, "turns": [] } },
       "projection": {
         "qualityScore": 0,
-        "searchText": "<lower-case title + Chinese title + plain summary + retained evidence>"
+        "searchText": "<lower-case bilingual titles + summaries + retained evidence>"
       }
     }
   }]
@@ -95,18 +117,19 @@ projections use these exact keys: ${projectionKeys.join(', ')}.`
 
 export function parseArgs(argv) {
   const options = {
-    apply: false,
     help: false,
     mappingPath: null,
     mappingSha: null,
+    mode: 'dry-run',
   }
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     if (argument === '--help' || argument === '-h') {
       options.help = true
-    } else if (argument === '--apply') {
-      options.apply = true
+    } else if (argument === '--apply' || argument === '--rollback' || argument === '--verify') {
+      if (options.mode !== 'dry-run') throw new Error('Choose only one execution mode')
+      options.mode = argument.slice(2)
     } else if (argument === '--mapping') {
       const value = argv[index + 1]
       if (!value || value.startsWith('--')) throw new Error('--mapping requires a path')
@@ -127,8 +150,10 @@ export function parseArgs(argv) {
   if (options.mappingSha !== null && !SHA256_RE.test(options.mappingSha)) {
     throw new Error('--mapping-sha must be exactly 64 hexadecimal characters')
   }
-  if (options.apply && options.mappingSha === null) {
-    throw new Error('--apply requires --mapping-sha from a dry-run of the exact mapping file')
+  if ((options.mode === 'apply' || options.mode === 'rollback') && options.mappingSha === null) {
+    throw new Error(
+      `--${options.mode} requires --mapping-sha from a dry-run of the exact mapping file`,
+    )
   }
   return options
 }
@@ -204,6 +229,8 @@ function requireNumber(value, path, options = {}) {
     throw new Error(`${path} must be a finite number`)
   }
   if (options.integer && !Number.isInteger(value)) throw new Error(`${path} must be an integer`)
+  if (options.safe && !Number.isSafeInteger(value))
+    throw new Error(`${path} must be a safe integer`)
   if (options.nonNegative && value < 0) throw new Error(`${path} must be non-negative`)
   return value
 }
@@ -238,6 +265,7 @@ function validateProjection(value, path) {
   requireString(projection.title, `${path}.title`, { nonEmpty: true })
   requireNullableString(projection.titleJson, `${path}.titleJson`)
   requireNullableString(projection.summaryText, `${path}.summaryText`)
+  requireNullableString(projection.summaryTextZh, `${path}.summaryTextZh`)
   requireString(projection.searchText, `${path}.searchText`)
   for (const key of [
     'messageCount',
@@ -260,11 +288,198 @@ function validateProjection(value, path) {
   return projection
 }
 
-export function buildCanonicalNote(titles, summaryBodyMd) {
-  return `---\ntitle: ${titles.en}\ntitle_zh: ${titles.zh}\n---\n\n${summaryBodyMd}`
+function validateSummaryBody(value, path) {
+  const summary = requireString(value, path, { nonEmpty: true })
+  if (summary !== summary.trim()) throw new Error(`${path} must be trimmed`)
+  if (
+    summary
+      .split(/\r?\n/)
+      .some(
+        (line) =>
+          /^<!--\s*spool:summary:(?:en|zh)\s*-->$/.test(line.trim()) ||
+          line.trim() === SUMMARY_SECTION_END,
+      )
+  ) {
+    throw new Error(`${path} must not contain reserved Summary delimiters`)
+  }
+  return summary
 }
 
-function desiredProjection(expectedProjection, replacement, titles, summaryBodyMd, path) {
+function validateUsage(value, path) {
+  if (value === null) return { usage: null, totalTokens: 0 }
+  const usage = requireRecord(value, path)
+  requireExactKeys(usage, ['models', 'records'], path)
+  const records = requireNumber(usage.records, `${path}.records`, {
+    integer: true,
+    nonNegative: true,
+    safe: true,
+  })
+  const models = requireRecord(usage.models, `${path}.models`)
+  const entries = Object.entries(models)
+  if (entries.length === 0 || entries.length > MAX_USAGE_MODELS) {
+    throw new Error(`${path}.models must contain between 1 and ${MAX_USAGE_MODELS} entries`)
+  }
+  let totalTokens = 0
+  const normalizedModels = Object.create(null)
+  for (const [modelId, rawTotals] of entries) {
+    if (
+      modelId.length === 0 ||
+      modelId !== modelId.trim() ||
+      encoder.encode(modelId).byteLength > MAX_MODEL_ID_BYTES ||
+      !MODEL_ID_RE.test(modelId)
+    ) {
+      throw new Error(`${path}.models contains an invalid model id`)
+    }
+    const totals = requireRecord(rawTotals, `${path}.models.${modelId}`)
+    requireExactKeys(
+      totals,
+      ['cacheRead', 'cacheWrite', 'input', 'output'],
+      `${path}.models.${modelId}`,
+    )
+    const normalizedTotals = {}
+    for (const field of ['input', 'output', 'cacheRead', 'cacheWrite']) {
+      const tokens = requireNumber(totals[field], `${path}.models.${modelId}.${field}`, {
+        integer: true,
+        nonNegative: true,
+        safe: true,
+      })
+      if (tokens > Number.MAX_SAFE_INTEGER - totalTokens) {
+        throw new Error(`${path} token total exceeds Number.MAX_SAFE_INTEGER`)
+      }
+      totalTokens += tokens
+      normalizedTotals[field] = tokens
+    }
+    normalizedModels[modelId] = normalizedTotals
+  }
+  if (records === 0 || totalTokens === 0) {
+    throw new Error(`${path} must carry at least one usage record and token`)
+  }
+  return { usage: { models: normalizedModels, records }, totalTokens }
+}
+
+function validateCost(value, usageTotalTokens, path) {
+  if (value === null) {
+    if (usageTotalTokens !== 0) throw new Error(`${path} is required when usage has tokens`)
+    return null
+  }
+  const cost = requireRecord(value, path)
+  requireExactKeys(cost, ['totalTokens', 'usd'], path)
+  const totalTokens = requireNumber(cost.totalTokens, `${path}.totalTokens`, {
+    integer: true,
+    nonNegative: true,
+    safe: true,
+  })
+  const usd = requireNullableNumber(cost.usd, `${path}.usd`, { nonNegative: true })
+  if (totalTokens !== usageTotalTokens || totalTokens === 0) {
+    throw new Error(`${path}.totalTokens must equal the non-zero usage token total`)
+  }
+  return { totalTokens, usd }
+}
+
+function validateGuidanceValue(value, recordCount, path) {
+  const guidance = requireRecord(value, path)
+  requireExactKeys(guidance, ['turns', 'v'], path)
+  if (guidance.v !== 1) throw new Error(`${path}.v must be 1`)
+  if (!Array.isArray(guidance.turns) || guidance.turns.length > MAX_GUIDANCE_TURNS) {
+    throw new Error(`${path}.turns must be an array of at most ${MAX_GUIDANCE_TURNS} entries`)
+  }
+  const turns = []
+  let previousPrompt = -1
+  let replyRecordCount = 0
+  for (let index = 0; index < guidance.turns.length; index += 1) {
+    const turnPath = `${path}.turns[${index}]`
+    const turn = requireRecord(guidance.turns[index], turnPath)
+    requireExactKeys(turn, ['promptRecord', 'replyChars', 'replyRecords', 'toolCalls'], turnPath)
+    const promptRecord = requireNumber(turn.promptRecord, `${turnPath}.promptRecord`, {
+      integer: true,
+      nonNegative: true,
+      safe: true,
+    })
+    const replyChars = requireNumber(turn.replyChars, `${turnPath}.replyChars`, {
+      integer: true,
+      nonNegative: true,
+      safe: true,
+    })
+    const toolCalls = requireNumber(turn.toolCalls, `${turnPath}.toolCalls`, {
+      integer: true,
+      nonNegative: true,
+      safe: true,
+    })
+    if (!Array.isArray(turn.replyRecords)) {
+      throw new Error(`${turnPath}.replyRecords must be an array`)
+    }
+    replyRecordCount += turn.replyRecords.length
+    if (replyRecordCount > MAX_GUIDANCE_REPLY_RECORDS) {
+      throw new Error(`${path} must reference at most ${MAX_GUIDANCE_REPLY_RECORDS} reply records`)
+    }
+    if (promptRecord <= previousPrompt || promptRecord >= recordCount) {
+      throw new Error(`${turnPath}.promptRecord is out of order or range`)
+    }
+    previousPrompt = promptRecord
+    let previousReply = promptRecord
+    const replyRecords = turn.replyRecords.map((rawReply, replyIndex) => {
+      const reply = requireNumber(rawReply, `${turnPath}.replyRecords[${replyIndex}]`, {
+        integer: true,
+        nonNegative: true,
+        safe: true,
+      })
+      if (reply <= previousReply || reply >= recordCount) {
+        throw new Error(`${turnPath}.replyRecords are out of order or range`)
+      }
+      previousReply = reply
+      return reply
+    })
+    turns.push({ promptRecord, replyChars, replyRecords, toolCalls })
+  }
+  for (let index = 0; index + 1 < turns.length; index += 1) {
+    if (turns[index].replyRecords.some((reply) => reply >= turns[index + 1].promptRecord)) {
+      throw new Error(`${path}.turns overlap the next human instruction`)
+    }
+  }
+  const normalized = { turns, v: 1 }
+  if (encoder.encode(JSON.stringify(normalized)).byteLength > MAX_GUIDANCE_BYTES) {
+    throw new Error(`${path} exceeds the ${MAX_GUIDANCE_BYTES}-byte projection limit`)
+  }
+  return normalized
+}
+
+function validateGuidanceRow(value, recordCount, path) {
+  if (value === null) return null
+  const row = requireRecord(value, path)
+  requireExactKeys(row, ['generatedAt', 'guidanceJson', 'guidanceSha256', 'root'], path)
+  const root = requireString(row.root, `${path}.root`, { nonEmpty: true })
+  if (!ROOT_RE.test(root)) throw new Error(`${path}.root must be a SHA-256`)
+  const generatedAt = requireNumber(row.generatedAt, `${path}.generatedAt`, {
+    integer: true,
+    nonNegative: true,
+    safe: true,
+  })
+  const guidanceJson = requireString(row.guidanceJson, `${path}.guidanceJson`, { nonEmpty: true })
+  const guidanceSha256 = requireString(row.guidanceSha256, `${path}.guidanceSha256`, {
+    nonEmpty: true,
+  }).toLowerCase()
+  if (!SHA256_RE.test(guidanceSha256) || sha256(guidanceJson) !== guidanceSha256) {
+    throw new Error(`${path}.guidanceSha256 does not match the exact JSON preimage`)
+  }
+  let parsed
+  try {
+    parsed = JSON.parse(guidanceJson)
+  } catch {
+    throw new Error(`${path}.guidanceJson is not valid JSON`)
+  }
+  validateGuidanceValue(parsed, recordCount, `${path}.guidanceJson`)
+  return { generatedAt, guidanceJson, guidanceSha256, root }
+}
+
+export function buildCanonicalNote(titles, summaries) {
+  return (
+    `---\ntitle: ${titles.en}\ntitle_zh: ${titles.zh}\n---\n\n` +
+    `<!-- spool:summary:en -->\n${summaries.enMd}\n${SUMMARY_SECTION_END}\n\n` +
+    `<!-- spool:summary:zh -->\n${summaries.zhMd}\n${SUMMARY_SECTION_END}`
+  )
+}
+
+function desiredProjection(expectedProjection, replacement, titles, summaries, cost, path) {
   if (expectedProjection === null) {
     if (replacement !== null) throw new Error(`${path} must be null for a non-Public Session`)
     return null
@@ -284,29 +499,35 @@ function desiredProjection(expectedProjection, replacement, titles, summaryBodyM
     throw new Error(`${path}.searchText must be normalized to lower case`)
   }
 
-  const summaryText = boundCharacters(markdownToPlainText(summaryBodyMd), MAX_SUMMARY_CHARACTERS)
-  if (!summaryText) throw new Error(`${path} requires a non-empty projected summary`)
-  const searchPrefix = [titles.en, titles.zh, summaryText]
+  const summaryText = boundCharacters(markdownToPlainText(summaries.enMd), MAX_SUMMARY_CHARACTERS)
+  const summaryTextZh = boundCharacters(markdownToPlainText(summaries.zhMd), MAX_SUMMARY_CHARACTERS)
+  if (!summaryText || !summaryTextZh) {
+    throw new Error(`${path} requires non-empty projected summaries in both languages`)
+  }
+  const searchPrefix = [titles.en, titles.zh, summaryText, summaryTextZh]
     .map((part) => collapseWhitespace(part).toLowerCase())
     .join(' ')
   if (!searchText.startsWith(searchPrefix)) {
-    throw new Error(`${path}.searchText must start with the bilingual titles and summary`)
+    throw new Error(`${path}.searchText must start with the bilingual titles and summaries`)
   }
 
   return {
     ...expectedProjection,
+    costUsd: cost?.usd ?? null,
     qualityScore,
     searchText,
     summaryText,
+    summaryTextZh,
     title: titles.en,
     titleJson: JSON.stringify(titles),
+    totalTokens: cost?.totalTokens ?? null,
   }
 }
 
 export function validateMapping(value) {
   const mapping = requireRecord(value, 'mapping')
   requireExactKeys(mapping, ['sessions', 'target', 'version'], 'mapping')
-  if (mapping.version !== 1) throw new Error('mapping.version must be 1')
+  if (mapping.version !== 2) throw new Error('mapping.version must be 2')
 
   const target = requireRecord(mapping.target, 'mapping.target')
   requireExactKeys(
@@ -337,11 +558,15 @@ export function validateMapping(value) {
     requireExactKeys(
       expected,
       [
+        'costUsd',
+        'guidance',
         'noteMd',
         'noteSha256',
         'projection',
+        'recordCount',
         'root',
         'teamId',
+        'totalTokens',
         'updatedAt',
         'visibility',
         'withdrawnAt',
@@ -350,9 +575,15 @@ export function validateMapping(value) {
     )
     const root = requireString(expected.root, `${path}.expected.root`, { nonEmpty: true })
     if (!ROOT_RE.test(root)) throw new Error(`${path}.expected.root must be a SHA-256`)
+    const recordCount = requireNumber(expected.recordCount, `${path}.expected.recordCount`, {
+      integer: true,
+      nonNegative: true,
+      safe: true,
+    })
     const updatedAt = requireNumber(expected.updatedAt, `${path}.expected.updatedAt`, {
       integer: true,
       nonNegative: true,
+      safe: true,
     })
     const visibility = requireString(expected.visibility, `${path}.expected.visibility`)
     if (visibility !== 'unlisted' && visibility !== 'private') {
@@ -375,34 +606,90 @@ export function validateMapping(value) {
     if (noteSha256(noteMd) !== expectedNoteSha) {
       throw new Error(`${path}.expected.noteSha256 does not match the full note preimage`)
     }
+    const costUsd = requireNullableNumber(expected.costUsd, `${path}.expected.costUsd`, {
+      nonNegative: true,
+    })
+    const totalTokens = requireNullableNumber(
+      expected.totalTokens,
+      `${path}.expected.totalTokens`,
+      { integer: true, nonNegative: true, safe: true },
+    )
+    if ((costUsd !== null && totalTokens === null) || totalTokens === 0) {
+      throw new Error(`${path}.expected cost/token preimage is inconsistent`)
+    }
+    const expectedGuidance = validateGuidanceRow(
+      expected.guidance,
+      recordCount,
+      `${path}.expected.guidance`,
+    )
+    if (expectedGuidance !== null && expectedGuidance.root !== root) {
+      throw new Error(`${path}.expected.guidance.root must match the Session root`)
+    }
     const expectedProjection =
       expected.projection === null
         ? null
         : validateProjection(expected.projection, `${path}.expected.projection`)
+    if (
+      expectedProjection !== null &&
+      (expectedProjection.costUsd !== costUsd || expectedProjection.totalTokens !== totalTokens)
+    ) {
+      throw new Error(`${path}.expected projection and Session cost preimages must match`)
+    }
 
     const replacement = requireRecord(entry.replacement, `${path}.replacement`)
-    requireExactKeys(replacement, ['projection', 'summaryBodyMd', 'titles'], `${path}.replacement`)
+    requireExactKeys(
+      replacement,
+      ['cost', 'guidance', 'projection', 'summaries', 'titles', 'usage'],
+      `${path}.replacement`,
+    )
     const titles = requireRecord(replacement.titles, `${path}.replacement.titles`)
     requireExactKeys(titles, ['en', 'zh'], `${path}.replacement.titles`)
     const normalizedTitles = {
       en: validateTitle(titles.en, `${path}.replacement.titles.en`),
       zh: validateTitle(titles.zh, `${path}.replacement.titles.zh`),
     }
-    const summaryBodyMd = requireString(
-      replacement.summaryBodyMd,
-      `${path}.replacement.summaryBodyMd`,
-      { nonEmpty: true },
-    )
-    if (summaryBodyMd !== summaryBodyMd.trim()) {
-      throw new Error(`${path}.replacement.summaryBodyMd must be trimmed`)
+    const summaries = requireRecord(replacement.summaries, `${path}.replacement.summaries`)
+    requireExactKeys(summaries, ['enMd', 'zhMd'], `${path}.replacement.summaries`)
+    const normalizedSummaries = {
+      enMd: validateSummaryBody(summaries.enMd, `${path}.replacement.summaries.enMd`),
+      zhMd: validateSummaryBody(summaries.zhMd, `${path}.replacement.summaries.zhMd`),
     }
-    const nextNoteMd = buildCanonicalNote(normalizedTitles, summaryBodyMd)
+    const usageResult = validateUsage(replacement.usage, `${path}.replacement.usage`)
+    const nextCost = validateCost(
+      replacement.cost,
+      usageResult.totalTokens,
+      `${path}.replacement.cost`,
+    )
+    const replacementGuidance = requireRecord(replacement.guidance, `${path}.replacement.guidance`)
+    requireExactKeys(replacementGuidance, ['generatedAt', 'value'], `${path}.replacement.guidance`)
+    const guidanceGeneratedAt = requireNumber(
+      replacementGuidance.generatedAt,
+      `${path}.replacement.guidance.generatedAt`,
+      { integer: true, nonNegative: true, safe: true },
+    )
+    const guidanceValue = validateGuidanceValue(
+      replacementGuidance.value,
+      recordCount,
+      `${path}.replacement.guidance.value`,
+    )
+    const guidanceJson = JSON.stringify(guidanceValue)
+    const nextGuidance = {
+      generatedAt: guidanceGeneratedAt,
+      guidanceJson,
+      guidanceSha256: sha256(guidanceJson),
+      root,
+    }
+    const nextNoteMd = buildCanonicalNote(normalizedTitles, normalizedSummaries)
+    if (encoder.encode(nextNoteMd).byteLength > MAX_NOTE_BYTES) {
+      throw new Error(`${path}.replacement canonical note exceeds ${MAX_NOTE_BYTES} UTF-8 bytes`)
+    }
     if (nextNoteMd === noteMd) throw new Error(`${path}.replacement does not change note_md`)
     const nextProjection = desiredProjection(
       expectedProjection,
       replacement.projection,
       normalizedTitles,
-      summaryBodyMd,
+      normalizedSummaries,
+      nextCost,
       `${path}.replacement.projection`,
     )
 
@@ -421,21 +708,28 @@ export function validateMapping(value) {
     return {
       sid,
       expected: {
+        costUsd,
+        guidance: expectedGuidance,
         noteMd,
         noteSha256: expectedNoteSha,
         projection: expectedProjection,
+        recordCount,
         root,
         teamId,
+        totalTokens,
         updatedAt,
         visibility,
         withdrawnAt: null,
       },
       next: {
+        cost: nextCost,
+        guidance: nextGuidance,
         noteMd: nextNoteMd,
         noteSha256: noteSha256(nextNoteMd),
         projection: nextProjection,
-        summaryBodyMd,
+        summaries: normalizedSummaries,
         titles: normalizedTitles,
+        usage: usageResult.usage,
       },
     }
   })
@@ -448,7 +742,7 @@ export function validateMapping(value) {
   return {
     sessions: sessions.sort((left, right) => left.sid.localeCompare(right.sid)),
     target: { ...TARGET },
-    version: 1,
+    version: 2,
   }
 }
 
@@ -462,6 +756,18 @@ function assertProjectionEqual(actual, expected, path) {
   }
   if (actual === null || expected === null) return
   for (const key of projectionKeys) {
+    if (!scalarEqual(actual[key], expected[key])) {
+      throw new Error(`${path}.${key} drifted`)
+    }
+  }
+}
+
+function assertGuidanceEqual(actual, expected, path) {
+  if ((actual === null) !== (expected === null)) {
+    throw new Error(`${path} presence drifted`)
+  }
+  if (actual === null || expected === null) return
+  for (const key of ['generatedAt', 'guidanceJson', 'root']) {
     if (!scalarEqual(actual[key], expected[key])) {
       throw new Error(`${path}.${key} drifted`)
     }
@@ -521,7 +827,16 @@ export function validateSnapshotAgainstMapping(rows, mapping) {
   for (const entry of mapping.sessions) {
     const remote = remoteBySid.get(entry.sid)
     if (!remote) throw new Error('A mapped Session is absent from the remote snapshot')
-    for (const key of ['root', 'updatedAt', 'visibility', 'teamId', 'withdrawnAt']) {
+    for (const key of [
+      'costUsd',
+      'recordCount',
+      'root',
+      'teamId',
+      'totalTokens',
+      'updatedAt',
+      'visibility',
+      'withdrawnAt',
+    ]) {
       if (!scalarEqual(remote[key], entry.expected[key])) {
         throw new Error(`Session preimage ${key} drifted`)
       }
@@ -531,6 +846,7 @@ export function validateSnapshotAgainstMapping(rows, mapping) {
       throw new Error(`Session note preimage drifted (remote sha256 ${remoteNoteSha})`)
     }
     assertProjectionEqual(remote.projection, entry.expected.projection, 'Projection preimage')
+    assertGuidanceEqual(remote.guidance, entry.expected.guidance, 'Guidance preimage')
   }
 
   return scopes
@@ -546,15 +862,18 @@ function sqlLiteral(value) {
   throw new Error(`Cannot encode SQL value of type ${typeof value}`)
 }
 
-function casWhereForSession(entry, expectedNoteMd) {
+function casWhereForSession(entry, before) {
   return [
     `sid IS ${sqlLiteral(entry.sid)}`,
     `root IS ${sqlLiteral(entry.expected.root)}`,
+    `record_count IS ${sqlLiteral(entry.expected.recordCount)}`,
     `updated_at IS ${sqlLiteral(entry.expected.updatedAt)}`,
     `visibility IS ${sqlLiteral(entry.expected.visibility)}`,
     `team_id IS ${sqlLiteral(entry.expected.teamId)}`,
     'withdrawn_at IS NULL',
-    `note_md IS ${sqlLiteral(expectedNoteMd)}`,
+    `note_md IS ${sqlLiteral(before.noteMd)}`,
+    `cost_usd IS ${sqlLiteral(before.costUsd)}`,
+    `total_tokens IS ${sqlLiteral(before.totalTokens)}`,
   ].join('\n  AND ')
 }
 
@@ -570,6 +889,7 @@ const projectionColumns = Object.freeze({
   qualityScore: 'quality_score',
   searchText: 'search_text',
   summaryText: 'summary_text',
+  summaryTextZh: 'summary_text_zh',
   title: 'title',
   titleJson: 'title_json',
   toolCallCount: 'tool_call_count',
@@ -596,7 +916,51 @@ function absenceGuard(sid) {
   )
 }
 
-function liveInventoryGuard(mapping, phase) {
+function guidanceMutationSql(sid, before, after) {
+  if (before === null && after === null) {
+    return [
+      `SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM hub_session_guidance WHERE sid IS ${sqlLiteral(
+        sid,
+      )}) THEN 1 ELSE json_extract('spool-cas-guard', '$') END;`,
+    ]
+  }
+  if (before === null) {
+    return [
+      `INSERT INTO hub_session_guidance (sid,root,guidance_json,generated_at)
+SELECT session.sid, session.root, ${sqlLiteral(after.guidanceJson)}, ${sqlLiteral(
+        after.generatedAt,
+      )}
+FROM hub_sessions session
+WHERE session.sid IS ${sqlLiteral(sid)}
+  AND session.root IS ${sqlLiteral(after.root)}
+  AND NOT EXISTS (SELECT 1 FROM hub_session_guidance WHERE sid IS ${sqlLiteral(sid)});`,
+      mutationGuard(),
+    ]
+  }
+  if (after === null) {
+    return [
+      `DELETE FROM hub_session_guidance
+WHERE sid IS ${sqlLiteral(sid)}
+  AND root IS ${sqlLiteral(before.root)}
+  AND guidance_json IS ${sqlLiteral(before.guidanceJson)}
+  AND generated_at IS ${sqlLiteral(before.generatedAt)};`,
+      mutationGuard(),
+    ]
+  }
+  return [
+    `UPDATE hub_session_guidance
+SET root = ${sqlLiteral(after.root)},
+    guidance_json = ${sqlLiteral(after.guidanceJson)},
+    generated_at = ${sqlLiteral(after.generatedAt)}
+WHERE sid IS ${sqlLiteral(sid)}
+  AND root IS ${sqlLiteral(before.root)}
+  AND guidance_json IS ${sqlLiteral(before.guidanceJson)}
+  AND generated_at IS ${sqlLiteral(before.generatedAt)};`,
+    mutationGuard(),
+  ]
+}
+
+function liveInventoryGuard(mapping, phase, guidanceCount) {
   const mappedSids = mapping.sessions.map((entry) => sqlLiteral(entry.sid)).join(', ')
   return [
     `-- Exact live inventory guard (${phase}).`,
@@ -613,6 +977,19 @@ function liveInventoryGuard(mapping, phase) {
     '    JOIN hub_sessions session ON session.sid=projection.sid',
     '    WHERE session.withdrawn_at IS NULL',
     `  ) = ${EXPECTED_PROJECTIONS}`,
+    '  AND (',
+    '    SELECT COUNT(*)',
+    '    FROM hub_session_guidance guidance',
+    '    JOIN hub_sessions session ON session.sid=guidance.sid',
+    '    WHERE session.withdrawn_at IS NULL',
+    `  ) = ${guidanceCount}`,
+    '  AND NOT EXISTS (',
+    '    SELECT 1',
+    '    FROM hub_session_guidance guidance',
+    '    JOIN hub_sessions session ON session.sid=guidance.sid',
+    '    WHERE session.withdrawn_at IS NULL',
+    `      AND guidance.sid NOT IN (${mappedSids})`,
+    '  )',
     "THEN 1 ELSE json_extract('spool-inventory-guard', '$') END;",
   ].join('\n')
 }
@@ -628,22 +1005,53 @@ export function buildMutationSql(mapping, direction, metadata = {}) {
   ]
   if (metadata.mappingSha256) lines.push(`-- mapping-sha256: ${metadata.mappingSha256}`)
   if (metadata.backupSha256) lines.push(`-- backup-sha256: ${metadata.backupSha256}`)
-  lines.push('', liveInventoryGuard(mapping, `before ${direction}`), '')
+  const beforeGuidanceCount = mapping.sessions.filter((entry) =>
+    direction === 'apply' ? entry.expected.guidance !== null : entry.next.guidance !== null,
+  ).length
+  const afterGuidanceCount = mapping.sessions.filter((entry) =>
+    direction === 'apply' ? entry.next.guidance !== null : entry.expected.guidance !== null,
+  ).length
+  lines.push('', liveInventoryGuard(mapping, `before ${direction}`, beforeGuidanceCount), '')
 
   mapping.sessions.forEach((entry, index) => {
-    const beforeNote = direction === 'apply' ? entry.expected.noteMd : entry.next.noteMd
-    const afterNote = direction === 'apply' ? entry.next.noteMd : entry.expected.noteMd
+    const beforeSession =
+      direction === 'apply'
+        ? {
+            costUsd: entry.expected.costUsd,
+            noteMd: entry.expected.noteMd,
+            totalTokens: entry.expected.totalTokens,
+          }
+        : {
+            costUsd: entry.next.cost?.usd ?? null,
+            noteMd: entry.next.noteMd,
+            totalTokens: entry.next.cost?.totalTokens ?? null,
+          }
+    const afterSession =
+      direction === 'apply'
+        ? {
+            costUsd: entry.next.cost?.usd ?? null,
+            noteMd: entry.next.noteMd,
+            totalTokens: entry.next.cost?.totalTokens ?? null,
+          }
+        : {
+            costUsd: entry.expected.costUsd,
+            noteMd: entry.expected.noteMd,
+            totalTokens: entry.expected.totalTokens,
+          }
     const beforeProjection =
       direction === 'apply' ? entry.expected.projection : entry.next.projection
     const afterProjection =
       direction === 'apply' ? entry.next.projection : entry.expected.projection
+    const beforeGuidance = direction === 'apply' ? entry.expected.guidance : entry.next.guidance
+    const afterGuidance = direction === 'apply' ? entry.next.guidance : entry.expected.guidance
 
     lines.push(`-- Session ${index + 1} of ${mapping.sessions.length}`)
     lines.push(
-      `UPDATE hub_sessions\nSET note_md = ${sqlLiteral(afterNote)}\nWHERE ${casWhereForSession(
-        entry,
-        beforeNote,
-      )};`,
+      `UPDATE hub_sessions
+SET note_md = ${sqlLiteral(afterSession.noteMd)},
+    cost_usd = ${sqlLiteral(afterSession.costUsd)},
+    total_tokens = ${sqlLiteral(afterSession.totalTokens)}
+WHERE ${casWhereForSession(entry, beforeSession)};`,
     )
     lines.push(mutationGuard())
 
@@ -657,23 +1065,27 @@ export function buildMutationSql(mapping, direction, metadata = {}) {
         `UPDATE hub_session_discovery\nSET title = ${sqlLiteral(afterProjection.title)},\n` +
           `    title_json = ${sqlLiteral(afterProjection.titleJson)},\n` +
           `    summary_text = ${sqlLiteral(afterProjection.summaryText)},\n` +
+          `    summary_text_zh = ${sqlLiteral(afterProjection.summaryTextZh)},\n` +
           `    search_text = ${sqlLiteral(afterProjection.searchText)},\n` +
-          `    quality_score = ${sqlLiteral(afterProjection.qualityScore)}\n` +
+          `    quality_score = ${sqlLiteral(afterProjection.qualityScore)},\n` +
+          `    cost_usd = ${sqlLiteral(afterProjection.costUsd)},\n` +
+          `    total_tokens = ${sqlLiteral(afterProjection.totalTokens)}\n` +
           `WHERE ${casWhereForProjection(entry.sid, beforeProjection)};`,
       )
       lines.push(mutationGuard())
     }
+    lines.push(...guidanceMutationSql(entry.sid, beforeGuidance, afterGuidance))
     lines.push('')
   })
 
-  lines.push(liveInventoryGuard(mapping, `after ${direction}`), '')
+  lines.push(liveInventoryGuard(mapping, `after ${direction}`, afterGuidanceCount), '')
   return `${lines.join('\n')}\n`
 }
 
-function buildReverseMapping(mapping, metadata) {
+export function buildReverseMapping(mapping, metadata) {
   return {
-    version: 1,
-    kind: 'spool-session-title-backfill-reverse-map',
+    version: 2,
+    kind: 'spool-session-metadata-backfill-reverse-map',
     warning: 'Sensitive production preimages. Keep this file mode 0600.',
     generatedAt: new Date().toISOString(),
     target: { ...TARGET },
@@ -685,7 +1097,11 @@ function buildReverseMapping(mapping, metadata) {
         projection: entry.expected.projection,
       },
       after: {
+        costUsd: entry.next.cost?.usd ?? null,
+        guidance: entry.next.guidance,
+        recordCount: entry.expected.recordCount,
         root: entry.expected.root,
+        totalTokens: entry.next.cost?.totalTokens ?? null,
         updatedAt: entry.expected.updatedAt,
         visibility: entry.expected.visibility,
         teamId: entry.expected.teamId,
@@ -693,8 +1109,23 @@ function buildReverseMapping(mapping, metadata) {
         noteMd: entry.next.noteMd,
         noteSha256: entry.next.noteSha256,
         projection: entry.next.projection,
+        usage: entry.next.usage,
       },
     })),
+  }
+}
+
+export function buildArtifactMetadata({
+  applySha256,
+  backupSha256,
+  mappingSha256,
+  rollbackSha256,
+}) {
+  return {
+    applySha256,
+    ...(backupSha256 ? { backupSha256 } : {}),
+    mappingSha256,
+    rollbackSha256,
   }
 }
 
@@ -702,13 +1133,16 @@ export function verifyPostState(rows, mapping) {
   const scopes = validateFixedCounts(rows)
   const remoteBySid = new Map(rows.map((row) => [row.sid, row]))
   let bilingualTitles = 0
-  let summaries = 0
+  let bilingualSummaries = 0
+  let costs = 0
+  let guidance = 0
   let projections = 0
+  let usage = 0
 
   for (const entry of mapping.sessions) {
     const remote = remoteBySid.get(entry.sid)
     if (!remote) throw new Error('A mapped Session is absent after apply')
-    for (const key of ['root', 'updatedAt', 'visibility', 'teamId', 'withdrawnAt']) {
+    for (const key of ['recordCount', 'root', 'teamId', 'updatedAt', 'visibility', 'withdrawnAt']) {
       if (!scalarEqual(remote[key], entry.expected[key])) {
         throw new Error(`Post-apply Session ${key} changed unexpectedly`)
       }
@@ -725,21 +1159,34 @@ export function verifyPostState(rows, mapping) {
       throw new Error('Post-apply canonical note is missing its bilingual title front matter')
     }
     bilingualTitles += 1
-    if (!entry.next.summaryBodyMd.trim()) {
-      throw new Error('Post-apply canonical note has an empty summary')
+    if (!entry.next.summaries.enMd.trim() || !entry.next.summaries.zhMd.trim()) {
+      throw new Error('Post-apply canonical note has an empty localized summary')
     }
-    summaries += 1
+    bilingualSummaries += 1
+    if (
+      remote.costUsd !== (entry.next.cost?.usd ?? null) ||
+      remote.totalTokens !== (entry.next.cost?.totalTokens ?? null)
+    ) {
+      throw new Error('Post-apply Session usage/cost does not match the reviewed replacement')
+    }
+    if (entry.next.usage !== null) usage += 1
+    if (entry.next.cost !== null) costs += 1
     assertProjectionEqual(remote.projection, entry.next.projection, 'Post-apply projection')
+    assertGuidanceEqual(remote.guidance, entry.next.guidance, 'Post-apply guidance')
+    if (remote.guidance !== null) guidance += 1
     if (remote.projection !== null) projections += 1
   }
 
-  if (bilingualTitles !== EXPECTED_LIVE_SESSIONS || summaries !== EXPECTED_LIVE_SESSIONS) {
+  if (bilingualTitles !== EXPECTED_LIVE_SESSIONS || bilingualSummaries !== EXPECTED_LIVE_SESSIONS) {
     throw new Error('Post-apply title/summary totals are incomplete')
+  }
+  if (guidance !== EXPECTED_LIVE_SESSIONS) {
+    throw new Error('Post-apply guidance total is incomplete')
   }
   if (projections !== EXPECTED_PROJECTIONS) {
     throw new Error('Post-apply projection total is incomplete')
   }
-  return { bilingualTitles, projections, scopes, summaries }
+  return { bilingualSummaries, bilingualTitles, costs, guidance, projections, scopes, usage }
 }
 
 function normalizeRemoteProjection(row) {
@@ -756,6 +1203,7 @@ function normalizeRemoteProjection(row) {
     qualityScore: row.projection_quality_score,
     searchText: row.projection_search_text,
     summaryText: row.projection_summary_text,
+    summaryTextZh: row.projection_summary_text_zh,
     title: row.projection_title,
     titleJson: row.projection_title_json,
     toolCallCount: row.projection_tool_call_count,
@@ -764,14 +1212,27 @@ function normalizeRemoteProjection(row) {
   }
 }
 
+function normalizeRemoteGuidance(row) {
+  if (row.guidance_sid === null) return null
+  return {
+    generatedAt: row.guidance_generated_at,
+    guidanceJson: row.guidance_json,
+    root: row.guidance_root,
+  }
+}
+
 function normalizeRemoteRows(rows) {
   if (!Array.isArray(rows)) throw new Error('Wrangler returned an invalid Session snapshot')
   return rows.map((row) => ({
+    costUsd: row.cost_usd,
+    guidance: normalizeRemoteGuidance(row),
     noteMd: row.note_md,
     projection: normalizeRemoteProjection(row),
+    recordCount: row.record_count,
     root: row.root,
     sid: row.sid,
     teamId: row.team_id,
+    totalTokens: row.total_tokens,
     updatedAt: row.updated_at,
     visibility: row.visibility,
     withdrawnAt: row.withdrawn_at,
@@ -782,16 +1243,20 @@ const remoteSnapshotSql = `
 SELECT
   s.sid,
   s.root,
+  s.record_count,
   s.updated_at,
   s.visibility,
   s.team_id,
   s.withdrawn_at,
   s.note_md,
+  s.cost_usd,
+  s.total_tokens,
   d.sid AS projection_sid,
   d.agent AS projection_agent,
   d.title AS projection_title,
   d.title_json AS projection_title_json,
   d.summary_text AS projection_summary_text,
+  d.summary_text_zh AS projection_summary_text_zh,
   d.search_text AS projection_search_text,
   d.message_count AS projection_message_count,
   d.tool_call_count AS projection_tool_call_count,
@@ -803,9 +1268,14 @@ SELECT
   d.published_at AS projection_published_at,
   d.updated_at AS projection_updated_at,
   d.cost_usd AS projection_cost_usd,
-  d.total_tokens AS projection_total_tokens
+  d.total_tokens AS projection_total_tokens,
+  g.sid AS guidance_sid,
+  g.root AS guidance_root,
+  g.guidance_json,
+  g.generated_at AS guidance_generated_at
 FROM hub_sessions s
 LEFT JOIN hub_session_discovery d ON d.sid = s.sid
+LEFT JOIN hub_session_guidance g ON g.sid = s.sid
 WHERE s.withdrawn_at IS NULL
 ORDER BY s.sid;
 `
@@ -919,7 +1389,7 @@ async function verifyFixedTarget() {
   }
 }
 
-async function readPrivateMapping(mappingPath) {
+export async function readPrivateMapping(mappingPath) {
   if (!isAbsolute(mappingPath)) throw new Error('--mapping must be an absolute path')
   const resolvedPath = await realpath(mappingPath)
   const repositoryRelative = relative(repoRoot, resolvedPath)
@@ -988,6 +1458,25 @@ async function verifyMigration(artifactDir) {
   if (rows.length !== 1 || rows[0]?.name !== TARGET.migration) {
     throw new Error(`Required migration ${TARGET.migration} is not applied exactly once`)
   }
+  const discoveryColumns = await remoteQuery(
+    'PRAGMA table_info(hub_session_discovery);',
+    artifactDir,
+    'discovery-schema-check',
+  )
+  if (!discoveryColumns.some((column) => column.name === 'summary_text_zh')) {
+    throw new Error('Required hub_session_discovery.summary_text_zh column is missing')
+  }
+  const guidanceColumns = await remoteQuery(
+    'PRAGMA table_info(hub_session_guidance);',
+    artifactDir,
+    'guidance-schema-check',
+  )
+  if (
+    JSON.stringify(guidanceColumns.map((column) => column.name)) !==
+    JSON.stringify(['sid', 'root', 'guidance_json', 'generated_at'])
+  ) {
+    throw new Error('Required hub_session_guidance table is missing or malformed')
+  }
 }
 
 async function readRemoteSnapshot(artifactDir, label) {
@@ -995,19 +1484,26 @@ async function readRemoteSnapshot(artifactDir, label) {
   return normalizeRemoteRows(rows)
 }
 
-function logReview({ apply, artifactDir, backup, mappingSha256, scopes, sql }) {
-  console.log(`[session-title-backfill] mode: ${apply ? 'APPLY' : 'dry-run (no writes)'}`)
-  console.log(`[session-title-backfill] mapping sha256: ${mappingSha256}`)
+function logReview({ artifactDir, backup, mapping, mappingSha256, mode, scopes, sql }) {
   console.log(
-    `[session-title-backfill] backup: ${backup.backupSizeBytes} bytes, sha256 ${backup.backupSha256}`,
+    `[session-metadata-backfill] mode: ${mode === 'dry-run' ? 'dry-run (no writes)' : mode.toUpperCase()}`,
   )
+  console.log(`[session-title-backfill] mapping sha256: ${mappingSha256}`)
+  if (backup) {
+    console.log(
+      `[session-title-backfill] backup: ${backup.backupSizeBytes} bytes, sha256 ${backup.backupSha256}`,
+    )
+  } else {
+    console.log('[session-title-backfill] backup: deferred until a mutation mode')
+  }
   console.log(
     `[session-title-backfill] reviewed: ${EXPECTED_LIVE_SESSIONS} live Sessions, ` +
       `${EXPECTED_PROJECTIONS} projections, scopes ${scopes.public}/${scopes.linkOnly}/${scopes.team}`,
   )
   console.log(
-    `[session-title-backfill] planned: ${EXPECTED_LIVE_SESSIONS} canonical notes, ` +
-      `${EXPECTED_LIVE_SESSIONS} bilingual titles, ${EXPECTED_PROJECTIONS} projection updates`,
+    `[session-title-backfill] planned: ${EXPECTED_LIVE_SESSIONS} canonical bilingual notes, ` +
+      `${mapping.sessions.filter((entry) => entry.next.cost !== null).length} usage/cost rows, ` +
+      `${EXPECTED_LIVE_SESSIONS} guidance rows, ${EXPECTED_PROJECTIONS} projection updates`,
   )
   console.log(`[session-title-backfill] apply SQL sha256: ${sql.applySha256}`)
   console.log(`[session-title-backfill] rollback SQL sha256: ${sql.rollbackSha256}`)
@@ -1026,6 +1522,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.umask(0o077)
   await stat(wranglerEntrypoint)
   const { mapping, mappingSha256 } = await readPrivateMapping(options.mappingPath)
+  const expectedCostRows = mapping.sessions.filter((entry) => entry.next.cost !== null).length
   if (options.mappingSha !== null && options.mappingSha !== mappingSha256) {
     throw new Error('--mapping-sha does not match the exact mapping bytes')
   }
@@ -1034,13 +1531,28 @@ export async function main(argv = process.argv.slice(2)) {
   const artifactDir = await mkdtemp(join(tmpdir(), 'spool-session-title-backfill-'))
   await chmod(artifactDir, 0o700)
 
-  const backup = await exportBackup(artifactDir)
   await verifyMigration(artifactDir)
   const beforeRows = await readRemoteSnapshot(artifactDir, 'preflight-snapshot')
-  const scopes = validateSnapshotAgainstMapping(beforeRows, mapping)
+  if (options.mode === 'verify') {
+    const verified = verifyPostState(beforeRows, mapping)
+    console.log(
+      `[session-title-backfill] verify complete: ${verified.bilingualTitles}/9 titles, ` +
+        `${verified.bilingualSummaries}/9 summaries, ${verified.costs}/${expectedCostRows} cost rows, ` +
+        `${verified.guidance}/9 guidance rows, ${verified.projections}/7 projections`,
+    )
+    console.log(`[session-title-backfill] secure diagnostics directory (0700): ${artifactDir}`)
+    return
+  }
+
+  const scopes =
+    options.mode === 'rollback'
+      ? verifyPostState(beforeRows, mapping).scopes
+      : validateSnapshotAgainstMapping(beforeRows, mapping)
+  const mutationMode = options.mode === 'apply' || options.mode === 'rollback'
+  const backup = mutationMode ? await exportBackup(artifactDir) : null
 
   const sqlMetadata = {
-    backupSha256: backup.backupSha256,
+    ...(backup ? { backupSha256: backup.backupSha256 } : {}),
     mappingSha256,
   }
   const applySql = buildMutationSql(mapping, 'apply', sqlMetadata)
@@ -1055,33 +1567,38 @@ export async function main(argv = process.argv.slice(2)) {
   await writeSecureFile(
     reverseMappingPath,
     `${JSON.stringify(
-      buildReverseMapping(mapping, {
-        applySha256,
-        backupSha256: backup.backupSha256,
-        mappingSha256,
-        rollbackSha256,
-      }),
+      buildReverseMapping(
+        mapping,
+        buildArtifactMetadata({
+          applySha256,
+          backupSha256: backup?.backupSha256 ?? null,
+          mappingSha256,
+          rollbackSha256,
+        }),
+      ),
       null,
       2,
     )}\n`,
   )
 
   logReview({
-    apply: options.apply,
     artifactDir,
     backup,
+    mapping,
     mappingSha256,
+    mode: options.mode,
     scopes,
     sql: { applySha256, rollbackSha256 },
   })
 
-  if (!options.apply) {
+  if (options.mode === 'dry-run') {
     console.log(
       '[session-title-backfill] dry-run complete; rerun with --apply and the printed mapping SHA',
     )
     return
   }
 
+  const mutationPath = options.mode === 'rollback' ? rollbackPath : applyPath
   await runWrangler(
     [
       'd1',
@@ -1091,22 +1608,37 @@ export async function main(argv = process.argv.slice(2)) {
       '--config',
       'wrangler.prod.toml',
       '--file',
-      applyPath,
+      mutationPath,
       '--yes',
     ],
-    { sensitiveLogPath: join(artifactDir, 'apply-wrangler-failure.log') },
+    {
+      sensitiveLogPath: join(
+        artifactDir,
+        `${options.mode === 'rollback' ? 'rollback' : 'apply'}-wrangler-failure.log`,
+      ),
+    },
   )
 
-  const afterRows = await readRemoteSnapshot(artifactDir, 'post-apply-snapshot')
-  const verified = verifyPostState(afterRows, mapping)
+  const afterRows = await readRemoteSnapshot(artifactDir, `post-${options.mode}-snapshot`)
+  if (options.mode === 'rollback') {
+    const restoredScopes = validateSnapshotAgainstMapping(afterRows, mapping)
+    console.log(
+      `[session-title-backfill] rollback verified: restored exact mapping preimages; ` +
+        `scopes ${restoredScopes.public}/${restoredScopes.linkOnly}/${restoredScopes.team}`,
+    )
+  } else {
+    const verified = verifyPostState(afterRows, mapping)
+    console.log(
+      `[session-title-backfill] apply verified: ${verified.bilingualTitles}/9 titles, ` +
+        `${verified.bilingualSummaries}/9 summaries, ${verified.costs}/${expectedCostRows} cost rows, ` +
+        `${verified.guidance}/9 guidance rows, ${verified.projections}/7 projections, ` +
+        `scopes ${verified.scopes.public}/${verified.scopes.linkOnly}/${verified.scopes.team}`,
+    )
+  }
   console.log(
-    `[session-title-backfill] apply verified: ${verified.bilingualTitles}/9 bilingual titles, ` +
-      `${verified.summaries}/9 summaries, ${verified.projections}/7 projections, ` +
-      `scopes ${verified.scopes.public}/${verified.scopes.linkOnly}/${verified.scopes.team}`,
-  )
-  console.log(
-    `[session-title-backfill] guarded rollback remains at ${rollbackPath} ` +
-      `(sha256 ${rollbackSha256}); the full export is ${backup.backupPath}`,
+    `[session-title-backfill] guarded reverse SQL remains at ${
+      options.mode === 'rollback' ? applyPath : rollbackPath
+    }; the full pre-mutation export is ${backup.backupPath}`,
   )
 }
 

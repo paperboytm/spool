@@ -53,7 +53,7 @@ describe('loadSessionContent', () => {
     expect(makeRangeFetcher).not.toHaveBeenCalled()
   })
 
-  it('downloads the raw record fallback only after an attached spool document is rejected', async () => {
+  it('never exposes raw records when an attached spool document is rejected', async () => {
     const calls: string[] = []
     const fetchRange: RangeFetcher = vi.fn(async (from, to) => {
       calls.push(`records:${from}-${to}`)
@@ -75,17 +75,12 @@ describe('loadSessionContent', () => {
         }),
         makeRangeFetcher: vi.fn(() => fetchRange),
       },
-      {
-        onRecordProgress: (loaded, total) => progress.push([loaded, total]),
-      },
+      { onRecordProgress: (loaded, total) => progress.push([loaded, total]) },
     )
 
-    expect(calls.indexOf('spool-invalid')).toBeLessThan(calls.indexOf('records:0-2'))
-    expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })
-    expect(progress).toEqual([
-      [0, 2],
-      [2, 2],
-    ])
+    expect(calls).toEqual(['view', 'spool-invalid'])
+    expect(result).toEqual({ view, spoolDocument: null, records: [] })
+    expect(progress).toEqual([])
   })
 
   it('skips the spool request and immediately uses raw records for legacy shares', async () => {
@@ -109,25 +104,21 @@ describe('loadSessionContent', () => {
     expect(result?.records).toEqual([record(0), record(1)])
   })
 
-  it('uses the exact raw-record view for record-addressed deep links', async () => {
+  it('keeps an attached publication authoritative for record-addressed links', async () => {
     const fetchSpoolFile = vi.fn(async () => spoolDocument)
     const fetchRange = vi.fn<RangeFetcher>(async (from, to) =>
       Array.from({ length: to - from }, (_, offset) => record(from + offset)),
     )
 
-    const result = await loadSessionContent(
-      meta.sid,
-      meta,
-      {
-        fetchView: vi.fn(async () => view),
-        fetchSpoolFile,
-        makeRangeFetcher: vi.fn(() => fetchRange),
-      },
-      { preferRawRecords: true },
-    )
+    const result = await loadSessionContent(meta.sid, meta, {
+      fetchView: vi.fn(async () => view),
+      fetchSpoolFile,
+      makeRangeFetcher: vi.fn(() => fetchRange),
+    })
 
-    expect(fetchSpoolFile).not.toHaveBeenCalled()
-    expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })
+    expect(fetchSpoolFile).toHaveBeenCalledOnce()
+    expect(fetchRange).not.toHaveBeenCalled()
+    expect(result).toEqual({ view, spoolDocument, records: [] })
   })
 
   it('loads a 2,726-record legacy session in small monotonic pages', async () => {

@@ -1,8 +1,13 @@
 import { composeSessionDiff } from './diff.js'
 import { extractEditEvents } from './edits.js'
-import { PORTABLE_MESSAGE_TYPE } from './messages.js'
+import {
+  extractClaudeContentText,
+  isClaudeSyntheticUserText,
+  PORTABLE_MESSAGE_TYPE,
+} from './messages.js'
 import type {
   EditEvent,
+  SessionGuidanceV1,
   SessionProvider,
   SessionRecord,
   SessionRecordsOptions,
@@ -25,6 +30,9 @@ interface RecordDetails {
 const EXCERPT_BYTES = 4 * 1024
 const VIEW_BYTES = 8 * 1024 * 1024
 const textEncoder = new TextEncoder()
+export const MAX_SESSION_GUIDANCE_BYTES = 128 * 1024
+export const MAX_SESSION_GUIDANCE_TURNS = 2_048
+export const MAX_SESSION_GUIDANCE_REPLY_RECORDS = 8_192
 
 export function deriveView(
   provider: SessionProvider,
@@ -80,6 +88,8 @@ export function deriveView(
 
   const diff = composeSessionDiff(editEvents)
   const usage = deriveUsage(provider, parsed)
+  const derivedGuidance = deriveGuidance(provider, records, parsed)
+  const guidance = guidanceFitsProjection(derivedGuidance) ? derivedGuidance : undefined
   const view: SessionViewV1 = {
     v: 1,
     index,
@@ -94,12 +104,27 @@ export function deriveView(
     lastReply,
     diffstat: diff.diffstat,
     ...(usage === undefined ? {} : { usage }),
+    ...(guidance === undefined ? {} : { guidance }),
   }
 
   if (textEncoder.encode(JSON.stringify(view)).byteLength > VIEW_BYTES) {
     throw new RangeError('Derived view exceeds the 8 MB wire limit')
   }
   return view
+}
+
+/** Guidance accelerates a reading mode but is not canonical Session data.
+ * Omit it when the bounded D1 projection would be too large so an otherwise
+ * valid long Session remains shareable. */
+export function guidanceFitsProjection(guidance: SessionGuidanceV1): boolean {
+  if (guidance.turns.length > MAX_SESSION_GUIDANCE_TURNS) return false
+
+  let replyRecords = 0
+  for (const turn of guidance.turns) {
+    replyRecords += turn.replyRecords.length
+    if (replyRecords > MAX_SESSION_GUIDANCE_REPLY_RECORDS) return false
+  }
+  return textEncoder.encode(JSON.stringify(guidance)).byteLength <= MAX_SESSION_GUIDANCE_BYTES
 }
 
 function normalizeArguments(
@@ -137,6 +162,18 @@ function parseRecord(record: SessionRecord): UnknownRecord | null {
   }
 }
 
+/**
+ * Extracts the human-visible prompt or agent prose from one sparse record.
+ * This deliberately parses the record in isolation, so portable records do
+ * not require their Session header to be present in the same fetch.
+ */
+export function extractGuidanceRecord(
+  provider: SessionProvider,
+  record: SessionRecord,
+): { role: 'user' | 'assistant'; text: string } | null {
+  return extractGuidanceVisibleRecord(provider, parseRecord(record))
+}
+
 function classifyRecord(
   provider: SessionProvider,
   record: UnknownRecord | null,
@@ -156,6 +193,151 @@ function classifyRecord(
     return { ...details, kind: 'edit', ...(tool === undefined ? {} : { tool }) }
   }
   return details
+}
+
+interface GuidanceRecordDetails {
+  opensTurn: boolean
+  replyText?: string
+  toolCalls: number
+}
+
+interface MutableGuidanceTurn {
+  promptRecord: number
+  replyRecords: number[]
+  replyChars: number
+  toolCalls: number
+}
+
+function deriveGuidance(
+  provider: SessionProvider,
+  records: readonly SessionRecord[],
+  parsed: readonly (UnknownRecord | null)[],
+): SessionGuidanceV1 {
+  const turns: MutableGuidanceTurn[] = []
+  let current: MutableGuidanceTurn | null = null
+
+  for (let position = 0; position < records.length; position += 1) {
+    const raw = records[position] as SessionRecord
+    const recordIndex = typeof raw !== 'string' && 'i' in raw ? raw.i : position
+    const record = parsed[position] ?? null
+    const details = classifyGuidanceRecord(provider, record)
+
+    if (details.opensTurn) {
+      if (current !== null) turns.push(current)
+      current = { promptRecord: recordIndex, replyRecords: [], replyChars: 0, toolCalls: 0 }
+      continue
+    }
+    if (current === null) continue
+
+    current.toolCalls += details.toolCalls
+    const replyText = details.replyText?.trim() ?? ''
+    if (!replyText) continue
+    current.replyRecords.push(recordIndex)
+    current.replyChars += unicodeCodePointLength(replyText)
+  }
+
+  if (current !== null) turns.push(current)
+  return { v: 1, turns }
+}
+
+function classifyGuidanceRecord(
+  provider: SessionProvider,
+  record: UnknownRecord | null,
+): GuidanceRecordDetails {
+  if (!record) return { opensTurn: false, toolCalls: 0 }
+  const visible = extractGuidanceVisibleRecord(provider, record)
+  return {
+    opensTurn: visible?.role === 'user',
+    toolCalls: countGuidanceToolCalls(provider, record),
+    ...(visible?.role === 'assistant' ? { replyText: visible.text } : {}),
+  }
+}
+
+function extractGuidanceVisibleRecord(
+  provider: SessionProvider,
+  record: UnknownRecord | null,
+): { role: 'user' | 'assistant'; text: string } | null {
+  if (!record) return null
+  if (record['type'] === PORTABLE_MESSAGE_TYPE) return extractPortableGuidanceRecord(record)
+  if (provider === 'claude') return extractClaudeGuidanceRecord(record)
+  if (provider === 'codex') return extractCodexGuidanceRecord(record)
+  return null
+}
+
+function extractPortableGuidanceRecord(
+  record: UnknownRecord,
+): { role: 'user' | 'assistant'; text: string } | null {
+  if (record['isSidechain'] === true) return null
+  const message = objectAt(record, 'message')
+  const role = stringAt(message, 'role')
+  const text = (stringAt(message, 'content') ?? '').trim()
+  if ((role !== 'user' && role !== 'assistant') || !text) return null
+  return { role, text }
+}
+
+function extractClaudeGuidanceRecord(
+  record: UnknownRecord,
+): { role: 'user' | 'assistant'; text: string } | null {
+  if (record['isSidechain'] === true) return null
+  if (record['isMeta'] === true) return null
+  const message = objectAt(record, 'message')
+  const role = stringAt(message, 'role')
+  const content = message?.['content']
+  const items = Array.isArray(content) ? content.filter(isObject) : []
+  if (role === 'user' && items.some((item) => item['type'] === 'tool_result')) return null
+  const text = extractClaudeContentText(content)
+  if (role === 'user' && isClaudeSyntheticUserText(text)) return null
+  if ((role !== 'user' && role !== 'assistant') || !text) return null
+  return { role, text }
+}
+
+function extractCodexGuidanceRecord(
+  record: UnknownRecord,
+): { role: 'user' | 'assistant'; text: string } | null {
+  const payload = objectAt(record, 'payload')
+  if (!payload || record['type'] !== 'event_msg') return null
+  const outerType = stringAt(record, 'type')
+  const payloadType = stringAt(payload, 'type')
+
+  // event_msg is Codex's concise, human-visible stream. response_item message
+  // records repeat the same prose and are intentionally excluded.
+  if (outerType === 'event_msg' && payloadType === 'user_message') {
+    const text = (stringAt(payload, 'message') ?? '').trim()
+    return text ? { role: 'user', text } : null
+  }
+  if (outerType === 'event_msg' && payloadType === 'agent_message') {
+    const text = (stringAt(payload, 'message') ?? '').trim()
+    return text ? { role: 'assistant', text } : null
+  }
+  return null
+}
+
+function countGuidanceToolCalls(provider: SessionProvider, record: UnknownRecord): number {
+  if (record['type'] === PORTABLE_MESSAGE_TYPE) {
+    if (record['isSidechain'] === true) return 0
+    const names = objectAt(record, 'message')?.['toolNames']
+    return Array.isArray(names)
+      ? names.filter((name): name is string => typeof name === 'string' && name.length > 0).length
+      : 0
+  }
+  if (provider === 'claude') {
+    if (record['isSidechain'] === true) return 0
+    const content = objectAt(record, 'message')?.['content']
+    return Array.isArray(content)
+      ? content.filter(isObject).filter((item) => item['type'] === 'tool_use').length
+      : 0
+  }
+  if (provider === 'codex' && record['type'] === 'response_item') {
+    const payloadType = stringAt(objectAt(record, 'payload'), 'type')
+    return isCodexToolCallType(payloadType) ? 1 : 0
+  }
+  return 0
+}
+
+function unicodeCodePointLength(value: string): number {
+  let length = 0
+  for (const _codePoint of value) length += 1
+  return length
 }
 
 function classifyPortable(record: UnknownRecord): RecordDetails {
@@ -221,13 +403,13 @@ function classifyCodex(record: UnknownRecord): RecordDetails {
     const text = stringAt(payload, 'message')
     return { kind: 'assistant', messageRole: 'assistant', ...(text ? { text } : {}) }
   }
-  if (payloadType === 'custom_tool_call' || payloadType === 'function_call') {
+  if (isCodexToolCallType(payloadType)) {
     const tool = stringAt(payload, 'name')
     return { kind: 'tool', ...(tool === undefined ? {} : { tool }) }
   }
   if (
-    payloadType === 'custom_tool_call_output' ||
-    payloadType === 'function_call_output' ||
+    payloadType?.endsWith('_call_output') ||
+    payloadType === 'tool_search_output' ||
     payloadType === 'patch_apply_end'
   )
     return { kind: 'tool' }
@@ -239,6 +421,10 @@ function classifyCodex(record: UnknownRecord): RecordDetails {
     return { kind: 'assistant', messageRole: 'assistant', ...(text ? { text } : {}) }
   }
   return { kind: 'other' }
+}
+
+function isCodexToolCallType(value: string | undefined): boolean {
+  return value?.endsWith('_call') === true
 }
 
 function claudeText(content: unknown): string {

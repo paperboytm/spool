@@ -8,6 +8,10 @@ const item: DiscoverySessionItem = {
   sid: 'claude_abc12345',
   title: 'Prevent refresh-token races across browser tabs',
   summaryExcerpt: 'Implemented a single-flight refresh path and replay protection.',
+  summaryExcerpts: {
+    en: 'Implemented a single-flight refresh path and replay protection.',
+    zh: '通过单飞刷新和重放保护修复跨标签页令牌竞态。',
+  },
   agent: 'claude',
   author: {
     handle: 'maya',
@@ -25,6 +29,7 @@ const item: DiscoverySessionItem = {
   lineage: { sourceSid: 'codex_source123' },
   titles: { en: 'Prevent refresh-token races across browser tabs', zh: '修复跨标签页刷新令牌竞态' },
   cost: { usd: 1.87, totalTokens: 2_400_000 },
+  starCount: 12,
   publishedAt: Date.now() - 120_000,
   updatedAt: Date.now() - 120_000,
 }
@@ -40,7 +45,8 @@ describe('DiscoveryRow', () => {
     expect(html).toContain('Claude Code')
     expect(html).toContain('42 messages')
     expect(html).toContain('18 tools')
-    expect(html).toContain('7 files')
+    expect(html).not.toContain('7 files')
+    expect(html).toContain('12 stars')
     expect(html).toContain('+214')
     expect(html).toContain('−63')
     expect(html).toContain('/session/codex_source123')
@@ -50,6 +56,14 @@ describe('DiscoveryRow', () => {
     expect(html).toContain('$1.87 · 2.4M tokens')
     expect(html).toContain('Prevent refresh-token races across browser tabs')
     expect(html).not.toContain('修复跨标签页刷新令牌竞态')
+  })
+
+  it('renders a stable zero-star fallback during a rolling backend upgrade', () => {
+    const { starCount: _, ...legacyItem } = item
+    const html = renderToStaticMarkup(<DiscoveryRow item={legacyItem} />)
+
+    expect(html).toContain('0 stars')
+    expect(html).not.toContain('NaN')
   })
 })
 

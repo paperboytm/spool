@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test'
 
-import { formatSessionCost, pickLocalizedTitle } from './session-title'
+import { formatSessionCost, pickLocalizedSummary, pickLocalizedTitle } from './session-title'
 
 const TITLES = { en: 'Fix refresh-token race across tabs', zh: '修复跨标签页刷新令牌竞态' }
 
@@ -34,5 +34,25 @@ describe('formatSessionCost', () => {
     expect(formatSessionCost(null)).toBeNull()
     expect(formatSessionCost(undefined)).toBeNull()
     expect(formatSessionCost({ usd: 3, totalTokens: 0 })).toBeNull()
+  })
+})
+
+describe('pickLocalizedSummary', () => {
+  const summaries = {
+    en: 'Background and outcome in English.',
+    zh: '中文背景、动机和结果。',
+  }
+
+  it('keeps titles and summaries on the same browser locale', () => {
+    expect(pickLocalizedSummary(summaries, 'legacy', 'zh-CN')).toBe('中文背景、动机和结果。')
+    expect(pickLocalizedSummary(summaries, 'legacy', 'en-US')).toBe(
+      'Background and outcome in English.',
+    )
+  })
+
+  it('falls back across locales, then to a legacy body', () => {
+    expect(pickLocalizedSummary({ en: 'English only' }, 'legacy', 'zh-TW')).toBe('English only')
+    expect(pickLocalizedSummary(null, 'legacy', 'zh-CN')).toBe('legacy')
+    expect(pickLocalizedSummary(null, null, 'en')).toBeNull()
   })
 })
