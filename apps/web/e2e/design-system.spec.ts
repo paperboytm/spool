@@ -96,6 +96,8 @@ const publicSessions = [
     title: 'Unify the Sessions workspace',
     summaryExcerpt:
       'Aligned Public, Team, and Mine around one readable Session feed and one information hierarchy.',
+    cost: { usd: 1.25, totalTokens: 800_000 },
+    starCount: 3,
     agent: 'codex',
     author: {
       handle: 'example-owner',
@@ -120,6 +122,9 @@ const personalSession = {
   sid: 'codex_22222222-2222-4222-8222-222222222222',
   title: 'Audit the release pipeline',
   summary: 'Verified the release train and documented the production checks.',
+  summaries: null,
+  cost: { usd: 0.84, totalTokens: 520_000 },
+  star_count: 2,
   provider: 'codex',
   created_at: Date.UTC(2026, 6, 23, 8),
   updated_at: Date.UTC(2026, 6, 24, 9),
@@ -138,6 +143,9 @@ const teamSession = {
   sid: 'claude_33333333-3333-4333-8333-333333333333',
   title: 'Plan the Paperboy launch',
   summary: 'Turned the launch requirements into a staged, reviewable rollout.',
+  summaries: null,
+  cost: { usd: 2.15, totalTokens: 1_100_000 },
+  star_count: 0,
   provider: 'claude',
   created_at: Date.UTC(2026, 6, 22, 8),
   updated_at: Date.UTC(2026, 6, 24, 8),

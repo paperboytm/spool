@@ -2,6 +2,7 @@ import type { D1Database, D1PreparedStatement, R2Bucket } from '@cloudflare/work
 import {
   costForUsage,
   isDiscoverySessionProvider,
+  isSessionGuidanceV1,
   parseSummaryFrontMatter,
   type SessionProvider,
   type SessionViewV1,
@@ -20,6 +21,7 @@ const MODEL_ID_RE = /^[^\s\u0000-\u001f\u007f]+$/u
 const MAX_TITLE_CHARS = 200
 const MAX_SUMMARY_CHARS = 4_000
 const MAX_SEARCH_BYTES = 16 * 1024
+const MAX_SEARCH_SUMMARY_BYTES_PER_LOCALE = 6 * 1024
 const encoder = new TextEncoder()
 
 export type DiscoveryProjection = {
@@ -30,6 +32,7 @@ export type DiscoveryProjection = {
   costUsd: number | null
   totalTokens: number | null
   summaryText: string | null
+  summaryTextZh: string | null
   searchText: string
   messageCount: number
   toolCallCount: number
@@ -93,9 +96,20 @@ export function buildDiscoveryProjection(args: {
   // The summary is stored verbatim (front-matter included) so shares
   // round-trip losslessly; the projection is where titles split out and the
   // plain-text body feeds excerpts and search.
-  const { titles, body: summaryBody } = parseSummaryFrontMatter(args.summaryMd)
-  const summaryTextValue = markdownToPlainText(summaryBody)
+  const { titles, summaries, body: summaryBody } = parseSummaryFrontMatter(args.summaryMd)
+  const summaryEnMarkdown = withoutRepeatedTitleHeading(
+    summaries?.en ?? summaryBody,
+    titles?.en ?? null,
+  )
+  const summaryZhMarkdown = summaries?.zh
+    ? withoutRepeatedTitleHeading(summaries.zh, titles?.zh ?? null)
+    : ''
+  const summaryTextValue = markdownToPlainText(summaryEnMarkdown)
   const summaryText = summaryTextValue ? boundCharacters(summaryTextValue, MAX_SUMMARY_CHARS) : null
+  const summaryTextZhValue = summaryZhMarkdown ? markdownToPlainText(summaryZhMarkdown) : ''
+  const summaryTextZh = summaryTextZhValue
+    ? boundCharacters(summaryTextZhValue, MAX_SUMMARY_CHARS)
+    : null
   const frontMatterTitle = titles?.en ?? titles?.zh ?? ''
   const promptTitle = firstNonEmptyLine(args.view.firstPrompt)
   const summaryTitle = firstMeaningfulSummaryLine(summaryBody)
@@ -121,7 +135,8 @@ export function buildDiscoveryProjection(args: {
   const searchText = boundedSearchText([
     title,
     titles?.zh ?? '',
-    summaryText ?? '',
+    truncateUtf8(summaryText ?? '', MAX_SEARCH_SUMMARY_BYTES_PER_LOCALE),
+    truncateUtf8(summaryTextZh ?? '', MAX_SEARCH_SUMMARY_BYTES_PER_LOCALE),
     args.view.firstPrompt,
     args.view.lastReply,
     ...args.view.files.map((file) => file.path),
@@ -136,6 +151,7 @@ export function buildDiscoveryProjection(args: {
     costUsd: cost ? cost.usd : null,
     totalTokens: cost ? cost.totalTokens : null,
     summaryText,
+    summaryTextZh,
     searchText,
     messageCount,
     toolCallCount,
@@ -157,15 +173,16 @@ export function prepareDiscoveryProjectionUpsert(
     .prepare(
       '/* discovery:upsert-projection */ ' +
         'INSERT INTO hub_session_discovery ' +
-        '(sid, agent, title, summary_text, search_text, message_count, tool_call_count, file_count, additions, deletions, lineage_source_sid, quality_score, published_at, updated_at, title_json, cost_usd, total_tokens) ' +
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
-        'ON CONFLICT(sid) DO UPDATE SET agent=excluded.agent, title=excluded.title, summary_text=excluded.summary_text, search_text=excluded.search_text, message_count=excluded.message_count, tool_call_count=excluded.tool_call_count, file_count=excluded.file_count, additions=excluded.additions, deletions=excluded.deletions, lineage_source_sid=excluded.lineage_source_sid, quality_score=excluded.quality_score, updated_at=excluded.updated_at, title_json=excluded.title_json, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens',
+        '(sid, agent, title, summary_text, summary_text_zh, search_text, message_count, tool_call_count, file_count, additions, deletions, lineage_source_sid, quality_score, published_at, updated_at, title_json, cost_usd, total_tokens) ' +
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+        'ON CONFLICT(sid) DO UPDATE SET agent=excluded.agent, title=excluded.title, summary_text=excluded.summary_text, summary_text_zh=excluded.summary_text_zh, search_text=excluded.search_text, message_count=excluded.message_count, tool_call_count=excluded.tool_call_count, file_count=excluded.file_count, additions=excluded.additions, deletions=excluded.deletions, lineage_source_sid=excluded.lineage_source_sid, quality_score=excluded.quality_score, updated_at=excluded.updated_at, title_json=excluded.title_json, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens',
     )
     .bind(
       projection.sid,
       projection.agent,
       projection.title,
       projection.summaryText,
+      projection.summaryTextZh,
       projection.searchText,
       projection.messageCount,
       projection.toolCallCount,
@@ -254,16 +271,17 @@ export function prepareAuthorizedDiscoveryProjectionUpsert(
     .prepare(
       `/* discovery:authorized-upsert-projection */
        INSERT INTO hub_session_discovery
-         (sid, agent, title, summary_text, search_text, message_count,
+         (sid, agent, title, summary_text, summary_text_zh, search_text, message_count,
           tool_call_count, file_count, additions, deletions,
           lineage_source_sid, quality_score, published_at, updated_at,
           title_json, cost_usd, total_tokens)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
        WHERE ${AUTHORIZED_SESSION_PROJECTION_GATE}
        ON CONFLICT(sid) DO UPDATE SET
          agent=excluded.agent,
          title=excluded.title,
          summary_text=excluded.summary_text,
+         summary_text_zh=excluded.summary_text_zh,
          search_text=excluded.search_text,
          message_count=excluded.message_count,
          tool_call_count=excluded.tool_call_count,
@@ -282,6 +300,7 @@ export function prepareAuthorizedDiscoveryProjectionUpsert(
       projection.agent,
       projection.title,
       projection.summaryText,
+      projection.summaryTextZh,
       projection.searchText,
       projection.messageCount,
       projection.toolCallCount,
@@ -427,6 +446,17 @@ function firstMeaningfulSummaryLine(markdown: string | null): string {
   return ''
 }
 
+function withoutRepeatedTitleHeading(markdown: string, title: string | null): string {
+  if (!title) return markdown
+  const lines = markdown.split(/\r?\n/)
+  const firstContent = lines.findIndex((line) => line.trim() !== '')
+  if (firstContent < 0 || !/^\s{0,3}#\s+/.test(lines[firstContent]!)) return markdown
+  if (markdownToPlainText(lines[firstContent]!) !== collapseWhitespace(title)) return markdown
+  lines.splice(firstContent, 1)
+  while (lines[firstContent]?.trim() === '') lines.splice(firstContent, 1)
+  return lines.join('\n')
+}
+
 function isGenericSummaryHeading(value: string): boolean {
   return [
     'summary',
@@ -519,6 +549,7 @@ function isSessionViewV1(value: unknown): value is SessionViewV1 {
   if (!value['files'].every(isViewFileEntry)) return false
   if (!value['outline'].every(isViewOutlineEntry)) return false
   if (value['usage'] !== undefined && !isSessionUsageV1(value['usage'])) return false
+  if (value['guidance'] !== undefined && !isSessionGuidanceV1(value['guidance'])) return false
   return isDiffstat(value['diffstat'])
 }
 

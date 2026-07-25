@@ -21,7 +21,14 @@ export {
 } from './spool-prelude.js'
 export { sequenceRoot, chainRoots } from './sequence.js'
 export { extractEditEvents } from './edits.js'
-export { deriveView } from './view.js'
+export {
+  deriveView,
+  extractGuidanceRecord,
+  guidanceFitsProjection,
+  MAX_SESSION_GUIDANCE_BYTES,
+  MAX_SESSION_GUIDANCE_REPLY_RECORDS,
+  MAX_SESSION_GUIDANCE_TURNS,
+} from './view.js'
 export { composeSessionDiff } from './diff.js'
 
 export type {
@@ -51,6 +58,8 @@ export type {
   JsonValue,
   SessionDiff,
   SessionFileDiff,
+  SessionGuidanceTurnV1,
+  SessionGuidanceV1,
   SessionProvider,
   ResumableSessionProvider,
   SessionRecord,
@@ -73,10 +82,11 @@ export {
   isDiscoverySessionProvider,
   isDiscoverySessionSid,
   isResumableSessionProvider,
+  isSessionGuidanceV1,
   isSessionProvider,
 } from './types.js'
 
 export { parseSummaryFrontMatter } from './summary.js'
-export type { ParsedSummary, SessionTitles } from './summary.js'
+export type { ParsedSummary, SessionSummaries, SessionTitles } from './summary.js'
 export { costForUsage, MODEL_PRICING } from './pricing.js'
 export type { ModelPricing, SessionCost } from './pricing.js'

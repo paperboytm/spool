@@ -15,6 +15,36 @@ describe('parseSummaryFrontMatter', () => {
     })
     expect(parsed.body.startsWith('# Fix daemon reconnect loop')).toBe(true)
     expect(parsed.body).not.toContain('---')
+    expect(parsed.summaries).toBeNull()
+  })
+
+  it('parses bilingual Markdown bodies and keeps English as the compatibility body', () => {
+    const parsed = parseSummaryFrontMatter(
+      [
+        '---',
+        'title: Explain React Vapor and build the compiler runtime',
+        'title_zh: 解释 React Vapor 并构建编译器运行时',
+        '---',
+        '',
+        '<!-- spool:summary:en -->',
+        '# Build React Vapor support',
+        '',
+        'React Vapor reduces runtime reconciliation work.',
+        '<!-- /spool:summary -->',
+        '',
+        '<!-- spool:summary:zh -->',
+        '# 构建 React Vapor 支持',
+        '',
+        'React Vapor 通过编译降低运行时协调开销。',
+        '<!-- /spool:summary -->',
+      ].join('\n'),
+    )
+
+    expect(parsed.summaries).toEqual({
+      en: '# Build React Vapor support\n\nReact Vapor reduces runtime reconciliation work.',
+      zh: '# 构建 React Vapor 支持\n\nReact Vapor 通过编译降低运行时协调开销。',
+    })
+    expect(parsed.body).toBe(parsed.summaries?.en)
   })
 
   it('treats summaries without a leading block as plain bodies', () => {
@@ -26,9 +56,15 @@ describe('parseSummaryFrontMatter', () => {
     ]) {
       const parsed = parseSummaryFrontMatter(source)
       expect(parsed.titles).toBeNull()
+      expect(parsed.summaries).toBeNull()
       expect(parsed.body).toBe(source)
     }
-    expect(parseSummaryFrontMatter(null)).toEqual({ titles: null, body: '' })
+    expect(parseSummaryFrontMatter(null)).toEqual({
+      titles: null,
+      summaries: null,
+      body: '',
+      titleOverflow: false,
+    })
   })
 
   it('ignores unknown keys, unquotes, and single-lines title values', () => {
@@ -36,18 +72,37 @@ describe('parseSummaryFrontMatter', () => {
       '---\r\ntitle: "Ship the  thing"\r\nauthor: someone\r\ntitle_zh:   完成任务  \r\n---\r\nBody',
     )
     expect(parsed.titles).toEqual({ en: 'Ship the thing', zh: '完成任务' })
+    expect(parsed.summaries).toBeNull()
     expect(parsed.body).toBe('Body')
   })
 
   it('bounds stored titles to the 96-character design contract', () => {
     const parsed = parseSummaryFrontMatter(`---\ntitle: ${'a'.repeat(120)}\n---\nBody`)
     expect(parsed.titles?.en).toBe('a'.repeat(96))
+    expect(parsed.titleOverflow).toBe(true)
+  })
+
+  it('does not apply title limits to ignored front-matter keys', () => {
+    const parsed = parseSummaryFrontMatter(
+      `---\nauthor: ${'a'.repeat(120)}\ntitle: Short outcome\n---\nBody`,
+    )
+    expect(parsed.titles?.en).toBe('Short outcome')
+    expect(parsed.titleOverflow).toBe(false)
   })
 
   it('yields null titles when the block has no usable title keys', () => {
     const parsed = parseSummaryFrontMatter('---\nauthor: x\n---\nBody')
     expect(parsed.titles).toBeNull()
+    expect(parsed.summaries).toBeNull()
     expect(parsed.body).toBe('Body')
+  })
+
+  it('falls back to the full body when localized delimiters are malformed', () => {
+    const source =
+      '<!-- spool:summary:en -->\nEnglish without an end\n<!-- spool:summary:zh -->\n中文'
+    const parsed = parseSummaryFrontMatter(source)
+    expect(parsed.summaries).toBeNull()
+    expect(parsed.body).toBe(source)
   })
 })
 

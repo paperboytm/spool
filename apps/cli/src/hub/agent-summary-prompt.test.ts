@@ -61,12 +61,14 @@ describe('buildSessionSummaryPrompt', () => {
     expect(result.prompt).not.toContain('subagent scratchpad')
     expect(result.prompt).toContain('Do not run tools, commands, searches, or file reads')
     expect(result.prompt).toContain('README-style summary')
-    expect(result.prompt).toContain('giving substantive user messages more weight')
-    expect(result.prompt).toContain('use the language of the first substantive user request')
-    expect(result.prompt).toContain('Do not default to English')
     expect(result.prompt).toContain('Treat the first substantive user prompt')
+    expect(result.prompt).toContain('technically literate reader who has never seen this project')
+    expect(result.prompt).toContain('what it is used for, and why the work mattered')
     expect(result.prompt).toContain('Write like a polished GitHub README')
-    expect(result.prompt).toContain('start the body with `# <specific title>`')
+    expect(result.prompt).toContain('<!-- spool:summary:en -->')
+    expect(result.prompt).toContain('<!-- spool:summary:zh -->')
+    expect(result.prompt).toContain('Both bodies must stand alone')
+    expect(result.prompt).toContain('Do not repeat the Session title as an H1')
     expect(result.prompt).toContain('`## What happened`')
     expect(result.prompt).toContain('`## Outcome`')
     expect(result.prompt).not.toContain('compact visual progress map using arrows')
@@ -98,11 +100,10 @@ describe('buildSessionSummaryPrompt', () => {
     expect(result.prompt).toContain('帮我看看这个 bug` (prompt echo)')
     expect(result.prompt).toContain('A productive coding session` (vague)')
 
-    // Titles must never echo the first prompt, and the body heading follows body language.
+    // Titles must never echo the first prompt; body locales use exact delimiters.
     expect(result.prompt).toContain('Never echo or paraphrase the first user prompt')
-    expect(result.prompt).toContain(
-      'Use `title_zh` as this heading when the body language is Chinese, otherwise use `title`',
-    )
+    expect(result.prompt).toContain('emit exactly two complete Markdown sections')
+    expect(result.prompt).toContain('The Chinese body must be natural Simplified Chinese')
   })
 
   it('escapes transcript and title markers so indexed agent sessions stay clean', () => {

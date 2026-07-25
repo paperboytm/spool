@@ -17,6 +17,9 @@ const session: ManagedSession = {
   title: 'Ship Team workspaces',
   titles: null,
   summary: 'Implemented tenant-scoped Sessions.',
+  summaries: null,
+  cost: { usd: 1.25, totalTokens: 800_000 },
+  star_count: 3,
   provider: 'codex',
   created_at: 1,
   updated_at: 2,
@@ -45,6 +48,8 @@ describe('ManagedSessionList', () => {
     expect(html).toContain('session-feed-row')
     expect(html).toContain('@alice')
     expect(html).toContain('Codex CLI')
+    expect(html).toContain('$1.25 · 800K tokens')
+    expect(html).toContain('3 stars')
     expect(html).toContain('Public')
     expect(html).toContain('Manage Ship Team workspaces')
     expect(html).not.toContain('<select')
@@ -68,6 +73,11 @@ describe('ManagedSessionList', () => {
                 en: 'Ship Team workspaces',
                 zh: '交付团队工作区',
               },
+              summary: 'Legacy fallback Summary.',
+              summaries: {
+                en: 'English background, motivation, and result.',
+                zh: '中文背景、动机和结果。',
+              },
             },
           ]}
           teams={[]}
@@ -80,12 +90,36 @@ describe('ManagedSessionList', () => {
       // Server rendering intentionally stays English for hydration safety;
       // the browser reconciles through useSyncExternalStore after hydration.
       expect(html).toContain('Ship Team workspaces')
+      expect(html).toContain('English background, motivation, and result.')
+      expect(html).not.toContain('Legacy fallback Summary.')
     } finally {
       Object.defineProperty(globalThis, 'navigator', {
         configurable: true,
         value: previous,
       })
     }
+  })
+
+  it('renders legacy managed responses safely during a rolling backend upgrade', () => {
+    const {
+      titles: _titles,
+      summaries: _summaries,
+      cost: _cost,
+      star_count: _starCount,
+      ...legacySession
+    } = session
+    const html = renderToStaticMarkup(
+      <ManagedSessionList
+        sessions={[legacySession]}
+        teams={[]}
+        canManageVisibility
+        onSessionChanged={() => undefined}
+        onSessionWithdrawn={() => undefined}
+      />,
+    )
+
+    expect(html).toContain('0 stars')
+    expect(html).not.toContain('NaN')
   })
 
   it('keeps management controls hidden when the Session permission is absent', () => {
@@ -108,6 +142,8 @@ describe('ManagedSessionList', () => {
     )
 
     expect(html).toContain('Team · Paperboy')
+    expect(html).toContain('$1.25 · 800K tokens')
+    expect(html).not.toContain('3 stars')
     expect(html).not.toContain('<select')
     expect(html).not.toContain('Manage Ship Team workspaces')
     expect(html).not.toContain('Withdraw')
@@ -181,6 +217,8 @@ describe('ManagedSessionList', () => {
     )
     expect(html).toContain('Link-only')
     expect(html).toContain('Gemini CLI')
+    expect(html).toContain('$1.25 · 800K tokens')
+    expect(html).not.toContain('3 stars')
     expect(html).not.toContain('<select')
   })
 })

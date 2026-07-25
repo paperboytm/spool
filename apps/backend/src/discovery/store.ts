@@ -8,6 +8,7 @@ export type DiscoveryCandidateRow = {
   cost_usd: number | null
   total_tokens: number | null
   summary_text: string | null
+  summary_text_zh: string | null
   search_text: string
   agent: SessionProvider
   message_count: number
@@ -28,6 +29,7 @@ export type DiscoveryCandidateRow = {
   custom_avatar_id: string | null
   avatar_visible: number
   qualified_reads_7d: number
+  star_count: number
 }
 
 export type DiscoveryPageKey = {
@@ -104,7 +106,9 @@ export async function listDiscoveryPage(
   params.push(options.rankedAt)
 
   const normalizedTitle = 'base.normalized_title'
+  const normalizedTitleZh = 'base.normalized_title_zh'
   const normalizedSummary = 'base.normalized_summary'
+  const normalizedSummaryZh = 'base.normalized_summary_zh'
   const normalizedAuthor = 'base.normalized_author'
   let relevanceExpression = '0'
   // Recent is an honest chronological order even while search is active.
@@ -112,19 +116,32 @@ export async function listDiscoveryPage(
   // Top uses relevance to rank those matches.
   if (options.query !== null && options.sort !== 'recent') {
     relevanceExpression =
-      `CASE WHEN ${normalizedTitle} = ? THEN 10000 ` +
-      `WHEN instr(${normalizedTitle}, ?) > 0 THEN 5000 ELSE 0 END + ` +
-      `CASE WHEN instr(${normalizedSummary}, ?) > 0 THEN 1000 ELSE 0 END + ` +
+      `CASE WHEN ${normalizedTitle} = ? OR ${normalizedTitleZh} = ? THEN 10000 ` +
+      `WHEN instr(${normalizedTitle}, ?) > 0 OR instr(${normalizedTitleZh}, ?) > 0 ` +
+      `THEN 5000 ELSE 0 END + ` +
+      `CASE WHEN instr(${normalizedSummary}, ?) > 0 OR instr(${normalizedSummaryZh}, ?) > 0 ` +
+      `THEN 1000 ELSE 0 END + ` +
       `CASE WHEN ${normalizedAuthor} = ? THEN 2000 ` +
       `WHEN instr(${normalizedAuthor}, ?) > 0 THEN 500 ELSE 0 END`
-    params.push(options.query, options.query, options.query, options.query, options.query)
+    params.push(
+      options.query,
+      options.query,
+      options.query,
+      options.query,
+      options.query,
+      options.query,
+      options.query,
+      options.query,
+    )
     for (const token of options.tokens) {
       relevanceExpression +=
-        ` + CASE WHEN instr(${normalizedTitle}, ?) > 0 THEN 200 ELSE 0 END` +
-        ` + CASE WHEN instr(${normalizedSummary}, ?) > 0 THEN 80 ELSE 0 END` +
+        ` + CASE WHEN instr(${normalizedTitle}, ?) > 0 OR instr(${normalizedTitleZh}, ?) > 0 ` +
+        `THEN 200 ELSE 0 END` +
+        ` + CASE WHEN instr(${normalizedSummary}, ?) > 0 ` +
+        `OR instr(${normalizedSummaryZh}, ?) > 0 THEN 80 ELSE 0 END` +
         ` + CASE WHEN instr(${normalizedAuthor}, ?) > 0 THEN 100 ELSE 0 END` +
         ' + CASE WHEN instr(base.search_text, ?) > 0 THEN 20 ELSE 0 END'
-      params.push(token, token, token, token)
+      params.push(token, token, token, token, token, token)
     }
   }
 
@@ -219,6 +236,7 @@ export async function listDiscoveryPage(
            d.cost_usd,
            d.total_tokens,
            d.summary_text,
+           d.summary_text_zh,
            d.search_text,
            d.agent,
            d.message_count,
@@ -240,7 +258,9 @@ export async function listDiscoveryPage(
            CASE WHEN u.deleted_at IS NULL THEN u.avatar_visible ELSE 0 END AS avatar_visible,
            ${qualifiedReads} AS qualified_reads_7d,
            LOWER(d.title) AS normalized_title,
+           LOWER(COALESCE(json_extract(d.title_json, '$.zh'), '')) AS normalized_title_zh,
            LOWER(COALESCE(d.summary_text, '')) AS normalized_summary,
+           LOWER(COALESCE(d.summary_text_zh, '')) AS normalized_summary_zh,
            CASE WHEN u.deleted_at IS NULL
              THEN LOWER(TRIM(
                COALESCE(h.handle, '') || ' ' || COALESCE(u.display_name, u.name, '')
@@ -290,6 +310,7 @@ export async function listDiscoveryPage(
          d.cost_usd,
          d.total_tokens,
          d.summary_text,
+         d.summary_text_zh,
          d.search_text,
          d.agent,
          d.message_count,
@@ -321,6 +342,11 @@ export async function listDiscoveryPage(
          d.custom_avatar_id,
          d.avatar_visible,
          d.qualified_reads_7d,
+         (
+           SELECT COUNT(*)
+           FROM hub_session_stars star
+           WHERE star.sid=d.sid
+         ) AS star_count,
          d.relevance_score,
          d.sort_score
        FROM page d

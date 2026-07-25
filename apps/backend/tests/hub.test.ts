@@ -8,6 +8,7 @@ import {
   sequenceRoot,
   type CanonicalRecord,
   type SessionUsageV1,
+  type SessionViewV1,
 } from '@spool-lab/session-kit'
 import { describe, expect, it, vi } from 'vite-plus/test'
 
@@ -27,6 +28,7 @@ import {
 import { onRequestPatch as visibilityPatch } from '../functions/api/me/sessions/[sid]'
 import type { SessionRecord } from '../src/auth/session'
 import { sha256Hex } from '../src/hub/auth'
+import { MAX_SESSION_GUIDANCE_BYTES, validateSessionGuidanceForHead } from '../src/hub/guidance'
 import { TEAM_QUOTA_BYTES } from '../src/hub/wire'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
@@ -601,6 +603,82 @@ describe('hub head and withdrawal', () => {
     expect(env.state.hub_session_discovery).toHaveLength(0)
   })
 
+  it('rejects malformed guidance embedded in the canonical Session view', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    await replaceFixtureView(fixture, {
+      ...fixture.viewValue,
+      guidance: {
+        v: 1,
+        turns: [
+          {
+            promptRecord: 1,
+            replyRecords: [1],
+            replyChars: 1,
+            toolCalls: 0,
+          },
+        ],
+      },
+    })
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+
+    const response = await commit(env, fixture)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ detail: 'invalid session view' })
+    expect(env.state.hub_sessions).toHaveLength(0)
+  })
+
+  it('rejects guidance record references outside the committed head', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    await replaceFixtureView(fixture, {
+      ...fixture.viewValue,
+      guidance: {
+        v: 1,
+        turns: [
+          {
+            promptRecord: fixture.head.count,
+            replyRecords: [],
+            replyChars: 0,
+            toolCalls: 0,
+          },
+        ],
+      },
+    })
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+
+    const response = await commit(env, fixture)
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({
+      detail: 'session guidance references records outside the head',
+    })
+    expect(env.state.hub_sessions).toHaveLength(0)
+    expect(env.state.hub_session_guidance).toHaveLength(0)
+  })
+
+  it('caps the D1 guidance projection independently of the canonical view size', () => {
+    const oversized = {
+      v: 1 as const,
+      turns: [
+        {
+          promptRecord: 0,
+          replyRecords: [],
+          replyChars: 0,
+          toolCalls: 0,
+        },
+      ],
+      padding: 'x'.repeat(MAX_SESSION_GUIDANCE_BYTES),
+    }
+
+    expect(() =>
+      validateSessionGuidanceForHead(oversized as unknown as SessionViewV1['guidance'], 1),
+    ).toThrow(/session guidance exceeds projection limits/)
+  })
+
   it('rejects untrusted usage shapes and token totals before advancing the head', async () => {
     const counts = { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }
     const missingFieldCases = (['input', 'output', 'cacheRead', 'cacheWrite'] as const).map(
@@ -716,6 +794,50 @@ describe('hub head and withdrawal', () => {
     const published = await changeVisibility(env, { visibility: 'public' })
 
     expect(published.status).toBe(200)
+    expect(env.state.hub_session_discovery[0]).toMatchObject({
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
+  })
+
+  it('preserves the frozen cost when a modern view recommits the same record root', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    await replaceFixtureView(fixture, { ...fixture.viewValue, usage: pricedUsage() })
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+
+    Object.assign(env.state.hub_sessions[0]!, {
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
+    Object.assign(env.state.hub_session_discovery[0]!, {
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
+    await replaceFixtureView(fixture, {
+      ...fixture.viewValue,
+      usage: {
+        models: {
+          'claude-sonnet-4-5-20250929': {
+            input: 1,
+            output: 1,
+            cacheRead: 0,
+            cacheWrite: 0,
+          },
+        },
+        records: 1,
+      },
+    })
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+
+    const recommitted = await commit(env, fixture)
+
+    expect(recommitted.status).toBe(200)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      cost_usd: 42.125,
+      total_tokens: 765_432,
+    })
     expect(env.state.hub_session_discovery[0]).toMatchObject({
       cost_usd: 42.125,
       total_tokens: 765_432,
@@ -1112,6 +1234,7 @@ describe('hub public reads', () => {
       root: fixture.head.root,
       count: fixture.head.count,
       summaryMd: fixture.head.summaryMd,
+      guidance: fixture.viewValue.guidance,
       visibility: 'public',
       author: {
         handle: 'alice',
@@ -1130,6 +1253,142 @@ describe('hub public reads', () => {
       detail: 'withdrawn',
       withdrawnAt: expect.any(Number),
     })
+  })
+
+  it('returns root-matched backfilled guidance for a legacy canonical view', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const legacyView: SessionViewV1 = { ...fixture.viewValue }
+    delete legacyView.guidance
+    await replaceFixtureView(fixture, legacyView)
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const backfill = {
+      v: 1 as const,
+      turns: [
+        {
+          promptRecord: 0,
+          replyRecords: [3],
+          replyChars: 27,
+          toolCalls: 1,
+        },
+      ],
+    }
+    env.state.hub_session_guidance.push({
+      sid: SID,
+      root: fixture.head.root,
+      guidance_json: JSON.stringify(backfill),
+      generated_at: Date.now(),
+    })
+
+    const metadata = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+
+    expect(metadata.status).toBe(200)
+    await expect(metadata.json()).resolves.toMatchObject({ guidance: backfill })
+  })
+
+  it('materializes validated canonical guidance when the head commits', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+
+    expect(env.state.hub_session_guidance).toHaveLength(1)
+    expect(env.state.hub_session_guidance[0]).toMatchObject({
+      sid: SID,
+      root: fixture.head.root,
+      generated_at: expect.any(Number),
+    })
+    expect(JSON.parse(env.state.hub_session_guidance[0]!.guidance_json)).toEqual(
+      fixture.viewValue.guidance,
+    )
+
+    const metadata = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+
+    expect(metadata.status).toBe(200)
+    await expect(metadata.json()).resolves.toMatchObject({
+      guidance: fixture.viewValue.guidance,
+    })
+  })
+
+  it('preserves backfilled cost and guidance when a legacy view recommits the same root', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const legacyView: SessionViewV1 = { ...fixture.viewValue }
+    delete legacyView.usage
+    delete legacyView.guidance
+    await replaceFixtureView(fixture, legacyView)
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+
+    const backfilledGuidance = {
+      v: 1 as const,
+      turns: [{ promptRecord: 0, replyRecords: [3], replyChars: 27, toolCalls: 1 }],
+    }
+    Object.assign(env.state.hub_sessions[0]!, {
+      cost_usd: 12.34,
+      total_tokens: 5_678,
+    })
+    Object.assign(env.state.hub_session_discovery[0]!, {
+      cost_usd: 12.34,
+      total_tokens: 5_678,
+    })
+    const generatedAt = Date.now() - 1_000
+    env.state.hub_session_guidance.push({
+      sid: SID,
+      root: fixture.head.root,
+      guidance_json: JSON.stringify(backfilledGuidance),
+      generated_at: generatedAt,
+    })
+
+    expect((await commit(env, fixture)).status).toBe(200)
+
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      cost_usd: 12.34,
+      total_tokens: 5_678,
+    })
+    expect(env.state.hub_session_discovery[0]).toMatchObject({
+      cost_usd: 12.34,
+      total_tokens: 5_678,
+    })
+    expect(env.state.hub_session_guidance).toEqual([
+      {
+        sid: SID,
+        root: fixture.head.root,
+        guidance_json: JSON.stringify(backfilledGuidance),
+        generated_at: generatedAt,
+      },
+    ])
+  })
+
+  it('ignores stale or invalid legacy guidance instead of exposing it', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    const legacyView: SessionViewV1 = { ...fixture.viewValue }
+    delete legacyView.guidance
+    await replaceFixtureView(fixture, legacyView)
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const row = {
+      sid: SID,
+      root: 'f'.repeat(64),
+      guidance_json: JSON.stringify({ v: 1, turns: [] }),
+      generated_at: Date.now(),
+    }
+    env.state.hub_session_guidance.push(row)
+
+    const stale = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(stale.status).toBe(200)
+    await expect(stale.json()).resolves.toMatchObject({ guidance: null })
+
+    row.root = fixture.head.root
+    row.guidance_json = JSON.stringify({
+      v: 1,
+      turns: [{ promptRecord: 1, replyRecords: [1], replyChars: 1, toolCalls: 0 }],
+    })
+    const invalid = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(invalid.status).toBe(200)
+    await expect(invalid.json()).resolves.toMatchObject({ guidance: null })
   })
 
   it('does not disclose metadata for a private session', async () => {

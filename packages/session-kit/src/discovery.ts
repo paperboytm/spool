@@ -1,3 +1,4 @@
+import type { SessionSummaries } from './summary.js'
 import type { SessionProvider } from './types.js'
 
 /** Public Explore API v1. Shared Sessions are discoverable by default in v1. */
@@ -31,6 +32,10 @@ export interface DiscoverySessionItem {
   cost?: { usd: number | null; totalTokens: number } | null
   /** Plain text, bounded for feed rendering; never Markdown. */
   summaryExcerpt: string | null
+  /** Bilingual plain-text excerpts; absent for legacy single-language rows. */
+  summaryExcerpts?: SessionSummaries
+  /** Live count of stars; absent only during a rolling backend upgrade. */
+  starCount?: number
   agent: SessionProvider
   author: DiscoveryAuthor
   evidence: DiscoveryEvidence

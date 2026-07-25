@@ -167,6 +167,7 @@ type HubSessionDiscoveryRow = {
   cost_usd: number | null
   total_tokens: number | null
   summary_text: string | null
+  summary_text_zh: string | null
   search_text: string
   message_count: number
   tool_call_count: number
@@ -189,6 +190,13 @@ type HubSessionStarRow = {
   sid: string
   user_id: string
   created_at: number
+}
+
+type HubSessionGuidanceRow = {
+  sid: string
+  root: string
+  guidance_json: string
+  generated_at: number
 }
 
 type HubSessionResumeGrantRow = {
@@ -243,6 +251,7 @@ export type FakeDbState = {
   hub_session_discovery: HubSessionDiscoveryRow[]
   hub_session_engagement_daily: HubSessionEngagementDailyRow[]
   hub_session_stars: HubSessionStarRow[]
+  hub_session_guidance: HubSessionGuidanceRow[]
   hub_session_resume_grants: HubSessionResumeGrantRow[]
   hub_session_verified_forks: HubSessionVerifiedForkRow[]
 }
@@ -265,6 +274,7 @@ export function emptyState(): FakeDbState {
     hub_session_discovery: [],
     hub_session_engagement_daily: [],
     hub_session_stars: [],
+    hub_session_guidance: [],
     hub_session_resume_grants: [],
     hub_session_verified_forks: [],
   }
@@ -446,9 +456,22 @@ export function makeDb(state: FakeDbState = emptyState()): {
             viewer_starred: viewerStarred ? 1 : 0,
           } as T
         }
+        if (/^SELECT COUNT\(\*\) AS star_count FROM hub_session_stars WHERE sid=\?$/i.test(sql)) {
+          const [sid] = params as [string]
+          return {
+            star_count: state.hub_session_stars.filter((row) => row.sid === sid).length,
+          } as T
+        }
         if (/^SELECT \* FROM hub_sessions WHERE sid=\?$/i.test(sql)) {
           const [sid] = params as [string]
           return (state.hub_sessions.find((row) => row.sid === sid) as T) ?? null
+        }
+        if (sql.includes('/* hub:session-guidance */')) {
+          const [sid, root] = params as [string, string]
+          const row = state.hub_session_guidance.find(
+            (candidate) => candidate.sid === sid && candidate.root === root,
+          )
+          return row ? ({ guidance_json: row.guidance_json } as T) : null
         }
         if (sql.includes('/* hub:active-team-role */')) {
           const [teamId, userId] = params as [string, string]
@@ -868,6 +891,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             agent,
             title,
             summaryText,
+            summaryTextZh,
             searchText,
             messageCount,
             toolCallCount,
@@ -886,6 +910,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             SessionProvider,
             string,
             string | null,
+            string | null,
             string,
             number,
             number,
@@ -900,7 +925,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             number | null,
             number | null,
           ]
-          if (!authorizedProjectionGateAllows(params, 17)) {
+          if (!authorizedProjectionGateAllows(params, 18)) {
             return { success: true, meta: { changes: 0 } }
           }
           const existing = state.hub_session_discovery.find((row) => row.sid === sid)
@@ -909,6 +934,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               agent,
               title,
               summary_text: summaryText,
+              summary_text_zh: summaryTextZh,
               search_text: searchText,
               message_count: messageCount,
               tool_call_count: toolCallCount,
@@ -928,6 +954,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               agent,
               title,
               summary_text: summaryText,
+              summary_text_zh: summaryTextZh,
               search_text: searchText,
               message_count: messageCount,
               tool_call_count: toolCallCount,
@@ -986,6 +1013,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             agent,
             title,
             summaryText,
+            summaryTextZh,
             searchText,
             messageCount,
             toolCallCount,
@@ -1003,6 +1031,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string,
             SessionProvider,
             string,
+            string | null,
             string | null,
             string,
             number,
@@ -1024,6 +1053,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               agent,
               title,
               summary_text: summaryText,
+              summary_text_zh: summaryTextZh,
               search_text: searchText,
               message_count: messageCount,
               tool_call_count: toolCallCount,
@@ -1043,6 +1073,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               agent,
               title,
               summary_text: summaryText,
+              summary_text_zh: summaryTextZh,
               search_text: searchText,
               message_count: messageCount,
               tool_call_count: toolCallCount,
@@ -1292,6 +1323,69 @@ export function makeDb(state: FakeDbState = emptyState()): {
           grant.claimed_child_root = childRoot
           grant.claimed_at = claimedAt
           return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:upsert-session-guidance-projection */')) {
+          const [
+            sid,
+            root,
+            guidanceJson,
+            generatedAt,
+            gateSid,
+            ownerUserId,
+            gateRoot,
+            viewOid,
+            updatedAt,
+          ] = params as [string, string, string, number, string, string, string, string, number]
+          const session = state.hub_sessions.find(
+            (row) =>
+              row.sid === gateSid &&
+              row.owner_user_id === ownerUserId &&
+              row.root === gateRoot &&
+              row.view_oid === viewOid &&
+              row.updated_at === updatedAt &&
+              row.withdrawn_at === null,
+          )
+          if (!session) return { success: true, meta: { changes: 0 } }
+          const existing = state.hub_session_guidance.find((row) => row.sid === sid)
+          if (existing) {
+            existing.root = root
+            existing.guidance_json = guidanceJson
+            existing.generated_at = generatedAt
+          } else {
+            state.hub_session_guidance.push({
+              sid,
+              root,
+              guidance_json: guidanceJson,
+              generated_at: generatedAt,
+            })
+          }
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:delete-session-guidance-projection */')) {
+          const [sid, gateSid, ownerUserId, root, viewOid, updatedAt] = params as [
+            string,
+            string,
+            string,
+            string,
+            string,
+            number,
+          ]
+          const session = state.hub_sessions.find(
+            (row) =>
+              row.sid === gateSid &&
+              row.owner_user_id === ownerUserId &&
+              row.root === root &&
+              row.view_oid === viewOid &&
+              row.updated_at === updatedAt &&
+              row.withdrawn_at === null,
+          )
+          if (!session) return { success: true, meta: { changes: 0 } }
+          const before = state.hub_session_guidance.length
+          state.hub_session_guidance = state.hub_session_guidance.filter((row) => row.sid !== sid)
+          return {
+            success: true,
+            meta: { changes: before - state.hub_session_guidance.length },
+          }
         }
         if (sql.includes('/* hub:authorized-head-insert */')) {
           const [
@@ -2463,7 +2557,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
           const ranksByRelevance = hasQuery && sort !== 'recent'
           const query = ranksByRelevance ? (params[parameterIndex] as string) : null
           if (ranksByRelevance) {
-            parameterIndex += 5 + tokenCount * 4
+            parameterIndex += 8 + tokenCount * 6
           }
           if (ranked) {
             const scoreRankedAt = params[parameterIndex++] as number
@@ -2587,6 +2681,8 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   custom_avatar_id: identityLive ? (user.custom_avatar_id ?? null) : null,
                   avatar_visible: identityLive ? (user.avatar_visible ?? 1) : 0,
                   qualified_reads_7d: qualifiedReads,
+                  star_count: state.hub_session_stars.filter((row) => row.sid === discovery.sid)
+                    .length,
                   relevance_score: relevanceScore,
                   sort_score: sortScore,
                 },
@@ -2915,21 +3011,37 @@ function fakeDiscoveryRelevance(
   query: string,
   tokens: readonly string[],
 ): number {
-  const title = discovery.title.toLowerCase()
-  const summary = (discovery.summary_text ?? '').toLowerCase()
+  const titles = [
+    discovery.title.toLowerCase(),
+    discoveryLocalizedTitle(discovery.title_json, 'zh'),
+  ]
+  const summaries = [
+    (discovery.summary_text ?? '').toLowerCase(),
+    (discovery.summary_text_zh ?? '').toLowerCase(),
+  ]
   let score = 0
-  if (title === query) score += 10_000
-  else if (title.includes(query)) score += 5_000
-  if (summary.includes(query)) score += 1_000
+  if (titles.some((title) => title === query)) score += 10_000
+  else if (titles.some((title) => title.includes(query))) score += 5_000
+  if (summaries.some((summary) => summary.includes(query))) score += 1_000
   if (normalizedAuthor === query) score += 2_000
   else if (normalizedAuthor.includes(query)) score += 500
   for (const token of tokens) {
-    if (title.includes(token)) score += 200
-    if (summary.includes(token)) score += 80
+    if (titles.some((title) => title.includes(token))) score += 200
+    if (summaries.some((summary) => summary.includes(token))) score += 80
     if (normalizedAuthor.includes(token)) score += 100
     if (discovery.search_text.includes(token)) score += 20
   }
   return score
+}
+
+function discoveryLocalizedTitle(titleJson: string | null, locale: 'zh'): string {
+  if (!titleJson) return ''
+  try {
+    const value = JSON.parse(titleJson) as Record<string, unknown>
+    return typeof value[locale] === 'string' ? value[locale].toLowerCase() : ''
+  } catch {
+    return ''
+  }
 }
 
 function fakeDiscoverySortScore(

@@ -1,6 +1,6 @@
 import { isDiscoverySessionSid } from '@spool-lab/session-kit'
 import { Badge, Button, IconButton } from '@spool-lab/ui'
-import { CircleOff, Globe2, Link2, MoreHorizontal, Users } from 'lucide-react'
+import { CircleOff, Globe2, Link2, MoreHorizontal, Star, Users } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import {
@@ -10,7 +10,11 @@ import {
   type ManagedSession,
   type ManagedSessionVisibility,
 } from '../lib/hub-management-api'
-import { useLocalizedSessionTitle } from '../lib/session-title'
+import {
+  formatSessionCost,
+  useLocalizedSessionSummary,
+  useLocalizedSessionTitle,
+} from '../lib/session-title'
 import type { TeamSummary } from '../lib/team-api'
 import { SessionFeedRow, SessionSourceBadge } from './SessionFeedRow'
 
@@ -40,6 +44,12 @@ function visibilityLabel(session: ManagedSession): string {
 
 function sessionTeamName(session: ManagedSession): string {
   return session.team_name || 'this Team'
+}
+
+function compactNumber(value: number): string {
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(
+    value,
+  )
 }
 
 export function visibilityConfirmation(session: ManagedSession, choice: VisibilityChoice): string {
@@ -195,7 +205,10 @@ function ManagedSessionRow({
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuId = useId()
   const title = useLocalizedSessionTitle(session.titles, session.title || 'Shared Session')
+  const summary = useLocalizedSessionSummary(session.summaries, session.summary)
   const localizedSession = title === session.title ? session : { ...session, title }
+  const costLabel = formatSessionCost(session.cost)
+  const starCount = session.star_count ?? 0
 
   useEffect(() => {
     if (!open) return
@@ -367,7 +380,7 @@ function ManagedSessionRow({
         as="div"
         sid={session.sid}
         title={title}
-        summary={session.summary}
+        summary={summary}
         author={{
           handle: session.author.handle,
           displayName: session.author.display_name,
@@ -378,6 +391,20 @@ function ManagedSessionRow({
         metadata={
           <div className="session-feed-row-meta">
             <SessionSourceBadge provider={session.provider} />
+            {costLabel ? (
+              <span
+                className="session-feed-cost"
+                title="Estimated API cost from recorded token usage"
+              >
+                {costLabel}
+              </span>
+            ) : null}
+            {session.visibility === 'public' ? (
+              <span title={`${starCount} ${starCount === 1 ? 'star' : 'stars'}`}>
+                <Star size={13} strokeWidth={1.7} aria-hidden="true" />
+                {compactNumber(starCount)} {starCount === 1 ? 'star' : 'stars'}
+              </span>
+            ) : null}
             <VisibilityBadge session={session} />
             {session.team_id && session.visibility !== 'team' ? (
               <span

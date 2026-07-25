@@ -221,6 +221,8 @@ function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem {
       ? `/api/avatars/${encodeURIComponent(row.owner_user_id)}?v=${encodeURIComponent(row.custom_avatar_id)}`
       : row.avatar_url
   const titles = parseTitleJson(row.title_json)
+  const summaryExcerpt = boundExcerpt(row.summary_text)
+  const summaryExcerptZh = boundExcerpt(row.summary_text_zh)
   return {
     sid: row.sid,
     title: row.title,
@@ -228,10 +230,16 @@ function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem {
     ...(row.total_tokens !== null && row.total_tokens > 0
       ? { cost: { usd: row.cost_usd, totalTokens: row.total_tokens } }
       : {}),
-    summaryExcerpt:
-      row.summary_text === null
-        ? null
-        : Array.from(row.summary_text).slice(0, SUMMARY_EXCERPT_CHARS).join(''),
+    summaryExcerpt,
+    ...(summaryExcerptZh === null
+      ? {}
+      : {
+          summaryExcerpts: {
+            ...(summaryExcerpt === null ? {} : { en: summaryExcerpt }),
+            zh: summaryExcerptZh,
+          },
+        }),
+    starCount: Number(row.star_count),
     agent: row.agent,
     author: {
       handle: row.handle,
@@ -250,6 +258,10 @@ function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem {
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
   }
+}
+
+function boundExcerpt(value: string | null): string | null {
+  return value === null ? null : Array.from(value).slice(0, SUMMARY_EXCERPT_CHARS).join('')
 }
 
 function utcDay(timestamp: number): string {

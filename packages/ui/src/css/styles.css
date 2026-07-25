@@ -1,6 +1,7 @@
 @import './tokens.css';
 
 .sp-button,
+.sp-dialog,
 .sp-icon-button,
 .sp-mobile-menu,
 .sp-mobile-menu__trigger,
@@ -17,6 +18,24 @@
 .sp-list-row,
 .sp-wordmark {
   box-sizing: border-box;
+}
+
+.sp-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow: hidden;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius-card);
+  padding: 0;
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  box-shadow: var(--sp-shadow-popover);
+}
+
+.sp-dialog::backdrop {
+  background: rgb(0 0 0 / 52%);
 }
 
 .sp-button {
@@ -256,6 +275,14 @@
   height: var(--sp-control-icon-md);
 }
 
+@media (max-width: 768px) {
+  .sp-icon-button--sm,
+  .sp-icon-button--md {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .sp-icon-button:hover:not(:disabled),
 .sp-icon-button:focus-visible {
   background: var(--sp-surface-2);
@@ -372,6 +399,12 @@
   transition:
     background-color var(--sp-motion-hover),
     color var(--sp-motion-hover);
+}
+
+@media (max-width: 768px) {
+  .sp-tabs__tab {
+    height: 44px;
+  }
 }
 
 .sp-tabs__tab::after {

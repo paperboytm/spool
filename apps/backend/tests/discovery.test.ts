@@ -82,6 +82,7 @@ function seedDiscovery(
     owner?: string
     title?: string
     summary?: string | null
+    summaryZh?: string | null
     search?: string
     agent?: 'claude' | 'codex'
     publishedAt?: number
@@ -126,7 +127,10 @@ function seedDiscovery(
     cost_usd: options.costUsd ?? null,
     total_tokens: options.totalTokens ?? null,
     summary_text: summary,
-    search_text: (options.search ?? `${title} ${summary ?? ''} ${agent}`).toLowerCase(),
+    summary_text_zh: options.summaryZh ?? null,
+    search_text: (
+      options.search ?? `${title} ${summary ?? ''} ${options.summaryZh ?? ''} ${agent}`
+    ).toLowerCase(),
     message_count: 4,
     tool_call_count: 2,
     file_count: 1,
@@ -308,6 +312,7 @@ describe('GET /api/discovery/v1/sessions', () => {
   it('emits bilingual titles and cost only for rows that carry them', async () => {
     const env = makeEnv()
     seedUser(env.state, 'user-1')
+    seedUser(env.state, 'starrer')
     seedDiscovery(env.state, {
       sid: CLAUDE_SID,
       title: 'Fix refresh-token race across tabs',
@@ -317,12 +322,19 @@ describe('GET /api/discovery/v1/sessions', () => {
       }),
       costUsd: 3.0125,
       totalTokens: 1_200_000,
+      summary: 'Explains why refresh-token races break signed-in browser tabs.',
+      summaryZh: '解释刷新令牌竞态为什么会破坏已登录的浏览器标签页。',
       publishedAt: NOW,
     })
     seedDiscovery(env.state, {
       sid: CODEX_SID,
       title: 'Legacy row',
       publishedAt: NOW - 1,
+    })
+    env.state.hub_session_stars.push({
+      sid: CLAUDE_SID,
+      user_id: 'starrer',
+      created_at: NOW,
     })
 
     const response = await invoke(
@@ -342,9 +354,42 @@ describe('GET /api/discovery/v1/sessions', () => {
         zh: '修复跨标签页刷新令牌竞态',
       },
       cost: { usd: 3.0125, totalTokens: 1_200_000 },
+      summaryExcerpts: {
+        en: 'Explains why refresh-token races break signed-in browser tabs.',
+        zh: '解释刷新令牌竞态为什么会破坏已登录的浏览器标签页。',
+      },
+      starCount: 1,
     })
     expect(body.items[1]).not.toHaveProperty('titles')
+    expect(body.items[1]).not.toHaveProperty('summaryExcerpts')
     expect(body.items[1]).not.toHaveProperty('cost')
+    expect(body.items[1]).toMatchObject({ starCount: 0 })
+  })
+
+  it('bounds both localized Summary excerpts by Unicode characters', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      summary: 'a'.repeat(400),
+      summaryZh: '中'.repeat(400),
+    })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request('https://spool.new/api/discovery/v1/sessions?sort=recent'),
+      env,
+    )
+    const body = (await response.json()) as {
+      items: Array<{
+        summaryExcerpt: string
+        summaryExcerpts: { en: string; zh: string }
+      }>
+    }
+
+    expect(Array.from(body.items[0]!.summaryExcerpt)).toHaveLength(360)
+    expect(Array.from(body.items[0]!.summaryExcerpts.en)).toHaveLength(360)
+    expect(Array.from(body.items[0]!.summaryExcerpts.zh)).toHaveLength(360)
   })
 
   it('returns only live Sessions with live owners and resolves author fields at read time', async () => {
@@ -547,6 +592,48 @@ describe('GET /api/discovery/v1/sessions', () => {
     )
     const searchItems = (await search.json()) as { items: Array<{ sid: string }> }
     expect(searchItems.items.map((item) => item.sid)).toEqual([CLAUDE_SID, CODEX_SID])
+  })
+
+  it('gives Chinese titles and summaries the same high-weight search ranking', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'user-1')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      title: 'Prevent refresh-token races',
+      titleJson: JSON.stringify({
+        en: 'Prevent refresh-token races',
+        zh: '修复刷新令牌竞态',
+      }),
+      summary: 'Keeps browser tabs signed in.',
+      summaryZh: '避免多个标签页同时刷新凭据。',
+      search: 'Prevent refresh-token races 修复刷新令牌竞态 避免多个标签页同时刷新凭据',
+      quality: 1,
+      publishedAt: NOW - 20 * DAY_MS,
+    })
+    seedDiscovery(env.state, {
+      sid: CODEX_SID,
+      title: 'Popular browser concurrency',
+      summary: 'Refresh-token guidance.',
+      summaryZh: '包含修复刷新令牌竞态的背景资料。',
+      quality: 20,
+      publishedAt: NOW - DAY_MS,
+    })
+    env.state.hub_session_engagement_daily.push({
+      sid: CODEX_SID,
+      day: '2026-07-19',
+      qualified_reads: 10_000,
+    })
+
+    const response = await invoke(
+      sessionsGet,
+      new Request(
+        'https://spool.new/api/discovery/v1/sessions?q=%E4%BF%AE%E5%A4%8D%E5%88%B7%E6%96%B0%E4%BB%A4%E7%89%8C%E7%AB%9E%E6%80%81&sort=trending',
+      ),
+      env,
+    )
+    const body = (await response.json()) as { items: Array<{ sid: string }> }
+
+    expect(body.items.map((item) => item.sid)).toEqual([CLAUDE_SID, CODEX_SID])
   })
 
   it('paginates with an opaque filter-bound cursor and validates every query parameter', async () => {

@@ -1,4 +1,4 @@
-import type { SessionTitles } from '@spool-lab/session-kit'
+import type { SessionSummaries, SessionTitles } from '@spool-lab/session-kit'
 import { useSyncExternalStore } from 'react'
 
 const getServerLocale = () => 'en'
@@ -37,6 +37,29 @@ export function useLocalizedSessionTitle(
 ): string {
   const locale = useSyncExternalStore(subscribeToLocale, getBrowserLocale, getServerLocale)
   return pickLocalizedTitle(titles, fallback, locale)
+}
+
+/** Select the Summary body with the same locale and fallback contract as titles. */
+export function pickLocalizedSummary(
+  summaries: SessionSummaries | null | undefined,
+  fallback: string | null | undefined,
+  locale?: string,
+): string | null {
+  const en = cleanValue(summaries?.en)
+  const zh = cleanValue(summaries?.zh)
+  const legacy = cleanValue(fallback ?? undefined)
+  const resolved = locale ?? 'en'
+  const preferred = resolved.toLowerCase().startsWith('zh') ? (zh ?? en) : (en ?? zh)
+  return preferred ?? legacy ?? null
+}
+
+/** Hydration-safe locale selection for bilingual Summary bodies. */
+export function useLocalizedSessionSummary(
+  summaries: SessionSummaries | null | undefined,
+  fallback: string | null | undefined,
+): string | null {
+  const locale = useSyncExternalStore(subscribeToLocale, getBrowserLocale, getServerLocale)
+  return pickLocalizedSummary(summaries, fallback, locale)
 }
 
 function cleanValue(value: string | undefined): string | undefined {

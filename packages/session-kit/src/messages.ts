@@ -264,13 +264,15 @@ export function parseClaudeSessionText(raw: string, filePath: string): ParseProv
 
     const role = msgObj['role'] as string | undefined
     if (role !== 'user' && role !== 'assistant') continue
+    if (role === 'user' && record['isMeta'] === true) continue
 
     const contentRaw = msgObj['content']
-    const contentText = extractText(contentRaw)
+    const contentText = extractClaudeContentText(contentRaw)
     const toolNames = extractToolNames(contentRaw)
 
     // Skip empty messages (e.g. tool result placeholders with no text)
     if (!contentText && toolNames.length === 0) continue
+    if (role === 'user' && isClaudeSyntheticUserText(contentText)) continue
 
     messages.push({
       uuid: (record['uuid'] as string | undefined) ?? `msg-${messages.length}`,
@@ -397,7 +399,7 @@ function stripBlocks(s: string, open: string, close: string): string {
   return s
 }
 
-function extractText(content: unknown): string {
+export function extractClaudeContentText(content: unknown): string {
   let raw: string
   if (typeof content === 'string') {
     raw = content
@@ -409,12 +411,26 @@ function extractText(content: unknown): string {
   } else {
     return ''
   }
+  const hasSlashCommand = raw.includes('<command-name>')
   let text = stripBlocks(raw, '<spool-system-prelude>', '</spool-system-prelude>')
+  text = stripBlocks(text, '<task-notification>', '</task-notification>')
   text = stripSlashCommandRecords(text)
+  if (hasSlashCommand) {
+    // Claude sometimes writes command-message before command-name. Once a
+    // command-name proves this is a slash-command record, remove leftover
+    // command metadata in either order without changing legitimate prose
+    // that merely mentions a bare command-args tag.
+    text = stripBlocks(text, '<command-message>', '</command-message>')
+    text = stripBlocks(text, '<command-args>', '</command-args>')
+  }
   text = stripBlocks(text, '<local-command-stdout>', '</local-command-stdout>')
   text = stripBlocks(text, '<local-command-caveat>', '</local-command-caveat>')
   text = stripBlocks(text, '<system-reminder>', '</system-reminder>')
   return stripAngleTags(text).trim()
+}
+
+export function isClaudeSyntheticUserText(text: string): boolean {
+  return /^\[Request interrupted by user(?: for tool use)?\]$/i.test(text.trim())
 }
 
 function extractToolNames(content: unknown): string[] {

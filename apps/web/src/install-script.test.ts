@@ -1,19 +1,16 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readlinkSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vite-plus/test'
 
 const INSTALLER = resolve(import.meta.dirname, '..', 'public', 'install.sh')
+const INSTALLER_COMMAND = resolve(
+  import.meta.dirname,
+  '..',
+  'test-fixtures',
+  'installer-command.sh',
+)
 const cleanupPaths: string[] = []
 
 interface Fixture {
@@ -24,72 +21,17 @@ interface Fixture {
 }
 
 function fixture(): Fixture {
-  const root = mkdtempSync(join(tmpdir(), 'spool-cli-installer-'))
+  // macOS can indefinitely defer direct execution of fresh shebang scripts
+  // from its per-user temporary volume. Keep executable fixtures beside the
+  // test and remove them after each case so the installer contract stays
+  // deterministic across local development and CI.
+  const root = mkdtempSync(join(import.meta.dirname, '.spool-cli-installer-'))
   cleanupPaths.push(root)
   const home = join(root, 'home')
   const fakeBin = join(root, 'fake-bin')
   const npmLog = join(root, 'npm.log')
   mkdirSync(home, { recursive: true })
   mkdirSync(fakeBin, { recursive: true })
-
-  const fakeNode = join(fakeBin, 'node')
-  writeFileSync(
-    fakeNode,
-    `#!/bin/sh
-if [ "$1" = "-p" ]; then
-  printf '%s\\n' "\${FAKE_NODE_VERSION:-22.19.0}"
-  exit 0
-fi
-if [ "$1" = "-e" ]; then
-  exit "\${FAKE_NODE_CHECK_EXIT:-0}"
-fi
-exit 1
-`,
-  )
-  chmodSync(fakeNode, 0o755)
-
-  const fakeNpm = join(fakeBin, 'npm')
-  writeFileSync(
-    fakeNpm,
-    `#!/bin/sh
-set -eu
-if [ "$1" = "view" ]; then
-  if [ "\${FAKE_NPM_VIEW_FAIL:-0}" = "1" ]; then
-    exit 1
-  fi
-  printf '%s\\n' "$FAKE_CLI_VERSION"
-  exit 0
-fi
-if [ "$1" != "install" ]; then
-  exit 2
-fi
-printf '%s\\n' install >> "$FAKE_NPM_LOG"
-if [ "\${FAKE_NPM_FAIL:-0}" = "1" ]; then
-  printf '%s\\n' 'simulated npm failure' >&2
-  exit 1
-fi
-prefix=''
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--prefix" ]; then
-    shift
-    prefix=$1
-  fi
-  shift
-done
-[ -n "$prefix" ]
-mkdir -p "$prefix/bin"
-{
-  printf '%s\\n' '#!/bin/sh'
-  printf '%s\\n' 'if [ "$1" = "--version" ]; then'
-  printf '  printf "%%s\\\\n" "%s"\\n' "$FAKE_CLI_VERSION"
-  printf '%s\\n' '  exit 0'
-  printf '%s\\n' 'fi'
-  printf '%s\\n' 'exit 0'
-} > "$prefix/bin/spool"
-chmod +x "$prefix/bin/spool"
-`,
-  )
-  chmodSync(fakeNpm, 0o755)
 
   return {
     root,
@@ -101,13 +43,22 @@ chmod +x "$prefix/bin/spool"
       SHELL: '/bin/zsh',
       PATH: `${fakeBin}:/usr/bin:/bin`,
       FAKE_CLI_VERSION: '9.8.7',
+      FAKE_INSTALLER_COMMAND: INSTALLER_COMMAND,
       FAKE_NPM_LOG: npmLog,
+      _SPOOL_INSTALLER_TEST_SHIM: INSTALLER_COMMAND,
     },
   }
 }
 
 function runInstaller(env: NodeJS.ProcessEnv) {
   return spawnSync('sh', [INSTALLER], { encoding: 'utf8', env })
+}
+
+function installedVersion(path: string, env: NodeJS.ProcessEnv): string {
+  return execFileSync('sh', [INSTALLER_COMMAND, 'spool', path, '--version'], {
+    encoding: 'utf8',
+    env,
+  }).trim()
 }
 
 afterEach(() => {
@@ -132,7 +83,7 @@ describe('CLI install.sh', () => {
     expect(first.stdout).toContain('Spool CLI 9.8.7 installed')
     const binPath = join(test.home, '.local', 'bin', 'spool')
     expect(readlinkSync(binPath)).toContain('/.local/share/spool/cli/9.8.7/bin/spool')
-    expect(execFileSync(binPath, ['--version'], { encoding: 'utf8' }).trim()).toBe('9.8.7')
+    expect(installedVersion(binPath, test.env)).toBe('9.8.7')
 
     const second = runInstaller(test.env)
     expect(second.status).toBe(0)
@@ -178,7 +129,7 @@ describe('CLI install.sh', () => {
     expect(failed.stderr).toContain('simulated npm failure')
     expect(failed.stderr).toContain('Keeping Spool CLI 9.8.7')
     expect(readlinkSync(binPath)).toBe(originalTarget)
-    expect(execFileSync(binPath, ['--version'], { encoding: 'utf8' }).trim()).toBe('9.8.7')
+    expect(installedVersion(binPath, test.env)).toBe('9.8.7')
   })
 
   it('keeps the working CLI available when npm cannot be reached', () => {
@@ -192,7 +143,7 @@ describe('CLI install.sh', () => {
     expect(offline.status).toBe(0)
     expect(offline.stderr).toContain('Could not check npm for updates')
     expect(readlinkSync(binPath)).toBe(originalTarget)
-    expect(execFileSync(binPath, ['--version'], { encoding: 'utf8' }).trim()).toBe('9.8.7')
+    expect(installedVersion(binPath, test.env)).toBe('9.8.7')
   })
 
   it('keeps the working CLI available when the target version directory is incomplete', () => {

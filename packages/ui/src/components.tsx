@@ -8,6 +8,7 @@ import {
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type ChangeEventHandler,
+  type DialogHTMLAttributes,
   type HTMLAttributes,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -63,6 +64,66 @@ export function Button({
         children
       )}
     </button>
+  )
+}
+
+export type DialogProps = Omit<DialogHTMLAttributes<HTMLDialogElement>, 'open' | 'onClose'> & {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+/** Native modal dialog with top-layer focus containment and trigger restoration. */
+export function Dialog({
+  children,
+  className,
+  open,
+  onOpenChange,
+  onCancel,
+  onClick,
+  ...props
+}: DialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) {
+      restoreFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
+      dialog.showModal()
+      const previousOverflow = document.documentElement.style.overflow
+      document.documentElement.style.overflow = 'hidden'
+      return () => {
+        document.documentElement.style.overflow = previousOverflow
+        if (dialog.open) dialog.close()
+        restoreFocusRef.current?.focus()
+        restoreFocusRef.current = null
+      }
+    }
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  return (
+    <dialog
+      {...props}
+      ref={dialogRef}
+      className={cx('sp-dialog', className)}
+      onCancel={(event) => {
+        onCancel?.(event)
+        if (event.defaultPrevented) return
+        event.preventDefault()
+        onOpenChange(false)
+      }}
+      onClick={(event) => {
+        onClick?.(event)
+        if (!event.defaultPrevented && event.target === event.currentTarget) {
+          onOpenChange(false)
+        }
+      }}
+    >
+      {children}
+    </dialog>
   )
 }
 

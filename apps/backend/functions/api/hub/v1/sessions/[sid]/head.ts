@@ -14,6 +14,10 @@ import {
 } from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
+import {
+  prepareSessionGuidanceProjection,
+  validateSessionGuidanceForHead,
+} from '../../../../../../src/hub/guidance'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
 import {
@@ -123,9 +127,14 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       body.viewOid,
       teamId && !aliasOids.includes(body.viewOid) ? teamId : null,
     )
+    const guidance = validateSessionGuidanceForHead(view.guidance, body.count)
+    const sameRecordRoot = existing?.root === body.root
     // Pricing is part of the publication event, not the read path. Persist
     // this one calculation on the Hub row and reuse it for the projection.
-    const cost = costForUsage(view.usage)
+    const cost =
+      sameRecordRoot && existing?.total_tokens !== null && existing?.total_tokens !== undefined
+        ? { usd: existing.cost_usd, totalTokens: existing.total_tokens }
+        : costForUsage(view.usage)
 
     if (teamId && aliasOids.length > 0) {
       const [used, incoming] = await Promise.all([
@@ -170,6 +179,22 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
         ? prepareAuthorizedHeadInsert(ctx.env.DB, sessionWrite)
         : prepareAuthorizedHeadUpdate(ctx.env.DB, sessionWrite)
     const statements = [sessionCommit]
+    // A legacy client may recommit Summary/card metadata against the same
+    // immutable record root. Preserve a server-backfilled projection when
+    // that old view cannot carry guidance; a new root without guidance must
+    // still clear the stale row.
+    if (guidance !== undefined || !sameRecordRoot) {
+      statements.push(
+        prepareSessionGuidanceProjection(ctx.env.DB, {
+          sid,
+          ownerUserId: user.id,
+          root: body.root,
+          viewOid: body.viewOid,
+          updatedAt: now,
+          guidance,
+        }),
+      )
+    }
     if (teamId && aliasOids.length > 0) {
       statements.push(
         ...prepareAuthorizedPersonalObjectAliases(ctx.env.DB, {

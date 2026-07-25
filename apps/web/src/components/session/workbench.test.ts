@@ -37,7 +37,9 @@ vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 6, 20, 12))
 
 import {
   SessionWorkbench,
+  getConversationGuidanceTurns,
   getSpoolPromptEntries,
+  getSpoolGuidanceTurns,
   getUserPromptEntries,
   type SessionHistoryState,
 } from './workbench'
@@ -152,6 +154,18 @@ describe('getUserPromptEntries', () => {
       },
     ])
   })
+
+  it('excludes sidechain prompts from the authored prompt directory', () => {
+    const sidechain = { ...message(377, 'user', 'Hidden subagent instruction'), isSidechain: true }
+
+    expect(getUserPromptEntries([sidechain, message(610, 'user', 'Visible instruction')])).toEqual([
+      {
+        id: 610,
+        excerpt: 'Visible instruction',
+        preview: 'Visible instruction',
+      },
+    ])
+  })
 })
 
 describe('getSpoolPromptEntries', () => {
@@ -217,6 +231,63 @@ describe('getSpoolPromptEntries', () => {
   })
 })
 
+describe('human guidance fallbacks', () => {
+  it('groups a loaded legacy conversation by human instruction', () => {
+    const firstAgent = {
+      ...message(2, 'assistant', 'I inspected the route.'),
+      toolNames: ['Read', 'Grep'],
+    }
+    const sidechain = {
+      ...message(3, 'assistant', 'Hidden subagent response'),
+      isSidechain: true,
+      toolNames: ['Task'],
+    }
+    const turns = getConversationGuidanceTurns([
+      message(1, 'user', 'Find the rendering issue'),
+      firstAgent,
+      sidechain,
+      message(4, 'user', 'Ship the fix'),
+      { ...message(5, 'assistant', 'Done 🚀'), toolNames: ['Edit'] },
+    ])
+
+    expect(turns).toEqual([
+      {
+        prompt: 'Find the rendering issue',
+        replies: ['I inspected the route.'],
+        replyChars: 22,
+        toolCalls: 2,
+      },
+      {
+        prompt: 'Ship the fix',
+        replies: ['Done 🚀'],
+        replyChars: 6,
+        toolCalls: 1,
+      },
+    ])
+  })
+
+  it('follows selection and redaction for curated guidance', () => {
+    const document = spoolDocument(
+      [
+        { role: 'user', body: 'Hidden instruction' },
+        { role: 'assistant', body: 'Hidden response' },
+        { role: 'user', body: 'Email maya@hogwarts.edu' },
+        { role: 'assistant', body: 'Handled maya@hogwarts.edu' },
+      ],
+      { selected: [2, 3], redact: true },
+    )
+
+    expect(getSpoolGuidanceTurns(document)).toEqual([
+      {
+        prompt: 'Email m***@hogwarts.edu',
+        replies: ['Handled m***@hogwarts.edu'],
+        replyChars: 25,
+        toolCalls: null,
+      },
+    ])
+  })
+})
+
 const meta: HubSessionMeta = {
   sid: 'claude_test-session',
   root: 'root-oid',
@@ -271,8 +342,10 @@ function renderWorkbench(
         cardJson: options.cardJson === undefined ? meta.cardJson : options.cardJson,
         visibility: options.visibility ?? meta.visibility,
         cost: options.cost === undefined ? (meta.cost ?? null) : options.cost,
+        spoolFileOid: options.spool === null ? null : (meta.spoolFileOid ?? null),
       },
       view: options.view === undefined ? view : options.view,
+      viewResolved: true,
       provider: options.provider ?? 'claude',
       conversation: options.messages === undefined ? conversation : options.messages,
       isDark: false,

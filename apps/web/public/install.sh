@@ -15,13 +15,38 @@ err() {
   exit 1
 }
 
-command -v node >/dev/null 2>&1 ||
-  err "Node.js ${MIN_NODE_VERSION} or newer is required. Install Node.js, then run this command again."
-command -v npm >/dev/null 2>&1 ||
-  err "npm is required. Install Node.js ${MIN_NODE_VERSION} or newer, then run this command again."
+run_node() {
+  if [ -n "${_SPOOL_INSTALLER_TEST_SHIM:-}" ]; then
+    sh "$_SPOOL_INSTALLER_TEST_SHIM" node "$@"
+  else
+    node "$@"
+  fi
+}
+run_npm() {
+  if [ -n "${_SPOOL_INSTALLER_TEST_SHIM:-}" ]; then
+    sh "$_SPOOL_INSTALLER_TEST_SHIM" npm "$@"
+  else
+    npm "$@"
+  fi
+}
+read_spool_version() {
+  executable=$1
+  if [ -n "${_SPOOL_INSTALLER_TEST_SHIM:-}" ]; then
+    sh "$_SPOOL_INSTALLER_TEST_SHIM" spool "$executable" --version
+  else
+    "$executable" --version
+  fi
+}
 
-NODE_VERSION=$(node -p 'process.versions.node')
-node -e '
+if [ -z "${_SPOOL_INSTALLER_TEST_SHIM:-}" ]; then
+  command -v node >/dev/null 2>&1 ||
+    err "Node.js ${MIN_NODE_VERSION} or newer is required. Install Node.js, then run this command again."
+  command -v npm >/dev/null 2>&1 ||
+    err "npm is required. Install Node.js ${MIN_NODE_VERSION} or newer, then run this command again."
+fi
+
+NODE_VERSION=$(run_node -p 'process.versions.node')
+run_node -e '
   const [major, minor] = process.versions.node.split(".").map(Number)
   process.exit(major > 22 || (major === 22 && minor >= 19) ? 0 : 1)
 ' || err "Node.js ${NODE_VERSION} is too old. Spool requires Node.js ${MIN_NODE_VERSION} or newer."
@@ -63,13 +88,13 @@ fi
 existing_version=''
 if [ -x "$BIN_PATH" ]; then
   existing_version=$(
-    "$BIN_PATH" --version 2>/dev/null || true
+    read_spool_version "$BIN_PATH" 2>/dev/null || true
   )
 fi
 
 info 'Finding the latest Spool CLI release...'
 VERSION=''
-if VERSION=$(npm view "$PACKAGE" version 2>/dev/null); then
+if VERSION=$(run_npm view "$PACKAGE" version 2>/dev/null); then
   case "$VERSION" in
     [0-9]*) ;;
     *) err "npm returned an invalid Spool CLI version: $VERSION" ;;
@@ -114,7 +139,7 @@ if [ -n "$VERSION" ]; then
   installed_version=''
   if [ -x "$VERSION_DIR/bin/spool" ]; then
     installed_version=$(
-      "$VERSION_DIR/bin/spool" --version 2>/dev/null || true
+      read_spool_version "$VERSION_DIR/bin/spool" 2>/dev/null || true
     )
   fi
 
@@ -130,7 +155,7 @@ if [ -n "$VERSION" ]; then
       NPM_LOG="$LOG_DIR/npm-install.log"
 
       info "Installing Spool CLI $VERSION..."
-      if ! npm install --global --prefix "$STAGE_DIR" --no-audit --no-fund --loglevel=error \
+      if ! run_npm install --global --prefix "$STAGE_DIR" --no-audit --no-fund --loglevel=error \
         "$PACKAGE@$VERSION" >"$NPM_LOG" 2>&1; then
         printf '\n'
         cat "$NPM_LOG" >&2
@@ -142,7 +167,7 @@ if [ -n "$VERSION" ]; then
       fi
       if [ -n "$VERSION" ]; then
         staged_version=$(
-          "$STAGE_DIR/bin/spool" --version 2>/dev/null || true
+          read_spool_version "$STAGE_DIR/bin/spool" 2>/dev/null || true
         )
         if [ "$staged_version" != "$VERSION" ]; then
           keep_existing_or_fail \
@@ -154,7 +179,7 @@ if [ -n "$VERSION" ]; then
       # verified directory and discard this process's duplicate staging tree.
       if [ -n "$VERSION" ] && [ -e "$VERSION_DIR" ]; then
         concurrent_version=$(
-          "$VERSION_DIR/bin/spool" --version 2>/dev/null || true
+          read_spool_version "$VERSION_DIR/bin/spool" 2>/dev/null || true
         )
         if [ "$concurrent_version" = "$VERSION" ]; then
           rm -rf -- "$STAGE_DIR"
