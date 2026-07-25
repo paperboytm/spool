@@ -28,6 +28,7 @@ import { readCachedMe } from '../lib/me-cache'
 import { fetchTeams, TEAM_SUMMARY_CHANGED, type TeamSummary } from '../lib/team-api'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 import { AccountMenu } from './AccountMenu'
+import { SessionLanguageToggle } from './SessionLanguageToggle'
 
 export type WorkspaceDestination = 'feed' | 'library' | 'teams'
 
@@ -305,7 +306,14 @@ function WorkspaceSidebar({
       />
       <div className="workspace-sidebar-footer">
         <UtilityLinks identity={identity} />
-        <WorkspaceThemeToggle className="workspace-theme-toggle" />
+        <div
+          className="workspace-sidebar-preferences"
+          role="group"
+          aria-label="Reading preferences"
+        >
+          <SessionLanguageToggle className="workspace-language-toggle" />
+          <WorkspaceThemeToggle className="workspace-theme-toggle" />
+        </div>
       </div>
     </aside>
   )
@@ -357,6 +365,7 @@ export function WorkspaceMobileHeader({
               Publish
             </ButtonLink>
             <WorkspaceThemeToggle className="workspace-mobile-theme" showLabel />
+            <SessionLanguageToggle className="workspace-mobile-language" showLabel />
             <div className="workspace-mobile-menu-resources">
               <a href="/docs/installation">Docs</a>
               <a href="/terms">Terms</a>

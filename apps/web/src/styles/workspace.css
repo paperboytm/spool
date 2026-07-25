@@ -109,6 +109,13 @@
   gap: var(--sp-space-3);
 }
 
+.workspace-sidebar-preferences {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-space-1);
+}
+
 .workspace-account-link {
   display: inline-flex;
   min-height: 32px;

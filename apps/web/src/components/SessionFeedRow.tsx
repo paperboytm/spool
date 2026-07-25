@@ -22,6 +22,8 @@ export interface SessionFeedRowProps {
   sid: string
   title: string
   summary: string | null
+  titleLanguage?: string | undefined
+  summaryLanguage?: string | undefined
   author: SessionFeedAuthor
   timestamp: number
   timestampVerb: 'published' | 'updated'
@@ -49,6 +51,8 @@ export function SessionFeedRow({
   sid,
   title,
   summary,
+  titleLanguage,
+  summaryLanguage,
   author,
   timestamp,
   timestampVerb,
@@ -85,12 +89,16 @@ export function SessionFeedRow({
         </>
       }
       title={
-        <h2>
+        <h2 lang={titleLanguage}>
           <a href={`/session/${encodeURIComponent(sid)}`}>{title}</a>
         </h2>
       }
       summary={
-        summary ? summary : <span className="session-feed-summary is-missing">No Summary yet.</span>
+        summary ? (
+          <span lang={summaryLanguage}>{summary}</span>
+        ) : (
+          <span className="session-feed-summary is-missing">No Summary yet.</span>
+        )
       }
       metadata={metadata}
       lineage={lineage}

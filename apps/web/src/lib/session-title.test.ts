@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vite-plus/test'
 
-import { formatSessionCost, pickLocalizedSummary, pickLocalizedTitle } from './session-title'
+import {
+  formatSessionCost,
+  pickLocalizedSummary,
+  pickLocalizedTitle,
+  resolveLocalizedSessionSummary,
+  resolveLocalizedTitle,
+} from './session-title'
 
 const TITLES = { en: 'Fix refresh-token race across tabs', zh: '修复跨标签页刷新令牌竞态' }
 
@@ -11,7 +17,7 @@ describe('pickLocalizedTitle', () => {
     expect(pickLocalizedTitle(TITLES, 'fallback', 'en-US')).toBe(TITLES.en)
     expect(pickLocalizedTitle(TITLES, 'fallback', 'de')).toBe(TITLES.en)
     expect(pickLocalizedTitle({ en: TITLES.en }, 'fallback', 'zh-CN')).toBe(TITLES.en)
-    expect(pickLocalizedTitle({ zh: TITLES.zh }, 'fallback', 'en-US')).toBe('fallback')
+    expect(pickLocalizedTitle({ zh: TITLES.zh }, 'fallback', 'en-US')).toBe(TITLES.zh)
     expect(pickLocalizedTitle(null, 'fallback', 'zh-CN')).toBe('fallback')
     expect(pickLocalizedTitle({ en: '   ' }, 'fallback', 'en-US')).toBe('fallback')
   })
@@ -19,6 +25,17 @@ describe('pickLocalizedTitle', () => {
   it('defaults to English when no navigator locale exists (SSR)', () => {
     // vitest node environment has no navigator; must not throw.
     expect(pickLocalizedTitle(TITLES, 'fallback')).toBe(TITLES.en)
+  })
+
+  it('reports the language actually rendered when a translation is missing', () => {
+    expect(resolveLocalizedTitle({ zh: TITLES.zh }, 'fallback', 'en')).toEqual({
+      text: TITLES.zh,
+      language: 'zh',
+    })
+    expect(resolveLocalizedTitle(null, 'legacy title', 'zh')).toEqual({
+      text: 'legacy title',
+      language: null,
+    })
   })
 })
 
@@ -54,5 +71,9 @@ describe('pickLocalizedSummary', () => {
     expect(pickLocalizedSummary({ en: 'English only' }, 'legacy', 'zh-TW')).toBe('English only')
     expect(pickLocalizedSummary(null, 'legacy', 'zh-CN')).toBe('legacy')
     expect(pickLocalizedSummary(null, null, 'en')).toBeNull()
+    expect(resolveLocalizedSessionSummary({ en: 'English only' }, null, 'zh')).toEqual({
+      text: 'English only',
+      language: 'en',
+    })
   })
 })
