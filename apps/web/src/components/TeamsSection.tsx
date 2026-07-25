@@ -95,9 +95,16 @@ export function TeamList({ teams }: { teams: TeamSummary[] }) {
   )
 }
 
-export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {}) {
+export function TeamsSection({
+  signInNext = '/me',
+  presentation = 'index',
+}: {
+  signInNext?: string
+  presentation?: 'index' | 'create'
+} = {}) {
+  const creationOnly = presentation === 'create'
   const [state, setState] = useState<TeamsState>({ kind: 'loading' })
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState(creationOnly)
   const [createBusy, setCreateBusy] = useState(false)
   const [name, setName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
@@ -137,27 +144,33 @@ export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {
         id="teams-heading"
         role="heading"
         aria-level={2}
-        count={state.kind === 'ready' && state.teams.length > 0 ? state.teams.length : undefined}
+        count={
+          !creationOnly && state.kind === 'ready' && state.teams.length > 0
+            ? state.teams.length
+            : undefined
+        }
         action={
-          <Button
-            size="sm"
-            variant="ghost"
-            className="sw-teams-create-trigger"
-            aria-expanded={creating}
-            onClick={() => {
-              setCreateError(null)
-              setCreating((value) => {
-                if (!value) createIntent.started()
-                return !value
-              })
-            }}
-          >
-            <Plus aria-hidden="true" />
-            Create team
-          </Button>
+          creationOnly ? undefined : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="sw-teams-create-trigger"
+              aria-expanded={creating}
+              onClick={() => {
+                setCreateError(null)
+                setCreating((value) => {
+                  if (!value) createIntent.started()
+                  return !value
+                })
+              }}
+            >
+              <Plus aria-hidden="true" />
+              Create team
+            </Button>
+          )
         }
       >
-        Teams
+        {creationOnly ? 'New team' : 'Teams'}
       </SectionLabel>
 
       {creating ? (
@@ -177,19 +190,22 @@ export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {
             />
           </label>
           <div className="sw-team-create-actions">
+            {!creationOnly ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={createBusy}
+                onClick={() => {
+                  setCreating(false)
+                  setName('')
+                  setCreateError(null)
+                }}
+              >
+                Cancel
+              </Button>
+            ) : null}
             <Button
-              type="button"
-              variant="ghost"
-              disabled={createBusy}
-              onClick={() => {
-                setCreating(false)
-                setName('')
-                setCreateError(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
+              size="lg"
               type="submit"
               variant="accent"
               loading={createBusy}
@@ -207,13 +223,13 @@ export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {
         </form>
       ) : null}
 
-      {state.kind === 'loading' ? (
+      {!creationOnly && state.kind === 'loading' ? (
         <div className="sw-team-panel-message" aria-busy="true">
           <span className="sw-spin sw-spin-anim" aria-hidden="true" />
           <span>Loading teams</span>
         </div>
       ) : null}
-      {state.kind === 'error' ? (
+      {!creationOnly && state.kind === 'error' ? (
         <div className="sw-team-panel-error" role="alert">
           <p>{state.message}</p>
           <Button variant="outline" onClick={() => void load()}>
@@ -221,7 +237,7 @@ export function TeamsSection({ signInNext = '/me' }: { signInNext?: string } = {
           </Button>
         </div>
       ) : null}
-      {state.kind === 'ready' ? <TeamList teams={state.teams} /> : null}
+      {!creationOnly && state.kind === 'ready' ? <TeamList teams={state.teams} /> : null}
     </section>
   )
 }

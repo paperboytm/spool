@@ -1182,7 +1182,7 @@ html[data-theme='dark'] .sw-root {
 .sw-team-member-actions select {
   width: 100%;
   min-width: 0;
-  height: 48px;
+  height: var(--sp-control-button-lg);
   border: 1px solid var(--border-strong);
   border-radius: var(--sp-radius-input);
   padding: 0 var(--sp-space-3);
@@ -1372,7 +1372,6 @@ html[data-theme='dark'] .sw-root {
   display: none;
 }
 .sw-team-panel {
-  min-height: 320px;
   padding: var(--sp-space-6);
   border: 1px solid var(--border);
   border-top: 0;
@@ -1531,7 +1530,8 @@ html[data-theme='dark'] .sw-root {
   gap: var(--sp-space-6);
 }
 .sw-team-rename {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--sp-space-2);
 }
@@ -1551,8 +1551,6 @@ html[data-theme='dark'] .sw-root {
 .sw-team-danger-zone {
   align-items: center;
   margin-top: var(--sp-space-6);
-  padding-top: var(--sp-space-6);
-  border-top: 1px solid var(--border);
   border-bottom: 0;
 }
 
@@ -1602,7 +1600,6 @@ html[data-theme='dark'] .sw-root {
     height: 48px;
   }
   .sw-team-panel {
-    min-height: 240px;
     padding: var(--sp-space-4);
   }
   .sw-team-panel-error {
@@ -1649,6 +1646,11 @@ html[data-theme='dark'] .sw-root {
   .sw-team-rename,
   .sw-team-danger-actions {
     align-items: stretch;
+  }
+  .sw-team-rename {
+    grid-template-columns: 1fr;
+  }
+  .sw-team-danger-actions {
     flex-direction: column;
   }
   .sw-team-danger-actions .sp-button {

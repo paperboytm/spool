@@ -52,6 +52,48 @@
   gap: var(--sp-space-1);
 }
 
+.workspace-team-navigation {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-space-1);
+}
+
+.workspace-team-navigation-chevron {
+  transition: transform var(--sp-motion-hover);
+}
+
+.workspace-team-navigation-chevron[data-expanded='true'] {
+  transform: rotate(180deg);
+}
+
+.workspace-team-navigation-items {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-space-1);
+  padding-left: var(--sp-space-5);
+}
+
+.workspace-team-navigation-item.sp-nav-item {
+  position: relative;
+  min-height: 32px;
+  color: var(--muted);
+  font-size: var(--sp-text-meta);
+}
+
+.workspace-team-navigation-item.sp-nav-item::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--sp-space-2) * -1);
+  width: 1px;
+  background: var(--border);
+  content: '';
+}
+
+.workspace-team-navigation-item.sp-nav-item[data-active='true']::before {
+  background: var(--accent);
+}
+
 .workspace-sidebar-footer {
   display: flex;
   align-items: flex-end;
@@ -189,6 +231,29 @@
   padding: var(--sp-space-6);
 }
 
+.workspace-feed-header {
+  display: flex;
+  min-height: var(--sp-control-tab);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-space-4);
+  padding: 0 var(--sp-space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-feed-header h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.workspace-feed-header span {
+  color: var(--muted);
+  font-size: var(--sp-text-meta);
+}
+
 @media (max-width: 768px) {
   .workspace-shell {
     display: block;
@@ -243,6 +308,10 @@
     min-height: 44px;
   }
 
+  .workspace-mobile-menu-primary .workspace-team-navigation-item.sp-nav-item {
+    min-height: 44px;
+  }
+
   .workspace-page-header {
     padding: var(--sp-space-6) var(--sp-space-4) var(--sp-space-5);
   }
@@ -253,6 +322,11 @@
 
   .workspace-page-body {
     padding: var(--sp-space-4);
+  }
+
+  .workspace-feed-header {
+    min-height: 44px;
+    padding: 0 var(--sp-space-4);
   }
 }
 

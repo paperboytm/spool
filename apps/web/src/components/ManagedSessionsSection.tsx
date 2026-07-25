@@ -1,5 +1,5 @@
 import { Button, SectionLabel } from '@spool-lab/ui'
-import { ShieldCheck } from 'lucide-react'
+import { Library } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -154,7 +154,7 @@ export function ManagedSessionsSection({
       ) : null}
       {state.kind === 'ready' && state.sessions.length === 0 ? (
         <div className={isFeed ? 'session-feed-state' : 'sw-team-empty'}>
-          <ShieldCheck size={20} strokeWidth={1.6} aria-hidden="true" />
+          <Library size={20} strokeWidth={1.6} aria-hidden="true" />
           <div>
             <h2>No uploaded Sessions yet</h2>
             <p>Share a Session from the CLI to see it here.</p>

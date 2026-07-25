@@ -94,7 +94,7 @@ export function prepareHubSessionUpsert(
     )
 }
 
-export type AuthorizedHeadUpsert = HubSessionUpsert & {
+export type AuthorizedHeadWrite = HubSessionUpsert & {
   actorUserId: string
   /** The tenant observed before doing any R2 or multi-statement preparation. */
   expectedTeamId: string | null
@@ -103,7 +103,6 @@ export type AuthorizedHeadUpsert = HubSessionUpsert & {
   expectedRoot: string | null
   expectedUpdatedAt: number | null
   expectedPublished: boolean
-  expectedExists: boolean
   /** The durable tenant and storage visibility after this commit. */
   targetTeamId: string | null
   targetVisibility: 'unlisted' | 'private'
@@ -113,24 +112,21 @@ export type AuthorizedHeadUpsert = HubSessionUpsert & {
 }
 
 /**
- * Commit a head only while the exact disclosure snapshot and Team authority
- * validated by the request are still current. The SELECT gate applies to both
- * a new insert and the ON CONFLICT update, so an archive/removal that wins the
- * race makes this statement a zero-row no-op inside the final D1 batch.
+ * Insert a new head only while the actor and target Team authority validated
+ * by the request are still current. This deliberately has no conflict handler:
+ * a same-SID commit that wins after the preflight must raise a SQL constraint
+ * error so D1 rolls back every later statement in the batch, including any
+ * one-use Resume grant claim.
  */
-export function prepareAuthorizedHeadUpsert(
+export function prepareAuthorizedHeadInsert(
   db: D1Database,
-  row: AuthorizedHeadUpsert,
+  row: AuthorizedHeadWrite,
 ): D1PreparedStatement {
   const manager = row.requireTeamManager ? 1 : 0
-  const changeAccess = row.changeAccess ? 1 : 0
-  const clearWithdrawal = row.clearWithdrawal ? 1 : 0
-  const expectedExists = row.expectedExists ? 1 : 0
-  const expectedPublished = row.expectedPublished ? 1 : 0
 
   return db
     .prepare(
-      `/* hub:authorized-head-upsert */
+      `/* hub:authorized-head-insert */
        INSERT INTO hub_sessions
          (sid, owner_user_id, root, record_count, sig, card_json, note_md,
           lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens,
@@ -151,38 +147,7 @@ export function prepareAuthorizedHeadUpsert(
            AND m.user_id=? AND (?=0 OR m.role IN ('owner','admin'))
            AND actor_user.deleted_at IS NULL
            AND actor_user.deletion_pending_until IS NULL
-       ))
-       ON CONFLICT(sid) DO UPDATE SET
-         root=excluded.root,
-         record_count=excluded.record_count,
-         sig=excluded.sig,
-         card_json=excluded.card_json,
-         note_md=excluded.note_md,
-         lineage_json=excluded.lineage_json,
-         view_oid=excluded.view_oid,
-         spool_file_oid=excluded.spool_file_oid,
-         cost_usd=excluded.cost_usd,
-         total_tokens=excluded.total_tokens,
-         visibility=CASE WHEN ?=1 THEN excluded.visibility ELSE hub_sessions.visibility END,
-         team_id=CASE WHEN ?=1 THEN excluded.team_id ELSE hub_sessions.team_id END,
-         withdrawn_at=CASE WHEN ?=1 THEN NULL ELSE hub_sessions.withdrawn_at END,
-         updated_at=excluded.updated_at
-       WHERE ?=1
-         AND hub_sessions.owner_user_id=?
-         AND hub_sessions.root=?
-         AND hub_sessions.updated_at=?
-         AND hub_sessions.team_id IS ?
-         AND hub_sessions.visibility=?
-         AND hub_sessions.withdrawn_at IS ?
-         AND (
-           (?=1 AND EXISTS (
-             SELECT 1 FROM hub_session_discovery d WHERE d.sid=hub_sessions.sid
-           ))
-           OR
-           (?=0 AND NOT EXISTS (
-             SELECT 1 FROM hub_session_discovery d WHERE d.sid=hub_sessions.sid
-           ))
-         )`,
+       ))`,
     )
     .bind(
       row.sid,
@@ -206,10 +171,92 @@ export function prepareAuthorizedHeadUpsert(
       row.targetTeamId,
       row.actorUserId,
       manager,
+    )
+}
+
+/**
+ * Update an existing head only while the exact disclosure snapshot and Team
+ * authority validated by the request are still current. A deletion, archive,
+ * membership change, or competing head commit makes this a zero-row no-op.
+ * Unlike an upsert, a deleted expected row can never be recreated here.
+ */
+export function prepareAuthorizedHeadUpdate(
+  db: D1Database,
+  row: AuthorizedHeadWrite,
+): D1PreparedStatement {
+  const manager = row.requireTeamManager ? 1 : 0
+  const changeAccess = row.changeAccess ? 1 : 0
+  const clearWithdrawal = row.clearWithdrawal ? 1 : 0
+  const expectedPublished = row.expectedPublished ? 1 : 0
+
+  return db
+    .prepare(
+      `/* hub:authorized-head-update */
+       UPDATE hub_sessions
+       SET root=?,
+           record_count=?,
+           sig=?,
+           card_json=?,
+           note_md=?,
+           lineage_json=?,
+           view_oid=?,
+           spool_file_oid=?,
+           cost_usd=?,
+           total_tokens=?,
+           visibility=CASE WHEN ?=1 THEN ? ELSE visibility END,
+           team_id=CASE WHEN ?=1 THEN ? ELSE team_id END,
+           withdrawn_at=CASE WHEN ?=1 THEN NULL ELSE withdrawn_at END,
+           updated_at=?
+       WHERE sid=?
+         AND owner_user_id=?
+         AND root=?
+         AND updated_at=?
+         AND team_id IS ?
+         AND visibility=?
+         AND withdrawn_at IS ?
+         AND (
+           (?=1 AND EXISTS (
+             SELECT 1 FROM hub_session_discovery d WHERE d.sid=hub_sessions.sid
+           ))
+           OR
+           (?=0 AND NOT EXISTS (
+             SELECT 1 FROM hub_session_discovery d WHERE d.sid=hub_sessions.sid
+           ))
+         )
+         AND EXISTS (
+           SELECT 1 FROM users actor
+           WHERE actor.id=? AND actor.deleted_at IS NULL
+             AND actor.deletion_pending_until IS NULL
+         )
+         AND (? IS NULL OR EXISTS (
+           SELECT 1
+           FROM teams t
+           JOIN team_memberships m ON m.team_id=t.id
+           JOIN users actor_user ON actor_user.id=m.user_id
+           WHERE t.id=? AND t.archived_at IS NULL AND t.deletion_pending_until IS NULL
+             AND m.user_id=? AND (?=0 OR m.role IN ('owner','admin'))
+             AND actor_user.deleted_at IS NULL
+             AND actor_user.deletion_pending_until IS NULL
+         ))`,
+    )
+    .bind(
+      row.root,
+      row.recordCount,
+      row.sig,
+      row.cardJson,
+      row.summaryMd,
+      row.lineageJson,
+      row.viewOid,
+      row.spoolFileOid,
+      row.costUsd,
+      row.totalTokens,
       changeAccess,
+      row.targetVisibility,
       changeAccess,
+      row.targetTeamId,
       clearWithdrawal,
-      expectedExists,
+      row.now,
+      row.sid,
       row.actorUserId,
       row.expectedRoot,
       row.expectedUpdatedAt,
@@ -218,6 +265,11 @@ export function prepareAuthorizedHeadUpsert(
       row.expectedWithdrawnAt,
       expectedPublished,
       expectedPublished,
+      row.actorUserId,
+      row.targetTeamId,
+      row.targetTeamId,
+      row.actorUserId,
+      manager,
     )
 }
 

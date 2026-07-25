@@ -185,6 +185,34 @@ type HubSessionEngagementDailyRow = {
   qualified_reads: number
 }
 
+type HubSessionStarRow = {
+  sid: string
+  user_id: string
+  created_at: number
+}
+
+type HubSessionResumeGrantRow = {
+  token_hash: string
+  source_sid: string
+  source_root: string
+  source_position: number
+  created_at: number
+  expires_at: number
+  claimed_child_sid: string | null
+  claimed_child_root: string | null
+  claimed_at: number | null
+}
+
+type HubSessionVerifiedForkRow = {
+  child_sid: string
+  source_sid: string
+  source_root: string
+  source_position: number
+  child_root: string
+  grant_token_hash: string
+  verified_at: number
+}
+
 export type WorkosCleanupOutboxRow = {
   id: string
   operation: 'membership.delete' | 'organization.delete' | 'invitation.revoke'
@@ -214,6 +242,9 @@ export type FakeDbState = {
   api_tokens: ApiTokenRow[]
   hub_session_discovery: HubSessionDiscoveryRow[]
   hub_session_engagement_daily: HubSessionEngagementDailyRow[]
+  hub_session_stars: HubSessionStarRow[]
+  hub_session_resume_grants: HubSessionResumeGrantRow[]
+  hub_session_verified_forks: HubSessionVerifiedForkRow[]
 }
 
 export function emptyState(): FakeDbState {
@@ -233,6 +264,9 @@ export function emptyState(): FakeDbState {
     api_tokens: [],
     hub_session_discovery: [],
     hub_session_engagement_daily: [],
+    hub_session_stars: [],
+    hub_session_resume_grants: [],
+    hub_session_verified_forks: [],
   }
 }
 
@@ -255,6 +289,22 @@ export function makeDb(state: FakeDbState = emptyState()): {
     return (
       state.team_memberships.find((row) => row.team_id === teamId && row.user_id === userId)
         ?.role ?? null
+    )
+  }
+
+  function isLivePublicSession(sid: string): boolean {
+    const session = state.hub_sessions.find(
+      (row) => row.sid === sid && row.visibility === 'unlisted' && row.withdrawn_at === null,
+    )
+    if (!session || !state.hub_session_discovery.some((row) => row.sid === sid)) return false
+    const author = state.users.find((row) => row.id === session.owner_user_id)
+    if (!author) return false
+    if (session.team_id == null) return author.deleted_at === null
+    return state.teams.some(
+      (row) =>
+        row.id === session.team_id &&
+        row.archived_at === null &&
+        (row.deletion_pending_until ?? null) === null,
     )
   }
 
@@ -378,6 +428,23 @@ export function makeDb(state: FakeDbState = emptyState()): {
           return (session.team_id == null && owner.deleted_at === null) || team
             ? ({ '1': 1 } as T)
             : null
+        }
+        if (sql.includes('/* discovery:social */')) {
+          const [sid, viewerUserId] = params as [string, string | null, string | null]
+          if (!isLivePublicSession(sid)) return null
+          const starCount = state.hub_session_stars.filter((row) => row.sid === sid).length
+          const forkCount = state.hub_session_verified_forks.filter(
+            (row) =>
+              row.child_sid !== sid && row.source_sid === sid && isLivePublicSession(row.child_sid),
+          ).length
+          const viewerStarred =
+            viewerUserId !== null &&
+            state.hub_session_stars.some((row) => row.sid === sid && row.user_id === viewerUserId)
+          return {
+            star_count: starCount,
+            fork_count: forkCount,
+            viewer_starred: viewerStarred ? 1 : 0,
+          } as T
         }
         if (/^SELECT \* FROM hub_sessions WHERE sid=\?$/i.test(sql)) {
           const [sid] = params as [string]
@@ -892,6 +959,18 @@ export function makeDb(state: FakeDbState = emptyState()): {
             meta: { changes: before - state.hub_session_engagement_daily.length },
           }
         }
+        if (sql.includes('/* discovery:authorized-delete-target-stars */')) {
+          const [sid] = params as [string]
+          if (!authorizedProjectionGateAllows(params, 1)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const before = state.hub_session_stars.length
+          state.hub_session_stars = state.hub_session_stars.filter((row) => row.sid !== sid)
+          return {
+            success: true,
+            meta: { changes: before - state.hub_session_stars.length },
+          }
+        }
         if (sql.includes('/* discovery:authorized-delete-projection */')) {
           const [sid] = params as [string]
           if (!authorizedProjectionGateAllows(params, 1)) {
@@ -1010,7 +1089,211 @@ export function makeDb(state: FakeDbState = emptyState()): {
           else state.hub_session_engagement_daily.push({ sid, day, qualified_reads: 1 })
           return { success: true, meta: { changes: 1 } }
         }
-        if (sql.includes('/* hub:authorized-head-upsert */')) {
+        if (sql.includes('/* discovery:add-star-if-live */')) {
+          const [createdAt, userId, sid] = params as [number, string, string]
+          const viewer = state.users.find(
+            (row) =>
+              row.id === userId && row.deleted_at === null && row.deletion_pending_until === null,
+          )
+          if (!viewer || !isLivePublicSession(sid)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (state.hub_session_stars.some((row) => row.sid === sid && row.user_id === userId)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          state.hub_session_stars.push({ sid, user_id: userId, created_at: createdAt })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* discovery:delete-star-if-live */')) {
+          const [sid, userId] = params as [string, string]
+          if (!isLivePublicSession(sid)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const before = state.hub_session_stars.length
+          state.hub_session_stars = state.hub_session_stars.filter(
+            (row) => row.sid !== sid || row.user_id !== userId,
+          )
+          return { success: true, meta: { changes: before - state.hub_session_stars.length } }
+        }
+        if (sql.includes('/* hub:create-resume-grant */')) {
+          const [
+            tokenHash,
+            position,
+            createdAt,
+            expiresAt,
+            sid,
+            root,
+            updatedAt,
+            minimumCount,
+            expectedUnlistedTeamId,
+            expectedTeamId,
+            teamViewerUserId,
+          ] = params as [
+            string,
+            number,
+            number,
+            number,
+            string,
+            string,
+            number,
+            number,
+            string | null,
+            string | null,
+            string | null,
+            string | null,
+          ]
+          const session = state.hub_sessions.find(
+            (row) =>
+              row.sid === sid &&
+              row.root === root &&
+              row.updated_at === updatedAt &&
+              row.record_count >= minimumCount &&
+              row.withdrawn_at === null,
+          )
+          const readable =
+            session !== undefined &&
+            ((session.visibility === 'unlisted' &&
+              (session.team_id ?? null) === expectedUnlistedTeamId) ||
+              (session.visibility === 'private' &&
+                (session.team_id ?? null) === expectedTeamId &&
+                teamViewerUserId !== null &&
+                expectedTeamId !== null &&
+                activeTeamRoleFor(expectedTeamId, teamViewerUserId) !== null))
+          if (
+            !readable ||
+            state.hub_session_resume_grants.some((row) => row.token_hash === tokenHash)
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          state.hub_session_resume_grants.push({
+            token_hash: tokenHash,
+            source_sid: sid,
+            source_root: root,
+            source_position: position,
+            created_at: createdAt,
+            expires_at: expiresAt,
+            claimed_child_sid: null,
+            claimed_child_root: null,
+            claimed_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:delete-expired-resume-grants */')) {
+          const [now] = params as [number]
+          const before = state.hub_session_resume_grants.length
+          state.hub_session_resume_grants = state.hub_session_resume_grants.filter(
+            (row) => row.claimed_child_sid !== null || row.expires_at >= now,
+          )
+          return {
+            success: true,
+            meta: { changes: before - state.hub_session_resume_grants.length },
+          }
+        }
+        if (sql.includes('/* hub:claim-verified-fork */')) {
+          const [
+            verifiedAt,
+            childSid,
+            tokenHash,
+            sourceSid,
+            sourcePosition,
+            minimumExpiry,
+            childOwnerUserId,
+            childRoot,
+            childCreatedAt,
+            childUpdatedAt,
+            audienceTeamId,
+          ] = params as [
+            number,
+            string,
+            string,
+            string,
+            number,
+            number,
+            string,
+            string,
+            number,
+            number,
+            string | null,
+            string | null,
+            string | null,
+            string | null,
+          ]
+          const grant = state.hub_session_resume_grants.find(
+            (row) =>
+              row.token_hash === tokenHash &&
+              row.source_sid === sourceSid &&
+              row.source_position === sourcePosition &&
+              row.expires_at >= minimumExpiry &&
+              row.claimed_child_sid === null,
+          )
+          const source = state.hub_sessions.find((row) => row.sid === sourceSid)
+          const child = state.hub_sessions.find((row) => row.sid === childSid)
+          const sourceAudience =
+            source !== undefined &&
+            (audienceTeamId === null
+              ? source.visibility === 'unlisted' &&
+                source.withdrawn_at === null &&
+                state.hub_session_discovery.some((row) => row.sid === sourceSid)
+              : child?.visibility === 'private' &&
+                child.team_id === audienceTeamId &&
+                source.team_id === audienceTeamId &&
+                source.withdrawn_at === null)
+          const eligible =
+            grant !== undefined &&
+            source !== undefined &&
+            child !== undefined &&
+            child.sid !== source.sid &&
+            child.owner_user_id === childOwnerUserId &&
+            child.root === childRoot &&
+            child.created_at === childCreatedAt &&
+            child.updated_at === childUpdatedAt &&
+            child.withdrawn_at === null &&
+            grant.source_position <= source.record_count &&
+            sourceAudience
+          if (
+            !eligible ||
+            state.hub_session_verified_forks.some(
+              (row) => row.child_sid === childSid || row.grant_token_hash === tokenHash,
+            )
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          state.hub_session_verified_forks.push({
+            child_sid: childSid,
+            source_sid: sourceSid,
+            source_root: grant.source_root,
+            source_position: sourcePosition,
+            child_root: childRoot,
+            grant_token_hash: tokenHash,
+            verified_at: verifiedAt,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:mark-resume-grant-claimed */')) {
+          const [childSid, childRoot, claimedAt, tokenHash] = params as [
+            string,
+            string,
+            number,
+            string,
+            string,
+            string,
+          ]
+          const grant = state.hub_session_resume_grants.find(
+            (row) => row.token_hash === tokenHash && row.claimed_child_sid === null,
+          )
+          const relation = state.hub_session_verified_forks.find(
+            (row) =>
+              row.grant_token_hash === tokenHash &&
+              row.child_sid === childSid &&
+              row.child_root === childRoot,
+          )
+          if (!grant || !relation) return { success: true, meta: { changes: 0 } }
+          grant.claimed_child_sid = childSid
+          grant.claimed_child_root = childRoot
+          grant.claimed_at = claimedAt
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:authorized-head-insert */')) {
           const [
             sid,
             ownerUserId,
@@ -1033,17 +1316,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
             ,
             ,
             requireTeamManager,
-            changeAccess,
-            ,
-            clearWithdrawal,
-            expectedExists,
-            ,
-            expectedRoot,
-            expectedUpdatedAt,
-            expectedTeamId,
-            expectedVisibility,
-            expectedWithdrawnAt,
-            expectedPublished,
           ] = params as [
             string,
             string,
@@ -1066,10 +1338,96 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string | null,
             string,
             number,
+          ]
+          const actor = state.users.find((row) => row.id === actorUserId)
+          if (!actor || actor.deleted_at !== null || actor.deletion_pending_until !== null) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (targetTeamId !== null) {
+            const role = activeTeamRoleFor(targetTeamId, actorUserId)
+            if (
+              role === null ||
+              (requireTeamManager === 1 && role !== 'owner' && role !== 'admin') ||
+              actor.deleted_at !== null ||
+              actor.deletion_pending_until !== null
+            ) {
+              return { success: true, meta: { changes: 0 } }
+            }
+          }
+          if (state.hub_sessions.some((row) => row.sid === sid)) {
+            throw new Error('UNIQUE constraint failed: hub_sessions.sid')
+          }
+          state.hub_sessions.push({
+            sid,
+            owner_user_id: ownerUserId,
+            root,
+            record_count: recordCount,
+            sig,
+            card_json: cardJson,
+            note_md: summaryMd,
+            lineage_json: lineageJson,
+            view_oid: viewOid,
+            spool_file_oid: spoolFileOid,
+            cost_usd: costUsd,
+            total_tokens: totalTokens,
+            visibility: targetVisibility,
+            team_id: targetTeamId,
+            withdrawn_at: null,
+            created_at: createdAt,
+            updated_at: updatedAt,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* hub:authorized-head-update */')) {
+          const [
+            root,
+            recordCount,
+            sig,
+            cardJson,
+            summaryMd,
+            lineageJson,
+            viewOid,
+            spoolFileOid,
+            costUsd,
+            totalTokens,
+            changeAccess,
+            targetVisibility,
+            ,
+            targetTeamId,
+            clearWithdrawal,
+            updatedAt,
+            sid,
+            actorUserId,
+            expectedRoot,
+            expectedUpdatedAt,
+            expectedTeamId,
+            expectedVisibility,
+            expectedWithdrawnAt,
+            expectedPublished,
+            ,
+            ,
+            ,
+            ,
+            ,
+            requireTeamManager,
+          ] = params as [
+            string,
+            number,
+            string | null,
+            string | null,
+            string | null,
+            string | null,
+            string,
+            string | null,
+            number | null,
+            number | null,
+            number,
+            string,
+            number,
+            string | null,
             number,
             number,
-            number,
-            number,
+            string,
             string,
             string | null,
             number | null,
@@ -1077,6 +1435,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
             string,
             number | null,
             number,
+            number,
+            string,
+            string | null,
+            string | null,
+            string,
             number,
           ]
           const actor = state.users.find((row) => row.id === actorUserId)
@@ -1095,31 +1458,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
             }
           }
           const existing = state.hub_sessions.find((row) => row.sid === sid)
-          if (!existing) {
-            state.hub_sessions.push({
-              sid,
-              owner_user_id: ownerUserId,
-              root,
-              record_count: recordCount,
-              sig,
-              card_json: cardJson,
-              note_md: summaryMd,
-              lineage_json: lineageJson,
-              view_oid: viewOid,
-              spool_file_oid: spoolFileOid,
-              cost_usd: costUsd,
-              total_tokens: totalTokens,
-              visibility: targetVisibility,
-              team_id: targetTeamId,
-              withdrawn_at: null,
-              created_at: createdAt,
-              updated_at: updatedAt,
-            })
-            return { success: true, meta: { changes: 1 } }
-          }
+          if (!existing) return { success: true, meta: { changes: 0 } }
           const isPublished = state.hub_session_discovery.some((row) => row.sid === sid)
           if (
-            expectedExists !== 1 ||
             existing.owner_user_id !== actorUserId ||
             existing.root !== expectedRoot ||
             existing.updated_at !== expectedUpdatedAt ||
@@ -1991,6 +2332,25 @@ export function makeDb(state: FakeDbState = emptyState()): {
           state.hub_objects = state.hub_objects.filter((row) => row.owner_user_id !== ownerUserId)
           return { success: true, meta: { changes: before - state.hub_objects.length } }
         }
+        if (sql.includes('/* account-deletion:delete-target-stars */')) {
+          const [ownerUserId] = params as [string]
+          const targetSids = new Set(
+            state.hub_sessions
+              .filter((row) => row.owner_user_id === ownerUserId && row.team_id == null)
+              .map((row) => row.sid),
+          )
+          const before = state.hub_session_stars.length
+          state.hub_session_stars = state.hub_session_stars.filter(
+            (row) => !targetSids.has(row.sid),
+          )
+          return { success: true, meta: { changes: before - state.hub_session_stars.length } }
+        }
+        if (sql.includes('/* account-deletion:delete-viewer-stars */')) {
+          const [userId] = params as [string]
+          const before = state.hub_session_stars.length
+          state.hub_session_stars = state.hub_session_stars.filter((row) => row.user_id !== userId)
+          return { success: true, meta: { changes: before - state.hub_session_stars.length } }
+        }
         if (/^DELETE FROM hub_sessions WHERE owner_user_id=\? AND team_id IS NULL$/i.test(sql)) {
           const [ownerUserId] = params as [string]
           const deletedSids = new Set(
@@ -2006,6 +2366,9 @@ export function makeDb(state: FakeDbState = emptyState()): {
             (row) => !deletedSids.has(row.sid),
           )
           state.hub_session_engagement_daily = state.hub_session_engagement_daily.filter(
+            (row) => !deletedSids.has(row.sid),
+          )
+          state.hub_session_stars = state.hub_session_stars.filter(
             (row) => !deletedSids.has(row.sid),
           )
           return { success: true, meta: { changes: before - state.hub_sessions.length } }
@@ -2439,7 +2802,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
     async batch(statements: Array<{ run(): Promise<unknown> }>) {
       const snapshot = structuredClone(state)
       try {
-        const results = []
+        const results: unknown[] = []
         for (const statement of statements) results.push(await statement.run())
         return results
       } catch (error) {

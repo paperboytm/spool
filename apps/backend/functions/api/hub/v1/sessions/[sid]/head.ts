@@ -9,6 +9,7 @@ import {
   prepareAuthorizedDiscoveryProjectionDelete,
   prepareAuthorizedDiscoveryProjectionUpsert,
   prepareAuthorizedEngagementDelete,
+  prepareAuthorizedTargetStarsDelete,
   readDiscoveryView,
 } from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
@@ -16,11 +17,16 @@ import { requireHubUser } from '../../../../../../src/hub/auth'
 import { validateHead, type HubEnv } from '../../../../../../src/hub/head'
 import { writeManifest } from '../../../../../../src/hub/packs'
 import {
+  prepareVerifiedForkClaim,
+  sanitizeResumeLineageProof,
+} from '../../../../../../src/hub/resume-grants'
+import {
   getHubSession,
   isTeamStorageQuotaError,
   personalObjectBytes,
   prepareAuthorizedPersonalObjectAliases,
-  prepareAuthorizedHeadUpsert,
+  prepareAuthorizedHeadInsert,
+  prepareAuthorizedHeadUpdate,
   teamStorageBytes,
 } from '../../../../../../src/hub/store'
 import { parseHeadBody, requireSid, TEAM_QUOTA_BYTES } from '../../../../../../src/hub/wire'
@@ -100,9 +106,10 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     if (requireTeamManager && teamRole !== 'owner' && teamRole !== 'admin') {
       throw new ApiError('FORBIDDEN')
     }
+    const resumeLineage = sanitizeResumeLineageProof(body.lineageJson)
     const safeLineageJson = await filterLineageForAudience(
       ctx.env.DB,
-      body.lineageJson,
+      resumeLineage.lineageJson,
       effectiveVisibility === 'team' ? teamId : null,
     )
 
@@ -131,7 +138,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     }
 
     const now = existing ? Math.max(Date.now(), existing.updated_at + 1) : Date.now()
-    const sessionUpsert = prepareAuthorizedHeadUpsert(ctx.env.DB, {
+    const sessionWrite = {
       sid,
       ownerUserId: user.id,
       root: body.root,
@@ -152,14 +159,17 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       expectedRoot: existing?.root ?? null,
       expectedUpdatedAt: existing?.updated_at ?? null,
       expectedPublished: wasPublic,
-      expectedExists: existing !== null,
       targetTeamId: teamId,
       targetVisibility: requestedStorageVisibility,
       changeAccess: accessChanged,
       clearWithdrawal: existing?.team_id == null && existing?.withdrawn_at != null,
       requireTeamManager,
-    })
-    const statements = [sessionUpsert]
+    } as const
+    const sessionCommit =
+      existing === null
+        ? prepareAuthorizedHeadInsert(ctx.env.DB, sessionWrite)
+        : prepareAuthorizedHeadUpdate(ctx.env.DB, sessionWrite)
+    const statements = [sessionCommit]
     if (teamId && aliasOids.length > 0) {
       statements.push(
         ...prepareAuthorizedPersonalObjectAliases(ctx.env.DB, {
@@ -174,6 +184,22 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
           now,
           requireTeamManager,
         }),
+      )
+    }
+    // A verified fork is established only on the child's first head commit.
+    // The proof itself is never persisted; invalid, expired, or reused grants
+    // degrade to legacy display lineage without blocking the share.
+    if (existing === null && safeLineageJson !== null && resumeLineage.claim !== null) {
+      statements.push(
+        ...(await prepareVerifiedForkClaim(ctx.env.DB, {
+          claim: resumeLineage.claim,
+          childSid: sid,
+          childRoot: body.root,
+          childOwnerUserId: user.id,
+          childCreatedAt: now,
+          audienceTeamId: effectiveVisibility === 'team' ? teamId : null,
+          now,
+        })),
       )
     }
     const projectionGate = {
@@ -209,6 +235,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       // Team recommit also scrubs stale projections left by an older build.
       statements.push(
         prepareAuthorizedEngagementDelete(ctx.env.DB, projectionGate),
+        prepareAuthorizedTargetStarsDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedDiscoveryProjectionDelete(ctx.env.DB, projectionGate),
       )
     }
@@ -220,6 +247,12 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     } catch (error) {
       if (isTeamStorageQuotaError(error)) {
         throw new ApiError('UNPROCESSABLE', 'Team storage quota exceeded')
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes('UNIQUE constraint failed: hub_sessions.sid')
+      ) {
+        throw new ApiError('CONFLICT', 'Session was committed concurrently; retry')
       }
       throw error
     }

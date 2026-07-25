@@ -7,12 +7,12 @@ export function TeamsPage() {
   return (
     <WorkspaceFrame active="teams" mainClassName="workspace-content-main">
       <header className="workspace-page-header">
-        <p className="workspace-page-eyebrow">Shared workspaces</p>
-        <h1>Teams</h1>
-        <p>Open a Team’s recent Session feed, manage members, or create a workspace.</p>
+        <p className="workspace-page-eyebrow">Team workspace</p>
+        <h1>Create a Team</h1>
+        <p>Start a private workspace for Sessions shared with current members.</p>
       </header>
       <div className="workspace-page-body">
-        <TeamsSection signInNext="/teams" />
+        <TeamsSection signInNext="/teams" presentation="create" />
       </div>
     </WorkspaceFrame>
   )

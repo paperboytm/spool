@@ -2,18 +2,16 @@ import { ManagedSessionsSection } from '../components/ManagedSessionsSection'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
 
 import '../styles/app.css'
+import '../styles/explore.css'
 
 export function MySessionsPage() {
   return (
-    <WorkspaceFrame active="library" mainClassName="workspace-content-main">
-      <header className="workspace-page-header">
-        <p className="workspace-page-eyebrow">Your library</p>
+    <WorkspaceFrame active="library" rootClassName="explore-root" mainClassName="explore-center">
+      <header className="workspace-feed-header">
         <h1>My Sessions</h1>
-        <p>Review your uploaded Sessions and manage who can read them.</p>
+        <span>Recent</span>
       </header>
-      <div className="workspace-page-body">
-        <ManagedSessionsSection signInNext="/my-sessions" />
-      </div>
+      <ManagedSessionsSection presentation="feed" signInNext="/my-sessions" />
     </WorkspaceFrame>
   )
 }

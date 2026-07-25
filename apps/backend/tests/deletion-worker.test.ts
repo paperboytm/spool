@@ -448,6 +448,58 @@ describe('runDeletionSweep', () => {
     expect(env.state.users[0]?.deleted_at).not.toBeNull()
   })
 
+  it('removes both stars targeting deleted personal Sessions and stars placed by the user', async () => {
+    const env = envFor()
+    seedUser(env.state, 'user-1')
+    seedUser(env.state, 'user-2')
+    await seedHubData(env, {
+      userId: 'user-1',
+      sid: 'codex_delete-social',
+      root: 'root-delete-social',
+      packKey: 'hub/packs/user-1/delete-social',
+      oids: ['oid-delete-social'],
+    })
+    await seedHubData(env, {
+      userId: 'user-2',
+      sid: 'codex_keep-social',
+      root: 'root-keep-social',
+      packKey: 'hub/packs/user-2/keep-social',
+      oids: ['oid-keep-social'],
+    })
+    env.state.hub_session_stars.push(
+      {
+        sid: 'codex_delete-social',
+        user_id: 'user-2',
+        created_at: Date.now() - 3,
+      },
+      {
+        sid: 'codex_keep-social',
+        user_id: 'user-1',
+        created_at: Date.now() - 2,
+      },
+      {
+        sid: 'codex_keep-social',
+        user_id: 'user-2',
+        created_at: Date.now() - 1,
+      },
+    )
+    env.state.deletion_queue.push({
+      user_id: 'user-1',
+      scheduled_at: Date.now() - 1000,
+      cancelled: 0,
+    })
+
+    const { runDeletionSweep } = await import('../functions/_scheduled/deletion-worker')
+    await runDeletionSweep(env, Date.now())
+
+    expect(env.state.hub_session_stars).toEqual([
+      expect.objectContaining({
+        sid: 'codex_keep-social',
+        user_id: 'user-2',
+      }),
+    ])
+  })
+
   it('leaves cancelled rows alone', async () => {
     const env = envFor()
     seedUser(env.state, 'user-1')

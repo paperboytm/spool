@@ -10,6 +10,7 @@ import {
   type ManagedSession,
   type ManagedSessionVisibility,
 } from '../lib/hub-management-api'
+import { useLocalizedSessionTitle } from '../lib/session-title'
 import type { TeamSummary } from '../lib/team-api'
 import { SessionFeedRow, SessionSourceBadge } from './SessionFeedRow'
 
@@ -193,7 +194,8 @@ function ManagedSessionRow({
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuId = useId()
-  const title = session.title || 'Shared Session'
+  const title = useLocalizedSessionTitle(session.titles, session.title || 'Shared Session')
+  const localizedSession = title === session.title ? session : { ...session, title }
 
   useEffect(() => {
     if (!open) return
@@ -222,7 +224,7 @@ function ManagedSessionRow({
   async function changeVisibility(value: string) {
     const choice = parseChoice(value, teams)
     if (!choice || value === currentChoice(session) || busy !== 'idle') return
-    if (!window.confirm(visibilityConfirmation(session, choice))) return
+    if (!window.confirm(visibilityConfirmation(localizedSession, choice))) return
 
     setBusy('visibility')
     setError(null)
@@ -249,7 +251,7 @@ function ManagedSessionRow({
   }
 
   async function withdraw() {
-    if (busy !== 'idle' || !window.confirm(withdrawalConfirmation(session))) return
+    if (busy !== 'idle' || !window.confirm(withdrawalConfirmation(localizedSession))) return
 
     function finishWithdrawal() {
       const currentRow = menuRef.current?.closest('.managed-session-item')

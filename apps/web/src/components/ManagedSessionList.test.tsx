@@ -15,6 +15,7 @@ import {
 const session: ManagedSession = {
   sid: 'codex_1',
   title: 'Ship Team workspaces',
+  titles: null,
   summary: 'Implemented tenant-scoped Sessions.',
   provider: 'codex',
   created_at: 1,
@@ -49,6 +50,42 @@ describe('ManagedSessionList', () => {
     expect(html).not.toContain('<select')
     expect(html).not.toContain('Withdraw')
     expect(html).toContain('href="/session/codex_1"')
+  })
+
+  it('renders the localized task title when bilingual Summary titles are available', () => {
+    const previous = globalThis.navigator
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { language: 'zh-CN' },
+    })
+    try {
+      const html = renderToStaticMarkup(
+        <ManagedSessionList
+          sessions={[
+            {
+              ...session,
+              titles: {
+                en: 'Ship Team workspaces',
+                zh: '交付团队工作区',
+              },
+            },
+          ]}
+          teams={[]}
+          canManageVisibility
+          onSessionChanged={() => undefined}
+          onSessionWithdrawn={() => undefined}
+        />,
+      )
+
+      // Server rendering intentionally stays English for hydration safety;
+      // the browser reconciles through useSyncExternalStore after hydration.
+      expect(html).toContain('Ship Team workspaces')
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: previous,
+      })
+    }
   })
 
   it('keeps management controls hidden when the Session permission is absent', () => {

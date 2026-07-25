@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vite-plus/test'
 vi.mock('../components/session/workbench', () => ({ SessionWorkbench: () => null }))
 
 import type { HubRecordLine, HubSessionMeta, RangeFetcher } from '../lib/hub-api'
-import { loadSessionContent } from './session-reader'
+import { SESSION_RECORD_PAGE_SIZE, loadSessionContent } from './session-reader'
 
 const meta: HubSessionMeta = {
   sid: 'claude_12345678',
@@ -128,5 +128,60 @@ describe('loadSessionContent', () => {
 
     expect(fetchSpoolFile).not.toHaveBeenCalled()
     expect(result).toEqual({ view, spoolDocument: null, records: [record(0), record(1)] })
+  })
+
+  it('loads a 2,726-record legacy session in small monotonic pages', async () => {
+    const calls: Array<[number, number]> = []
+    const loaded: number[] = []
+    const fetchRange = vi.fn<RangeFetcher>(async (from, to) => {
+      calls.push([from, to])
+      return Array.from({ length: to - from }, (_, offset) => record(from + offset))
+    })
+
+    const result = await loadSessionContent(
+      meta.sid,
+      { ...meta, count: 2_726, spoolFileOid: null },
+      {
+        fetchView: vi.fn(async () => view),
+        fetchSpoolFile: vi.fn(async () => null),
+        makeRangeFetcher: vi.fn(() => fetchRange),
+      },
+      {
+        onRecordProgress: (count) => loaded.push(count),
+      },
+    )
+
+    expect(result?.records).toHaveLength(2_726)
+    expect(calls[0]).toEqual([0, SESSION_RECORD_PAGE_SIZE])
+    expect(calls.at(-1)).toEqual([2_700, 2_726])
+    expect(calls).toHaveLength(28)
+    expect(calls.every(([from, to]) => to - from <= SESSION_RECORD_PAGE_SIZE)).toBe(true)
+    expect(loaded).toEqual([
+      0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1_000, 1_100, 1_200, 1_300, 1_400, 1_500,
+      1_600, 1_700, 1_800, 1_900, 2_000, 2_100, 2_200, 2_300, 2_400, 2_500, 2_600, 2_700, 2_726,
+    ])
+  })
+
+  it('resumes a failed raw-record load from the records already rendered', async () => {
+    const calls: Array<[number, number]> = []
+    const initialRecords = Array.from({ length: 200 }, (_, index) => record(index))
+    const fetchRange = vi.fn<RangeFetcher>(async (from, to) => {
+      calls.push([from, to])
+      return Array.from({ length: to - from }, (_, offset) => record(from + offset))
+    })
+
+    const result = await loadSessionContent(
+      meta.sid,
+      { ...meta, count: 250, spoolFileOid: null },
+      {
+        fetchView: vi.fn(async () => view),
+        fetchSpoolFile: vi.fn(async () => null),
+        makeRangeFetcher: vi.fn(() => fetchRange),
+      },
+      { initialRecords },
+    )
+
+    expect(calls).toEqual([[200, 250]])
+    expect(result?.records).toHaveLength(250)
   })
 })

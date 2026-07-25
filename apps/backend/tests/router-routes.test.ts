@@ -11,6 +11,7 @@ describe('spool-web routeFor', () => {
     expect(routeFor('/api/hub/v1/sessions/x')).toBe('backend')
     expect(routeFor('/api/discovery/v1/sessions')).toBe('backend')
     expect(routeFor('/api/discovery/v1/sessions/x/engagement')).toBe('backend')
+    expect(routeFor('/api/discovery/v1/sessions/x/social')).toBe('backend')
     expect(routeFor('/api/cli-auth/start')).toBe('backend')
     expect(routeFor('/api/meta/abc')).toBe('backend')
   })

@@ -850,17 +850,19 @@ describe('Team archive disclosure boundary', () => {
     await expect(archiveLocalTeam(db, TEAM.id, 'local_owner', 900)).resolves.toBe(true)
 
     expect(batches).toHaveLength(1)
-    expect(batches[0]).toHaveLength(5)
+    expect(batches[0]).toHaveLength(6)
     expect(batches[0]!.map((statement) => statement.sql)).toEqual([
       expect.stringContaining('/* teams:archive */'),
       expect.stringContaining('/* teams:archive-sessions */'),
       expect.stringContaining('/* teams:archive-discovery-engagement */'),
+      expect.stringContaining('/* teams:archive-session-stars */'),
       expect.stringContaining('/* teams:archive-discovery */'),
       expect.stringContaining('/* teams:archive-workos-cleanup */'),
     ])
     expect(batches[0]![1]!.sql).toContain("visibility='private'")
     expect(batches[0]![2]!.sql).toContain('hub_session_engagement_daily')
-    expect(batches[0]![3]!.sql).toContain('hub_session_discovery')
+    expect(batches[0]![3]!.sql).toContain('hub_session_stars')
+    expect(batches[0]![4]!.sql).toContain('hub_session_discovery')
   })
 })
 

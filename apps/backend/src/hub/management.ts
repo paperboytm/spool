@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types'
-import { parseSummaryFrontMatter } from '@spool-lab/session-kit'
+import { parseSummaryFrontMatter, type SessionTitles } from '@spool-lab/session-kit'
 
 import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { isPublishedToDiscovery } from '../discovery/projection'
@@ -34,6 +34,8 @@ type ManagedHubSessionScope =
 export type ManagedHubSession = {
   sid: string
   title: string
+  /** Canonical bilingual task-outcome titles from Summary front-matter. */
+  titles: SessionTitles | null
   summary: string | null
   provider: string
   created_at: number
@@ -270,10 +272,12 @@ export async function serializeManagedSession(
     getHubAuthor(db, row.owner_user_id),
     row.visibility === 'unlisted' ? isPublishedToDiscovery(db, row.sid) : Promise.resolve(false),
   ])
+  const parsedSummary = parseSummaryFrontMatter(row.note_md)
   return {
     sid: row.sid,
-    title: sessionTitle(row),
-    summary: row.note_md === null ? null : parseSummaryFrontMatter(row.note_md).body,
+    title: sessionTitle(row, parsedSummary.titles),
+    titles: parsedSummary.titles,
+    summary: row.note_md === null ? null : parsedSummary.body,
     provider: row.sid.slice(0, row.sid.indexOf('_')),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -290,10 +294,12 @@ export async function serializeManagedSession(
   }
 }
 
-function sessionTitle(row: Pick<HubSessionRow, 'sid' | 'card_json' | 'note_md'>): string {
+function sessionTitle(
+  row: Pick<HubSessionRow, 'sid' | 'card_json' | 'note_md'>,
+  titles: SessionTitles | null,
+): string {
   // The agent-authored task title outranks workspace naming: it says what
   // the Session accomplished rather than where it ran.
-  const { titles } = parseSummaryFrontMatter(row.note_md)
   const taskTitle = titles?.en ?? titles?.zh
   if (taskTitle) return taskTitle.slice(0, 200)
   if (row.card_json) {

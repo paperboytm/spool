@@ -56,7 +56,7 @@ function makeHub() {
     const path = url.pathname
     const method = init?.method ?? 'GET'
     const sidMatch = path.match(
-      /^\/api\/hub\/v1\/sessions\/([^/]+)(?:\/(push|head|records|view|withdraw))?$/,
+      /^\/api\/hub\/v1\/sessions\/([^/]+)(?:\/(push|head|records|view|withdraw|resume-grant))?$/,
     )
 
     if (method === 'POST' && path === '/api/hub/v1/objects/batch') {
@@ -121,6 +121,10 @@ function makeHub() {
           status: 200,
           headers: { 'content-type': 'application/x-ndjson' },
         })
+      }
+      if (method === 'POST' && action === 'resume-grant') {
+        const body = JSON.parse(String(init?.body)) as { position: number }
+        return json({ version: 1, token: `grant:${sid}:${body.position}` })
       }
     }
     return json({ error: 'NOT_FOUND', detail: `unhandled ${method} ${path}` }, 404)
@@ -681,6 +685,7 @@ describe('spool share → spool resume round trip', () => {
     }
     expect(birth.parentUuid).toBe('u-4')
     expect(birth.message.content[0].text).toContain('<spool-resume-note>')
+    expect(birth.message.content[0].text).toContain(`"proof":"grant:${sid}:4"`)
     expect(logs.join('\n')).toContain(`claude --resume ${newSessionId} --fork-session`)
 
     // Default behavior hands off to the native CLI's fork entry point, in
@@ -798,6 +803,7 @@ describe('spool share → spool resume round trip', () => {
     }
     expect(birth.type).toBe('response_item')
     expect(birth.payload.content[0].text).toContain('<spool-resume-note>')
+    expect(birth.payload.content[0].text).toContain(`"proof":"grant:${sid}:4"`)
 
     expect(logs.join('\n')).toContain(`codex fork ${newSessionId}`)
     expect(spawnCalls).toEqual([{ cmd: 'codex', args: ['fork', newSessionId], cwd: resumerWs }])

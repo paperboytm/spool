@@ -4,10 +4,10 @@
 
 import type { SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
-import { SessionWorkbench } from '../components/session/workbench'
+import { SessionWorkbench, type SessionHistoryState } from '../components/session/workbench'
 import { humanDateTime } from '../lib/dates'
 import {
   fetchHubMeta,
@@ -24,7 +24,12 @@ import { parseHubConversation } from '../lib/session-messages'
 import { deepLinkIndex, providerOf } from '../lib/session-page'
 import { Tombstone } from './Tombstone'
 
-const FETCH_PAGE = 500
+/**
+ * The Hub permits 500 records per read, but the reader deliberately asks for
+ * smaller pages. That gives long legacy Sessions useful, monotonic progress
+ * instead of holding the UI at zero while a multi-megabyte response arrives.
+ */
+export const SESSION_RECORD_PAGE_SIZE = 100
 
 export interface LoadedSessionContent {
   view: SessionViewV1 | null
@@ -40,8 +45,9 @@ interface SessionContentDeps {
 
 interface SessionContentLoadOptions {
   isCancelled?: () => boolean
+  initialRecords?: readonly HubRecordLine[]
   signal?: AbortSignal
-  onRecordProgress?: (loaded: number, total: number) => void
+  onRecordProgress?: (loaded: number, total: number, records: readonly HubRecordLine[]) => void
   /** Preserve record-addressed URLs by using the legacy MessageList, whose
    * record-to-message mapping is exact. Curated turns cannot be mapped back
    * to raw tool records reliably. */
@@ -58,19 +64,26 @@ async function loadRawRecords(
   sid: string,
   total: number,
   makeFetcher: (sid: string, signal?: AbortSignal) => RangeFetcher,
-  options: Pick<SessionContentLoadOptions, 'isCancelled' | 'onRecordProgress' | 'signal'> = {},
+  options: Pick<
+    SessionContentLoadOptions,
+    'initialRecords' | 'isCancelled' | 'onRecordProgress' | 'signal'
+  > = {},
 ): Promise<HubRecordLine[] | null> {
   const isCancelled = options.isCancelled ?? (() => false)
   if (isCancelled()) return null
   const fetchRange = makeFetcher(sid, options.signal)
-  const records: HubRecordLine[] = []
-  options.onRecordProgress?.(0, total)
+  const records: HubRecordLine[] = [...(options.initialRecords ?? [])]
+  options.onRecordProgress?.(records.length, total, records)
   while (records.length < total) {
     const from = records.length
-    const page = await fetchRecordsExact(fetchRange, from, Math.min(from + FETCH_PAGE, total))
+    const page = await fetchRecordsExact(
+      fetchRange,
+      from,
+      Math.min(from + SESSION_RECORD_PAGE_SIZE, total),
+    )
     if (isCancelled()) return null
     records.push(...page)
-    options.onRecordProgress?.(records.length, total)
+    options.onRecordProgress?.(records.length, total, records)
   }
   return records
 }
@@ -110,7 +123,7 @@ export async function loadSessionContent(
 }
 
 type PageState =
-  | { phase: 'loading'; loaded: number; total: number | null }
+  | { phase: 'loading' }
   | { phase: 'not-found' }
   | { phase: 'auth-required' }
   | { phase: 'withdrawn'; at: number }
@@ -121,6 +134,7 @@ type PageState =
       view: SessionViewV1 | null
       spoolDocument: SpoolDocument | null
       records: HubRecordLine[]
+      history: SessionHistoryState
     }
 
 /** html[data-theme] is the page-wide theme contract (see Chrome.tsx). */
@@ -142,7 +156,7 @@ function useIsDark(): boolean {
 }
 
 export function SessionReader({ sid }: { sid: string }) {
-  const [state, setState] = useState<PageState>({ phase: 'loading', loaded: 0, total: null })
+  const [state, setState] = useState<PageState>({ phase: 'loading' })
   const isDark = useIsDark()
 
   const provider = providerOf(sid)
@@ -154,8 +168,7 @@ export function SessionReader({ sid }: { sid: string }) {
 
   useEffect(() => {
     let cancelled = false
-    const abortController = new AbortController()
-    setState({ phase: 'loading', loaded: 0, total: null })
+    setState({ phase: 'loading' })
     void (async () => {
       const meta = await fetchHubMeta(sid)
       if (cancelled) return
@@ -164,31 +177,158 @@ export function SessionReader({ sid }: { sid: string }) {
       if (meta.kind === 'withdrawn') return setState({ phase: 'withdrawn', at: meta.at })
       if (meta.kind === 'error') return setState({ phase: 'error' })
 
+      const shouldLoadPublication = initialRecordIndex === null && meta.meta.spoolFileOid != null
+      setState({
+        phase: 'ready',
+        meta: meta.meta,
+        view: null,
+        spoolDocument: null,
+        records: [],
+        history: shouldLoadPublication
+          ? { phase: 'loading', source: 'publication', loaded: 0, total: meta.meta.count }
+          : initialRecordIndex !== null
+            ? { phase: 'loading', source: 'records', loaded: 0, total: meta.meta.count }
+            : { phase: 'idle', total: meta.meta.count },
+      })
+
+      // The machine-derived view is evidence, not a prerequisite for the
+      // first screen. Let Summary, title metadata, and author attribution
+      // render while this independent immutable object arrives.
+      const view = await fetchHubView(sid)
+      if (cancelled) return
+      setState((current) =>
+        current.phase === 'ready' && current.meta.sid === meta.meta.sid
+          ? { ...current, view }
+          : current,
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [initialRecordIndex, sid])
+
+  const activeHistorySource =
+    state.phase === 'ready' && state.history.phase === 'loading' ? state.history.source : null
+
+  useEffect(() => {
+    if (activeHistorySource === null || state.phase !== 'ready') return
+
+    let cancelled = false
+    const abortController = new AbortController()
+    const { meta } = state
+    const startingRecords = state.records
+
+    void (async () => {
       try {
-        const content = await loadSessionContent(sid, meta.meta, defaultSessionContentDeps, {
-          isCancelled: () => cancelled,
-          signal: abortController.signal,
-          onRecordProgress: (loaded, total) => {
-            if (!cancelled) setState({ phase: 'loading', loaded, total })
+        if (activeHistorySource === 'publication') {
+          const spoolDocument = await fetchHubSpoolFile(sid)
+          if (cancelled) return
+          if (spoolDocument !== null) {
+            setState((current) =>
+              current.phase === 'ready' && current.meta.sid === meta.sid
+                ? {
+                    ...current,
+                    spoolDocument,
+                    history: { phase: 'ready', total: meta.count },
+                  }
+                : current,
+            )
+            return
+          }
+
+          // A stale or invalid optional publication attachment must not force
+          // an eager multi-megabyte fallback. Keep the Summary visible and
+          // let the reader explicitly load the raw history.
+          setState((current) =>
+            current.phase === 'ready' && current.meta.sid === meta.sid
+              ? { ...current, history: { phase: 'idle', total: meta.count } }
+              : current,
+          )
+          return
+        }
+
+        const records = await loadRawRecords(
+          sid,
+          meta.count,
+          defaultSessionContentDeps.makeRangeFetcher,
+          {
+            initialRecords: startingRecords,
+            isCancelled: () => cancelled,
+            signal: abortController.signal,
+            onRecordProgress: (loaded, total, nextRecords) => {
+              if (cancelled) return
+              setState((current) =>
+                current.phase === 'ready' && current.meta.sid === meta.sid
+                  ? {
+                      ...current,
+                      records: [...nextRecords],
+                      history: { phase: 'loading', source: 'records', loaded, total },
+                    }
+                  : current,
+              )
+            },
           },
-          preferRawRecords: initialRecordIndex !== null,
-        })
-        if (cancelled || content === null) return
-        setState({ phase: 'ready', meta: meta.meta, ...content })
+        )
+        if (cancelled || records === null) return
+        setState((current) =>
+          current.phase === 'ready' && current.meta.sid === meta.sid
+            ? {
+                ...current,
+                records,
+                history: { phase: 'ready', total: meta.count },
+              }
+            : current,
+        )
       } catch {
-        if (!cancelled) setState({ phase: 'error' })
+        if (cancelled) return
+        setState((current) =>
+          current.phase === 'ready' && current.meta.sid === meta.sid
+            ? {
+                ...current,
+                history: {
+                  phase: 'error',
+                  loaded: current.records.length,
+                  total: meta.count,
+                },
+              }
+            : current,
+        )
       }
     })()
+
     return () => {
       cancelled = true
       abortController.abort()
     }
-  }, [initialRecordIndex, sid])
+    // Progress updates intentionally do not restart this effect: only the
+    // active source (curated publication or raw records) identifies a load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHistorySource, sid])
+
+  const loadHistory = useCallback(() => {
+    setState((current) =>
+      current.phase === 'ready' &&
+      (current.history.phase === 'idle' || current.history.phase === 'error')
+        ? {
+            ...current,
+            history: {
+              phase: 'loading',
+              source: 'records',
+              loaded: current.records.length,
+              total: current.meta.count,
+            },
+          }
+        : current,
+    )
+  }, [])
 
   const readyRecords = state.phase === 'ready' ? state.records : null
 
   const conversation = useMemo(
-    () => (readyRecords === null ? null : parseHubConversation(provider, readyRecords)),
+    () =>
+      readyRecords === null || readyRecords.length === 0
+        ? null
+        : parseHubConversation(provider, readyRecords),
     [provider, readyRecords],
   )
 
@@ -274,7 +414,7 @@ export function SessionReader({ sid }: { sid: string }) {
     )
   }
 
-  if (state.phase === 'ready' && conversation !== null) {
+  if (state.phase === 'ready') {
     return (
       <Page>
         <Header sticky />
@@ -287,6 +427,8 @@ export function SessionReader({ sid }: { sid: string }) {
           spoolDocument={state.spoolDocument}
           isDark={isDark}
           initialRecordIndex={initialRecordIndex}
+          history={state.history}
+          onLoadHistory={loadHistory}
         />
         <Footer />
       </Page>
@@ -298,11 +440,11 @@ export function SessionReader({ sid }: { sid: string }) {
       <Header sticky />
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
         {state.phase === 'loading' && (
-          <p className="m-0 text-center text-[13px] text-[var(--muted)]">
-            {state.total === null
-              ? 'Loading session…'
-              : `Loading records ${state.loaded}/${state.total}…`}
-          </p>
+          <div className="w-full max-w-[720px]" aria-label="Loading session">
+            <div className="mb-4 h-3 w-32 rounded bg-[var(--surface2)]" />
+            <div className="mb-3 h-8 w-4/5 rounded bg-[var(--surface2)]" />
+            <div className="h-24 rounded-[10px] bg-[var(--surface)]" />
+          </div>
         )}
       </main>
       <Footer />

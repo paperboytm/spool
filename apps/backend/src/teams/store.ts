@@ -626,6 +626,11 @@ export async function archiveLocalTeam(
       .bind(teamId, now),
     db
       .prepare(
+        '/* teams:archive-session-stars */ DELETE FROM hub_session_stars WHERE sid IN (SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id WHERE s.team_id=? AND t.archived_at=?)',
+      )
+      .bind(teamId, now),
+    db
+      .prepare(
         '/* teams:archive-discovery */ DELETE FROM hub_session_discovery WHERE sid IN (SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id WHERE s.team_id=? AND t.archived_at=?)',
       )
       .bind(teamId, now),

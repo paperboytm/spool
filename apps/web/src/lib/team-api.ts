@@ -23,6 +23,25 @@ export interface TeamSummary {
   archived_at?: number | null
 }
 
+export const TEAM_SUMMARY_CHANGED = 'spool:team-summary-changed' as const
+
+declare global {
+  interface WindowEventMap {
+    [TEAM_SUMMARY_CHANGED]: CustomEvent<TeamSummary>
+  }
+}
+
+/**
+ * Keep independently mounted workspace chrome in sync with a confirmed Team
+ * mutation. Authorization still comes from the next server request; this
+ * event only updates already-authorized navigation copy immediately.
+ */
+export function announceTeamSummaryChanged(team: TeamSummary): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(TEAM_SUMMARY_CHANGED, { detail: team }))
+  }
+}
+
 export interface TeamMember {
   user_id: string
   email: string

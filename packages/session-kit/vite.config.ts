@@ -5,7 +5,19 @@ export default defineConfig({
     tasks: {
       build: {
         command: 'pnpm run clean && tsc',
-        input: [{ auto: true }, '!dist/**', '!node_modules/**'],
+        // Keep source files explicit as well as auto-tracked. A stale task
+        // archive must never restore an older barrel after a new public export
+        // is added: downstream production builds resolve this package through
+        // dist, not the workspace source alias.
+        input: [
+          { auto: true },
+          'src/**',
+          'package.json',
+          'tsconfig.json',
+          'vite.config.ts',
+          '!dist/**',
+          '!node_modules/**',
+        ],
         output: ['dist/**'],
       },
     },

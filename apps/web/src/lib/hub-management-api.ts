@@ -1,3 +1,5 @@
+import type { SessionTitles } from '@spool-lab/session-kit'
+
 export type ManagedSessionVisibility = 'public' | 'link-only' | 'team'
 
 export interface ManagedSessionAuthor {
@@ -9,6 +11,7 @@ export interface ManagedSessionAuthor {
 export interface ManagedSession {
   sid: string
   title: string
+  titles: SessionTitles | null
   summary: string | null
   provider: string
   created_at: number

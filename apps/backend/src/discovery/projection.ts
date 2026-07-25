@@ -325,6 +325,21 @@ export function prepareAuthorizedEngagementDelete(
     .bind(gate.sid, ...authorizedProjectionGateValues(gate))
 }
 
+/** Remove every public star for a Session as part of the same authorized
+ * disclosure transaction that makes the target non-Public or withdrawn. */
+export function prepareAuthorizedTargetStarsDelete(
+  db: D1Database,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-delete-target-stars */
+       DELETE FROM hub_session_stars
+       WHERE sid=? AND ${AUTHORIZED_SESSION_PROJECTION_GATE}`,
+    )
+    .bind(gate.sid, ...authorizedProjectionGateValues(gate))
+}
+
 export async function isPublishedToDiscovery(db: D1Database, sid: string): Promise<boolean> {
   const row = await db
     .prepare('/* discovery:is-published */ SELECT 1 FROM hub_session_discovery WHERE sid = ?')

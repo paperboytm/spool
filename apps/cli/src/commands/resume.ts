@@ -69,10 +69,24 @@ export async function handleResumeCommand(
     let downloaded: Awaited<ReturnType<typeof downloadAndVerify>>
     try {
       downloaded = await downloadAndVerify(client, ref.sid, ref.position)
-      downloading.stop(`Verified ${downloaded.records.length} records`)
     } catch (cause) {
       downloading.error('Could not download and verify the shared session')
       throw cause
+    }
+    let lineageProof: string | undefined
+    try {
+      downloading.message('Recording verified resume lineage')
+      const grant = await client.createResumeGrant(ref.sid, downloaded.wanted)
+      if (grant.version !== 1 || typeof grant.token !== 'string' || grant.token.length === 0) {
+        throw new Error('Hub returned an invalid resume grant')
+      }
+      lineageProof = grant.token
+      downloading.stop(`Verified ${downloaded.records.length} records`)
+    } catch {
+      downloading.stop(`Verified ${downloaded.records.length} records`)
+      ui.warn(
+        'Resume will continue, but a later Public share cannot count as a verified fork because the Hub did not issue a resume grant.',
+      )
     }
     const { meta, records, wanted } = downloaded
 
@@ -93,6 +107,7 @@ export async function handleResumeCommand(
           position: wanted,
           url: `${hubUrl}/session/${ref.sid}`,
         },
+        ...(lineageProof === undefined ? {} : { proof: lineageProof }),
       },
       cardJson: meta.cardJson,
     })

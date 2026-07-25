@@ -2,11 +2,18 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import type { KVNamespace } from '@cloudflare/workers-types'
 import type { SessionViewV1 } from '@spool-lab/session-kit'
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { onRequestGet as sessionsGet } from '../functions/api/discovery/v1/sessions'
 import { onRequestPost as engagementPost } from '../functions/api/discovery/v1/sessions/[sid]/engagement'
+import {
+  onRequestDelete as socialDelete,
+  onRequestGet as socialGet,
+  onRequestPut as socialPut,
+} from '../functions/api/discovery/v1/sessions/[sid]/social'
+import type { SessionRecord } from '../src/auth/session'
 import { buildDiscoveryProjection } from '../src/discovery/projection'
 import { incrementQualifiedReadIfLive, isDiscoverySessionLive } from '../src/discovery/store'
 import { invoke } from './_helpers/ctx'
@@ -17,6 +24,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const CLAUDE_SID = 'claude_11111111-2222-4333-8444-555555555555'
 const CODEX_SID = 'codex_aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 const TEAM_ID = 'team_discovery_0001'
+const VIEWER_TOKEN = 'v'.repeat(40)
 
 function indexedSid(index: number, agent: 'claude' | 'codex' = 'claude'): string {
   return `${agent}_00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`
@@ -24,7 +32,26 @@ function indexedSid(index: number, agent: 'claude' | 'codex' = 'claude'): string
 
 function makeEnv() {
   const { db, state } = makeDb(emptyState())
-  return { DB: db, RATE: makeKv(), state }
+  return { DB: db, RATE: makeKv(), SESSIONS: makeKv(), state }
+}
+
+async function seedViewerSession(kv: KVNamespace, userId: string): Promise<void> {
+  const record: SessionRecord = {
+    user_id: userId,
+    created: NOW,
+    exp: NOW + 30 * DAY_MS,
+    last_seen: NOW,
+  }
+  await kv.put(`session/${VIEWER_TOKEN}`, JSON.stringify(record), {
+    expirationTtl: 30 * 24 * 60 * 60,
+  })
+}
+
+function socialRequest(sid: string, method = 'GET', authenticated = false): Request {
+  return new Request(`https://spool.new/api/discovery/v1/sessions/${sid}/social`, {
+    method,
+    ...(authenticated ? { headers: { authorization: `Bearer ${VIEWER_TOKEN}` } } : {}),
+  })
 }
 
 function seedUser(
@@ -238,6 +265,20 @@ describe('Explore projection', () => {
     expect(migration).toContain(
       'ALTER TABLE hub_session_discovery ADD COLUMN total_tokens INTEGER;',
     )
+  })
+
+  it('ships the idempotent Public star schema and direct-lineage index', () => {
+    const migration = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../migrations/0012_session_social.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('CREATE TABLE hub_session_stars')
+    expect(migration).toContain('PRIMARY KEY (sid, user_id)')
+    expect(migration).toContain('REFERENCES hub_sessions(sid) ON DELETE CASCADE')
+    expect(migration).toContain('REFERENCES users(id) ON DELETE CASCADE')
+    expect(migration).toContain('CREATE INDEX hub_session_stars_user_created')
+    expect(migration).toContain('CREATE INDEX hub_discovery_lineage_source_sid')
+    expect(migration).toContain('WHERE lineage_source_sid IS NOT NULL')
   })
 
   it('ships the projection, aggregate, indexes, and live-unlisted backfill migration', () => {
@@ -818,6 +859,267 @@ describe('GET /api/discovery/v1/sessions', () => {
       env,
     )
     await expect(none.json()).resolves.toMatchObject({ items: [] })
+  })
+})
+
+describe('/api/discovery/v1/sessions/:sid/social', () => {
+  it('returns anonymous counts and derives only verified live Public direct forks', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'author')
+    seedUser(env.state, 'starrer-1')
+    seedUser(env.state, 'starrer-2')
+    seedDiscovery(env.state, { sid: CLAUDE_SID, owner: 'author' })
+    env.state.hub_session_stars.push(
+      { sid: CLAUDE_SID, user_id: 'starrer-1', created_at: NOW - 2 },
+      { sid: CLAUDE_SID, user_id: 'starrer-2', created_at: NOW - 1 },
+    )
+
+    const liveChild = indexedSid(101)
+    seedDiscovery(env.state, { sid: liveChild, owner: 'author' })
+    env.state.hub_session_discovery.find((row) => row.sid === liveChild)!.lineage_source_sid =
+      CLAUDE_SID
+    env.state.hub_session_verified_forks.push({
+      child_sid: liveChild,
+      source_sid: CLAUDE_SID,
+      source_root: 'a'.repeat(64),
+      source_position: 1,
+      child_root: 'b'.repeat(64),
+      grant_token_hash: '1'.repeat(64),
+      verified_at: NOW,
+    })
+
+    const withdrawnChild = indexedSid(102)
+    seedDiscovery(env.state, { sid: withdrawnChild, owner: 'author', withdrawnAt: NOW })
+    env.state.hub_session_discovery.find((row) => row.sid === withdrawnChild)!.lineage_source_sid =
+      CLAUDE_SID
+    env.state.hub_session_verified_forks.push({
+      child_sid: withdrawnChild,
+      source_sid: CLAUDE_SID,
+      source_root: 'a'.repeat(64),
+      source_position: 1,
+      child_root: 'c'.repeat(64),
+      grant_token_hash: '2'.repeat(64),
+      verified_at: NOW,
+    })
+
+    const teamOnlyChild = indexedSid(103)
+    env.state.teams.push({ id: TEAM_ID, name: 'Private Team', archived_at: null })
+    seedDiscovery(env.state, {
+      sid: teamOnlyChild,
+      owner: 'author',
+      teamId: TEAM_ID,
+      visibility: 'private',
+    })
+    env.state.hub_session_discovery.find((row) => row.sid === teamOnlyChild)!.lineage_source_sid =
+      CLAUDE_SID
+    env.state.hub_session_verified_forks.push({
+      child_sid: teamOnlyChild,
+      source_sid: CLAUDE_SID,
+      source_root: 'a'.repeat(64),
+      source_position: 1,
+      child_root: 'd'.repeat(64),
+      grant_token_hash: '3'.repeat(64),
+      verified_at: NOW,
+    })
+
+    const archivedTeamChild = indexedSid(104)
+    const archivedTeamId = `${TEAM_ID}_archived`
+    env.state.teams.push({
+      id: archivedTeamId,
+      name: 'Archived Team',
+      archived_at: NOW,
+    })
+    seedDiscovery(env.state, {
+      sid: archivedTeamChild,
+      owner: 'author',
+      teamId: archivedTeamId,
+    })
+    env.state.hub_session_discovery.find(
+      (row) => row.sid === archivedTeamChild,
+    )!.lineage_source_sid = CLAUDE_SID
+    env.state.hub_session_verified_forks.push({
+      child_sid: archivedTeamChild,
+      source_sid: CLAUDE_SID,
+      source_root: 'a'.repeat(64),
+      source_position: 1,
+      child_root: 'e'.repeat(64),
+      grant_token_hash: '4'.repeat(64),
+      verified_at: NOW,
+    })
+
+    // Legacy/client-asserted lineage is still displayed, but is not a fork
+    // count until a server-issued grant has been claimed by its child head.
+    const unverifiedChild = indexedSid(105)
+    seedDiscovery(env.state, { sid: unverifiedChild, owner: 'author' })
+    env.state.hub_session_discovery.find((row) => row.sid === unverifiedChild)!.lineage_source_sid =
+      CLAUDE_SID
+
+    // A malformed self-reference is not a fork.
+    env.state.hub_session_discovery.find((row) => row.sid === CLAUDE_SID)!.lineage_source_sid =
+      CLAUDE_SID
+
+    const response = await invoke(socialGet, socialRequest(CLAUDE_SID), env, {
+      sid: CLAUDE_SID,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('vary')).toBe('Cookie, Authorization')
+    await expect(response.json()).resolves.toEqual({
+      version: 1,
+      starCount: 2,
+      forkCount: 1,
+      viewerStarred: false,
+      canStar: false,
+    })
+  })
+
+  it('stars and unstars idempotently for a signed-in viewer', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'author')
+    seedUser(env.state, 'viewer')
+    await seedViewerSession(env.SESSIONS, 'viewer')
+    seedDiscovery(env.state, { sid: CLAUDE_SID, owner: 'author' })
+
+    const initial = await invoke(socialGet, socialRequest(CLAUDE_SID, 'GET', true), env, {
+      sid: CLAUDE_SID,
+    })
+    await expect(initial.json()).resolves.toMatchObject({
+      starCount: 0,
+      viewerStarred: false,
+      canStar: true,
+    })
+
+    const first = await invoke(socialPut, socialRequest(CLAUDE_SID, 'PUT', true), env, {
+      sid: CLAUDE_SID,
+    })
+    const duplicate = await invoke(socialPut, socialRequest(CLAUDE_SID, 'PUT', true), env, {
+      sid: CLAUDE_SID,
+    })
+
+    expect(first.status).toBe(200)
+    await expect(first.json()).resolves.toMatchObject({
+      starCount: 1,
+      viewerStarred: true,
+      canStar: true,
+    })
+    await expect(duplicate.json()).resolves.toMatchObject({
+      starCount: 1,
+      viewerStarred: true,
+    })
+    expect(env.state.hub_session_stars).toEqual([
+      expect.objectContaining({ sid: CLAUDE_SID, user_id: 'viewer' }),
+    ])
+
+    const removed = await invoke(socialDelete, socialRequest(CLAUDE_SID, 'DELETE', true), env, {
+      sid: CLAUDE_SID,
+    })
+    const duplicateDelete = await invoke(
+      socialDelete,
+      socialRequest(CLAUDE_SID, 'DELETE', true),
+      env,
+      { sid: CLAUDE_SID },
+    )
+    await expect(removed.json()).resolves.toMatchObject({
+      starCount: 0,
+      viewerStarred: false,
+    })
+    await expect(duplicateDelete.json()).resolves.toMatchObject({
+      starCount: 0,
+      viewerStarred: false,
+    })
+    expect(env.state.hub_session_stars).toEqual([])
+  })
+
+  it('rate-limits repeated Star mutations per viewer and target', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'author')
+    seedUser(env.state, 'viewer')
+    await seedViewerSession(env.SESSIONS, 'viewer')
+    seedDiscovery(env.state, { sid: CLAUDE_SID, owner: 'author' })
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const response = await invoke(socialPut, socialRequest(CLAUDE_SID, 'PUT', true), env, {
+        sid: CLAUDE_SID,
+      })
+      expect(response.status, `attempt ${attempt + 1}`).toBe(200)
+    }
+
+    const limited = await invoke(socialDelete, socialRequest(CLAUDE_SID, 'DELETE', true), env, {
+      sid: CLAUDE_SID,
+    })
+
+    expect(limited.status).toBe(429)
+    expect(limited.headers.get('cache-control')).toBe('no-store')
+    expect(limited.headers.get('vary')).toBe('Cookie, Authorization')
+    expect(env.state.hub_session_stars).toEqual([
+      expect.objectContaining({ sid: CLAUDE_SID, user_id: 'viewer' }),
+    ])
+  })
+
+  it('fails closed for non-Public targets and requires login for mutations', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'author')
+    seedUser(env.state, 'viewer')
+    await seedViewerSession(env.SESSIONS, 'viewer')
+    seedDiscovery(env.state, {
+      sid: CLAUDE_SID,
+      owner: 'author',
+      visibility: 'private',
+      teamId: TEAM_ID,
+    })
+    env.state.teams.push({ id: TEAM_ID, name: 'Private Team', archived_at: null })
+
+    const hiddenGet = await invoke(socialGet, socialRequest(CLAUDE_SID), env, {
+      sid: CLAUDE_SID,
+    })
+    const hiddenPut = await invoke(socialPut, socialRequest(CLAUDE_SID, 'PUT', true), env, {
+      sid: CLAUDE_SID,
+    })
+    const anonymousPut = await invoke(socialPut, socialRequest(CLAUDE_SID, 'PUT'), env, {
+      sid: CLAUDE_SID,
+    })
+
+    expect(hiddenGet.status).toBe(404)
+    expect(hiddenPut.status).toBe(404)
+    expect(anonymousPut.status).toBe(401)
+    expect(anonymousPut.headers.get('cache-control')).toBe('no-store')
+    expect(anonymousPut.headers.get('vary')).toBe('Cookie, Authorization')
+    expect(env.state.hub_session_stars).toEqual([])
+  })
+
+  it('treats stale and deletion-pending sessions as anonymous on GET', async () => {
+    const env = makeEnv()
+    seedUser(env.state, 'author')
+    seedUser(env.state, 'viewer', { deletion_pending_until: NOW + DAY_MS })
+    await seedViewerSession(env.SESSIONS, 'viewer')
+    seedDiscovery(env.state, { sid: CLAUDE_SID, owner: 'author' })
+    env.state.hub_session_stars.push({
+      sid: CLAUDE_SID,
+      user_id: 'viewer',
+      created_at: NOW,
+    })
+
+    const pending = await invoke(socialGet, socialRequest(CLAUDE_SID, 'GET', true), env, {
+      sid: CLAUDE_SID,
+    })
+    const stale = await invoke(
+      socialGet,
+      new Request(`https://spool.new/api/discovery/v1/sessions/${CLAUDE_SID}/social`, {
+        headers: { authorization: `Bearer ${'x'.repeat(40)}` },
+      }),
+      env,
+      { sid: CLAUDE_SID },
+    )
+
+    await expect(pending.json()).resolves.toMatchObject({
+      viewerStarred: false,
+      canStar: false,
+    })
+    await expect(stale.json()).resolves.toMatchObject({
+      viewerStarred: false,
+      canStar: false,
+    })
   })
 })
 

@@ -17,6 +17,7 @@ import { onRequestPost as headPost } from '../functions/api/hub/v1/sessions/[sid
 import { onRequestGet as metaGet } from '../functions/api/hub/v1/sessions/[sid]/index'
 import { onRequestPost as pushPost } from '../functions/api/hub/v1/sessions/[sid]/push'
 import { onRequestGet as recordsGet } from '../functions/api/hub/v1/sessions/[sid]/records'
+import { onRequestPost as resumeGrantPost } from '../functions/api/hub/v1/sessions/[sid]/resume-grant'
 import { onRequestGet as viewGet } from '../functions/api/hub/v1/sessions/[sid]/view'
 import { onRequestPost as withdrawPost } from '../functions/api/hub/v1/sessions/[sid]/withdraw'
 import {
@@ -158,7 +159,7 @@ async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) 
     sig: null,
     cardJson: JSON.stringify({ workspace: '$SPOOL_WS', branch: 'main' }),
     summaryMd: '## Outcome\n\nA synthetic shared session.',
-    lineageJson: null,
+    lineageJson: null as string | null,
     viewOid: view.oid,
   }
   return { records, view, viewValue, head, entries: [...records, view] }
@@ -236,6 +237,20 @@ async function commit(env: TestEnv, fixture: Fixture, token = USER_A_TOKEN, sid 
 
 async function withdraw(env: TestEnv, token = USER_A_TOKEN, sid = SID) {
   return invoke(withdrawPost, jsonPost(`${sessionUrl(sid)}/withdraw`, {}, token), env, { sid })
+}
+
+async function resumeGrant(
+  env: TestEnv,
+  sid: string,
+  position: number,
+  token?: string,
+): Promise<Response> {
+  return invoke(
+    resumeGrantPost,
+    jsonPost(`${sessionUrl(sid)}/resume-grant`, { position }, token),
+    env,
+    { sid },
+  )
 }
 
 async function changeVisibility(
@@ -682,8 +697,14 @@ describe('hub head and withdrawal', () => {
     const fixture = await makeFixture()
     await replaceFixtureView(fixture, { ...fixture.viewValue, usage: pricedUsage() })
     expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    env.state.hub_session_stars.push({
+      sid: SID,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
     expect((await changeVisibility(env, { visibility: 'link-only' })).status).toBe(200)
     expect(env.state.hub_session_discovery).toHaveLength(0)
+    expect(env.state.hub_session_stars).toHaveLength(0)
 
     // A sentinel persisted value makes a repricing regression observable:
     // recomputing from the immutable view would produce a different result.
@@ -782,6 +803,11 @@ describe('hub head and withdrawal', () => {
     await seedUsers(env)
     const fixture = await makeFixture()
     expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    env.state.hub_session_stars.push({
+      sid: SID,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
 
     const foreign = await withdraw(env, USER_B_TOKEN)
     expect(foreign.status).toBe(403)
@@ -791,9 +817,225 @@ describe('hub head and withdrawal', () => {
     const second = await withdraw(env)
 
     expect(first.status).toBe(200)
+    expect(env.state.hub_session_stars).toHaveLength(0)
     expect(second.status).toBe(200)
     await expect(second.json()).resolves.toEqual({ withdrawn: true })
     expect(env.state.audit).toHaveLength(auditCount)
+  })
+
+  it('removes target stars when a head recommit makes a Public Session Link-only', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    env.state.hub_session_stars.push({
+      sid: SID,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'link-only' },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(200)
+    expect(env.state.hub_session_discovery).toHaveLength(0)
+    expect(env.state.hub_session_stars).toHaveLength(0)
+  })
+})
+
+describe('verified Resume fork provenance', () => {
+  it('stores only a grant hash and atomically claims it for one new child', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const source = await makeFixture()
+    expect((await uploadAndCommit(env, source)).status).toBe(200)
+
+    const issued = await resumeGrant(env, SID, 2)
+    expect(issued.status).toBe(200)
+    expect(issued.headers.get('cache-control')).toBe('private, no-store')
+    const grant = (await issued.json()) as { version: number; token: string }
+    expect(grant).toMatchObject({ version: 1 })
+    expect(grant.token).toMatch(/^[0-9A-Za-z_-]{43}$/)
+    expect(env.state.hub_session_resume_grants).toEqual([
+      expect.objectContaining({
+        token_hash: await sha256Hex(grant.token),
+        source_sid: SID,
+        source_position: 2,
+        claimed_child_sid: null,
+      }),
+    ])
+    expect(JSON.stringify(env.state.hub_session_resume_grants)).not.toContain(grant.token)
+
+    const childSid = 'codex_12345678-abcd-4321-abcd-1234567890ac'
+    const child = await makeFixture()
+    child.head.lineageJson = JSON.stringify({
+      source: { sid: SID, position: 2, url: `${BASE_URL}/session/${SID}` },
+      proof: grant.token,
+    })
+    expect((await uploadAndCommit(env, child, { sid: childSid })).status).toBe(200)
+
+    expect(env.state.hub_sessions.find((row) => row.sid === childSid)?.lineage_json).toBe(
+      JSON.stringify({
+        source: { sid: SID, position: 2, url: `${BASE_URL}/session/${SID}` },
+      }),
+    )
+    expect(env.state.hub_sessions.find((row) => row.sid === childSid)?.lineage_json).not.toContain(
+      grant.token,
+    )
+    expect(env.state.hub_session_verified_forks).toEqual([
+      expect.objectContaining({
+        child_sid: childSid,
+        source_sid: SID,
+        source_position: 2,
+        grant_token_hash: await sha256Hex(grant.token),
+      }),
+    ])
+    expect(env.state.hub_session_resume_grants[0]).toMatchObject({
+      claimed_child_sid: childSid,
+      claimed_child_root: child.head.root,
+    })
+
+    const secondChildSid = 'codex_12345678-abcd-4321-abcd-1234567890ad'
+    const secondChild = await makeFixture()
+    secondChild.head.lineageJson = JSON.stringify({
+      source: { sid: SID, position: 2, url: null },
+      proof: grant.token,
+    })
+    expect((await uploadAndCommit(env, secondChild, { sid: secondChildSid })).status).toBe(200)
+    expect(env.state.hub_session_verified_forks).toHaveLength(1)
+
+    // A child deletion cascades its relation, but the durable grant marker
+    // still prevents assigning that one-use grant to a later child.
+    env.state.hub_sessions = env.state.hub_sessions.filter((row) => row.sid !== childSid)
+    env.state.hub_session_verified_forks = env.state.hub_session_verified_forks.filter(
+      (row) => row.child_sid !== childSid,
+    )
+    const thirdChildSid = 'codex_12345678-abcd-4321-abcd-1234567890ae'
+    const thirdChild = await makeFixture()
+    thirdChild.head.lineageJson = JSON.stringify({
+      source: { sid: SID, position: 2, url: null },
+      proof: grant.token,
+    })
+    expect((await uploadAndCommit(env, thirdChild, { sid: thirdChildSid })).status).toBe(200)
+    expect(env.state.hub_session_verified_forks).toEqual([])
+  })
+
+  it('rolls back a Resume grant claim when another new head wins the same-SID race', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const source = await makeFixture()
+    expect((await uploadAndCommit(env, source)).status).toBe(200)
+
+    const issued = await resumeGrant(env, SID, 2)
+    expect(issued.status).toBe(200)
+    const grant = (await issued.json()) as { version: number; token: string }
+    const childSid = 'codex_12345678-abcd-4321-abcd-1234567890af'
+    const child = await makeFixture()
+    const storedLineage = JSON.stringify({
+      source: { sid: SID, position: 2, url: null },
+    })
+    child.head.lineageJson = JSON.stringify({
+      source: { sid: SID, position: 2, url: null },
+      proof: grant.token,
+    })
+    expect((await upload(env, USER_A_TOKEN, child.entries)).status).toBe(200)
+
+    const racedAt = Date.now() + 1_000
+    const now = vi.spyOn(Date, 'now').mockReturnValue(racedAt)
+    const originalBatch = env.DB.batch.bind(env.DB)
+    let raced = false
+    Object.assign(env.DB, {
+      batch: async (statements: Parameters<typeof originalBatch>[0]) => {
+        if (!raced) {
+          raced = true
+          const cost = costForUsage(child.viewValue.usage)
+          env.state.hub_sessions.push({
+            sid: childSid,
+            owner_user_id: 'user-a',
+            root: child.head.root,
+            record_count: child.head.count,
+            sig: child.head.sig,
+            card_json: child.head.cardJson,
+            note_md: child.head.summaryMd,
+            lineage_json: storedLineage,
+            view_oid: child.head.viewOid,
+            spool_file_oid: null,
+            cost_usd: cost?.usd ?? null,
+            total_tokens: cost?.totalTokens ?? null,
+            visibility: 'unlisted',
+            team_id: null,
+            withdrawn_at: null,
+            created_at: racedAt,
+            updated_at: racedAt,
+          })
+        }
+        return originalBatch(statements)
+      },
+    })
+
+    try {
+      const response = await commit(env, child, USER_A_TOKEN, childSid)
+      expect(response.status).toBe(409)
+      await expect(response.json()).resolves.toMatchObject({ error: 'CONFLICT' })
+    } finally {
+      now.mockRestore()
+    }
+
+    expect(env.state.hub_sessions.filter((row) => row.sid === childSid)).toHaveLength(1)
+    expect(env.state.hub_session_verified_forks).toEqual([])
+    expect(env.state.hub_session_resume_grants).toEqual([
+      expect.objectContaining({
+        token_hash: await sha256Hex(grant.token),
+        claimed_child_sid: null,
+        claimed_child_root: null,
+        claimed_at: null,
+      }),
+    ])
+    expect(env.state.hub_session_discovery.filter((row) => row.sid === childSid)).toEqual([])
+  })
+
+  it('keeps legacy lineage but never counts absent or forged proof as verified', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const source = await makeFixture()
+    expect((await uploadAndCommit(env, source)).status).toBe(200)
+
+    for (const [index, proof] of [null, 'x'.repeat(43)].entries()) {
+      const child = await makeFixture()
+      child.head.lineageJson = JSON.stringify({
+        source: { sid: SID, position: 1, url: null },
+        ...(proof === null ? {} : { proof }),
+      })
+      const childSid = `codex_12345678-abcd-4321-abcd-1234567890b${index}`
+      expect((await uploadAndCommit(env, child, { sid: childSid })).status).toBe(200)
+      expect(env.state.hub_sessions.find((row) => row.sid === childSid)?.lineage_json).toBe(
+        JSON.stringify({ source: { sid: SID, position: 1, url: null } }),
+      )
+    }
+
+    expect(env.state.hub_session_verified_forks).toEqual([])
+  })
+
+  it('validates the requested position and rate-limits repeated grants per source', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const source = await makeFixture()
+    expect((await uploadAndCommit(env, source)).status).toBe(200)
+
+    expect((await resumeGrant(env, SID, 0)).status).toBe(400)
+    expect((await resumeGrant(env, SID, source.head.count + 1)).status).toBe(400)
+    for (let index = 0; index < 20; index += 1) {
+      expect((await resumeGrant(env, SID, 1)).status).toBe(200)
+    }
+    expect((await resumeGrant(env, SID, 1)).status).toBe(429)
   })
 })
 

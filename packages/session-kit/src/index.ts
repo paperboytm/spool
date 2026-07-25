@@ -31,6 +31,7 @@ export type {
   DiscoveryEvidence,
   DiscoveryLineage,
   DiscoverySessionItem,
+  DiscoverySessionSocialResponse,
   DiscoverySessionsResponse,
   DiscoverySort,
 } from './discovery.js'
