@@ -309,6 +309,7 @@ export function Tabs({ className, items, value, onValueChange, onKeyDown, ...pro
 
 type NavItemVisualProps = {
   active?: boolean
+  current?: boolean
   leading?: ReactNode
   trailing?: ReactNode
 }
@@ -335,12 +336,20 @@ export function NavItem(props: NavItemProps) {
   )
 
   if ('href' in props && props.href !== undefined) {
-    const { active = false, children, className, leading, trailing, ...linkProps } = props
+    const {
+      active = false,
+      children,
+      className,
+      current = active,
+      leading,
+      trailing,
+      ...linkProps
+    } = props
     return (
       <a
         {...linkProps}
         className={cx('sp-nav-item', className)}
-        aria-current={active ? 'page' : undefined}
+        aria-current={current ? 'page' : undefined}
         data-active={active || undefined}
       >
         {content(leading, children, trailing)}
@@ -348,13 +357,22 @@ export function NavItem(props: NavItemProps) {
     )
   }
 
-  const { active = false, children, className, leading, trailing, type, ...buttonProps } = props
+  const {
+    active = false,
+    children,
+    className,
+    current = active,
+    leading,
+    trailing,
+    type,
+    ...buttonProps
+  } = props
   return (
     <button
       {...buttonProps}
       type={type ?? 'button'}
       className={cx('sp-nav-item', className)}
-      aria-current={active ? 'page' : undefined}
+      aria-current={current ? 'page' : undefined}
       data-active={active || undefined}
     >
       {content(leading, children, trailing)}

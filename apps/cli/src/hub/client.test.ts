@@ -126,6 +126,24 @@ describe('HubClient', () => {
     expect(init?.body).toBeUndefined()
   })
 
+  it('requests a one-use resume grant at the verified record position', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ version: 1, token: 'resume-proof' }))
+    const client = new HubClient({
+      hubUrl: 'https://spool.new',
+      token: 'hub-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await expect(client.createResumeGrant(SID, 42)).resolves.toEqual({
+      version: 1,
+      token: 'resume-proof',
+    })
+    const [input, init] = fetchMock.mock.calls[0]!
+    expect(String(input)).toBe(`https://spool.new/api/hub/v1/sessions/${SID}/resume-grant`)
+    expect(init).toMatchObject({ method: 'POST', body: '{"position":42}' })
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer hub-token')
+  })
+
   it.each([
     [401, { message: 'invalid token' }, 'invalid token'],
     [404, { error: 'NOT_FOUND', detail: 'session missing' }, 'session missing'],

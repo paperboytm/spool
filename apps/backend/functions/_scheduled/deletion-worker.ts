@@ -189,6 +189,12 @@ async function sweepDeletedUsers(env: DeletionEnv, now: number): Promise<void> {
         // row, no permanent ban from the soft-deleted tombstone.
         env.DB.prepare('DELETE FROM user_identities WHERE user_id=?').bind(row.user_id),
         env.DB.prepare('DELETE FROM api_tokens WHERE user_id=?').bind(row.user_id),
+        // Users are soft-deleted, so the user_id FK cannot remove stars they
+        // placed on other authors' Sessions. Keep this in the final D1 scrub
+        // transaction so no tombstoned viewer continues contributing stars.
+        env.DB.prepare(
+          '/* account-deletion:delete-viewer-stars */ DELETE FROM hub_session_stars WHERE user_id=?',
+        ).bind(row.user_id),
         env.DB.prepare(
           `/* deletion:enqueue-workos-memberships */
              INSERT INTO workos_cleanup_outbox
@@ -397,6 +403,14 @@ async function deleteHubContent(
   await requireClaim()
   await env.DB.batch([
     env.DB.prepare('DELETE FROM hub_objects WHERE owner_user_id=?').bind(userId),
+    env.DB.prepare(
+      `/* account-deletion:delete-target-stars */
+       DELETE FROM hub_session_stars
+       WHERE sid IN (
+         SELECT sid FROM hub_sessions
+         WHERE owner_user_id=? AND team_id IS NULL
+       )`,
+    ).bind(userId),
     env.DB.prepare('DELETE FROM hub_sessions WHERE owner_user_id=? AND team_id IS NULL').bind(
       userId,
     ),

@@ -301,6 +301,26 @@ async function revokeDeletedUserMemberships(
       .bind(now, workosUserId, workosUserId),
     db
       .prepare(
+        `/* workos-webhook:user-delete-session-stars */
+         DELETE FROM hub_session_stars
+         WHERE sid IN (
+           SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id
+           WHERE t.archived_at=? AND (
+             EXISTS (
+               SELECT 1 FROM team_memberships m
+               JOIN user_identities identity ON identity.user_id=m.user_id
+               WHERE m.team_id=t.id AND identity.provider='workos'
+                 AND identity.provider_sub=?
+             ) OR EXISTS (
+               SELECT 1 FROM workos_membership_denials denied
+               WHERE denied.team_id=t.id AND denied.workos_user_id=?
+             )
+           )
+         )`,
+      )
+      .bind(now, workosUserId, workosUserId),
+    db
+      .prepare(
         `/* workos-webhook:user-delete-discovery */
          DELETE FROM hub_session_discovery
          WHERE sid IN (
@@ -501,6 +521,16 @@ export async function revokeLocalWorkosMembership(
       .prepare(
         `/* workos-webhook:archive-last-owner-engagement */
          DELETE FROM hub_session_engagement_daily
+         WHERE sid IN (
+           SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id
+           WHERE t.workos_organization_id=? AND t.archived_at=?
+         )`,
+      )
+      .bind(args.organizationId, args.now),
+    db
+      .prepare(
+        `/* workos-webhook:archive-last-owner-session-stars */
+         DELETE FROM hub_session_stars
          WHERE sid IN (
            SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id
            WHERE t.workos_organization_id=? AND t.archived_at=?
@@ -722,6 +752,16 @@ async function archiveOrganization(
       .prepare(
         `/* workos-webhook:archive-organization-engagement */
          DELETE FROM hub_session_engagement_daily
+         WHERE sid IN (
+           SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id
+           WHERE t.workos_organization_id=? AND t.archived_at=?
+         )`,
+      )
+      .bind(organizationId, now),
+    db
+      .prepare(
+        `/* workos-webhook:archive-organization-session-stars */
+         DELETE FROM hub_session_stars
          WHERE sid IN (
            SELECT s.sid FROM hub_sessions s JOIN teams t ON t.id=s.team_id
            WHERE t.workos_organization_id=? AND t.archived_at=?

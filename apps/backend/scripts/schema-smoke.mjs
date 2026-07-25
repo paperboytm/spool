@@ -236,6 +236,63 @@ try {
   if (discoveryIndexes.length !== 2) {
     throw new Error(`Missing Discovery keyset indexes: ${JSON.stringify(discoveryIndexes)}`)
   }
+  const socialSchema = await executeJson(
+    stateDir,
+    "SELECT type,name FROM sqlite_master WHERE (type='table' AND name IN ('hub_session_stars','hub_session_resume_grants','hub_session_verified_forks')) OR (type='index' AND name IN ('hub_session_stars_user_created','hub_discovery_lineage_source_sid','hub_resume_grants_source_expires','hub_resume_grants_unclaimed_expires','hub_verified_forks_source_verified')) ORDER BY type,name;",
+  )
+  if (
+    JSON.stringify(socialSchema) !==
+    JSON.stringify([
+      { type: 'index', name: 'hub_discovery_lineage_source_sid' },
+      { type: 'index', name: 'hub_resume_grants_source_expires' },
+      { type: 'index', name: 'hub_resume_grants_unclaimed_expires' },
+      { type: 'index', name: 'hub_session_stars_user_created' },
+      { type: 'index', name: 'hub_verified_forks_source_verified' },
+      { type: 'table', name: 'hub_session_resume_grants' },
+      { type: 'table', name: 'hub_session_stars' },
+      { type: 'table', name: 'hub_session_verified_forks' },
+    ])
+  ) {
+    throw new Error(`Missing Session social schema: ${JSON.stringify(socialSchema)}`)
+  }
+  await executeJson(
+    stateDir,
+    `INSERT INTO users (id,email,created_at,last_signin_at)
+       VALUES ('social-viewer','social-viewer@example.test',1,1);
+     INSERT INTO hub_sessions
+       (sid,owner_user_id,root,record_count,visibility,created_at,updated_at)
+       VALUES (
+         'codex_00000000-0000-4000-8000-000000000099',
+         'durable-user',
+         '${'c'.repeat(64)}',
+         1,
+         'unlisted',
+         1,
+         1
+       );
+     INSERT INTO hub_session_stars (sid,user_id,created_at)
+       VALUES ('codex_00000000-0000-4000-8000-000000000099','social-viewer',1);
+     INSERT OR IGNORE INTO hub_session_stars (sid,user_id,created_at)
+       VALUES ('codex_00000000-0000-4000-8000-000000000099','social-viewer',2);`,
+  )
+  const idempotentStars = await executeJson(
+    stateDir,
+    "SELECT COUNT(*) AS count FROM hub_session_stars WHERE sid='codex_00000000-0000-4000-8000-000000000099';",
+  )
+  if (idempotentStars[0]?.count !== 1) {
+    throw new Error(`Session stars are not idempotent: ${JSON.stringify(idempotentStars)}`)
+  }
+  await executeJson(
+    stateDir,
+    "DELETE FROM hub_sessions WHERE sid='codex_00000000-0000-4000-8000-000000000099';",
+  )
+  const cascadedStars = await executeJson(
+    stateDir,
+    "SELECT COUNT(*) AS count FROM hub_session_stars WHERE sid='codex_00000000-0000-4000-8000-000000000099';",
+  )
+  if (cascadedStars[0]?.count !== 0) {
+    throw new Error(`Session star target cascade failed: ${JSON.stringify(cascadedStars)}`)
+  }
   await executeJson(
     stateDir,
     `INSERT INTO hub_sessions
@@ -273,6 +330,62 @@ try {
        VALUES
          ('zeta-durable','durable-user',1,NULL),
          ('alpha-durable','durable-user',2,NULL);`,
+  )
+  await executeJson(
+    stateDir,
+    `INSERT INTO hub_sessions
+       (sid,owner_user_id,root,record_count,visibility,created_at,updated_at)
+       VALUES (
+         'codex_00000000-0000-4000-8000-000000000098',
+         'durable-user',
+         '${'b'.repeat(64)}',
+         2,
+         'unlisted',
+         2,
+         2
+       );
+     INSERT INTO hub_session_resume_grants
+       (token_hash,source_sid,source_root,source_position,created_at,expires_at,
+        claimed_child_sid,claimed_child_root,claimed_at)
+       VALUES (
+         '${'d'.repeat(64)}',
+         'claude_00000000-0000-4000-8000-000000000001',
+         '${'a'.repeat(64)}',
+         2,
+         1,
+         100,
+         'codex_00000000-0000-4000-8000-000000000098',
+         '${'b'.repeat(64)}',
+         2
+       );
+     INSERT INTO hub_session_verified_forks
+       (child_sid,source_sid,source_root,source_position,child_root,
+        grant_token_hash,verified_at)
+       VALUES (
+         'codex_00000000-0000-4000-8000-000000000098',
+         'claude_00000000-0000-4000-8000-000000000001',
+         '${'a'.repeat(64)}',
+         2,
+         '${'b'.repeat(64)}',
+         '${'d'.repeat(64)}',
+         2
+       );`,
+  )
+  await expectD1Failure(
+    stateDir,
+    `INSERT INTO hub_session_verified_forks
+       (child_sid,source_sid,source_root,source_position,child_root,
+        grant_token_hash,verified_at)
+     VALUES (
+       'claude_00000000-0000-4000-8000-000000000001',
+       'codex_00000000-0000-4000-8000-000000000098',
+       '${'b'.repeat(64)}',
+       1,
+       '${'a'.repeat(64)}',
+       '${'d'.repeat(64)}',
+       3
+     );`,
+    'UNIQUE constraint failed: hub_session_verified_forks.grant_token_hash',
   )
   const rankedDiscoverySql = await discoverySql({
     query: 'durable',

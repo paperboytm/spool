@@ -16,6 +16,8 @@ export interface BirthPayload {
     position: number
     url: string | null
   }
+  /** One-use Hub grant proving this lineage came through `spool resume`. */
+  proof?: string
 }
 
 export function buildBirthText(payload: BirthPayload, cardJson: string | null): string {
@@ -98,5 +100,10 @@ function isBirthPayload(value: unknown): value is BirthPayload {
   const source = (value as { source?: unknown }).source
   if (typeof source !== 'object' || source === null) return false
   const { sid, position } = source as { sid?: unknown; position?: unknown }
-  return typeof sid === 'string' && typeof position === 'number'
+  const proof = (value as { proof?: unknown }).proof
+  return (
+    typeof sid === 'string' &&
+    typeof position === 'number' &&
+    (proof === undefined || (typeof proof === 'string' && proof.length > 0))
+  )
 }

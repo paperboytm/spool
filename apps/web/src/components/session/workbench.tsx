@@ -10,7 +10,7 @@ import {
   type ConversationMessage,
   type MessageListHandle,
 } from '@spool-lab/session-view'
-import { Avatar, Badge } from '@spool-lab/ui'
+import { Avatar, Badge, Button } from '@spool-lab/ui'
 import type { SpoolDocument } from '@spool/share-kit'
 import {
   TimelineBody,
@@ -36,18 +36,26 @@ import type { HubSessionMeta } from '../../lib/hub-api'
 import type { ParsedConversation } from '../../lib/session-messages'
 import { authorLabel, parseWorkspaceCard, repositoryUrlForRemote } from '../../lib/session-page'
 import { formatSessionCost, useLocalizedSessionTitle } from '../../lib/session-title'
-import { ResumeMenu } from './resume-menu'
+import { SessionActions } from './session-actions'
 import { SessionSummary } from './session-summary'
 
 interface Props {
   meta: HubSessionMeta
   view: SessionViewV1 | null
   provider: SessionProvider
-  conversation: ParsedConversation
+  conversation: ParsedConversation | null
   isDark: boolean
   initialRecordIndex: number | null
   spoolDocument: SpoolDocument | null
+  history: SessionHistoryState
+  onLoadHistory: () => void
 }
+
+export type SessionHistoryState =
+  | { phase: 'idle'; total: number }
+  | { phase: 'loading'; source: 'publication' | 'records'; loaded: number; total: number }
+  | { phase: 'ready'; total: number }
+  | { phase: 'error'; loaded: number; total: number }
 
 export interface UserPromptEntry {
   id: number
@@ -134,9 +142,11 @@ export function SessionWorkbench({
   isDark,
   initialRecordIndex,
   spoolDocument,
+  history,
+  onLoadHistory,
 }: Props) {
   const initialMessageId =
-    initialRecordIndex === null
+    initialRecordIndex === null || conversation === null
       ? null
       : (conversation.recordToMessageId.get(initialRecordIndex) ?? null)
   const [targetMessageId, setTargetMessageId] = useState<number | null>(initialMessageId)
@@ -146,6 +156,7 @@ export function SessionWorkbench({
   const timelineRef = useRef<HTMLDivElement>(null)
   const focusedTurnRef = useRef<HTMLElement | null>(null)
   const jumpFrameRef = useRef<number | null>(null)
+  const appliedInitialRecordRef = useRef(initialMessageId !== null)
 
   const card = parseWorkspaceCard(meta.cardJson)
   const resumable = isResumableSessionProvider(provider)
@@ -155,8 +166,8 @@ export function SessionWorkbench({
   const visibilityTimestamp = isPublic ? meta.createdAt : meta.updatedAt
   const avatarName = meta.author.displayName ?? meta.author.handle ?? 'Spool author'
   const rawPrompts = useMemo(
-    () => getUserPromptEntries(conversation.messages),
-    [conversation.messages],
+    () => getUserPromptEntries(conversation?.messages ?? []),
+    [conversation?.messages],
   )
   const spoolRedactList = useMemo(
     () =>
@@ -178,7 +189,7 @@ export function SessionWorkbench({
   const spoolTitle = spoolDocument?.conversation.title.trim() ?? ''
   const derivedTitle =
     spoolDocument === null
-      ? conversation.title.trim() || 'Shared session'
+      ? conversation?.title.trim() || view?.firstPrompt.trim() || 'Shared session'
       : (spoolDocument.opts.redact ? redactPlainText(spoolTitle, spoolRedactList) : spoolTitle) ||
         'Shared session'
   const fullTitle = useLocalizedSessionTitle(parsedSummary.titles, derivedTitle)
@@ -205,7 +216,20 @@ export function SessionWorkbench({
           turnIndex: entry.turnIndex,
         }))
   const messageCount =
-    spoolDocument === null ? conversation.messages.length : visibleSpoolTurnCount(spoolDocument)
+    spoolDocument === null
+      ? (conversation?.messages.length ?? 0)
+      : visibleSpoolTurnCount(spoolDocument)
+
+  useEffect(() => {
+    if (appliedInitialRecordRef.current || initialRecordIndex === null || conversation === null) {
+      return
+    }
+    const messageId = conversation.recordToMessageId.get(initialRecordIndex)
+    if (messageId === undefined) return
+    appliedInitialRecordRef.current = true
+    setTargetMessageId(messageId)
+    window.requestAnimationFrame(() => listRef.current?.scrollToMessageId(messageId))
+  }, [conversation, initialRecordIndex])
 
   const jumpToTurn = useCallback((turnIndex: number) => {
     setTargetTurnIndex(turnIndex)
@@ -321,15 +345,20 @@ export function SessionWorkbench({
             <span className="sr-only">Session ID: {meta.sid}</span>
           </div>
 
-          {resumable && (
+          {(resumable || isPublic) && (
             <section
               className="mt-4 w-full max-w-[720px] min-w-0"
-              aria-labelledby="resume-session-title"
+              aria-labelledby="session-actions-title"
             >
-              <h2 id="resume-session-title" className="sr-only">
-                Resume in {providerLabel}
+              <h2 id="session-actions-title" className="sr-only">
+                Session actions
               </h2>
-              <ResumeMenu sid={meta.sid} providerLabel={providerLabel} />
+              <SessionActions
+                sid={meta.sid}
+                providerLabel={providerLabel}
+                publicSession={isPublic}
+                resumable={resumable}
+              />
             </section>
           )}
         </header>
@@ -347,18 +376,27 @@ export function SessionWorkbench({
                   Session
                 </h2>
                 <span className="font-mono text-[11px] text-[var(--faint)] tabular-nums">
-                  {messageCount}{' '}
-                  {spoolDocument === null
-                    ? messageCount === 1
-                      ? 'message'
-                      : 'messages'
-                    : messageCount === 1
-                      ? 'turn'
-                      : 'turns'}
+                  {history.phase === 'ready'
+                    ? `${messageCount} ${
+                        spoolDocument === null
+                          ? messageCount === 1
+                            ? 'message'
+                            : 'messages'
+                          : messageCount === 1
+                            ? 'turn'
+                            : 'turns'
+                      }`
+                    : history.phase === 'loading' && history.source === 'publication'
+                      ? 'Preparing conversation'
+                      : `${history.total.toLocaleString('en-US')} records`}
                 </span>
               </div>
 
-              <div className="min-w-0 lg:grid lg:grid-cols-[24px_minmax(0,1fr)] lg:gap-4">
+              <div
+                className={`min-w-0 ${
+                  prompts.length > 0 ? 'lg:grid lg:grid-cols-[24px_minmax(0,1fr)] lg:gap-4' : ''
+                }`}
+              >
                 {prompts.length > 0 && (
                   <nav className="relative z-30 mb-4 min-w-0 lg:mb-0" aria-label="User prompts">
                     <div className="mb-2 flex items-center justify-between gap-3 lg:hidden">
@@ -441,6 +479,9 @@ export function SessionWorkbench({
                 )}
 
                 <div className="min-w-0">
+                  {history.phase !== 'ready' && (
+                    <SessionHistoryStatus history={history} onLoad={onLoadHistory} />
+                  )}
                   {spoolDocument !== null ? (
                     messageCount > 0 ? (
                       <div
@@ -459,22 +500,22 @@ export function SessionWorkbench({
                         No turns were selected for this session.
                       </p>
                     )
-                  ) : conversation.messages.length > 0 ? (
+                  ) : (conversation?.messages.length ?? 0) > 0 ? (
                     <div className="min-w-0">
                       <MessageList
                         ref={listRef}
-                        messages={conversation.messages}
+                        messages={conversation?.messages ?? []}
                         isDark={isDark}
                         useWindowScroll
                         targetMessageId={targetMessageId}
                         showTargetHighlight={targetMessageId !== null}
                       />
                     </div>
-                  ) : (
+                  ) : history.phase === 'ready' ? (
                     <p className="m-0 border-t border-[var(--border)] py-6 text-[13px] text-[var(--faint)]">
                       No renderable messages in this session.
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </section>
@@ -514,7 +555,11 @@ export function SessionWorkbench({
                 <MetadataRow label="Messages">
                   <span className="inline-flex items-center gap-2 font-mono tabular-nums">
                     <MessageSquareText size={12} strokeWidth={1.7} aria-hidden="true" />
-                    {messageCount}
+                    {history.phase === 'ready'
+                      ? messageCount
+                      : messageCount > 0
+                        ? `${messageCount}+`
+                        : '—'}
                   </span>
                 </MetadataRow>
                 <MetadataRow label="Records">
@@ -593,6 +638,111 @@ export function SessionWorkbench({
         </div>
       </div>
     </main>
+  )
+}
+
+function SessionHistoryStatus({
+  history,
+  onLoad,
+}: {
+  history: Exclude<SessionHistoryState, { phase: 'ready' }>
+  onLoad: () => void
+}) {
+  const formattedTotal = history.total.toLocaleString('en-US')
+
+  if (history.phase === 'idle') {
+    return (
+      <div className="mb-4 border-y border-[var(--border)] py-5" data-testid="session-history-idle">
+        <p className="m-0 text-[13px] font-medium text-[var(--text)]">Full session history</p>
+        <p className="mt-1 mb-4 max-w-[560px] text-[12px] leading-5 text-[var(--muted)]">
+          Summary and workspace details are ready. Load {formattedTotal} source records when you
+          want the complete conversation.
+        </p>
+        <Button size="lg" variant="outline" onClick={onLoad}>
+          Load full session
+        </Button>
+      </div>
+    )
+  }
+
+  if (history.phase === 'error') {
+    return (
+      <div
+        className="mb-4 border-y border-[var(--border)] py-5"
+        data-testid="session-history-error"
+      >
+        <p className="m-0 text-[13px] font-medium text-[var(--text)]">
+          The remaining history did not load
+        </p>
+        <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+          {history.loaded.toLocaleString('en-US')} of {formattedTotal} records are available. Retry
+          from where loading stopped.
+        </p>
+        <Button size="lg" variant="outline" onClick={onLoad}>
+          Retry remaining history
+        </Button>
+      </div>
+    )
+  }
+
+  if (history.source === 'publication') {
+    return (
+      <div
+        className="mb-4 border-y border-[var(--border)] py-5"
+        aria-busy="true"
+        aria-live="polite"
+        data-testid="session-publication-loading"
+      >
+        <p className="m-0 text-[13px] font-medium text-[var(--text)]">
+          Preparing the published session
+        </p>
+        <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+          Summary and workspace details are ready while the curated conversation loads.
+        </p>
+        <HistorySkeleton />
+      </div>
+    )
+  }
+
+  const percentage =
+    history.total === 0 ? 100 : Math.min(100, Math.round((history.loaded / history.total) * 100))
+  return (
+    <div
+      className="mb-4 border-y border-[var(--border)] py-5"
+      aria-live="polite"
+      data-testid="session-history-loading"
+    >
+      <div className="mb-2 flex items-baseline justify-between gap-4">
+        <p className="m-0 text-[13px] font-medium text-[var(--text)]">Loading session history</p>
+        <span className="shrink-0 font-mono text-[11px] text-[var(--muted)] tabular-nums">
+          {history.loaded.toLocaleString('en-US')} / {formattedTotal}
+        </span>
+      </div>
+      <div
+        className="h-1 overflow-hidden rounded bg-[var(--surface2)]"
+        role="progressbar"
+        aria-label="Session records loaded"
+        aria-valuemin={0}
+        aria-valuemax={history.total}
+        aria-valuenow={history.loaded}
+      >
+        <span
+          className="block h-full bg-[var(--accent)] transition-[width] duration-150 ease-out motion-reduce:transition-none"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      {history.loaded === 0 && <HistorySkeleton />}
+    </div>
+  )
+}
+
+function HistorySkeleton() {
+  return (
+    <div className="mt-4 space-y-3" aria-hidden="true">
+      <div className="h-3 w-2/5 rounded bg-[var(--surface2)]" />
+      <div className="h-3 w-full rounded bg-[var(--surface)]" />
+      <div className="h-3 w-4/5 rounded bg-[var(--surface)]" />
+    </div>
   )
 }
 

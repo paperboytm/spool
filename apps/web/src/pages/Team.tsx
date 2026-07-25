@@ -19,6 +19,7 @@ import { humanDate } from '../lib/dates'
 import { appendUniqueManagedSessions } from '../lib/hub-management-api'
 import {
   archiveTeam,
+  announceTeamSummaryChanged,
   createTeamInvitation,
   fetchTeam,
   fetchTeamInvitations,
@@ -111,11 +112,12 @@ export function TeamPage({ teamId }: { teamId: string }) {
   }, [pageTitle])
 
   if (state.kind === 'loading') {
-    return <TeamStatus title="Loading team" busy />
+    return <TeamStatus teamId={teamId} title="Loading team" busy />
   }
   if (state.kind === 'not-found' || state.kind === 'forbidden') {
     return (
       <TeamStatus
+        teamId={teamId}
         title="Team unavailable"
         body="This team does not exist, or your account is not a current member."
       />
@@ -124,6 +126,7 @@ export function TeamPage({ teamId }: { teamId: string }) {
   if (state.kind === 'error') {
     return (
       <TeamStatus
+        teamId={teamId}
         title="Could not load this team"
         body="The team service did not respond. Try again."
         action={<Button onClick={() => void loadTeam()}>Try again</Button>}
@@ -133,7 +136,7 @@ export function TeamPage({ teamId }: { teamId: string }) {
 
   const { team } = state
   return (
-    <WorkspaceFrame active="teams" mainClassName="sw-team-workspace-main">
+    <WorkspaceFrame active="teams" activeTeamId={team.id} mainClassName="sw-team-workspace-main">
       <div className="sw-team-main">
         <div className="sw-team-shell">
           <header className="sw-team-heading">
@@ -171,18 +174,20 @@ export function TeamPage({ teamId }: { teamId: string }) {
 }
 
 function TeamStatus({
+  teamId,
   title,
   body,
   busy,
   action,
 }: {
+  teamId: string
   title: string
   body?: string
   busy?: boolean
   action?: ReactNode
 }) {
   return (
-    <WorkspaceFrame active="teams" mainClassName="sw-team-workspace-main">
+    <WorkspaceFrame active="teams" activeTeamId={teamId} mainClassName="sw-team-workspace-main">
       <div className="sw-main center" aria-busy={busy || undefined}>
         <div className="sw-card tight sw-team-status sw-card--480">
           {busy ? <span className="sw-spin sw-spin-anim" aria-hidden="true" /> : null}
@@ -825,6 +830,7 @@ function TeamSettingsPanel({
     if (result.kind !== 'ok') {
       return setError(failureMessage(result, 'Could not rename this team.'))
     }
+    announceTeamSummaryChanged(result.data.team)
     onTeamChanged(result.data.team)
   }
 

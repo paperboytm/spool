@@ -108,6 +108,26 @@ describe('Team Session management feed', () => {
     },
   )
 
+  it('returns both canonical task titles so Mine and Team feeds can localize them', async () => {
+    const authorized = mockDatabase([
+      {
+        ...TEAM_SESSION,
+        note_md:
+          '---\ntitle: Ship Team workspaces\ntitle_zh: 交付团队工作区\n---\n\n## Outcome\n\nDone.',
+        team_name: 'Paperboy',
+        team_role: 'member',
+      },
+    ])
+
+    const page = await listTeamHubSessions(authorized.db, 'team_1', 'user_1')
+
+    expect(page?.sessions[0]).toMatchObject({
+      title: 'Ship Team workspaces',
+      titles: { en: 'Ship Team workspaces', zh: '交付团队工作区' },
+      summary: '## Outcome\n\nDone.',
+    })
+  })
+
   it('hides Sessions from archived or deletion-pending Teams in the owner feed', async () => {
     const owner = mockDatabase([])
 

@@ -48,6 +48,7 @@ describe('Hub Session management API', () => {
     const session = (sid: string, title: string): ManagedSession => ({
       sid,
       title,
+      titles: null,
       summary: null,
       provider: 'claude',
       created_at: 1,

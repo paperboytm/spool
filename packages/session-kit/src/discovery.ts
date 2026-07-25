@@ -54,3 +54,18 @@ export interface DiscoveryEngagementResponse {
   /** False when this reader/session/day was already counted. */
   accepted: boolean
 }
+
+/** Public social state for one currently live Public Session. */
+export interface DiscoverySessionSocialResponse {
+  version: 1
+  starCount: number
+  /**
+   * Direct child Sessions that are themselves currently Public. A local
+   * Resume is not counted until its resulting Session is published.
+   */
+  forkCount: number
+  /** False for anonymous viewers and true only for the signed-in viewer's star. */
+  viewerStarred: boolean
+  /** Whether this viewer may currently change their star state. */
+  canStar: boolean
+}

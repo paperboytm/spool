@@ -43,6 +43,11 @@ export interface HubHeadResponse {
   url: string
 }
 
+export interface HubResumeGrantResponse {
+  version: 1
+  token: string
+}
+
 export interface HubAuthor {
   handle: string | null
   displayName: string | null
@@ -161,6 +166,12 @@ export class HubClient {
 
   createToken(): Promise<HubTokenResponse> {
     return this.postJson('/api/hub/v1/tokens', undefined)
+  }
+
+  createResumeGrant(sid: string, position: number): Promise<HubResumeGrantResponse> {
+    return this.postJson(`/api/hub/v1/sessions/${encodeURIComponent(sid)}/resume-grant`, {
+      position,
+    })
   }
 
   /** Revoke the token this client authenticates with (`spool logout`). */

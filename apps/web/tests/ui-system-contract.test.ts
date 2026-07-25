@@ -62,7 +62,7 @@ describe('Web shared UI contract', () => {
     const teamPage = source('src/pages/Team.tsx')
 
     expect(desktopCss).toMatch(
-      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*48px;[^}]*\}/,
+      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*var\(--sp-control-button-lg\);[^}]*\}/,
     )
     expect(desktopCss).not.toMatch(
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,

@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
+import { prepareAuthorizedTargetStarsDelete } from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { activeTeamRole, type HubEnv } from '../../../../../../src/hub/head'
@@ -42,6 +43,17 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
           actorUserId: user.id,
           expectedTeamId: existing.team_id,
           now,
+        }),
+        prepareAuthorizedTargetStarsDelete(ctx.env.DB, {
+          sid,
+          actorUserId: user.id,
+          teamId: existing.team_id,
+          root: existing.root,
+          updatedAt: now,
+          visibility: existing.visibility === 'private' ? 'private' : 'unlisted',
+          withdrawn: true,
+          requireAuthor: false,
+          requireTeamManager: existing.team_id !== null,
         }),
       ])
       if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')

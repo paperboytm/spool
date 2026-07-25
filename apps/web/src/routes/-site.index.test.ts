@@ -1,19 +1,15 @@
-import { describe, expect, it, vi } from 'vite-plus/test'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vite-plus/test'
 
-import { hasFreshHomeSession } from './_site.index'
+import { HomeRoute } from './_site.index'
 
-describe('homepage session redirect', () => {
-  it('redirects only after a fresh authenticated /api/me response', async () => {
-    const fetchCurrentMe = vi.fn(async () => ({ kind: 'ok' as const }))
+describe('homepage route', () => {
+  it('renders the real homepage instead of redirecting authenticated visitors', () => {
+    const html = renderToStaticMarkup(createElement(HomeRoute))
 
-    await expect(hasFreshHomeSession(fetchCurrentMe)).resolves.toBe(true)
-    expect(fetchCurrentMe).toHaveBeenCalledOnce()
+    expect(html).toContain('class="home-page"')
+    expect(html).toContain('Sessions everywhere.')
+    expect(html).toContain('Explore Sessions')
   })
-
-  it.each(['unauthenticated', 'forbidden', 'error'] as const)(
-    'stays on the homepage when /api/me returns %s',
-    async (kind) => {
-      await expect(hasFreshHomeSession(async () => ({ kind }))).resolves.toBe(false)
-    },
-  )
 })

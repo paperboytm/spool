@@ -35,7 +35,12 @@ vi.mock('@spool/share-kit/timeline', async (importOriginal) => {
 
 vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2026, 6, 20, 12))
 
-import { SessionWorkbench, getSpoolPromptEntries, getUserPromptEntries } from './workbench'
+import {
+  SessionWorkbench,
+  getSpoolPromptEntries,
+  getUserPromptEntries,
+  type SessionHistoryState,
+} from './workbench'
 
 function message(
   id: number,
@@ -248,13 +253,14 @@ const view: SessionViewV1 = {
 function renderWorkbench(
   options: {
     spool?: SpoolDocument | null
-    messages?: ParsedConversation
+    messages?: ParsedConversation | null
     summaryMd?: string | null
     cardJson?: string | null
     view?: SessionViewV1 | null
     provider?: SessionProvider
     visibility?: HubSessionMeta['visibility']
     cost?: HubSessionMeta['cost']
+    history?: SessionHistoryState
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -268,7 +274,7 @@ function renderWorkbench(
       },
       view: options.view === undefined ? view : options.view,
       provider: options.provider ?? 'claude',
-      conversation: options.messages ?? conversation,
+      conversation: options.messages === undefined ? conversation : options.messages,
       isDark: false,
       initialRecordIndex: null,
       spoolDocument:
@@ -277,6 +283,8 @@ function renderWorkbench(
               { role: 'user', body: 'Published full prompt\nwith private detail removed' },
             ])
           : options.spool,
+      history: options.history ?? { phase: 'ready', total: meta.count },
+      onLoadHistory: vi.fn(),
     }),
   )
 }
@@ -376,6 +384,50 @@ describe('SessionWorkbench', () => {
     expect(html).not.toContain('This line belongs in the full title only</h1>')
   })
 
+  it('renders Summary and evidence before a legacy conversation is requested', () => {
+    const html = renderWorkbench({
+      spool: null,
+      messages: null,
+      history: { phase: 'idle', total: 2_726 },
+    })
+
+    expect(html).toContain('<h1>Purpose</h1>')
+    expect(html).toContain('Full session history')
+    expect(html).toContain('Load 2,726 source records')
+    expect(html).toContain('Load full session')
+    expect(html).toContain('id="workspace-title"')
+    expect(html).toContain('>Changes<')
+    expect(html).toContain('>2,726 records</span>')
+    expect(html).not.toContain('lg:grid-cols-[24px_minmax(0,1fr)]')
+    expect(html).not.toContain('No renderable messages')
+  })
+
+  it('shows monotonic raw-record progress while preserving partial conversation content', () => {
+    const html = renderWorkbench({
+      spool: null,
+      history: { phase: 'loading', source: 'records', loaded: 100, total: 2_726 },
+    })
+
+    expect(html).toContain('Loading session history')
+    expect(html).toContain('100 / 2,726')
+    expect(html).toContain('role="progressbar"')
+    expect(html).toContain('aria-valuemax="2726"')
+    expect(html).toContain('aria-valuenow="100"')
+    expect(html).toContain('data-testid="message-list"')
+  })
+
+  it('uses view evidence as a stable title fallback before raw records arrive', () => {
+    const html = renderWorkbench({
+      spool: null,
+      messages: null,
+      summaryMd: null,
+      history: { phase: 'idle', total: 2_726 },
+    })
+
+    expect(html).toContain('Full prompt</h1>')
+    expect(html).not.toContain('Shared session</h1>')
+  })
+
   it('puts the Resume control below the title and links browser-addressable remotes', () => {
     const html = renderWorkbench({
       cardJson: JSON.stringify({
@@ -388,7 +440,7 @@ describe('SessionWorkbench', () => {
     })
 
     const titleIndex = html.indexOf('id="sw-workbench-title"')
-    const resumeIndex = html.indexOf('id="resume-session-title"')
+    const resumeIndex = html.indexOf('id="session-actions-title"')
     const timelineIndex = html.indexOf('id="session-timeline-title"')
     expect(titleIndex).toBeGreaterThan(-1)
     expect(resumeIndex).toBeGreaterThan(titleIndex)
@@ -405,6 +457,21 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('target="_blank"')
     expect(html).toContain('origin: git@github.com:paperboytm/spool.git</a>')
     expect(html).toContain('class="sw-session-sticky min-w-0 lg:sticky"')
+  })
+
+  it('uses GitHub-style Star and published-fork counts only for Public Sessions', () => {
+    const publicHtml = renderWorkbench()
+    const teamHtml = renderWorkbench({ visibility: 'team' })
+
+    expect(publicHtml).toContain('aria-label="Session actions"')
+    expect(publicHtml).toContain('Star this public Session')
+    expect(publicHtml).toContain('Loading stars')
+    expect(publicHtml).toContain('Loading published forks')
+    expect(publicHtml).toContain('Resume in Claude Code')
+
+    expect(teamHtml).toContain('Resume in Claude Code')
+    expect(teamHtml).not.toContain('Star this public Session')
+    expect(teamHtml).not.toContain('published forks')
   })
 
   it('identifies a Pi share without offering an unsupported native Resume command', () => {

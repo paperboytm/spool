@@ -179,6 +179,11 @@ describe('content primitives', () => {
       </NavItem>,
     )
     const button = renderToStaticMarkup(<NavItem>Projects</NavItem>)
+    const disclosure = renderToStaticMarkup(
+      <NavItem active current={false} aria-expanded="true">
+        Teams
+      </NavItem>,
+    )
 
     expect(link).toContain('<a')
     expect(link).toContain('aria-current="page"')
@@ -186,6 +191,8 @@ describe('content primitives', () => {
     expect(link).toContain('sp-nav-item__trailing')
     expect(button).toContain('<button')
     expect(button).toContain('type="button"')
+    expect(disclosure).toContain('data-active="true"')
+    expect(disclosure).not.toContain('aria-current')
   })
 
   it('renders badge variants and avatar image fallbacks', () => {

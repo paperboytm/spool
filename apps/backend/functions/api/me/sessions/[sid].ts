@@ -10,6 +10,7 @@ import {
   prepareAuthorizedDiscoveryProjectionDelete,
   prepareAuthorizedDiscoveryProjectionUpsert,
   prepareAuthorizedEngagementDelete,
+  prepareAuthorizedTargetStarsDelete,
   readDiscoveryView,
 } from '../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
@@ -215,6 +216,7 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
     } else {
       statements.push(
         prepareAuthorizedEngagementDelete(ctx.env.DB, projectionGate),
+        prepareAuthorizedTargetStarsDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedDiscoveryProjectionDelete(ctx.env.DB, projectionGate),
       )
     }
