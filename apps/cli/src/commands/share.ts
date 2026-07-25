@@ -353,13 +353,24 @@ export function bilingualSummaryValidationError(summary: string): string | null 
 function repeatsTitleAsFirstHeading(markdown: string, title: string): boolean {
   const first = markdown.split(/\r?\n/).find((line) => line.trim() !== '')
   if (!first || !/^\s{0,3}#\s+/.test(first)) return false
-  const heading = first
-    .replace(/^\s{0,3}#\s+/, '')
-    .replace(/\s+#+\s*$/, '')
+  const heading = stripClosingHeadingSequence(first.replace(/^\s{0,3}#\s+/, ''))
     .replace(/[*_`]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
   return heading === title
+}
+
+function stripClosingHeadingSequence(heading: string): string {
+  let end = heading.length
+  while (end > 0 && heading[end - 1]!.trim() === '') end--
+
+  let hashesStart = end
+  while (hashesStart > 0 && heading[hashesStart - 1] === '#') hashesStart--
+  if (hashesStart === end) return heading
+
+  const separator = hashesStart - 1
+  if (separator < 0 || heading[separator]!.trim() !== '') return heading
+  return heading.slice(0, separator)
 }
 
 async function announceShareComplete(

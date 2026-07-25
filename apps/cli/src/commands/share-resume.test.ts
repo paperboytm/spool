@@ -298,6 +298,38 @@ describe('spool share local Agent Summary flow', () => {
     ).toMatch(/must not repeat the Session title/)
   })
 
+  it('checks long closing heading sequences without regex backtracking', () => {
+    const repeatedHeading = `# Rename alpha to beta${' '.repeat(32 * 1024)}###`
+    expect(
+      bilingualSummaryValidationError(
+        BILINGUAL_SUMMARY.replace(
+          '<!-- spool:summary:en -->\n',
+          `<!-- spool:summary:en -->\n${repeatedHeading}\n\n`,
+        ),
+      ),
+    ).toMatch(/must not repeat the Session title/)
+
+    const distinctHeading = `# Explain the change${' '.repeat(32 * 1024)}###`
+    expect(
+      bilingualSummaryValidationError(
+        BILINGUAL_SUMMARY.replace(
+          '<!-- spool:summary:en -->\n',
+          `<!-- spool:summary:en -->\n${distinctHeading}\n\n`,
+        ),
+      ),
+    ).toBeNull()
+
+    const unclosedHeading = `# Explain the change${' '.repeat(32 * 1024)}x`
+    expect(
+      bilingualSummaryValidationError(
+        BILINGUAL_SUMMARY.replace(
+          '<!-- spool:summary:en -->\n',
+          `<!-- spool:summary:en -->\n${unclosedHeading}\n\n`,
+        ),
+      ),
+    ).toBeNull()
+  })
+
   it('shows the installer when an npx caller does not have the spool command yet', async () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-share-login-home-'))
     const events: string[] = []
