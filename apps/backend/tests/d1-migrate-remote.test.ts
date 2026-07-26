@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it, vi } from 'vite-plus/test'
 
@@ -31,8 +32,9 @@ describe('remote D1 migration runner', () => {
   })
 
   it('keeps production and staging on the atomic remote runner', async () => {
+    const testDirectory = dirname(fileURLToPath(import.meta.url))
     const packageJson = JSON.parse(
-      await readFile(new URL('../package.json', import.meta.url), 'utf8'),
+      await readFile(join(testDirectory, '..', 'package.json'), 'utf8'),
     ) as {
       scripts: Record<string, string>
     }
