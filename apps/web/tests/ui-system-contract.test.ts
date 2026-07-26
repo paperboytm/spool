@@ -67,9 +67,10 @@ describe('Web shared UI contract', () => {
     expect(desktopCss).not.toMatch(
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
     )
-    expect(teamPage.match(/size="lg"/g)).toHaveLength(2)
+    expect(teamPage.match(/size="lg"/g)).toHaveLength(3)
     expect(teamPage).toContain("loading={busyKey === 'invite'}")
     expect(teamPage).toContain("loading={busy === 'rename'}")
+    expect(teamPage).toContain("loading={busy === 'handle'}")
   })
 
   it('uses the shared danger hierarchy instead of private Team color patches', () => {

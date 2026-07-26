@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vite-plus/test'
 
-import { canonicalizeRecord, splitRecords } from './records.js'
+import {
+  backupSessionRecord,
+  canonicalizeRecord,
+  restoreSessionRecord,
+  sessionRecordData,
+  splitRecords,
+} from './records.js'
 
 describe('splitRecords', () => {
   it('keeps non-empty JSONL records and accepts CRLF and a missing final newline', () => {
@@ -43,5 +49,55 @@ describe('canonicalizeRecord', () => {
     )
 
     expect(mac).toEqual(linux)
+  })
+
+  it('rejects a high surrogate at the end of a JSON string', async () => {
+    await expect(canonicalizeRecord('{"key":"\\ud800"}')).rejects.toThrow('lone surrogates')
+  })
+})
+
+describe('PortableSessionBackupV1', () => {
+  it('preserves direct provider JSON key order, whitespace, and number lexemes', async () => {
+    const source =
+      '{ "trailing": 1.2300, "exponent": 1e3, "negativeZero": -0, "large": 9007199254740993 }'
+    const backup = await backupSessionRecord(source)
+
+    expect(backup.version).toBe(1)
+    expect(backup.data).toBe(source)
+    expect(sessionRecordData(backup)).toBe(source)
+  })
+
+  it('normalizes escaped path spellings only inside affected JSON string tokens', async () => {
+    const backup = await backupSessionRecord(
+      '{ "\\/Users\\/test\\/work\\/demo": 1.2300, "unicode": "\\u002fUsers\\u002ftest\\u002fwork\\u002fdemo/src" }',
+      { workspaceRoot: '/Users/test/work/demo', homeDir: '/Users/test' },
+    )
+
+    expect(sessionRecordData(backup)).toBe('{ "$SPOOL_WS": 1.2300, "unicode": "$SPOOL_WS/src" }')
+  })
+
+  it('keeps the established reserved-token restore behavior', () => {
+    expect(
+      restoreSessionRecord(
+        '{"literal":"$SPOOL_ESC_WS","cwd":"$SPOOL_WS"}',
+        '/workspace',
+        '/home/resumer',
+      ),
+    ).toBe('{"literal":"$SPOOL_ESC_WS","cwd":"/workspace"}')
+  })
+
+  it('rejects local roots containing reserved portability tokens', async () => {
+    await expect(
+      backupSessionRecord('{"cwd":"safe"}', {
+        workspaceRoot: '/tmp/$SPOOL_WS/project',
+        homeDir: '/tmp',
+      }),
+    ).rejects.toThrow('reserved Spool portability tokens')
+  })
+
+  it('validates strings hidden behind duplicate provider keys', async () => {
+    await expect(backupSessionRecord('{"key":"\\ud800","key":"safe"}')).rejects.toThrow(
+      'lone surrogates',
+    )
   })
 })

@@ -6,6 +6,7 @@ import {
   deriveView,
   extractEditEvents,
   isResumableSessionProvider,
+  sessionRecordData,
   splitRecords,
   type SessionDiff,
   type SessionProvider,
@@ -112,7 +113,7 @@ async function showHub(
     )
     const record = records[0]
     if (!record) throw new Error(`Record ${parsed.recordIndex} could not be fetched`)
-    log(prettyRecord(record.data))
+    log(prettyRecord(sessionRecordData(record)))
     return 0
   }
 

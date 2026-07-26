@@ -1,5 +1,5 @@
 // Security headers for the runtime-SSR'd app surfaces (/s/*, /session/*,
-// /@*, /explore, /sessions, /me, /my-sessions, /teams*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
+// /@*, /explore, /sessions, /projects, /me, /my-sessions, /teams*, /sign-in, /cli-auth). Port of the Cloudflare Pages `_headers`
 // file from the standalone share-web era — same values, same per-route
 // CSP split — applied by the request middleware in src/start.ts because
 // the merged app serves these routes through the TanStack Start worker
@@ -52,10 +52,12 @@ const BASE_HEADERS: Record<string, string> = {
  *  either a prerendered static asset (marketing site) or an unknown
  *  path that falls through to the tombstone — the latter still gets
  *  the noindex defaults. */
-const READER_PREFIXES = ['/s/', '/session/', '/@']
+const LEGACY_READER_PREFIXES = ['/s/']
+const PRIVATE_READER_PREFIXES = ['/session/']
+const OWNER_PREFIXES = ['/@']
 const ACCOUNT_PATHS = ['/me', '/my-sessions', '/teams', '/sign-in', '/cli-auth']
-const ACCOUNT_PREFIXES = ['/teams/']
-const PUBLIC_APP_PATHS = ['/explore', '/sessions']
+const ACCOUNT_PREFIXES = ['/teams/', '/projects/']
+const PUBLIC_APP_PATHS = ['/explore', '/sessions', '/projects']
 const PRERENDERED_PREFIXES = ['/daemon', '/connectors', '/blog', '/docs', '/terms', '/privacy']
 
 function isAccountPath(pathname: string): boolean {
@@ -76,9 +78,9 @@ function requestUrl(target: RequestTarget): URL {
  * account- or tenant-owned data after hydration. Inspect every repeated scope
  * value so `?scope=public&scope=team` cannot weaken the response policy.
  */
-function isPrivateSessionsScope(url: URL, path: string): boolean {
+function isPrivateCollectionScope(url: URL, path: string): boolean {
   return (
-    path === '/sessions' &&
+    (path === '/sessions' || path === '/projects') &&
     url.searchParams.getAll('scope').some((scope) => scope === 'mine' || scope === 'team')
   )
 }
@@ -91,7 +93,10 @@ export function securityHeadersFor(
   const pathname = url.pathname
   const path = pathname.replace(/\/+$/, '') || '/'
 
-  if (READER_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (
+    LEGACY_READER_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+    PRIVATE_READER_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  ) {
     return {
       ...BASE_HEADERS,
       'X-Robots-Tag': 'noindex',
@@ -99,7 +104,7 @@ export function securityHeadersFor(
     }
   }
 
-  if (isAccountPath(pathname) || isPrivateSessionsScope(url, path)) {
+  if (isAccountPath(pathname) || isPrivateCollectionScope(url, path)) {
     return {
       ...BASE_HEADERS,
       'X-Robots-Tag': 'noindex',
@@ -111,6 +116,19 @@ export function securityHeadersFor(
     return {
       ...BASE_HEADERS,
       'Content-Security-Policy': csp(nonce, { formAction: 'self', imgSrc: IMG_SRC_READER }),
+    }
+  }
+
+  // Personal and Team owners share /@handle[/project]. This generic client
+  // shell cannot know the owner tenant without fetching protected data, so it
+  // takes the stricter Team policy: no indexing, no cache, and no embedded
+  // tenant metadata. Public personal Projects remain discoverable from the
+  // indexable /projects directory.
+  if (OWNER_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return {
+      ...BASE_HEADERS,
+      'X-Robots-Tag': 'noindex',
+      'Content-Security-Policy': csp(nonce, { formAction: 'none', imgSrc: IMG_SRC_READER }),
     }
   }
 
@@ -134,12 +152,13 @@ export function cacheHeaderFor(target: RequestTarget, status: number): string | 
   const path = pathname.replace(/\/+$/, '') || '/'
   if (
     isAccountPath(pathname) ||
-    isPrivateSessionsScope(url, path) ||
-    pathname.startsWith('/session/')
+    isPrivateCollectionScope(url, path) ||
+    PRIVATE_READER_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+    OWNER_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   ) {
     return 'private, no-store'
   }
-  if (!READER_PREFIXES.some((p) => pathname.startsWith(p))) return null
+  if (!LEGACY_READER_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null
   return status === 200 ? 'public, max-age=30, s-maxage=30, must-revalidate' : 'no-store'
 }
 

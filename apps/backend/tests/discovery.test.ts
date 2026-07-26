@@ -497,12 +497,14 @@ describe('GET /api/discovery/v1/sessions', () => {
       items: Array<{
         sid: string
         author: { handle: string | null; displayName: string | null; avatarUrl: string | null }
+        project: { id: string; slug: string; name: string } | null
       }>
     }
     expect(body.items).toEqual([
       expect.objectContaining({
         sid: CLAUDE_SID,
         author: { handle: null, displayName: null, avatarUrl: null },
+        project: null,
       }),
     ])
 

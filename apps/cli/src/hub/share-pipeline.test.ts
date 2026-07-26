@@ -316,6 +316,71 @@ describe('materialize → share lineage round-trip', () => {
     expect(JSON.parse(reshared.lineageJson as string)).toEqual(birth)
   })
 
+  it('rewrites only Claude identity tokens and preserves every other provider byte', () => {
+    const source =
+      '{ "type": "assistant", "sessionId": "old", "metrics": { "score": 1.2300 }, "nested": { "sessionId": "quoted" } }'
+    const materialized = materializeClaudeSession({
+      records: [{ i: 0, data: source }],
+      sessionId: 'new',
+      workspaceRoot: '/workspace',
+      homeDir: '/home/resumer',
+      birth,
+      cardJson: null,
+      now: new Date('2026-07-16T12:34:56.789Z'),
+    })
+
+    expect(materialized.lines[0]).toBe(
+      '{ "type": "assistant", "sessionId": "new", "metrics": { "score": 1.2300 }, "nested": { "sessionId": "quoted" } }',
+    )
+  })
+
+  it('rewrites only Codex session_meta identity tokens and preserves number lexemes', () => {
+    const source =
+      '{ "type": "session_meta", "payload": { "id": "old", "session_id": "old", "sample": 1e3, "nested": { "id": "keep" } } }'
+    const materialized = materializeCodexSession({
+      records: [{ i: 0, data: source }],
+      sessionId: 'new',
+      workspaceRoot: '/workspace',
+      homeDir: '/home/resumer',
+      birth,
+      cardJson: null,
+      now: new Date('2026-07-16T12:34:56.789Z'),
+    })
+
+    expect(materialized.lines[0]).toBe(
+      '{ "type": "session_meta", "payload": { "id": "new", "session_id": "new", "sample": 1e3, "nested": { "id": "keep" } } }',
+    )
+  })
+
+  it('rejects ambiguous duplicate identity keys instead of rewriting the wrong one', () => {
+    expect(() =>
+      materializeClaudeSession({
+        records: [{ i: 0, data: '{"sessionId":"one","sessionId":"two"}' }],
+        sessionId: 'new',
+        workspaceRoot: '/workspace',
+        homeDir: '/home/resumer',
+        birth,
+        cardJson: null,
+      }),
+    ).toThrow(/exactly one string at sessionId/)
+  })
+
+  it.each([
+    '{"type":"session_meta","payload":{"cwd":"/workspace"}}',
+    '{"type":"session_meta","payload":{"id":42}}',
+  ])('rejects a Codex session_meta without one string payload.id', (data) => {
+    expect(() =>
+      materializeCodexSession({
+        records: [{ i: 0, data }],
+        sessionId: 'new',
+        workspaceRoot: '/workspace',
+        homeDir: '/home/resumer',
+        birth,
+        cardJson: null,
+      }),
+    ).toThrow(/exactly one string at payload.id/)
+  })
+
   it('sharing a materialized session extracts its lineage', async () => {
     const prepared = await prepareShare({
       provider: 'claude',

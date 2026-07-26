@@ -8,7 +8,15 @@ import {
 import { base64urlFromBuffer, sha256 } from '../auth/pkce'
 import { isPublishedToDiscovery } from '../discovery/projection'
 import { ApiError } from '../errors'
+import { getProjectById, projectOwner } from '../projects/store'
+import type { ProjectRef } from '../projects/types'
 import type { TeamRole } from './head'
+import {
+  isHydratedManagedSessionRow,
+  managedSessionJoins,
+  managedSessionProjection,
+  type HydratedManagedSessionRow,
+} from './managed-row'
 import { getHubAuthor, type HubSessionRow } from './store'
 import { SID_RE } from './wire'
 
@@ -23,6 +31,8 @@ export type ManagedHubSessionPageOptions = {
 
 export type ManagedHubSessionPage = {
   sessions: ManagedHubSession[]
+  /** Total Sessions in this scope, independent of the current page. */
+  session_count: number
   next_cursor: string | null
 }
 
@@ -49,10 +59,13 @@ export type ManagedHubSession = {
   star_count: number
   provider: string
   created_at: number
+  /** Discovery publication time. Null for Link-only and Team-only Sessions. */
+  published_at: number | null
   updated_at: number
   visibility: 'public' | 'link-only' | 'team'
   team_id: string | null
   team_name: string | null
+  project: ProjectRef
   can_manage_visibility: boolean
   author: {
     handle: string | null
@@ -74,18 +87,36 @@ export async function listOwnerHubSessions(
   const after = decodeCursor(options.cursor, fingerprint)
   const rows = await db
     .prepare(
-      'SELECT s.*, t.name AS team_name, m.role AS team_role, ' +
-        '(SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count ' +
-        'FROM users actor ' +
-        'JOIN hub_sessions s ON s.owner_user_id=actor.id ' +
-        'LEFT JOIN teams t ON t.id=s.team_id ' +
-        'LEFT JOIN team_memberships m ON m.team_id=s.team_id AND m.user_id=actor.id ' +
-        'WHERE actor.id=? AND actor.deleted_at IS NULL ' +
-        'AND actor.deletion_pending_until IS NULL AND s.withdrawn_at IS NULL ' +
-        'AND (s.team_id IS NULL OR (m.user_id IS NOT NULL AND t.archived_at IS NULL ' +
-        'AND t.deletion_pending_until IS NULL)) ' +
-        'AND (?=0 OR s.updated_at<? OR (s.updated_at=? AND s.sid>?)) ' +
-        'ORDER BY s.updated_at DESC, s.sid ASC LIMIT ?',
+      `SELECT s.*, t.name AS team_name, m.role AS team_role,
+         (
+           SELECT COUNT(*)
+           FROM hub_sessions counted
+           LEFT JOIN teams counted_team ON counted_team.id=counted.team_id
+           LEFT JOIN team_memberships counted_member
+             ON counted_member.team_id=counted.team_id AND counted_member.user_id=actor.id
+           WHERE counted.owner_user_id=actor.id AND counted.withdrawn_at IS NULL
+             AND (
+               counted.team_id IS NULL
+               OR (
+                 counted_member.user_id IS NOT NULL
+                 AND counted_team.archived_at IS NULL
+                 AND counted_team.deletion_pending_until IS NULL
+               )
+             )
+         ) AS session_count,
+         (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count,
+         ${managedSessionProjection()}
+       FROM users actor
+       JOIN hub_sessions s ON s.owner_user_id=actor.id
+       ${managedSessionJoins('s')}
+       LEFT JOIN teams t ON t.id=s.team_id
+       LEFT JOIN team_memberships m ON m.team_id=s.team_id AND m.user_id=actor.id
+       WHERE actor.id=? AND actor.deleted_at IS NULL
+         AND actor.deletion_pending_until IS NULL AND s.withdrawn_at IS NULL
+         AND (s.team_id IS NULL OR (m.user_id IS NOT NULL AND t.archived_at IS NULL
+           AND t.deletion_pending_until IS NULL))
+         AND (?=0 OR s.updated_at<? OR (s.updated_at=? AND s.sid>?))
+       ORDER BY s.updated_at DESC, s.sid ASC LIMIT ?`,
     )
     .bind(
       userId,
@@ -96,10 +127,11 @@ export async function listOwnerHubSessions(
       options.limit + 1,
     )
     .all<
-      HubSessionRow & {
+      HydratedManagedSessionRow & {
         team_name: string | null
         team_role: string | null
         star_count: number
+        session_count: number
       }
     >()
   const hasMore = rows.results.length > options.limit
@@ -115,6 +147,7 @@ export async function listOwnerHubSessions(
   )
   return {
     sessions,
+    session_count: Math.max(0, Number(rows.results[0]?.session_count ?? rows.results.length)),
     next_cursor: hasMore ? encodeCursor(pageKey(pageRows.at(-1)!), fingerprint) : null,
   }
 }
@@ -146,11 +179,18 @@ export async function listTeamHubSessions(
            AND actor.deletion_pending_until IS NULL
        )
        SELECT s.*, current_team.name AS team_name, current_team.role AS team_role,
-         (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count
+         (
+           SELECT COUNT(*)
+           FROM hub_sessions counted
+           WHERE counted.team_id=current_team.id AND counted.withdrawn_at IS NULL
+         ) AS session_count,
+         (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count,
+         ${managedSessionProjection()}
        FROM current_team
        LEFT JOIN hub_sessions s
          ON s.team_id=current_team.id AND s.withdrawn_at IS NULL
          AND (?=0 OR s.updated_at<? OR (s.updated_at=? AND s.sid>?))
+       ${managedSessionJoins('s', true)}
        ORDER BY s.updated_at DESC, s.sid ASC
        LIMIT ?`,
     )
@@ -164,10 +204,11 @@ export async function listTeamHubSessions(
       options.limit + 1,
     )
     .all<
-      { [K in keyof HubSessionRow]: HubSessionRow[K] | null } & {
+      { [K in keyof HydratedManagedSessionRow]: HydratedManagedSessionRow[K] | null } & {
         team_name: string
         team_role: TeamRole
         star_count: number
+        session_count: number
       }
     >()
   if (rows.results.length === 0) return null
@@ -179,13 +220,14 @@ export async function listTeamHubSessions(
     pageRows.map((row) =>
       serializeManagedSession(
         db,
-        row as HubSessionRow & { team_name: string },
+        row as HydratedManagedSessionRow & { team_name: string },
         row.team_role === 'owner' || row.team_role === 'admin',
       ),
     ),
   )
   return {
     sessions,
+    session_count: Math.max(0, Number(rows.results[0]?.session_count ?? sessionRows.length)),
     next_cursor: hasMore
       ? encodeCursor(pageKey(pageRows.at(-1)! as HubSessionRow), fingerprint)
       : null,
@@ -285,14 +327,70 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
 
 export async function serializeManagedSession(
   db: D1Database,
-  row: HubSessionRow & { team_name?: string | null; star_count?: number },
+  row:
+    | (HubSessionRow & { team_name?: string | null; star_count?: number })
+    | HydratedManagedSessionRow,
   canManageVisibility = true,
 ): Promise<ManagedHubSession> {
-  const [author, published, starCount] = await Promise.all([
-    getHubAuthor(db, row.owner_user_id),
-    row.visibility === 'unlisted' ? isPublishedToDiscovery(db, row.sid) : Promise.resolve(false),
-    row.star_count === undefined ? sessionStarCount(db, row.sid) : Promise.resolve(row.star_count),
-  ])
+  const hydrated = isHydratedManagedSessionRow(row)
+  const fallback = hydrated
+    ? null
+    : await Promise.all([
+        getHubAuthor(db, row.owner_user_id),
+        row.visibility === 'unlisted'
+          ? isPublishedToDiscovery(db, row.sid)
+          : Promise.resolve(false),
+        row.star_count === undefined
+          ? sessionStarCount(db, row.sid)
+          : Promise.resolve(row.star_count),
+        getProjectById(db, row.project_id, { includeArchived: true }),
+      ])
+  const fallbackProject = fallback?.[3] ?? null
+  if (!hydrated && !fallbackProject) throw new ApiError('INTERNAL', 'Session Project missing')
+  const author = hydrated
+    ? {
+        handle: row.managed_author_handle,
+        displayName: row.managed_author_display_name ?? row.managed_author_name,
+        avatarUrl: visibleAvatarUrl({
+          userId: row.owner_user_id,
+          avatarUrl: row.managed_author_avatar_url,
+          customAvatarId: row.managed_author_custom_avatar_id,
+          avatarVisible: row.managed_author_avatar_visible,
+        }),
+      }
+    : fallback![0]
+  const published = hydrated ? row.managed_published === 1 : fallback![1]
+  const starCount = hydrated ? (row.star_count ?? 0) : fallback![2]
+  const project: ProjectRef = hydrated
+    ? {
+        id: row.project_id,
+        slug: row.managed_project_slug,
+        name: row.managed_project_name,
+        owner: {
+          kind: row.managed_project_owner_team_id === null ? 'user' : 'team',
+          id:
+            row.managed_project_owner_team_id ??
+            row.managed_project_owner_user_id ??
+            row.owner_user_id,
+          handle: row.managed_project_owner_handle,
+          name: row.managed_project_owner_name,
+          avatar_url:
+            row.managed_project_owner_user_id === null
+              ? null
+              : visibleAvatarUrl({
+                  userId: row.managed_project_owner_user_id,
+                  avatarUrl: row.managed_project_owner_avatar_url,
+                  customAvatarId: row.managed_project_owner_custom_avatar_id,
+                  avatarVisible: row.managed_project_owner_avatar_visible,
+                }),
+        },
+      }
+    : {
+        id: fallbackProject!.id,
+        slug: fallbackProject!.slug,
+        name: fallbackProject!.name,
+        owner: await projectOwner(db, fallbackProject!),
+      }
   const parsedSummary = parseSummaryFrontMatter(row.note_md)
   return {
     sid: row.sid,
@@ -307,11 +405,13 @@ export async function serializeManagedSession(
     star_count: Math.max(0, Number(starCount)),
     provider: row.sid.slice(0, row.sid.indexOf('_')),
     created_at: row.created_at,
+    published_at: hydrated ? row.managed_published_at : published ? row.created_at : null,
     updated_at: row.updated_at,
     visibility:
       row.visibility === 'private' && row.team_id ? 'team' : published ? 'public' : 'link-only',
     team_id: row.team_id ?? null,
     team_name: row.team_name ?? null,
+    project,
     can_manage_visibility: canManageVisibility,
     author: {
       handle: author.handle,
@@ -319,6 +419,18 @@ export async function serializeManagedSession(
       avatar_url: author.avatarUrl,
     },
   }
+}
+
+function visibleAvatarUrl(args: {
+  userId: string
+  avatarUrl: string | null
+  customAvatarId: string | null
+  avatarVisible: number
+}): string | null {
+  if (args.avatarVisible !== 1) return null
+  return args.customAvatarId
+    ? `/api/avatars/${encodeURIComponent(args.userId)}?v=${encodeURIComponent(args.customAvatarId)}`
+    : args.avatarUrl
 }
 
 async function sessionStarCount(db: D1Database, sid: string): Promise<number> {

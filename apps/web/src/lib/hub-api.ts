@@ -17,6 +17,18 @@ export interface HubAuthor {
   avatarUrl: string | null
 }
 
+export interface HubProject {
+  id: string
+  slug: string
+  name: string
+  owner: {
+    kind: 'user' | 'team'
+    id: string
+    handle: string
+    name: string
+  }
+}
+
 export interface HubSessionMeta {
   sid: string
   root: string
@@ -35,6 +47,11 @@ export interface HubSessionMeta {
   /** Cost snapshot persisted when this head was published. */
   cost?: { usd: number | null; totalTokens: number } | null
   team?: { id: string; name: string } | null
+  /**
+   * Null for publicly disclosed Team-owned Sessions: Team Project metadata
+   * remains private even when the Session itself is Public or Link-only.
+   */
+  project?: HubProject | null
   author: HubAuthor
 }
 

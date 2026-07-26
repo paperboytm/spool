@@ -34,11 +34,12 @@ describe('SiteMobileNavigation', () => {
     expect(html).toContain('site-mobile-menu')
     expect(html).toContain('aria-label="Mobile navigation"')
     expect(html).toContain('>Sessions</span>')
+    expect(html).toContain('>Projects</span>')
     expect(html).toContain('>Docs</span>')
     expect(html).toContain('>Publish</a>')
     expect(html).toContain('Use dark theme')
-    expect(html).toContain('aria-label="Session language"')
-    expect(html).toContain('<span>Session language</span>')
+    expect(html).not.toContain('aria-label="Session language"')
+    expect(html).not.toContain('<span>Session language</span>')
     // Search lives inside the Sessions feed now; Blog moved to the footer.
     expect(html).not.toContain('Search Sessions')
     expect(html).not.toContain('>Blog</span>')
@@ -50,6 +51,7 @@ describe('SiteMobileNavigation', () => {
     const html = renderToStaticMarkup(<SiteMobileNavigation auth={{ name: 'Alice', src: null }} />)
 
     expect(html).toContain('href="/my-sessions"')
+    expect(html).toContain('href="/projects?scope=mine"')
     expect(html).toContain('href="/teams"')
     expect(html).toContain('>Teams</span>')
   })

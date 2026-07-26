@@ -1,6 +1,8 @@
 import {
+  backupSessionRecord,
   canonicalizeRecord,
   deriveView,
+  sessionRecordData,
   sequenceRoot,
   splitRecords,
   type CanonicalRecord,
@@ -10,9 +12,9 @@ import {
 
 import { extractBirthPayload } from './birth.js'
 
-// Pure share preparation: provider JSONL in, everything the 3-step hub
-// handshake needs out. No store.db in this PR — records are canonicalized
-// at share time, straight from the provider file.
+// Pure share preparation: provider JSONL in, everything the 3-step Hub
+// handshake needs out. Provider records remain direct JSON while local path
+// string tokens are made portable at share time, straight from the file.
 
 export interface PreparedShare {
   sid: string
@@ -73,7 +75,7 @@ export async function prepareShare(opts: {
   for (let index = 0; index < shared.length; index += 1) {
     try {
       records.push(
-        await canonicalizeRecord(shared[index] as string, {
+        await backupSessionRecord(shared[index] as string, {
           workspaceRoot: opts.workspaceRoot,
           homeDir: opts.homeDir,
         }),
@@ -91,7 +93,7 @@ export async function prepareShare(opts: {
   // and any future re-derivation agree on bytes.
   const canonicalView = await canonicalizeRecord(JSON.stringify(view))
 
-  const birth = extractBirthPayload(records.map((record) => record.data))
+  const birth = extractBirthPayload(records.map((record) => sessionRecordData(record)))
 
   return {
     sid: `${opts.provider}_${opts.sessionUuid}`,

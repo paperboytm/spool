@@ -22,6 +22,10 @@ import {
 import { describe, expect, it } from 'vite-plus/test'
 
 import { onRequestPost as batchPost } from '../functions/api/hub/v1/objects/batch'
+import {
+  onRequestGet as projectsGet,
+  onRequestPost as projectsPost,
+} from '../functions/api/hub/v1/projects'
 import { onRequestPost as headPost } from '../functions/api/hub/v1/sessions/[sid]/head'
 import { onRequestGet as metaGet } from '../functions/api/hub/v1/sessions/[sid]/index'
 import { onRequestPost as pushPost } from '../functions/api/hub/v1/sessions/[sid]/push'
@@ -60,6 +64,10 @@ function makeFetchAdapter(env: Env): typeof fetch {
     )
     if (url.pathname === '/api/hub/v1/objects/batch') {
       return invoke(batchPost, request, env)
+    }
+    if (url.pathname === '/api/hub/v1/projects') {
+      if (request.method === 'GET') return invoke(projectsGet, request, env)
+      if (request.method === 'POST') return invoke(projectsPost, request, env)
     }
     if (sidMatch) {
       const params = { sid: decodeURIComponent(sidMatch[1] as string) }
@@ -153,7 +161,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     const shareErrors: string[] = []
     const shareExit = await handleShareCommand(
       undefined,
-      { agentSummary: false, yes: true },
+      { agentSummary: false, yes: true, createProject: 'Round-trip fixture' },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,
@@ -166,6 +174,11 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
           sessionUuid: SESSION_UUID,
           filePath,
           cwd: authorWs,
+          projectIdentity: {
+            kind: 'path',
+            key: authorWs,
+            displayName: 'Round-trip fixture',
+          },
         }),
       },
     )
@@ -289,7 +302,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
     const codexSid = `codex_${SESSION_UUID}`
     const exit = await handleShareCommand(
       undefined,
-      { agentSummary: false, yes: true },
+      { agentSummary: false, yes: true, createProject: 'Round-trip fixture' },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,
@@ -304,6 +317,11 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
           sessionUuid: SESSION_UUID,
           filePath,
           cwd: authorWs,
+          projectIdentity: {
+            kind: 'path',
+            key: authorWs,
+            displayName: 'Round-trip fixture',
+          },
         }),
       },
     )
@@ -362,7 +380,7 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
 
     const exit = await handleShareCommand(
       `${SESSION_UUID}@2`,
-      { agentSummary: false, yes: true },
+      { agentSummary: false, yes: true, createProject: 'Round-trip fixture' },
       {
         fetch: fetchAdapter,
         homeDir: authorHome,
@@ -377,6 +395,11 @@ describe('full-stack round trip: CLI ↔ hub handlers ↔ reader derivation', ()
           sessionUuid: SESSION_UUID,
           filePath,
           cwd: authorWs,
+          projectIdentity: {
+            kind: 'path',
+            key: authorWs,
+            displayName: 'Round-trip fixture',
+          },
         }),
       },
     )

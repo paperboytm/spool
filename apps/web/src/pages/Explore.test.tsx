@@ -18,6 +18,11 @@ const item: DiscoverySessionItem = {
     displayName: 'Maya Chen',
     avatarUrl: null,
   },
+  project: {
+    id: 'project_1',
+    slug: 'browser-auth',
+    name: 'Browser Auth',
+  },
   evidence: {
     records: 96,
     messages: 42,
@@ -40,6 +45,8 @@ describe('DiscoveryRow', () => {
 
     expect(html).toContain('/@maya')
     expect(html).toContain('@maya')
+    expect(html).toContain('href="/@maya/browser-auth"')
+    expect(html).toContain('Browser Auth')
     expect(html).toContain('Prevent refresh-token races across browser tabs')
     expect(html).toContain('Implemented a single-flight refresh path')
     expect(html).toContain('Claude Code')

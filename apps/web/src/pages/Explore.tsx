@@ -1,6 +1,7 @@
 import type { DiscoverySessionItem } from '@spool-lab/session-kit'
 import { Button, SearchField, Tabs } from '@spool-lab/ui'
 import {
+  FolderKanban,
   GitFork,
   LoaderCircle,
   MessageSquareText,
@@ -166,6 +167,16 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
       timestampVerb="published"
       metadata={
         <div className="session-feed-row-meta">
+          {item.project && item.author.handle ? (
+            <a
+              className="session-feed-project"
+              href={`/@${encodeURIComponent(item.author.handle)}/${encodeURIComponent(item.project.slug)}`}
+              title={`Project · @${item.author.handle}/${item.project.slug}`}
+            >
+              <FolderKanban size={13} strokeWidth={1.7} aria-hidden="true" />
+              {item.project.name}
+            </a>
+          ) : null}
           <SessionSourceBadge provider={item.agent} />
           <span title={`${item.evidence.messages} messages`}>
             <MessageSquareText size={13} strokeWidth={1.7} aria-hidden="true" />

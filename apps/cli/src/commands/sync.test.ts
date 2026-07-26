@@ -32,6 +32,7 @@ describe('createAutoPublisher', () => {
     published: [],
     unchanged: 0,
     skippedSecrets: 0,
+    skippedUnbound: 0,
     failed: 0,
   }
 

@@ -15,8 +15,9 @@ import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
-import type { HubFetch } from '../hub/client.js'
+import type { HubFetch, HubProject } from '../hub/client.js'
 import type { LocalSummaryAgent } from '../hub/local-summary-agent.js'
+import { upsertProjectBinding } from '../hub/project-bindings.js'
 import type { CliSpinner, CliUi } from '../ui.js'
 import { handleResumeCommand } from './resume.js'
 import {
@@ -31,6 +32,24 @@ import {
 
 const SESSION_UUID = '6f9a1b2c-3d4e-5f60-8a9b-0c1d2e3f4a5b'
 const HUB_URL = 'https://hub.test'
+const ACTOR_ID = 'user_00000001'
+const HUB_PROJECT: HubProject = {
+  id: 'project_spool0001',
+  slug: 'spool',
+  name: 'Spool',
+  description: null,
+  github_url: 'https://github.com/paperboytm/spool',
+  owner: { kind: 'user', id: ACTOR_ID, handle: 'author', name: 'Author' },
+  can_manage: true,
+}
+const TEAM_ID = 'team_00000001'
+const TEAM_PROJECT: HubProject = {
+  ...HUB_PROJECT,
+  id: 'project_paperboy01',
+  slug: 'react-vapor',
+  name: 'React Vapor',
+  owner: { kind: 'team', id: TEAM_ID, handle: 'paperboy', name: 'Paperboy' },
+}
 const BILINGUAL_SUMMARY = [
   '---',
   'title: Rename alpha to beta',
@@ -56,12 +75,18 @@ interface StoredHead {
   lineageJson: string | null
   viewOid: string
   spoolFileOid?: string | null
+  projectId: string
+  expectedProjectId?: string | null
+  visibility?: 'public' | 'link-only' | 'team'
+  teamId?: string
+  expectedTeamId?: string | null
   withdrawn?: boolean
 }
 
 function makeHub() {
   const objects = new Map<string, string>()
   const sessions = new Map<string, StoredHead>()
+  const writes: Array<{ action: 'push' | 'head'; sid: string; body: StoredHead }> = []
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -76,6 +101,26 @@ function makeHub() {
     const sidMatch = path.match(
       /^\/api\/hub\/v1\/sessions\/([^/]+)(?:\/(push|head|records|view|withdraw|resume-grant))?$/,
     )
+
+    if (method === 'GET' && path === '/api/hub/v1/projects') {
+      return json({ actor: { id: ACTOR_ID }, projects: [HUB_PROJECT, TEAM_PROJECT] })
+    }
+
+    if (method === 'GET' && path === '/api/hub/v1/teams') {
+      return json({
+        teams: [
+          {
+            id: TEAM_ID,
+            name: 'Paperboy',
+            handle: 'paperboy',
+            role: 'owner',
+            permissions: [],
+            member_count: 1,
+            archived_at: null,
+          },
+        ],
+      })
+    }
 
     if (method === 'POST' && path === '/api/hub/v1/objects/batch') {
       const lines = String(init?.body ?? '')
@@ -93,6 +138,19 @@ function makeHub() {
       const action = sidMatch[2]
       if (method === 'POST' && (action === 'push' || action === 'head')) {
         const body = JSON.parse(String(init?.body)) as StoredHead
+        writes.push({ action, sid, body })
+        if (
+          body.expectedProjectId !== undefined &&
+          (sessions.get(sid)?.projectId ?? null) !== body.expectedProjectId
+        ) {
+          return json({ error: 'CONFLICT', detail: 'Project changed' }, 409)
+        }
+        if (
+          body.expectedTeamId !== undefined &&
+          (sessions.get(sid)?.teamId ?? null) !== body.expectedTeamId
+        ) {
+          return json({ error: 'CONFLICT', detail: 'Team changed' }, 409)
+        }
         const wanted = [
           ...new Set([
             ...body.manifest,
@@ -121,6 +179,14 @@ function makeHub() {
           viewOid: session.viewOid,
           createdAt: 1,
           updatedAt: 1,
+          visibility: session.visibility ?? 'public',
+          team: session.teamId === TEAM_ID ? { id: TEAM_ID, name: 'Paperboy' } : null,
+          project:
+            session.projectId === HUB_PROJECT.id
+              ? HUB_PROJECT
+              : session.projectId === TEAM_PROJECT.id
+                ? TEAM_PROJECT
+                : null,
           author: { handle: 'author', displayName: 'Author', avatarUrl: null },
         })
       }
@@ -148,7 +214,7 @@ function makeHub() {
     return json({ error: 'NOT_FOUND', detail: `unhandled ${method} ${path}` }, 404)
   }
 
-  return { fetchImpl, objects, sessions }
+  return { fetchImpl, objects, sessions, writes }
 }
 
 function writeFixtureSession(workspaceRoot: string): string {
@@ -244,9 +310,14 @@ function interactiveUi(
         ? options.confirm(message)
         : (options.confirm ?? true)
     },
-    select: async ({ message }) => {
+    select: async ({ message, choices }) => {
       events.push(`select:${message}`)
-      return options.selected ?? 'claude'
+      const wanted = options.selected ?? 'claude'
+      return choices.find((choice) => choice.value === wanted)?.value ?? choices[0]?.value ?? null
+    },
+    autocomplete: async ({ message, choices }) => {
+      events.push(`autocomplete:${message}`)
+      return choices[0]?.value ?? null
     },
     spinner,
   }
@@ -260,6 +331,21 @@ function shareDeps(
 ) {
   const logs: string[] = []
   const errors: string[] = []
+  const projectIdentity = {
+    kind: 'git_remote' as const,
+    key: 'github.com/paperboytm/spool',
+    displayName: 'spool',
+  }
+  upsertProjectBinding(
+    {
+      hubUrl: HUB_URL,
+      actorId: ACTOR_ID,
+      tenant: { kind: 'user', id: ACTOR_ID },
+      localIdentity: projectIdentity,
+      project: HUB_PROJECT,
+    },
+    { homeDir: home },
+  )
   return {
     logs,
     errors,
@@ -276,6 +362,7 @@ function shareDeps(
         sessionUuid: SESSION_UUID,
         filePath,
         cwd: workspaceRoot,
+        projectIdentity,
       }),
     },
   }
@@ -349,6 +436,11 @@ describe('spool share local Agent Summary flow', () => {
               sessionUuid: SESSION_UUID,
               filePath: '/tmp/unused-session.jsonl',
               cwd: '/tmp/example',
+              projectIdentity: {
+                kind: 'path',
+                key: '/tmp/example',
+                displayName: 'example',
+              },
             }),
           },
         ),
@@ -523,9 +615,106 @@ describe('spool share local Agent Summary flow', () => {
     expect(exit).toBe(0)
     expect(detected).toBe(false)
     expect(share.logs.join('\n')).toContain(
-      'This Session will be Public and can appear in Explore and search.',
+      'This Session will be Public in Project Spool and can appear in Explore and search.',
     )
     expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+  })
+
+  it('fails closed without an explicit or saved Project in non-interactive mode', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-project-nontty-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-project-nontty-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const logs: string[] = []
+    const errors: string[] = []
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false, visibilityConfirmed: true, yes: true },
+      {
+        fetch: hub.fetchImpl,
+        homeDir: home,
+        env: { SPOOL_HUB_URL: HUB_URL, SPOOL_HUB_TOKEN: 'test-token' },
+        cwd: workspace,
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+        resolveTarget: () => ({
+          provider: 'claude',
+          sessionUuid: SESSION_UUID,
+          filePath,
+          cwd: workspace,
+          projectIdentity: {
+            kind: 'git_remote',
+            key: 'github.com/paperboytm/unbound',
+            displayName: 'unbound',
+          },
+        }),
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.size).toBe(0)
+    expect(errors.join('\n')).toContain('--yes` never chooses a Project')
+  })
+
+  it('publishes directly to a Team Project without creating a Public head', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-team-share-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-team-share-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {
+        agentSummary: false,
+        summary: BILINGUAL_SUMMARY,
+        team: '@paperboy',
+        project: TEAM_PROJECT.id,
+        visibilityConfirmed: true,
+        yes: true,
+      },
+      share.deps,
+    )
+
+    expect(exit).toBe(0)
+    const writes = hub.writes.filter((write) => write.sid === `claude_${SESSION_UUID}`)
+    expect(writes).not.toHaveLength(0)
+    expect(writes.every((write) => write.body.visibility === 'team')).toBe(true)
+    expect(writes.every((write) => write.body.teamId === TEAM_ID)).toBe(true)
+    expect(writes.every((write) => write.body.projectId === TEAM_PROJECT.id)).toBe(true)
+    expect(
+      writes.filter((write) => write.action === 'head').map((write) => write.body.expectedTeamId),
+    ).toEqual([null, TEAM_ID])
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'team',
+      teamId: TEAM_ID,
+      projectId: TEAM_PROJECT.id,
+    })
+    expect(share.logs.join('\n')).toContain('Only current members')
+  })
+
+  it('still asks an interactive Team share to select a Project when --yes is set', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-team-project-select-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-team-project-select-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false, team: 'paperboy', visibilityConfirmed: true, yes: true },
+      { ...share.deps, ui: interactiveUi({ events }) },
+    )
+
+    expect(exit).toBe(0)
+    expect(events.join('\n')).toContain('select:Which Hub Project should "spool" publish to?')
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'team',
+      teamId: TEAM_ID,
+      projectId: TEAM_PROJECT.id,
+    })
   })
 
   it('aborts before upload when non-interactive visibility is not acknowledged', async () => {
@@ -540,6 +729,27 @@ describe('spool share local Agent Summary flow', () => {
     expect(exit).toBe(1)
     expect(hub.sessions.size).toBe(0)
     expect(share.errors.join('\n')).toContain('--visibility-confirmed')
+  })
+
+  it('does not create a Project before the user accepts the disclosure', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-project-before-disclosure-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-project-before-disclosure-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false, createProject: 'Should not exist' },
+      {
+        ...share.deps,
+        ui: interactiveUi({ confirm: false }),
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.size).toBe(0)
+    expect(hub.writes).toEqual([])
   })
 
   it('preserves an existing Summary when the user declines regeneration', async () => {
@@ -562,7 +772,7 @@ describe('spool share local Agent Summary flow', () => {
       {
         ...share.deps,
         ui: interactiveUi({
-          confirm: (message) => message.startsWith('Publish this Session as Public?'),
+          confirm: (message) => message.startsWith('Publish this Session as Public'),
         }),
         detectSummaryAgents: async () => [
           { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
@@ -587,7 +797,7 @@ describe('spool share local Agent Summary flow', () => {
       {
         ...share.deps,
         ui: interactiveUi({
-          confirm: (message) => message.startsWith('Publish this Session as Public?'),
+          confirm: (message) => message.startsWith('Publish this Session as Public'),
         }),
         detectSummaryAgents: async () => [
           { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
@@ -638,7 +848,11 @@ describe('spool share → spool resume round trip', () => {
 
       const exit = await handleShareCommand(
         sessionUuid,
-        { agentSummary: false, visibilityConfirmed: true },
+        {
+          agentSummary: false,
+          visibilityConfirmed: true,
+          project: HUB_PROJECT.id,
+        },
         {
           fetch: hub.fetchImpl,
           homeDir: home,
@@ -651,6 +865,11 @@ describe('spool share → spool resume round trip', () => {
             sessionUuid,
             filePath: `/virtual/${provider}`,
             cwd: workspace,
+            projectIdentity: {
+              kind: 'git_remote',
+              key: 'github.com/paperboytm/spool',
+              displayName: 'spool',
+            },
             jsonl,
           }),
         },
@@ -706,6 +925,16 @@ describe('spool share → spool resume round trip', () => {
     expect(head?.count).toBe(4)
     expect(head?.root).toBe(await sequenceRoot(head?.manifest ?? []))
     expect(head?.summaryMd).toBe(summary)
+    expect(head?.projectId).toBe(HUB_PROJECT.id)
+    expect(hub.writes).not.toHaveLength(0)
+    expect(new Set(hub.writes.map((write) => write.body.projectId))).toEqual(
+      new Set([HUB_PROJECT.id]),
+    )
+    expect(
+      hub.writes
+        .filter((write) => write.action === 'head')
+        .map((write) => write.body.expectedProjectId),
+    ).toEqual([null, HUB_PROJECT.id])
     expect(hub.objects.has(head?.viewOid ?? '')).toBe(true)
     for (const oid of head?.manifest ?? []) {
       expect(hub.objects.get(oid)).not.toContain(authorWs)
@@ -821,6 +1050,11 @@ describe('spool share → spool resume round trip', () => {
           sessionUuid: SESSION_UUID,
           filePath,
           cwd: authorWs,
+          projectIdentity: {
+            kind: 'git_remote',
+            key: 'github.com/paperboytm/spool',
+            displayName: 'spool',
+          },
         }),
       },
     )

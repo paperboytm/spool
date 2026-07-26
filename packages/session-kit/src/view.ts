@@ -5,6 +5,7 @@ import {
   isClaudeSyntheticUserText,
   PORTABLE_MESSAGE_TYPE,
 } from './messages.js'
+import { sessionRecordData } from './records.js'
 import type {
   EditEvent,
   SessionGuidanceV1,
@@ -60,7 +61,7 @@ export function deriveView(
 
   for (let position = 0; position < records.length; position += 1) {
     const raw = records[position] as SessionRecord
-    const data = typeof raw === 'string' ? raw : raw.data
+    const data = sessionRecordData(raw)
     const recordIndex = typeof raw !== 'string' && 'i' in raw ? raw.i : position
     const record = parsed[position] ?? null
     const recordEvents = eventsByRecord.get(recordIndex) ?? []
@@ -153,7 +154,7 @@ function groupEventsByRecord(events: readonly EditEvent[]): Map<number, EditEven
 }
 
 function parseRecord(record: SessionRecord): UnknownRecord | null {
-  const data = typeof record === 'string' ? record : record.data
+  const data = sessionRecordData(record)
   try {
     const parsed = JSON.parse(data) as unknown
     return isObject(parsed) ? parsed : null

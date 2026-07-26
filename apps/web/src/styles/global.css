@@ -183,8 +183,7 @@ code,
   justify-content: flex-start;
 }
 .site-publish-link,
-.site-signin-link,
-.site-language-toggle {
+.site-signin-link {
   flex: none;
 }
 @media (max-width: 768px) {
@@ -201,9 +200,6 @@ code,
     display: none;
   }
   .site-publish-link {
-    display: none;
-  }
-  .site-language-toggle {
     display: none;
   }
   .site-nav-actions {
@@ -286,5 +282,11 @@ footer.wrap {
   .foot-links {
     flex-wrap: wrap;
     gap: var(--sp-space-2) var(--sp-space-5);
+  }
+}
+
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+  .session-reader-project {
+    min-height: 44px;
   }
 }

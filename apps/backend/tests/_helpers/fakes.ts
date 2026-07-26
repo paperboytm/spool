@@ -69,7 +69,8 @@ type UserIdentityRow = {
 
 type HandleRow = {
   handle: string
-  user_id: string
+  user_id: string | null
+  team_id?: string | null
   claimed_at: number
   released_at: number | null
 }
@@ -116,6 +117,9 @@ type HubSessionRow = {
   // Added in migration 0007. Optional keeps pre-Team fixtures readable while
   // still letting deletion tests distinguish personal and Team-owned rows.
   team_id?: string | null
+  // Added in migration 0014. Optional keeps older fixture literals source
+  // compatible; all new Hub commits below resolve and persist a Project.
+  project_id?: string
   withdrawn_at: number | null
   created_at: number
   updated_at: number
@@ -148,6 +152,31 @@ type TeamMembershipRow = {
   user_id: string
   role: 'owner' | 'admin' | 'member'
   workos_membership_id?: string | null
+}
+
+type ProjectRow = {
+  id: string
+  owner_user_id: string | null
+  owner_team_id: string | null
+  slug: string
+  name: string
+  description: string | null
+  github_url: string | null
+  created_by_user_id: string
+  created_at: number
+  updated_at: number
+  archived_at: number | null
+}
+
+type ProjectCreationRequestRow = {
+  actor_user_id: string
+  owner_scope: string
+  owner_user_id: string | null
+  owner_team_id: string | null
+  idempotency_key: string
+  project_id: string
+  request_hash: string
+  created_at: number
 }
 
 type ApiTokenRow = {
@@ -246,6 +275,8 @@ export type FakeDbState = {
   hub_team_objects: HubTeamObjectRow[]
   teams: TeamRow[]
   team_memberships: TeamMembershipRow[]
+  projects: ProjectRow[]
+  project_creation_requests: ProjectCreationRequestRow[]
   workos_cleanup_outbox: WorkosCleanupOutboxRow[]
   api_tokens: ApiTokenRow[]
   hub_session_discovery: HubSessionDiscoveryRow[]
@@ -269,6 +300,8 @@ export function emptyState(): FakeDbState {
     hub_team_objects: [],
     teams: [],
     team_memberships: [],
+    projects: [],
+    project_creation_requests: [],
     workos_cleanup_outbox: [],
     api_tokens: [],
     hub_session_discovery: [],
@@ -300,6 +333,80 @@ export function makeDb(state: FakeDbState = emptyState()): {
       state.team_memberships.find((row) => row.team_id === teamId && row.user_id === userId)
         ?.role ?? null
     )
+  }
+
+  function activeProjectFor(
+    projectId: string,
+    ownerUserId: string | null,
+    ownerTeamId: string | null,
+  ): ProjectRow | null {
+    return (
+      state.projects.find(
+        (row) =>
+          row.id === projectId &&
+          row.owner_user_id === ownerUserId &&
+          row.owner_team_id === ownerTeamId &&
+          row.archived_at === null,
+      ) ?? null
+    )
+  }
+
+  function hydratedManagedSessionFields(
+    session: HubSessionRow,
+  ): Record<string, string | number | null> {
+    const project = state.projects.find((row) => row.id === session.project_id)
+    if (!project) return {}
+
+    const author = state.users.find((row) => row.id === session.owner_user_id) ?? null
+    const authorHandle =
+      state.handles
+        .filter((row) => row.user_id === session.owner_user_id && row.released_at === null)
+        .sort((left, right) => left.handle.localeCompare(right.handle))[0]?.handle ?? null
+    const ownerHandle =
+      state.handles
+        .filter(
+          (row) =>
+            row.user_id === project.owner_user_id &&
+            (row.team_id ?? null) === project.owner_team_id &&
+            row.released_at === null,
+        )
+        .sort((left, right) => left.handle.localeCompare(right.handle))[0]?.handle ?? null
+    if (ownerHandle === null) return {}
+
+    const ownerUser =
+      project.owner_user_id === null
+        ? null
+        : (state.users.find((row) => row.id === project.owner_user_id) ?? null)
+    const ownerTeam =
+      project.owner_team_id === null
+        ? null
+        : (state.teams.find((row) => row.id === project.owner_team_id) ?? null)
+
+    const discovery = state.hub_session_discovery.find((row) => row.sid === session.sid) ?? null
+    return {
+      managed_published: discovery === null ? 0 : 1,
+      managed_published_at: discovery?.published_at ?? null,
+      managed_author_handle: authorHandle,
+      managed_author_name: author?.name ?? null,
+      managed_author_display_name: author?.display_name ?? null,
+      managed_author_avatar_url: author?.avatar_url ?? null,
+      managed_author_custom_avatar_id: author?.custom_avatar_id ?? null,
+      managed_author_avatar_visible: author?.avatar_visible ?? 1,
+      managed_project_slug: project.slug,
+      managed_project_name: project.name,
+      managed_project_owner_user_id: project.owner_user_id,
+      managed_project_owner_team_id: project.owner_team_id,
+      managed_project_owner_handle: ownerHandle,
+      managed_project_owner_name:
+        ownerTeam?.name ??
+        ownerUser?.display_name ??
+        ownerUser?.name ??
+        ownerUser?.email.split('@')[0] ??
+        ownerHandle,
+      managed_project_owner_avatar_url: ownerUser?.avatar_url ?? null,
+      managed_project_owner_custom_avatar_id: ownerUser?.custom_avatar_id ?? null,
+      managed_project_owner_avatar_visible: ownerUser?.avatar_visible ?? 1,
+    }
   }
 
   function isLivePublicSession(sid: string): boolean {
@@ -462,6 +569,344 @@ export function makeDb(state: FakeDbState = emptyState()): {
             star_count: state.hub_session_stars.filter((row) => row.sid === sid).length,
           } as T
         }
+        if (
+          /^SELECT COUNT\(\*\) AS count\s+FROM hub_sessions\s+WHERE project_id=\? AND withdrawn_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [projectId] = params as [string]
+          return {
+            count: state.hub_sessions.filter(
+              (row) => row.project_id === projectId && row.withdrawn_at === null,
+            ).length,
+          } as T
+        }
+        if (
+          sql.includes('SELECT COUNT(*) AS count') &&
+          sql.includes('FROM hub_sessions s') &&
+          sql.includes('JOIN hub_session_discovery d ON d.sid=s.sid') &&
+          sql.includes('s.project_id=?') &&
+          sql.includes('s.owner_user_id=?')
+        ) {
+          const [projectId, ownerUserId] = params as [string, string]
+          return {
+            count: state.hub_sessions.filter(
+              (row) =>
+                row.project_id === projectId &&
+                row.owner_user_id === ownerUserId &&
+                (row.team_id ?? null) === null &&
+                row.visibility === 'unlisted' &&
+                row.withdrawn_at === null &&
+                state.hub_session_discovery.some((projection) => projection.sid === row.sid),
+            ).length,
+          } as T
+        }
+        if (sql.includes('SELECT id FROM projects') && sql.includes("(id=? OR slug='sessions')")) {
+          const [ownerUserId, ownerTeamId, preferredId] = params as [
+            string | null,
+            string | null,
+            string,
+            string,
+          ]
+          const candidates = state.projects
+            .filter(
+              (row) =>
+                row.owner_user_id === ownerUserId &&
+                row.owner_team_id === ownerTeamId &&
+                row.archived_at === null &&
+                (row.id === preferredId || row.slug === 'sessions'),
+            )
+            .sort((left, right) => {
+              const preferred = Number(right.id === preferredId) - Number(left.id === preferredId)
+              return (
+                preferred || left.created_at - right.created_at || left.id.localeCompare(right.id)
+              )
+            })
+          return candidates[0] ? ({ id: candidates[0].id } as T) : null
+        }
+        if (
+          sql.includes('SELECT * FROM projects') &&
+          sql.includes('owner_user_id IS ?') &&
+          sql.includes('owner_team_id IS ?')
+        ) {
+          const [projectId, ownerUserId, ownerTeamId] = params as [
+            string,
+            string | null,
+            string | null,
+          ]
+          return (activeProjectFor(projectId, ownerUserId, ownerTeamId) as T) ?? null
+        }
+        if (/^SELECT \* FROM projects WHERE id=\?(?: AND archived_at IS NULL)?$/i.test(sql)) {
+          const [projectId] = params as [string]
+          const row = state.projects.find(
+            (candidate) =>
+              candidate.id === projectId &&
+              (!sql.includes('archived_at IS NULL') || candidate.archived_at === null),
+          )
+          return (row as T) ?? null
+        }
+        if (
+          /^SELECT \* FROM projects\s+WHERE id=\? AND owner_user_id=\? AND owner_team_id IS NULL\s+AND archived_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [projectId, userId] = params as [string, string]
+          return (
+            (state.projects.find(
+              (row) =>
+                row.id === projectId &&
+                row.owner_user_id === userId &&
+                row.owner_team_id === null &&
+                row.archived_at === null,
+            ) as T) ?? null
+          )
+        }
+        if (
+          /^SELECT \* FROM projects\s+WHERE id=\? AND owner_team_id=\? AND owner_user_id IS NULL\s+AND archived_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [projectId, teamId] = params as [string, string]
+          return (
+            (state.projects.find(
+              (row) =>
+                row.id === projectId &&
+                row.owner_team_id === teamId &&
+                row.owner_user_id === null &&
+                row.archived_at === null,
+            ) as T) ?? null
+          )
+        }
+        if (
+          /^SELECT \* FROM projects WHERE (owner_user_id|owner_team_id)=\? AND slug=\? AND archived_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [, ownerColumn] =
+            sql.match(/^SELECT \* FROM projects WHERE (owner_user_id|owner_team_id)=\?/i) ?? []
+          const [ownerId, slug] = params as [string, string]
+          return (
+            (state.projects.find(
+              (row) =>
+                row[ownerColumn as 'owner_user_id' | 'owner_team_id'] === ownerId &&
+                row.slug === slug &&
+                row.archived_at === null,
+            ) as T) ?? null
+          )
+        }
+        if (
+          /^SELECT project_id, request_hash\s+FROM project_creation_requests\s+WHERE actor_user_id=\? AND owner_scope=\? AND idempotency_key=\?$/i.test(
+            sql,
+          )
+        ) {
+          const [actorUserId, ownerScope, idempotencyKey] = params as [string, string, string]
+          const row = state.project_creation_requests.find(
+            (candidate) =>
+              candidate.actor_user_id === actorUserId &&
+              candidate.owner_scope === ownerScope &&
+              candidate.idempotency_key === idempotencyKey,
+          )
+          return row ? ({ project_id: row.project_id, request_hash: row.request_hash } as T) : null
+        }
+        if (sql.includes('SELECT h.handle, h.user_id, h.team_id')) {
+          const [handle] = params as [string]
+          const claim = state.handles.find(
+            (candidate) => candidate.handle === handle && candidate.released_at === null,
+          )
+          if (!claim) return null
+          if (claim.user_id !== null) {
+            const user = state.users.find(
+              (candidate) =>
+                candidate.id === claim.user_id &&
+                candidate.deleted_at === null &&
+                candidate.deletion_pending_until === null,
+            )
+            if (!user) return null
+            return {
+              handle,
+              user_id: user.id,
+              team_id: null,
+              owner_name: null,
+              owner_email: user.email,
+              owner_provider_name: user.name,
+              owner_display_name: user.display_name ?? null,
+              owner_avatar_url: user.avatar_url,
+              owner_custom_avatar_id: user.custom_avatar_id ?? null,
+              owner_avatar_visible: user.avatar_visible ?? 1,
+            } as T
+          }
+          const team = state.teams.find(
+            (candidate) =>
+              candidate.id === (claim.team_id ?? null) &&
+              candidate.archived_at === null &&
+              (candidate.deletion_pending_until ?? null) === null,
+          )
+          return team
+            ? ({
+                handle,
+                user_id: null,
+                team_id: team.id,
+                owner_name: team.name,
+                owner_email: null,
+                owner_provider_name: null,
+                owner_display_name: null,
+                owner_avatar_url: null,
+                owner_custom_avatar_id: null,
+                owner_avatar_visible: null,
+              } as T)
+            : null
+        }
+        if (
+          /^SELECT 1 FROM hub_sessions WHERE project_id=\? AND withdrawn_at IS NULL LIMIT 1$/i.test(
+            sql,
+          )
+        ) {
+          const [projectId] = params as [string]
+          return state.hub_sessions.some(
+            (row) => row.project_id === projectId && row.withdrawn_at === null,
+          )
+            ? ({ '1': 1 } as T)
+            : null
+        }
+        if (
+          /^SELECT COUNT\(\*\) AS count\s+FROM projects\s+WHERE owner_user_id IS \? AND owner_team_id IS \?\s+AND archived_at IS NULL$/i.test(
+            sql,
+          )
+        ) {
+          const [ownerUserId, ownerTeamId] = params as [string | null, string | null]
+          return {
+            count: state.projects.filter(
+              (project) =>
+                project.owner_user_id === ownerUserId &&
+                project.owner_team_id === ownerTeamId &&
+                project.archived_at === null,
+            ).length,
+          } as T
+        }
+        if (
+          /^SELECT COUNT\(\*\) AS count\s+FROM projects\s+WHERE owner_user_id IS \? AND owner_team_id IS \?$/i.test(
+            sql,
+          )
+        ) {
+          const [ownerUserId, ownerTeamId] = params as [string | null, string | null]
+          return {
+            count: state.projects.filter(
+              (project) =>
+                project.owner_user_id === ownerUserId && project.owner_team_id === ownerTeamId,
+            ).length,
+          } as T
+        }
+        if (
+          /^SELECT COUNT\(\*\) AS count\s+FROM project_creation_requests\s+WHERE actor_user_id=\?$/i.test(
+            sql,
+          )
+        ) {
+          const [actorUserId] = params as [string]
+          return {
+            count: state.project_creation_requests.filter(
+              (receipt) => receipt.actor_user_id === actorUserId,
+            ).length,
+          } as T
+        }
+        if (
+          /^SELECT 1 FROM projects\s+WHERE id=\? AND owner_user_id IS \? AND owner_team_id IS \?\s+AND archived_at IS NULL\s+AND \(id=\? OR slug='sessions'\)\s+LIMIT 1$/i.test(
+            sql,
+          )
+        ) {
+          const [projectId, ownerUserId, ownerTeamId, defaultId] = params as [
+            string,
+            string | null,
+            string | null,
+            string,
+          ]
+          return state.projects.some(
+            (project) =>
+              project.id === projectId &&
+              project.owner_user_id === ownerUserId &&
+              project.owner_team_id === ownerTeamId &&
+              project.archived_at === null &&
+              (project.id === defaultId || project.slug === 'sessions'),
+          )
+            ? ({ '1': 1 } as T)
+            : null
+        }
+        if (
+          /SELECT m\.role FROM team_memberships m\s+JOIN teams t ON t\.id=m\.team_id\s+WHERE m\.team_id=\? AND m\.user_id=\?/i.test(
+            sql,
+          )
+        ) {
+          const [teamId, userId] = params as [string, string]
+          const role = activeTeamRoleFor(teamId, userId)
+          return role === null ? null : ({ role } as T)
+        }
+        if (/^SELECT role FROM team_memberships WHERE team_id=\? AND user_id=\?$/i.test(sql)) {
+          const [teamId, userId] = params as [string, string]
+          const role = activeTeamRoleFor(teamId, userId)
+          return role === null ? null : ({ role } as T)
+        }
+        if (
+          sql.includes('/* teams:get */ SELECT * FROM teams WHERE id=? AND archived_at IS NULL')
+        ) {
+          const [teamId] = params as [string]
+          const team = state.teams.find((team) => team.id === teamId && team.archived_at === null)
+          return team
+            ? ({ ...team, deletion_pending_until: team.deletion_pending_until ?? null } as T)
+            : null
+        }
+        if (
+          sql.includes(
+            '/* teams:get-membership */ SELECT * FROM team_memberships WHERE team_id=? AND user_id=?',
+          )
+        ) {
+          const [teamId, userId] = params as [string, string]
+          return (
+            (state.team_memberships.find(
+              (membership) => membership.team_id === teamId && membership.user_id === userId,
+            ) as T) ?? null
+          )
+        }
+        if (sql.includes('SELECT t.name') && sql.includes('FROM teams t')) {
+          const [teamId] = params as [string]
+          const team = state.teams.find(
+            (candidate) =>
+              candidate.id === teamId &&
+              candidate.archived_at === null &&
+              (candidate.deletion_pending_until ?? null) === null,
+          )
+          if (!team) return null
+          const handle =
+            state.handles.find(
+              (candidate) =>
+                (candidate.team_id ?? null) === teamId && candidate.released_at === null,
+            )?.handle ?? null
+          return { name: team.name, handle } as T
+        }
+        if (
+          sql.includes('SELECT u.email, u.name, u.display_name, u.avatar_url') &&
+          sql.includes('FROM users u')
+        ) {
+          const [userId] = params as [string]
+          const user = state.users.find(
+            (candidate) =>
+              candidate.id === userId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          if (!user) return null
+          const handle =
+            state.handles.find(
+              (candidate) => candidate.user_id === userId && candidate.released_at === null,
+            )?.handle ?? null
+          return {
+            email: user.email,
+            name: user.name,
+            display_name: user.display_name ?? null,
+            avatar_url: user.avatar_url,
+            custom_avatar_id: user.custom_avatar_id ?? null,
+            avatar_visible: user.avatar_visible ?? 1,
+            handle,
+          } as T
+        }
         if (/^SELECT \* FROM hub_sessions WHERE sid=\?$/i.test(sql)) {
           const [sid] = params as [string]
           return (state.hub_sessions.find((row) => row.sid === sid) as T) ?? null
@@ -580,6 +1025,38 @@ export function makeDb(state: FakeDbState = emptyState()): {
             avatar_visible: user.avatar_visible ?? 1,
           } as T
         }
+        if (sql.includes('SELECT COALESCE(display_name,name) AS label')) {
+          const [userId, actorUserId] = params as [string, string]
+          const user = state.users.find(
+            (candidate) =>
+              candidate.id === userId &&
+              candidate.id === actorUserId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          return user
+            ? ({
+                label: user.display_name ?? user.name ?? null,
+              } as T)
+            : null
+        }
+        if (sql.includes('SELECT t.name AS label') && sql.includes('JOIN team_memberships')) {
+          const [teamId, actorUserId] = params as [string, string]
+          const team = state.teams.find(
+            (candidate) =>
+              candidate.id === teamId &&
+              candidate.archived_at === null &&
+              (candidate.deletion_pending_until ?? null) === null,
+          )
+          const role = activeTeamRoleFor(teamId, actorUserId)
+          const actor = state.users.find(
+            (candidate) =>
+              candidate.id === actorUserId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          return team && actor && role !== null ? ({ label: team.name } as T) : null
+        }
         if (
           /^SELECT u\.\* FROM users u JOIN user_identities i ON i\.user_id = u\.id WHERE i\.provider = \? AND i\.provider_sub = \?/i.test(
             sql,
@@ -617,6 +1094,21 @@ export function makeDb(state: FakeDbState = emptyState()): {
           if (!u) return null
           return { custom_avatar_id: u.custom_avatar_id ?? null } as T
         }
+        if (/^SELECT 1 FROM handles WHERE handle=\?$/i.test(sql)) {
+          const [handle] = params as [string]
+          return state.handles.some((row) => row.handle === handle) ? ({ '1': 1 } as T) : null
+        }
+        if (/^SELECT user_id, team_id, released_at FROM handles WHERE handle=\?$/i.test(sql)) {
+          const [handle] = params as [string]
+          const row = state.handles.find((candidate) => candidate.handle === handle)
+          return row
+            ? ({
+                user_id: row.user_id,
+                team_id: row.team_id ?? null,
+                released_at: row.released_at,
+              } as T)
+            : null
+        }
         if (/^SELECT 1 FROM handles WHERE handle=\? AND released_at IS NULL/i.test(sql)) {
           const [h] = params
           const row = state.handles.find((x) => x.handle === h && x.released_at === null)
@@ -630,6 +1122,13 @@ export function makeDb(state: FakeDbState = emptyState()): {
         if (/^SELECT handle FROM handles WHERE user_id=\? AND released_at IS NULL/i.test(sql)) {
           const [uid] = params
           const row = state.handles.find((x) => x.user_id === uid && x.released_at === null)
+          return row ? ({ handle: row.handle } as T) : null
+        }
+        if (/^SELECT handle FROM handles WHERE team_id=\? AND released_at IS NULL/i.test(sql)) {
+          const [teamId] = params
+          const row = state.handles.find(
+            (candidate) => (candidate.team_id ?? null) === teamId && candidate.released_at === null,
+          )
           return row ? ({ handle: row.handle } as T) : null
         }
         if (
@@ -1387,6 +1886,304 @@ export function makeDb(state: FakeDbState = emptyState()): {
             meta: { changes: before - state.hub_session_guidance.length },
           }
         }
+        if (sql.includes('/* projects:authorized-create */')) {
+          const [
+            projectId,
+            ownerUserId,
+            ownerTeamId,
+            slug,
+            name,
+            description,
+            githubUrl,
+            createdByUserId,
+            createdAt,
+            updatedAt,
+            actorUserId,
+          ] = params as [
+            string,
+            string | null,
+            string | null,
+            string,
+            string,
+            string | null,
+            string | null,
+            string,
+            number,
+            number,
+            string,
+          ]
+          const actor = state.users.find(
+            (row) =>
+              row.id === actorUserId &&
+              row.deleted_at === null &&
+              row.deletion_pending_until === null,
+          )
+          const authorized =
+            actor !== undefined &&
+            (ownerTeamId === null
+              ? ownerUserId === actorUserId
+              : ['owner', 'admin'].includes(activeTeamRoleFor(ownerTeamId, actorUserId) ?? ''))
+          const hasHandle = state.handles.some(
+            (row) =>
+              row.released_at === null &&
+              row.user_id === ownerUserId &&
+              (row.team_id ?? null) === ownerTeamId,
+          )
+          if (!authorized || !hasHandle) return { success: true, meta: { changes: 0 } }
+          if (
+            state.projects.filter(
+              (row) =>
+                row.owner_user_id === ownerUserId &&
+                row.owner_team_id === ownerTeamId &&
+                row.archived_at === null,
+            ).length >= 100
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (
+            state.projects.filter(
+              (row) => row.owner_user_id === ownerUserId && row.owner_team_id === ownerTeamId,
+            ).length >= 1_000
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const receiptRequired = params.at(-3) !== null
+          const receiptActorUserId = params.at(-2) as string
+          const receiptLimit = params.at(-1) as number
+          if (
+            receiptRequired &&
+            state.project_creation_requests.filter(
+              (receipt) => receipt.actor_user_id === receiptActorUserId,
+            ).length >= receiptLimit
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (
+            state.projects.some(
+              (row) =>
+                row.id === projectId ||
+                (row.owner_user_id === ownerUserId &&
+                  row.owner_team_id === ownerTeamId &&
+                  row.slug === slug &&
+                  row.archived_at === null),
+            )
+          ) {
+            throw new Error('UNIQUE constraint failed: projects.owner, projects.slug')
+          }
+          state.projects.push({
+            id: projectId,
+            owner_user_id: ownerUserId,
+            owner_team_id: ownerTeamId,
+            slug,
+            name,
+            description,
+            github_url: githubUrl,
+            created_by_user_id: createdByUserId,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            archived_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* projects:record-idempotent-create */')) {
+          const [
+            actorUserId,
+            ownerScope,
+            ownerUserId,
+            ownerTeamId,
+            idempotencyKey,
+            projectId,
+            requestHash,
+            createdAt,
+          ] = params as [
+            string,
+            string,
+            string | null,
+            string | null,
+            string,
+            string,
+            string,
+            number,
+          ]
+          const project = activeProjectFor(projectId, ownerUserId, ownerTeamId)
+          if (!project) return { success: true, meta: { changes: 0 } }
+          const receiptActorUserId = params[11] as string
+          const receiptLimit = params[12] as number
+          if (
+            state.project_creation_requests.filter(
+              (receipt) => receipt.actor_user_id === receiptActorUserId,
+            ).length >= receiptLimit
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (
+            state.project_creation_requests.some(
+              (row) =>
+                (row.actor_user_id === actorUserId &&
+                  row.owner_scope === ownerScope &&
+                  row.idempotency_key === idempotencyKey) ||
+                row.project_id === projectId,
+            )
+          ) {
+            throw new Error(
+              'UNIQUE constraint failed: project_creation_requests.actor_user_id, project_creation_requests.owner_scope, project_creation_requests.idempotency_key',
+            )
+          }
+          state.project_creation_requests.push({
+            actor_user_id: actorUserId,
+            owner_scope: ownerScope,
+            owner_user_id: ownerUserId,
+            owner_team_id: ownerTeamId,
+            idempotency_key: idempotencyKey,
+            project_id: projectId,
+            request_hash: requestHash,
+            created_at: createdAt,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* projects:authorized-update */')) {
+          const [
+            hasName,
+            name,
+            hasSlug,
+            slug,
+            hasDescription,
+            description,
+            hasGithubUrl,
+            githubUrl,
+            hasArchived,
+            archived,
+            archivedAt,
+            updatedAt,
+            projectId,
+            ownerUserId,
+            ownerTeamId,
+            hasExpectedUpdatedAt,
+            expectedUpdatedAt,
+            archiveRequested,
+            fallbackArchiveRequested,
+            defaultProjectId,
+            actorUserId,
+          ] = params as [
+            number,
+            string,
+            number,
+            string,
+            number,
+            string | null,
+            number,
+            string | null,
+            number,
+            number,
+            number,
+            number,
+            string,
+            string | null,
+            string | null,
+            number,
+            number,
+            number,
+            number,
+            string,
+            string,
+          ]
+          const project = activeProjectFor(projectId, ownerUserId, ownerTeamId)
+          const actor = state.users.find(
+            (row) =>
+              row.id === actorUserId &&
+              row.deleted_at === null &&
+              row.deletion_pending_until === null,
+          )
+          const authorized =
+            actor !== undefined &&
+            (ownerTeamId === null
+              ? ownerUserId === actorUserId
+              : ['owner', 'admin'].includes(activeTeamRoleFor(ownerTeamId, actorUserId) ?? ''))
+          if (
+            !project ||
+            !authorized ||
+            (hasExpectedUpdatedAt === 1 && project.updated_at !== expectedUpdatedAt) ||
+            (archiveRequested === 1 &&
+              state.hub_sessions.some(
+                (row) => row.project_id === projectId && row.withdrawn_at === null,
+              )) ||
+            (fallbackArchiveRequested === 1 &&
+              (project.id === defaultProjectId || project.slug === 'sessions'))
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const nextSlug = hasSlug === 1 ? slug : project.slug
+          if (
+            state.projects.some(
+              (row) =>
+                row.id !== projectId &&
+                row.owner_user_id === ownerUserId &&
+                row.owner_team_id === ownerTeamId &&
+                row.slug === nextSlug &&
+                row.archived_at === null,
+            )
+          ) {
+            throw new Error('UNIQUE constraint failed: projects.owner, projects.slug')
+          }
+          if (hasName === 1) project.name = name
+          if (hasSlug === 1) project.slug = slug
+          if (hasDescription === 1) project.description = description
+          if (hasGithubUrl === 1) project.github_url = githubUrl
+          if (hasArchived === 1) project.archived_at = archived === 1 ? archivedAt : null
+          project.updated_at = updatedAt
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (sql.includes('/* projects:authorized-default */')) {
+          const [projectId, ownerUserId, ownerTeamId, actorUserId, createdAt, updatedAt] =
+            params as [string, string | null, string | null, string, number, number]
+          if (state.projects.some((row) => row.id === projectId)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const actor = state.users.find(
+            (row) =>
+              row.id === actorUserId &&
+              row.deleted_at === null &&
+              row.deletion_pending_until === null,
+          )
+          const authorized =
+            actor !== undefined &&
+            (ownerTeamId === null
+              ? ownerUserId === actorUserId
+              : activeTeamRoleFor(ownerTeamId, actorUserId) !== null)
+          if (!authorized) return { success: true, meta: { changes: 0 } }
+          if (
+            state.projects.filter(
+              (row) =>
+                row.owner_user_id === ownerUserId &&
+                row.owner_team_id === ownerTeamId &&
+                row.archived_at === null,
+            ).length >= 100
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (
+            state.projects.filter(
+              (row) => row.owner_user_id === ownerUserId && row.owner_team_id === ownerTeamId,
+            ).length >= 1_000
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          state.projects.push({
+            id: projectId,
+            owner_user_id: ownerUserId,
+            owner_team_id: ownerTeamId,
+            slug: 'sessions',
+            name: 'Sessions',
+            description:
+              'Sessions from older clients or work without a specific Project are collected here so every Session keeps a stable home.',
+            github_url: null,
+            created_by_user_id: actorUserId,
+            created_at: createdAt,
+            updated_at: updatedAt,
+            archived_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
         if (sql.includes('/* hub:authorized-head-insert */')) {
           const [
             sid,
@@ -1403,6 +2200,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             totalTokens,
             targetVisibility,
             targetTeamId,
+            targetProjectId,
             createdAt,
             updatedAt,
             actorUserId,
@@ -1425,6 +2223,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             number | null,
             string,
             string | null,
+            string,
             number,
             number,
             string,
@@ -1447,6 +2246,15 @@ export function makeDb(state: FakeDbState = emptyState()): {
             ) {
               return { success: true, meta: { changes: 0 } }
             }
+          }
+          if (
+            !activeProjectFor(
+              targetProjectId,
+              targetTeamId === null ? actorUserId : null,
+              targetTeamId,
+            )
+          ) {
+            return { success: true, meta: { changes: 0 } }
           }
           if (state.hub_sessions.some((row) => row.sid === sid)) {
             throw new Error('UNIQUE constraint failed: hub_sessions.sid')
@@ -1466,6 +2274,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             total_tokens: totalTokens,
             visibility: targetVisibility,
             team_id: targetTeamId,
+            project_id: targetProjectId,
             withdrawn_at: null,
             created_at: createdAt,
             updated_at: updatedAt,
@@ -1473,69 +2282,33 @@ export function makeDb(state: FakeDbState = emptyState()): {
           return { success: true, meta: { changes: 1 } }
         }
         if (sql.includes('/* hub:authorized-head-update */')) {
-          const [
-            root,
-            recordCount,
-            sig,
-            cardJson,
-            summaryMd,
-            lineageJson,
-            viewOid,
-            spoolFileOid,
-            costUsd,
-            totalTokens,
-            changeAccess,
-            targetVisibility,
-            ,
-            targetTeamId,
-            clearWithdrawal,
-            updatedAt,
-            sid,
-            actorUserId,
-            expectedRoot,
-            expectedUpdatedAt,
-            expectedTeamId,
-            expectedVisibility,
-            expectedWithdrawnAt,
-            expectedPublished,
-            ,
-            ,
-            ,
-            ,
-            ,
-            requireTeamManager,
-          ] = params as [
-            string,
-            number,
-            string | null,
-            string | null,
-            string | null,
-            string | null,
-            string,
-            string | null,
-            number | null,
-            number | null,
-            number,
-            string,
-            number,
-            string | null,
-            number,
-            number,
-            string,
-            string,
-            string | null,
-            number | null,
-            string | null,
-            string,
-            number | null,
-            number,
-            number,
-            string,
-            string | null,
-            string | null,
-            string,
-            number,
-          ]
+          const root = params[0] as string
+          const recordCount = params[1] as number
+          const sig = params[2] as string | null
+          const cardJson = params[3] as string | null
+          const summaryMd = params[4] as string | null
+          const lineageJson = params[5] as string | null
+          const viewOid = params[6] as string
+          const spoolFileOid = params[7] as string | null
+          const costUsd = params[8] as number | null
+          const totalTokens = params[9] as number | null
+          const changeAccess = params[10] as number
+          const targetVisibility = params[11] as string
+          const targetTeamId = params[13] as string | null
+          const changeProject = params[14] as number
+          const targetProjectId = params[15] as string
+          const clearWithdrawal = params[16] as number
+          const updatedAt = params[17] as number
+          const sid = params[18] as string
+          const actorUserId = params[19] as string
+          const expectedRoot = params[20] as string | null
+          const expectedUpdatedAt = params[21] as number | null
+          const expectedTeamId = params[22] as string | null
+          const expectedProjectId = params[23] as string | null
+          const expectedVisibility = params[24] as string
+          const expectedWithdrawnAt = params[25] as number | null
+          const expectedPublished = params[26] as number
+          const requireTeamManager = params[32] as number
           const actor = state.users.find((row) => row.id === actorUserId)
           if (!actor || actor.deleted_at !== null || actor.deletion_pending_until !== null) {
             return { success: true, meta: { changes: 0 } }
@@ -1551,6 +2324,15 @@ export function makeDb(state: FakeDbState = emptyState()): {
               return { success: true, meta: { changes: 0 } }
             }
           }
+          if (
+            !activeProjectFor(
+              targetProjectId,
+              targetTeamId === null ? actorUserId : null,
+              targetTeamId,
+            )
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
           const existing = state.hub_sessions.find((row) => row.sid === sid)
           if (!existing) return { success: true, meta: { changes: 0 } }
           const isPublished = state.hub_session_discovery.some((row) => row.sid === sid)
@@ -1559,6 +2341,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             existing.root !== expectedRoot ||
             existing.updated_at !== expectedUpdatedAt ||
             (existing.team_id ?? null) !== expectedTeamId ||
+            (existing.project_id ?? null) !== expectedProjectId ||
             existing.visibility !== expectedVisibility ||
             existing.withdrawn_at !== expectedWithdrawnAt ||
             isPublished !== (expectedPublished === 1)
@@ -1579,56 +2362,26 @@ export function makeDb(state: FakeDbState = emptyState()): {
             existing.visibility = targetVisibility
             existing.team_id = targetTeamId
           }
+          if (changeProject === 1) existing.project_id = targetProjectId
           if (clearWithdrawal === 1) existing.withdrawn_at = null
           existing.updated_at = updatedAt
           return { success: true, meta: { changes: 1 } }
         }
         if (sql.includes('/* hub:authorized-visibility-update */')) {
-          const [
-            targetVisibility,
-            targetTeamId,
-            lineageJson,
-            updatedAt,
-            sid,
-            expectedTeamId,
-            expectedVisibility,
-            expectedRoot,
-            expectedUpdatedAt,
-            actorUserId,
-            expectedPublished,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            requireTargetManager,
-          ] = params as [
-            string,
-            string | null,
-            string | null,
-            number,
-            string,
-            string | null,
-            string,
-            string,
-            number,
-            string,
-            number,
-            number,
-            string | null,
-            string,
-            string | null,
-            string | null,
-            string,
-            string | null,
-            string | null,
-            string,
-            number,
-          ]
+          const targetVisibility = params[0] as string
+          const targetTeamId = params[1] as string | null
+          const targetProjectId = params[2] as string
+          const lineageJson = params[3] as string | null
+          const updatedAt = params[4] as number
+          const sid = params[5] as string
+          const expectedTeamId = params[6] as string | null
+          const expectedProjectId = params[7] as string
+          const expectedVisibility = params[8] as string
+          const expectedRoot = params[9] as string
+          const expectedUpdatedAt = params[10] as number
+          const actorUserId = params[11] as string
+          const expectedPublished = params[12] as number
+          const requireTargetManager = params[22] as number
           const session = state.hub_sessions.find((row) => row.sid === sid)
           const isPublished = state.hub_session_discovery.some((row) => row.sid === sid)
           const actor = state.users.find((row) => row.id === actorUserId)
@@ -1638,6 +2391,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
             actor.deleted_at !== null ||
             actor.deletion_pending_until !== null ||
             (session.team_id ?? null) !== expectedTeamId ||
+            session.project_id !== expectedProjectId ||
             session.visibility !== expectedVisibility ||
             session.root !== expectedRoot ||
             session.updated_at !== expectedUpdatedAt ||
@@ -1671,8 +2425,18 @@ export function makeDb(state: FakeDbState = emptyState()): {
               return { success: true, meta: { changes: 0 } }
             }
           }
+          if (
+            !activeProjectFor(
+              targetProjectId,
+              targetTeamId === null ? actorUserId : null,
+              targetTeamId,
+            )
+          ) {
+            return { success: true, meta: { changes: 0 } }
+          }
           session.visibility = targetVisibility
           session.team_id = targetTeamId
+          session.project_id = targetProjectId
           session.lineage_json = lineageJson
           session.updated_at = updatedAt
           return { success: true, meta: { changes: 1 } }
@@ -2218,13 +2982,97 @@ export function makeDb(state: FakeDbState = emptyState()): {
           state.audit.push({ user_id, ip_hash, ua_hash, action, target_id, details_json, ts })
           return { success: true, meta: { changes: 1 } }
         }
-        if (/^INSERT INTO handles \(handle, user_id, claimed_at\) VALUES/i.test(sql)) {
+        if (
+          /INSERT INTO handles\s+\(handle, user_id, team_id, claimed_at, released_at\)\s+SELECT \?,id,NULL,\?,NULL\s+FROM users/i.test(
+            sql,
+          )
+        ) {
+          const [handle, claimedAt, userId, actorUserId] = params as [
+            string,
+            number,
+            string,
+            string,
+          ]
+          const user = state.users.find(
+            (candidate) =>
+              candidate.id === userId &&
+              candidate.id === actorUserId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          if (!user) return { success: true, meta: { changes: 0 } }
+          if (
+            state.handles.some(
+              (candidate) =>
+                candidate.handle === handle ||
+                (candidate.user_id === userId && candidate.released_at === null),
+            )
+          ) {
+            throw new Error('UNIQUE constraint failed: handles.handle')
+          }
+          state.handles.push({
+            handle,
+            user_id: userId,
+            team_id: null,
+            claimed_at: claimedAt,
+            released_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (
+          /INSERT INTO handles\s+\(handle, user_id, team_id, claimed_at, released_at\)\s+SELECT \?,NULL,t\.id,\?,NULL\s+FROM teams t/i.test(
+            sql,
+          )
+        ) {
+          const [handle, claimedAt, teamId, actorUserId] = params as [
+            string,
+            number,
+            string,
+            string,
+          ]
+          const actor = state.users.find(
+            (candidate) =>
+              candidate.id === actorUserId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          const role = activeTeamRoleFor(teamId, actorUserId)
+          if (!actor || role === null) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          if (
+            state.handles.some(
+              (candidate) =>
+                candidate.handle === handle ||
+                ((candidate.team_id ?? null) === teamId && candidate.released_at === null),
+            )
+          ) {
+            throw new Error('UNIQUE constraint failed: handles.handle')
+          }
+          state.handles.push({
+            handle,
+            user_id: null,
+            team_id: teamId,
+            claimed_at: claimedAt,
+            released_at: null,
+          })
+          return { success: true, meta: { changes: 1 } }
+        }
+        if (
+          /^INSERT INTO handles \(handle, user_id, (?:team_id, )?claimed_at\) VALUES/i.test(sql)
+        ) {
           const [handle, user_id, claimed_at] = params as [string, string, number]
           // Mirror the real D1 PK constraint so race-condition coverage works.
           if (state.handles.some((h) => h.handle === handle)) {
             throw new Error(`UNIQUE constraint failed: handles.handle`)
           }
-          state.handles.push({ handle, user_id, claimed_at, released_at: null })
+          state.handles.push({
+            handle,
+            user_id,
+            team_id: null,
+            claimed_at,
+            released_at: null,
+          })
           return { success: true, meta: { changes: 1 } }
         }
         if (/^INSERT OR REPLACE INTO deletion_queue/i.test(sql)) {
@@ -2467,6 +3315,25 @@ export function makeDb(state: FakeDbState = emptyState()): {
           )
           return { success: true, meta: { changes: before - state.hub_sessions.length } }
         }
+        if (sql.includes('/* account-deletion:delete-personal-project-receipts */')) {
+          const [ownerUserId] = params as [string]
+          const before = state.project_creation_requests.length
+          state.project_creation_requests = state.project_creation_requests.filter(
+            (row) => row.owner_user_id !== ownerUserId || row.owner_team_id !== null,
+          )
+          return {
+            success: true,
+            meta: { changes: before - state.project_creation_requests.length },
+          }
+        }
+        if (sql.includes('/* account-deletion:delete-personal-projects */')) {
+          const [ownerUserId] = params as [string]
+          const before = state.projects.length
+          state.projects = state.projects.filter(
+            (row) => row.owner_user_id !== ownerUserId || row.owner_team_id !== null,
+          )
+          return { success: true, meta: { changes: before - state.projects.length } }
+        }
         if (/^DELETE FROM hub_session_engagement_daily WHERE sid=\?$/i.test(sql)) {
           const [sid] = params as [string]
           const before = state.hub_session_engagement_daily.length
@@ -2490,6 +3357,378 @@ export function makeDb(state: FakeDbState = emptyState()): {
         throw new Error(`unmocked run() SQL: ${sql}`)
       },
       async all<T = unknown>(): Promise<{ results: T[] }> {
+        if (sql.includes('/* teams:list */')) {
+          const [userId, limit] = params as [string, number]
+          const items = state.team_memberships
+            .filter((membership) => membership.user_id === userId)
+            .flatMap((membership) => {
+              const team = state.teams.find(
+                (candidate) =>
+                  candidate.id === membership.team_id &&
+                  candidate.archived_at === null &&
+                  (candidate.deletion_pending_until ?? null) === null,
+              )
+              if (!team) return []
+              return [
+                {
+                  ...team,
+                  role: membership.role,
+                  handle:
+                    state.handles.find(
+                      (candidate) =>
+                        (candidate.team_id ?? null) === team.id && candidate.released_at === null,
+                    )?.handle ?? null,
+                  member_count: state.team_memberships.filter(
+                    (candidate) => candidate.team_id === team.id,
+                  ).length,
+                  owner_count: state.team_memberships.filter(
+                    (candidate) => candidate.team_id === team.id && candidate.role === 'owner',
+                  ).length,
+                },
+              ]
+            })
+            .slice(0, limit)
+          return { results: items as T[] }
+        }
+        if (sql.includes('/* projects:list-hub-authorized */')) {
+          const [userId, hasAfter, beforeUpdatedAt, equalUpdatedAt, afterId, limit] = params as [
+            string,
+            number,
+            number,
+            number,
+            string,
+            number,
+          ]
+          const actor = state.users.find(
+            (user) =>
+              user.id === userId &&
+              user.deleted_at === null &&
+              user.deletion_pending_until === null,
+          )
+          if (!actor) return { results: [] }
+          const rows = state.projects
+            .flatMap((project) => {
+              const role =
+                project.owner_team_id === null
+                  ? null
+                  : activeTeamRoleFor(project.owner_team_id, userId)
+              if (
+                project.archived_at !== null ||
+                (project.owner_user_id !== userId && role === null)
+              ) {
+                return []
+              }
+              const handle = state.handles.find(
+                (candidate) =>
+                  candidate.released_at === null &&
+                  candidate.user_id === project.owner_user_id &&
+                  (candidate.team_id ?? null) === project.owner_team_id,
+              )
+              if (!handle) return []
+              const ownerUser =
+                project.owner_user_id === null
+                  ? null
+                  : (state.users.find((user) => user.id === project.owner_user_id) ?? null)
+              const ownerTeam =
+                project.owner_team_id === null
+                  ? null
+                  : (state.teams.find((team) => team.id === project.owner_team_id) ?? null)
+              return [
+                {
+                  ...project,
+                  session_count: state.hub_sessions.filter(
+                    (session) => session.project_id === project.id && session.withdrawn_at === null,
+                  ).length,
+                  owner_handle: handle.handle,
+                  owner_name:
+                    ownerTeam?.name ??
+                    ownerUser?.display_name ??
+                    ownerUser?.name ??
+                    ownerUser?.email.split('@')[0] ??
+                    handle.handle,
+                  owner_avatar_url: ownerUser?.avatar_url ?? null,
+                  owner_custom_avatar_id: ownerUser?.custom_avatar_id ?? null,
+                  owner_avatar_visible: ownerUser?.avatar_visible ?? 1,
+                  can_manage:
+                    project.owner_user_id === userId || role === 'owner' || role === 'admin'
+                      ? 1
+                      : 0,
+                },
+              ]
+            })
+            .sort(
+              (left, right) =>
+                right.updated_at - left.updated_at || left.id.localeCompare(right.id),
+            )
+            .filter(
+              (project) =>
+                hasAfter === 0 ||
+                project.updated_at < beforeUpdatedAt ||
+                (project.updated_at === equalUpdatedAt && project.id > afterId),
+            )
+            .slice(0, limit)
+          return { results: rows as T[] }
+        }
+        if (
+          sql.includes('FROM projects p') &&
+          sql.includes('JOIN users owner ON owner.id=p.owner_user_id') &&
+          sql.includes('WHERE p.owner_user_id=? AND p.owner_team_id IS NULL') &&
+          !sql.includes('JOIN hub_sessions')
+        ) {
+          const [userId, hasAfter, beforeUpdatedAt, equalUpdatedAt, afterId, limit] = params as [
+            string,
+            number,
+            number,
+            number,
+            string,
+            number,
+          ]
+          const user = state.users.find(
+            (candidate) =>
+              candidate.id === userId &&
+              candidate.deleted_at === null &&
+              candidate.deletion_pending_until === null,
+          )
+          const items = user
+            ? state.projects
+                .filter(
+                  (project) =>
+                    project.owner_user_id === userId &&
+                    project.owner_team_id === null &&
+                    project.archived_at === null,
+                )
+                .map((project) => ({
+                  ...project,
+                  session_count: state.hub_sessions.filter(
+                    (session) => session.project_id === project.id && session.withdrawn_at === null,
+                  ).length,
+                }))
+                .sort(
+                  (left, right) =>
+                    right.updated_at - left.updated_at || left.id.localeCompare(right.id),
+                )
+                .filter(
+                  (project) =>
+                    hasAfter === 0 ||
+                    project.updated_at < beforeUpdatedAt ||
+                    (project.updated_at === equalUpdatedAt && project.id > afterId),
+                )
+                .slice(0, limit)
+            : []
+          return { results: items as T[] }
+        }
+        if (sql.includes('/* projects:list-team-authorized */')) {
+          const [teamId, userId, hasAfter, beforeUpdatedAt, equalUpdatedAt, afterId, limit] =
+            params as [string, string, number, number, number, string, number]
+          const role = activeTeamRoleFor(teamId, userId)
+          if (role === null) return { results: [] }
+          const projects = state.projects
+            .filter(
+              (project) =>
+                project.owner_user_id === null &&
+                project.owner_team_id === teamId &&
+                project.archived_at === null,
+            )
+            .map((project) => ({
+              ...project,
+              session_count: state.hub_sessions.filter(
+                (session) => session.project_id === project.id && session.withdrawn_at === null,
+              ).length,
+            }))
+            .sort(
+              (left, right) =>
+                right.updated_at - left.updated_at || left.id.localeCompare(right.id),
+            )
+            .filter(
+              (project) =>
+                hasAfter === 0 ||
+                project.updated_at < beforeUpdatedAt ||
+                (project.updated_at === equalUpdatedAt && project.id > afterId),
+            )
+            .slice(0, limit)
+          return {
+            results: (projects.length > 0 ? projects : [{ id: null }]) as T[],
+          }
+        }
+        if (sql.includes('/* projects:list-public */')) {
+          const [hasAfter, beforePublishedAt, equalPublishedAt, afterId, limit] = params as [
+            number,
+            number,
+            number,
+            string,
+            number,
+          ]
+          const items = state.projects
+            .flatMap((project) => {
+              if (
+                project.owner_user_id === null ||
+                project.owner_team_id !== null ||
+                project.archived_at !== null
+              ) {
+                return []
+              }
+              const user = state.users.find(
+                (candidate) =>
+                  candidate.id === project.owner_user_id && candidate.deleted_at === null,
+              )
+              const handle = state.handles.find(
+                (candidate) =>
+                  candidate.user_id === project.owner_user_id && candidate.released_at === null,
+              )
+              if (!user || !handle) return []
+              const published = state.hub_sessions.flatMap((session) => {
+                const projection = state.hub_session_discovery.find(
+                  (candidate) => candidate.sid === session.sid,
+                )
+                return session.project_id === project.id &&
+                  session.owner_user_id === project.owner_user_id &&
+                  (session.team_id ?? null) === null &&
+                  session.visibility === 'unlisted' &&
+                  session.withdrawn_at === null &&
+                  projection
+                  ? [projection]
+                  : []
+              })
+              if (published.length === 0) return []
+              return [
+                {
+                  ...project,
+                  session_count: published.length,
+                  last_session_at: Math.max(...published.map((row) => row.published_at)),
+                  owner_handle: handle.handle,
+                  owner_email: user.email,
+                  owner_name: user.name,
+                  owner_display_name: user.display_name ?? null,
+                  owner_avatar_url: user.avatar_url,
+                  owner_custom_avatar_id: user.custom_avatar_id ?? null,
+                  owner_avatar_visible: user.avatar_visible ?? 1,
+                },
+              ]
+            })
+            .filter(
+              (project) =>
+                hasAfter === 0 ||
+                project.last_session_at < beforePublishedAt ||
+                (project.last_session_at === equalPublishedAt && project.id > afterId),
+            )
+            .sort(
+              (left, right) =>
+                right.last_session_at - left.last_session_at || left.id.localeCompare(right.id),
+            )
+            .slice(0, limit)
+          return { results: items as T[] }
+        }
+        if (
+          sql.includes('SELECT p.*, COUNT(d.sid) AS session_count') &&
+          sql.includes('JOIN hub_session_discovery d')
+        ) {
+          const [userId, limit] = params as [string, number]
+          const projects = state.projects.flatMap((project) => {
+            if (
+              project.owner_user_id !== userId ||
+              project.owner_team_id !== null ||
+              project.archived_at !== null
+            ) {
+              return []
+            }
+            const projections = state.hub_sessions.flatMap((session) => {
+              const projection = state.hub_session_discovery.find(
+                (candidate) => candidate.sid === session.sid,
+              )
+              return session.project_id === project.id &&
+                (session.team_id ?? null) === null &&
+                session.visibility === 'unlisted' &&
+                session.withdrawn_at === null &&
+                projection
+                ? [projection]
+                : []
+            })
+            return projections.length === 0
+              ? []
+              : [
+                  {
+                    ...project,
+                    session_count: projections.length,
+                    last_session_at: Math.max(...projections.map((row) => row.published_at)),
+                  },
+                ]
+          })
+          projects.sort(
+            (left, right) =>
+              right.last_session_at - left.last_session_at || left.id.localeCompare(right.id),
+          )
+          return { results: projects.slice(0, limit) as T[] }
+        }
+        if (
+          sql.includes('/* projects:list-sessions-authorized */') ||
+          sql.includes('/* projects:list-public-sessions */') ||
+          sql.includes('/* projects:list-public-owner-sessions */')
+        ) {
+          const publicProject = sql.includes('/* projects:list-public-sessions */')
+          const publicOwner = sql.includes('/* projects:list-public-owner-sessions */')
+          const [firstParam, secondParam] = params as [string, string | null]
+          const projectId = publicOwner ? null : firstParam
+          const ownerUserId = publicOwner ? firstParam : publicProject ? secondParam : null
+          const teamId = !publicProject && !publicOwner ? (params[2] as string | null) : null
+          const actorUserId = !publicProject && !publicOwner ? (params[4] as string) : null
+          const cursorOffset = publicOwner ? 1 : publicProject ? 2 : 8
+          const hasAfter = Number(params[cursorOffset] ?? 0)
+          const afterSortAt = Number(params[cursorOffset + 1] ?? 0)
+          const equalSortAt = Number(params[cursorOffset + 2] ?? 0)
+          const afterSid = String(params[cursorOffset + 3] ?? '')
+          const limit = Number(params[cursorOffset + 4] ?? Number.MAX_SAFE_INTEGER)
+          const rows = state.hub_sessions
+            .filter((session) => {
+              if (projectId !== null && session.project_id !== projectId) return false
+              if (session.withdrawn_at !== null) return false
+              if (publicProject || publicOwner) {
+                return (
+                  session.owner_user_id === ownerUserId &&
+                  (session.team_id ?? null) === null &&
+                  session.visibility === 'unlisted' &&
+                  state.hub_session_discovery.some((projection) => projection.sid === session.sid)
+                )
+              }
+              if (teamId === null) {
+                return (session.team_id ?? null) === null && session.owner_user_id === actorUserId
+              }
+              return (
+                session.team_id === teamId &&
+                actorUserId !== null &&
+                activeTeamRoleFor(teamId, actorUserId) !== null
+              )
+            })
+            .map((session) => {
+              const publishedAt =
+                state.hub_session_discovery.find((projection) => projection.sid === session.sid)
+                  ?.published_at ?? 0
+              return {
+                ...session,
+                ...hydratedManagedSessionFields(session),
+                team_name:
+                  session.team_id == null
+                    ? null
+                    : (state.teams.find((team) => team.id === session.team_id)?.name ?? null),
+                star_count: state.hub_session_stars.filter((star) => star.sid === session.sid)
+                  .length,
+                published_at: publishedAt,
+                project_sort_at: publicProject || publicOwner ? publishedAt : session.updated_at,
+              }
+            })
+            .filter(
+              (session) =>
+                hasAfter === 0 ||
+                session.project_sort_at < afterSortAt ||
+                (session.project_sort_at === equalSortAt && session.sid > afterSid),
+            )
+            .sort((left, right) =>
+              publicProject || publicOwner
+                ? right.published_at - left.published_at || left.sid.localeCompare(right.sid)
+                : right.updated_at - left.updated_at || left.sid.localeCompare(right.sid),
+            )
+            .slice(0, limit)
+          return { results: rows as T[] }
+        }
         if (sql.includes('/* teams:local-workos-memberships */')) {
           const [userId, after, limit] = params as [string, string, number]
           const items = state.team_memberships
@@ -2668,12 +3907,24 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 )
                 return sourceTeam ? discovery.lineage_source_sid : null
               })()
+              const publicProject =
+                session.team_id == null && session.project_id
+                  ? state.projects.find(
+                      (project) =>
+                        project.id === session.project_id &&
+                        project.owner_user_id === session.owner_user_id &&
+                        project.owner_team_id === null,
+                    )
+                  : null
               return [
                 {
                   ...discovery,
                   lineage_source_sid: lineageSourceSid,
                   record_count: session.record_count,
                   owner_user_id: session.owner_user_id,
+                  project_id: publicProject?.id ?? null,
+                  project_slug: publicProject?.slug ?? null,
+                  project_name: publicProject?.name ?? null,
                   handle,
                   name: identityLive ? user.name : null,
                   display_name: identityLive ? (user.display_name ?? null) : null,

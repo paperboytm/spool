@@ -5,9 +5,8 @@ import { HubClient, type HubFetch, type HubTeam } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
-// Read-only: the Teams the signed-in user belongs to. Names printed here are
-// exactly what `spool subscribe --team <name>` and `spool visibility … --team
-// <name>` accept — the id is only needed when two Teams share a name.
+// Read-only: the Teams the signed-in user belongs to. Stable handles are the
+// preferred CLI reference; a unique display name remains a convenience.
 
 export interface TeamsCommandOptions {
   json?: boolean
@@ -53,10 +52,11 @@ export async function handleTeamsCommand(
     }
     for (const team of teams) {
       const members = `${team.member_count} member${team.member_count === 1 ? '' : 's'}`
-      ui.info(`Team · ${team.name}  (${team.role}, ${members})`)
+      const handle = team.handle ? `  @${team.handle}` : ''
+      ui.info(`Team · ${team.name}${handle}  (${team.role}, ${members})`)
     }
     ui.info(
-      `Use a name with \`${formatCliCommand('subscribe --team <name>')}\` or \`${formatCliCommand('visibility <sid> team --team <name>')}\`.`,
+      `Use a handle with \`${formatCliCommand('subscribe --team <handle>')}\`, \`${formatCliCommand('share --team <handle>')}\`, or \`${formatCliCommand('visibility <sid> team --team <handle>')}\`.`,
     )
     return 0
   } catch (cause) {

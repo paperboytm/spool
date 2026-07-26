@@ -60,6 +60,51 @@ describe('HubClient', () => {
     })
   })
 
+  it('authenticates Team Session metadata reads and preserves its Project context', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        sid: SID,
+        root: 'root-1',
+        count: 1,
+        sig: null,
+        cardJson: null,
+        summaryMd: '# Team summary',
+        lineageJson: null,
+        viewOid: 'view-oid',
+        createdAt: 1,
+        updatedAt: 1,
+        visibility: 'public',
+        team: { id: 'team_1', name: 'Paperboy' },
+        project: {
+          id: 'project_team_1',
+          slug: 'spool',
+          name: 'Spool',
+          description: null,
+          github_url: null,
+          owner: { kind: 'team', id: 'team_1', handle: 'paperboy', name: 'Paperboy' },
+          can_manage: true,
+        },
+        author: { handle: 'evan', displayName: 'Evan', avatarUrl: null },
+      }),
+    )
+    const client = new HubClient({
+      hubUrl: 'https://hub.example',
+      token: 'hub-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await expect(client.getSession(SID)).resolves.toMatchObject({
+      team: { id: 'team_1' },
+      project: {
+        id: 'project_team_1',
+        owner: { kind: 'team', id: 'team_1' },
+      },
+    })
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer hub-token',
+    )
+  })
+
   it('uploads object batches as NDJSON', async () => {
     const fetchMock = vi.fn(async () => Response.json({ stored: 2 }))
     const client = new HubClient({
@@ -142,6 +187,89 @@ describe('HubClient', () => {
     expect(String(input)).toBe(`https://spool.new/api/hub/v1/sessions/${SID}/resume-grant`)
     expect(init).toMatchObject({ method: 'POST', body: '{"position":42}' })
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer hub-token')
+  })
+
+  it('lists and creates Projects through the Hub contract', async () => {
+    const project = {
+      id: 'project_spool0001',
+      slug: 'spool',
+      name: 'Spool',
+      description: null,
+      github_url: null,
+      owner: { kind: 'user' as const, id: 'user_1', handle: 'evan', name: 'Evan' },
+      can_manage: true,
+    }
+    const fetchMock = vi.fn(async (input: unknown, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname
+      if (path === '/api/hub/v1/projects' && init?.method === 'GET') {
+        return Response.json({ actor: { id: 'user_1' }, projects: [project] })
+      }
+      return Response.json({ project })
+    })
+    const client = new HubClient({
+      hubUrl: 'https://hub.example',
+      token: 'hub-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await expect(client.listProjects()).resolves.toEqual({
+      actor: { id: 'user_1' },
+      projects: [project],
+    })
+    await expect(
+      client.createProject(
+        { name: 'Spool', owner: { kind: 'user', id: 'user_1' } },
+        'spool-project-key',
+      ),
+    ).resolves.toEqual(project)
+
+    const [, init] = fetchMock.mock.calls[1]!
+    expect(new Headers(init?.headers).get('idempotency-key')).toBe('spool-project-key')
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      name: 'Spool',
+      owner: { kind: 'user', id: 'user_1' },
+      idempotency_key: 'spool-project-key',
+    })
+  })
+
+  it('follows every bounded Hub Project page before resolving Project identity', async () => {
+    const project = (id: string) => ({
+      id,
+      slug: id,
+      name: id,
+      description: null,
+      github_url: null,
+      owner: { kind: 'user' as const, id: 'user_1', handle: 'evan', name: 'Evan' },
+      can_manage: true,
+    })
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = new URL(String(input))
+      expect(url.searchParams.get('limit')).toBe('100')
+      if (url.searchParams.get('cursor') === null) {
+        return Response.json({
+          actor: { id: 'user_1' },
+          projects: [project('first')],
+          next_cursor: 'page-two',
+        })
+      }
+      expect(url.searchParams.get('cursor')).toBe('page-two')
+      return Response.json({
+        actor: { id: 'user_1' },
+        projects: [project('second')],
+        next_cursor: null,
+      })
+    })
+    const client = new HubClient({
+      hubUrl: 'https://hub.example',
+      token: 'hub-token',
+      fetch: fetchMock as typeof fetch,
+    })
+
+    await expect(client.listProjects()).resolves.toMatchObject({
+      actor: { id: 'user_1' },
+      projects: [{ id: 'first' }, { id: 'second' }],
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it.each([

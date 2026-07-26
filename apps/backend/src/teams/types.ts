@@ -2,6 +2,7 @@ export type TeamRole = 'owner' | 'admin' | 'member'
 
 export const TEAM_PERMISSIONS = [
   'team:update',
+  'team:identity',
   'team:archive',
   'members:invite',
   'members:manage',
@@ -79,6 +80,7 @@ export type TeamInvitationRow = {
 export type TeamResponse = {
   id: string
   name: string
+  handle: string | null
   role: TeamRole
   permissions: TeamPermission[]
   member_count: number

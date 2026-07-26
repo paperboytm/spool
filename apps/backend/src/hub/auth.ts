@@ -52,6 +52,25 @@ export async function requireHubUser(req: Request, env: HubAuthEnv): Promise<Use
   return requireUser(req, env)
 }
 
+/**
+ * Auth-aware public Hub reads use this to enrich a representation for a
+ * signed-in tenant member without turning an invalid/expired credential into
+ * a different public status code. Unexpected storage failures still surface.
+ */
+export async function optionalHubUser(req: Request, env: HubAuthEnv): Promise<UserRow | null> {
+  try {
+    return await requireHubUser(req, env)
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      (error.code === 'UNAUTHENTICATED' || error.code === 'FORBIDDEN')
+    ) {
+      return null
+    }
+    throw error
+  }
+}
+
 async function ensureDevUser(db: D1Database): Promise<UserRow> {
   const existing = await getUserById(db, DEV_USER_ID)
   if (existing) return existing

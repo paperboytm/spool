@@ -1,4 +1,4 @@
-import type { ResumableSessionProvider } from '@spool-lab/session-kit'
+import { restoreSessionRecord, type ResumableSessionProvider } from '@spool-lab/session-kit'
 
 import { buildBirthText, type BirthPayload } from './birth.js'
 
@@ -48,14 +48,15 @@ export function materializeClaudeSession(opts: MaterializeOptions): Materialized
   let lastCwd: string | null = null
 
   for (const record of sorted) {
-    const parsed = parseRecordObject(
-      restorePlaceholders(record.data, opts.workspaceRoot, opts.homeDir),
-      record.i,
-    )
-    if ('sessionId' in parsed) parsed['sessionId'] = opts.sessionId
+    const restored = restorePlaceholders(record.data, opts.workspaceRoot, opts.homeDir)
+    const parsed = parseRecordObject(restored, record.i)
+    const line =
+      'sessionId' in parsed
+        ? replaceJsonStringAtPath(restored, ['sessionId'], opts.sessionId, record.i)
+        : restored
     if (typeof parsed['uuid'] === 'string') lastUuid = parsed['uuid']
     if (typeof parsed['cwd'] === 'string') lastCwd = parsed['cwd']
-    lines.push(JSON.stringify(parsed))
+    lines.push(line)
   }
 
   const now = (opts.now ?? new Date()).toISOString()
@@ -86,10 +87,9 @@ export function materializeCodexSession(opts: MaterializeOptions): MaterializedS
   const lines: string[] = []
 
   for (const record of sorted) {
-    const parsed = parseRecordObject(
-      restorePlaceholders(record.data, opts.workspaceRoot, opts.homeDir),
-      record.i,
-    )
+    const restored = restorePlaceholders(record.data, opts.workspaceRoot, opts.homeDir)
+    const parsed = parseRecordObject(restored, record.i)
+    let line = restored
     // The rollout's identity lives in session_meta.payload — `id` on older
     // CLIs, plus a `session_id` alias on ≥0.144 — and `codex resume`
     // additionally matches the uuid in the file name. Rewrite every copy
@@ -98,11 +98,13 @@ export function materializeCodexSession(opts: MaterializeOptions): MaterializedS
       const payload = parsed['payload']
       if (typeof payload === 'object' && payload !== null && !Array.isArray(payload)) {
         const meta = payload as Record<string, unknown>
-        meta['id'] = opts.sessionId
-        if ('session_id' in meta) meta['session_id'] = opts.sessionId
+        line = replaceJsonStringAtPath(line, ['payload', 'id'], opts.sessionId, record.i)
+        if ('session_id' in meta) {
+          line = replaceJsonStringAtPath(line, ['payload', 'session_id'], opts.sessionId, record.i)
+        }
       }
     }
-    lines.push(JSON.stringify(parsed))
+    lines.push(line)
   }
 
   const iso = (opts.now ?? new Date()).toISOString()
@@ -142,15 +144,105 @@ function parseRecordObject(restored: string, index: number): Record<string, unkn
   }
 }
 
-/**
- * Replace canonicalization placeholders with the resumer's local paths.
- * Tokens live inside JSON string values, so the replacement must be
- * JSON-escaped before splicing into the raw line.
- */
+/** Restore portable local-path tokens without reserializing provider JSON. */
 export function restorePlaceholders(data: string, workspaceRoot: string, homeDir: string): string {
-  const escapedWs = JSON.stringify(workspaceRoot).slice(1, -1)
-  const escapedHome = JSON.stringify(homeDir).slice(1, -1)
-  return data.split('$SPOOL_WS').join(escapedWs).split('$SPOOL_HOME').join(escapedHome)
+  return restoreSessionRecord(data, workspaceRoot, homeDir)
+}
+
+/**
+ * Replace one JSON string value without re-serializing the surrounding
+ * provider record. JSON.parse would collapse number lexemes and formatting
+ * across the whole line merely to change a Session identity field.
+ */
+function replaceJsonStringAtPath(
+  data: string,
+  path: readonly string[],
+  replacement: string,
+  recordIndex: number,
+): string {
+  const ranges = findJsonStringRanges(data, path)
+  if (ranges.length !== 1) {
+    throw new Error(
+      `Record ${recordIndex} must contain exactly one string at ${path.join('.') || '<root>'}`,
+    )
+  }
+  const range = ranges[0] as { start: number; end: number }
+  return `${data.slice(0, range.start)}${JSON.stringify(replacement)}${data.slice(range.end)}`
+}
+
+function findJsonStringRanges(
+  data: string,
+  targetPath: readonly string[],
+): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = []
+
+  const skipWhitespace = (from: number): number => {
+    let index = from
+    while (index < data.length && /\s/.test(data[index] as string)) index += 1
+    return index
+  }
+
+  const stringEnd = (from: number): number => {
+    let index = from + 1
+    while (index < data.length) {
+      const char = data[index] as string
+      if (char === '\\') {
+        index += 2
+        continue
+      }
+      if (char === '"') return index + 1
+      index += 1
+    }
+    return data.length
+  }
+
+  const pathMatches = (path: readonly string[]): boolean =>
+    path.length === targetPath.length &&
+    path.every((segment, index) => segment === targetPath[index])
+
+  const visitValue = (from: number, path: readonly string[]): number => {
+    let index = skipWhitespace(from)
+    const char = data[index]
+    if (char === '"') {
+      const end = stringEnd(index)
+      if (pathMatches(path)) ranges.push({ start: index, end })
+      return end
+    }
+    if (char === '{') {
+      index = skipWhitespace(index + 1)
+      if (data[index] === '}') return index + 1
+      while (index < data.length) {
+        const keyStart = index
+        const keyEnd = stringEnd(keyStart)
+        const key = JSON.parse(data.slice(keyStart, keyEnd)) as string
+        index = skipWhitespace(keyEnd)
+        index = skipWhitespace(index + 1) // colon
+        index = visitValue(index, [...path, key])
+        index = skipWhitespace(index)
+        if (data[index] === '}') return index + 1
+        index = skipWhitespace(index + 1) // comma
+      }
+      return index
+    }
+    if (char === '[') {
+      index = skipWhitespace(index + 1)
+      if (data[index] === ']') return index + 1
+      let item = 0
+      while (index < data.length) {
+        index = visitValue(index, [...path, String(item)])
+        item += 1
+        index = skipWhitespace(index)
+        if (data[index] === ']') return index + 1
+        index = skipWhitespace(index + 1) // comma
+      }
+      return index
+    }
+    while (index < data.length && !/[\s,\]}]/.test(data[index] as string)) index += 1
+    return index
+  }
+
+  visitValue(0, [])
+  return ranges
 }
 
 /** Claude Code names project dirs by the cwd with every non-alphanumeric character mapped to '-'. */

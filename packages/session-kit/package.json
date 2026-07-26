@@ -1,7 +1,7 @@
 {
   "name": "@spool-lab/session-kit",
   "version": "0.8.3",
-  "description": "Browser-safe canonical records, sequence hashing, edit extraction, views, and Session diffs for Spool.",
+  "description": "Browser-safe content-addressed records, sequence hashing, edit extraction, views, and Session diffs for Spool.",
   "homepage": "https://github.com/paperboytm/spool#readme",
   "bugs": {
     "url": "https://github.com/paperboytm/spool/issues"

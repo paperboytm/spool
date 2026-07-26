@@ -302,6 +302,17 @@ const meta: HubSessionMeta = {
   updatedAt: Date.UTC(2026, 6, 17, 7),
   visibility: 'public',
   cost: null,
+  project: {
+    id: 'project_1',
+    slug: 'session-reader',
+    name: 'Session Reader',
+    owner: {
+      kind: 'user',
+      id: 'user_1',
+      handle: 'dev-user',
+      name: 'Dev User',
+    },
+  },
   author: { handle: 'dev-user', displayName: 'Dev User', avatarUrl: null },
 }
 
@@ -370,6 +381,8 @@ describe('SessionWorkbench', () => {
     expect(html).toContain('data-testid="session-visibility"')
     expect(html).toContain('lucide-earth')
     expect(html).toContain('>Public</span>')
+    expect(html).toContain('href="/@dev-user/session-reader"')
+    expect(html).toContain('dev-user/session-reader')
     expect(html).toContain('Published Jul 10, 2026')
     expect(html).toContain('data-progressive="true"')
     expect(html).toContain('Published full prompt')

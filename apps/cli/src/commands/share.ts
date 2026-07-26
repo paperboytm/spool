@@ -6,7 +6,9 @@ import {
   formatCliCommand,
   getDB,
   getSessionWithMessages,
+  resolveSessionProjectIdentity,
   serializeIndexedSession,
+  type ProjectIdentity,
 } from '@spool-lab/core'
 import {
   canonicalizeRecord,
@@ -14,6 +16,7 @@ import {
   isResumableSessionProvider,
   parseSummaryFrontMatter,
   parseSessionText,
+  sessionRecordData,
   SESSION_PROVIDERS,
   type SessionProvider,
 } from '@spool-lab/session-kit'
@@ -21,16 +24,24 @@ import { Command } from 'commander'
 
 import { copyTextToClipboard } from '../clipboard.js'
 import { buildSessionSummaryPrompt } from '../hub/agent-summary-prompt.js'
-import { HubClient, HubHttpError, type HubFetch } from '../hub/client.js'
+import {
+  HubClient,
+  HubHttpError,
+  type HubFetch,
+  type HubSessionMeta,
+  type HubTeam,
+} from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
 import {
   detectLocalSummaryAgents,
   runLocalSummaryAgent,
   type LocalSummaryAgent,
 } from '../hub/local-summary-agent.js'
+import { persistResolvedProject, resolveHubProject } from '../hub/project-resolution.js'
 import { publishPreparedShare } from '../hub/publish.js'
 import { formatRedactSummary, scanRecordsForSecrets } from '../hub/redact-gate.js'
 import { prepareShare, type PreparedShare } from '../hub/share-pipeline.js'
+import { resolveTeamReference } from '../hub/team-resolution.js'
 import { buildWorkspaceCard, detectWorkspaceRoot } from '../hub/workspace.js'
 import { expandLocalSessionUuid } from '../local-session-ref.js'
 import { createClackUi, createTextUi, type CliUi } from '../ui.js'
@@ -48,6 +59,14 @@ export interface ShareTarget {
   sessionUuid: string
   filePath: string
   cwd: string | null
+  /**
+   * Exact identity joined through sessions.project_id in the local index.
+   *
+   * Optional only at the injected resolver boundary for compatibility with
+   * programmatic callers. The command fails closed before preparation or
+   * upload when it is absent; it never substitutes the caller's cwd.
+   */
+  projectIdentity?: ProjectIdentity
   /** Portable JSONL for indexed sources without native provider records. */
   jsonl?: string
 }
@@ -64,6 +83,12 @@ export interface ShareCommandOptions {
   visibilityDisclosed?: boolean
   /** Path to a .spool document to attach to the share. */
   spoolFile?: string
+  /** Existing Hub Project id or owner/slug. */
+  project?: string
+  /** Create and bind a Hub Project with this name. */
+  createProject?: string
+  /** Publish directly into a Team tenant instead of the personal default. */
+  team?: string
 }
 
 export interface ShareCommandDependencies extends HubCredentialOptions {
@@ -79,8 +104,14 @@ export interface ShareCommandDependencies extends HubCredentialOptions {
   buildSummaryPrompt?: (target: ShareTarget, prepared: PreparedShare) => string
   /** Best-effort clipboard writer; injected in tests. */
   copyToClipboard?: (text: string) => boolean | Promise<boolean>
+  listTeams?: (client: HubClient) => Promise<HubTeam[]>
   cwd?: string
 }
+
+type ShareDisclosure =
+  | { kind: 'public' }
+  | { kind: 'link-only' }
+  | { kind: 'team'; id: string; name: string }
 
 export async function handleShareCommand(
   input: string | undefined,
@@ -94,17 +125,31 @@ export async function handleShareCommand(
   ui.intro('Share a session')
 
   try {
+    if (options.project !== undefined && options.createProject !== undefined) {
+      ui.error('`--project` and `--create-project` cannot be used together.')
+      return 1
+    }
     const { sessionUuid, position } = parseShareRef(input)
     const resolveTarget = dependencies.resolveTarget ?? resolveTargetFromIndex
     const target = resolveTarget(sessionUuid, cwd)
-    const publicByDefault = isDiscoverySessionProvider(target.provider)
-
+    if (!target.projectIdentity) {
+      throw new Error(
+        `Session ${target.sessionUuid} has no local Project identity. ` +
+          'Refresh the local index or update the programmatic resolver before sharing.',
+      )
+    }
+    const projectIdentity = target.projectIdentity
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
     if (!credentials.token) {
       ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
       ui.info(formatCliInstallHint())
       return 1
     }
+    const client = new HubClient({
+      hubUrl: credentials.hubUrl,
+      token: credentials.token,
+      ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+    })
 
     if (options.summary !== undefined && options.summary.trim() === '') {
       ui.error('`--summary` cannot be empty. Omit it to use the local Agent flow.')
@@ -136,7 +181,9 @@ export async function handleShareCommand(
       throw cause
     }
 
-    const secrets = scanRecordsForSecrets(prepared.records.map((record) => record.data))
+    const secrets = scanRecordsForSecrets(
+      prepared.records.map((record) => sessionRecordData(record)),
+    )
     if (secrets.total > 0) {
       ui.warn(formatRedactSummary(secrets))
       if (options.yes !== true) {
@@ -154,9 +201,28 @@ export async function handleShareCommand(
       }
     }
 
-    const visibilityConfirmation = publicByDefault
-      ? 'Publish this Session as Public? It can appear in Explore and search.'
-      : 'Share this Session as Link-only? Anyone with the URL can read it.'
+    const spoolFile =
+      options.spoolFile === undefined ? null : await readSpoolFileObject(options.spoolFile)
+    const existing = await existingSession(client, prepared.sid)
+    const existingProject = existing?.project ?? null
+    const requestedTeam =
+      options.team === undefined
+        ? undefined
+        : await resolveRequestedTeam(client, options.team, dependencies)
+    if (
+      requestedTeam &&
+      existingProject &&
+      (existingProject.owner.kind !== 'team' || existingProject.owner.id !== requestedTeam.id)
+    ) {
+      throw new Error(
+        `Session is already in Project ${existingProject.owner.handle ?? existingProject.owner.id}/${existingProject.slug}. ` +
+          `Re-sharing preserves its remote Project; use \`${formatCliCommand(
+            `visibility ${prepared.sid} team --team ${requestedTeam.id} --project <id|owner/slug>`,
+          )}\` for an explicit ownership transfer.`,
+      )
+    }
+    const disclosure = resolveShareDisclosure(existing, requestedTeam, target.provider)
+    const visibilityConfirmation = shareConfirmation(disclosure)
     let visibilityDisclosed = options.visibilityDisclosed === true
     if (options.yes !== true && options.visibilityConfirmed !== true) {
       if (!ui.interactive) {
@@ -173,22 +239,47 @@ export async function handleShareCommand(
       }
       visibilityDisclosed = true
     }
+
+    const resolvedProject = await resolveHubProject({
+      client,
+      ui,
+      hubUrl: credentials.hubUrl,
+      localIdentity: projectIdentity,
+      tenant: requestedTeam
+        ? { kind: 'team', id: requestedTeam.id }
+        : existingProject?.owner.kind === 'team'
+          ? { kind: 'team', id: existingProject.owner.id }
+          : { kind: 'personal' },
+      ...(options.project === undefined ? {} : { projectRef: options.project }),
+      ...(options.createProject === undefined ? {} : { createProjectName: options.createProject }),
+      existingProject,
+      ...pickCredentialOptions(dependencies),
+    })
+    if (!resolvedProject) return 1
+
     if (!visibilityDisclosed) {
-      ui.info(
-        publicByDefault
-          ? 'This Session will be Public and can appear in Explore and search.'
-          : 'This Session will be Link-only; anyone with the URL can read it.',
-      )
+      ui.info(shareDisclosureInfo(disclosure, resolvedProject.project.name))
     }
 
-    const client = new HubClient({
-      hubUrl: credentials.hubUrl,
-      token: credentials.token,
-      ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
-    })
-    const spoolFile =
-      options.spoolFile === undefined ? null : await readSpoolFileObject(options.spoolFile)
-    const initialSummary = await existingSummary(client, prepared.sid)
+    const directTeamTarget =
+      requestedTeam === undefined ? {} : ({ visibility: 'team', teamId: requestedTeam.id } as const)
+    const initialOwnershipExpectation =
+      requestedTeam === undefined ? {} : { expectedTeamId: existing?.team?.id ?? null }
+    const subsequentOwnershipExpectation =
+      requestedTeam === undefined ? {} : { expectedTeamId: requestedTeam.id }
+    const initialProjectWrite = {
+      projectId: resolvedProject.project.id,
+      expectedProjectId: existingProject?.id ?? null,
+      ...directTeamTarget,
+      ...initialOwnershipExpectation,
+    }
+    const subsequentProjectWrite = {
+      projectId: resolvedProject.project.id,
+      expectedProjectId: resolvedProject.project.id,
+      ...directTeamTarget,
+      ...subsequentOwnershipExpectation,
+    }
+    const initialSummary = existing?.summaryMd ?? null
 
     const upload = ui.spinner()
     upload.start('Uploading session')
@@ -198,10 +289,12 @@ export async function handleShareCommand(
         card,
         summary: initialSummary,
         spoolFile,
+        ...initialProjectWrite,
         onUploadProgress: (uploaded, total) =>
           upload.message(`Uploading session objects ${uploaded}/${total}`),
       })
       url = published.url
+      persistResolvedProject(resolvedProject, pickCredentialOptions(dependencies))
       upload.stop(`Uploaded ${prepared.count} records`)
     } catch (cause) {
       upload.error('Session upload failed')
@@ -210,7 +303,7 @@ export async function handleShareCommand(
     await announceShareComplete(
       ui,
       url,
-      publicByDefault,
+      disclosure,
       dependencies.copyToClipboard ?? copyTextToClipboard,
     )
 
@@ -222,6 +315,7 @@ export async function handleShareCommand(
           card,
           summary: options.summary,
           spoolFile,
+          ...subsequentProjectWrite,
           onUploadProgress: (uploaded, total) =>
             summaryUpload.message(`Uploading Summary objects ${uploaded}/${total}`),
         })
@@ -302,6 +396,7 @@ export async function handleShareCommand(
         card,
         summary,
         spoolFile,
+        ...subsequentProjectWrite,
         onUploadProgress: (uploaded, total) =>
           generation.message(`Uploading Summary objects ${uploaded}/${total}`),
       })
@@ -373,13 +468,79 @@ function stripClosingHeadingSequence(heading: string): string {
   return heading.slice(0, separator)
 }
 
+async function resolveRequestedTeam(
+  client: HubClient,
+  reference: string,
+  dependencies: ShareCommandDependencies,
+): Promise<HubTeam> {
+  const teams = await (dependencies.listTeams ?? ((forClient) => forClient.listTeams()))(client)
+  const team = resolveTeamReference(teams, reference)
+  if (team) return team
+  throw new Error(
+    teams.length === 0
+      ? 'You are not a member of any Team.'
+      : `No Team matches "${reference}". Your Teams: ${teams
+          .map((entry) => (entry.handle ? `@${entry.handle}` : entry.name))
+          .join(', ')}`,
+  )
+}
+
+function resolveShareDisclosure(
+  existing: HubSessionMeta | null,
+  requestedTeam: HubTeam | undefined,
+  provider: SessionProvider,
+): ShareDisclosure {
+  if (requestedTeam) {
+    return { kind: 'team', id: requestedTeam.id, name: requestedTeam.name }
+  }
+  if (existing?.visibility === 'team') {
+    const id = existing.team?.id ?? existing.project?.owner.id ?? 'unknown'
+    const name = existing.team?.name ?? existing.project?.owner.name ?? id
+    return { kind: 'team', id, name }
+  }
+  if (existing?.visibility === 'public') return { kind: 'public' }
+  if (existing?.visibility === 'link-only') return { kind: 'link-only' }
+  return isDiscoverySessionProvider(provider) ? { kind: 'public' } : { kind: 'link-only' }
+}
+
+function shareConfirmation(disclosure: ShareDisclosure): string {
+  if (disclosure.kind === 'team') {
+    return (
+      `Publish this Session to Team · ${disclosure.name}? ` +
+      'Only current members can read it, and the Team owns the hosted Session.'
+    )
+  }
+  return disclosure.kind === 'public'
+    ? 'Publish this Session as Public? It can appear in Explore and search.'
+    : 'Share this Session as Link-only? Anyone with the URL can read it.'
+}
+
+function shareDisclosureInfo(disclosure: ShareDisclosure, projectName: string): string {
+  if (disclosure.kind === 'team') {
+    return (
+      `This Session will be Team · ${disclosure.name} / Project ${projectName}. ` +
+      'Only current members can read it, and the Team owns the hosted Session.'
+    )
+  }
+  return disclosure.kind === 'public'
+    ? `This Session will be Public in Project ${projectName} and can appear in Explore and search.`
+    : `This Session will be Link-only in Project ${projectName}; anyone with the URL can read it.`
+}
+
 async function announceShareComplete(
   ui: CliUi,
   url: string,
-  publicByDefault: boolean,
+  disclosure: ShareDisclosure,
   copyToClipboard: (text: string) => boolean | Promise<boolean>,
 ): Promise<void> {
-  ui.note(url, publicByDefault ? 'Public Session URL' : 'Link-only URL')
+  ui.note(
+    url,
+    disclosure.kind === 'public'
+      ? 'Public Session URL'
+      : disclosure.kind === 'team'
+        ? `Team · ${disclosure.name} Session URL`
+        : 'Link-only URL',
+  )
   let copied = false
   if (ui.interactive) {
     try {
@@ -388,15 +549,24 @@ async function announceShareComplete(
       // Clipboard access is a convenience; a live share must still succeed.
     }
   }
-  const result = publicByDefault ? 'Session published.' : 'Session shared as Link-only.'
+  const result =
+    disclosure.kind === 'public'
+      ? 'Session published.'
+      : disclosure.kind === 'team'
+        ? `Session shared to Team · ${disclosure.name}.`
+        : 'Session shared as Link-only.'
   ui.success(copied ? `${result} Link copied to clipboard.` : result)
   if (ui.interactive && !copied) {
     ui.info('Could not copy automatically. Copy the Session URL above to share it.')
   }
-  if (publicByDefault) {
+  if (disclosure.kind === 'public') {
     ui.info('This Session can appear in Explore and search. The source Session stays unchanged.')
+  } else if (disclosure.kind === 'team') {
+    ui.info(
+      `Only current members of Team · ${disclosure.name} can read it, and the Team owns the hosted Session.`,
+    )
   } else {
-    ui.info('This provider is not yet supported in Explore, so the Session remains Link-only.')
+    ui.info('Anyone with the URL can read it; it does not appear in Explore or search.')
   }
 }
 
@@ -414,6 +584,9 @@ export const shareCommand = new Command('share')
   .option('--visibility-confirmed', 'Acknowledge visibility when running without a TTY')
   .option('--yes', 'Skip all confirmations, including secret findings')
   .option('--spool-file <path>', 'Attach a .spool document to the share')
+  .option('--team <handle-name-or-id>', 'Publish directly to this Team')
+  .option('--project <id-or-owner-slug>', 'Publish to this Hub Project')
+  .option('--create-project <name>', 'Create and bind a Hub Project')
   .action(
     async (
       session: string | undefined,
@@ -423,6 +596,9 @@ export const shareCommand = new Command('share')
         visibilityConfirmed?: boolean
         yes?: boolean
         spoolFile?: string
+        team?: string
+        project?: string
+        createProject?: string
       },
     ) => {
       const exitCode = await handleShareCommand(
@@ -435,6 +611,9 @@ export const shareCommand = new Command('share')
             : { visibilityConfirmed: opts.visibilityConfirmed }),
           ...(opts.yes === undefined ? {} : { yes: opts.yes }),
           ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
+          ...(opts.team === undefined ? {} : { team: opts.team }),
+          ...(opts.project === undefined ? {} : { project: opts.project }),
+          ...(opts.createProject === undefined ? {} : { createProject: opts.createProject }),
         },
         { ui: createClackUi() },
       )
@@ -463,7 +642,7 @@ async function chooseSummaryAgent(
 }
 
 function buildPreparedSummaryPrompt(target: ShareTarget, prepared: PreparedShare): string {
-  const raw = prepared.records.map((record) => record.data).join('\n')
+  const raw = prepared.records.map((record) => sessionRecordData(record)).join('\n')
   const parsed = parseSessionText(target.provider, raw, target.filePath)
   if (parsed.kind !== 'parsed') {
     throw new Error('Could not extract the shared conversation for Summary generation.')
@@ -471,9 +650,9 @@ function buildPreparedSummaryPrompt(target: ShareTarget, prepared: PreparedShare
   return buildSessionSummaryPrompt(parsed.session, parsed.session.messages).prompt
 }
 
-async function existingSummary(client: HubClient, sid: string): Promise<string | null> {
+async function existingSession(client: HubClient, sid: string): Promise<HubSessionMeta | null> {
   try {
-    return (await client.getSession(sid)).summaryMd
+    return await client.getSession(sid)
   } catch (cause) {
     if (cause instanceof HubHttpError && (cause.status === 404 || cause.status === 410)) return null
     throw cause
@@ -535,6 +714,7 @@ function resolveTargetFromIndex(sessionUuid: string | undefined, cwd: string): S
     sessionUuid: session.sessionUuid,
     filePath: session.filePath,
     cwd: session.cwd,
+    projectIdentity: resolveSessionProjectIdentity(db, session.sessionUuid),
     ...(isResumableSessionProvider(session.source)
       ? {}
       : { jsonl: serializeIndexedSession(session, found.messages) }),

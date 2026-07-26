@@ -1,6 +1,6 @@
 import { Button, ButtonLink, IconButton, MobileMenu, NavItem, Wordmark } from '@spool-lab/ui'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Library, Moon, Sun, Users } from 'lucide-react'
+import { FolderKanban, Library, Moon, Sun, Users } from 'lucide-react'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { AUTH_IDENTITY_CHANGED, type AuthIdentity } from '../../lib/auth-cache'
@@ -8,7 +8,6 @@ import { resolveAuthState, type AuthState } from '../../lib/auth-state'
 import { readCachedMe } from '../../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../../lib/theme'
 import { AccountMenu } from '../AccountMenu'
-import { SessionLanguageToggle } from '../SessionLanguageToggle'
 import { SpoolMark } from './spool-mark'
 
 export default function SiteLayout({
@@ -41,8 +40,8 @@ export default function SiteLayout({
             >
               Sessions
             </NavItem>
-            <NavItem className="nav-hideable" href="/docs/installation">
-              Docs
+            <NavItem className="nav-hideable" href="/projects">
+              Projects
             </NavItem>
           </nav>
 
@@ -55,7 +54,6 @@ export default function SiteLayout({
             >
               Publish
             </ButtonLink>
-            <SessionLanguageToggle className="site-language-toggle" />
             <SiteAccountActions auth={resolvedAuth} />
             <SiteMobileNavigation auth={resolvedAuth} />
           </div>
@@ -77,6 +75,7 @@ export default function SiteLayout({
             <Link to="/sessions" search={{ sort: 'recommended' }}>
               Sessions
             </Link>
+            <Link to="/projects">Projects</Link>
             <Link to="/docs/$" params={{ _splat: 'quick-start' }}>
               Publish
             </Link>
@@ -123,14 +122,17 @@ export function SiteMobileNavigation({ auth }: { auth: AuthIdentity }) {
     >
       <nav className="site-mobile-menu-items" aria-label="Mobile navigation">
         <NavItem href="/sessions">Sessions</NavItem>
+        <NavItem href="/projects">Projects</NavItem>
         <NavItem href="/docs/installation">Docs</NavItem>
         <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
           Publish
         </ButtonLink>
         <ThemeToggle className="site-mobile-theme-toggle" showLabel />
-        <SessionLanguageToggle className="site-mobile-language-toggle" showLabel />
         {auth === 'out' ? null : (
           <>
+            <NavItem href="/projects?scope=mine" leading={<FolderKanban aria-hidden="true" />}>
+              My Projects
+            </NavItem>
             <NavItem href="/my-sessions" leading={<Library aria-hidden="true" />}>
               My Sessions
             </NavItem>

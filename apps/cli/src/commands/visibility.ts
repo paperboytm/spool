@@ -1,9 +1,20 @@
+import { createHash } from 'node:crypto'
+
 import { formatCliCommand, formatCliInstallHint } from '@spool-lab/core'
 import { Command } from 'commander'
 
-import { HubClient, HubHttpError, type HubFetch, type HubTeam } from '../hub/client.js'
+import {
+  HubClient,
+  HubHttpError,
+  type HubFetch,
+  type HubProject,
+  type HubSessionMeta,
+  type HubTeam,
+} from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
+import { findProjectByReference, projectLabel } from '../hub/project-resolution.js'
 import { resolveSessionRef } from '../hub/ref.js'
+import { resolveTeamReference } from '../hub/team-resolution.js'
 import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // Disclosure changes are named, confirmed actions (DESIGN.md): moving a
@@ -17,6 +28,8 @@ export type VisibilityTargetName = (typeof TARGETS)[number]
 export interface VisibilityCommandOptions {
   team?: string
   yes?: boolean
+  project?: string
+  createProject?: string
 }
 
 export interface VisibilityCommandDependencies extends HubCredentialOptions {
@@ -39,6 +52,17 @@ export async function handleVisibilityCommand(
       return 1
     }
     const visibility = target as VisibilityTargetName
+    if (options.project !== undefined && options.createProject !== undefined) {
+      ui.error('`--project` and `--create-project` cannot be used together.')
+      return 1
+    }
+    if (
+      visibility !== 'team' &&
+      (options.project !== undefined || options.createProject !== undefined)
+    ) {
+      ui.error('`--project` and `--create-project` are only valid when targeting `team`.')
+      return 1
+    }
     const ref = resolveSessionRef(input)
 
     const credentials = loadHubCredentials(pickCredentialOptions(dependencies))
@@ -52,15 +76,20 @@ export async function handleVisibilityCommand(
       token: credentials.token,
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     })
+    let current: HubSessionMeta | undefined
 
     let teamId: string | undefined
     let teamName: string | undefined
+    let project: HubProject | undefined
+    let pendingProjectName: string | undefined
+    let projectActorId: string | undefined
     if (visibility === 'team') {
+      current = await client.getSession(ref.sid)
       const listTeams = dependencies.listTeams ?? ((forClient) => forClient.listTeams())
       const teams = await listTeams(client)
       if (options.team !== undefined) {
         const wanted = options.team.trim()
-        const team = teams.find((entry) => entry.id === wanted || entry.name === wanted)
+        const team = resolveTeamReference(teams, wanted)
         if (!team) {
           ui.error(
             teams.length === 0
@@ -89,9 +118,76 @@ export async function handleVisibilityCommand(
         ui.error('Pass `--team <name-or-id>` to choose the target Team.')
         return 1
       }
+
+      const { actor, projects } = await client.listProjects()
+      projectActorId = actor.id
+      const teamProjects = projects.filter(
+        (entry) => entry.owner.kind === 'team' && entry.owner.id === teamId,
+      )
+      if (options.project !== undefined) {
+        project = findProjectByReference(teamProjects, options.project)
+        if (!project) {
+          ui.error(
+            teamProjects.length === 0
+              ? `Team · ${teamName ?? teamId} has no writable Projects.`
+              : `No Project matches "${options.project}". Available Projects: ${teamProjects.map(projectLabel).join(', ')}`,
+          )
+          return 1
+        }
+      } else if (options.createProject !== undefined) {
+        const name = options.createProject.trim()
+        if (!name) {
+          ui.error('`--create-project` requires a non-empty Project name.')
+          return 1
+        }
+        pendingProjectName = name
+      } else if (current.project?.owner.kind === 'team' && current.project.owner.id === teamId) {
+        project = current.project
+      } else if (ui.interactive) {
+        const createValue = '__create_project__'
+        const selected = await ui.select({
+          message: `Which Team Project should own this Session?`,
+          choices: [
+            ...teamProjects.map((entry) => ({
+              value: entry.id,
+              label: entry.name,
+              hint: projectLabel(entry),
+            })),
+            {
+              value: createValue,
+              label: `Create Project “${current.project?.name ?? 'Imported sessions'}”`,
+              hint: `owned by Team · ${teamName ?? teamId}`,
+            },
+          ],
+          initialValue: teamProjects[0]?.id ?? createValue,
+        })
+        if (selected === null) {
+          ui.cancel('Visibility unchanged.')
+          return 1
+        }
+        if (selected === createValue) {
+          pendingProjectName = current.project?.name ?? 'Imported sessions'
+        } else {
+          project = teamProjects.find((entry) => entry.id === selected)
+        }
+      } else {
+        ui.error(
+          'Moving a Session to a Team requires an explicit Team Project. ' +
+            'Pass `--project <id|owner/slug>` or `--create-project <name>`.',
+        )
+        return 1
+      }
+      if (!project && !pendingProjectName) {
+        ui.error('The selected Team Project is no longer available.')
+        return 1
+      }
     }
 
-    const confirmation = confirmationCopy(visibility, teamName ?? teamId)
+    const confirmation = confirmationCopy(
+      visibility,
+      teamName ?? teamId,
+      project?.name ?? pendingProjectName,
+    )
     if (options.yes !== true) {
       if (!ui.interactive) {
         ui.error('Cannot confirm a disclosure change without a TTY. Re-run with `--yes`.')
@@ -106,7 +202,27 @@ export async function handleVisibilityCommand(
       ui.info(confirmation)
     }
 
-    const session = await client.updateSessionVisibility(ref.sid, visibility, teamId)
+    if (pendingProjectName) {
+      if (!teamId || !projectActorId || !current) {
+        throw new Error('Cannot create a Team Project without a resolved Team and Session.')
+      }
+      project = await client.createProject(
+        { name: pendingProjectName, owner: { kind: 'team', id: teamId } },
+        visibilityProjectIdempotencyKey(
+          ref.sid,
+          projectActorId,
+          teamId,
+          current.project?.id ?? null,
+          pendingProjectName,
+        ),
+      )
+    }
+
+    const session = await client.updateSessionVisibility(ref.sid, visibility, {
+      ...(teamId === undefined ? {} : { teamId }),
+      ...(project === undefined ? {} : { projectId: project.id }),
+      ...(project === undefined ? {} : { expectedProjectId: current?.project?.id ?? null }),
+    })
     ui.success(`Session ${ref.sid} is now ${describeVisibility(session)}.`)
     ui.outro('Disclosure updated.')
     return 0
@@ -121,14 +237,18 @@ export async function handleVisibilityCommand(
   }
 }
 
-function confirmationCopy(visibility: VisibilityTargetName, teamLabel?: string): string {
+function confirmationCopy(
+  visibility: VisibilityTargetName,
+  teamLabel?: string,
+  projectName?: string,
+): string {
   switch (visibility) {
     case 'public':
       return 'Make this Session Public? It can appear in Explore, search, and your Profile; a Team-owned Session stays owned by the Team.'
     case 'link-only':
       return 'Make this Session Link-only? Anyone with the URL can read it, and it leaves Explore and search.'
     case 'team':
-      return `Move this Session to Team · ${teamLabel ?? 'unknown'}? Only current members can read it, the Team owns it from now on, and any public discovery is removed.`
+      return `Move this Session to Team · ${teamLabel ?? 'unknown'} / Project ${projectName ?? 'unknown'}? Only current members can read it, the Team owns it from now on, and any public discovery is removed.`
   }
 }
 
@@ -160,20 +280,47 @@ export const visibilityCommand = new Command('visibility')
   .description('Change a published session’s disclosure (Team, Link-only, or Public)')
   .argument('<sid|url>', 'Shared session ID or URL')
   .argument('<target>', `One of: ${TARGETS.join(', ')}`)
-  .option('--team <name-or-id>', 'Target Team when moving a session to a Team')
+  .option('--team <handle-name-or-id>', 'Target Team when moving a session to a Team')
+  .option('--project <id-or-owner-slug>', 'Target Project when moving a session to a Team')
+  .option('--create-project <name>', 'Create the target Team Project')
   .option('--yes', 'Skip the confirmation')
-  .action(async (input: string, target: string, opts: { team?: string; yes?: boolean }) => {
-    const exitCode = await handleVisibilityCommand(
-      input,
-      target,
-      {
-        ...(opts.team === undefined ? {} : { team: opts.team }),
-        ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+  .action(
+    async (
+      input: string,
+      target: string,
+      opts: {
+        team?: string
+        yes?: boolean
+        project?: string
+        createProject?: string
       },
-      { ui: createClackUi() },
-    )
-    if (exitCode !== 0) process.exitCode = exitCode
-  })
+    ) => {
+      const exitCode = await handleVisibilityCommand(
+        input,
+        target,
+        {
+          ...(opts.team === undefined ? {} : { team: opts.team }),
+          ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+          ...(opts.project === undefined ? {} : { project: opts.project }),
+          ...(opts.createProject === undefined ? {} : { createProject: opts.createProject }),
+        },
+        { ui: createClackUi() },
+      )
+      if (exitCode !== 0) process.exitCode = exitCode
+    },
+  )
+
+function visibilityProjectIdempotencyKey(
+  sid: string,
+  actorId: string,
+  teamId: string,
+  currentProjectId: string | null,
+  name: string,
+): string {
+  return `spool-project-${createHash('sha256')
+    .update(JSON.stringify({ sid, actorId, teamId, currentProjectId, name }))
+    .digest('hex')}`
+}
 
 function pickCredentialOptions(dependencies: HubCredentialOptions): HubCredentialOptions {
   return {

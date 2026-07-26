@@ -25,13 +25,10 @@ import {
 } from '../lib/api'
 import { humanDate, humanDateTime } from '../lib/dates'
 
-// Public profiles (/@handle pages) are cut from the launch scope. This
-// gates the handle-claim entry point; the backend gates the API side
-// (the backend PROFILES_ENABLED env var — flip both together if user
-// feedback brings profiles back). Everything downstream — the profile
-// page, the per-share "List on profile" action — already keys off the
-// user having a handle, so it stays dark on its own.
-const PROFILES_ENABLED = false
+// Handles are the stable owner namespace for hosted Projects. Keep the
+// existing claim UI in the account surface; backend uniqueness spans both
+// Users and Teams.
+const PROFILES_ENABLED = true
 
 // Match the server-side handle regex (apps/backend/src/handles.ts).
 // We pre-filter input so check requests + the submit button respond

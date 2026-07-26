@@ -1,5 +1,6 @@
 import type { KVNamespace } from '@cloudflare/workers-types'
 import {
+  backupSessionRecord,
   canonicalizeRecord,
   composeSessionDiff,
   costForUsage,
@@ -30,6 +31,7 @@ import type { SessionRecord } from '../src/auth/session'
 import { sha256Hex } from '../src/hub/auth'
 import { MAX_SESSION_GUIDANCE_BYTES, validateSessionGuidanceForHead } from '../src/hub/guidance'
 import { TEAM_QUOTA_BYTES } from '../src/hub/wire'
+import { defaultProjectId } from '../src/projects/store'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2, type FakeDbState } from './_helpers/fakes'
 
@@ -41,7 +43,22 @@ const USER_C_TOKEN = 'c'.repeat(40)
 const DEV_TOKEN = 'local-hub-dev-token'
 const TEAM_ID = `team_${'d'.repeat(32)}`
 
-type Fixture = Awaited<ReturnType<typeof makeFixture>>
+type Fixture = {
+  records: CanonicalRecord[]
+  view: CanonicalRecord
+  viewValue: SessionViewV1
+  head: {
+    root: string
+    count: number
+    manifest: string[]
+    sig: null
+    cardJson: string
+    summaryMd: string
+    lineageJson: string | null
+    viewOid: string
+  }
+  entries: CanonicalRecord[]
+}
 type TestEnv = ReturnType<typeof envFor>
 
 function envFor(options: { devToken?: string } = {}) {
@@ -144,7 +161,7 @@ function syntheticRecords(): unknown[] {
 async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) {
   const records = await Promise.all(
     rawRecords.map((record) =>
-      canonicalizeRecord(JSON.stringify(record), {
+      backupSessionRecord(JSON.stringify(record), {
         workspaceRoot: '/workspace',
         homeDir: '/home/tester',
       }),
@@ -165,6 +182,56 @@ async function makeFixture(rawRecords: readonly unknown[] = syntheticRecords()) 
     viewOid: view.oid,
   }
   return { records, view, viewValue, head, entries: [...records, view] }
+}
+
+async function makeLegacyCanonicalFixture(
+  rawRecords: readonly unknown[] = syntheticRecords(),
+): Promise<Fixture> {
+  const portable = await Promise.all(
+    rawRecords.map((record) =>
+      canonicalizeRecord(JSON.stringify(record), {
+        workspaceRoot: '/workspace',
+        homeDir: '/home/tester',
+      }),
+    ),
+  )
+  const records = await Promise.all(
+    portable.map(async (record) => {
+      const data = serializeLegacyCanonical(JSON.parse(record.data))
+      return { data, oid: await sha256Hex(data) }
+    }),
+  )
+  const viewValue = deriveView(records, { provider: 'claude' })
+  const viewData = serializeLegacyCanonical(viewValue)
+  const view = { data: viewData, oid: await sha256Hex(viewData) }
+  const manifest = records.map((record) => record.oid)
+  const root = await sequenceRoot(manifest)
+  const head = {
+    root,
+    count: manifest.length,
+    manifest,
+    sig: null,
+    cardJson: JSON.stringify({ workspace: '$SPOOL_WS', branch: 'main' }),
+    summaryMd: '## Outcome\n\nA synthetic shared session.',
+    lineageJson: null,
+    viewOid: view.oid,
+  }
+  return { records, view, viewValue, head, entries: [...records, view] }
+}
+
+function serializeLegacyCanonical(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'number') {
+    return JSON.stringify(value)
+  }
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => serializeLegacyCanonical(item)).join(',')}]`
+  }
+  const record = value as Record<string, unknown>
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${serializeLegacyCanonical(record[key])}`)
+    .join(',')}}`
 }
 
 async function replaceFixtureView(fixture: Fixture, viewValue: unknown): Promise<void> {
@@ -257,13 +324,54 @@ async function resumeGrant(
 
 async function changeVisibility(
   env: TestEnv,
-  body: { visibility: 'public' | 'link-only' | 'team'; team_id?: string | null },
+  body: {
+    visibility: 'public' | 'link-only' | 'team'
+    team_id?: string | null
+    project_id?: string | null
+    expected_project_id?: string | null
+  },
   token = USER_A_TOKEN,
   sid = SID,
 ) {
+  const current = env.state.hub_sessions.find((session) => session.sid === sid)
+  if (!current) throw new Error(`Missing test Session ${sid}`)
+  let requestBody = body
+  if (current.team_id == null && body.team_id) {
+    const projectId = defaultProjectId({ userId: null, teamId: body.team_id })
+    if (!env.state.handles.some((handle) => handle.team_id === body.team_id)) {
+      env.state.handles.push({
+        handle: 'launch-team',
+        user_id: null,
+        team_id: body.team_id,
+        claimed_at: Date.now(),
+        released_at: null,
+      })
+    }
+    if (!env.state.projects.some((project) => project.id === projectId)) {
+      const now = Date.now()
+      env.state.projects.push({
+        id: projectId,
+        owner_user_id: null,
+        owner_team_id: body.team_id,
+        slug: 'sessions',
+        name: 'Sessions',
+        description: null,
+        github_url: null,
+        created_by_user_id: current.owner_user_id,
+        created_at: now,
+        updated_at: now,
+        archived_at: null,
+      })
+    }
+    requestBody = {
+      ...body,
+      project_id: body.project_id ?? projectId,
+      expected_project_id: body.expected_project_id ?? current.project_id ?? null,
+    }
+  }
   return invoke(
     visibilityPatch,
-    jsonPatch(`${BASE_URL}/api/me/sessions/${sid}`, body, token),
+    jsonPatch(`${BASE_URL}/api/me/sessions/${sid}`, requestBody, token),
     env,
     { sid },
   )
@@ -842,6 +950,41 @@ describe('hub head and withdrawal', () => {
       cost_usd: 42.125,
       total_tokens: 765_432,
     })
+  })
+
+  it('upgrades a legacy canonical head to byte-preserving records without changing its identity', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const legacy = await makeLegacyCanonicalFixture()
+    expect((await uploadAndCommit(env, legacy)).status).toBe(200)
+    env.state.hub_session_stars.push({
+      sid: SID,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+    const before = { ...env.state.hub_sessions[0]! }
+    const publishedAt = env.state.hub_session_discovery[0]?.published_at
+
+    const bytePreserving = await makeFixture()
+    expect(bytePreserving.head.root).not.toBe(legacy.head.root)
+    const pushed = await push(env, bytePreserving)
+    expect(pushed.status).toBe(200)
+    expect((await upload(env, USER_A_TOKEN, bytePreserving.entries)).status).toBe(200)
+    const upgraded = await commit(env, bytePreserving)
+
+    expect(upgraded.status).toBe(200)
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      sid: SID,
+      owner_user_id: before.owner_user_id,
+      project_id: before.project_id,
+      visibility: before.visibility,
+      lineage_json: before.lineage_json,
+      root: bytePreserving.head.root,
+    })
+    expect(env.state.hub_session_stars).toEqual([
+      expect.objectContaining({ sid: SID, user_id: 'user-b' }),
+    ])
+    expect(env.state.hub_session_discovery[0]?.published_at).toBe(publishedAt)
   })
 
   it('commits a portable-provider head as Link-only without a Discovery projection', async () => {
@@ -1644,6 +1787,34 @@ describe('Team-only Hub isolation', () => {
     return env
   }
 
+  it('requires an explicit target Project and source Project expectation for ownership transfer', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await uploadAndCommit(env, fixture)).status).toBe(200)
+    const sourceProjectId = env.state.hub_sessions[0]?.project_id
+
+    const missingSelection = await invoke(
+      visibilityPatch,
+      jsonPatch(
+        `${BASE_URL}/api/me/sessions/${SID}`,
+        { visibility: 'team', team_id: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+
+    expect(missingSelection.status).toBe(422)
+    await expect(missingSelection.json()).resolves.toMatchObject({
+      detail: 'Moving a Session to a Team requires project_id and expected_project_id',
+    })
+    expect(env.state.hub_sessions[0]).toMatchObject({
+      team_id: null,
+      project_id: sourceProjectId,
+    })
+    expect(env.state.hub_team_objects).toHaveLength(0)
+  })
+
   it('returns a committed head when post-commit audit delivery fails', async () => {
     const env = await teamEnv()
     const fixture = await makeFixture()
@@ -1716,6 +1887,10 @@ describe('Team-only Hub isolation', () => {
     await expect(memberMeta.json()).resolves.toMatchObject({
       visibility: 'team',
       team: { id: TEAM_ID, name: 'Launch Team' },
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
     })
 
     const memberView = await invoke(
@@ -1748,6 +1923,119 @@ describe('Team-only Hub isolation', () => {
       { sid: SID },
     )
     expect(removedMember.status).toBe(404)
+  })
+
+  it('keeps Team Project metadata member-only on Public and Link-only reads', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+
+    const published = await invoke(
+      headPost,
+      jsonPost(
+        `${sessionUrl(SID)}/head`,
+        { ...fixture.head, visibility: 'public', teamId: TEAM_ID },
+        USER_A_TOKEN,
+      ),
+      env,
+      { sid: SID },
+    )
+    expect(published.status).toBe(200)
+
+    const publicMeta = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(publicMeta.status).toBe(200)
+    expect(publicMeta.headers.get('cache-control')).toBe('private, no-store')
+    expect(publicMeta.headers.get('vary')).toBe('Cookie, Authorization')
+    await expect(publicMeta.json()).resolves.toMatchObject({
+      visibility: 'public',
+      team: { id: TEAM_ID, name: 'Launch Team' },
+      project: null,
+    })
+
+    const outsiderMeta = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_C_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(outsiderMeta.status).toBe(200)
+    expect(outsiderMeta.headers.get('cache-control')).toBe('private, no-store')
+    await expect(outsiderMeta.json()).resolves.toMatchObject({
+      visibility: 'public',
+      project: null,
+    })
+
+    const memberMeta = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(memberMeta.status).toBe(200)
+    await expect(memberMeta.json()).resolves.toMatchObject({
+      visibility: 'public',
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
+    })
+
+    const apiToken = 'team-project-cli-api-token'
+    env.state.api_tokens.push({
+      id: 'team-project-cli-token-id',
+      user_id: 'user-a',
+      token_hash: await sha256Hex(apiToken),
+      label: 'cli',
+      created_at: Date.now(),
+      last_used_at: null,
+    })
+    const cliMeta = await invoke(
+      metaGet,
+      new Request(sessionUrl(SID), {
+        headers: { authorization: `Bearer ${apiToken}` },
+      }),
+      env,
+      { sid: SID },
+    )
+    expect(cliMeta.status).toBe(200)
+    await expect(cliMeta.json()).resolves.toMatchObject({
+      visibility: 'public',
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
+    })
+
+    const madeLinkOnly = await changeVisibility(
+      env,
+      { visibility: 'link-only', team_id: TEAM_ID },
+      USER_A_TOKEN,
+    )
+    expect(madeLinkOnly.status).toBe(200)
+
+    const linkOnlyMeta = await invoke(metaGet, readRequest(sessionUrl(SID)), env, { sid: SID })
+    expect(linkOnlyMeta.status).toBe(200)
+    expect(linkOnlyMeta.headers.get('cache-control')).toBe('private, no-store')
+    await expect(linkOnlyMeta.json()).resolves.toMatchObject({
+      visibility: 'link-only',
+      team: { id: TEAM_ID, name: 'Launch Team' },
+      project: null,
+    })
+
+    const linkOnlyMemberMeta = await invoke(
+      metaGet,
+      authenticatedReadRequest(sessionUrl(SID), USER_B_TOKEN),
+      env,
+      { sid: SID },
+    )
+    expect(linkOnlyMemberMeta.status).toBe(200)
+    await expect(linkOnlyMemberMeta.json()).resolves.toMatchObject({
+      visibility: 'link-only',
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
+    })
   })
 
   it('rejects stale personal/new tenant expectations in both push and head', async () => {

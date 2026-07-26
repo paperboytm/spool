@@ -22,6 +22,9 @@ export type DiscoveryCandidateRow = {
   updated_at: number
   record_count: number
   owner_user_id: string
+  project_id: string | null
+  project_slug: string | null
+  project_name: string | null
   handle: string | null
   name: string | null
   display_name: string | null
@@ -250,6 +253,9 @@ export async function listDiscoveryPage(
            d.updated_at,
            s.record_count,
            s.owner_user_id,
+           CASE WHEN s.team_id IS NULL THEN project.id ELSE NULL END AS project_id,
+           CASE WHEN s.team_id IS NULL THEN project.slug ELSE NULL END AS project_slug,
+           CASE WHEN s.team_id IS NULL THEN project.name ELSE NULL END AS project_name,
            CASE WHEN u.deleted_at IS NULL THEN h.handle ELSE NULL END AS handle,
            CASE WHEN u.deleted_at IS NULL THEN u.name ELSE NULL END AS name,
            CASE WHEN u.deleted_at IS NULL THEN u.display_name ELSE NULL END AS display_name,
@@ -269,6 +275,7 @@ export async function listDiscoveryPage(
            END AS normalized_author
          FROM hub_session_discovery d
          JOIN hub_sessions s ON s.sid = d.sid
+         JOIN projects project ON project.id=s.project_id
          JOIN users u ON u.id = s.owner_user_id
          LEFT JOIN teams owning_team ON owning_team.id=s.team_id
            AND owning_team.archived_at IS NULL
@@ -335,6 +342,9 @@ export async function listDiscoveryPage(
          d.updated_at,
          d.record_count,
          d.owner_user_id,
+         d.project_id,
+         d.project_slug,
+         d.project_name,
          d.handle,
          d.name,
          d.display_name,

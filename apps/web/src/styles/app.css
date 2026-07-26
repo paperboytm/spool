@@ -1200,6 +1200,36 @@ html[data-theme='dark'] .sw-root {
   border-color: var(--accent);
   box-shadow: var(--sp-focus-ring);
 }
+.sw-team-handle-input {
+  display: flex;
+  min-width: 0;
+  height: var(--sp-control-button-lg);
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--sp-radius-input);
+  background: var(--bg);
+  color: var(--faint);
+  font-family: var(--sp-font-mono);
+}
+.sw-team-handle-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--sp-focus-ring);
+}
+.sw-team-handle-input > span {
+  flex: none;
+  padding-left: var(--sp-space-3);
+}
+.sw-team-handle-input input {
+  height: 46px;
+  border: 0;
+  padding-left: 2px;
+  box-shadow: none;
+  font-family: var(--sp-font-mono);
+}
+.sw-team-handle-input input:focus {
+  border: 0;
+  box-shadow: none;
+}
 .sw-team-create-actions {
   display: flex;
   justify-content: flex-end;

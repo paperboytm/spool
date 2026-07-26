@@ -1,36 +1,57 @@
-import { Avatar, SectionLabel } from '@spool-lab/ui'
-import { useEffect, useState } from 'react'
+import { Avatar, Button, SectionLabel } from '@spool-lab/ui'
+import { Star } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
-import { fetchProfile, type ProfileFetchResult, type ProfileResponse } from '../lib/api'
-import { humanDate } from '../lib/dates'
+import { ProjectCard } from '../components/ProjectCard'
+import { SessionFeedRow, SessionSourceBadge } from '../components/SessionFeedRow'
+import { SessionLanguageToolbar } from '../components/SessionLanguageToggle'
+import { appendUniqueManagedSessions } from '../lib/hub-management-api'
+import { sessionLanguageTag, useSessionLanguage } from '../lib/language'
 import { normalizeTabTitle } from '../lib/page-title'
+import { fetchOwnerProjects, type ProjectOwnerPage } from '../lib/project-api'
+import {
+  formatSessionCost,
+  resolveLocalizedSessionSummary,
+  resolveLocalizedTitle,
+} from '../lib/session-title'
+
+import '../styles/projects.css'
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'ok'; profile: ProfileResponse }
+  | { kind: 'ready'; data: ProjectOwnerPage }
   | { kind: 'not-found' }
   | { kind: 'error' }
 
-function fromFetch(r: ProfileFetchResult): Exclude<State, { kind: 'loading' }> {
-  if (r.kind === 'ok') return { kind: 'ok', profile: r.profile }
-  return r
-}
-
 export function Profile({ handle }: { handle: string }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
+  const requestIdRef = useRef(0)
+  const language = useSessionLanguage()
 
   useEffect(() => {
+    const requestId = ++requestIdRef.current
     let cancelled = false
-    void fetchProfile(handle).then((r) => {
-      if (cancelled) return
-      const next = fromFetch(r)
-      setState(next)
-      if (next.kind === 'ok') {
-        const display = next.profile.name ?? `@${next.profile.handle}`
-        document.title = `${normalizeTabTitle(display)} · spool.new`
-      } else {
+    setState({ kind: 'loading' })
+    setLoadingMore(false)
+    setLoadMoreError(false)
+    void fetchOwnerProjects(handle).then((result) => {
+      if (cancelled || requestId !== requestIdRef.current) return
+      if (result.kind === 'ok') {
+        setState({ kind: 'ready', data: result.data })
+        document.title = `${normalizeTabTitle(result.data.owner.name || `@${handle}`)} · spool.new`
+      } else if (
+        result.kind === 'not-found' ||
+        result.kind === 'forbidden' ||
+        result.kind === 'unauthenticated'
+      ) {
+        setState({ kind: 'not-found' })
         document.title = 'Profile not found · spool.new'
+      } else {
+        setState({ kind: 'error' })
+        document.title = 'Profile unavailable · spool.new'
       }
     })
     return () => {
@@ -38,28 +59,51 @@ export function Profile({ handle }: { handle: string }) {
     }
   }, [handle])
 
+  async function loadMoreSessions() {
+    if (
+      state.kind !== 'ready' ||
+      state.data.owner.kind === 'team' ||
+      state.data.next_cursor === null ||
+      loadingMore
+    ) {
+      return
+    }
+    const requestId = ++requestIdRef.current
+    const cursor = state.data.next_cursor
+    setLoadingMore(true)
+    setLoadMoreError(false)
+    const result = await fetchOwnerProjects(handle, cursor)
+    if (requestId !== requestIdRef.current) return
+    setLoadingMore(false)
+    if (result.kind !== 'ok') {
+      setLoadMoreError(true)
+      return
+    }
+    setState((current) =>
+      current.kind !== 'ready'
+        ? current
+        : {
+            kind: 'ready',
+            data: {
+              ...result.data,
+              sessions: appendUniqueManagedSessions(
+                current.data.sessions ?? [],
+                result.data.sessions ?? [],
+              ),
+            },
+          },
+    )
+  }
+
   if (state.kind === 'loading') {
     return (
       <Page>
         <Header />
-        <main className="sw-main">
-          <div className="sw-card sw-card--600">
-            <div className="sw-identity">
-              <span className="sw-skel" style={{ width: 54, height: 54, borderRadius: '50%' }} />
-              <div className="body">
-                <span className="sw-skel" style={{ width: 140, height: 18, marginBottom: 8 }} />
-                <span className="sw-skel" style={{ width: 80, height: 13 }} />
-              </div>
-            </div>
-            <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
-            <ul className="sw-list">
-              {[0, 1, 2].map((i) => (
-                <li key={i} className="sw-share" style={{ justifyContent: 'space-between' }}>
-                  <span className="sw-skel" style={{ width: `${60 - i * 8}%`, height: 14 }} />
-                  <span className="sw-skel" style={{ width: 70, height: 11 }} />
-                </li>
-              ))}
-            </ul>
+        <main className="project-public-main">
+          <div className="project-public-skeleton" aria-busy="true">
+            <span className="sw-skel" />
+            <span className="sw-skel" />
+            <span className="sw-skel" />
           </div>
         </main>
         <Footer />
@@ -71,14 +115,14 @@ export function Profile({ handle }: { handle: string }) {
     return (
       <Page>
         <Header />
-        <main className="sw-main">
-          <div className="sw-card tight sw-card--600">
-            <div className="sw-rule" style={{ marginBottom: 22 }}>
-              <span className="tag muted">Profile not found</span>
-              <span className="line" />
-            </div>
-            <h1 className="sw-title">Nothing here</h1>
-            <p className="sw-lede">Check the handle, or ask the author for a fresh link.</p>
+        <main className="project-public-main">
+          <div className="projects-state">
+            <h1>{state.kind === 'error' ? 'Could not load profile' : 'Nothing here'}</h1>
+            <p>
+              {state.kind === 'error'
+                ? 'The profile service did not respond. Try again.'
+                : 'Check the handle, or ask the owner for a fresh Project link.'}
+            </p>
           </div>
         </main>
         <Footer />
@@ -86,45 +130,145 @@ export function Profile({ handle }: { handle: string }) {
     )
   }
 
-  const { profile } = state
+  const { owner, projects } = state.data
+  // Keep the public profile resilient during a rolling API deployment while
+  // preserving the hard Team boundary: Team Sessions belong only in the
+  // authenticated workspace, never on /@handle.
+  const sessions = state.data.sessions ?? []
+  const sessionCount = state.data.session_count ?? sessions.length
+  const teamOwned = owner.kind === 'team'
+  const hasBilingualSessions =
+    !teamOwned &&
+    sessions.some(
+      (session) =>
+        Boolean(session.titles?.en && session.titles.zh) ||
+        Boolean(session.summaries?.en && session.summaries.zh),
+    )
   return (
     <Page>
-      <Header />
-      <main className="sw-main">
-        <div className="sw-card sw-card--600">
-          <div className="sw-identity">
-            <Avatar src={profile.avatar_url} name={profile.name} alt="" size="lg" />
-            <div className="body">
-              {profile.name && <h1 className="name">{profile.name}</h1>}
-              <p className="handle">@{profile.handle}</p>
-            </div>
+      <Header
+        contextTeam={owner.kind === 'team' ? { id: owner.id, name: owner.name } : null}
+        sticky
+      />
+      {hasBilingualSessions ? <SessionLanguageToolbar /> : null}
+      <main className="project-public-main">
+        <header className="profile-project-header">
+          <Avatar src={owner.avatar_url ?? null} name={owner.name} alt="" size="lg" />
+          <div>
+            <h1>{owner.name}</h1>
+            <p>@{owner.handle}</p>
+            <span>
+              {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
+              {!teamOwned ? (
+                <>
+                  {' '}
+                  · {sessionCount} Public {sessionCount === 1 ? 'Session' : 'Sessions'}
+                </>
+              ) : null}
+            </span>
           </div>
-          <div className="sw-divider" style={{ margin: '24px 0 18px' }} />
+        </header>
+        <section className="profile-projects" aria-labelledby="profile-projects-heading">
           <SectionLabel
-            className="sw-section-label"
+            id="profile-projects-heading"
             role="heading"
             aria-level={2}
-            count={profile.shares.length > 0 ? profile.shares.length : undefined}
+            count={projects.length || undefined}
           >
-            Published
+            Projects
           </SectionLabel>
-          {profile.shares.length === 0 ? (
-            <p className="sw-empty">Nothing published yet.</p>
+          {projects.length === 0 ? (
+            <div className="projects-state profile-projects-empty">
+              <h2>No public Projects yet</h2>
+              <p>Projects appear after they contain a Public Session.</p>
+            </div>
           ) : (
-            <ul className="sw-list">
-              {profile.shares.map((s) => (
-                <li key={s.id} className="sw-share">
-                  <a className="sw-share-link" href={`/s/${encodeURIComponent(s.id)}`}>
-                    <span className="sw-share-title" title={s.title}>
-                      {s.title}
-                    </span>
-                    <span className="sw-share-date">{humanDate(s.published_at)}</span>
-                  </a>
-                </li>
+            <div className="projects-list">
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
               ))}
-            </ul>
+            </div>
           )}
-        </div>
+        </section>
+        {!teamOwned ? (
+          <section className="profile-sessions" aria-labelledby="profile-sessions-heading">
+            <SectionLabel
+              id="profile-sessions-heading"
+              role="heading"
+              aria-level={2}
+              count={sessionCount || undefined}
+            >
+              Public Sessions
+            </SectionLabel>
+            {sessions.length === 0 ? (
+              <div className="projects-state profile-projects-empty">
+                <h2>No Public Sessions yet</h2>
+                <p>Sessions appear here after they are associated with a Project.</p>
+              </div>
+            ) : (
+              <div className="project-session-list">
+                {sessions.map((session) => {
+                  const title = resolveLocalizedTitle(session.titles, session.title, language)
+                  const summary = resolveLocalizedSessionSummary(
+                    session.summaries,
+                    session.summary,
+                    language,
+                  )
+                  const cost = formatSessionCost(session.cost)
+                  const stars = session.star_count ?? 0
+                  return (
+                    <SessionFeedRow
+                      key={session.sid}
+                      sid={session.sid}
+                      title={title.text ?? session.title}
+                      summary={summary.text}
+                      titleLanguage={
+                        title.language ? sessionLanguageTag(title.language) : undefined
+                      }
+                      summaryLanguage={
+                        summary.language ? sessionLanguageTag(summary.language) : undefined
+                      }
+                      author={{
+                        handle: session.author.handle,
+                        displayName: session.author.display_name,
+                        avatarUrl: session.author.avatar_url,
+                      }}
+                      timestamp={session.published_at ?? session.created_at}
+                      timestampVerb="published"
+                      metadata={
+                        <div className="session-feed-row-meta">
+                          <SessionSourceBadge provider={session.provider} />
+                          {cost ? <span className="session-feed-cost">{cost}</span> : null}
+                          <span title={`${stars} ${stars === 1 ? 'star' : 'stars'}`}>
+                            <Star size={13} strokeWidth={1.7} aria-hidden="true" />
+                            {stars} {stars === 1 ? 'star' : 'stars'}
+                          </span>
+                        </div>
+                      }
+                    />
+                  )
+                })}
+              </div>
+            )}
+            {state.data.next_cursor !== null || loadMoreError ? (
+              <div className="project-session-load-more">
+                <Button
+                  variant="outline"
+                  loading={loadingMore}
+                  loadingLabel="Loading more Sessions…"
+                  onClick={() => void loadMoreSessions()}
+                >
+                  {loadMoreError ? 'Try loading more again' : 'Load more Sessions'}
+                </Button>
+                {loadMoreError ? (
+                  <p role="alert">
+                    More Sessions could not be loaded. Your current list is intact.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </main>
       <Footer />
     </Page>

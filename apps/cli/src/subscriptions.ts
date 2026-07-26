@@ -1,8 +1,12 @@
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 
-import type { HubCredentialOptions } from './hub/credentials.js'
+import type { ProjectIdentityKind } from '@spool-lab/core'
+
+import type { HubProject } from './hub/client.js'
+import { normalizeHubUrl, type HubCredentialOptions } from './hub/credentials.js'
+import type { ProjectBindingTenant } from './hub/project-bindings.js'
 
 // A subscription marks a project directory whose Sessions — including those
 // recorded from its git worktrees — publish automatically on every sync. The
@@ -20,11 +24,23 @@ export interface Subscription {
   teamId?: string
   /** Display-only; the id is authoritative. */
   teamName?: string
+  /** Absent only on legacy v1/v2 entries, which must not auto-publish. */
+  project?: {
+    hubUrl: string
+    actorId: string
+    tenant: ProjectBindingTenant
+    localIdentity: {
+      kind: ProjectIdentityKind
+      key: string
+      displayName: string
+    }
+    remote: HubProject
+  }
   addedAt: string
 }
 
 interface SubscriptionsFile {
-  version: 1
+  version: 3
   subscriptions: Subscription[]
 }
 
@@ -53,7 +69,18 @@ export function loadSubscriptions(options: HubCredentialOptions = {}): Subscript
   if (!isRecord(parsed) || !Array.isArray(parsed['subscriptions'])) {
     throw new Error(`Invalid subscriptions file at ${path}: expected { subscriptions: [] }`)
   }
-  return parsed['subscriptions'].map((value, index) => parseSubscription(value, index, path))
+  if (
+    parsed['version'] !== undefined &&
+    parsed['version'] !== 1 &&
+    parsed['version'] !== 2 &&
+    parsed['version'] !== 3
+  ) {
+    throw new Error(`Invalid subscriptions file at ${path}: unsupported version`)
+  }
+  const version = parsed['version'] === 3 ? 3 : parsed['version'] === 2 ? 2 : 1
+  return parsed['subscriptions'].map((value, index) =>
+    parseSubscription(value, index, path, version),
+  )
 }
 
 export function saveSubscriptions(
@@ -61,9 +88,13 @@ export function saveSubscriptions(
   options: HubCredentialOptions = {},
 ): string {
   const path = subscriptionsPath(options)
-  const stored: SubscriptionsFile = { version: 1, subscriptions: [...subscriptions] }
+  const stored: SubscriptionsFile = { version: 3, subscriptions: [...subscriptions] }
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-  writeFileSync(path, `${JSON.stringify(stored, null, 2)}\n`, 'utf8')
+  writeFileSync(path, `${JSON.stringify(stored, null, 2)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  })
+  chmodSync(path, 0o600)
   return path
 }
 
@@ -85,7 +116,17 @@ export function addSubscription(
   const existing = loadSubscriptions(options)
   const found = existing.find((entry) => entry.path === subscription.path)
   if (found) {
-    if (found.visibility === subscription.visibility && found.teamId === subscription.teamId) {
+    if (
+      found.visibility === subscription.visibility &&
+      found.teamId === subscription.teamId &&
+      found.project?.hubUrl === subscription.project?.hubUrl &&
+      found.project?.actorId === subscription.project?.actorId &&
+      found.project?.tenant.kind === subscription.project?.tenant.kind &&
+      found.project?.tenant.id === subscription.project?.tenant.id &&
+      found.project?.remote.id === subscription.project?.remote.id &&
+      found.project?.localIdentity.kind === subscription.project?.localIdentity.kind &&
+      found.project?.localIdentity.key === subscription.project?.localIdentity.key
+    ) {
       return { added: false, subscriptions: existing }
     }
     const updated = existing.map((entry) =>
@@ -112,7 +153,12 @@ export function removeSubscription(
   return { removed: true, subscriptions: remaining }
 }
 
-function parseSubscription(value: unknown, index: number, path: string): Subscription {
+function parseSubscription(
+  value: unknown,
+  index: number,
+  path: string,
+  version: 1 | 2 | 3,
+): Subscription {
   if (!isRecord(value) || typeof value['path'] !== 'string' || value['path'].trim() === '') {
     throw new Error(`Invalid subscriptions file at ${path}: entry ${index} has no path`)
   }
@@ -129,13 +175,89 @@ function parseSubscription(value: unknown, index: number, path: string): Subscri
   const teamName =
     typeof value['teamName'] === 'string' && value['teamName'] ? value['teamName'] : undefined
   const addedAt = typeof value['addedAt'] === 'string' ? value['addedAt'] : ''
+  const project =
+    version === 3 && value['project'] !== undefined
+      ? parseSubscriptionProject(value['project'], index, path)
+      : undefined
   return {
     path: value['path'],
     visibility,
     ...(visibility === 'team' && teamId !== undefined ? { teamId } : {}),
     ...(visibility === 'team' && teamName !== undefined ? { teamName } : {}),
+    ...(project === undefined ? {} : { project }),
     addedAt,
   }
+}
+
+function parseSubscriptionProject(
+  value: unknown,
+  index: number,
+  path: string,
+): NonNullable<Subscription['project']> {
+  if (
+    !isRecord(value) ||
+    typeof value['hubUrl'] !== 'string' ||
+    typeof value['actorId'] !== 'string' ||
+    !isProjectBindingTenant(value['tenant']) ||
+    !isRecord(value['localIdentity']) ||
+    !isProjectIdentityKind(value['localIdentity']['kind']) ||
+    typeof value['localIdentity']['key'] !== 'string' ||
+    typeof value['localIdentity']['displayName'] !== 'string' ||
+    !isHubProject(value['remote'])
+  ) {
+    throw new Error(`Invalid subscriptions file at ${path}: entry ${index} has no Project binding`)
+  }
+  return {
+    hubUrl: normalizeHubUrl(value['hubUrl']),
+    actorId: value['actorId'],
+    tenant: value['tenant'],
+    localIdentity: {
+      kind: value['localIdentity']['kind'],
+      key: value['localIdentity']['key'],
+      displayName: value['localIdentity']['displayName'],
+    },
+    remote: value['remote'],
+  }
+}
+
+function isProjectBindingTenant(value: unknown): value is ProjectBindingTenant {
+  return (
+    isRecord(value) &&
+    (value['kind'] === 'user' || value['kind'] === 'team') &&
+    typeof value['id'] === 'string' &&
+    value['id'] !== ''
+  )
+}
+
+function isHubProject(value: unknown): value is HubProject {
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['slug'] === 'string' &&
+    typeof value['name'] === 'string' &&
+    (value['description'] === null || typeof value['description'] === 'string') &&
+    (value['github_url'] === null || typeof value['github_url'] === 'string') &&
+    typeof value['can_manage'] === 'boolean' &&
+    isRecord(value['owner']) &&
+    (value['owner']['kind'] === 'user' || value['owner']['kind'] === 'team') &&
+    typeof value['owner']['id'] === 'string' &&
+    (value['owner']['handle'] === null || typeof value['owner']['handle'] === 'string') &&
+    (value['owner']['name'] === null || typeof value['owner']['name'] === 'string')
+  )
+}
+
+const PROJECT_IDENTITY_KINDS = new Set<ProjectIdentityKind>([
+  'git_remote',
+  'git_common_dir',
+  'manifest_path',
+  'synthetic',
+  'path',
+  'loose',
+  'spool_internal',
+])
+
+function isProjectIdentityKind(value: unknown): value is ProjectIdentityKind {
+  return typeof value === 'string' && PROJECT_IDENTITY_KINDS.has(value as ProjectIdentityKind)
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

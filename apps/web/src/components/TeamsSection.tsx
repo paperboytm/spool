@@ -9,6 +9,16 @@ type TeamsState =
   | { kind: 'ready'; teams: TeamSummary[] }
   | { kind: 'error'; message: string }
 
+export function teamHandleFromName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^[^a-z]+/, '')
+    .replace(/[-_]+$/g, '')
+    .slice(0, 32)
+}
+
 function teamFailureMessage(result: TeamApiFailure): string {
   if (result.kind === 'conflict') return result.detail ?? 'A team with that name already exists.'
   if (result.kind === 'invalid') return result.detail ?? 'Enter a valid team name.'
@@ -107,6 +117,8 @@ export function TeamsSection({
   const [creating, setCreating] = useState(creationOnly)
   const [createBusy, setCreateBusy] = useState(false)
   const [name, setName] = useState('')
+  const [handle, setHandle] = useState('')
+  const [handleEdited, setHandleEdited] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const submitting = useRef(false)
   const [createIntent] = useState(() => createTeamCreateIntent())
@@ -129,7 +141,14 @@ export function TeamsSection({
     submitting.current = true
     setCreateBusy(true)
     setCreateError(null)
-    const result = await createTeam(trimmed, createIntent.currentKey())
+    const normalizedHandle = teamHandleFromName(handle || trimmed)
+    if (!normalizedHandle) {
+      submitting.current = false
+      setCreateBusy(false)
+      setCreateError('Choose a handle that starts with a letter.')
+      return
+    }
+    const result = await createTeam(trimmed, createIntent.currentKey(), normalizedHandle)
     submitting.current = false
     setCreateBusy(false)
     if (result.kind === 'unauthenticated') return redirectToSignIn(signInNext)
@@ -181,13 +200,35 @@ export function TeamsSection({
               autoFocus
               value={name}
               onChange={(event) => {
-                setName(event.target.value)
+                const next = event.target.value
+                setName(next)
+                if (!handleEdited) setHandle(teamHandleFromName(next))
                 createIntent.nameEdited()
               }}
               maxLength={80}
               placeholder="Paperboy"
               required
             />
+          </label>
+          <label>
+            <span>Team handle</span>
+            <span className="sw-team-handle-input">
+              <span>@</span>
+              <input
+                value={handle}
+                onChange={(event) => {
+                  setHandleEdited(true)
+                  setHandle(event.target.value.toLowerCase())
+                  createIntent.nameEdited()
+                }}
+                minLength={3}
+                maxLength={32}
+                pattern="[a-z][a-z0-9_-]{2,31}"
+                placeholder="paperboy"
+                autoComplete="off"
+                required
+              />
+            </span>
           </label>
           <div className="sw-team-create-actions">
             {!creationOnly ? (
@@ -198,6 +239,8 @@ export function TeamsSection({
                 onClick={() => {
                   setCreating(false)
                   setName('')
+                  setHandle('')
+                  setHandleEdited(false)
                   setCreateError(null)
                 }}
               >
@@ -210,7 +253,7 @@ export function TeamsSection({
               variant="accent"
               loading={createBusy}
               loadingLabel="Creating…"
-              disabled={!createBusy && name.trim() === ''}
+              disabled={!createBusy && (name.trim() === '' || teamHandleFromName(handle) === '')}
             >
               Create team
             </Button>

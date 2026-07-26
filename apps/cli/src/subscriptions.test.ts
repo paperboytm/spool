@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -43,6 +43,7 @@ describe('subscriptions store', () => {
     const savedPath = saveSubscriptions([subscription], { homeDir: home })
     expect(savedPath).toBe(join(home, '.spool', 'subscriptions.json'))
     expect(subscriptionsPath({ homeDir: home })).toBe(savedPath)
+    expect(statSync(savedPath).mode & 0o777).toBe(0o600)
     expect(loadSubscriptions({ homeDir: home })).toEqual([subscription])
   })
 
@@ -76,6 +77,53 @@ describe('subscriptions store', () => {
     mkdirSync(join(home, '.spool'), { recursive: true })
     writeFileSync(join(home, '.spool', 'subscriptions.json'), '{"subscriptions": [{}]}')
     expect(() => loadSubscriptions({ homeDir: home })).toThrow(/entry 0 has no path/)
+  })
+
+  it('stores Project bindings as v3 and fails closed for legacy v2 bindings', () => {
+    const home = tempDir('spool-subs-')
+    const project = {
+      hubUrl: 'https://hub.test',
+      actorId: 'user_1',
+      tenant: { kind: 'user' as const, id: 'user_1' },
+      localIdentity: {
+        kind: 'git_remote' as const,
+        key: 'github.com/acme/spool',
+        displayName: 'spool',
+      },
+      remote: {
+        id: 'project_1',
+        slug: 'spool',
+        name: 'Spool',
+        description: null,
+        github_url: null,
+        owner: { kind: 'user' as const, id: 'user_1', handle: 'evan', name: 'Evan' },
+        can_manage: true,
+      },
+    }
+    const entry = {
+      path: '/repos/spool',
+      visibility: 'public' as const,
+      project,
+      addedAt: '2026-07-26T00:00:00.000Z',
+    }
+    const path = saveSubscriptions([entry], { homeDir: home })
+    expect(JSON.parse(readFileSync(path, 'utf8')).version).toBe(3)
+    expect(loadSubscriptions({ homeDir: home })).toEqual([entry])
+
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 2,
+        subscriptions: [{ ...entry, project: { actorId: 'user_1', ...project } }],
+      }),
+    )
+    expect(loadSubscriptions({ homeDir: home })).toEqual([
+      {
+        path: entry.path,
+        visibility: entry.visibility,
+        addedAt: entry.addedAt,
+      },
+    ])
   })
 
   it('canonicalizes relative inputs and rejects files', () => {

@@ -44,7 +44,7 @@ export const PORTABLE_MESSAGE_TYPE = 'spool_portable_message'
 
 /**
  * Serialize an indexed Session into a provider-neutral JSONL stream. Claude
- * and Codex shares keep their native records for lossless Resume; sources
+ * and Codex shares keep provider-native records for direct Resume; sources
  * without a native materializer use this format so their indexed conversation
  * remains shareable without masquerading as another provider.
  */

@@ -2,12 +2,13 @@
 // through share-kit's TimelineBody; legacy sessions fall back to the desktop
 // MessageList fed by the same session-kit parsers.
 
-import type { SessionViewV1 } from '@spool-lab/session-kit'
+import { parseSummaryFrontMatter, type SessionViewV1 } from '@spool-lab/session-kit'
 import type { SpoolDocument } from '@spool/share-kit'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
 import { SessionWorkbench, type SessionHistoryState } from '../components/session/workbench'
+import { SessionLanguageToolbar } from '../components/SessionLanguageToggle'
 import { humanDateTime } from '../lib/dates'
 import {
   fetchHubMeta,
@@ -30,6 +31,13 @@ import { Tombstone } from './Tombstone'
  * instead of holding the UI at zero while a multi-megabyte response arrives.
  */
 export const SESSION_RECORD_PAGE_SIZE = 100
+
+function hasBilingualSessionCopy(summaryMd: string | null): boolean {
+  const summary = parseSummaryFrontMatter(summaryMd)
+  return Boolean(
+    (summary.titles?.en && summary.titles.zh) || (summary.summaries?.en && summary.summaries.zh),
+  )
+}
 
 export interface LoadedSessionContent {
   view: SessionViewV1 | null
@@ -423,6 +431,7 @@ export function SessionReader({ sid }: { sid: string }) {
     return (
       <Page>
         <Header sticky />
+        {hasBilingualSessionCopy(state.meta.summaryMd) ? <SessionLanguageToolbar /> : null}
         <SessionWorkbench
           key={sid}
           meta={state.meta}

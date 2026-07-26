@@ -41,12 +41,40 @@ describe('Explore security headers', () => {
     }
   })
 
-  it('makes authenticated Sessions scopes non-indexable and private/no-store', () => {
+  it('keeps the public Projects directory indexable', () => {
+    for (const target of ['/projects', '/projects?scope=public']) {
+      const headers = securityHeadersFor(target, 'projects-public')
+
+      expect(headers).not.toBeNull()
+      expect(headers?.['X-Robots-Tag']).toBeUndefined()
+      expect(headers?.['Content-Security-Policy']).toContain(
+        "script-src 'self' 'nonce-projects-public'",
+      )
+    }
+  })
+
+  it('gives every owner route the strict Team-compatible document policy', () => {
+    for (const target of ['/@evan', '/@evan/react-vapor', '/@paperboy/private-project']) {
+      const headers = securityHeadersFor(target, 'owner-private')
+      expect(headers?.['X-Robots-Tag']).toBe('noindex')
+      expect(headers?.['Content-Security-Policy']).toContain(
+        "script-src 'self' 'nonce-owner-private'",
+      )
+      expect(cacheHeaderFor(target, 200)).toBe('private, no-store')
+    }
+  })
+
+  it('makes authenticated Sessions and Projects scopes non-indexable and private/no-store', () => {
     for (const target of [
       '/sessions?scope=mine',
       '/sessions?scope=team&team=team_123',
       // Repeated parameters must not let a public value weaken the policy.
       '/sessions?scope=public&scope=team&team=team_123',
+      '/projects?scope=mine',
+      '/projects?scope=team&team=team_123',
+      '/projects?scope=public&scope=mine',
+      '/projects/new',
+      '/projects/project_123/edit',
     ]) {
       const headers = securityHeadersFor(new URL(target, 'https://spool.new'), 'sessions-private')
 

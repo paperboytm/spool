@@ -244,6 +244,7 @@ export type TeamCreationRequestRow = {
   idempotency_key: string
   team_id: string
   normalized_name: string
+  requested_handle: string | null
   status: 'pending' | 'completed' | 'failed'
   workos_organization_id: string | null
   created_at: number
@@ -270,6 +271,7 @@ export async function beginTeamCreationRequest(
     idempotencyKey: string
     teamId: string
     name: string
+    requestedHandle: string
     now: number
   },
 ): Promise<{ created: boolean; request: TeamCreationRequestRow }> {
@@ -277,15 +279,49 @@ export async function beginTeamCreationRequest(
     .prepare(
       `/* teams:begin-creation-request */
        INSERT OR IGNORE INTO team_creation_requests
-         (user_id, idempotency_key, team_id, normalized_name, status,
+         (user_id, idempotency_key, team_id, normalized_name, requested_handle, status,
           workos_organization_id, created_at, updated_at)
-       VALUES (?,?,?,?,'pending',NULL,?,?)`,
+       VALUES (?,?,?,?,?,'pending',NULL,?,?)`,
     )
-    .bind(args.userId, args.idempotencyKey, args.teamId, args.name, args.now, args.now)
+    .bind(
+      args.userId,
+      args.idempotencyKey,
+      args.teamId,
+      args.name,
+      args.requestedHandle,
+      args.now,
+      args.now,
+    )
     .run()
   const request = await getTeamCreationRequest(db, args.userId, args.idempotencyKey)
   if (!request) throw new ApiError('INTERNAL', 'team creation request could not be loaded')
   return { created: result.meta.changes > 0, request }
+}
+
+/**
+ * Older pending/completed receipts predate handle intent. A retry may adopt
+ * one handle exactly once; after that the migration trigger and this predicate
+ * make the intent immutable.
+ */
+export async function adoptTeamCreationHandle(
+  db: D1Database,
+  userId: string,
+  idempotencyKey: string,
+  requestedHandle: string,
+  now: number,
+): Promise<TeamCreationRequestRow> {
+  await db
+    .prepare(
+      `/* teams:adopt-creation-handle */
+       UPDATE team_creation_requests
+       SET requested_handle=?, updated_at=?
+       WHERE user_id=? AND idempotency_key=? AND requested_handle IS NULL`,
+    )
+    .bind(requestedHandle, now, userId, idempotencyKey)
+    .run()
+  const request = await getTeamCreationRequest(db, userId, idempotencyKey)
+  if (!request) throw new ApiError('INTERNAL', 'team creation request could not be loaded')
+  return request
 }
 
 export async function recordTeamCreationOrganization(
@@ -340,11 +376,13 @@ export async function failTeamCreationRequest(
         `/* teams:fail-creation-request */
          UPDATE team_creation_requests SET status='failed', updated_at=?
          WHERE user_id=? AND idempotency_key=? AND status='pending'
-           AND workos_organization_id IS NOT NULL
-           AND EXISTS (
-             SELECT 1 FROM workos_cleanup_outbox cleanup
-             WHERE cleanup.operation='organization.delete'
-               AND cleanup.resource_id=team_creation_requests.workos_organization_id
+           AND (
+             workos_organization_id IS NULL OR
+             EXISTS (
+               SELECT 1 FROM workos_cleanup_outbox cleanup
+               WHERE cleanup.operation='organization.delete'
+                 AND cleanup.resource_id=team_creation_requests.workos_organization_id
+             )
            )
            AND NOT EXISTS (
              SELECT 1 FROM teams t JOIN team_memberships m ON m.team_id=t.id
@@ -362,6 +400,7 @@ export async function completeTeamCreationRequest(
   userId: string,
   idempotencyKey: string,
   teamId: string,
+  requestedHandle: string,
   now: number,
 ): Promise<void> {
   await db
@@ -369,12 +408,17 @@ export async function completeTeamCreationRequest(
       `/* teams:complete-creation-request-recovery */
        UPDATE team_creation_requests SET status='completed', updated_at=?
        WHERE user_id=? AND idempotency_key=? AND team_id=? AND status='pending'
+         AND requested_handle=?
          AND EXISTS (
            SELECT 1 FROM teams t JOIN team_memberships m ON m.team_id=t.id
            WHERE t.id=? AND m.user_id=? AND m.role='owner'
+             AND EXISTS (
+               SELECT 1 FROM handles h
+               WHERE h.team_id=t.id AND h.handle=? AND h.released_at IS NULL
+             )
          )`,
     )
-    .bind(now, userId, idempotencyKey, teamId, teamId, userId)
+    .bind(now, userId, idempotencyKey, teamId, requestedHandle, teamId, userId, requestedHandle)
     .run()
 }
 
@@ -403,6 +447,7 @@ export async function createLocalTeam(
     workosMembershipUpdatedAt?: number | null
     idempotencyKey: string
     ownerUserId: string
+    requestedHandle: string
     now: number
   },
 ): Promise<boolean> {
@@ -418,6 +463,7 @@ export async function createLocalTeam(
            AND EXISTS (
              SELECT 1 FROM team_creation_requests
              WHERE user_id=? AND idempotency_key=? AND team_id=? AND status='pending'
+               AND requested_handle=? AND workos_organization_id=?
            )
            AND EXISTS (
              SELECT 1 FROM users owner
@@ -437,6 +483,8 @@ export async function createLocalTeam(
         args.ownerUserId,
         args.idempotencyKey,
         args.id,
+        args.requestedHandle,
+        args.workosOrganizationId,
         args.ownerUserId,
       ),
     db
@@ -455,13 +503,41 @@ export async function createLocalTeam(
       ),
     db
       .prepare(
+        `/* teams:create-handle */
+         INSERT INTO handles (handle, user_id, team_id, claimed_at, released_at)
+         SELECT ?,NULL,t.id,?,NULL
+         FROM teams t
+         JOIN team_memberships membership ON membership.team_id=t.id
+         JOIN team_creation_requests request ON request.team_id=t.id
+         WHERE t.id=? AND t.workos_organization_id=?
+           AND membership.user_id=? AND membership.role='owner'
+           AND request.user_id=? AND request.idempotency_key=?
+           AND request.status='pending' AND request.requested_handle=?`,
+      )
+      .bind(
+        args.requestedHandle,
+        args.now,
+        args.id,
+        args.workosOrganizationId,
+        args.ownerUserId,
+        args.ownerUserId,
+        args.idempotencyKey,
+        args.requestedHandle,
+      ),
+    db
+      .prepare(
         `/* teams:complete-creation-request */
          UPDATE team_creation_requests SET status='completed', updated_at=?
          WHERE user_id=? AND idempotency_key=? AND team_id=? AND status='pending'
+           AND requested_handle=?
            AND EXISTS (
              SELECT 1 FROM teams t JOIN team_memberships m ON m.team_id=t.id
              WHERE t.id=? AND t.workos_organization_id=?
                AND m.user_id=? AND m.role='owner'
+               AND EXISTS (
+                 SELECT 1 FROM handles h
+                 WHERE h.team_id=t.id AND h.handle=? AND h.released_at IS NULL
+               )
            )`,
       )
       .bind(
@@ -469,25 +545,35 @@ export async function createLocalTeam(
         args.ownerUserId,
         args.idempotencyKey,
         args.id,
+        args.requestedHandle,
         args.id,
         args.workosOrganizationId,
         args.ownerUserId,
+        args.requestedHandle,
       ),
   ])
   return (
     (results[0]?.meta.changes ?? 0) > 0 &&
     (results[1]?.meta.changes ?? 0) > 0 &&
-    (results[2]?.meta.changes ?? 0) > 0
+    (results[2]?.meta.changes ?? 0) > 0 &&
+    (results[3]?.meta.changes ?? 0) > 0
   )
 }
 
-type TeamListRow = TeamRow & { role: TeamRole; member_count: number; owner_count: number }
+type TeamListRow = TeamRow & {
+  role: TeamRole
+  member_count: number
+  owner_count: number
+  handle: string | null
+}
 
 export async function listTeamsForUser(db: D1Database, userId: string): Promise<TeamResponse[]> {
   const result = await db
     .prepare(
       `/* teams:list */
        SELECT t.*, m.role,
+         (SELECT handle FROM handles h
+          WHERE h.team_id=t.id AND h.released_at IS NULL LIMIT 1) AS handle,
          (SELECT COUNT(*) FROM team_memberships members WHERE members.team_id=t.id) AS member_count,
          (SELECT COUNT(*) FROM team_memberships owners
           WHERE owners.team_id=t.id AND owners.role='owner') AS owner_count
@@ -556,6 +642,8 @@ export async function getTeamForMember(
     .prepare(
       `/* teams:get-for-member */
        SELECT t.*, m.role,
+         (SELECT handle FROM handles h
+          WHERE h.team_id=t.id AND h.released_at IS NULL LIMIT 1) AS handle,
          (SELECT COUNT(*) FROM team_memberships members WHERE members.team_id=t.id) AS member_count,
          (SELECT COUNT(*) FROM team_memberships owners
           WHERE owners.team_id=t.id AND owners.role='owner') AS owner_count
@@ -1633,6 +1721,7 @@ function teamResponse(row: TeamListRow): TeamResponse {
   return {
     id: row.id,
     name: row.name,
+    handle: row.handle ?? null,
     role: row.role,
     // The final owner cannot leave without first transferring ownership. Keep
     // the server-computed capability contract aligned with that invariant so

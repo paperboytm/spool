@@ -3,6 +3,7 @@ import type { PagesFunction } from '@cloudflare/workers-types'
 import { auditAfterCommit } from '../../../../src/audit-after-commit'
 import { requireUser } from '../../../../src/auth/require'
 import { ApiError, jsonError, jsonOk } from '../../../../src/errors'
+import { changeTeamHandle } from '../../../../src/handles'
 import { checkRate } from '../../../../src/rate-limit'
 import { requireTeamAccess } from '../../../../src/teams/auth'
 import {
@@ -38,25 +39,41 @@ export const onRequestPatch: PagesFunction<TeamApiEnv, Params> = async (ctx) => 
   try {
     const user = await requireUser(ctx.request, ctx.env)
     const teamId = requireTeamId(ctx.params.teamId)
-    const { name } = await parseUpdateTeamBody(ctx.request)
-    const { team: current } = await requireTeamAccess(ctx.env.DB, teamId, user.id, 'team:update')
+    const update = await parseUpdateTeamBody(ctx.request)
+    const permission = update.handle === undefined ? 'team:update' : 'team:identity'
+    const { team: current } = await requireTeamAccess(ctx.env.DB, teamId, user.id, permission)
     const rate = await checkRate(ctx.env.RATE, {
       ...TEAM_NAME_UPDATE_RATE,
       key: teamId,
     })
     if (!rate.ok) throw new ApiError('TOO_MANY_REQUESTS')
-    const client = createWorkosTeamClient(ctx.env)
-    await client.updateOrganization(current.workos_organization_id, name)
-    try {
-      const updated = await updateLocalTeamName(ctx.env.DB, teamId, user.id, name, Date.now())
-      if (!updated) throw new ApiError('FORBIDDEN')
-    } catch (error) {
-      await client
-        .updateOrganization(current.workos_organization_id, current.name)
-        .catch((compensationError: unknown) => {
-          console.error('failed to compensate WorkOS organization rename', compensationError)
-        })
-      throw error
+    if (update.name !== undefined) {
+      const client = createWorkosTeamClient(ctx.env)
+      await client.updateOrganization(current.workos_organization_id, update.name)
+      try {
+        const updated = await updateLocalTeamName(
+          ctx.env.DB,
+          teamId,
+          user.id,
+          update.name,
+          Date.now(),
+        )
+        if (!updated) throw new ApiError('FORBIDDEN')
+      } catch (error) {
+        await client
+          .updateOrganization(current.workos_organization_id, current.name)
+          .catch((compensationError: unknown) => {
+            console.error('failed to compensate WorkOS organization rename', compensationError)
+          })
+        throw error
+      }
+    } else if (update.handle !== undefined) {
+      await changeTeamHandle(ctx.env.DB, {
+        teamId,
+        actorUserId: user.id,
+        handle: update.handle,
+        now: Date.now(),
+      })
     }
     const team = await getTeamForMember(ctx.env.DB, teamId, user.id)
     if (!team) throw new ApiError('NOT_FOUND')
@@ -64,7 +81,7 @@ export const onRequestPatch: PagesFunction<TeamApiEnv, Params> = async (ctx) => 
       user_id: user.id,
       action: 'team.update',
       target_id: teamId,
-      details: { fields: ['name'] },
+      details: { fields: [update.name === undefined ? 'handle' : 'name'] },
     })
     return jsonOk({ team })
   } catch (error) {

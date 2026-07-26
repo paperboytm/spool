@@ -50,3 +50,18 @@ export function SessionLanguageToggle({
     </div>
   )
 }
+
+export function SessionLanguageToolbar({ className }: { className?: string }) {
+  return (
+    <div
+      className={['session-language-toolbar', className].filter(Boolean).join(' ')}
+      aria-label="Session display preferences"
+    >
+      <span className="session-language-toolbar__label">
+        <Languages size={15} strokeWidth={1.7} aria-hidden="true" />
+        <span>Session language</span>
+      </span>
+      <SessionLanguageToggle />
+    </div>
+  )
+}

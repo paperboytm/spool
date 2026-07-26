@@ -9,7 +9,7 @@
 // no flash.
 
 import { Button, ButtonLink, IconButton, MobileMenu, NavItem, Wordmark } from '@spool-lab/ui'
-import { Library, Users } from 'lucide-react'
+import { FolderKanban, Library, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 // App-surface stylesheets. Chrome is imported by every app page
@@ -26,7 +26,6 @@ import { resolveAuthState, type AuthState } from '../lib/auth-state'
 import { readCachedMe } from '../lib/me-cache'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 import { AccountMenu } from './AccountMenu'
-import { SessionLanguageToggle } from './SessionLanguageToggle'
 
 export type { AuthState } from '../lib/auth-state'
 
@@ -297,6 +296,7 @@ export function Header({
         </a>
         <nav className="sw-header-nav" aria-label="Primary">
           <NavItem href="/sessions">Sessions</NavItem>
+          <NavItem href="/projects">Projects</NavItem>
         </nav>
       </div>
       <div className="sw-header-right">
@@ -309,7 +309,6 @@ export function Header({
           >
             Publish
           </ButtonLink>
-          <SessionLanguageToggle className="sw-header-language-toggle" />
         </div>
         {identity === null ? (
           <ButtonLink className="sw-signin-link" href="/sign-in" size="sm" variant="ghost">
@@ -329,14 +328,17 @@ export function Header({
         >
           <nav className="sw-header-mobile-menu-items" aria-label="Mobile navigation">
             <NavItem href="/sessions">Sessions</NavItem>
+            <NavItem href="/projects">Projects</NavItem>
             <NavItem href="/docs/installation">Docs</NavItem>
             <ButtonLink href="/docs/quick-start" size="lg" variant="accent">
               Publish
             </ButtonLink>
             <ThemeToggle className="sw-header-mobile-theme" showLabel />
-            <SessionLanguageToggle className="sw-header-mobile-language" showLabel />
             {signedIn ? (
               <>
+                <NavItem href="/projects?scope=mine" leading={<FolderKanban aria-hidden="true" />}>
+                  My Projects
+                </NavItem>
                 <NavItem href="/my-sessions" leading={<Library aria-hidden="true" />}>
                   My Sessions
                 </NavItem>
@@ -371,6 +373,8 @@ export function Footer({ report, reportHref }: { report?: boolean; reportHref?: 
         </>
       )}
       <a href="/docs/installation">Docs</a>
+      <span className="sep">·</span>
+      <a href="/projects">Projects</a>
       <span className="sep">·</span>
       <a href="/blog">Blog</a>
       <span className="sep">·</span>

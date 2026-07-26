@@ -414,6 +414,16 @@ async function deleteHubContent(
     env.DB.prepare('DELETE FROM hub_sessions WHERE owner_user_id=? AND team_id IS NULL').bind(
       userId,
     ),
+    env.DB.prepare(
+      `/* account-deletion:delete-personal-project-receipts */
+       DELETE FROM project_creation_requests
+       WHERE owner_user_id=? AND owner_team_id IS NULL`,
+    ).bind(userId),
+    env.DB.prepare(
+      `/* account-deletion:delete-personal-projects */
+       DELETE FROM projects
+       WHERE owner_user_id=? AND owner_team_id IS NULL`,
+    ).bind(userId),
   ])
 }
 

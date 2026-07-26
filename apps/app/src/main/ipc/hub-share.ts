@@ -21,6 +21,7 @@ import {
   isDiscoverySessionSid,
   isResumableSessionProvider,
   parseSessionText,
+  sessionRecordData,
   type SessionProvider,
 } from '@spool-lab/session-kit'
 // Type-only: share-kit's runtime bundle needs a DOM at import time and
@@ -206,7 +207,9 @@ export function registerHubShareIpc(deps: HubShareIpcDeps = {}): void {
     async (_e, args: { sessionUuid: string }): Promise<HubSharePrepareResult> => {
       try {
         const { prepared, card } = await prepareEntry(args.sessionUuid, deps)
-        const secrets = scanRecordsForSecrets(prepared.records.map((record) => record.data))
+        const secrets = scanRecordsForSecrets(
+          prepared.records.map((record) => sessionRecordData(record)),
+        )
         return {
           ok: true,
           prepared: {

@@ -27,6 +27,7 @@ import {
   Bot,
   ChevronRight,
   Clock3,
+  FolderKanban,
   GitBranch,
   GitCommitHorizontal,
   Globe2,
@@ -452,6 +453,18 @@ export function SessionWorkbench({
                     ? `Team · ${meta.team?.name ?? 'members'}`
                     : 'Link-only'}
               </Badge>
+              {meta.project ? (
+                <a
+                  className="session-reader-project inline-flex min-h-6 min-w-0 items-center gap-1.5 rounded-[var(--sp-radius-control)] px-1.5 font-mono text-[11px] text-[var(--muted)] hover:text-[var(--accent)] hover:underline focus-visible:text-[var(--accent)] focus-visible:underline"
+                  href={`/@${encodeURIComponent(meta.project.owner.handle)}/${encodeURIComponent(meta.project.slug)}`}
+                  title={`Project · @${meta.project.owner.handle}/${meta.project.slug}`}
+                >
+                  <FolderKanban size={12} strokeWidth={1.7} aria-hidden="true" />
+                  <span className="max-w-56 truncate">
+                    {meta.project.owner.handle}/{meta.project.slug}
+                  </span>
+                </a>
+              ) : null}
               <span title={humanDateTime(visibilityTimestamp)}>
                 {isPublic ? 'Published' : 'Shared'} {relativeDate(visibilityTimestamp)}
               </span>

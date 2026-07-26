@@ -35,4 +35,4 @@ Ingestion does not publish a Session. It makes the Session available for review,
 
 ## Adding a source
 
-A source must preserve enough indexed conversation structure for faithful rendering and safe canonical records before Hub Share is enabled. Native Resume is a separate capability that additionally requires lossless provider records and a safe materializer. Source badges are added to public UI only when that source can actually produce the relevant artifact.
+A source must preserve enough indexed conversation structure for faithful rendering and safe content-addressed records before Hub Share is enabled. Native Resume is a separate capability: Spool retains provider JSON bytes, including number lexemes and key order, while replacing local path strings with the reserved `$SPOOL_WS` and `$SPOOL_HOME` portability tokens. A materializer restores paths, changes only the new Session identity fields, and appends explicit continuation lineage. Source badges are added to public UI only when that source can actually produce the relevant artifact.

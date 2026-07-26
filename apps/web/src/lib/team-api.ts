@@ -11,11 +11,14 @@ export type TeamPermission =
   | 'members:invite'
   | 'members:manage'
   | 'sessions:manage'
+  | 'projects:manage'
+  | 'team:identity'
   | 'team:leave'
 
 export interface TeamSummary {
   id: string
   name: string
+  handle?: string | null
   slug?: string | null
   role?: TeamRole | null
   permissions: TeamPermission[]
@@ -131,11 +134,12 @@ export async function fetchTeams(): Promise<TeamApiResult<{ teams: TeamSummary[]
 export async function createTeam(
   name: string,
   idempotencyKey: string,
+  handle?: string,
 ): Promise<TeamApiResult<{ team: TeamSummary }>> {
   return requestJson('/api/teams', {
     method: 'POST',
     headers: { 'idempotency-key': idempotencyKey },
-    body: jsonBody({ name }),
+    body: jsonBody({ name, ...(handle ? { handle } : {}) }),
   })
 }
 
@@ -145,9 +149,12 @@ export async function fetchTeam(teamId: string): Promise<TeamApiResult<{ team: T
 
 export async function updateTeam(
   teamId: string,
-  name: string,
+  input: string | { name?: string; handle?: string },
 ): Promise<TeamApiResult<{ team: TeamSummary }>> {
-  return requestJson(teamPath(teamId), { method: 'PATCH', body: jsonBody({ name }) })
+  return requestJson(teamPath(teamId), {
+    method: 'PATCH',
+    body: jsonBody(typeof input === 'string' ? { name: input } : input),
+  })
 }
 
 export async function archiveTeam(teamId: string): Promise<TeamApiResult<Record<string, never>>> {

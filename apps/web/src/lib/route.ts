@@ -1,5 +1,6 @@
 // Bare-bones path matcher. We intentionally avoid react-router for an
 // SPA this small — a handful of static routes (`/s/<id>`, `/@<handle>`,
+// `/@<handle>/<project>`,
 // `/me`, `/sign-in`) and one catch-all tombstone is not worth a
 // dependency.
 //
@@ -10,6 +11,7 @@ export type Route =
   | { kind: 'reader'; id: string }
   | { kind: 'session'; sid: string }
   | { kind: 'profile'; handle: string }
+  | { kind: 'project'; handle: string; slug: string }
   | { kind: 'me' }
   | { kind: 'sign-in'; next: string }
   | { kind: 'cli-auth'; code: string | null }
@@ -33,6 +35,7 @@ export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
 // instead of issuing a guaranteed-404 fetch. Exported for the
 // /@{$handle} route.
 export const HANDLE_RE = /^[a-z][a-z0-9_-]{2,31}$/
+export const PROJECT_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 
 export function routeFor(pathname: string, search: string = ''): Route {
   const path = pathname.replace(/\/+$/, '') || '/'
@@ -51,10 +54,17 @@ export function routeFor(pathname: string, search: string = ''): Route {
     return { kind: 'session', sid }
   }
 
-  // Profile: /@<handle>
+  // Profile or Project: /@<handle>[/<project-slug>]
   if (path.startsWith('/@')) {
-    const handle = decodeURIComponent(path.slice(2)).toLowerCase()
+    const [rawHandle, rawSlug, ...rest] = path.slice(2).split('/')
+    const handle = decodeURIComponent(rawHandle ?? '').toLowerCase()
     if (!HANDLE_RE.test(handle)) return { kind: 'tombstone', reason: 'not-found' }
+    if (rawSlug !== undefined) {
+      if (rest.length > 0) return { kind: 'tombstone', reason: 'not-found' }
+      const slug = decodeURIComponent(rawSlug).toLowerCase()
+      if (!PROJECT_SLUG_RE.test(slug)) return { kind: 'tombstone', reason: 'not-found' }
+      return { kind: 'project', handle, slug }
+    }
     return { kind: 'profile', handle }
   }
 

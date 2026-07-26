@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
   archiveLocalTeam,
+  beginTeamCreationRequest,
   createLocalInvitation,
+  createLocalTeam,
   failTeamCreationRequest,
   failTeamInvitationCreationRequest,
   insertInvitationProjection,
@@ -242,6 +244,80 @@ describe('Team permissions', () => {
       avatar_url: '/api/avatars/member_1?v=avatar_hash',
       permissions: ['role:update', 'remove', 'ownership:transfer'],
     })
+  })
+})
+
+describe('Team creation transaction', () => {
+  it('persists immutable handle intent on the idempotency receipt', async () => {
+    const request = {
+      user_id: 'local_owner',
+      idempotency_key: 'team-create-store-0001',
+      team_id: TEAM.id,
+      normalized_name: TEAM.name,
+      requested_handle: 'team-handle',
+      status: 'pending' as const,
+      workos_organization_id: null,
+      created_at: 100,
+      updated_at: 100,
+    }
+    const { db, prepared } = fakeDb((sql) =>
+      sql.includes('/* teams:get-creation-request */') ? request : null,
+    )
+
+    await expect(
+      beginTeamCreationRequest(db, {
+        userId: 'local_owner',
+        idempotencyKey: request.idempotency_key,
+        teamId: TEAM.id,
+        name: TEAM.name,
+        requestedHandle: request.requested_handle,
+        now: 100,
+      }),
+    ).resolves.toEqual({ created: true, request })
+
+    const begin = prepared.find((statement) =>
+      statement.sql.includes('/* teams:begin-creation-request */'),
+    )
+    expect(begin?.sql).toContain('requested_handle')
+    expect(begin?.params).toContain(request.requested_handle)
+  })
+
+  it('creates Team, owner, handle, and completed receipt in one D1 batch', async () => {
+    const { db, batches } = fakeDb()
+
+    await expect(
+      createLocalTeam(db, {
+        id: TEAM.id,
+        name: TEAM.name,
+        workosOrganizationId: TEAM.workos_organization_id,
+        workosMembershipId: 'membership_owner',
+        workosMembershipUpdatedAt: 50,
+        idempotencyKey: 'team-create-store-0002',
+        ownerUserId: 'local_owner',
+        requestedHandle: 'team-handle',
+        now: 100,
+      }),
+    ).resolves.toBe(true)
+
+    expect(batches).toHaveLength(1)
+    expect(batches[0]).toHaveLength(4)
+    const create = batches[0]!.find((statement) => statement.sql.includes('/* teams:create */'))
+    const owner = batches[0]!.find((statement) =>
+      statement.sql.includes('/* teams:create-owner */'),
+    )
+    const handle = batches[0]!.find((statement) =>
+      statement.sql.includes('/* teams:create-handle */'),
+    )
+    const complete = batches[0]!.find((statement) =>
+      statement.sql.includes('/* teams:complete-creation-request */'),
+    )
+    expect(create?.sql).toContain('requested_handle=?')
+    expect(create?.sql).toContain('workos_organization_id=?')
+    expect(owner?.sql).toContain('INSERT INTO team_memberships')
+    expect(handle?.sql).toContain('INSERT INTO handles')
+    expect(handle?.params[0]).toBe('team-handle')
+    expect(complete?.sql).toContain('h.handle=?')
+    expect(complete?.params.at(-1)).toBe('team-handle')
   })
 })
 

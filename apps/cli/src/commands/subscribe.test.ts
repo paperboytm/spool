@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vite-plus/test'
 
-import type { HubTeam } from '../hub/client.js'
+import type { HubProject, HubProjectsResponse, HubTeam } from '../hub/client.js'
 import { loadSubscriptions } from '../subscriptions.js'
 import { createTextUi } from '../ui.js'
 import {
@@ -42,12 +42,46 @@ const TEAMS: HubTeam[] = [
   {
     id: 'team_00000001',
     name: 'Paperboy',
+    handle: 'paperboy',
     role: 'member',
     permissions: [],
     member_count: 3,
     archived_at: null,
   },
 ]
+
+const PERSONAL_PROJECT: HubProject = {
+  id: 'project_personal01',
+  slug: 'spool',
+  name: 'Spool',
+  description: null,
+  github_url: null,
+  owner: { kind: 'user', id: 'user_00000001', handle: 'evan', name: 'Evan' },
+  can_manage: true,
+}
+const TEAM_PROJECT: HubProject = {
+  ...PERSONAL_PROJECT,
+  id: 'project_team000001',
+  slug: 'paperboy',
+  name: 'Paperboy',
+  owner: { kind: 'team', id: 'team_00000001', handle: 'paperboy', name: 'Paperboy' },
+}
+
+function projectDeps(projectPath: string, projects: HubProject[] = [PERSONAL_PROJECT]) {
+  const response: HubProjectsResponse = {
+    actor: { id: 'user_00000001' },
+    projects,
+  }
+  return {
+    env: { SPOOL_HUB_URL: 'https://hub.test', SPOOL_HUB_TOKEN: 'token' },
+    resolveLocalIdentity: () => ({
+      kind: 'path' as const,
+      key: projectPath,
+      displayName: 'spool',
+    }),
+    listProjects: async () => response,
+  }
+}
 
 describe('subscribe command', () => {
   it('requires an explicit disclosure choice without a TTY', async () => {
@@ -85,13 +119,30 @@ describe('subscribe command', () => {
     expect(
       await handleSubscribeCommand(
         undefined,
-        { linkOnly: true, yes: true },
-        { ui, homeDir: home, cwd: project, now: () => '2026-07-24T00:00:00.000Z' },
+        { linkOnly: true, yes: true, project: PERSONAL_PROJECT.id },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          now: () => '2026-07-24T00:00:00.000Z',
+          ...projectDeps(project),
+        },
       ),
     ).toBe(0)
     expect(output.join('\n')).toContain('Link-only')
     expect(loadSubscriptions({ homeDir: home })).toEqual([
-      { path: project, visibility: 'link-only', addedAt: '2026-07-24T00:00:00.000Z' },
+      {
+        path: project,
+        visibility: 'link-only',
+        project: {
+          hubUrl: 'https://hub.test',
+          actorId: 'user_00000001',
+          tenant: { kind: 'user', id: 'user_00000001' },
+          localIdentity: { kind: 'path', key: project, displayName: 'spool' },
+          remote: PERSONAL_PROJECT,
+        },
+        addedAt: '2026-07-24T00:00:00.000Z',
+      },
     ])
   })
 
@@ -103,13 +154,14 @@ describe('subscribe command', () => {
     expect(
       await handleSubscribeCommand(
         project,
-        { team: 'Paperboy', yes: true },
+        { team: 'Paperboy', yes: true, project: TEAM_PROJECT.id },
         {
           ui,
           homeDir: home,
           cwd: project,
           listTeams: async () => TEAMS,
           now: () => '2026-07-24T00:00:00.000Z',
+          ...projectDeps(project, [PERSONAL_PROJECT, TEAM_PROJECT]),
         },
       ),
     ).toBe(0)
@@ -120,6 +172,13 @@ describe('subscribe command', () => {
         visibility: 'team',
         teamId: 'team_00000001',
         teamName: 'Paperboy',
+        project: {
+          hubUrl: 'https://hub.test',
+          actorId: 'user_00000001',
+          tenant: { kind: 'team', id: 'team_00000001' },
+          localIdentity: { kind: 'path', key: project, displayName: 'spool' },
+          remote: TEAM_PROJECT,
+        },
         addedAt: '2026-07-24T00:00:00.000Z',
       },
     ])
@@ -141,6 +200,52 @@ describe('subscribe command', () => {
     expect(loadSubscriptions({ homeDir: home })).toEqual([])
   })
 
+  it('accepts a Team handle and rejects an ambiguous display name', async () => {
+    const home = tempDir('spool-subscribe-home-')
+    const project = tempDir('spool-subscribe-project-')
+    const { ui, errors } = capturingUi()
+    const duplicateTeams: HubTeam[] = [
+      { ...TEAMS[0]!, id: 'team_a', name: 'Shared', handle: 'shared-a' },
+      { ...TEAMS[0]!, id: 'team_b', name: 'Shared', handle: 'shared-b' },
+    ]
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { team: 'Shared', createProject: 'Project', yes: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          listTeams: async () => duplicateTeams,
+          ...projectDeps(project, []),
+        },
+      ),
+    ).toBe(1)
+    expect(errors.join('\n')).toContain('More than one Team is named "Shared"')
+    expect(loadSubscriptions({ homeDir: home })).toEqual([])
+
+    const teamBProject = {
+      ...TEAM_PROJECT,
+      id: 'project_team_b',
+      owner: { ...TEAM_PROJECT.owner, id: 'team_b', handle: 'shared-b', name: 'Shared' },
+    }
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { team: '@shared-b', project: teamBProject.id, yes: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          listTeams: async () => duplicateTeams,
+          ...projectDeps(project, [teamBProject]),
+        },
+      ),
+    ).toBe(0)
+    expect(loadSubscriptions({ homeDir: home })[0]?.teamId).toBe('team_b')
+  })
+
   it('subscribes Public only as an explicit opt-in and lists it', async () => {
     const home = tempDir('spool-subscribe-home-')
     const project = tempDir('spool-subscribe-project-')
@@ -149,14 +254,14 @@ describe('subscribe command', () => {
     expect(
       await handleSubscribeCommand(
         project,
-        { public: true, yes: true },
-        { ui, homeDir: home, cwd: project },
+        { public: true, yes: true, project: PERSONAL_PROJECT.id },
+        { ui, homeDir: home, cwd: project, ...projectDeps(project) },
       ),
     ).toBe(0)
     expect(loadSubscriptions({ homeDir: home })[0]?.visibility).toBe('public')
 
     expect(handleSubscriptionsCommand({ ui, homeDir: home })).toBe(0)
-    expect(output.join('\n')).toContain(`${project}  (Public)`)
+    expect(output.join('\n')).toContain(`${project}  (Public · Project Spool)`)
   })
 
   it('unsubscribes by path and reports unknown directories', async () => {
@@ -166,8 +271,8 @@ describe('subscribe command', () => {
 
     await handleSubscribeCommand(
       project,
-      { linkOnly: true, yes: true },
-      { ui, homeDir: home, cwd: project },
+      { linkOnly: true, yes: true, project: PERSONAL_PROJECT.id },
+      { ui, homeDir: home, cwd: project, ...projectDeps(project) },
     )
     expect(await handleUnsubscribeCommand(project, { ui, homeDir: home, cwd: project })).toBe(0)
     expect(loadSubscriptions({ homeDir: home })).toEqual([])

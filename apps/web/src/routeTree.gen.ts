@@ -19,11 +19,15 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SessionsRouteImport } from './routes/sessions'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AtChar123handleChar125IndexRouteImport } from './routes/@{$handle}.index'
+import { Route as AtChar123handleChar125ProjectSlugRouteImport } from './routes/@{$handle}.$projectSlug'
 import { Route as SiteIndexRouteImport } from './routes/_site.index'
 import { Route as SiteConnectorsRouteImport } from './routes/_site.connectors'
 import { Route as SiteDaemonRouteImport } from './routes/_site.daemon'
 import { Route as SiteLogoLabRouteImport } from './routes/_site.logo-lab'
 import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
+import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
+import { Route as ProjectsNewRouteImport } from './routes/projects.new'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SessionSidRouteImport } from './routes/session.$sid'
 import { Route as TeamsIndexRouteImport } from './routes/teams.index'
@@ -31,6 +35,7 @@ import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as SiteBlogIndexRouteImport } from './routes/_site.blog.index'
 import { Route as SiteBlogSlugRouteImport } from './routes/_site.blog.$slug'
 import { Route as SiteDocsSplatRouteImport } from './routes/_site.docs.$'
+import { Route as ProjectsProjectIdEditRouteImport } from './routes/projects.$projectId.edit'
 
 const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
   id: '/@{$handle}',
@@ -81,6 +86,18 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtChar123handleChar125IndexRoute =
+  AtChar123handleChar125IndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AtChar123handleChar125Route,
+  } as any)
+const AtChar123handleChar125ProjectSlugRoute =
+  AtChar123handleChar125ProjectSlugRouteImport.update({
+    id: '/$projectSlug',
+    path: '/$projectSlug',
+    getParentRoute: () => AtChar123handleChar125Route,
+  } as any)
 const SiteIndexRoute = SiteIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -104,6 +121,16 @@ const SiteLogoLabRoute = SiteLogoLabRouteImport.update({
 const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
   id: '/blog/rss.xml',
   path: '/blog/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsNewRoute = ProjectsNewRouteImport.update({
+  id: '/projects/new',
+  path: '/projects/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SSlugRoute = SSlugRouteImport.update({
@@ -141,9 +168,14 @@ const SiteDocsSplatRoute = SiteDocsSplatRouteImport.update({
   path: '/docs/$',
   getParentRoute: () => SiteRoute,
 } as any)
+const ProjectsProjectIdEditRoute = ProjectsProjectIdEditRouteImport.update({
+  id: '/projects/$projectId/edit',
+  path: '/projects/$projectId/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/@{$handle}': typeof AtChar123handleChar125Route
+  '/@{$handle}': typeof AtChar123handleChar125RouteWithChildren
   '/': typeof SiteIndexRoute
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
@@ -153,20 +185,24 @@ export interface FileRoutesByFullPath {
   '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
+  '/@{$handle}/$projectSlug': typeof AtChar123handleChar125ProjectSlugRoute
   '/connectors': typeof SiteConnectorsRoute
   '/daemon': typeof SiteDaemonRoute
   '/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/@{$handle}/': typeof AtChar123handleChar125IndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/teams/': typeof TeamsIndexRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/blog/': typeof SiteBlogIndexRoute
 }
 export interface FileRoutesByTo {
-  '/@{$handle}': typeof AtChar123handleChar125Route
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
   '/me': typeof MeRoute
@@ -175,22 +211,27 @@ export interface FileRoutesByTo {
   '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
+  '/@{$handle}/$projectSlug': typeof AtChar123handleChar125ProjectSlugRoute
   '/connectors': typeof SiteConnectorsRoute
   '/daemon': typeof SiteDaemonRoute
   '/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/@{$handle}': typeof AtChar123handleChar125IndexRoute
   '/': typeof SiteIndexRoute
+  '/projects': typeof ProjectsIndexRoute
   '/teams': typeof TeamsIndexRoute
   '/blog/$slug': typeof SiteBlogSlugRoute
   '/docs/$': typeof SiteDocsSplatRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/blog': typeof SiteBlogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/@{$handle}': typeof AtChar123handleChar125Route
+  '/@{$handle}': typeof AtChar123handleChar125RouteWithChildren
   '/_site': typeof SiteRouteWithChildren
   '/cli-auth': typeof CliAuthRoute
   '/explore': typeof ExploreRoute
@@ -200,17 +241,22 @@ export interface FileRoutesById {
   '/sessions': typeof SessionsRoute
   '/sign-in': typeof SignInRoute
   '/terms': typeof TermsRoute
+  '/@{$handle}/$projectSlug': typeof AtChar123handleChar125ProjectSlugRoute
   '/_site/connectors': typeof SiteConnectorsRoute
   '/_site/daemon': typeof SiteDaemonRoute
   '/_site/logo-lab': typeof SiteLogoLabRoute
   '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/s/$slug': typeof SSlugRoute
   '/session/$sid': typeof SessionSidRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/@{$handle}/': typeof AtChar123handleChar125IndexRoute
   '/_site/': typeof SiteIndexRoute
+  '/projects/': typeof ProjectsIndexRoute
   '/teams/': typeof TeamsIndexRoute
   '/_site/blog/$slug': typeof SiteBlogSlugRoute
   '/_site/docs/$': typeof SiteDocsSplatRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/_site/blog/': typeof SiteBlogIndexRoute
 }
 export interface FileRouteTypes {
@@ -226,20 +272,24 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/sign-in'
     | '/terms'
+    | '/@{$handle}/$projectSlug'
     | '/connectors'
     | '/daemon'
     | '/logo-lab'
     | '/blog/rss.xml'
+    | '/projects/new'
     | '/s/$slug'
     | '/session/$sid'
     | '/teams/$teamId'
+    | '/@{$handle}/'
+    | '/projects/'
     | '/teams/'
     | '/blog/$slug'
     | '/docs/$'
+    | '/projects/$projectId/edit'
     | '/blog/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/@{$handle}'
     | '/cli-auth'
     | '/explore'
     | '/me'
@@ -248,17 +298,22 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/sign-in'
     | '/terms'
+    | '/@{$handle}/$projectSlug'
     | '/connectors'
     | '/daemon'
     | '/logo-lab'
     | '/blog/rss.xml'
+    | '/projects/new'
     | '/s/$slug'
     | '/session/$sid'
     | '/teams/$teamId'
+    | '/@{$handle}'
     | '/'
+    | '/projects'
     | '/teams'
     | '/blog/$slug'
     | '/docs/$'
+    | '/projects/$projectId/edit'
     | '/blog'
   id:
     | '__root__'
@@ -272,22 +327,27 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/sign-in'
     | '/terms'
+    | '/@{$handle}/$projectSlug'
     | '/_site/connectors'
     | '/_site/daemon'
     | '/_site/logo-lab'
     | '/blog/rss.xml'
+    | '/projects/new'
     | '/s/$slug'
     | '/session/$sid'
     | '/teams/$teamId'
+    | '/@{$handle}/'
     | '/_site/'
+    | '/projects/'
     | '/teams/'
     | '/_site/blog/$slug'
     | '/_site/docs/$'
+    | '/projects/$projectId/edit'
     | '/_site/blog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AtChar123handleChar125Route: typeof AtChar123handleChar125Route
+  AtChar123handleChar125Route: typeof AtChar123handleChar125RouteWithChildren
   SiteRoute: typeof SiteRouteWithChildren
   CliAuthRoute: typeof CliAuthRoute
   ExploreRoute: typeof ExploreRoute
@@ -298,10 +358,13 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   TermsRoute: typeof TermsRoute
   BlogRssDotxmlRoute: typeof BlogRssDotxmlRoute
+  ProjectsNewRoute: typeof ProjectsNewRoute
   SSlugRoute: typeof SSlugRoute
   SessionSidRoute: typeof SessionSidRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
+  ProjectsIndexRoute: typeof ProjectsIndexRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
+  ProjectsProjectIdEditRoute: typeof ProjectsProjectIdEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -376,6 +439,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/@{$handle}/': {
+      id: '/@{$handle}/'
+      path: '/'
+      fullPath: '/@{$handle}/'
+      preLoaderRoute: typeof AtChar123handleChar125IndexRouteImport
+      parentRoute: typeof AtChar123handleChar125Route
+    }
+    '/@{$handle}/$projectSlug': {
+      id: '/@{$handle}/$projectSlug'
+      path: '/$projectSlug'
+      fullPath: '/@{$handle}/$projectSlug'
+      preLoaderRoute: typeof AtChar123handleChar125ProjectSlugRouteImport
+      parentRoute: typeof AtChar123handleChar125Route
+    }
     '/_site/': {
       id: '/_site/'
       path: '/'
@@ -409,6 +486,20 @@ declare module '@tanstack/react-router' {
       path: '/blog/rss.xml'
       fullPath: '/blog/rss.xml'
       preLoaderRoute: typeof BlogRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/': {
+      id: '/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof ProjectsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/new': {
+      id: '/projects/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof ProjectsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s/$slug': {
@@ -460,8 +551,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SiteDocsSplatRouteImport
       parentRoute: typeof SiteRoute
     }
+    '/projects/$projectId/edit': {
+      id: '/projects/$projectId/edit'
+      path: '/projects/$projectId/edit'
+      fullPath: '/projects/$projectId/edit'
+      preLoaderRoute: typeof ProjectsProjectIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
+
+interface AtChar123handleChar125RouteChildren {
+  AtChar123handleChar125ProjectSlugRoute: typeof AtChar123handleChar125ProjectSlugRoute
+  AtChar123handleChar125IndexRoute: typeof AtChar123handleChar125IndexRoute
+}
+
+const AtChar123handleChar125RouteChildren: AtChar123handleChar125RouteChildren =
+  {
+    AtChar123handleChar125ProjectSlugRoute:
+      AtChar123handleChar125ProjectSlugRoute,
+    AtChar123handleChar125IndexRoute: AtChar123handleChar125IndexRoute,
+  }
+
+const AtChar123handleChar125RouteWithChildren =
+  AtChar123handleChar125Route._addFileChildren(
+    AtChar123handleChar125RouteChildren,
+  )
 
 interface SiteRouteChildren {
   SiteConnectorsRoute: typeof SiteConnectorsRoute
@@ -486,7 +601,7 @@ const SiteRouteChildren: SiteRouteChildren = {
 const SiteRouteWithChildren = SiteRoute._addFileChildren(SiteRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  AtChar123handleChar125Route: AtChar123handleChar125Route,
+  AtChar123handleChar125Route: AtChar123handleChar125RouteWithChildren,
   SiteRoute: SiteRouteWithChildren,
   CliAuthRoute: CliAuthRoute,
   ExploreRoute: ExploreRoute,
@@ -497,10 +612,13 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   TermsRoute: TermsRoute,
   BlogRssDotxmlRoute: BlogRssDotxmlRoute,
+  ProjectsNewRoute: ProjectsNewRoute,
   SSlugRoute: SSlugRoute,
   SessionSidRoute: SessionSidRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
+  ProjectsIndexRoute: ProjectsIndexRoute,
   TeamsIndexRoute: TeamsIndexRoute,
+  ProjectsProjectIdEditRoute: ProjectsProjectIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

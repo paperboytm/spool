@@ -76,13 +76,22 @@ describe('Hub Session management API', () => {
   it('sends an explicit Team ownership target', async () => {
     respond(200, { session: { sid: 'codex_1', visibility: 'team' } })
 
-    await updateManagedSessionVisibility('codex/a', 'team', 'team_1')
+    await updateManagedSessionVisibility('codex/a', 'team', {
+      teamId: 'team_1',
+      projectId: 'project_target',
+      expectedProjectId: 'project_current',
+    })
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/me/sessions/codex%2Fa',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ visibility: 'team', team_id: 'team_1' }),
+        body: JSON.stringify({
+          visibility: 'team',
+          team_id: 'team_1',
+          project_id: 'project_target',
+          expected_project_id: 'project_current',
+        }),
       }),
     )
   })
@@ -90,17 +99,25 @@ describe('Hub Session management API', () => {
   it('does not send stale team_id when selecting a public scope', async () => {
     respond(200, { session: { sid: 'codex_1', visibility: 'public' } })
 
-    await updateManagedSessionVisibility('codex_1', 'public', 'team_1')
+    await updateManagedSessionVisibility('codex_1', 'public', {
+      teamId: 'team_1',
+      expectedProjectId: 'project_current',
+    })
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/me/sessions/codex_1',
-      expect.objectContaining({ body: JSON.stringify({ visibility: 'public' }) }),
+      expect.objectContaining({
+        body: JSON.stringify({
+          visibility: 'public',
+          expected_project_id: 'project_current',
+        }),
+      }),
     )
   })
 
   it('keeps ownership conflicts distinct from validation failures', async () => {
     respond(409, { detail: 'a Team-owned Session cannot move to another Team' })
-    expect(await updateManagedSessionVisibility('codex_1', 'team', 'team_2')).toEqual({
+    expect(await updateManagedSessionVisibility('codex_1', 'team', { teamId: 'team_2' })).toEqual({
       kind: 'conflict',
       detail: 'a Team-owned Session cannot move to another Team',
     })

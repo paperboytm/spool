@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
   assertCanManageMember: vi.fn(),
+  assertHandleAvailable: vi.fn(),
+  chooseAvailableTeamHandle: vi.fn(),
+  changeTeamHandle: vi.fn(),
   requireUser: vi.fn(),
   requireTeamAccess: vi.fn(),
   countActiveTeamsCreatedByUser: vi.fn(),
@@ -36,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   updateLocalTeamName: vi.fn(),
   updateInvitationProjection: vi.fn(),
   archiveLocalTeam: vi.fn(),
+  adoptTeamCreationHandle: vi.fn(),
   beginTeamCreationRequest: vi.fn(),
   completeTeamCreationRequest: vi.fn(),
   failTeamCreationRequest: vi.fn(),
@@ -65,12 +69,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../src/audit', () => ({ audit: mocks.audit }))
 vi.mock('../src/auth/require', () => ({ requireUser: mocks.requireUser }))
+vi.mock('../src/handles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/handles')>()),
+  assertHandleAvailable: mocks.assertHandleAvailable,
+  chooseAvailableTeamHandle: mocks.chooseAvailableTeamHandle,
+  changeTeamHandle: mocks.changeTeamHandle,
+}))
 vi.mock('../src/store/d1', () => ({ getUserById: mocks.getUserById }))
 vi.mock('../src/teams/auth', () => ({
   assertCanManageMember: mocks.assertCanManageMember,
   requireTeamAccess: mocks.requireTeamAccess,
 }))
 vi.mock('../src/teams/store', () => ({
+  adoptTeamCreationHandle: mocks.adoptTeamCreationHandle,
   beginTeamInvitationCreationRequest: mocks.beginTeamInvitationCreationRequest,
   beginTeamCreationRequest: mocks.beginTeamCreationRequest,
   completeTeamInvitationCreationRequest: mocks.completeTeamInvitationCreationRequest,
@@ -141,6 +152,7 @@ const TEAM_ID = 'team_00000000000000000000000000000000'
 const INVITATION_ID = 'tinv_00000000000000000000000000000000'
 const USER_ID = 'user_0000000000000000'
 const MEMBER_ID = 'member_000000000000'
+const TEAM_HANDLE = 'original-team-0000000000'
 const TEAM_ROW = {
   id: TEAM_ID,
   workos_organization_id: 'org_1',
@@ -191,6 +203,9 @@ beforeEach(() => {
     },
   })
   mocks.countActiveTeamsCreatedByUser.mockResolvedValue(0)
+  mocks.assertHandleAvailable.mockResolvedValue(undefined)
+  mocks.chooseAvailableTeamHandle.mockResolvedValue(TEAM_HANDLE)
+  mocks.changeTeamHandle.mockResolvedValue(undefined)
   mocks.countPendingTeamInvitations.mockResolvedValue(0)
   mocks.createLocalInvitation.mockResolvedValue(true)
   mocks.createLocalTeam.mockResolvedValue(true)
@@ -203,12 +218,26 @@ beforeEach(() => {
       idempotency_key: args.idempotencyKey,
       team_id: args.teamId,
       normalized_name: args.name,
+      requested_handle: args.requestedHandle,
       status: 'pending',
       workos_organization_id: null,
       created_at: args.now,
       updated_at: args.now,
     },
   }))
+  mocks.adoptTeamCreationHandle.mockImplementation(
+    async (_db, userId, idempotencyKey, requestedHandle, now) => ({
+      user_id: userId,
+      idempotency_key: idempotencyKey,
+      team_id: TEAM_ID,
+      normalized_name: 'Original',
+      requested_handle: requestedHandle,
+      status: 'pending',
+      workos_organization_id: null,
+      created_at: now,
+      updated_at: now,
+    }),
+  )
   mocks.completeTeamCreationRequest.mockResolvedValue(undefined)
   mocks.failTeamCreationRequest.mockResolvedValue(true)
   mocks.recordTeamCreationOrganization.mockResolvedValue(undefined)
@@ -218,6 +247,7 @@ beforeEach(() => {
     role: 'owner',
     permissions: ['team:update', 'team:archive'],
     member_count: 1,
+    handle: TEAM_HANDLE,
     archived_at: null,
   })
   mocks.getWorkosUserId.mockResolvedValue('workos_owner')
@@ -506,12 +536,88 @@ describe('WorkOS compensation', () => {
 })
 
 describe('Team creation idempotency', () => {
+  it('rejects an occupied explicit handle before writing a receipt or calling WorkOS', async () => {
+    mocks.assertHandleAvailable.mockRejectedValue(new ApiError('CONFLICT', 'handle taken'))
+
+    const response = await invoke(
+      createTeam,
+      new Request('https://spool.new/api/teams', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'team-create-handle-taken-0001' },
+        body: JSON.stringify({ name: 'Original', handle: 'taken-handle' }),
+      }),
+      env(),
+    )
+
+    expect(response.status).toBe(409)
+    expect(mocks.beginTeamCreationRequest).not.toHaveBeenCalled()
+    expect(mocks.client.createOrganization).not.toHaveBeenCalled()
+    expect(mocks.client.createMembership).not.toHaveBeenCalled()
+  })
+
+  it('commits the selected handle in the same local operation as the Team', async () => {
+    mocks.getTeamForMember.mockResolvedValue({
+      id: TEAM_ID,
+      name: 'Original',
+      role: 'owner',
+      permissions: ['team:update', 'team:archive'],
+      member_count: 1,
+      handle: 'atomic-handle',
+      archived_at: null,
+    })
+    const response = await invoke(
+      createTeam,
+      new Request('https://spool.new/api/teams', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'team-create-atomic-handle-0001' },
+        body: JSON.stringify({ name: 'Original', handle: 'atomic-handle' }),
+      }),
+      env(),
+    )
+
+    expect(response.status).toBe(201)
+    expect(mocks.createLocalTeam).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ requestedHandle: 'atomic-handle' }),
+    )
+    expect(mocks.changeTeamHandle).not.toHaveBeenCalled()
+  })
+
+  it('rejects the same idempotency key when its recorded handle intent differs', async () => {
+    mocks.getTeamCreationRequest.mockResolvedValue({
+      user_id: USER_ID,
+      idempotency_key: 'team-create-handle-intent-0001',
+      team_id: TEAM_ID,
+      normalized_name: 'Original',
+      requested_handle: 'first-handle',
+      status: 'pending',
+      workos_organization_id: null,
+      created_at: 1,
+      updated_at: 1,
+    })
+
+    const response = await invoke(
+      createTeam,
+      new Request('https://spool.new/api/teams', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'team-create-handle-intent-0001' },
+        body: JSON.stringify({ name: 'Original', handle: 'second-handle' }),
+      }),
+      env(),
+    )
+
+    expect(response.status).toBe(409)
+    expect(mocks.client.createOrganization).not.toHaveBeenCalled()
+    expect(mocks.client.createMembership).not.toHaveBeenCalled()
+  })
+
   it('replays a completed browser operation without another WorkOS mutation', async () => {
     mocks.getTeamCreationRequest.mockResolvedValue({
       user_id: USER_ID,
       idempotency_key: 'team-create-replay-0001',
       team_id: TEAM_ID,
       normalized_name: 'Original',
+      requested_handle: TEAM_HANDLE,
       status: 'completed',
       workos_organization_id: 'org_1',
       created_at: 1,
@@ -529,6 +635,7 @@ describe('Team creation idempotency', () => {
     expect(response.status).toBe(200)
     expect(mocks.client.createOrganization).not.toHaveBeenCalled()
     expect(mocks.client.createMembership).not.toHaveBeenCalled()
+    expect(mocks.changeTeamHandle).not.toHaveBeenCalled()
   })
 
   it('treats a same-key concurrent local commit as success and never deletes its Organization', async () => {
@@ -547,6 +654,103 @@ describe('Team creation idempotency', () => {
     expect(mocks.completeTeamCreationRequest).toHaveBeenCalled()
     expect(mocks.failTeamCreationRequest).not.toHaveBeenCalled()
     expect(mocks.client.deleteOrganization).not.toHaveBeenCalled()
+  })
+
+  it('compensates WorkOS when another operation wins the atomic handle claim', async () => {
+    mocks.createLocalTeam.mockRejectedValue(new Error('UNIQUE constraint failed: handles.handle'))
+    mocks.getTeamById.mockResolvedValue(null)
+
+    const response = await invoke(
+      createTeam,
+      new Request('https://spool.new/api/teams', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'team-create-handle-race-0001' },
+        body: JSON.stringify({ name: 'Original', handle: 'racing-handle' }),
+      }),
+      env(),
+    )
+
+    expect(response.status).toBe(409)
+    expect(mocks.failTeamCreationRequest).toHaveBeenCalled()
+    expect(mocks.client.deleteOrganization).toHaveBeenCalledWith('org_1')
+    expect(mocks.completeWorkosCleanup).toHaveBeenCalledWith(
+      expect.anything(),
+      'organization.delete',
+      'org_1',
+    )
+  })
+
+  it('repairs a pre-handle receipt once and then completes it', async () => {
+    mocks.getTeamCreationRequest.mockResolvedValue({
+      user_id: USER_ID,
+      idempotency_key: 'team-create-legacy-handle-0001',
+      team_id: TEAM_ID,
+      normalized_name: 'Original',
+      requested_handle: null,
+      status: 'pending',
+      workos_organization_id: 'org_1',
+      created_at: 1,
+      updated_at: 1,
+    })
+    mocks.adoptTeamCreationHandle.mockResolvedValue({
+      user_id: USER_ID,
+      idempotency_key: 'team-create-legacy-handle-0001',
+      team_id: TEAM_ID,
+      normalized_name: 'Original',
+      requested_handle: TEAM_HANDLE,
+      status: 'pending',
+      workos_organization_id: 'org_1',
+      created_at: 1,
+      updated_at: 2,
+    })
+    const withoutHandle = {
+      id: TEAM_ID,
+      name: 'Original',
+      role: 'owner',
+      permissions: ['team:update', 'team:archive'],
+      member_count: 1,
+      handle: null,
+      archived_at: null,
+    }
+    const withHandle = { ...withoutHandle, handle: TEAM_HANDLE }
+    mocks.getTeamForMember
+      .mockResolvedValueOnce(withoutHandle)
+      .mockResolvedValueOnce(withoutHandle)
+      .mockResolvedValueOnce(withHandle)
+
+    const response = await invoke(
+      createTeam,
+      new Request('https://spool.new/api/teams', {
+        method: 'POST',
+        headers: { 'idempotency-key': 'team-create-legacy-handle-0001' },
+        body: JSON.stringify({ name: 'Original' }),
+      }),
+      env(),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.adoptTeamCreationHandle).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      'team-create-legacy-handle-0001',
+      TEAM_HANDLE,
+      expect.any(Number),
+    )
+    expect(mocks.changeTeamHandle).toHaveBeenCalledWith(expect.anything(), {
+      teamId: TEAM_ID,
+      actorUserId: USER_ID,
+      handle: TEAM_HANDLE,
+      now: expect.any(Number),
+    })
+    expect(mocks.completeTeamCreationRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+      'team-create-legacy-handle-0001',
+      TEAM_ID,
+      TEAM_HANDLE,
+      expect.any(Number),
+    )
+    expect(mocks.client.createOrganization).not.toHaveBeenCalled()
   })
 })
 

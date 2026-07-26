@@ -1,8 +1,10 @@
-import { Avatar, Badge, Button, SectionLabel, Tabs } from '@spool-lab/ui'
+import { Avatar, Badge, Button, ButtonLink, SectionLabel, Tabs } from '@spool-lab/ui'
 import {
   Archive,
   Clock3,
+  FolderKanban,
   MailPlus,
+  Plus,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -10,13 +12,15 @@ import {
   UserMinus,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 import { ManagedSessionList, withoutManagedSession } from '../components/ManagedSessionList'
+import { ProjectCard } from '../components/ProjectCard'
 import { SessionFeedSkeleton } from '../components/SessionFeedRow'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { humanDate } from '../lib/dates'
 import { appendUniqueManagedSessions } from '../lib/hub-management-api'
+import { fetchTeamProjects, type ProjectSummary } from '../lib/project-api'
 import {
   archiveTeam,
   announceTeamSummaryChanged,
@@ -41,8 +45,9 @@ import {
 } from '../lib/team-api'
 
 import '../styles/app.css'
+import '../styles/projects.css'
 
-export type TeamTab = 'sessions' | 'members' | 'settings'
+export type TeamTab = 'sessions' | 'projects' | 'members' | 'settings'
 
 type TeamState =
   | { kind: 'loading' }
@@ -80,6 +85,7 @@ export function TeamTabs({
       value={value}
       items={[
         { value: 'sessions', label: 'Sessions', ariaControls: 'team-panel-sessions' },
+        { value: 'projects', label: 'Projects', ariaControls: 'team-panel-projects' },
         { value: 'members', label: 'Members', ariaControls: 'team-panel-members' },
         { value: 'settings', label: 'Settings', ariaControls: 'team-panel-settings' },
       ]}
@@ -88,9 +94,16 @@ export function TeamTabs({
   )
 }
 
-export function TeamPage({ teamId }: { teamId: string }) {
+export function TeamPage({
+  teamId,
+  tab,
+  onTabChange,
+}: {
+  teamId: string
+  tab: TeamTab
+  onTabChange: (tab: TeamTab) => void
+}) {
   const [state, setState] = useState<TeamState>({ kind: 'loading' })
-  const [tab, setTab] = useState<TeamTab>('sessions')
 
   const loadTeam = useCallback(async () => {
     const result = await fetchTeam(teamId)
@@ -146,14 +159,15 @@ export function TeamPage({ teamId }: { teamId: string }) {
             <div className="sw-team-heading-copy">
               <p className="sw-team-eyebrow">Team workspace</p>
               <h1>{team.name}</h1>
-              <p>Recent Team-owned Sessions live here; each row states who can read it.</p>
+              <p>Projects organize the work; Team-owned Sessions preserve its private history.</p>
             </div>
             {team.role ? <Badge>{roleLabel(team.role)}</Badge> : null}
           </header>
 
-          <TeamTabs value={tab} onChange={setTab} />
+          <TeamTabs value={tab} onChange={onTabChange} />
           <div className="sw-team-panel">
             {tab === 'sessions' ? <TeamSessionsPanel team={team} /> : null}
+            {tab === 'projects' ? <TeamProjectsPanel team={team} /> : null}
             {tab === 'members' ? (
               <TeamMembersPanel
                 team={team}
@@ -334,6 +348,7 @@ export function TeamSessionsPanel({
     | {
         kind: 'ready'
         sessions: TeamSession[]
+        sessionCount: number
         nextCursor: string | null
         loadingMore: boolean
         moreError: string | null
@@ -354,6 +369,7 @@ export function TeamSessionsPanel({
     setState({
       kind: 'ready',
       sessions: result.data.sessions,
+      sessionCount: result.data.session_count ?? result.data.sessions.length,
       nextCursor: result.data.next_cursor ?? null,
       loadingMore: false,
       moreError: null,
@@ -376,7 +392,11 @@ export function TeamSessionsPanel({
   function removeSession(sid: string) {
     setState((current) =>
       current.kind === 'ready'
-        ? { ...current, sessions: withoutManagedSession(current.sessions, sid) }
+        ? {
+            ...current,
+            sessions: withoutManagedSession(current.sessions, sid),
+            sessionCount: Math.max(0, current.sessionCount - 1),
+          }
         : current,
     )
   }
@@ -404,6 +424,7 @@ export function TeamSessionsPanel({
         ? {
             ...current,
             sessions: appendUniqueManagedSessions(current.sessions, result.data.sessions),
+            sessionCount: result.data.session_count ?? current.sessionCount,
             nextCursor: result.data.next_cursor ?? null,
             loadingMore: false,
             moreError: null,
@@ -422,7 +443,7 @@ export function TeamSessionsPanel({
       {!isFeed ? (
         <SectionLabel
           className="sw-team-session-label"
-          count={state.kind === 'ready' ? state.sessions.length || undefined : undefined}
+          count={state.kind === 'ready' ? state.sessionCount || undefined : undefined}
         >
           Recent Sessions
         </SectionLabel>
@@ -484,6 +505,132 @@ export function TeamSessionsPanel({
       ) : null}
     </section>
   )
+}
+
+function TeamProjectsPanel({ team }: { team: TeamSummary }) {
+  const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [moreError, setMoreError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
+  const canManage =
+    hasTeamPermission(team, 'projects:manage') || team.role === 'owner' || team.role === 'admin'
+
+  const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+    setProjects(null)
+    setNextCursor(null)
+    setError(null)
+    setMoreError(null)
+    setLoadingMore(false)
+    const result = await fetchTeamProjects(team.id)
+    if (requestId !== requestIdRef.current) return
+    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind !== 'ok') {
+      setError(failureMessage(result, 'Could not load Team Projects.'))
+      return
+    }
+    setProjects(result.data.projects)
+    setNextCursor(result.data.next_cursor ?? null)
+  }, [team.id])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function loadMoreProjects() {
+    if (nextCursor === null || loadingMore) return
+    const requestId = requestIdRef.current
+    const cursor = nextCursor
+    setLoadingMore(true)
+    setMoreError(null)
+    const result = await fetchTeamProjects(team.id, cursor)
+    if (requestId !== requestIdRef.current) return
+    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind !== 'ok') {
+      setLoadingMore(false)
+      setMoreError(failureMessage(result, 'Could not load more Team Projects.'))
+      return
+    }
+    setProjects((current) => appendUniqueProjects(current ?? [], result.data.projects))
+    setNextCursor(result.data.next_cursor ?? null)
+    setLoadingMore(false)
+  }
+
+  return (
+    <section id="team-panel-projects" role="tabpanel" aria-label="Team Projects">
+      <SectionLabel
+        count={nextCursor === null ? projects?.length || undefined : undefined}
+        action={
+          canManage ? (
+            <ButtonLink
+              href={`/projects/new?team=${encodeURIComponent(team.id)}`}
+              size="sm"
+              variant="ghost"
+            >
+              <Plus aria-hidden="true" />
+              New Project
+            </ButtonLink>
+          ) : undefined
+        }
+      >
+        Projects
+      </SectionLabel>
+      {projects === null && error === null ? <PanelLoading label="Loading Projects" /> : null}
+      {error ? <PanelError message={error} onRetry={load} /> : null}
+      {projects?.length === 0 ? (
+        <div className="sw-team-empty">
+          <FolderKanban size={20} strokeWidth={1.6} aria-hidden="true" />
+          <div>
+            <h2>No Team Projects yet</h2>
+            <p>Create one stable namespace before associating Team Sessions from the CLI.</p>
+          </div>
+        </div>
+      ) : null}
+      {projects && projects.length > 0 ? (
+        <>
+          <div className="projects-list sw-team-project-list">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+          {nextCursor !== null || moreError !== null ? (
+            <div className="sw-team-status sw-team-status-action">
+              <Button
+                variant="outline"
+                loading={loadingMore}
+                loadingLabel="Loading more Projects…"
+                onClick={() => void loadMoreProjects()}
+              >
+                {moreError ? 'Try loading more again' : 'Load more Projects'}
+              </Button>
+              {moreError ? (
+                <p className="managed-session-error" role="alert">
+                  {moreError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  )
+}
+
+export function appendUniqueProjects(
+  current: readonly ProjectSummary[],
+  incoming: readonly ProjectSummary[],
+): ProjectSummary[] {
+  const seen = new Set(current.map((project) => project.id))
+  return [
+    ...current,
+    ...incoming.filter((project) => {
+      if (seen.has(project.id)) return false
+      seen.add(project.id)
+      return true
+    }),
+  ]
 }
 
 function TeamMembersPanel({
@@ -810,13 +957,18 @@ function TeamSettingsPanel({
   onTeamChanged: (team: TeamSummary) => void
 }) {
   const [name, setName] = useState(team.name)
-  const [busy, setBusy] = useState<'rename' | 'leave' | 'archive' | null>(null)
+  const [handle, setHandle] = useState(team.handle ?? '')
+  const [busy, setBusy] = useState<'rename' | 'handle' | 'leave' | 'archive' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const canUpdate = hasTeamPermission(team, 'team:update')
+  const canUpdateIdentity = hasTeamPermission(team, 'team:identity') || team.role === 'owner'
   const canArchive = hasTeamPermission(team, 'team:archive')
   const canLeave = hasTeamPermission(team, 'team:leave')
 
-  useEffect(() => setName(team.name), [team.name])
+  useEffect(() => {
+    setName(team.name)
+    setHandle(team.handle ?? '')
+  }, [team.handle, team.name])
 
   async function rename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -847,10 +999,26 @@ function TeamSettingsPanel({
     window.location.assign('/me#teams')
   }
 
+  async function saveHandle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const next = handle.trim().toLowerCase()
+    if (!next || next === team.handle || busy !== null) return
+    setBusy('handle')
+    setError(null)
+    const result = await updateTeam(team.id, { handle: next })
+    setBusy(null)
+    if (result.kind === 'unauthenticated') return redirectToSignIn()
+    if (result.kind !== 'ok') {
+      return setError(failureMessage(result, 'Could not update this Team handle.'))
+    }
+    announceTeamSummaryChanged(result.data.team)
+    onTeamChanged(result.data.team)
+  }
+
   async function archive() {
     if (
       !window.confirm(
-        `Archive ${team.name}? Team Sessions will no longer be available to members. This cannot be undone here.`,
+        `Archive ${team.name}? Its Projects and Sessions will no longer be available to members. This cannot be undone here.`,
       )
     ) {
       return
@@ -870,7 +1038,7 @@ function TeamSettingsPanel({
       <div className="sw-team-settings-section">
         <div className="sw-team-section-copy">
           <h2>Team details</h2>
-          <p>The team name appears anywhere membership and Team-only visibility are shown.</p>
+          <p>The team name appears on membership, Project ownership, and Team-only visibility.</p>
         </div>
         {canUpdate ? (
           <form className="sw-team-rename" onSubmit={(event) => void rename(event)}>
@@ -903,11 +1071,52 @@ function TeamSettingsPanel({
         )}
       </div>
 
+      <div className="sw-team-settings-section">
+        <div className="sw-team-section-copy">
+          <h2>Team namespace</h2>
+          <p>The handle owns stable Project paths such as @{team.handle || 'paperboy'}/project.</p>
+        </div>
+        {canUpdateIdentity ? (
+          <form className="sw-team-rename" onSubmit={(event) => void saveHandle(event)}>
+            <label>
+              <span>Team handle</span>
+              <span className="sw-team-handle-input">
+                <span>@</span>
+                <input
+                  value={handle}
+                  minLength={3}
+                  maxLength={32}
+                  pattern="[a-z][a-z0-9_-]{2,31}"
+                  required
+                  onChange={(event) => setHandle(event.target.value.toLowerCase())}
+                />
+              </span>
+            </label>
+            <Button
+              variant="outline"
+              size="lg"
+              type="submit"
+              loading={busy === 'handle'}
+              loadingLabel="Saving…"
+              disabled={
+                busy !== 'handle' &&
+                (busy !== null || handle.trim() === '' || handle.trim() === team.handle)
+              }
+            >
+              <Settings2 aria-hidden="true" />
+              Save handle
+            </Button>
+          </form>
+        ) : (
+          <div className="sw-team-readonly-name">@{team.handle ?? 'Not set'}</div>
+        )}
+      </div>
+
       {canLeave || canArchive ? (
         <div className="sw-team-settings-section sw-team-danger-zone">
           <div className="sw-team-section-copy">
             <h2>Workspace access</h2>
-            <p>Membership changes apply immediately to every Team Session.</p>
+            <p>Membership changes apply immediately to every Team Project and Session.</p>
           </div>
           <div className="sw-team-danger-actions">
             {canLeave ? (

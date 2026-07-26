@@ -1,4 +1,4 @@
-import type { PagesFunction } from '@cloudflare/workers-types'
+import type { D1PreparedStatement, PagesFunction } from '@cloudflare/workers-types'
 import { costForUsage, isDiscoverySessionSid } from '@spool-lab/session-kit'
 
 import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
@@ -34,6 +34,10 @@ import {
   teamStorageBytes,
 } from '../../../../../../src/hub/store'
 import { parseHeadBody, requireSid, TEAM_QUOTA_BYTES } from '../../../../../../src/hub/wire'
+import {
+  ensureProjectTenantHandle,
+  prepareAuthorizedDefaultProjectInsert,
+} from '../../../../../../src/projects/store'
 import { publicBaseUrl } from '../../../../../../src/public-url'
 
 // Step 3 of the share handshake: commit the head. Re-runs the same
@@ -49,12 +53,8 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     const body = await parseHeadBody(ctx.request)
 
     const existing = await getHubSession(ctx.env.DB, sid)
-    const { missing, aliasOids, teamId, teamRole } = await validateHead(
-      ctx.env.DB,
-      user.id,
-      sid,
-      body,
-    )
+    const { missing, aliasOids, teamId, teamRole, projectId, projectNeedsInsert } =
+      await validateHead(ctx.env.DB, user.id, sid, body)
     if (missing.length > 0) {
       throw new ApiError('CONFLICT', 'objects missing — upload before committing', {
         missing: missing.slice(0, 50),
@@ -96,6 +96,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       : null
     const accessChanged =
       existing === null || existing.team_id !== teamId || currentVisibility !== effectiveVisibility
+    const projectChanged = existing === null || existing.project_id !== projectId
     const requestedStorageVisibility: 'private' | 'unlisted' =
       effectiveVisibility === 'team' ? 'private' : 'unlisted'
     const committedStorageVisibility: 'private' | 'unlisted' =
@@ -106,6 +107,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
     const requireTeamManager =
       teamId !== null &&
       ((existingTeamOwned && accessChanged) ||
+        (existingTeamOwned && projectChanged) ||
         (!existingTeamOwned && effectiveVisibility !== 'team'))
     if (requireTeamManager && teamRole !== 'owner' && teamRole !== 'admin') {
       throw new ApiError('FORBIDDEN')
@@ -160,17 +162,21 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       spoolFileOid: body.spoolFileOid,
       costUsd: cost?.usd ?? null,
       totalTokens: cost?.totalTokens ?? null,
+      projectId,
       now,
       actorUserId: user.id,
       expectedTeamId: existing?.team_id ?? null,
+      expectedProjectId: existing?.project_id ?? null,
       expectedVisibility: existing?.visibility ?? 'unlisted',
       expectedWithdrawnAt: existing?.withdrawn_at ?? null,
       expectedRoot: existing?.root ?? null,
       expectedUpdatedAt: existing?.updated_at ?? null,
       expectedPublished: wasPublic,
       targetTeamId: teamId,
+      targetProjectId: projectId,
       targetVisibility: requestedStorageVisibility,
       changeAccess: accessChanged,
+      changeProject: projectChanged,
       clearWithdrawal: existing?.team_id == null && existing?.withdrawn_at != null,
       requireTeamManager,
     } as const
@@ -178,7 +184,26 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       existing === null
         ? prepareAuthorizedHeadInsert(ctx.env.DB, sessionWrite)
         : prepareAuthorizedHeadUpdate(ctx.env.DB, sessionWrite)
-    const statements = [sessionCommit]
+    const statements: D1PreparedStatement[] = []
+    // A Project may have been synthesized by the rolling-deploy compatibility
+    // trigger while the previous Worker was still serving traffic. Repair the
+    // tenant route identity before every commit, not only on first creation.
+    await ensureProjectTenantHandle(ctx.env.DB, {
+      actorUserId: user.id,
+      tenant: teamId === null ? { userId: user.id, teamId: null } : { userId: null, teamId },
+      now,
+    })
+    if (projectNeedsInsert) {
+      statements.push(
+        prepareAuthorizedDefaultProjectInsert(ctx.env.DB, {
+          actorUserId: user.id,
+          tenant: teamId === null ? { userId: user.id, teamId: null } : { userId: null, teamId },
+          now,
+        }),
+      )
+    }
+    const sessionCommitIndex = statements.length
+    statements.push(sessionCommit)
     // A legacy client may recommit Summary/card metadata against the same
     // immutable record root. Preserve a server-backfilled projection when
     // that old view cannot carry guidance; a new root without guidance must
@@ -281,7 +306,9 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
       }
       throw error
     }
-    if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')
+    if ((results[sessionCommitIndex]?.meta.changes ?? 0) === 0) {
+      throw new ApiError('NOT_FOUND')
+    }
 
     auditAfterCommit(ctx, {
       user_id: user.id,
@@ -292,6 +319,7 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
         count: body.count,
         visibility: effectiveVisibility,
         team_id: teamId,
+        project_id: projectId,
       },
     })
 
