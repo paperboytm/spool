@@ -20,7 +20,7 @@ import { HUB_PROJECTS_LIST_SQL } from './query-sql'
 import type { ProjectOwner, ProjectResponse, ProjectRow, ProjectTenant } from './types'
 import type { CreateProjectInput, UpdateProjectInput } from './validators'
 
-export type ProjectWithCount = ProjectRow & { session_count: number }
+export type ProjectWithCount = ProjectRow & { session_count: number; star_count?: number }
 
 export type HubProjectRow = ProjectWithCount & {
   owner_handle: string
@@ -34,8 +34,9 @@ export type HubProjectRow = ProjectWithCount & {
 export type PublicProjectRow = ProjectRow & {
   session_count: number
   last_session_at: number
+  star_count: number
   owner_handle: string
-  owner_email: string
+  owner_email: string | null
   owner_name: string | null
   owner_display_name: string | null
   owner_avatar_url: string | null
@@ -65,6 +66,11 @@ export type ProjectSessionPageOptions = {
 export type ProjectSessionPage<Row> = {
   rows: Row[]
   nextCursor: string | null
+}
+
+export type PublicProjectSessionSnapshot<Row> = ProjectSessionPage<Row> & {
+  owner: ResolvedHandleOwner
+  project: ProjectWithCount
 }
 
 const DEFAULT_PROJECT_SESSION_LIMIT = 20
@@ -365,7 +371,12 @@ export async function listPersonalProjects(
     .prepare(
       `SELECT p.*,
          (SELECT COUNT(*) FROM hub_sessions s
-          WHERE s.project_id=p.id AND s.withdrawn_at IS NULL) AS session_count
+          WHERE s.project_id=p.id AND s.withdrawn_at IS NULL) AS session_count,
+         (SELECT COUNT(*) FROM project_stars relation
+          JOIN users star_user ON star_user.id=relation.user_id
+            AND star_user.deleted_at IS NULL
+            AND star_user.deletion_pending_until IS NULL
+          WHERE relation.project_id=p.id) AS star_count
        FROM projects p
        JOIN users owner ON owner.id=p.owner_user_id
        WHERE p.owner_user_id=? AND p.owner_team_id IS NULL
@@ -436,6 +447,7 @@ export function serializeHubProject(row: HubProjectRow): ProjectResponse {
     updated_at: row.updated_at,
     archived_at: row.archived_at,
     session_count: Math.max(0, Number(row.session_count)),
+    star_count: Math.max(0, Number(row.star_count ?? 0)),
     can_manage: row.can_manage === 1,
   }
 }
@@ -460,7 +472,12 @@ export async function listTeamProjects(
        )
        SELECT p.*,
          (SELECT COUNT(*) FROM hub_sessions s
-          WHERE s.project_id=p.id AND s.withdrawn_at IS NULL) AS session_count
+          WHERE s.project_id=p.id AND s.withdrawn_at IS NULL) AS session_count,
+         (SELECT COUNT(*) FROM project_stars relation
+          JOIN users star_user ON star_user.id=relation.user_id
+            AND star_user.deleted_at IS NULL
+            AND star_user.deletion_pending_until IS NULL
+          WHERE relation.project_id=p.id) AS star_count
        FROM current_team
        LEFT JOIN projects p
          ON p.owner_team_id=current_team.id AND p.owner_user_id IS NULL
@@ -674,12 +691,26 @@ export function serializeProjectWithOwner(
     updated_at: row.updated_at,
     archived_at: row.archived_at,
     session_count: Math.max(0, Number(row.session_count)),
+    star_count: Math.max(0, Number(row.star_count ?? 0)),
     can_manage: options.canManage ?? false,
   }
 }
 
 export function serializePublicProject(row: PublicProjectRow): ProjectResponse {
-  if (row.owner_user_id === null) {
+  if (row.owner_team_id !== null) {
+    return serializeProjectWithOwner(
+      row,
+      {
+        kind: 'team',
+        id: row.owner_team_id,
+        handle: row.owner_handle,
+        name: row.owner_name ?? row.owner_handle,
+        avatar_url: null,
+      },
+      { canManage: false },
+    )
+  }
+  if (row.owner_user_id === null || row.owner_email === null) {
     throw new ApiError('INTERNAL', 'Public Project owner missing')
   }
   return serializeProjectWithOwner(
@@ -1222,68 +1253,236 @@ export async function listProjectSessions(
   return finishProjectSessionPage(rows.results, options)
 }
 
+type PublicProjectSessionRow = HydratedManagedSessionRow & {
+  team_name: string | null
+  star_count: number
+  project_sort_at: number
+}
+
+type PublicProjectSnapshotColumns = {
+  snapshot_project_id: string
+  snapshot_owner_user_id: string | null
+  snapshot_owner_team_id: string | null
+  snapshot_project_slug: string
+  snapshot_project_name: string
+  snapshot_project_description: string | null
+  snapshot_project_github_url: string | null
+  snapshot_project_created_by_user_id: string
+  snapshot_project_created_at: number
+  snapshot_project_updated_at: number
+  snapshot_project_archived_at: number | null
+  snapshot_owner_handle: string
+  snapshot_owner_email: string | null
+  snapshot_owner_name: string | null
+  snapshot_owner_display_name: string | null
+  snapshot_owner_avatar_url: string | null
+  snapshot_owner_custom_avatar_id: string | null
+  snapshot_owner_avatar_visible: number | null
+  snapshot_team_name: string | null
+  public_session_count: number
+  snapshot_star_count: number
+}
+
+type PublicProjectSessionSnapshotRow = PublicProjectSnapshotColumns & {
+  [Key in keyof PublicProjectSessionRow]: PublicProjectSessionRow[Key] | null
+}
+
 export async function listPublicProjectSessions(
   db: D1Database,
-  projectId: string,
-  ownerUserId: string,
+  handle: string,
+  slug: string,
   options: ProjectSessionPageOptions,
-): Promise<
-  ProjectSessionPage<
-    HydratedManagedSessionRow & {
-      team_name: null
-      star_count: number
-      project_sort_at: number
-    }
-  >
-> {
+): Promise<PublicProjectSessionSnapshot<PublicProjectSessionRow>> {
   const rows = await db
     .prepare(
       `/* projects:list-public-sessions */
-       SELECT s.*, d.published_at AS project_sort_at, NULL AS team_name,
-         (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count,
-         ${managedSessionProjection()}
-       FROM projects p
-       JOIN users owner ON owner.id=p.owner_user_id
-       JOIN hub_sessions s ON s.project_id=p.id
-       ${managedSessionJoins('s')}
-       JOIN hub_session_discovery d ON d.sid=s.sid
-       WHERE p.id=? AND p.owner_user_id=? AND p.owner_team_id IS NULL
-         AND p.archived_at IS NULL AND owner.deleted_at IS NULL
-         AND s.team_id IS NULL AND s.visibility='unlisted'
-         AND s.withdrawn_at IS NULL
-         AND (
-           ?=0 OR d.published_at<? OR (d.published_at=? AND s.sid>?)
-         )
-       ORDER BY d.published_at DESC, s.sid ASC
-       LIMIT ?`,
+       WITH project_snapshot AS (
+         SELECT p.*,route_handle.handle AS snapshot_owner_handle,
+           owner_user.email AS snapshot_owner_email,
+           owner_user.name AS snapshot_owner_name,
+           owner_user.display_name AS snapshot_owner_display_name,
+           owner_user.avatar_url AS snapshot_owner_avatar_url,
+           owner_user.custom_avatar_id AS snapshot_owner_custom_avatar_id,
+           owner_user.avatar_visible AS snapshot_owner_avatar_visible,
+           owner_team.name AS snapshot_team_name,
+           (
+             SELECT COUNT(*)
+             FROM hub_sessions counted_session
+             JOIN hub_session_discovery counted_projection
+               ON counted_projection.sid=counted_session.sid
+             WHERE counted_session.project_id=p.id
+               AND counted_session.visibility='unlisted'
+               AND counted_session.withdrawn_at IS NULL
+               AND (
+                 (p.owner_user_id IS NOT NULL
+                   AND counted_session.team_id IS NULL
+                   AND counted_session.owner_user_id=p.owner_user_id)
+                 OR
+                 (p.owner_team_id IS NOT NULL
+                   AND counted_session.team_id=p.owner_team_id)
+               )
+           ) AS public_session_count,
+           (
+             SELECT COUNT(*)
+             FROM project_stars relation
+             JOIN users actor ON actor.id=relation.user_id
+               AND actor.deleted_at IS NULL
+               AND actor.deletion_pending_until IS NULL
+             WHERE relation.project_id=p.id
+           ) AS snapshot_star_count
+         FROM handles route_handle
+         JOIN projects p
+           ON route_handle.user_id IS p.owner_user_id
+           AND route_handle.team_id IS p.owner_team_id
+         LEFT JOIN users owner_user ON owner_user.id=p.owner_user_id
+           AND owner_user.deleted_at IS NULL
+           AND owner_user.deletion_pending_until IS NULL
+         LEFT JOIN teams owner_team ON owner_team.id=p.owner_team_id
+           AND owner_team.archived_at IS NULL
+           AND owner_team.deletion_pending_until IS NULL
+         WHERE route_handle.handle=? AND route_handle.released_at IS NULL
+           AND p.slug=? AND p.archived_at IS NULL
+           AND (
+             (p.owner_user_id IS NOT NULL AND owner_user.id IS NOT NULL)
+             OR
+             (p.owner_team_id IS NOT NULL AND owner_team.id IS NOT NULL)
+           )
+       ),
+       authorized_project AS (
+         SELECT *
+         FROM project_snapshot
+         WHERE owner_user_id IS NOT NULL OR public_session_count>0
+       ),
+       page AS (
+         SELECT s.*,d.published_at AS project_sort_at,session_team.name AS team_name,
+           (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count,
+           ${managedSessionProjection()}
+         FROM authorized_project p
+         JOIN hub_sessions s ON s.project_id=p.id
+         ${managedSessionJoins('s')}
+         JOIN hub_session_discovery d ON d.sid=s.sid
+         LEFT JOIN teams session_team ON session_team.id=s.team_id
+         WHERE (
+             (p.owner_user_id IS NOT NULL
+               AND s.team_id IS NULL
+               AND s.owner_user_id=p.owner_user_id)
+             OR
+             (p.owner_team_id IS NOT NULL AND s.team_id=p.owner_team_id)
+           )
+           AND s.visibility='unlisted'
+           AND s.withdrawn_at IS NULL
+           AND (
+             ?=0 OR d.published_at<? OR (d.published_at=? AND s.sid>?)
+           )
+         ORDER BY d.published_at DESC,s.sid ASC
+         LIMIT ?
+       )
+       SELECT
+         project.id AS snapshot_project_id,
+         project.owner_user_id AS snapshot_owner_user_id,
+         project.owner_team_id AS snapshot_owner_team_id,
+         project.slug AS snapshot_project_slug,
+         project.name AS snapshot_project_name,
+         project.description AS snapshot_project_description,
+         project.github_url AS snapshot_project_github_url,
+         project.created_by_user_id AS snapshot_project_created_by_user_id,
+         project.created_at AS snapshot_project_created_at,
+         project.updated_at AS snapshot_project_updated_at,
+         project.archived_at AS snapshot_project_archived_at,
+         project.snapshot_owner_handle,
+         project.snapshot_owner_email,
+         project.snapshot_owner_name,
+         project.snapshot_owner_display_name,
+         project.snapshot_owner_avatar_url,
+         project.snapshot_owner_custom_avatar_id,
+         project.snapshot_owner_avatar_visible,
+         project.snapshot_team_name,
+         project.public_session_count,
+         project.snapshot_star_count,
+         page.*
+       FROM authorized_project project
+       LEFT JOIN page ON TRUE
+       ORDER BY page.project_sort_at DESC,page.sid ASC`,
     )
     .bind(
-      projectId,
-      ownerUserId,
+      handle,
+      slug,
       options.after === null ? 0 : 1,
       options.after?.sortAt ?? 0,
       options.after?.sortAt ?? 0,
       options.after?.sid ?? '',
       options.limit + 1,
     )
-    .all<
-      HydratedManagedSessionRow & {
-        team_name: null
-        star_count: number
-        project_sort_at: number
-      }
-    >()
-  return finishProjectSessionPage(rows.results, options)
+    .all<PublicProjectSessionSnapshotRow>()
+  const snapshot = rows.results[0]
+  if (!snapshot) throw new ApiError('NOT_FOUND')
+  const page = finishProjectSessionPage(rows.results.filter(isPublicProjectSessionRow), options)
+  return {
+    ...page,
+    owner: projectSnapshotOwner(snapshot),
+    project: {
+      id: snapshot.snapshot_project_id,
+      owner_user_id: snapshot.snapshot_owner_user_id,
+      owner_team_id: snapshot.snapshot_owner_team_id,
+      slug: snapshot.snapshot_project_slug,
+      name: snapshot.snapshot_project_name,
+      description: snapshot.snapshot_project_description,
+      github_url: snapshot.snapshot_project_github_url,
+      created_by_user_id: snapshot.snapshot_project_created_by_user_id,
+      created_at: snapshot.snapshot_project_created_at,
+      updated_at: snapshot.snapshot_project_updated_at,
+      archived_at: snapshot.snapshot_project_archived_at,
+      session_count: Math.max(0, Number(snapshot.public_session_count)),
+      star_count: Math.max(0, Number(snapshot.snapshot_star_count)),
+    },
+  }
 }
 
-export async function listPublicSessionsForUser(
+function isPublicProjectSessionRow(
+  row: PublicProjectSessionSnapshotRow,
+): row is PublicProjectSessionSnapshotRow & PublicProjectSessionRow {
+  return typeof row.sid === 'string'
+}
+
+function projectSnapshotOwner(row: PublicProjectSessionSnapshotRow): ResolvedHandleOwner {
+  if (row.snapshot_owner_team_id !== null) {
+    return {
+      kind: 'team',
+      id: row.snapshot_owner_team_id,
+      handle: row.snapshot_owner_handle,
+      name: row.snapshot_team_name ?? row.snapshot_owner_handle,
+      avatar_url: null,
+    }
+  }
+  if (row.snapshot_owner_user_id === null || row.snapshot_owner_email === null) {
+    throw new ApiError('INTERNAL', 'Public Project owner missing')
+  }
+  return {
+    kind: 'user',
+    id: row.snapshot_owner_user_id,
+    handle: row.snapshot_owner_handle,
+    name: resolveDisplayName({
+      display_name: row.snapshot_owner_display_name,
+      name: row.snapshot_owner_name,
+      email: row.snapshot_owner_email,
+    }),
+    avatar_url: visibleUserAvatarUrl({
+      userId: row.snapshot_owner_user_id,
+      avatarUrl: row.snapshot_owner_avatar_url,
+      customAvatarId: row.snapshot_owner_custom_avatar_id,
+      avatarVisible: row.snapshot_owner_avatar_visible,
+    }),
+  }
+}
+
+export async function listPublicSessionsForOwner(
   db: D1Database,
-  ownerUserId: string,
+  owner: ResolvedHandleOwner,
   options: ProjectSessionPageOptions,
 ): Promise<
   ProjectSessionPage<
     HydratedManagedSessionRow & {
-      team_name: null
+      team_name: string | null
       star_count: number
       project_sort_at: number
     }
@@ -1292,19 +1491,34 @@ export async function listPublicSessionsForUser(
   const rows = await db
     .prepare(
       `/* projects:list-public-owner-sessions */
-       SELECT s.*, d.published_at AS project_sort_at, NULL AS team_name,
+       SELECT s.*, d.published_at AS project_sort_at, session_team.name AS team_name,
          (SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count,
          ${managedSessionProjection()}
        FROM hub_sessions s
        ${managedSessionJoins('s')}
        JOIN projects p ON p.id=s.project_id
        JOIN hub_session_discovery d ON d.sid=s.sid
-       JOIN users owner ON owner.id=s.owner_user_id
-       WHERE s.owner_user_id=? AND s.team_id IS NULL
+       LEFT JOIN teams session_team ON session_team.id=s.team_id
+       WHERE p.owner_user_id IS ? AND p.owner_team_id IS ?
+         AND (
+           (?=1 AND s.team_id IS NULL AND s.owner_user_id=p.owner_user_id
+             AND EXISTS (
+               SELECT 1 FROM users project_user
+               WHERE project_user.id=p.owner_user_id
+                 AND project_user.deleted_at IS NULL
+                 AND project_user.deletion_pending_until IS NULL
+             ))
+           OR
+           (?=1 AND s.team_id=p.owner_team_id
+             AND EXISTS (
+               SELECT 1 FROM teams project_team
+               WHERE project_team.id=p.owner_team_id
+                 AND project_team.archived_at IS NULL
+                 AND project_team.deletion_pending_until IS NULL
+             ))
+         )
          AND s.visibility='unlisted' AND s.withdrawn_at IS NULL
-         AND p.owner_user_id=s.owner_user_id AND p.owner_team_id IS NULL
          AND p.archived_at IS NULL
-         AND owner.deleted_at IS NULL AND owner.deletion_pending_until IS NULL
          AND (
            ?=0 OR d.published_at<? OR (d.published_at=? AND s.sid>?)
          )
@@ -1312,7 +1526,10 @@ export async function listPublicSessionsForUser(
        LIMIT ?`,
     )
     .bind(
-      ownerUserId,
+      owner.kind === 'user' ? owner.id : null,
+      owner.kind === 'team' ? owner.id : null,
+      owner.kind === 'user' ? 1 : 0,
+      owner.kind === 'team' ? 1 : 0,
       options.after === null ? 0 : 1,
       options.after?.sortAt ?? 0,
       options.after?.sortAt ?? 0,
@@ -1321,7 +1538,7 @@ export async function listPublicSessionsForUser(
     )
     .all<
       HydratedManagedSessionRow & {
-        team_name: null
+        team_name: string | null
         star_count: number
         project_sort_at: number
       }
@@ -1340,24 +1557,38 @@ export async function listPublicProjects(
          SELECT p.*,
            COUNT(*) AS session_count,
            MAX(d.published_at) AS last_session_at,
+           (SELECT COUNT(*) FROM project_stars relation
+            JOIN users star_user ON star_user.id=relation.user_id
+              AND star_user.deleted_at IS NULL
+              AND star_user.deletion_pending_until IS NULL
+            WHERE relation.project_id=p.id) AS star_count,
            h.handle AS owner_handle,
            u.email AS owner_email,
-           u.name AS owner_name,
+           CASE WHEN p.owner_team_id IS NULL THEN u.name ELSE t.name END AS owner_name,
            u.display_name AS owner_display_name,
            u.avatar_url AS owner_avatar_url,
            u.custom_avatar_id AS owner_custom_avatar_id,
            COALESCE(u.avatar_visible,1) AS owner_avatar_visible
          FROM projects p
-         JOIN users u ON u.id=p.owner_user_id AND u.deleted_at IS NULL
-         JOIN handles h ON h.user_id=p.owner_user_id AND h.released_at IS NULL
+         LEFT JOIN users u ON u.id=p.owner_user_id
+           AND u.deleted_at IS NULL AND u.deletion_pending_until IS NULL
+         LEFT JOIN teams t ON t.id=p.owner_team_id
+           AND t.archived_at IS NULL AND t.deletion_pending_until IS NULL
+         JOIN handles h ON h.released_at IS NULL
+           AND h.user_id IS p.owner_user_id AND h.team_id IS p.owner_team_id
          JOIN hub_sessions s ON s.project_id=p.id
-           AND s.owner_user_id=p.owner_user_id
-           AND s.team_id IS NULL
+           AND (
+             (p.owner_user_id IS NOT NULL
+               AND s.owner_user_id=p.owner_user_id AND s.team_id IS NULL)
+             OR
+             (p.owner_team_id IS NOT NULL AND s.team_id=p.owner_team_id)
+           )
            AND s.visibility='unlisted'
            AND s.withdrawn_at IS NULL
          JOIN hub_session_discovery d ON d.sid=s.sid
-         WHERE p.owner_user_id IS NOT NULL AND p.owner_team_id IS NULL
-           AND p.archived_at IS NULL
+         WHERE p.archived_at IS NULL
+           AND ((p.owner_user_id IS NOT NULL AND u.id IS NOT NULL)
+             OR (p.owner_team_id IS NOT NULL AND t.id IS NOT NULL))
          GROUP BY p.id
        )
        SELECT * FROM public_projects
@@ -1376,26 +1607,41 @@ export async function listPublicProjects(
   return rows.results
 }
 
-export async function listPublicProjectsForUser(
+export async function listPublicProjectsForOwner(
   db: D1Database,
-  userId: string,
+  owner: ResolvedHandleOwner,
 ): Promise<ProjectWithCount[]> {
   const rows = await db
     .prepare(
-      `SELECT p.*, COUNT(d.sid) AS session_count
+      `SELECT p.*, COUNT(d.sid) AS session_count,
+         (SELECT COUNT(*) FROM project_stars relation
+          JOIN users star_user ON star_user.id=relation.user_id
+            AND star_user.deleted_at IS NULL
+            AND star_user.deletion_pending_until IS NULL
+          WHERE relation.project_id=p.id) AS star_count
        FROM projects p
        JOIN hub_sessions s ON s.project_id=p.id
        JOIN hub_session_discovery d ON d.sid=s.sid
-       JOIN users owner ON owner.id=p.owner_user_id
-       WHERE p.owner_user_id=? AND p.owner_team_id IS NULL
-         AND p.archived_at IS NULL AND owner.deleted_at IS NULL
-         AND s.team_id IS NULL AND s.visibility='unlisted'
+       WHERE p.owner_user_id IS ? AND p.owner_team_id IS ?
+         AND p.archived_at IS NULL
+         AND (
+           (?=1 AND s.team_id IS NULL AND s.owner_user_id=p.owner_user_id)
+           OR
+           (?=1 AND s.team_id=p.owner_team_id)
+         )
+         AND s.visibility='unlisted'
          AND s.withdrawn_at IS NULL
        GROUP BY p.id
        ORDER BY MAX(d.published_at) DESC, p.id ASC
        LIMIT ?`,
     )
-    .bind(userId, MAX_ACTIVE_PROJECTS_PER_TENANT + 1)
+    .bind(
+      owner.kind === 'user' ? owner.id : null,
+      owner.kind === 'team' ? owner.id : null,
+      owner.kind === 'user' ? 1 : 0,
+      owner.kind === 'team' ? 1 : 0,
+      MAX_ACTIVE_PROJECTS_PER_TENANT + 1,
+    )
     .all<ProjectWithCount>()
   return rows.results
 }

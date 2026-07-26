@@ -10,6 +10,8 @@ import {
   prepareAuthorizedDiscoveryProjectionDelete,
   prepareAuthorizedDiscoveryProjectionUpsert,
   prepareAuthorizedEngagementDelete,
+  prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic,
+  prepareAuthorizedProjectStarsDeleteWhenNotPublic,
   prepareAuthorizedTargetStarsDelete,
   readDiscoveryView,
 } from '../../../../src/discovery/projection'
@@ -287,6 +289,20 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
         prepareAuthorizedEngagementDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedTargetStarsDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedDiscoveryProjectionDelete(ctx.env.DB, projectionGate),
+      )
+    }
+    if (wasPublic || session.project_id !== targetProjectId) {
+      statements.push(
+        prepareAuthorizedProjectStarsDeleteWhenNotPublic(
+          ctx.env.DB,
+          session.project_id,
+          projectionGate,
+        ),
+        prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic(
+          ctx.env.DB,
+          session.project_id,
+          projectionGate,
+        ),
       )
     }
 

@@ -1,7 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
-import '@spool-lab/ui/styles.css'
+import '../styles/tailwind.css'
 // Self-hosted Geist (CSP: font-src 'self'). The variable face carries
 // the sans family for both surfaces; mono weights match what the
 // indexed-content styles use. Loaded at the root so the marketing and

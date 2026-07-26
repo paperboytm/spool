@@ -479,8 +479,9 @@ export type AvatarProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
 function initialsOf(name: string | null | undefined): string {
   if (!name?.trim()) return '?'
   const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]?.slice(0, 1).toUpperCase() ?? '?'
-  return `${parts[0]?.[0] ?? ''}${parts.at(-1)?.[0] ?? ''}`.toUpperCase() || '?'
+  const firstCodePoint = (value: string | undefined) => Array.from(value ?? '')[0] ?? ''
+  if (parts.length === 1) return firstCodePoint(parts[0]).toUpperCase() || '?'
+  return `${firstCodePoint(parts[0])}${firstCodePoint(parts.at(-1))}`.toUpperCase() || '?'
 }
 
 export function Avatar({ src, name, alt = '', size = 'md', className, ...props }: AvatarProps) {

@@ -6,9 +6,19 @@ import {
 } from '@spool-lab/core'
 import { Command } from 'commander'
 
-import { HubClient, type HubFetch, type HubProjectsResponse, type HubTeam } from '../hub/client.js'
+import {
+  HubClient,
+  type HubFetch,
+  type HubProject,
+  type HubProjectsResponse,
+  type HubTeam,
+} from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
-import { persistResolvedProject, resolveHubProject } from '../hub/project-resolution.js'
+import {
+  materializeHubProject,
+  persistResolvedProject,
+  resolveHubProject,
+} from '../hub/project-resolution.js'
 import { resolveTeamReference } from '../hub/team-resolution.js'
 import {
   addSubscription,
@@ -22,8 +32,8 @@ import { createClackUi, createTextUi, type CliUi } from '../ui.js'
 
 // `spool subscribe [dir]` records the one-time decision that Sessions from a
 // directory — and from its git worktrees — publish automatically. The
-// disclosure target is always an explicit choice among Team, Link-only, and
-// Public; there is no implicit default and Public is never preselected.
+// Project ownership and disclosure are confirmed separately. Team-owned
+// Projects default to Team-only, and Public is never preselected.
 
 export interface SubscribeCommandOptions {
   team?: string
@@ -46,8 +56,6 @@ export interface SubscribeCommandDependencies extends HubCredentialOptions {
 
 interface VisibilityTarget {
   visibility: SubscriptionVisibility
-  teamId?: string
-  teamName?: string
 }
 
 export async function handleSubscribeCommand(
@@ -59,40 +67,38 @@ export async function handleSubscribeCommand(
   const cwd = dependencies.cwd ?? process.cwd()
   ui.intro('Subscribe a directory')
   try {
-    const flagCount = [options.team, options.linkOnly, options.public].filter(
-      (value) => value !== undefined && value !== false,
-    ).length
-    if (flagCount > 1) {
-      ui.error('Pick exactly one of `--team`, `--link-only`, or `--public`.')
+    if (options.linkOnly === true && options.public === true) {
+      ui.error('Pick exactly one of `--link-only` or `--public`.')
       return 1
     }
     if (options.project !== undefined && options.createProject !== undefined) {
       ui.error('`--project` and `--create-project` cannot be used together.')
       return 1
     }
-
-    const path = canonicalSubscriptionPath(directory ?? cwd, cwd)
-    const target = await resolveVisibilityTarget(ui, options, dependencies)
-    if (target === null) return 1
-
-    if (options.yes !== true) {
-      if (!ui.interactive) {
-        ui.error('Cannot confirm auto-publish visibility without a TTY. Re-run with `--yes`.')
-        return 1
-      }
-      ui.info(disclosureCopy(target))
-      const approved = await ui.confirm(`Subscribe ${path}?`, true)
-      if (approved !== true) {
-        ui.cancel('Nothing subscribed.')
-        return 1
-      }
-    } else {
-      ui.info(disclosureCopy(target))
+    if (
+      !ui.interactive &&
+      options.team === undefined &&
+      options.linkOnly !== true &&
+      options.public !== true &&
+      options.project === undefined &&
+      options.createProject === undefined
+    ) {
+      ui.error('Choose a disclosure: `--team <name-or-id>`, `--link-only`, or `--public`.')
+      return 1
     }
 
+    const path = canonicalSubscriptionPath(directory ?? cwd, cwd)
     const credentialOptions = pickCredentialOptions(dependencies)
+    const requestedTeam = await resolveRequestedTeam(ui, options.team, dependencies)
+    if (options.team !== undefined && requestedTeam === null) return 1
+
     const credentials = loadHubCredentials(credentialOptions)
     if (!credentials.token) {
+      if (options.linkOnly === true) {
+        ui.info('Sessions from this directory and its worktrees would auto-publish as Link-only.')
+      } else if (options.public === true) {
+        ui.info('Sessions from this directory and its worktrees would auto-publish as Public.')
+      }
       ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
       return 1
     }
@@ -103,29 +109,58 @@ export async function handleSubscribeCommand(
     })
     const localIdentity =
       dependencies.resolveLocalIdentity?.(path) ?? resolveLocalProjectIdentity(getDB(true), path)
-    const resolvedProject = await resolveHubProject({
+    const listResponse =
+      dependencies.listProjects === undefined
+        ? await client.listProjects()
+        : await dependencies.listProjects()
+    const projectSelection = await resolveHubProject({
       client,
       ui,
       hubUrl: credentials.hubUrl,
       localIdentity,
-      tenant:
-        target.visibility === 'team' && target.teamId
-          ? { kind: 'team', id: target.teamId }
-          : { kind: 'personal' },
+      ...(requestedTeam === null || requestedTeam === undefined
+        ? {}
+        : { tenant: { kind: 'team' as const, id: requestedTeam.id } }),
       ...(options.project === undefined ? {} : { projectRef: options.project }),
       ...(options.createProject === undefined ? {} : { createProjectName: options.createProject }),
-      ...(dependencies.listProjects === undefined
-        ? {}
-        : { listResponse: await dependencies.listProjects() }),
+      listResponse,
+      deferCreate: true,
       ...credentialOptions,
     })
-    if (!resolvedProject) return 1
+    if (!projectSelection) return 1
+    const selectedProject =
+      projectSelection.kind === 'resolved' ? projectSelection.project : undefined
 
+    const ownerTeam =
+      requestedTeam ?? (selectedProject ? teamOwnerFromProject(selectedProject) : undefined)
+    const target = await resolveVisibilityTarget(ui, options, ownerTeam)
+    if (target === null) return 1
+    const projectDescription =
+      projectSelection.kind === 'create'
+        ? `new Project ${projectSelection.name}`
+        : `Project ${projectReference(projectSelection.project)}`
+    ui.info(disclosureCopy(target, ownerTeam, projectDescription))
+
+    if (options.yes !== true) {
+      if (!ui.interactive) {
+        ui.error('Cannot confirm auto-publish visibility without a TTY. Re-run with `--yes`.')
+        return 1
+      }
+      const approved = await ui.confirm(`Subscribe ${path}?`, true)
+      if (approved !== true) {
+        ui.cancel('Nothing subscribed.')
+        return 1
+      }
+    }
+
+    const resolvedProject = await materializeHubProject(projectSelection, client)
+
+    const resolvedOwnerTeam = teamOwnerFromProject(resolvedProject.project)
     const subscription: Subscription = {
       path,
       visibility: target.visibility,
-      ...(target.teamId === undefined ? {} : { teamId: target.teamId }),
-      ...(target.teamName === undefined ? {} : { teamName: target.teamName }),
+      ...(resolvedOwnerTeam === undefined ? {} : { teamId: resolvedOwnerTeam.id }),
+      ...(resolvedOwnerTeam?.name === undefined ? {} : { teamName: resolvedOwnerTeam.name }),
       project: {
         hubUrl: resolvedProject.hubUrl,
         actorId: resolvedProject.actorId,
@@ -157,47 +192,32 @@ export async function handleSubscribeCommand(
 async function resolveVisibilityTarget(
   ui: CliUi,
   options: SubscribeCommandOptions,
-  dependencies: SubscribeCommandDependencies,
+  ownerTeam: TeamOwner | undefined,
 ): Promise<VisibilityTarget | null> {
   if (options.linkOnly === true) return { visibility: 'link-only' }
   if (options.public === true) return { visibility: 'public' }
-
-  const listTeams = dependencies.listTeams ?? (() => listTeamsFromHub(dependencies))
-
-  if (options.team !== undefined) {
-    const teams = await listTeams()
-    const wanted = options.team.trim()
-    const team = resolveTeamReference(teams, wanted)
-    if (!team) {
-      ui.error(
-        teams.length === 0
-          ? 'You are not a member of any Team (or you are not logged in).'
-          : `No Team matches "${wanted}". Your Teams: ${teams.map((entry) => entry.name).join(', ')}`,
-      )
-      return null
-    }
-    return { visibility: 'team', teamId: team.id, teamName: team.name }
-  }
+  // Compatibility: `--team` alone remains Team-only.
+  if (options.team !== undefined) return { visibility: 'team' }
 
   // No flag: the disclosure is a real decision, so it must be asked. In a
-  // non-interactive context there is nothing safe to assume.
+  // non-interactive Team Project, Team-only is the sole fail-closed default.
+  // Personal Projects still require an explicit disclosure.
   if (!ui.interactive) {
+    if (ownerTeam !== undefined) return { visibility: 'team' }
     ui.error('Choose a disclosure: `--team <name-or-id>`, `--link-only`, or `--public`.')
     return null
   }
 
-  let teams: HubTeam[] = []
-  try {
-    teams = await listTeams()
-  } catch {
-    ui.warn('Could not load your Teams; log in with `spool login` to target a Team.')
-  }
   const choices = [
-    ...teams.map((team) => ({
-      value: `team:${team.id}`,
-      label: `Team · ${team.name}`,
-      hint: 'current members only; the Team owns the Sessions',
-    })),
+    ...(ownerTeam === undefined
+      ? []
+      : [
+          {
+            value: 'team',
+            label: `Team · ${ownerTeam.name ?? ownerTeam.id}`,
+            hint: 'current Team members only',
+          },
+        ]),
     { value: 'link-only', label: 'Link-only', hint: 'anyone with the URL can read' },
     { value: 'public', label: 'Public', hint: 'can appear in Explore and search' },
   ]
@@ -211,12 +231,30 @@ async function resolveVisibilityTarget(
     ui.cancel('Nothing subscribed.')
     return null
   }
-  if (selected.startsWith('team:')) {
-    const teamId = selected.slice('team:'.length)
-    const team = teams.find((entry) => entry.id === teamId)
-    return { visibility: 'team', teamId, ...(team === undefined ? {} : { teamName: team.name }) }
-  }
-  return { visibility: selected as 'public' | 'link-only' }
+  return { visibility: selected as SubscriptionVisibility }
+}
+
+interface TeamOwner {
+  id: string
+  name?: string
+}
+
+async function resolveRequestedTeam(
+  ui: CliUi,
+  reference: string | undefined,
+  dependencies: SubscribeCommandDependencies,
+): Promise<HubTeam | null | undefined> {
+  if (reference === undefined) return undefined
+  const teams = await (dependencies.listTeams ?? (() => listTeamsFromHub(dependencies)))()
+  const wanted = reference.trim()
+  const team = resolveTeamReference(teams, wanted)
+  if (team) return team
+  ui.error(
+    teams.length === 0
+      ? 'You are not a member of any Team (or you are not logged in).'
+      : `No Team matches "${wanted}". Your Teams: ${teams.map((entry) => entry.name).join(', ')}`,
+  )
+  return null
 }
 
 async function listTeamsFromHub(dependencies: SubscribeCommandDependencies): Promise<HubTeam[]> {
@@ -230,17 +268,41 @@ async function listTeamsFromHub(dependencies: SubscribeCommandDependencies): Pro
   return client.listTeams()
 }
 
-function disclosureCopy(target: VisibilityTarget): string {
+function teamOwnerFromProject(project: HubProject): TeamOwner | undefined {
+  if (project.owner.kind !== 'team') return undefined
+  const name = project.owner.name ?? project.owner.handle
+  return { id: project.owner.id, ...(name === null ? {} : { name }) }
+}
+
+function projectReference(project: HubProject): string {
+  return `${project.owner.handle ?? project.owner.id}/${project.slug}`
+}
+
+function disclosureCopy(
+  target: VisibilityTarget,
+  ownerTeam: TeamOwner | undefined,
+  projectDescription: string,
+): string {
+  const ownership =
+    ownerTeam === undefined
+      ? `${projectDescription} is owned by your account.`
+      : `${projectDescription} is owned by Team · ${ownerTeam.name ?? ownerTeam.id}.`
   switch (target.visibility) {
     case 'team':
       return (
-        `Sessions from this directory and its worktrees will auto-publish to Team · ${target.teamName ?? target.teamId}. ` +
-        'Only current members can read them, and the Team owns the resulting Sessions.'
+        `Sessions from this directory and its worktrees will auto-publish as Team-only. ` +
+        `Only current members can read them. ${ownership}`
       )
     case 'link-only':
-      return 'Sessions from this directory and its worktrees will auto-publish as Link-only. Anyone with the URL can read them.'
+      return (
+        'Sessions from this directory and its worktrees will auto-publish as Link-only. ' +
+        `Anyone with the URL can read them. ${ownership}`
+      )
     case 'public':
-      return 'Sessions from this directory and its worktrees will auto-publish as Public. They can appear in Explore and search.'
+      return (
+        'Sessions from this directory and its worktrees will auto-publish as Public. ' +
+        `They can appear in Explore and search. ${ownership}`
+      )
   }
 }
 
@@ -299,22 +361,29 @@ export function handleSubscriptionsCommand(dependencies: SubscribeCommandDepende
 
 export function subscriptionLabel(subscription: Subscription): string {
   const project = subscription.project
-    ? ` · Project ${subscription.project.remote.name}`
+    ? ` · Project ${projectReference(subscription.project.remote)}`
     : ' · Project not configured'
+  const owner =
+    subscription.teamId === undefined
+      ? ''
+      : ` · Team · ${subscription.teamName ?? subscription.teamId}`
   switch (subscription.visibility) {
     case 'team':
-      return `Team · ${subscription.teamName ?? subscription.teamId ?? 'unknown'}${project}`
+      return `Team-only${owner}${project}`
     case 'link-only':
-      return `Link-only${project}`
+      return `Link-only${owner}${project}`
     case 'public':
-      return `Public${project}`
+      return `Public${owner}${project}`
   }
 }
 
 export const subscribeCommand = new Command('subscribe')
   .description('Auto-publish sessions from a directory and its worktrees')
   .argument('[dir]', 'Directory to subscribe; defaults to the current directory')
-  .option('--team <handle-name-or-id>', 'Publish subscribed sessions to this Team')
+  .option(
+    '--team <handle-name-or-id>',
+    'Own subscribed sessions as this Team (Team-only unless --public or --link-only)',
+  )
   .option('--link-only', 'Publish subscribed sessions as Link-only')
   .option('--public', 'Publish subscribed sessions as Public (explicit opt-in)')
   .option('--project <id-or-owner-slug>', 'Bind to this Hub Project')

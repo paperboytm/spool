@@ -62,7 +62,7 @@ export function DiffPane({
 
   if (view.files.length === 0) {
     return (
-      <div className="min-h-[120px] rounded-[10px] border border-solid border-[var(--border)] bg-[var(--card)] p-5 text-xs text-[var(--faint)] shadow-[var(--shadow-card)]">
+      <div className="rounded-card border-border bg-background text-button text-faint shadow-card min-h-[120px] border border-solid p-5">
         No files were touched in this session.
       </div>
     )
@@ -71,37 +71,37 @@ export function DiffPane({
   const active = openFile ? diffs.get(openFile) : undefined
 
   return (
-    <div className="min-h-[120px] rounded-[10px] border border-solid border-[var(--border)] bg-[var(--card)] p-3 shadow-[var(--shadow-card)]">
+    <div className="rounded-card border-border bg-background shadow-card min-h-[120px] border border-solid p-3">
       <div className="mb-2 flex flex-col gap-1">
         {view.files.map((file) => (
           <button
             key={file.path}
             type="button"
             aria-pressed={openFile === file.path}
-            className={`m-0 flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border-0 px-2 py-1 text-left text-xs transition-colors duration-[80ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            className={`rounded-control text-button duration-hover focus-visible:outline-accent m-0 flex w-full cursor-pointer items-center justify-between gap-3 border-0 px-2 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
               openFile === file.path
-                ? 'bg-[var(--accent-soft)] text-[var(--accent)] hover:bg-[var(--accent-soft)]'
-                : 'bg-transparent text-[var(--text)] hover:bg-[var(--card-2)]'
+                ? 'bg-accent-soft text-accent hover:bg-accent-soft'
+                : 'text-foreground hover:bg-surface bg-transparent'
             }`}
             onClick={() => onSelectFile(file.path)}
           >
             <span className="min-w-0 truncate font-mono tabular-nums">{file.path}</span>
-            <span className="shrink-0 font-mono text-[11px] tabular-nums">
-              <span className="text-[var(--sp-success)]">+{file.adds}</span>{' '}
-              <span className="text-[var(--sp-error)]">-{file.dels}</span>
+            <span className="text-meta shrink-0 font-mono tabular-nums">
+              <span className="text-status-success">+{file.adds}</span>{' '}
+              <span className="text-status-error">-{file.dels}</span>
             </span>
           </button>
         ))}
       </div>
 
       {!openFile && (
-        <p className="m-0 p-2 text-xs text-[var(--faint)]">Select a file to see its net change.</p>
+        <p className="text-button text-faint m-0 p-2">Select a file to see its net change.</p>
       )}
       {active?.state === 'loading' && (
-        <p className="m-0 p-2 text-xs text-[var(--faint)]">Computing diff from records…</p>
+        <p className="text-button text-faint m-0 p-2">Computing diff from records…</p>
       )}
       {active?.state === 'error' && (
-        <p className="m-0 p-2 text-xs text-[var(--sp-error)]">
+        <p className="text-button text-status-error m-0 p-2">
           Could not reconstruct this file&apos;s diff from the shared records.
         </p>
       )}
@@ -127,9 +127,7 @@ function FileDiffView({
 }) {
   if (diff.hunks.length === 0) {
     return (
-      <p className="m-0 p-2 text-xs text-[var(--faint)]">
-        No net change — the edits cancelled out.
-      </p>
+      <p className="text-button text-faint m-0 p-2">No net change — the edits cancelled out.</p>
     )
   }
   return (
@@ -139,25 +137,25 @@ function FileDiffView({
         const hunkLabel = (
           <>
             @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-            <span className="text-[var(--accent)]">
+            <span className="text-accent">
               {' '}
               {hunk.recordIndices.map((index) => `#${index}`).join(' ')}
             </span>
           </>
         )
         const hunkHeaderClass =
-          'block w-full border-0 border-b border-solid border-[var(--border)] bg-[var(--card-2)] px-2 py-1 text-left font-mono text-[11px] text-[var(--muted)] tabular-nums'
+          'block w-full border-0 border-b border-solid border-border bg-surface px-2 py-1 text-left font-mono text-meta text-muted tabular-nums'
         return (
           <div
             key={hunkIndex}
-            className={`overflow-hidden rounded-md border border-solid ${
-              highlighted ? 'border-[var(--accent)]' : 'border-[var(--border)]'
+            className={`rounded-control overflow-hidden border border-solid ${
+              highlighted ? 'border-accent' : 'border-border'
             }`}
           >
             {onJumpToRecord ? (
               <button
                 type="button"
-                className={`m-0 cursor-pointer transition-colors duration-[80ms] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)] ${hunkHeaderClass}`}
+                className={`duration-hover hover:text-accent focus-visible:outline-accent m-0 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${hunkHeaderClass}`}
                 title="Jump to the tool call that produced this hunk"
                 onClick={() => onJumpToRecord(hunk.recordIndices[0] ?? 0)}
               >
@@ -166,15 +164,15 @@ function FileDiffView({
             ) : (
               <div className={hunkHeaderClass}>{hunkLabel}</div>
             )}
-            <pre className="m-0 overflow-x-auto p-2 font-mono text-xs leading-[1.5] tabular-nums">
+            <pre className="text-button m-0 overflow-x-auto p-2 font-mono leading-[1.5] tabular-nums">
               {hunk.lines.map((line, lineIndex) => (
                 <span
                   key={lineIndex}
                   className={`block whitespace-pre ${
                     line.kind === 'add'
-                      ? 'bg-[color-mix(in_srgb,#6BAF6B_12%,transparent)] dark:bg-[color-mix(in_srgb,#7DC07D_12%,transparent)]'
+                      ? 'bg-status-success/10'
                       : line.kind === 'del'
-                        ? 'bg-[color-mix(in_srgb,#C95A4F_12%,transparent)] dark:bg-[color-mix(in_srgb,#D67259_12%,transparent)]'
+                        ? 'bg-status-error/10'
                         : ''
                   }`}
                 >

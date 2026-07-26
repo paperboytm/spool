@@ -79,7 +79,7 @@ function MarkdownContent({
         // Find-highlight has split the code block into mixed text + <mark> nodes.
         // Render plainly so the highlights survive; sacrifice shiki for this one block.
         return (
-          <pre className="bg-warm-surface2 dark:bg-dark-surface2 border-warm-border dark:border-dark-border my-2 overflow-x-auto rounded-md border p-3 font-mono text-[13px] leading-snug">
+          <pre className="rounded-control border-border bg-surface-2 text-ui my-2 overflow-x-auto border p-3 font-mono leading-snug">
             <code>{codeChildren}</code>
           </pre>
         )
@@ -90,7 +90,7 @@ function MarkdownContent({
         return (
           <code
             {...rest}
-            className="bg-warm-surface dark:bg-dark-surface rounded px-1 py-0.5 font-mono text-[0.92em] break-all whitespace-pre-wrap"
+            className="rounded-badge bg-surface py-half px-1 font-mono text-[0.92em] break-all whitespace-pre-wrap"
           >
             {children}
           </code>
@@ -103,10 +103,8 @@ function MarkdownContent({
           <mark
             ref={isActive ? onActiveMatchRef : undefined}
             data-testid={isActive ? 'session-find-active-match' : undefined}
-            className={`rounded-[3px] px-0.5 text-inherit ${
-              isActive
-                ? 'bg-accent/35 dark:bg-accent-dark/45'
-                : 'bg-accent/15 dark:bg-accent-dark/20'
+            className={`rounded-badge px-half text-inherit ${
+              isActive ? 'bg-accent/35' : 'bg-accent/15'
             }`}
           >
             {children}
@@ -129,7 +127,7 @@ function MarkdownContent({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="text-accent dark:text-accent-dark underline-offset-2 hover:underline"
+            className="text-accent underline-offset-2 hover:underline"
           >
             {children}
           </a>
@@ -140,7 +138,7 @@ function MarkdownContent({
   )
 
   return (
-    <div className="markdown-body [&_blockquote]:border-warm-border [&_blockquote]:dark:border-dark-border [&_blockquote]:text-warm-muted [&_blockquote]:dark:text-dark-muted [&_th]:border-warm-border2 [&_th]:dark:border-dark-border2 [&_td]:border-warm-border [&_td]:dark:border-dark-border cursor-text text-sm leading-relaxed break-words text-neutral-800 select-text dark:text-neutral-200 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_h1]:mt-3 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mt-3 [&_h2]:text-[15px] [&_h2]:font-semibold [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_td]:max-w-[360px] [&_td]:border-b [&_td]:px-2 [&_td]:py-1 [&_th]:max-w-[360px] [&_th]:border-b [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+    <div className="markdown-body text-reading text-foreground [&_blockquote]:border-border [&_blockquote]:text-muted [&_h1]:text-summary [&_h2]:text-session-title [&_h3]:text-reading [&_li]:my-half [&_td]:border-border [&_th]:border-border-strong cursor-text leading-relaxed break-words select-text [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_h1]:mt-3 [&_h1]:font-semibold [&_h2]:mt-3 [&_h2]:font-semibold [&_h3]:mt-2 [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_td]:max-w-[360px] [&_td]:border-b [&_td]:px-2 [&_td]:py-1 [&_th]:max-w-[360px] [&_th]:border-b [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}

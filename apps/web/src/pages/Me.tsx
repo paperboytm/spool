@@ -771,18 +771,13 @@ export function Me() {
         <Header />
         <main className="sw-main sw-me-main center">
           <div className="sw-card sw-me-card tight sw-card--480">
-            <div className="sw-rule" style={{ marginBottom: 20 }}>
+            <div className="sw-rule mb-5">
               <span className="tag err">Error</span>
               <span className="line" />
             </div>
             <h1 className="sw-title">Something went wrong</h1>
             <p className="sw-lede">We couldn’t load your account.</p>
-            <Button
-              type="button"
-              variant="outline"
-              style={{ marginTop: 20 }}
-              onClick={() => void load()}
-            >
+            <Button type="button" variant="outline" className="mt-5" onClick={() => void load()}>
               Try again
             </Button>
           </div>
@@ -900,7 +895,7 @@ export function Me() {
 
           {PROFILES_ENABLED && !me.handle && !pending && (
             <>
-              <div className="sw-divider" style={{ margin: '24px 0 20px' }} />
+              <div className="sw-divider my-6 mb-5" />
               <HandleClaim
                 onClaimed={(handle) =>
                   setState((s) => (s.kind === 'ok' ? { ...s, me: { ...s.me, handle } } : s))

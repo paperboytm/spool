@@ -28,6 +28,7 @@ import {
   HubClient,
   HubHttpError,
   type HubFetch,
+  type HubProject,
   type HubSessionMeta,
   type HubTeam,
 } from '../hub/client.js'
@@ -37,7 +38,11 @@ import {
   runLocalSummaryAgent,
   type LocalSummaryAgent,
 } from '../hub/local-summary-agent.js'
-import { persistResolvedProject, resolveHubProject } from '../hub/project-resolution.js'
+import {
+  materializeHubProject,
+  persistResolvedProject,
+  resolveHubProject,
+} from '../hub/project-resolution.js'
 import { publishPreparedShare } from '../hub/publish.js'
 import { formatRedactSummary, scanRecordsForSecrets } from '../hub/redact-gate.js'
 import { prepareShare, type PreparedShare } from '../hub/share-pipeline.js'
@@ -89,6 +94,10 @@ export interface ShareCommandOptions {
   createProject?: string
   /** Publish directly into a Team tenant instead of the personal default. */
   team?: string
+  /** Explicitly publish to Explore; may be combined with a Team-owned Project. */
+  public?: boolean
+  /** Explicitly publish by URL only; may be combined with a Team-owned Project. */
+  linkOnly?: boolean
 }
 
 export interface ShareCommandDependencies extends HubCredentialOptions {
@@ -109,8 +118,8 @@ export interface ShareCommandDependencies extends HubCredentialOptions {
 }
 
 type ShareDisclosure =
-  | { kind: 'public' }
-  | { kind: 'link-only' }
+  | { kind: 'public'; ownerTeam?: { id: string; name: string } }
+  | { kind: 'link-only'; ownerTeam?: { id: string; name: string } }
   | { kind: 'team'; id: string; name: string }
 
 export async function handleShareCommand(
@@ -127,6 +136,10 @@ export async function handleShareCommand(
   try {
     if (options.project !== undefined && options.createProject !== undefined) {
       ui.error('`--project` and `--create-project` cannot be used together.')
+      return 1
+    }
+    if (options.public === true && options.linkOnly === true) {
+      ui.error('`--public` and `--link-only` cannot be used together.')
       return 1
     }
     const { sessionUuid, position } = parseShareRef(input)
@@ -221,8 +234,44 @@ export async function handleShareCommand(
           )}\` for an explicit ownership transfer.`,
       )
     }
-    const disclosure = resolveShareDisclosure(existing, requestedTeam, target.provider)
-    const visibilityConfirmation = shareConfirmation(disclosure)
+    const tenant =
+      requestedTeam !== undefined
+        ? ({ kind: 'team', id: requestedTeam.id } as const)
+        : existingProject?.owner.kind === 'team'
+          ? ({ kind: 'team', id: existingProject.owner.id } as const)
+          : existingProject
+            ? ({ kind: 'personal' } as const)
+            : undefined
+    const projectSelection = await resolveHubProject({
+      client,
+      ui,
+      hubUrl: credentials.hubUrl,
+      localIdentity: projectIdentity,
+      ...(tenant === undefined ? {} : { tenant }),
+      ...(options.project === undefined ? {} : { projectRef: options.project }),
+      ...(options.createProject === undefined ? {} : { createProjectName: options.createProject }),
+      existingProject,
+      deferCreate: true,
+      ...pickCredentialOptions(dependencies),
+    })
+    if (!projectSelection) return 1
+    const selectedProject =
+      projectSelection.kind === 'resolved' ? projectSelection.project : undefined
+
+    const disclosure = resolveShareDisclosure(
+      existing,
+      requestedTeam,
+      selectedProject,
+      target.provider,
+      options,
+    )
+    if (disclosure.kind === 'public' && !isDiscoverySessionProvider(target.provider)) {
+      ui.error('This Session provider cannot be published as Public; use `--link-only` instead.')
+      return 1
+    }
+    const projectName =
+      projectSelection.kind === 'resolved' ? projectSelection.project.name : projectSelection.name
+    const visibilityConfirmation = shareConfirmation(disclosure, projectName)
     let visibilityDisclosed = options.visibilityDisclosed === true
     if (options.yes !== true && options.visibilityConfirmed !== true) {
       if (!ui.interactive) {
@@ -240,43 +289,29 @@ export async function handleShareCommand(
       visibilityDisclosed = true
     }
 
-    const resolvedProject = await resolveHubProject({
-      client,
-      ui,
-      hubUrl: credentials.hubUrl,
-      localIdentity: projectIdentity,
-      tenant: requestedTeam
-        ? { kind: 'team', id: requestedTeam.id }
-        : existingProject?.owner.kind === 'team'
-          ? { kind: 'team', id: existingProject.owner.id }
-          : { kind: 'personal' },
-      ...(options.project === undefined ? {} : { projectRef: options.project }),
-      ...(options.createProject === undefined ? {} : { createProjectName: options.createProject }),
-      existingProject,
-      ...pickCredentialOptions(dependencies),
-    })
-    if (!resolvedProject) return 1
+    const resolvedProject = await materializeHubProject(projectSelection, client)
 
     if (!visibilityDisclosed) {
       ui.info(shareDisclosureInfo(disclosure, resolvedProject.project.name))
     }
 
-    const directTeamTarget =
-      requestedTeam === undefined ? {} : ({ visibility: 'team', teamId: requestedTeam.id } as const)
+    const ownerTeamId =
+      resolvedProject.project.owner.kind === 'team' ? resolvedProject.project.owner.id : undefined
+    const directTarget = sharePublishTarget(disclosure, ownerTeamId)
     const initialOwnershipExpectation =
-      requestedTeam === undefined ? {} : { expectedTeamId: existing?.team?.id ?? null }
+      ownerTeamId === undefined ? {} : { expectedTeamId: existing?.team?.id ?? null }
     const subsequentOwnershipExpectation =
-      requestedTeam === undefined ? {} : { expectedTeamId: requestedTeam.id }
+      ownerTeamId === undefined ? {} : { expectedTeamId: ownerTeamId }
     const initialProjectWrite = {
       projectId: resolvedProject.project.id,
       expectedProjectId: existingProject?.id ?? null,
-      ...directTeamTarget,
+      ...directTarget,
       ...initialOwnershipExpectation,
     }
     const subsequentProjectWrite = {
       projectId: resolvedProject.project.id,
       expectedProjectId: resolvedProject.project.id,
-      ...directTeamTarget,
+      ...directTarget,
       ...subsequentOwnershipExpectation,
     }
     const initialSummary = existing?.summaryMd ?? null
@@ -488,31 +523,88 @@ async function resolveRequestedTeam(
 function resolveShareDisclosure(
   existing: HubSessionMeta | null,
   requestedTeam: HubTeam | undefined,
+  project: HubProject | undefined,
   provider: SessionProvider,
+  options: Pick<ShareCommandOptions, 'public' | 'linkOnly'>,
 ): ShareDisclosure {
+  const projectTeam =
+    project?.owner.kind === 'team'
+      ? {
+          id: project.owner.id,
+          name: project.owner.name ?? project.owner.handle ?? project.owner.id,
+        }
+      : undefined
+  const existingTeam =
+    existing?.team ??
+    (existing?.project?.owner.kind === 'team'
+      ? {
+          id: existing.project.owner.id,
+          name:
+            existing.project.owner.name ??
+            existing.project.owner.handle ??
+            existing.project.owner.id,
+        }
+      : undefined)
+  const ownerTeam = requestedTeam
+    ? { id: requestedTeam.id, name: requestedTeam.name }
+    : (projectTeam ?? existingTeam)
+
+  if (options.public === true) {
+    return { kind: 'public', ...(ownerTeam === undefined ? {} : { ownerTeam }) }
+  }
+  if (options.linkOnly === true) {
+    return { kind: 'link-only', ...(ownerTeam === undefined ? {} : { ownerTeam }) }
+  }
   if (requestedTeam) {
     return { kind: 'team', id: requestedTeam.id, name: requestedTeam.name }
   }
   if (existing?.visibility === 'team') {
-    const id = existing.team?.id ?? existing.project?.owner.id ?? 'unknown'
-    const name = existing.team?.name ?? existing.project?.owner.name ?? id
+    const id = ownerTeam?.id ?? 'unknown'
+    const name = ownerTeam?.name ?? id
     return { kind: 'team', id, name }
   }
-  if (existing?.visibility === 'public') return { kind: 'public' }
-  if (existing?.visibility === 'link-only') return { kind: 'link-only' }
+  if (existing?.visibility === 'public') {
+    return { kind: 'public', ...(ownerTeam === undefined ? {} : { ownerTeam }) }
+  }
+  if (existing?.visibility === 'link-only') {
+    return { kind: 'link-only', ...(ownerTeam === undefined ? {} : { ownerTeam }) }
+  }
+  // Selecting a Team-owned Project without an explicit disclosure stays
+  // private by default. `--public` and `--link-only` are named opt-ins.
+  if (ownerTeam) return { kind: 'team', id: ownerTeam.id, name: ownerTeam.name }
   return isDiscoverySessionProvider(provider) ? { kind: 'public' } : { kind: 'link-only' }
 }
 
-function shareConfirmation(disclosure: ShareDisclosure): string {
+function sharePublishTarget(
+  disclosure: ShareDisclosure,
+  ownerTeamId: string | undefined,
+):
+  | { visibility: 'public' | 'link-only'; teamId?: string }
+  | { visibility: 'team'; teamId: string } {
+  if (disclosure.kind === 'team') {
+    if (!ownerTeamId) {
+      throw new Error('Team-only publishing requires a Team-owned Project.')
+    }
+    return { visibility: 'team', teamId: ownerTeamId }
+  }
+  return {
+    visibility: disclosure.kind,
+    ...(ownerTeamId === undefined ? {} : { teamId: ownerTeamId }),
+  }
+}
+
+function shareConfirmation(disclosure: ShareDisclosure, projectName: string): string {
   if (disclosure.kind === 'team') {
     return (
-      `Publish this Session to Team · ${disclosure.name}? ` +
+      `Publish this Session to Team · ${disclosure.name} / Project ${projectName}? ` +
       'Only current members can read it, and the Team owns the hosted Session.'
     )
   }
+  const owner =
+    disclosure.ownerTeam === undefined ? '' : ` Team · ${disclosure.ownerTeam.name} owns it.`
   return disclosure.kind === 'public'
-    ? 'Publish this Session as Public? It can appear in Explore and search.'
-    : 'Share this Session as Link-only? Anyone with the URL can read it.'
+    ? `Publish this Session as Public in Project ${projectName}? It can appear in Explore and search.${owner}`
+    : `Share this Session as Link-only in Project ${projectName}? Anyone with the URL can read it.${owner}`
 }
 
 function shareDisclosureInfo(disclosure: ShareDisclosure, projectName: string): string {
@@ -522,9 +614,13 @@ function shareDisclosureInfo(disclosure: ShareDisclosure, projectName: string): 
       'Only current members can read it, and the Team owns the hosted Session.'
     )
   }
+  const owner =
+    disclosure.ownerTeam === undefined
+      ? ''
+      : ` Team · ${disclosure.ownerTeam.name} owns the hosted Session.`
   return disclosure.kind === 'public'
-    ? `This Session will be Public in Project ${projectName} and can appear in Explore and search.`
-    : `This Session will be Link-only in Project ${projectName}; anyone with the URL can read it.`
+    ? `This Session will be Public in Project ${projectName} and can appear in Explore and search.${owner}`
+    : `This Session will be Link-only in Project ${projectName}; anyone with the URL can read it.${owner}`
 }
 
 async function announceShareComplete(
@@ -561,12 +657,18 @@ async function announceShareComplete(
   }
   if (disclosure.kind === 'public') {
     ui.info('This Session can appear in Explore and search. The source Session stays unchanged.')
+    if (disclosure.ownerTeam) {
+      ui.info(`Team · ${disclosure.ownerTeam.name} owns the hosted Session.`)
+    }
   } else if (disclosure.kind === 'team') {
     ui.info(
       `Only current members of Team · ${disclosure.name} can read it, and the Team owns the hosted Session.`,
     )
   } else {
     ui.info('Anyone with the URL can read it; it does not appear in Explore or search.')
+    if (disclosure.ownerTeam) {
+      ui.info(`Team · ${disclosure.ownerTeam.name} owns the hosted Session.`)
+    }
   }
 }
 
@@ -584,7 +686,12 @@ export const shareCommand = new Command('share')
   .option('--visibility-confirmed', 'Acknowledge visibility when running without a TTY')
   .option('--yes', 'Skip all confirmations, including secret findings')
   .option('--spool-file <path>', 'Attach a .spool document to the share')
-  .option('--team <handle-name-or-id>', 'Publish directly to this Team')
+  .option(
+    '--team <handle-name-or-id>',
+    'Use a Project owned by this Team (Team-only unless --public or --link-only)',
+  )
+  .option('--public', 'Publish as Public; may be combined with a Team-owned Project')
+  .option('--link-only', 'Publish as Link-only; may be combined with a Team-owned Project')
   .option('--project <id-or-owner-slug>', 'Publish to this Hub Project')
   .option('--create-project <name>', 'Create and bind a Hub Project')
   .action(
@@ -597,6 +704,8 @@ export const shareCommand = new Command('share')
         yes?: boolean
         spoolFile?: string
         team?: string
+        public?: boolean
+        linkOnly?: boolean
         project?: string
         createProject?: string
       },
@@ -612,6 +721,8 @@ export const shareCommand = new Command('share')
           ...(opts.yes === undefined ? {} : { yes: opts.yes }),
           ...(opts.spoolFile === undefined ? {} : { spoolFile: opts.spoolFile }),
           ...(opts.team === undefined ? {} : { team: opts.team }),
+          ...(opts.public === undefined ? {} : { public: opts.public }),
+          ...(opts.linkOnly === undefined ? {} : { linkOnly: opts.linkOnly }),
           ...(opts.project === undefined ? {} : { project: opts.project }),
           ...(opts.createProject === undefined ? {} : { createProject: opts.createProject }),
         },

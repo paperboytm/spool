@@ -41,12 +41,13 @@ Resume creates a new provider-native Session and preserves its relationship to t
 
 - **Share** is the explicit action that sends selected Session records to the Hub and returns a durable URL.
 - **Publish** is the default result for supported Claude Code and Codex CLI Shares: a Public Session that can appear on the author’s Profile, in Explore, and in search.
-- **Team** is a role-based workspace. Moving a Session into one transfers control of the hosted asset to the Team; `Team · name` limits reading to current members, while Team Owners and Admins can change disclosure.
+- **Project** is the required personal or Team-owned namespace that groups related Sessions without storing source code. A Team Project keeps Team ownership whether a Session is Team-only, Link-only, or Public.
+- **Team** is a role-based workspace. Publishing into one of its Projects transfers control of the hosted asset to the Team; `Team · name` limits reading to current members, while Team Owners and Admins can change disclosure.
 - **Read** moves from Summary to conversation, tools, files, and net diff.
 - **Resume / Fork** creates new agent-native work with visible lineage.
 - **Withdraw** makes the current hosted copy return `410 Gone`. A personal author can later explicitly Share the same Session again; a Team-owned withdrawal by an Owner/Admin is permanent and cannot be revived by another member.
 
-Nothing leaves the machine until the author confirms the Share flow started by `spool` or `spool share`. The confirmation states the initial visibility before upload: supported Claude Code and Codex CLI Sessions are Public by default; other providers remain Link-only. After Share, the account page can move a Session to `Team · name`; Team-only access requires current membership.
+Nothing leaves the machine until the author confirms the Share flow started by `spool` or `spool share`. The confirmation states both the Project owner and initial visibility before upload: supported Claude Code and Codex CLI Sessions are Public by default; other providers remain Link-only. `spool share --project paperboy/spool --public` publishes under a Team-owned Project while keeping the Session Public; omitting `--public` from a Team Project fails closed to Team-only.
 
 ## What Spool Includes
 

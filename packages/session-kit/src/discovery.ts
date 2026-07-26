@@ -23,11 +23,19 @@ export interface DiscoveryLineage {
   sourceSid: string
 }
 
-/** Public, non-tenant Project identity attached to a personal Public Session. */
+/** Public Project identity attached to a Public Session. */
 export interface DiscoveryProject {
   id: string
   slug: string
   name: string
+  /**
+   * Canonical Project namespace. Older servers omitted this for personal
+   * Projects, so clients should fall back to the Session author handle.
+   */
+  owner?: {
+    kind: 'user' | 'team'
+    handle: string
+  }
 }
 
 export interface DiscoverySessionItem {
@@ -45,10 +53,7 @@ export interface DiscoverySessionItem {
   starCount?: number
   agent: SessionProvider
   author: DiscoveryAuthor
-  /**
-   * Personal Project grouping for this Public Session. Team-owned Projects
-   * remain private and are deliberately represented as null.
-   */
+  /** Public Project grouping for this Public Session. */
   project?: DiscoveryProject | null
   evidence: DiscoveryEvidence
   lineage: DiscoveryLineage | null

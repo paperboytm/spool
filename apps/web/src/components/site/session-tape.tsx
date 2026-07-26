@@ -176,15 +176,15 @@ function readPalette(el: Element): TapePalette {
   const css = getComputedStyle(el)
   const read = (token: string, fallback: string) => css.getPropertyValue(token).trim() || fallback
   return {
-    bg: read('--bg', '#000000'),
-    surface: read('--surface', '#090909'),
-    surface2: read('--surface2', '#111111'),
-    border: read('--border', '#1f1f1f'),
-    border2: read('--border2', '#2e2e2e'),
-    text: read('--text', '#ffffff'),
-    muted: read('--muted', '#a6a6a6'),
-    faint: read('--faint', '#555555'),
-    accent: read('--accent', '#5bb1f0'),
+    bg: read('--color-background', '#000000'),
+    surface: read('--color-surface', '#090909'),
+    surface2: read('--color-surface-2', '#111111'),
+    border: read('--color-border', '#1f1f1f'),
+    border2: read('--color-border-strong', '#2e2e2e'),
+    text: read('--color-foreground', '#ffffff'),
+    muted: read('--color-muted', '#a6a6a6'),
+    faint: read('--color-faint', '#555555'),
+    accent: read('--color-accent', '#5bb1f0'),
   }
 }
 

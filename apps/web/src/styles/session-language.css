@@ -1,135 +1,137 @@
-.session-language-toggle {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--sp-border);
-  border-radius: 9999px;
-  background: var(--sp-surface);
-  color: var(--sp-muted);
-  font-family: var(--sp-font-sans);
-}
+@layer components {
+  .session-language-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-family: var(--font-sans);
+  }
 
-.session-language-toggle__option {
-  min-width: 34px;
-  height: 26px;
-  border: 0;
-  border-radius: 9999px;
-  padding: 0 var(--sp-space-2);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: var(--sp-text-meta);
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background-color var(--sp-motion-hover),
-    color var(--sp-motion-hover);
-}
+  .session-language-toggle__option {
+    min-width: 34px;
+    height: 26px;
+    border: 0;
+    border-radius: 9999px;
+    padding: 0 var(--spacing-2);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-meta);
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background-color var(--transition-duration-hover),
+      color var(--transition-duration-hover);
+  }
 
-.session-language-toggle__option:hover {
-  color: var(--sp-text);
-}
+  .session-language-toggle__option:hover {
+    color: var(--color-foreground);
+  }
 
-.session-language-toggle__option[aria-pressed='true'] {
-  background: var(--sp-accent-bg);
-  color: var(--sp-accent);
-  font-weight: 600;
-}
+  .session-language-toggle__option[aria-pressed='true'] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
 
-.session-language-toggle__option:focus-visible {
-  outline: 2px solid var(--sp-accent);
-  outline-offset: 1px;
-}
+  .session-language-toggle__option:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
 
-.session-language-toggle__label {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--sp-space-2);
-  color: var(--sp-text);
-  font-size: var(--sp-text-button);
-  font-weight: 500;
-}
+  .session-language-toggle__label {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--spacing-2);
+    color: var(--color-foreground);
+    font-size: var(--text-button);
+    font-weight: 500;
+  }
 
-.session-language-toggle--expanded {
-  width: 100%;
-  min-height: 48px;
-  gap: var(--sp-space-1);
-  border-color: transparent;
-  border-radius: var(--sp-radius-control);
-  padding: 2px var(--sp-space-2) 2px var(--sp-space-4);
-  background: transparent;
-}
+  .session-language-toggle--expanded {
+    width: 100%;
+    min-height: 48px;
+    gap: var(--spacing-1);
+    border-color: transparent;
+    border-radius: var(--radius-control);
+    padding: 2px var(--spacing-2) 2px var(--spacing-4);
+    background: transparent;
+  }
 
-.session-language-toggle--expanded:hover {
-  background: var(--sp-surface-2);
-}
+  .session-language-toggle--expanded:hover {
+    background: var(--color-surface-2);
+  }
 
-.session-language-toggle--expanded .session-language-toggle__label {
-  margin-right: auto;
-}
+  .session-language-toggle--expanded .session-language-toggle__label {
+    margin-right: auto;
+  }
 
-.session-language-toggle--expanded .session-language-toggle__option {
-  min-width: 44px;
-  height: 44px;
-}
-
-.session-language-toolbar {
-  position: sticky;
-  top: var(--sw-header-height, 56px);
-  z-index: 50;
-  display: flex;
-  min-height: 52px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-space-3);
-  padding: var(--sp-space-2) var(--sp-space-6);
-  border-bottom: 1px solid var(--sp-border);
-  background: color-mix(in srgb, var(--sp-bg) 96%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.session-language-toolbar__label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-space-2);
-  color: var(--sp-muted);
-  font-size: var(--sp-text-meta);
-  font-weight: 500;
-}
-
-@media (max-width: 768px), (pointer: coarse) {
-  .session-language-toggle:not(.session-language-toggle--expanded)
-    .session-language-toggle__option {
+  .session-language-toggle--expanded .session-language-toggle__option {
     min-width: 44px;
     height: 44px;
   }
 
   .session-language-toolbar {
-    min-height: 56px;
-    gap: var(--sp-space-2);
-    padding: var(--sp-space-1) var(--sp-space-3);
+    position: sticky;
+    top: var(--sw-header-height, 56px);
+    z-index: 50;
+    display: flex;
+    min-height: 52px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-6);
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-background) 96%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
-}
 
-@media (max-width: 420px) {
   .session-language-toolbar__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    color: var(--color-muted);
+    font-size: var(--text-meta);
+    font-weight: 500;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .session-language-toggle__option {
-    transition: none;
+  @media (max-width: 768px), (pointer: coarse) {
+    .session-language-toggle:not(.session-language-toggle--expanded)
+      .session-language-toggle__option {
+      min-width: 44px;
+      height: 44px;
+    }
+
+    .session-language-toolbar {
+      min-height: 56px;
+      gap: var(--spacing-2);
+      padding: var(--spacing-1) var(--spacing-3);
+    }
+  }
+
+  @media (max-width: 420px) {
+    .session-language-toolbar__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .session-language-toggle__option {
+      transition: none;
+    }
   }
 }

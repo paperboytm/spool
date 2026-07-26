@@ -1,7 +1,11 @@
 import type { PagesFunction } from '@cloudflare/workers-types'
 
 import { auditAfterCommit } from '../../../../../../src/audit-after-commit'
-import { prepareAuthorizedTargetStarsDelete } from '../../../../../../src/discovery/projection'
+import {
+  prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic,
+  prepareAuthorizedProjectStarsDeleteWhenNotPublic,
+  prepareAuthorizedTargetStarsDelete,
+} from '../../../../../../src/discovery/projection'
 import { ApiError, jsonError, jsonOk } from '../../../../../../src/errors'
 import { requireHubUser } from '../../../../../../src/hub/auth'
 import { activeTeamRole, type HubEnv } from '../../../../../../src/hub/head'
@@ -37,6 +41,18 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
 
     if (existing.withdrawn_at === null) {
       const now = Date.now()
+      const projectionGate = {
+        sid,
+        actorUserId: user.id,
+        teamId: existing.team_id,
+        root: existing.root,
+        updatedAt: now,
+        visibility:
+          existing.visibility === 'private' ? ('private' as const) : ('unlisted' as const),
+        withdrawn: true,
+        requireAuthor: false,
+        requireTeamManager: existing.team_id !== null,
+      }
       const results = await ctx.env.DB.batch([
         prepareAuthorizedWithdrawal(ctx.env.DB, {
           sid,
@@ -44,17 +60,17 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
           expectedTeamId: existing.team_id,
           now,
         }),
-        prepareAuthorizedTargetStarsDelete(ctx.env.DB, {
-          sid,
-          actorUserId: user.id,
-          teamId: existing.team_id,
-          root: existing.root,
-          updatedAt: now,
-          visibility: existing.visibility === 'private' ? 'private' : 'unlisted',
-          withdrawn: true,
-          requireAuthor: false,
-          requireTeamManager: existing.team_id !== null,
-        }),
+        prepareAuthorizedTargetStarsDelete(ctx.env.DB, projectionGate),
+        prepareAuthorizedProjectStarsDeleteWhenNotPublic(
+          ctx.env.DB,
+          existing.project_id,
+          projectionGate,
+        ),
+        prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic(
+          ctx.env.DB,
+          existing.project_id,
+          projectionGate,
+        ),
       ])
       if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')
       auditAfterCommit(ctx, {

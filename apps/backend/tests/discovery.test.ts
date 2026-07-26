@@ -481,12 +481,33 @@ describe('GET /api/discovery/v1/sessions', () => {
       deletion_pending_until: null,
       archived_at: null,
     })
+    env.state.handles.push({
+      handle: 'discovery-team',
+      user_id: null,
+      team_id: TEAM_ID,
+      claimed_at: NOW,
+      released_at: null,
+    })
+    env.state.projects.push({
+      id: 'project_discovery_team',
+      owner_user_id: null,
+      owner_team_id: TEAM_ID,
+      slug: 'knowledge',
+      name: 'Knowledge',
+      description: null,
+      github_url: null,
+      created_by_user_id: 'deleted-team-author',
+      created_at: NOW,
+      updated_at: NOW,
+      archived_at: null,
+    })
     seedDiscovery(env.state, {
       sid: CLAUDE_SID,
       owner: 'deleted-team-author',
       title: 'Team knowledge survives',
       teamId: TEAM_ID,
     })
+    env.state.hub_sessions[0]!.project_id = 'project_discovery_team'
 
     const response = await invoke(
       sessionsGet,
@@ -497,14 +518,24 @@ describe('GET /api/discovery/v1/sessions', () => {
       items: Array<{
         sid: string
         author: { handle: string | null; displayName: string | null; avatarUrl: string | null }
-        project: { id: string; slug: string; name: string } | null
+        project: {
+          id: string
+          slug: string
+          name: string
+          owner?: { kind: string; handle: string }
+        } | null
       }>
     }
     expect(body.items).toEqual([
       expect.objectContaining({
         sid: CLAUDE_SID,
         author: { handle: null, displayName: null, avatarUrl: null },
-        project: null,
+        project: {
+          id: 'project_discovery_team',
+          slug: 'knowledge',
+          name: 'Knowledge',
+          owner: { kind: 'team', handle: 'discovery-team' },
+        },
       }),
     ])
 

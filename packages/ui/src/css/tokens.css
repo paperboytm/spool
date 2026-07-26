@@ -18,7 +18,14 @@
      clears 4.5:1. --sp-accent stays the brand color for links/text/icons. */
   --sp-accent-fill: #0b6bdb;
   --sp-accent-bg: #e7f2ff;
+  --sp-accent-weak: color-mix(in srgb, var(--sp-accent) 8%, transparent);
   --sp-on-accent: #ffffff;
+  --sp-accent-line: color-mix(in srgb, var(--sp-accent) 30%, transparent);
+  --sp-overlay: rgb(0 0 0 / 55%);
+  --sp-modal-overlay: rgb(0 0 0 / 45%);
+  --sp-on-overlay: #ffffff;
+  --sp-scrollbar-thumb: rgb(31 31 31 / 40%);
+  --sp-scrollbar-thumb-hover: rgb(31 31 31 / 60%);
   /* Brand accent as rendered on dark surfaces (terminal mockups, dark
      theme). One knob: change this + the light/dark --sp-accent values
      above/below to retheme the whole site. */
@@ -30,6 +37,12 @@
   --sp-source-gemini: #5887d0;
   --sp-source-opencode: #8a6f3d;
   --sp-source-pi: #a55a7a;
+  --sp-connector-github: #555555;
+  --sp-connector-twitter: #3a3a3a;
+  --sp-connector-youtube: #b22222;
+  --sp-connector-reddit: #ff4500;
+  --sp-connector-hn: #ff6600;
+  --sp-connector-xhs: #ff2442;
   --sp-success: #6baf6b;
   --sp-warning: #e4a640;
   --sp-error: #e5484d;
@@ -43,6 +56,9 @@
   --sp-text-meta: 11px;
   --sp-text-label: 10px;
   --sp-text-session-title: 15px;
+  --sp-text-reading: 14px;
+  --sp-text-summary: 16px;
+  --sp-text-section-title: 18px;
 
   --sp-control-button-sm: 28px;
   --sp-control-button-md: 32px;
@@ -73,8 +89,14 @@
   --sp-radius-pill: 9999px;
 
   --sp-motion-hover: 80ms;
+  --sp-motion-reveal: 150ms;
+  --sp-motion-highlight: 700ms;
   --sp-focus-ring: 0 0 0 2px var(--sp-accent-bg), 0 0 0 3px var(--sp-accent);
+  --sp-shadow-control: 0 1px 2px rgb(0 0 0 / 8%);
+  --sp-shadow-card: 0 1px 2px rgb(10 10 10 / 4%), 0 8px 24px rgb(10 10 10 / 6%);
+  --sp-shadow-menu: 0 8px 24px rgb(0 0 0 / 10%);
   --sp-shadow-popover: 0 12px 32px rgb(0 0 0 / 0.14);
+  --sp-shadow-reader: 0 1px 2px rgb(0 0 0 / 5%), 0 18px 50px rgb(0 0 0 / 10%);
 }
 
 html.dark,
@@ -93,24 +115,32 @@ html[data-theme='dark'] {
   --sp-accent-fill: #5bb1f0;
   --sp-accent-bg: #0e2740;
   --sp-on-accent: #0b1520;
+  --sp-modal-overlay: rgb(0 0 0 / 65%);
+  --sp-scrollbar-thumb: rgb(230 230 230 / 40%);
+  --sp-scrollbar-thumb-hover: rgb(230 230 230 / 60%);
 
   --sp-source-claude: #e89a7c;
   --sp-source-codex: #7cc9a2;
   --sp-source-gemini: #8ab0e5;
   --sp-source-opencode: #c9a761;
   --sp-source-pi: #d88aaa;
+  --sp-connector-github: #999990;
+  --sp-connector-twitter: #888880;
+  --sp-connector-youtube: #d44444;
+  --sp-connector-reddit: #ff6b3d;
+  --sp-connector-hn: #ff8c3d;
+  --sp-connector-xhs: #ff4f6a;
   --sp-success: #7dc07d;
   --sp-warning: #f0b854;
   --sp-error: #ff6369;
   --sp-error-bg: #2a1113;
+  --sp-shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 10px 30px rgb(0 0 0 / 40%);
+  --sp-shadow-menu: 0 8px 24px rgb(0 0 0 / 50%);
   --sp-shadow-popover: 0 12px 32px rgb(0 0 0 / 0.64);
+  --sp-shadow-reader: 0 1px 2px rgb(0 0 0 / 40%), 0 18px 50px rgb(0 0 0 / 55%);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1f1f1f66 transparent;
-}
-
-html:is(.dark, [data-theme='dark']) {
-  scrollbar-color: #e6e6e666 transparent;
+  scrollbar-color: var(--sp-scrollbar-thumb) transparent;
 }

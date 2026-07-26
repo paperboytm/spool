@@ -6,6 +6,8 @@ import { ProjectCard } from '../components/ProjectCard'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import {
   fetchMyProjects,
+  fetchMyStarredProjects,
+  fetchMyWatchingProjects,
   fetchPublicProjects,
   fetchTeamProjects,
   type ProjectApiResult,
@@ -18,6 +20,8 @@ import '../styles/projects.css'
 export type ProjectsSearchState =
   | { scope?: 'public'; team?: never }
   | { scope: 'mine'; team?: never }
+  | { scope: 'starred'; team?: never }
+  | { scope: 'watching'; team?: never }
   | { scope: 'team'; team: string }
 
 type Membership =
@@ -58,6 +62,8 @@ function resultState(
 
 function scopeValue(search: ProjectsSearchState): string {
   if (search.scope === 'mine') return 'mine'
+  if (search.scope === 'starred') return 'starred'
+  if (search.scope === 'watching') return 'watching'
   if (search.scope === 'team') return `team:${search.team}`
   return 'public'
 }
@@ -112,6 +118,8 @@ export function ProjectsPage({
   const fetchPage = useCallback(
     (cursor: string | null = null) => {
       if (search.scope === 'mine') return fetchMyProjects(cursor)
+      if (search.scope === 'starred') return fetchMyStarredProjects(cursor)
+      if (search.scope === 'watching') return fetchMyWatchingProjects(cursor)
       if (search.scope === 'team') {
         if (!activeTeam) return null
         return fetchTeamProjects(activeTeam.id, cursor)
@@ -178,6 +186,8 @@ export function ProjectsPage({
     membership.kind === 'ready'
       ? [
           { value: 'public', label: 'Public' },
+          { value: 'starred', label: 'Starred' },
+          { value: 'watching', label: 'Watching' },
           ...membership.teams.map((team) => ({
             value: `team:${team.id}`,
             label: (
@@ -214,6 +224,8 @@ export function ProjectsPage({
           }))}
           onValueChange={(value) => {
             if (value === 'mine') return onSearchChange({ scope: 'mine' })
+            if (value === 'starred') return onSearchChange({ scope: 'starred' })
+            if (value === 'watching') return onSearchChange({ scope: 'watching' })
             if (value.startsWith('team:')) {
               return onSearchChange({ scope: 'team', team: value.slice('team:'.length) })
             }
@@ -262,7 +274,11 @@ export function ProjectsPage({
             <p>
               {search.scope === 'public'
                 ? 'Public Projects appear after they contain a Public Session.'
-                : 'Create a Project to give related Sessions one clear home.'}
+                : search.scope === 'starred'
+                  ? 'Star a Project to keep it in this list.'
+                  : search.scope === 'watching'
+                    ? 'Watch a Project to keep up with its Sessions.'
+                    : 'Create a Project to give related Sessions one clear home.'}
             </p>
             {mayCreate ? (
               <ButtonLink href={createHref} variant="accent">

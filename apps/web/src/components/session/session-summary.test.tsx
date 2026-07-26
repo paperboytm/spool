@@ -40,8 +40,8 @@ describe('SessionSummary', () => {
     expect(html).toContain('<h2 id="session-summary-title"')
     expect(html).not.toContain('<header')
     expect(html).not.toContain('<svg')
-    expect(html).not.toContain('rounded-[10px]')
-    expect(html).not.toContain('bg-[var(--card)]')
+    expect(html).not.toContain('rounded-card')
+    expect(html).not.toContain('bg-background')
   })
 
   it('marks localized Summary prose without changing the English UI heading', () => {

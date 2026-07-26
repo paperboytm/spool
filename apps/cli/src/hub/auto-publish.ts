@@ -251,6 +251,7 @@ export async function runAutoPublish(
         summary: existing?.summaryMd ?? null,
         projectId: subscription.project.remote.id,
         expectedProjectId: existing?.project?.id ?? null,
+        expectedTeamId: existing?.team?.id ?? null,
         ...publishTarget(subscription, candidate.provider),
       })
       state.sessions[stateKey] = { fingerprint: scopedFingerprint, url: published.url }
@@ -289,18 +290,22 @@ export function reportAutoPublish(ui: CliUi, result: AutoPublishResult | null): 
 export function publishTarget(
   subscription: Subscription,
   provider: SessionProvider,
-): { visibility: 'public' | 'link-only' } | { visibility: 'team'; teamId: string } {
+):
+  | { visibility: 'public' | 'link-only'; teamId?: string }
+  | { visibility: 'team'; teamId: string } {
+  const teamId =
+    subscription.project?.tenant.kind === 'team'
+      ? subscription.project.tenant.id
+      : subscription.teamId
   switch (subscription.visibility) {
     case 'team':
-      return subscription.teamId !== undefined
-        ? { visibility: 'team', teamId: subscription.teamId }
-        : { visibility: 'link-only' }
+      return teamId !== undefined ? { visibility: 'team', teamId } : { visibility: 'link-only' }
     case 'public':
       return isDiscoverySessionProvider(provider)
-        ? { visibility: 'public' }
-        : { visibility: 'link-only' }
+        ? { visibility: 'public', ...(teamId === undefined ? {} : { teamId }) }
+        : { visibility: 'link-only', ...(teamId === undefined ? {} : { teamId }) }
     case 'link-only':
-      return { visibility: 'link-only' }
+      return { visibility: 'link-only', ...(teamId === undefined ? {} : { teamId }) }
   }
 }
 
@@ -472,16 +477,20 @@ function subscriptionProjectBindingProblem(
   ) {
     return 'its saved Project and tenant no longer agree. Run `spool subscribe` again.'
   }
-  if (subscription.visibility === 'team') {
-    if (
-      binding.tenant.kind !== 'team' ||
-      !subscription.teamId ||
-      binding.tenant.id !== subscription.teamId
-    ) {
-      return 'its Team disclosure and Project tenant no longer agree. Run `spool subscribe` again.'
+  if (binding.tenant.kind === 'team') {
+    if (!subscription.teamId || binding.tenant.id !== subscription.teamId) {
+      return 'its Team owner and Project tenant no longer agree. Run `spool subscribe` again.'
     }
-  } else if (binding.tenant.kind !== 'user' || binding.tenant.id !== response.actor.id) {
-    return 'its personal disclosure is bound to another tenant. Run `spool subscribe` again.'
+  } else {
+    if (subscription.teamId !== undefined) {
+      return 'its personal Project has a Team owner. Run `spool subscribe` again.'
+    }
+    if (binding.tenant.id !== response.actor.id) {
+      return 'its personal Project is bound to another tenant. Run `spool subscribe` again.'
+    }
+  }
+  if (subscription.visibility === 'team' && binding.tenant.kind !== 'team') {
+    return 'its Team-only disclosure has no Team Project owner. Run `spool subscribe` again.'
   }
   const live = response.projects.find(
     (project) =>

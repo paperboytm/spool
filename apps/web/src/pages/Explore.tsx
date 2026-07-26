@@ -150,6 +150,7 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
   const summary = localizedSummary.text
   const costLabel = formatSessionCost(item.cost)
   const starCount = item.starCount ?? 0
+  const projectOwnerHandle = item.project?.owner?.handle ?? item.author.handle
 
   return (
     <SessionFeedRow
@@ -167,11 +168,11 @@ export function DiscoveryRow({ item }: { item: DiscoverySessionItem }) {
       timestampVerb="published"
       metadata={
         <div className="session-feed-row-meta">
-          {item.project && item.author.handle ? (
+          {item.project && projectOwnerHandle ? (
             <a
               className="session-feed-project"
-              href={`/@${encodeURIComponent(item.author.handle)}/${encodeURIComponent(item.project.slug)}`}
-              title={`Project · @${item.author.handle}/${item.project.slug}`}
+              href={`/@${encodeURIComponent(projectOwnerHandle)}/${encodeURIComponent(item.project.slug)}`}
+              title={`Project · @${projectOwnerHandle}/${item.project.slug}`}
             >
               <FolderKanban size={13} strokeWidth={1.7} aria-hidden="true" />
               {item.project.name}

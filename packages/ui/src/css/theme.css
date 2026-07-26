@@ -1,0 +1,97 @@
+/*
+ * Tailwind v4 semantic design-token interface.
+ *
+ * `tokens.css` owns the runtime light/dark values. This file is the only
+ * Tailwind-facing token interface: utilities inline the active `--sp-*`
+ * value, while `static` also emits the semantic namespace for authored CSS.
+ */
+@theme inline static {
+  /* Typography */
+  --font-sans: var(--sp-font-sans);
+  --font-mono: var(--sp-font-mono);
+  --text-ui: var(--sp-text-ui);
+  --text-button: var(--sp-text-button);
+  --text-command: var(--sp-text-command);
+  --text-meta: var(--sp-text-meta);
+  --text-label: var(--sp-text-label);
+  --text-session-title: var(--sp-text-session-title);
+  --text-reading: var(--sp-text-reading);
+  --text-summary: var(--sp-text-summary);
+  --text-section-title: var(--sp-text-section-title);
+
+  /* Active semantic palette */
+  --color-background: var(--sp-bg);
+  --color-surface: var(--sp-surface);
+  --color-surface-2: var(--sp-surface-2);
+  --color-border: var(--sp-border);
+  --color-border-strong: var(--sp-border-strong);
+  --color-foreground: var(--sp-text);
+  --color-muted: var(--sp-muted);
+  --color-faint: var(--sp-faint);
+  --color-accent: var(--sp-accent);
+  --color-accent-fill: var(--sp-accent-fill);
+  --color-accent-soft: var(--sp-accent-bg);
+  --color-accent-weak: var(--sp-accent-weak);
+  --color-on-accent: var(--sp-on-accent);
+  --color-accent-line: var(--sp-accent-line);
+  --color-error-surface: var(--sp-error-bg);
+  --color-overlay: var(--sp-overlay);
+  --color-modal-overlay: var(--sp-modal-overlay);
+  --color-on-overlay: var(--sp-on-overlay);
+  --color-scrollbar-thumb: var(--sp-scrollbar-thumb);
+  --color-scrollbar-thumb-hover: var(--sp-scrollbar-thumb-hover);
+
+  /* Semantic and source colors */
+  --color-status-success: var(--sp-success);
+  --color-status-warning: var(--sp-warning);
+  --color-status-error: var(--sp-error);
+  --color-source-claude: var(--sp-source-claude);
+  --color-source-codex: var(--sp-source-codex);
+  --color-source-gemini: var(--sp-source-gemini);
+  --color-source-opencode: var(--sp-source-opencode);
+  --color-source-pi: var(--sp-source-pi);
+  --color-connector-github: var(--sp-connector-github);
+  --color-connector-twitter: var(--sp-connector-twitter);
+  --color-connector-youtube: var(--sp-connector-youtube);
+  --color-connector-reddit: var(--sp-connector-reddit);
+  --color-connector-hn: var(--sp-connector-hn);
+  --color-connector-xhs: var(--sp-connector-xhs);
+
+  /* Spacing and controls */
+  --spacing-half: var(--sp-space-0-5);
+  --spacing-1: var(--sp-space-1);
+  --spacing-1_5: var(--sp-space-1-5);
+  --spacing-2: var(--sp-space-2);
+  --spacing-3: var(--sp-space-3);
+  --spacing-4: var(--sp-space-4);
+  --spacing-5: var(--sp-space-5);
+  --spacing-6: var(--sp-space-6);
+  --spacing-8: var(--sp-space-8);
+  --spacing-12: var(--sp-space-12);
+  --spacing-16: var(--sp-space-16);
+  --spacing-24: var(--sp-space-24);
+  --spacing-control-button-sm: var(--sp-control-button-sm);
+  --spacing-control-button-md: var(--sp-control-button-md);
+  --spacing-control-button-lg: var(--sp-control-button-lg);
+  --spacing-control-icon-sm: var(--sp-control-icon-sm);
+  --spacing-control-icon-md: var(--sp-control-icon-md);
+  --spacing-control-search: var(--sp-control-search);
+  --spacing-control-tab: var(--sp-control-tab);
+  --spacing-control-nav: var(--sp-control-nav);
+
+  /* Shape, depth, and motion */
+  --radius-badge: var(--sp-radius-badge);
+  --radius-control: var(--sp-radius-control);
+  --radius-input: var(--sp-radius-input);
+  --radius-card: var(--sp-radius-card);
+  --radius-pill: var(--sp-radius-pill);
+  --shadow-focus-ring: var(--sp-focus-ring);
+  --shadow-control: var(--sp-shadow-control);
+  --shadow-card: var(--sp-shadow-card);
+  --shadow-menu: var(--sp-shadow-menu);
+  --shadow-popover: var(--sp-shadow-popover);
+  --shadow-reader: var(--sp-shadow-reader);
+  --transition-duration-hover: var(--sp-motion-hover);
+  --transition-duration-reveal: var(--sp-motion-reveal);
+  --transition-duration-highlight: var(--sp-motion-highlight);
+}

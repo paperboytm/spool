@@ -353,22 +353,22 @@ export function SessionReader({ sid }: { sid: string }) {
       <Page>
         <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
-          <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-6 shadow-[var(--shadow-card)] md:p-8">
+          <div className="rounded-card border-border bg-background shadow-card w-full max-w-[560px] border p-6 md:p-8">
             <div className="mb-6 flex items-center gap-3">
-              <span className="rounded border border-[var(--accent)] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[var(--accent)] uppercase">
+              <span className="rounded-badge border-accent text-label text-accent border px-2 py-1 font-semibold tracking-[0.08em] uppercase">
                 Team Session
               </span>
-              <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
+              <span className="bg-border h-px flex-1" aria-hidden="true" />
             </div>
-            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
+            <h1 className="text-foreground m-0 text-xl leading-8 font-semibold tracking-[-0.01em]">
               Sign in to check access
             </h1>
-            <p className="mt-3 mb-6 text-[13px] leading-5 text-[var(--muted)]">
+            <p className="text-ui text-muted mt-3 mb-6 leading-5">
               This Session is visible only to current members of its Team. Sign in with your Spool
               account to continue.
             </p>
             <a
-              className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent-fill)] px-4 text-[13px] font-semibold text-[var(--accent-ink)] no-underline hover:opacity-90"
+              className="rounded-control bg-accent-fill text-ui text-on-accent inline-flex min-h-11 items-center justify-center px-4 font-semibold no-underline hover:opacity-90"
               href={`/sign-in?next=${encodeURIComponent(next)}`}
             >
               Sign in
@@ -385,20 +385,20 @@ export function SessionReader({ sid }: { sid: string }) {
       <Page>
         <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
-          <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
+          <div className="rounded-card border-border bg-background shadow-card w-full max-w-[560px] border p-8">
             <div className="mb-6 flex items-center gap-3">
-              <span className="rounded border border-[var(--sp-error)] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-[var(--sp-error)] uppercase">
+              <span className="rounded-badge border-status-error text-label text-status-error border px-2 py-1 font-semibold tracking-[0.08em] uppercase">
                 Session unavailable
               </span>
-              <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
+              <span className="bg-border h-px flex-1" aria-hidden="true" />
             </div>
-            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
+            <h1 className="text-foreground m-0 text-xl leading-8 font-semibold tracking-[-0.01em]">
               This session was withdrawn
             </h1>
-            <p className="mt-3 mb-0 text-[13px] leading-5 text-[var(--muted)]">
+            <p className="text-ui text-muted mt-3 mb-0 leading-5">
               The author took it off the hub. The link stays dead until they share it again.
             </p>
-            <p className="mt-4 mb-0 font-mono text-[11px] text-[var(--muted)]">
+            <p className="text-meta text-muted mt-4 mb-0 font-mono">
               Withdrawn on {humanDateTime(state.at)}.
             </p>
           </div>
@@ -413,11 +413,11 @@ export function SessionReader({ sid }: { sid: string }) {
       <Page>
         <Header sticky />
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
-          <div className="w-full max-w-[560px] rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-[var(--shadow-card)]">
-            <h1 className="m-0 text-xl leading-8 font-semibold tracking-[-0.01em] text-[var(--text)]">
+          <div className="rounded-card border-border bg-background shadow-card w-full max-w-[560px] border p-8">
+            <h1 className="text-foreground m-0 text-xl leading-8 font-semibold tracking-[-0.01em]">
               Could not load this session
             </h1>
-            <p className="mt-3 mb-0 text-[13px] leading-5 text-[var(--muted)]">
+            <p className="text-ui text-muted mt-3 mb-0 leading-5">
               The hub did not answer. Try again in a moment.
             </p>
           </div>
@@ -456,9 +456,9 @@ export function SessionReader({ sid }: { sid: string }) {
       <main className="flex flex-1 flex-col items-center justify-center px-4 py-8">
         {state.phase === 'loading' && (
           <div className="w-full max-w-[720px]" aria-label="Loading session">
-            <div className="mb-4 h-3 w-32 rounded bg-[var(--surface2)]" />
-            <div className="mb-3 h-8 w-4/5 rounded bg-[var(--surface2)]" />
-            <div className="h-24 rounded-[10px] bg-[var(--surface)]" />
+            <div className="rounded-badge bg-surface-2 mb-4 h-3 w-32" />
+            <div className="rounded-badge bg-surface-2 mb-3 h-8 w-4/5" />
+            <div className="rounded-card bg-surface h-24" />
           </div>
         )}
       </main>

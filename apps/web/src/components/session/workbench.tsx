@@ -420,21 +420,21 @@ export function SessionWorkbench({
 
   return (
     <main
-      className="relative min-w-0 flex-1 bg-[var(--bg)] text-[var(--text)]"
+      className="bg-background text-foreground relative min-w-0 flex-1"
       aria-labelledby="sw-workbench-title"
     >
       <div className="mx-auto w-full max-w-[1120px] px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <header className="mb-6 border-b border-[var(--border)] pb-5" title={`Session ${meta.sid}`}>
+        <header className="border-border mb-6 border-b pb-5" title={`Session ${meta.sid}`}>
           <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-[var(--muted)]">
-              <span className="inline-flex items-center gap-2 font-medium text-[var(--text)]">
+            <div className="text-meta text-muted mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-foreground inline-flex items-center gap-2 font-medium">
                 <Avatar src={meta.author.avatarUrl} name={avatarName} alt="" size="sm" />
                 {authorLabel(meta)}
               </span>
               <Badge variant={`source-${provider}`}>
                 <span
                   className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: `var(--sp-source-${provider})` }}
+                  style={{ backgroundColor: `var(--color-source-${provider})` }}
                   aria-hidden="true"
                 />
                 {providerLabel}
@@ -455,7 +455,7 @@ export function SessionWorkbench({
               </Badge>
               {meta.project ? (
                 <a
-                  className="session-reader-project inline-flex min-h-6 min-w-0 items-center gap-1.5 rounded-[var(--sp-radius-control)] px-1.5 font-mono text-[11px] text-[var(--muted)] hover:text-[var(--accent)] hover:underline focus-visible:text-[var(--accent)] focus-visible:underline"
+                  className="session-reader-project rounded-control text-meta text-muted hover:text-accent focus-visible:text-accent inline-flex min-h-6 min-w-0 items-center gap-1.5 px-1.5 font-mono hover:underline focus-visible:underline"
                   href={`/@${encodeURIComponent(meta.project.owner.handle)}/${encodeURIComponent(meta.project.slug)}`}
                   title={`Project · @${meta.project.owner.handle}/${meta.project.slug}`}
                 >
@@ -470,7 +470,7 @@ export function SessionWorkbench({
               </span>
               {costLabel && (
                 <span
-                  className="font-mono text-[11px] text-[var(--muted)] tabular-nums"
+                  className="text-meta text-muted font-mono tabular-nums"
                   title="Estimated API cost from recorded token usage"
                 >
                   {costLabel}
@@ -482,7 +482,7 @@ export function SessionWorkbench({
               lang={
                 localizedTitle.language ? sessionLanguageTag(localizedTitle.language) : undefined
               }
-              className="m-0 max-w-[760px] text-2xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] text-[var(--text)]"
+              className="text-foreground m-0 max-w-[760px] text-2xl leading-8 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]"
               title={fullTitle}
             >
               {title}
@@ -524,11 +524,11 @@ export function SessionWorkbench({
               <div className="mb-4 flex items-baseline justify-between gap-4">
                 <h2
                   id="session-timeline-title"
-                  className="m-0 text-base font-semibold text-[var(--text)]"
+                  className="text-summary text-foreground m-0 font-semibold"
                 >
                   Session
                 </h2>
-                <span className="font-mono text-[11px] text-[var(--faint)] tabular-nums">
+                <span className="text-meta text-faint font-mono tabular-nums">
                   {readingMode === 'guidance'
                     ? guidanceCountLabel
                     : history.phase === 'ready'
@@ -598,10 +598,10 @@ export function SessionWorkbench({
                   {prompts.length > 0 && (
                     <nav className="relative z-30 mb-4 min-w-0 lg:mb-0" aria-label="User prompts">
                       <div className="mb-2 flex items-center justify-between gap-3 lg:hidden">
-                        <h3 className="m-0 text-[10px] font-semibold tracking-[0.08em] text-[var(--muted)] uppercase">
+                        <h3 className="text-label text-muted m-0 font-semibold tracking-[0.08em] uppercase">
                           Prompts
                         </h3>
-                        <span className="font-mono text-[10px] text-[var(--faint)] tabular-nums">
+                        <span className="text-label text-faint font-mono tabular-nums">
                           {prompts.length}
                         </span>
                       </div>
@@ -634,27 +634,27 @@ export function SessionWorkbench({
                               >
                                 <button
                                   type="button"
-                                  className={`m-0 flex h-12 w-48 cursor-pointer items-center gap-2 rounded-md border px-3 py-0 text-left font-sans transition-colors duration-[80ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:h-4 lg:w-6 lg:border-0 lg:bg-transparent lg:p-0 ${
+                                  className={`rounded-control duration-hover focus-visible:outline-accent m-0 flex h-12 w-48 cursor-pointer items-center gap-2 border px-3 py-0 text-left font-sans transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 lg:h-4 lg:w-6 lg:border-0 lg:bg-transparent lg:p-0 ${
                                     active
-                                      ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]'
-                                      : 'border-[var(--border)] bg-[var(--card)] text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]'
+                                      ? 'border-accent bg-accent-soft text-foreground'
+                                      : 'border-border bg-background text-muted hover:border-border-strong hover:text-foreground'
                                   }`}
                                   aria-label={`Prompt ${index + 1}: ${entry.excerpt}`}
                                   aria-describedby={showPreview ? tooltipId : undefined}
                                   aria-current={active ? 'location' : undefined}
                                   onClick={() => jumpToPrompt(entry.messageId, entry.turnIndex)}
                                 >
-                                  <span className="font-mono text-[10px] text-[var(--accent)] tabular-nums lg:hidden">
+                                  <span className="text-label text-accent font-mono tabular-nums lg:hidden">
                                     {String(index + 1).padStart(2, '0')}
                                   </span>
-                                  <span className="line-clamp-2 min-w-0 text-[11px] leading-4 lg:hidden">
+                                  <span className="text-meta line-clamp-2 min-w-0 leading-4 lg:hidden">
                                     {entry.excerpt}
                                   </span>
                                   <span
-                                    className={`hidden h-px transition-[width,background-color] duration-150 ease-out lg:block ${
+                                    className={`duration-reveal hidden h-px transition-[width,background-color] ease-out lg:block ${
                                       active
-                                        ? 'w-6 bg-[var(--accent)]'
-                                        : 'w-4 bg-[var(--border-strong)] group-focus-within:w-6 group-focus-within:bg-[var(--text)] group-hover:w-6 group-hover:bg-[var(--text)]'
+                                        ? 'bg-accent w-6'
+                                        : 'bg-border-strong group-focus-within:bg-foreground group-hover:bg-foreground w-4 group-focus-within:w-6 group-hover:w-6'
                                     }`}
                                     aria-hidden="true"
                                   />
@@ -663,7 +663,7 @@ export function SessionWorkbench({
                                   <span
                                     id={tooltipId}
                                     role="tooltip"
-                                    className="absolute top-[-4px] left-7 z-50 hidden max-h-72 w-72 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 text-[12px] leading-[18px] break-words whitespace-pre-wrap text-[var(--text)] shadow-[0_8px_24px_color-mix(in_srgb,var(--text)_10%,transparent)] lg:block"
+                                    className="rounded-input border-border bg-background text-button text-foreground shadow-popover absolute top-[-4px] left-7 z-50 hidden max-h-72 w-72 overflow-y-auto border p-3 leading-[18px] break-words whitespace-pre-wrap lg:block"
                                   >
                                     {entry.preview}
                                   </span>
@@ -684,7 +684,7 @@ export function SessionWorkbench({
                       messageCount > 0 ? (
                         <div
                           ref={timelineRef}
-                          className="min-w-0 overflow-x-auto [&_[data-turn-index]:focus]:outline-none [&_[data-turn-index]:focus_[data-turn-body]]:rounded-md [&_[data-turn-index]:focus_[data-turn-body]]:outline-2 [&_[data-turn-index]:focus_[data-turn-body]]:outline-offset-4 [&_[data-turn-index]:focus_[data-turn-body]]:outline-[var(--accent)]"
+                          className="[&_[data-turn-index]:focus_[data-turn-body]]:rounded-control [&_[data-turn-index]:focus_[data-turn-body]]:outline-accent min-w-0 overflow-x-auto [&_[data-turn-index]:focus]:outline-none [&_[data-turn-index]:focus_[data-turn-body]]:outline-2 [&_[data-turn-index]:focus_[data-turn-body]]:outline-offset-4"
                         >
                           <TimelineBody
                             convo={spoolDocument.conversation}
@@ -694,7 +694,7 @@ export function SessionWorkbench({
                           />
                         </div>
                       ) : (
-                        <p className="m-0 border-t border-[var(--border)] py-6 text-[13px] text-[var(--faint)]">
+                        <p className="border-border text-ui text-faint m-0 border-t py-6">
                           No turns were selected for this session.
                         </p>
                       )
@@ -710,7 +710,7 @@ export function SessionWorkbench({
                         />
                       </div>
                     ) : history.phase === 'ready' ? (
-                      <p className="m-0 border-t border-[var(--border)] py-6 text-[13px] text-[var(--faint)]">
+                      <p className="border-border text-ui text-faint m-0 border-t py-6">
                         No renderable messages in this session.
                       </p>
                     ) : null}
@@ -728,16 +728,16 @@ export function SessionWorkbench({
             <div>
               <h2
                 id="workspace-title"
-                className="m-0 border-b border-[var(--border)] py-3 text-[10px] font-semibold tracking-[0.08em] text-[var(--muted)] uppercase"
+                className="border-border text-label text-muted m-0 border-b py-3 font-semibold tracking-[0.08em] uppercase"
               >
                 Workspace
               </h2>
-              <dl className="m-0 text-[11px]">
+              <dl className="text-meta m-0">
                 <MetadataRow label="Provider">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: `var(--sp-source-${provider})` }}
+                      style={{ backgroundColor: `var(--color-source-${provider})` }}
                       aria-hidden="true"
                     />
                     {providerLabel}
@@ -768,12 +768,8 @@ export function SessionWorkbench({
                   <MetadataRow label="Changes">
                     <span className="font-mono tabular-nums">
                       {view.diffstat.files} {view.diffstat.files === 1 ? 'file' : 'files'}{' '}
-                      <span className="font-medium text-[var(--sp-success)]">
-                        +{view.diffstat.adds}
-                      </span>{' '}
-                      <span className="font-medium text-[var(--sp-error)]">
-                        -{view.diffstat.dels}
-                      </span>
+                      <span className="text-status-success font-medium">+{view.diffstat.adds}</span>{' '}
+                      <span className="text-status-error font-medium">-{view.diffstat.dels}</span>
                     </span>
                   </MetadataRow>
                 )}
@@ -793,7 +789,7 @@ export function SessionWorkbench({
                     <MetadataRow label="Branch">
                       <span className="inline-flex min-w-0 items-start gap-2 font-mono [overflow-wrap:anywhere]">
                         <GitBranch
-                          className="mt-0.5 shrink-0"
+                          className="mt-half shrink-0"
                           size={12}
                           strokeWidth={1.7}
                           aria-hidden="true"
@@ -807,7 +803,7 @@ export function SessionWorkbench({
                         title={card.head ?? undefined}
                       >
                         <GitCommitHorizontal
-                          className="mt-0.5 shrink-0"
+                          className="mt-half shrink-0"
                           size={12}
                           strokeWidth={1.7}
                           aria-hidden="true"
@@ -1077,11 +1073,11 @@ function HumanGuidanceView({
     content = <GuidanceSkeleton />
   } else if (history.phase === 'idle' || history.phase === 'error') {
     content = (
-      <div className="border-y border-[var(--border)] py-5">
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">
+      <div className="border-border border-y py-5">
+        <p className="text-ui text-foreground m-0 font-medium">
           Human guidance is not indexed for this Session yet
         </p>
-        <p className="mt-1 mb-4 max-w-[560px] text-[12px] leading-5 text-[var(--muted)]">
+        <p className="text-button text-muted mt-1 mb-4 max-w-[560px] leading-5">
           Load the full history once to build this view in your browser.
         </p>
         <Button size="lg" variant="outline" onClick={onLoadHistory}>
@@ -1091,7 +1087,7 @@ function HumanGuidanceView({
     )
   } else {
     content = (
-      <p className="m-0 border-y border-[var(--border)] py-6 text-[13px] text-[var(--faint)]">
+      <p className="border-border text-ui text-faint m-0 border-y py-6">
         No human instructions were found in this Session.
       </p>
     )
@@ -1099,7 +1095,7 @@ function HumanGuidanceView({
 
   return (
     <>
-      <p className="mt-0 mb-4 max-w-[620px] text-[12px] leading-5 text-[var(--muted)]">
+      <p className="text-button text-muted mt-0 mb-4 max-w-[620px] leading-5">
         Read the human instructions in full. Agent work stays compact until you open the response
         you need.
       </p>
@@ -1135,30 +1131,30 @@ function GuidanceTurnCard({
 }) {
   const responseLabel = formatAgentResponse(toolCalls, replyChars)
   return (
-    <article className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--card)]">
-      <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3 text-[10px] font-semibold tracking-[0.08em] text-[var(--muted)] uppercase">
+    <article className="rounded-card border-border bg-background overflow-hidden border">
+      <div className="border-border text-label text-muted flex items-center gap-2 border-b px-4 py-3 font-semibold tracking-[0.08em] uppercase">
         <UserRound size={14} strokeWidth={1.7} aria-hidden="true" />
         Human instruction
-        <span className="ml-auto font-mono text-[var(--faint)] tabular-nums">
+        <span className="text-faint ml-auto font-mono tabular-nums">
           {String(turnNumber).padStart(2, '0')}
         </span>
       </div>
       <div className="min-h-20 px-4 py-4">
         {prompt === null ? (
           <div aria-label="Loading human instruction" className="animate-pulse">
-            <div className="mb-2 h-3 w-5/6 rounded bg-[var(--surface2)]" />
-            <div className="mb-2 h-3 w-full rounded bg-[var(--surface2)]" />
-            <div className="h-3 w-3/5 rounded bg-[var(--surface2)]" />
+            <div className="rounded-badge bg-surface-2 mb-2 h-3 w-5/6" />
+            <div className="rounded-badge bg-surface-2 mb-2 h-3 w-full" />
+            <div className="rounded-badge bg-surface-2 h-3 w-3/5" />
           </div>
         ) : (
-          <p className="m-0 font-mono text-[12px] leading-5 break-words whitespace-pre-wrap text-[var(--text)]">
+          <p className="text-button text-foreground m-0 font-mono leading-5 break-words whitespace-pre-wrap">
             {prompt}
           </p>
         )}
       </div>
       <button
         type="button"
-        className="flex min-h-11 w-full items-center gap-2 border-0 border-t border-[var(--border)] bg-[var(--bg-sink)] px-4 py-2 text-left font-sans text-[12px] text-[var(--muted)] transition-colors duration-[80ms] hover:bg-[var(--surface2)] hover:text-[var(--text)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)] disabled:cursor-default disabled:hover:bg-[var(--bg-sink)] disabled:hover:text-[var(--muted)]"
+        className="border-border bg-surface text-button text-muted duration-hover hover:bg-surface-2 hover:text-foreground focus-visible:outline-accent disabled:hover:bg-surface disabled:hover:text-muted flex min-h-11 w-full items-center gap-2 border-0 border-t px-4 py-2 text-left font-sans transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] disabled:cursor-default"
         disabled={!replyAvailable}
         aria-label={replyAvailable ? `Open ${responseLabel}` : responseLabel}
         onClick={onOpenReply}
@@ -1179,16 +1175,16 @@ function GuidanceSkeleton() {
       {[0, 1].map((index) => (
         <div
           key={index}
-          className="animate-pulse overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--card)]"
+          className="rounded-card border-border bg-background animate-pulse overflow-hidden border"
           aria-hidden="true"
         >
-          <div className="h-10 border-b border-[var(--border)] bg-[var(--surface)]" />
+          <div className="border-border bg-surface h-10 border-b" />
           <div className="space-y-2 px-4 py-5">
-            <div className="h-3 w-4/5 rounded bg-[var(--surface2)]" />
-            <div className="h-3 w-full rounded bg-[var(--surface2)]" />
-            <div className="h-3 w-2/3 rounded bg-[var(--surface2)]" />
+            <div className="rounded-badge bg-surface-2 h-3 w-4/5" />
+            <div className="rounded-badge bg-surface-2 h-3 w-full" />
+            <div className="rounded-badge bg-surface-2 h-3 w-2/3" />
           </div>
-          <div className="h-11 border-t border-[var(--border)] bg-[var(--bg-sink)]" />
+          <div className="border-border bg-surface h-11 border-t" />
         </div>
       ))}
     </div>
@@ -1197,11 +1193,9 @@ function GuidanceSkeleton() {
 
 function GuidanceLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="border-y border-[var(--border)] py-5" role="alert">
-      <p className="m-0 text-[13px] font-medium text-[var(--text)]">
-        Human instructions did not load
-      </p>
-      <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+    <div className="border-border border-y py-5" role="alert">
+      <p className="text-ui text-foreground m-0 font-medium">Human instructions did not load</p>
+      <p className="text-button text-muted mt-1 mb-4 leading-5">
         The full Session is untouched. Retry the small guidance request.
       </p>
       <Button size="lg" variant="outline" onClick={onRetry}>
@@ -1231,15 +1225,15 @@ function AgentReplyDialog({
     >
       {activeReply !== null && (
         <div className="flex max-h-[calc(100dvh-32px)] min-h-0 flex-col">
-          <header className="flex shrink-0 items-start gap-4 border-b border-[var(--border)] px-4 py-4 sm:px-5">
+          <header className="border-border flex shrink-0 items-start gap-4 border-b px-4 py-4 sm:px-5">
             <div className="min-w-0 flex-1">
-              <p className="mt-0 mb-1 font-mono text-[10px] tracking-[0.08em] text-[var(--accent)] uppercase">
+              <p className="text-label text-accent mt-0 mb-1 font-mono tracking-[0.08em] uppercase">
                 Instruction {String(activeReply.turnNumber).padStart(2, '0')}
               </p>
-              <h2 id={titleId} className="m-0 text-base font-semibold text-[var(--text)]">
+              <h2 id={titleId} className="text-summary text-foreground m-0 font-semibold">
                 Agent response
               </h2>
-              <p className="mt-1 mb-0 font-mono text-[11px] text-[var(--muted)] tabular-nums">
+              <p className="text-meta text-muted mt-1 mb-0 font-mono tabular-nums">
                 {formatAgentResponse(activeReply.toolCalls, activeReply.replyChars).replace(
                   /^Agent response · /,
                   '',
@@ -1253,17 +1247,17 @@ function AgentReplyDialog({
           <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-5">
             {activeReply.phase === 'loading' ? (
               <div aria-label="Loading agent response" aria-busy="true" className="animate-pulse">
-                <div className="mb-3 h-3 w-4/5 rounded bg-[var(--surface2)]" />
-                <div className="mb-3 h-3 w-full rounded bg-[var(--surface2)]" />
-                <div className="mb-3 h-3 w-2/3 rounded bg-[var(--surface2)]" />
-                <div className="h-28 rounded-md bg-[var(--surface)]" />
+                <div className="rounded-badge bg-surface-2 mb-3 h-3 w-4/5" />
+                <div className="rounded-badge bg-surface-2 mb-3 h-3 w-full" />
+                <div className="rounded-badge bg-surface-2 mb-3 h-3 w-2/3" />
+                <div className="rounded-control bg-surface h-28" />
               </div>
             ) : activeReply.phase === 'error' ? (
               <div role="alert">
-                <p className="m-0 text-[13px] font-medium text-[var(--text)]">
+                <p className="text-ui text-foreground m-0 font-medium">
                   This response did not load
                 </p>
-                <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+                <p className="text-button text-muted mt-1 mb-4 leading-5">
                   Retry only this Agent reply; the rest of the Session stays collapsed.
                 </p>
                 <Button size="lg" variant="outline" onClick={onRetry}>
@@ -1275,7 +1269,7 @@ function AgentReplyDialog({
                 {activeReply.texts.map((text, index) => (
                   <section
                     key={`${index}:${text.slice(0, 24)}`}
-                    className={index === 0 ? '' : 'border-t border-[var(--border)] pt-5'}
+                    className={index === 0 ? '' : 'border-border border-t pt-5'}
                     aria-label={`Agent response part ${index + 1}`}
                   >
                     <SessionMarkdown markdown={text} />
@@ -1283,7 +1277,7 @@ function AgentReplyDialog({
                 ))}
               </div>
             ) : (
-              <p className="m-0 text-[13px] text-[var(--muted)]">
+              <p className="text-ui text-muted m-0">
                 This turn contains Agent activity but no prose response.
               </p>
             )}
@@ -1305,9 +1299,9 @@ function SessionHistoryStatus({
 
   if (history.phase === 'idle') {
     return (
-      <div className="mb-4 border-y border-[var(--border)] py-5" data-testid="session-history-idle">
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">Full session history</p>
-        <p className="mt-1 mb-4 max-w-[560px] text-[12px] leading-5 text-[var(--muted)]">
+      <div className="border-border mb-4 border-y py-5" data-testid="session-history-idle">
+        <p className="text-ui text-foreground m-0 font-medium">Full session history</p>
+        <p className="text-button text-muted mt-1 mb-4 max-w-[560px] leading-5">
           Summary and workspace details are ready. Load {formattedTotal} source records when you
           want the complete conversation.
         </p>
@@ -1321,16 +1315,13 @@ function SessionHistoryStatus({
   if (history.phase === 'error') {
     const publication = history.source === 'publication'
     return (
-      <div
-        className="mb-4 border-y border-[var(--border)] py-5"
-        data-testid="session-history-error"
-      >
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">
+      <div className="border-border mb-4 border-y py-5" data-testid="session-history-error">
+        <p className="text-ui text-foreground m-0 font-medium">
           {publication
             ? 'The published conversation did not load'
             : 'The remaining history did not load'}
         </p>
-        <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+        <p className="text-button text-muted mt-1 mb-4 leading-5">
           {publication
             ? 'The curated publication remains private while unavailable. Retry without exposing its raw source records.'
             : `${history.loaded.toLocaleString('en-US')} of ${formattedTotal} records are available. Retry from where loading stopped.`}
@@ -1345,15 +1336,13 @@ function SessionHistoryStatus({
   if (history.source === 'publication') {
     return (
       <div
-        className="mb-4 border-y border-[var(--border)] py-5"
+        className="border-border mb-4 border-y py-5"
         aria-busy="true"
         aria-live="polite"
         data-testid="session-publication-loading"
       >
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">
-          Preparing the published session
-        </p>
-        <p className="mt-1 mb-4 text-[12px] leading-5 text-[var(--muted)]">
+        <p className="text-ui text-foreground m-0 font-medium">Preparing the published session</p>
+        <p className="text-button text-muted mt-1 mb-4 leading-5">
           Summary and workspace details are ready while the curated conversation loads.
         </p>
         <HistorySkeleton />
@@ -1365,18 +1354,18 @@ function SessionHistoryStatus({
     history.total === 0 ? 100 : Math.min(100, Math.round((history.loaded / history.total) * 100))
   return (
     <div
-      className="mb-4 border-y border-[var(--border)] py-5"
+      className="border-border mb-4 border-y py-5"
       aria-live="polite"
       data-testid="session-history-loading"
     >
       <div className="mb-2 flex items-baseline justify-between gap-4">
-        <p className="m-0 text-[13px] font-medium text-[var(--text)]">Loading session history</p>
-        <span className="shrink-0 font-mono text-[11px] text-[var(--muted)] tabular-nums">
+        <p className="text-ui text-foreground m-0 font-medium">Loading session history</p>
+        <span className="text-meta text-muted shrink-0 font-mono tabular-nums">
           {history.loaded.toLocaleString('en-US')} / {formattedTotal}
         </span>
       </div>
       <div
-        className="h-1 overflow-hidden rounded bg-[var(--surface2)]"
+        className="rounded-badge bg-surface-2 h-1 overflow-hidden"
         role="progressbar"
         aria-label="Session records loaded"
         aria-valuemin={0}
@@ -1384,7 +1373,7 @@ function SessionHistoryStatus({
         aria-valuenow={history.loaded}
       >
         <span
-          className="block h-full bg-[var(--accent)] transition-[width] duration-150 ease-out motion-reduce:transition-none"
+          className="bg-accent duration-reveal block h-full transition-[width] ease-out motion-reduce:transition-none"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -1396,18 +1385,18 @@ function SessionHistoryStatus({
 function HistorySkeleton() {
   return (
     <div className="mt-4 space-y-3" aria-hidden="true">
-      <div className="h-3 w-2/5 rounded bg-[var(--surface2)]" />
-      <div className="h-3 w-full rounded bg-[var(--surface)]" />
-      <div className="h-3 w-4/5 rounded bg-[var(--surface)]" />
+      <div className="rounded-badge bg-surface-2 h-3 w-2/5" />
+      <div className="rounded-badge bg-surface h-3 w-full" />
+      <div className="rounded-badge bg-surface h-3 w-4/5" />
     </div>
   )
 }
 
 function MetadataRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-b border-[var(--border)] py-2 last:border-b-0">
-      <dt className="m-0 text-[var(--faint)]">{label}</dt>
-      <dd className="m-0 min-w-0 [overflow-wrap:anywhere] text-[var(--muted)]">{children}</dd>
+    <div className="border-border grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-b py-2 last:border-b-0">
+      <dt className="text-faint m-0">{label}</dt>
+      <dd className="text-muted m-0 min-w-0 [overflow-wrap:anywhere]">{children}</dd>
     </div>
   )
 }
@@ -1427,7 +1416,7 @@ function RemoteValue({ remote }: { remote: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="font-mono [overflow-wrap:anywhere] text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      className="text-accent focus-visible:outline-accent font-mono [overflow-wrap:anywhere] underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
       title={`Open ${remote}`}
     >
       {remote}

@@ -30,11 +30,14 @@ describe('private collection scope navigation', () => {
 
   it('reloads when a Public document starts rendering personal or Team Projects', () => {
     expect(projectsRequireReload({ scope: 'public' }, { scope: 'mine' })).toBe(true)
+    expect(projectsRequireReload({ scope: 'public' }, { scope: 'starred' })).toBe(true)
+    expect(projectsRequireReload({ scope: 'starred' }, { scope: 'watching' })).toBe(false)
     expect(projectsRequireReload({ scope: 'mine' }, { scope: 'team', team: 'team_123' })).toBe(
       false,
     )
     expect(projectsSearchHref({ scope: 'team', team: 'team_123' })).toBe(
       '/projects?scope=team&team=team_123',
     )
+    expect(projectsSearchHref({ scope: 'watching' })).toBe('/projects?scope=watching')
   })
 })

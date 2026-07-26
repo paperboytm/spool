@@ -18,6 +18,8 @@ export interface ProjectSummary {
   github_url: string | null
   owner: ProjectOwner
   session_count: number
+  /** Absent only while an older backend is rolling out. */
+  star_count?: number
   updated_at: number
   archived_at: number | null
   can_manage: boolean
@@ -50,6 +52,47 @@ export type ProjectApiResult<T> = { kind: 'ok'; data: T } | ProjectApiFailure
 
 interface ErrorBody {
   detail?: string
+}
+
+export interface ProjectSocialState {
+  version: 1
+  starCount: number
+  watcherCount: number
+  viewerStarred: boolean
+  viewerWatching: boolean
+  viewerAuthenticated: boolean
+  starEligible: boolean
+  canStar: boolean
+  canWatch: boolean
+}
+
+export interface UserFollowState {
+  version: 1
+  followerCount: number
+  followingCount: number
+  viewerFollowing: boolean
+  viewerAuthenticated: boolean
+  viewerIsSelf: boolean
+  canFollow: boolean
+}
+
+export interface SocialIdentity {
+  id: string
+  handle: string
+  name: string
+  avatar_url: string | null
+}
+
+interface SocialProject {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  github_url: string | null
+  owner: ProjectOwner
+  session_count: number
+  star_count: number
+  updated_at: number
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}): Promise<ProjectApiResult<T>> {
@@ -193,4 +236,112 @@ export function archiveProject(
     method: 'PATCH',
     body: JSON.stringify({ archived: true }),
   })
+}
+
+function ownerProjectSocialPath(handle: string, slug: string, action: string): string {
+  return `/api/owners/${encodeURIComponent(handle)}/projects/${encodeURIComponent(slug)}/${action}`
+}
+
+export function fetchProjectSocial(
+  handle: string,
+  slug: string,
+): Promise<ProjectApiResult<ProjectSocialState>> {
+  return requestJson(ownerProjectSocialPath(handle, slug, 'social'))
+}
+
+export function fetchProjectStargazers(
+  handle: string,
+  slug: string,
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ stargazers: SocialIdentity[]; next_cursor: string | null }>> {
+  return requestJson(`${ownerProjectSocialPath(handle, slug, 'stargazers')}${queryPage(cursor)}`)
+}
+
+export function setProjectStar(
+  handle: string,
+  slug: string,
+  starred: boolean,
+): Promise<ProjectApiResult<ProjectSocialState>> {
+  return requestJson(ownerProjectSocialPath(handle, slug, 'star'), {
+    method: starred ? 'PUT' : 'DELETE',
+  })
+}
+
+export function setProjectWatch(
+  handle: string,
+  slug: string,
+  watching: boolean,
+): Promise<ProjectApiResult<ProjectSocialState>> {
+  return requestJson(ownerProjectSocialPath(handle, slug, 'watch'), {
+    method: watching ? 'PUT' : 'DELETE',
+  })
+}
+
+export function fetchUserFollow(handle: string): Promise<ProjectApiResult<UserFollowState>> {
+  return requestJson(`/api/owners/${encodeURIComponent(handle)}/follow`)
+}
+
+export function setUserFollow(
+  handle: string,
+  following: boolean,
+): Promise<ProjectApiResult<UserFollowState>> {
+  return requestJson(`/api/owners/${encodeURIComponent(handle)}/follow`, {
+    method: following ? 'PUT' : 'DELETE',
+  })
+}
+
+export function fetchFollowers(
+  handle: string,
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ followers: SocialIdentity[]; next_cursor: string | null }>> {
+  return requestJson(`/api/owners/${encodeURIComponent(handle)}/followers${queryPage(cursor)}`)
+}
+
+export function fetchFollowing(
+  handle: string,
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ following: SocialIdentity[]; next_cursor: string | null }>> {
+  return requestJson(`/api/owners/${encodeURIComponent(handle)}/following${queryPage(cursor)}`)
+}
+
+export function fetchOwnerStarredProjects(
+  handle: string,
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ projects: ProjectSummary[]; next_cursor: string | null }>> {
+  return fetchSocialProjects(
+    `/api/owners/${encodeURIComponent(handle)}/starred-projects${queryPage(cursor)}`,
+  )
+}
+
+export function fetchMyStarredProjects(
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ projects: ProjectSummary[]; next_cursor: string | null }>> {
+  return fetchSocialProjects(`/api/me/starred-projects${queryPage(cursor)}`)
+}
+
+export function fetchMyWatchingProjects(
+  cursor: string | null = null,
+): Promise<ProjectApiResult<{ projects: ProjectSummary[]; next_cursor: string | null }>> {
+  return fetchSocialProjects(`/api/me/watching-projects${queryPage(cursor)}`)
+}
+
+async function fetchSocialProjects(
+  path: string,
+): Promise<ProjectApiResult<{ projects: ProjectSummary[]; next_cursor: string | null }>> {
+  const result = await requestJson<{
+    projects: SocialProject[]
+    next_cursor: string | null
+  }>(path)
+  if (result.kind !== 'ok') return result
+  return {
+    kind: 'ok',
+    data: {
+      next_cursor: result.data.next_cursor,
+      projects: result.data.projects.map((project) => ({
+        ...project,
+        archived_at: null,
+        can_manage: false,
+      })),
+    },
+  }
 }

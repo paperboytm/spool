@@ -20,24 +20,38 @@ describe('Web shared UI contract', () => {
     expect(imports).toEqual(['@spool-lab/ui/styles.css'])
   })
 
+  it('compiles utilities through the shared Tailwind semantic theme', () => {
+    const tailwindCss = source('src/styles/tailwind.css')
+
+    expect(tailwindCss).toContain("@import 'tailwindcss/theme.css' layer(theme)")
+    expect(tailwindCss).toContain("@import '@spool-lab/ui/styles.css'")
+    expect(tailwindCss).not.toContain('@theme')
+    expect(tailwindCss).toContain("@import 'tailwindcss/utilities.css' important")
+    expect(tailwindCss).toContain('@source "../../../../packages/session-view/src"')
+  })
+
   it('allows the boot-time theme attribute without a hydration mismatch', () => {
     expect(source('src/routes/__root.tsx')).toContain('<html lang="en" suppressHydrationWarning>')
   })
 
-  it('adapts legacy Web palette names to shared tokens instead of redeclaring the palette', () => {
-    for (const file of [
-      'src/styles/app.css',
-      'src/styles/global.css',
-      'src/styles/explore.css',
-      'src/styles/workspace.css',
-    ]) {
-      const css = source(file)
-      expect(css, file).toContain('--bg: var(--sp-bg)')
-      expect(css, file).toContain('--accent: var(--sp-accent)')
-      expect(css, file).not.toMatch(
-        /#(?:fafaf8|f4f4f0|eeeee9|e8e8e2|d8d8d0|1c1c18|6b6b60|adadaa|c85a00|fff3e8|141410|242420|2e2e28|3a3a34|f2f2ec|8a8a80|505048|f07020|2a1800)\b/i,
-      )
+  it('keeps active Web styles in the component layer with no page-local palette aliases', () => {
+    const stylesRoot = resolve(webRoot, 'src/styles')
+    const stylesheets = filesUnder(stylesRoot).filter(
+      (file) => file.endsWith('.css') && !file.endsWith('/tailwind.css'),
+    )
+    const css = stylesheets.map((file) => readFileSync(file, 'utf8')).join('\n')
+
+    for (const file of stylesheets) {
+      expect(readFileSync(file, 'utf8'), file).toContain('@layer components')
     }
+
+    expect(css).not.toContain('var(--sp-')
+    expect(css).not.toMatch(
+      /--(?:bg|bg-sink|card|card-2|surface|surface2|border|border2|border-strong|text|muted|faint|accent|accent-bg|accent-soft|accent-fill|accent-ink|accent-line|accent-weak|ok|err|err-soft|src-[a-z-]+|shadow-card|paper)\s*:/,
+    )
+    expect(css).not.toMatch(
+      /#(?:fafaf8|f4f4f0|eeeee9|e8e8e2|d8d8d0|1c1c18|6b6b60|adadaa|c85a00|fff3e8|141410|242420|2e2e28|3a3a34|f2f2ec|8a8a80|505048|f07020|2a1800)\b/i,
+    )
   })
 
   it('keeps Explore desktop chrome compact and reserves 44px targets for adaptations', () => {
@@ -62,7 +76,7 @@ describe('Web shared UI contract', () => {
     const teamPage = source('src/pages/Team.tsx')
 
     expect(desktopCss).toMatch(
-      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*var\(--sp-control-button-lg\);[^}]*\}/,
+      /\.sw-team-invite input,\s*\.sw-team-invite select,[^{]*\{[^}]*height:\s*var\(--spacing-control-button-lg\);[^}]*\}/,
     )
     expect(desktopCss).not.toMatch(
       /\.sw-team-invite-controls \.sp-button\s*\{[^}]*height:\s*48px;[^}]*\}/,
@@ -147,7 +161,7 @@ describe('Web shared UI contract', () => {
       /\.sessions-scope-tabs\s*\{[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-inline:\s*contain;/,
     )
     expect(exploreCss).toMatch(
-      /\.sessions-scope-tabs \.sp-tabs__tab\s*\{[^}]*flex:\s*0 0 auto;[^}]*max-width:\s*min\(280px,\s*calc\(100vw - var\(--sp-space-8\)\)\);[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/,
+      /\.sessions-scope-tabs \.sp-tabs__tab\s*\{[^}]*flex:\s*0 0 auto;[^}]*max-width:\s*min\(280px,\s*calc\(100vw - var\(--spacing-8\)\)\);[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/,
     )
     expect(exploreMobile).toMatch(
       /\.sessions-scope-tabs \.sp-tabs__tab,[^{]*\{[^}]*min-height:\s*44px;/,

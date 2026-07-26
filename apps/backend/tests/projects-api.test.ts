@@ -1,4 +1,4 @@
-import type { KVNamespace } from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace } from '@cloudflare/workers-types'
 import { describe, expect, it } from 'vite-plus/test'
 
 import {
@@ -27,7 +27,10 @@ import {
   PROJECT_CREATE_RATE,
   PROJECT_LIST_RATE,
 } from '../src/projects/limits'
-import { prepareAuthorizedDefaultProjectInsert } from '../src/projects/store'
+import {
+  listPublicProjectSessions,
+  prepareAuthorizedDefaultProjectInsert,
+} from '../src/projects/store'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2 } from './_helpers/fakes'
 
@@ -835,7 +838,7 @@ describe('Projects API contract', () => {
     )
   })
 
-  it('keeps Team Project APIs private and hides Team slug existence from outsiders', async () => {
+  it('keeps private Team Projects in the workspace and publishes only their public projection', async () => {
     const env = envFor()
     await seedActors(env)
     env.state.teams.push({ id: TEAM_ID, name: 'Paperboy', archived_at: null })
@@ -906,7 +909,8 @@ describe('Projects API contract', () => {
         { handle, slug },
       )
       expect(anonymous.status).toBe(404)
-      expectPrivate(anonymous)
+      expect(anonymous.headers.get('cache-control')).toBe('no-store')
+      expect(anonymous.headers.get('vary')).toBe('Cookie, Authorization')
 
       const outsider = await invoke(
         ownerProjectGet,
@@ -915,7 +919,8 @@ describe('Projects API contract', () => {
         { handle, slug },
       )
       expect(outsider.status).toBe(404)
-      expectPrivate(outsider)
+      expect(outsider.headers.get('cache-control')).toBe('no-store')
+      expect(outsider.headers.get('vary')).toBe('Cookie, Authorization')
     }
 
     const memberProfile = await invoke(
@@ -925,13 +930,101 @@ describe('Projects API contract', () => {
       { handle },
     )
     expect(memberProfile.status).toBe(200)
-    expectPrivate(memberProfile)
+    expect(memberProfile.headers.get('cache-control')).toBe('no-store')
     await expect(memberProfile.json()).resolves.toMatchObject({
       owner: { kind: 'team', handle },
-      projects: [{ id: created.project.id }],
+      projects: [],
       session_count: 0,
       sessions: [],
     })
+
+    env.state.hub_sessions.push(
+      sessionRow(created.project.id as string, {
+        team_id: TEAM_ID,
+      }),
+    )
+    env.state.hub_session_discovery.push(discoveryRow())
+
+    const publicProject = await invoke(
+      ownerProjectGet,
+      getRequest(`/api/owners/${handle}/projects/private-team-project`),
+      env,
+      { handle, slug: 'private-team-project' },
+    )
+    expect(publicProject.status).toBe(200)
+    await expect(publicProject.json()).resolves.toMatchObject({
+      owner: { kind: 'team', handle },
+      project: {
+        id: created.project.id,
+        owner: { kind: 'team', handle },
+        session_count: 1,
+        can_manage: false,
+      },
+      sessions: [
+        {
+          sid: 'claude_project-session-1',
+          team_id: TEAM_ID,
+          visibility: 'public',
+        },
+      ],
+    })
+
+    const publicProfile = await invoke(
+      ownerProjectsGet,
+      getRequest(`/api/owners/${handle}/projects`),
+      env,
+      { handle },
+    )
+    expect(publicProfile.status).toBe(200)
+    await expect(publicProfile.json()).resolves.toMatchObject({
+      projects: [{ id: created.project.id, session_count: 1 }],
+      sessions: [{ sid: 'claude_project-session-1', team_id: TEAM_ID }],
+      session_count: 1,
+    })
+
+    const directory = await invoke(publicProjectsGet, getRequest('/api/projects'), env)
+    expect(directory.status).toBe(200)
+    await expect(directory.json()).resolves.toMatchObject({
+      projects: [
+        {
+          id: created.project.id,
+          owner: { kind: 'team', handle },
+          session_count: 1,
+        },
+      ],
+    })
+  })
+
+  it('404s when the final Project snapshot no longer has a live Team projection', async () => {
+    const calls: Array<{ params: unknown[]; sql: string }> = []
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...params: unknown[]) {
+            calls.push({ params, sql })
+            expect(sql.match(/\?/g)?.length ?? 0).toBe(params.length)
+            return {
+              async all() {
+                return { results: [], success: true, meta: {} }
+              },
+            }
+          },
+        }
+      },
+    } as unknown as D1Database
+
+    await expect(
+      listPublicProjectSessions(db, 'paperboy', 'react-vapor', {
+        after: null,
+        fingerprint: 'snapshot',
+        limit: 20,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.params.slice(0, 2)).toEqual(['paperboy', 'react-vapor'])
+    expect(calls[0]?.sql).toContain('authorized_project AS')
+    expect(calls[0]?.sql).toContain('public_session_count>0')
+    expect(calls[0]?.sql).toContain('LEFT JOIN page ON TRUE')
   })
 
   it('returns public personal Projects and Sessions while only the author can manage them', async () => {

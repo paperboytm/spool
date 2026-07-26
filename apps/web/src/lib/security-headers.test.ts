@@ -71,6 +71,8 @@ describe('Explore security headers', () => {
       // Repeated parameters must not let a public value weaken the policy.
       '/sessions?scope=public&scope=team&team=team_123',
       '/projects?scope=mine',
+      '/projects?scope=starred',
+      '/projects?scope=watching',
       '/projects?scope=team&team=team_123',
       '/projects?scope=public&scope=mine',
       '/projects/new',

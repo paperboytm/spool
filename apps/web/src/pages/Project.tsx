@@ -1,8 +1,9 @@
 import { Badge, Button, ButtonLink, SectionLabel } from '@spool-lab/ui'
-import { ExternalLink, FolderKanban, LockKeyhole, Star } from 'lucide-react'
+import { ExternalLink, FolderKanban, Star, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Footer, Header, Page } from '../components/Chrome'
+import { ProjectSocialActions } from '../components/ProjectSocialActions'
 import { SessionFeedRow, SessionSourceBadge } from '../components/SessionFeedRow'
 import { SessionLanguageToolbar } from '../components/SessionLanguageToggle'
 import { appendUniqueManagedSessions } from '../lib/hub-management-api'
@@ -156,10 +157,7 @@ export function ProjectPage({ handle, slug }: { handle: string; slug: string }) 
 
   return (
     <Page>
-      <Header
-        contextTeam={teamOwned ? { id: project.owner.id, name: project.owner.name } : null}
-        sticky
-      />
+      <Header sticky />
       {hasBilingualSessions ? <SessionLanguageToolbar /> : null}
       <main className="project-public-main">
         <header className="project-public-header">
@@ -174,9 +172,10 @@ export function ProjectPage({ handle, slug }: { handle: string; slug: string }) 
               <p>{project.description || 'A home for related agent Sessions.'}</p>
             </div>
             <div className="project-public-actions">
+              <ProjectSocialActions handle={project.owner.handle} slug={project.slug} />
               {teamOwned ? (
                 <Badge>
-                  <LockKeyhole size={12} aria-hidden="true" />
+                  <Users size={12} aria-hidden="true" />
                   Team · {project.owner.name}
                 </Badge>
               ) : null}
@@ -241,10 +240,8 @@ export function ProjectPage({ handle, slug }: { handle: string; slug: string }) 
                       displayName: session.author.display_name,
                       avatarUrl: session.author.avatar_url,
                     }}
-                    timestamp={
-                      teamOwned ? session.updated_at : (session.published_at ?? session.created_at)
-                    }
-                    timestampVerb={teamOwned ? 'updated' : 'published'}
+                    timestamp={session.published_at ?? session.created_at}
+                    timestampVerb="published"
                     metadata={
                       <div className="session-feed-row-meta">
                         <SessionSourceBadge provider={session.provider} />

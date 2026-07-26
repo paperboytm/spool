@@ -1,98 +1,100 @@
-/* Avatar-anchored account menu shared by the marketing and product
+@layer components {
+  /* Avatar-anchored account menu shared by the marketing and product
    headers. Tokens come from @spool-lab/ui (loaded by both shells). */
 
-.account-menu {
-  position: relative;
-  display: inline-flex;
-}
+  .account-menu {
+    position: relative;
+    display: inline-flex;
+  }
 
-.account-menu-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--sp-control-icon-md, 32px);
-  height: var(--sp-control-icon-md, 32px);
-  padding: 0;
-  border: 0;
-  border-radius: 9999px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.account-menu-trigger:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-focus-ring);
-}
-
-.account-menu-panel {
-  position: absolute;
-  top: calc(100% + var(--sp-space-2, 8px));
-  right: 0;
-  z-index: 60;
-  min-width: 184px;
-  padding: var(--sp-space-1, 4px);
-  border: 1px solid var(--sp-border, #e5e5e5);
-  border-radius: var(--sp-radius-card, 10px);
-  background: var(--sp-bg, #fff);
-  box-shadow: var(--sp-shadow-popover, 0 12px 32px rgb(0 0 0 / 0.14));
-}
-
-.account-menu-name {
-  margin: 0;
-  padding: var(--sp-space-2, 8px) var(--sp-space-3, 12px) var(--sp-space-1, 4px);
-  font-size: var(--sp-text-meta, 11px);
-  color: var(--sp-muted, #666);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-menu-item {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--sp-space-2, 8px);
-  padding: var(--sp-space-2, 8px) var(--sp-space-3, 12px);
-  border: 0;
-  border-radius: var(--sp-radius-control, 6px);
-  background: transparent;
-  color: var(--sp-text, #0a0a0a);
-  font-family: inherit;
-  font-size: var(--sp-text-ui, 13px);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  transition: background-color var(--sp-motion-hover, 80ms);
-}
-
-.account-menu-item:hover,
-.account-menu-item:focus-visible {
-  background: var(--sp-surface, #f5f5f5);
-  outline: none;
-}
-
-.account-menu-item > svg {
-  flex: none;
-  color: var(--sp-muted, #666);
-}
-
-.account-menu-divider {
-  height: 1px;
-  margin: var(--sp-space-1, 4px) var(--sp-space-2, 8px);
-  background: var(--sp-border, #e5e5e5);
-}
-
-@media (max-width: 768px) {
   .account-menu-trigger {
-    width: 44px;
-    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--spacing-control-icon-md);
+    height: var(--spacing-control-icon-md);
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .account-menu-trigger:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus-ring);
   }
 
   .account-menu-panel {
-    min-width: 200px;
+    position: absolute;
+    top: calc(100% + var(--spacing-2));
+    right: 0;
+    z-index: 60;
+    min-width: 184px;
+    padding: var(--spacing-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-background);
+    box-shadow: var(--shadow-popover);
+  }
+
+  .account-menu-name {
+    margin: 0;
+    padding: var(--spacing-2) var(--spacing-3) var(--spacing-1);
+    font-size: var(--text-meta);
+    color: var(--color-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .account-menu-item {
-    min-height: 44px;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-foreground);
+    font-family: inherit;
+    font-size: var(--text-ui);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--transition-duration-hover);
+  }
+
+  .account-menu-item:hover,
+  .account-menu-item:focus-visible {
+    background: var(--color-surface);
+    outline: none;
+  }
+
+  .account-menu-item > svg {
+    flex: none;
+    color: var(--color-muted);
+  }
+
+  .account-menu-divider {
+    height: 1px;
+    margin: var(--spacing-1) var(--spacing-2);
+    background: var(--color-border);
+  }
+
+  @media (max-width: 768px) {
+    .account-menu-trigger {
+      width: 44px;
+      height: 44px;
+    }
+
+    .account-menu-panel {
+      min-width: 200px;
+    }
+
+    .account-menu-item {
+      min-height: 44px;
+    }
   }
 }

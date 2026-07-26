@@ -87,7 +87,7 @@ export function CliAuth({ code }: Props) {
           sub={
             <>
               Enter the code shown in your terminal by{' '}
-              <code className="font-mono text-[var(--text)]">{CLI_LOGIN_COMMAND}</code>.
+              <code className="text-foreground font-mono">{CLI_LOGIN_COMMAND}</code>.
             </>
           }
         >
@@ -189,7 +189,7 @@ export function CliAuth({ code }: Props) {
           sub={
             <>
               This code has expired or was already handled. Run{' '}
-              <code className="font-mono text-[var(--text)]">{CLI_LOGIN_COMMAND}</code> again for a
+              <code className="text-foreground font-mono">{CLI_LOGIN_COMMAND}</code> again for a
               fresh one.
             </>
           }

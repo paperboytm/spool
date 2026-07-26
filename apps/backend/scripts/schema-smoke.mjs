@@ -212,9 +212,6 @@ async function verifyProjectBackfill() {
   if (projectMigrationIndex === -1) {
     throw new Error(`Missing ${projectMigrationName}`)
   }
-  if (projectMigrationIndex !== migrationNames.length - 1) {
-    throw new Error(`${projectMigrationName} must remain the newest migration for its legacy smoke`)
-  }
 
   const legacyStateDir = await mkdtemp(join(tmpdir(), 'spool-d1-project-backfill-smoke-'))
   const legacySchemaFile = join(legacyStateDir, 'schema-through-0013.sql')
@@ -784,6 +781,577 @@ async function verifyControlledHandleConflict() {
     }
   } finally {
     await rm(conflictStateDir, { force: true, recursive: true })
+  }
+}
+
+async function prepareIdentityTransferFixture(stateDir, { conflictingHandle = false } = {}) {
+  const projectMigrationName = '0014_projects.sql'
+  const socialMigrationName = '0015_social_graph.sql'
+  const transferMigrationName = '0016_doodlewind_paperboy_spool.sql'
+  const projectMigrationIndex = migrationNames.indexOf(projectMigrationName)
+  const socialMigrationIndex = migrationNames.indexOf(socialMigrationName)
+  const transferMigrationIndex = migrationNames.indexOf(transferMigrationName)
+  if (
+    projectMigrationIndex === -1 ||
+    socialMigrationIndex !== projectMigrationIndex + 1 ||
+    transferMigrationIndex !== socialMigrationIndex + 1
+  ) {
+    throw new Error(
+      `Identity transfer smoke requires ordered 0014/0015/0016 migrations: ${migrationNames.join(', ')}`,
+    )
+  }
+
+  const legacySchemaFile = join(stateDir, 'schema-through-0013.sql')
+  const legacyMigrationBodies = await Promise.all(
+    migrationNames
+      .slice(0, projectMigrationIndex)
+      .map((name) => readFile(join(migrationsDir, name), 'utf8')),
+  )
+  await writeFile(legacySchemaFile, `${legacyMigrationBodies.join('\n\n')}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  })
+  await executeFile(stateDir, legacySchemaFile)
+
+  await executeJson(
+    stateDir,
+    `INSERT INTO users
+       (id,email,name,avatar_url,created_at,last_signin_at)
+     VALUES
+       ('698b4cbc14e04f44','doodlewind@gmail.com','Legacy Doodlewind',NULL,10,20),
+       (
+         'c08e154b2d724bdf','doodlewind@qq.com','Yifeng Wang',
+         'https://images.example.test/doodlewind.png',11,21
+       );
+     INSERT INTO user_identities
+       (provider,provider_sub,user_id,email,linked_at)
+     VALUES
+       (
+         'workos','user_01KY74NZHXR35SWKKSNCE5YBJ3','698b4cbc14e04f44',
+         'doodlewind@gmail.com',10
+       ),
+       (
+         'workos','user_01KY4M15A84VDF48FP6JPFY95W','c08e154b2d724bdf',
+         'doodlewind@qq.com',11
+       );
+     INSERT INTO teams
+       (id,workos_organization_id,name,created_by_user_id,created_at,updated_at)
+     VALUES (
+       'team_2013aaa287124e2982e5d980802418b7',
+       'org_paperboy_production_shape',
+       'Paperboy',
+       'c08e154b2d724bdf',
+       30,
+       31
+     );
+     INSERT INTO team_memberships
+       (team_id,user_id,role,workos_membership_id,joined_at,updated_at,workos_updated_at)
+     VALUES (
+       'team_2013aaa287124e2982e5d980802418b7',
+       'c08e154b2d724bdf',
+       'owner',
+       'om_paperboy_doodlewind',
+       30,
+       31,
+       31
+     );
+     INSERT INTO hub_objects
+       (owner_user_id,oid,size,pack_key,offset,length,created_at)
+     VALUES
+       (
+         '698b4cbc14e04f44','${'1'.repeat(64)}',101,
+         'hub/packs/698b4cbc14e04f44/pack-a',0,101,40
+       ),
+       (
+         '698b4cbc14e04f44','${'2'.repeat(64)}',202,
+         'hub/packs/698b4cbc14e04f44/pack-a',101,202,40
+       ),
+       (
+         '698b4cbc14e04f44','${'3'.repeat(64)}',303,
+         'hub/packs/698b4cbc14e04f44/pack-b',0,303,41
+       );
+     INSERT INTO hub_team_objects
+       (team_id,oid,size,pack_key,offset,length,created_at)
+     VALUES (
+       'team_2013aaa287124e2982e5d980802418b7',
+       '${'1'.repeat(64)}',
+       101,
+       'hub/team-packs/team_2013aaa287124e2982e5d980802418b7/shared-a',
+       0,
+       101,
+       42
+     );
+     INSERT INTO hub_sessions
+       (
+         sid,owner_user_id,root,record_count,sig,card_json,note_md,lineage_json,
+         view_oid,spool_file_oid,visibility,withdrawn_at,created_at,updated_at,
+         cost_usd,total_tokens
+       )
+     VALUES
+       (
+         'codex_019f88f4-7675-7fb1-b7b1-c9fb283fe866',
+         '698b4cbc14e04f44','${'a'.repeat(64)}',11,'sig-a',
+         '{"cwd":"/spool/a"}','Summary A',NULL,'${'1'.repeat(64)}','${'2'.repeat(64)}',
+         'unlisted',NULL,101,201,1.25,1001
+       ),
+       (
+         'codex_019f8919-cd74-7ef1-8a2c-b26bef86e595',
+         '698b4cbc14e04f44','${'b'.repeat(64)}',12,'sig-b',
+         '{"cwd":"/spool/b"}','Summary B',NULL,'${'2'.repeat(64)}','${'3'.repeat(64)}',
+         'unlisted',NULL,102,202,2.5,1002
+       ),
+       (
+         'codex_019f89dc-54e9-7eb1-97cc-753269f594cb',
+         '698b4cbc14e04f44','${'c'.repeat(64)}',13,'sig-c',
+         '{"cwd":"/spool/c"}','Summary C','{"source":{"sid":"codex_parent"}}',
+         '${'3'.repeat(64)}','${'1'.repeat(64)}','unlisted',NULL,103,203,3.75,1003
+       ),
+       (
+         'codex_019f8a35-c2dd-7b72-a754-839cf3efae86',
+         '698b4cbc14e04f44','${'d'.repeat(64)}',14,'sig-d',
+         '{"cwd":"/spool/d"}','Summary D',NULL,'${'1'.repeat(64)}','${'3'.repeat(64)}',
+         'unlisted',NULL,104,204,5.0,1004
+       ),
+       (
+         'codex_019f8e14-8152-7412-98c7-ab55a1e32de3',
+         '698b4cbc14e04f44','${'e'.repeat(64)}',15,'sig-e',
+         '{"cwd":"/spool/e"}','Summary E',NULL,'${'2'.repeat(64)}','${'1'.repeat(64)}',
+         'unlisted',NULL,105,205,6.25,1005
+       );
+     INSERT INTO hub_session_discovery
+       (
+         sid,agent,title,summary_text,summary_text_zh,search_text,message_count,
+         tool_call_count,file_count,additions,deletions,lineage_source_sid,
+         quality_score,published_at,updated_at,title_json,cost_usd,total_tokens
+       )
+     VALUES
+       (
+         'codex_019f88f4-7675-7fb1-b7b1-c9fb283fe866','codex',
+         'Ship project foundations','Explain and ship project foundations.',
+         '讲清并发布 Project 基础。','ship project foundations',11,2,1,10,1,NULL,10,201,201,
+         '{"en":"Ship project foundations","zh":"发布 Project 基础"}',1.25,1001
+       ),
+       (
+         'codex_019f8919-cd74-7ef1-8a2c-b26bef86e595','codex',
+         'Repair Session loading','Make long Sessions readable sooner.',
+         '让长 Session 更快可读。','repair session loading',12,3,2,20,2,NULL,10,202,202,
+         '{"en":"Repair Session loading","zh":"修复 Session 加载"}',2.5,1002
+       ),
+       (
+         'codex_019f89dc-54e9-7eb1-97cc-753269f594cb','codex',
+         'Unify navigation','Unify the product navigation.','统一产品导航。',
+         'unify navigation',13,4,3,30,3,NULL,10,203,203,
+         '{"en":"Unify navigation","zh":"统一导航"}',3.75,1003
+       ),
+       (
+         'codex_019f8a35-c2dd-7b72-a754-839cf3efae86','codex',
+         'Add bilingual summaries','Add useful bilingual summaries.',
+         '补充有用的双语摘要。','bilingual summaries',14,5,4,40,4,NULL,10,204,204,
+         '{"en":"Add bilingual summaries","zh":"增加双语摘要"}',5.0,1004
+       ),
+       (
+         'codex_019f8e14-8152-7412-98c7-ab55a1e32de3','codex',
+         'Prepare Spool release','Prepare an end-to-end Spool release.',
+         '准备 Spool 端到端发布。','prepare spool release',15,6,5,50,5,NULL,10,205,205,
+         '{"en":"Prepare Spool release","zh":"准备 Spool 发布"}',6.25,1005
+       );`,
+  )
+
+  await executeFile(stateDir, join(migrationsDir, projectMigrationName))
+  await executeFile(stateDir, join(migrationsDir, socialMigrationName))
+
+  if (conflictingHandle) {
+    await executeJson(
+      stateDir,
+      `INSERT INTO users (id,email,name,created_at,last_signin_at)
+       VALUES ('doodlewind-squatter','squatter@example.test','Route Squatter',50,50);
+       INSERT INTO handles (handle,user_id,team_id,claimed_at,released_at)
+       VALUES ('doodlewind','doodlewind-squatter',NULL,50,NULL);`,
+    )
+  }
+}
+
+async function verifyProductionIdentityTransfer() {
+  const transferMigrationName = '0016_doodlewind_paperboy_spool.sql'
+  if (!migrationNames.includes(transferMigrationName)) {
+    throw new Error(`Missing ${transferMigrationName}`)
+  }
+
+  const migratedStateDir = await mkdtemp(
+    join(tmpdir(), 'spool-d1-production-identity-transfer-smoke-'),
+  )
+  const conflictStateDir = await mkdtemp(
+    join(tmpdir(), 'spool-d1-production-identity-conflict-smoke-'),
+  )
+
+  try {
+    await prepareIdentityTransferFixture(migratedStateDir)
+
+    const immutableSessionsBefore = await executeJson(
+      migratedStateDir,
+      `SELECT
+         sid,root,record_count,sig,card_json,note_md,lineage_json,view_oid,
+         spool_file_oid,visibility,withdrawn_at,created_at,updated_at,cost_usd,total_tokens
+       FROM hub_sessions
+       ORDER BY sid;`,
+    )
+    const discoveryBefore = await executeJson(
+      migratedStateDir,
+      'SELECT * FROM hub_session_discovery ORDER BY sid;',
+    )
+    const personalObjectsBefore = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM hub_objects
+       WHERE owner_user_id='698b4cbc14e04f44'
+       ORDER BY oid;`,
+    )
+    const identitiesBefore = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM user_identities
+       WHERE user_id IN ('698b4cbc14e04f44','c08e154b2d724bdf')
+       ORDER BY provider,provider_sub;`,
+    )
+
+    await executeFile(migratedStateDir, join(migrationsDir, transferMigrationName))
+
+    const migratedSessions = await executeJson(
+      migratedStateDir,
+      `SELECT sid,owner_user_id,team_id,project_id,visibility,withdrawn_at
+       FROM hub_sessions
+       ORDER BY sid;`,
+    )
+    if (
+      migratedSessions.length !== 5 ||
+      migratedSessions.some(
+        (row) =>
+          row.owner_user_id !== 'c08e154b2d724bdf' ||
+          row.team_id !== 'team_2013aaa287124e2982e5d980802418b7' ||
+          row.project_id !== 'project_team_team_2013aaa287124e2982e5d980802418b7_spool' ||
+          row.visibility !== 'unlisted' ||
+          row.withdrawn_at !== null,
+      )
+    ) {
+      throw new Error(
+        `Production Spool Sessions were not transferred: ${JSON.stringify(migratedSessions)}`,
+      )
+    }
+
+    const immutableSessionsAfter = await executeJson(
+      migratedStateDir,
+      `SELECT
+         sid,root,record_count,sig,card_json,note_md,lineage_json,view_oid,
+         spool_file_oid,visibility,withdrawn_at,created_at,updated_at,cost_usd,total_tokens
+       FROM hub_sessions
+       ORDER BY sid;`,
+    )
+    const discoveryAfter = await executeJson(
+      migratedStateDir,
+      'SELECT * FROM hub_session_discovery ORDER BY sid;',
+    )
+    const personalObjectsAfter = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM hub_objects
+       WHERE owner_user_id='698b4cbc14e04f44'
+       ORDER BY oid;`,
+    )
+    const identitiesAfter = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM user_identities
+       WHERE user_id IN ('698b4cbc14e04f44','c08e154b2d724bdf')
+       ORDER BY provider,provider_sub;`,
+    )
+    if (
+      JSON.stringify(immutableSessionsAfter) !== JSON.stringify(immutableSessionsBefore) ||
+      JSON.stringify(discoveryAfter) !== JSON.stringify(discoveryBefore) ||
+      JSON.stringify(personalObjectsAfter) !== JSON.stringify(personalObjectsBefore) ||
+      JSON.stringify(identitiesAfter) !== JSON.stringify(identitiesBefore)
+    ) {
+      throw new Error(
+        'Identity transfer rewrote immutable Session, Discovery, object, or identity data',
+      )
+    }
+
+    const projectRows = await executeJson(
+      migratedStateDir,
+      `SELECT
+         id,owner_user_id,owner_team_id,slug,name,description,github_url,
+         created_by_user_id,created_at,updated_at,archived_at
+       FROM projects
+       WHERE id IN (
+         'project_user_698b4cbc14e04f44_spool',
+         'project_team_team_2013aaa287124e2982e5d980802418b7_spool'
+       )
+       ORDER BY id;`,
+    )
+    if (
+      projectRows.length !== 2 ||
+      projectRows[0]?.id !== 'project_team_team_2013aaa287124e2982e5d980802418b7_spool' ||
+      projectRows[0]?.owner_user_id !== null ||
+      projectRows[0]?.owner_team_id !== 'team_2013aaa287124e2982e5d980802418b7' ||
+      projectRows[0]?.slug !== 'spool' ||
+      projectRows[0]?.name !== 'Spool' ||
+      projectRows[0]?.description !==
+        'Spool turns local coding-agent Sessions into durable, shareable records that people can read, search, and resume across tools.' ||
+      projectRows[0]?.github_url !== 'https://github.com/paperboytm/spool' ||
+      projectRows[0]?.created_by_user_id !== 'c08e154b2d724bdf' ||
+      projectRows[0]?.updated_at !== 1785038400000 ||
+      projectRows[0]?.archived_at !== null ||
+      projectRows[1]?.id !== 'project_user_698b4cbc14e04f44_spool' ||
+      projectRows[1]?.owner_user_id !== '698b4cbc14e04f44' ||
+      projectRows[1]?.owner_team_id !== null ||
+      projectRows[1]?.archived_at !== 1785038400000
+    ) {
+      throw new Error(`Production Project transfer is invalid: ${JSON.stringify(projectRows)}`)
+    }
+
+    const handleRows = await executeJson(
+      migratedStateDir,
+      `SELECT handle,user_id,team_id,claimed_at,released_at
+       FROM handles
+       WHERE handle IN ('doodlewind','evan','paperboy')
+       ORDER BY handle;`,
+    )
+    if (
+      handleRows.length !== 3 ||
+      handleRows[0]?.handle !== 'doodlewind' ||
+      handleRows[0]?.user_id !== 'c08e154b2d724bdf' ||
+      handleRows[0]?.team_id !== null ||
+      handleRows[0]?.claimed_at !== 1785038400000 ||
+      handleRows[0]?.released_at !== null ||
+      handleRows[1]?.handle !== 'evan' ||
+      handleRows[1]?.user_id !== '698b4cbc14e04f44' ||
+      handleRows[1]?.released_at !== 1785038400000 ||
+      handleRows[2]?.handle !== 'paperboy' ||
+      handleRows[2]?.team_id !== 'team_2013aaa287124e2982e5d980802418b7' ||
+      handleRows[2]?.released_at !== null
+    ) {
+      throw new Error(`Production handle transfer is invalid: ${JSON.stringify(handleRows)}`)
+    }
+
+    const aliasRows = await executeJson(
+      migratedStateDir,
+      `SELECT team_object.oid,team_object.size
+       FROM hub_team_objects team_object
+       JOIN hub_objects personal
+         ON personal.owner_user_id='698b4cbc14e04f44'
+        AND personal.oid=team_object.oid
+        AND personal.size=team_object.size
+       WHERE team_object.team_id='team_2013aaa287124e2982e5d980802418b7'
+       ORDER BY team_object.oid;`,
+    )
+    if (aliasRows.length !== personalObjectsBefore.length) {
+      throw new Error(`Personal Hub objects were not fully aliased: ${JSON.stringify(aliasRows)}`)
+    }
+
+    const remainingUsers = await executeJson(
+      migratedStateDir,
+      `SELECT id,email,deleted_at
+       FROM users
+       WHERE id IN ('698b4cbc14e04f44','c08e154b2d724bdf')
+       ORDER BY id;`,
+    )
+    if (remainingUsers.length !== 2 || remainingUsers.some((row) => row.deleted_at !== null)) {
+      throw new Error(`Identity transfer removed a user: ${JSON.stringify(remainingUsers)}`)
+    }
+    const transferForeignKeyViolations = await executeJson(
+      migratedStateDir,
+      'PRAGMA foreign_key_check;',
+    )
+    if (transferForeignKeyViolations.length !== 0) {
+      throw new Error(
+        `Identity transfer foreign-key violations: ${JSON.stringify(transferForeignKeyViolations)}`,
+      )
+    }
+
+    // A deliberate replay must be an exact no-op, including immutable source
+    // object and upstream identity rows.
+    await executeFile(migratedStateDir, join(migrationsDir, transferMigrationName))
+    const replayedIdentities = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM user_identities
+       WHERE user_id IN ('698b4cbc14e04f44','c08e154b2d724bdf')
+       ORDER BY provider,provider_sub;`,
+    )
+    const replayedObjects = await executeJson(
+      migratedStateDir,
+      `SELECT *
+       FROM hub_objects
+       WHERE owner_user_id='698b4cbc14e04f44'
+       ORDER BY oid;`,
+    )
+    if (
+      JSON.stringify(replayedIdentities) !== JSON.stringify(identitiesBefore) ||
+      JSON.stringify(replayedObjects) !== JSON.stringify(personalObjectsBefore)
+    ) {
+      throw new Error('Identity transfer replay mutated immutable source rows')
+    }
+
+    await prepareIdentityTransferFixture(conflictStateDir, { conflictingHandle: true })
+    await expectD1FileFailure(
+      conflictStateDir,
+      join(migrationsDir, transferMigrationName),
+      'identity_transfer_precondition_0016',
+    )
+    const conflictState = await executeJson(
+      conflictStateDir,
+      `SELECT
+         (SELECT COUNT(*) FROM projects
+          WHERE id='project_team_team_2013aaa287124e2982e5d980802418b7_spool') AS target_projects,
+         (SELECT COUNT(*) FROM projects
+          WHERE id='project_user_698b4cbc14e04f44_spool' AND archived_at IS NULL)
+           AS active_source_projects,
+         (SELECT COUNT(*) FROM hub_sessions
+          WHERE owner_user_id='698b4cbc14e04f44'
+            AND team_id IS NULL
+            AND project_id='project_user_698b4cbc14e04f44_spool') AS source_sessions,
+         (SELECT COUNT(*) FROM handles
+          WHERE handle='evan' AND user_id='698b4cbc14e04f44' AND released_at IS NULL)
+           AS active_evan,
+         (SELECT COUNT(*) FROM sqlite_master
+          WHERE name LIKE 'identity_transfer_%_0016') AS leaked_guard_tables;`,
+    )
+    if (
+      conflictState.length !== 1 ||
+      conflictState[0]?.target_projects !== 0 ||
+      conflictState[0]?.active_source_projects !== 1 ||
+      conflictState[0]?.source_sessions !== 5 ||
+      conflictState[0]?.active_evan !== 1 ||
+      conflictState[0]?.leaked_guard_tables !== 0
+    ) {
+      throw new Error(`Failed identity transfer was not atomic: ${JSON.stringify(conflictState)}`)
+    }
+  } finally {
+    await rm(migratedStateDir, { force: true, recursive: true })
+    await rm(conflictStateDir, { force: true, recursive: true })
+  }
+}
+
+async function verifySocialGraphLifecycle(stateDir) {
+  await executeJson(
+    stateDir,
+    `INSERT INTO users (id,email,name,created_at,last_signin_at)
+       VALUES
+         ('social-owner','social-owner@example.test','Social Owner',1,1),
+         ('social-actor','social-actor@example.test','Social Actor',1,1),
+         ('social-target','social-target@example.test','Social Target',1,1),
+         ('social-outsider','social-outsider@example.test','Social Outsider',1,1);
+     INSERT INTO handles (handle,user_id,team_id,claimed_at,released_at)
+       VALUES
+         ('social-owner','social-owner',NULL,1,NULL),
+         ('social-actor','social-actor',NULL,1,NULL),
+         ('social-target','social-target',NULL,1,NULL),
+         ('social-outsider','social-outsider',NULL,1,NULL);
+     INSERT INTO teams
+       (id,workos_organization_id,name,created_by_user_id,created_at,updated_at)
+       VALUES ('team_social_graph','org_social_graph','Social Team','social-owner',1,1);
+     INSERT INTO handles (handle,user_id,team_id,claimed_at,released_at)
+       VALUES ('social-team',NULL,'team_social_graph',1,NULL);
+     INSERT INTO team_memberships
+       (team_id,user_id,role,workos_membership_id,workos_updated_at,joined_at,updated_at)
+       VALUES
+         ('team_social_graph','social-owner','owner','om_social_owner',1,1,1),
+         ('team_social_graph','social-actor','member','om_social_actor',1,1,1);
+     INSERT INTO projects
+       (id,owner_user_id,owner_team_id,slug,name,created_by_user_id,created_at,updated_at)
+       VALUES
+         ('project_social_owner','social-owner',NULL,'social-owner','Social Owner',
+          'social-owner',1,1),
+         ('project_social_target','social-target',NULL,'social-target','Social Target',
+          'social-owner',1,1),
+         ('project_social_team',NULL,'team_social_graph','social-team','Social Team',
+          'social-owner',1,1),
+         ('project_social_team_private',NULL,'team_social_graph','social-private',
+          'Social Private',
+          'social-owner',1,1);
+     INSERT INTO hub_sessions
+       (sid,owner_user_id,root,record_count,visibility,team_id,project_id,
+        withdrawn_at,created_at,updated_at)
+       VALUES
+         ('codex_social_public','social-owner','social-root',1,'unlisted',
+          'team_social_graph','project_social_team',NULL,1,1);
+     INSERT INTO hub_session_discovery
+       (sid,agent,title,search_text,published_at,updated_at)
+       VALUES ('codex_social_public','codex','Social public','social public',1,1);
+     INSERT INTO project_stars (project_id,user_id,created_at)
+       VALUES
+         ('project_social_owner','social-actor',1),
+         ('project_social_target','social-actor',1),
+         ('project_social_team','social-actor',1),
+         ('project_social_team','social-outsider',2);
+     INSERT INTO project_watches (project_id,user_id,created_at)
+       VALUES
+         ('project_social_owner','social-actor',1),
+         ('project_social_target','social-actor',1),
+         ('project_social_team','social-actor',1),
+         ('project_social_team','social-outsider',2),
+         ('project_social_team_private','social-actor',1);
+     INSERT INTO user_follows (follower_user_id,followed_user_id,created_at)
+       VALUES
+         ('social-actor','social-target',1),
+         ('social-target','social-actor',1);`,
+  )
+
+  await expectD1Failure(
+    stateDir,
+    `INSERT INTO user_follows (follower_user_id,followed_user_id,created_at)
+     VALUES ('social-owner','social-owner',1);`,
+    'CHECK constraint failed',
+  )
+
+  await executeJson(
+    stateDir,
+    `DELETE FROM team_memberships
+       WHERE team_id='team_social_graph' AND user_id='social-actor';`,
+  )
+
+  const membershipRows = await executeJson(
+    stateDir,
+    `SELECT
+       (SELECT COUNT(*) FROM project_stars
+        WHERE project_id='project_social_team') AS public_stars,
+       (SELECT COUNT(*) FROM project_watches
+        WHERE project_id='project_social_team') AS public_watches,
+       (SELECT COUNT(*) FROM project_watches
+        WHERE project_id='project_social_team_private') AS private_watches;`,
+  )
+  if (
+    membershipRows[0]?.public_stars !== 2 ||
+    membershipRows[0]?.public_watches !== 2 ||
+    membershipRows[0]?.private_watches !== 0
+  ) {
+    throw new Error(
+      `Team membership social cleanup crossed the public/private boundary: ${JSON.stringify(membershipRows)}`,
+    )
+  }
+
+  await executeJson(
+    stateDir,
+    `UPDATE projects
+       SET archived_at=2,updated_at=2
+       WHERE id='project_social_owner';
+     UPDATE users SET deleted_at=3 WHERE id='social-actor';
+     UPDATE projects
+       SET archived_at=4,updated_at=4
+       WHERE id='project_social_target';
+     UPDATE teams
+       SET archived_at=5,updated_at=5
+       WHERE id='team_social_graph';`,
+  )
+
+  const rows = await executeJson(
+    stateDir,
+    `SELECT
+       (SELECT COUNT(*) FROM project_stars) AS stars,
+       (SELECT COUNT(*) FROM project_watches) AS watches,
+       (SELECT COUNT(*) FROM user_follows) AS follows;`,
+  )
+  if (rows[0]?.stars !== 0 || rows[0]?.watches !== 0 || rows[0]?.follows !== 0) {
+    throw new Error(`Social graph lifecycle cleanup failed: ${JSON.stringify(rows)}`)
   }
 }
 
@@ -1788,6 +2356,8 @@ try {
     throw new Error(`Hub Project integrity is invalid: ${JSON.stringify(projectIntegrity)}`)
   }
 
+  await verifySocialGraphLifecycle(stateDir)
+
   const finalForeignKeyViolations = await executeJson(stateDir, 'PRAGMA foreign_key_check;')
   if (finalForeignKeyViolations.length !== 0) {
     throw new Error(
@@ -1797,9 +2367,10 @@ try {
 
   await verifyProjectBackfill()
   await verifyControlledHandleConflict()
+  await verifyProductionIdentityTransfer()
 
   console.log(
-    `D1 schema smoke passed: ${migrationNames.length} migrations applied; foreign keys, handle/Project lifecycle, Project backfill, and Team quota triggers valid.`,
+    `D1 schema smoke passed: ${migrationNames.length} migrations applied; foreign keys, handle/Project/social lifecycle, production identity transfer, Project backfill, and Team quota triggers valid.`,
   )
 } finally {
   await rm(stateDir, { force: true, recursive: true })

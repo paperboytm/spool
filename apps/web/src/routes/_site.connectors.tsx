@@ -16,10 +16,10 @@ function ConnectorsRedirect() {
     window.location.replace('/daemon')
   }, [])
   return (
-    <main className="wrap" style={{ padding: '120px 24px', textAlign: 'center' }}>
-      <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+    <main className="wrap px-6 py-24 text-center">
+      <p className="text-reading text-muted">
         Connectors moved. Redirecting to{' '}
-        <a href="/daemon" style={{ color: 'var(--accent)' }}>
+        <a href="/daemon" className="text-accent">
           /daemon
         </a>
         …

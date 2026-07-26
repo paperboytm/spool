@@ -48,14 +48,16 @@ Record the one-time decision that Sessions from a directory — including its gi
 
 ```bash
 spool subscribe                        # current directory, interactive disclosure choice
-spool subscribe <dir> --team <handle|name|id> # Team · {name}: current members only
-spool subscribe <dir> --link-only      # anyone with the URL
-spool subscribe <dir> --public         # explicit opt-in to Explore and search
-spool subscribe <dir> --link-only --project evan/spool --yes
+spool subscribe <dir> --team paperboy --project paperboy/spool # Team-only
+spool subscribe <dir> --project paperboy/spool --public        # Team-owned, Public
+spool subscribe <dir> --team paperboy --link-only --project paperboy/spool
+spool subscribe <dir> --link-only --project doodlewind/spool --yes
 spool subscribe <dir> --public --create-project "My Project"
 ```
 
-The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public. There is no implicit default and Public is never preselected; interactive runs list your Teams first. Every hosted Session also belongs to one Project in the same personal or Team tenant. Interactive runs can select or create that Project. Non-interactive callers must pass exactly one disclosure flag plus `--project <id|owner/slug>` or `--create-project <name>` unless a matching binding already exists. `--yes` never chooses a Project.
+Every hosted Session belongs to one personal or Team Project, and the Project determines its durable owner. Visibility is a separate choice among `Team · {name}`, Link-only, and Public. A personally authenticated member can therefore publish a Public or Link-only Session to `paperboy/spool` while Paperboy owns the hosted Session and the member remains its author.
+
+Interactive runs select an `owner/project` and then confirm visibility; Public is never preselected. An explicit Team Project defaults to Team-only when a non-interactive caller omits `--public` or `--link-only`. Personal Projects still require an explicit visibility or an existing binding. `--team` constrains the Project owner, and `--yes` never chooses a Project or widens visibility.
 
 Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
 
@@ -107,7 +109,7 @@ spool daemon run      # the same loop in the foreground
 
 Create a durable Shared Session URL. Claude Code and Codex CLI Sessions are Public in Explore and search by default; providers not yet supported by Explore remain Link-only. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure. Non-interactive callers must pass `--visibility-confirmed`, which acknowledges visibility without bypassing sensitive-data findings.
 
-The CLI reports the exact initial Public, Link-only, or Team result. A direct Team share writes Team ownership and its Team Project on the first Hub head, so it never creates an intermediate Public Session. Use `spool visibility` or [your account page](/me) only when moving an already-hosted Session later.
+The CLI reports Project ownership and Public, Link-only, or Team visibility separately. A Team-owned share writes its Team and Project on the first Hub head, so it never creates an intermediate personal Session. Use `spool visibility` or [your account page](/me) only when moving an already-hosted Session later.
 
 ```bash
 spool share                        # latest Session in the current directory
@@ -115,9 +117,11 @@ spool share <uuid>                 # specific Session; UUID prefixes work
 spool share <uuid>@12              # first 12 records only
 spool share --no-agent-summary     # skip the local Agent offer
 spool share --spool-file x.spool   # attach a curated document
-spool share --project evan/spool   # select an existing Hub Project
+spool share --project doodlewind/spool # select an existing Hub Project
 spool share --create-project Spool # create and bind a Hub Project
 spool share --team paperboy --project paperboy/react-vapor # Team-only immediately
+spool share --project paperboy/spool --public              # Team-owned, Public
+spool share --team paperboy --project paperboy/spool --link-only
 spool share --visibility-confirmed # acknowledge visibility without a TTY
 spool share --yes                  # skip all confirmations, including secret findings
 ```

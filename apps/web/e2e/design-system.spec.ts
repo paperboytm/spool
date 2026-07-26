@@ -160,6 +160,93 @@ const teamSession = {
   },
 }
 
+const doodlewindOwner = {
+  kind: 'user',
+  id: 'user-doodlewind',
+  handle: 'doodlewind',
+  name: 'Doodlewind',
+  avatar_url: null,
+} as const
+
+const paperboyOwner = {
+  kind: 'team',
+  id: team.id,
+  handle: 'paperboy',
+  name: 'Paperboy',
+  avatar_url: null,
+} as const
+
+const paperboySpoolProject = {
+  id: 'project-paperboy-spool',
+  slug: 'spool',
+  name: 'Spool',
+  description: 'Publish complete agent Sessions as readable, attributable, and resumable work.',
+  github_url: 'https://github.com/paperboytm/spool',
+  owner: paperboyOwner,
+  session_count: 1,
+  star_count: 12,
+  updated_at: Date.UTC(2026, 6, 26, 10),
+  archived_at: null,
+  can_manage: false,
+}
+
+const doodlewindSession = {
+  ...personalSession,
+  sid: 'codex_44444444-4444-4444-8444-444444444444',
+  title: 'Build Team-owned publishing and a useful social graph',
+  summary:
+    'Spool needed authors to publish into Team-owned Projects without losing individual attribution. This Session added that ownership boundary together with Project Stars, private Watching, and person-to-person Follow.',
+  published_at: Date.UTC(2026, 6, 26, 10),
+  updated_at: Date.UTC(2026, 6, 26, 11),
+  team_id: team.id,
+  team_name: team.name,
+  can_manage_visibility: false,
+  author: {
+    handle: doodlewindOwner.handle,
+    display_name: doodlewindOwner.name,
+    avatar_url: null,
+  },
+}
+
+const doodlewindProject = {
+  id: 'project-doodlewind-reading',
+  slug: 'session-reading',
+  name: 'Session reading',
+  description: 'Reader-first experiments for understanding long agent Sessions.',
+  github_url: null,
+  owner: doodlewindOwner,
+  session_count: 2,
+  star_count: 4,
+  updated_at: Date.UTC(2026, 6, 25, 12),
+  archived_at: null,
+  can_manage: false,
+}
+
+const socialPeople = {
+  followers: [
+    {
+      id: 'user-ada',
+      handle: 'ada',
+      name: 'Ada Lovelace',
+      avatar_url: null,
+    },
+    {
+      id: 'user-grace',
+      handle: 'grace',
+      name: 'Grace Hopper',
+      avatar_url: null,
+    },
+  ],
+  following: [
+    {
+      id: 'user-linus',
+      handle: 'linus',
+      name: 'Linus Torvalds',
+      avatar_url: null,
+    },
+  ],
+}
+
 interface AccountApiOptions {
   teamName?: string
   teamAuthorHandle?: string
@@ -227,6 +314,182 @@ async function installAccountApi(page: Page, options: AccountApiOptions = {}) {
   })
 
   return { team: activeTeam, teamSession: activeTeamSession }
+}
+
+interface SocialApiOptions {
+  authenticated?: boolean
+  initiallyStarred?: boolean
+  initiallyWatching?: boolean
+  initiallyFollowing?: boolean
+  starEligible?: boolean
+}
+
+async function installSocialApi(page: Page, options: SocialApiOptions = {}) {
+  const authenticated = options.authenticated ?? true
+  const starEligible = options.starEligible ?? true
+  let viewerStarred = options.initiallyStarred ?? false
+  let viewerWatching = options.initiallyWatching ?? false
+  let viewerFollowing = options.initiallyFollowing ?? false
+  const requests: string[] = []
+  const unhandled: string[] = []
+
+  const project = () => ({
+    ...paperboySpoolProject,
+    star_count: 12 + Number(viewerStarred),
+  })
+  const projectSocial = () => ({
+    version: 1,
+    starCount: 12 + Number(viewerStarred),
+    watcherCount: 7 + Number(viewerWatching),
+    viewerStarred,
+    viewerWatching,
+    viewerAuthenticated: authenticated,
+    starEligible,
+    canStar: authenticated && starEligible,
+    canWatch: authenticated,
+  })
+  const followSocial = () => ({
+    version: 1,
+    followerCount: 21 + Number(viewerFollowing),
+    followingCount: 9,
+    viewerFollowing,
+    viewerAuthenticated: authenticated,
+    viewerIsSelf: false,
+    canFollow: authenticated,
+  })
+  const socialProject = () => {
+    const { archived_at: _archivedAt, can_manage: _canManage, ...publicProject } = project()
+    return publicProject
+  }
+  const fulfill = async (route: Parameters<Parameters<Page['route']>[1]>[0], body: unknown) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+  }
+  const unauthenticated = async (route: Parameters<Parameters<Page['route']>[1]>[0]) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'Authentication required' }),
+    })
+  }
+
+  await page.route('**/api/**', async (route) => {
+    const request = route.request()
+    const method = request.method()
+    const path = new URL(request.url()).pathname
+    const key = `${method} ${path}`
+    requests.push(key)
+
+    if (key === 'GET /api/me') {
+      if (!authenticated) return unauthenticated(route)
+      return fulfill(route, {
+        ...me,
+        id: 'user-viewer',
+        email: 'reader@example.com',
+        name: 'Session Reader',
+        display_name: 'Session Reader',
+        handle: 'session-reader',
+      })
+    }
+    if (key === 'GET /api/teams') {
+      if (!authenticated) return unauthenticated(route)
+      return fulfill(route, { teams: [team] })
+    }
+    if (key === 'GET /api/owners/paperboy/projects/spool') {
+      return fulfill(route, {
+        project: project(),
+        sessions: [doodlewindSession],
+        next_cursor: null,
+      })
+    }
+    if (key === 'GET /api/owners/paperboy/projects/spool/social') {
+      return fulfill(route, projectSocial())
+    }
+    if (key === 'GET /api/owners/paperboy/projects/spool/stargazers') {
+      return fulfill(route, { stargazers: socialPeople.followers, next_cursor: null })
+    }
+    if (key === 'PUT /api/owners/paperboy/projects/spool/star') {
+      if (!authenticated) return unauthenticated(route)
+      viewerStarred = true
+      return fulfill(route, projectSocial())
+    }
+    if (key === 'DELETE /api/owners/paperboy/projects/spool/star') {
+      if (!authenticated) return unauthenticated(route)
+      viewerStarred = false
+      return fulfill(route, projectSocial())
+    }
+    if (key === 'PUT /api/owners/paperboy/projects/spool/watch') {
+      if (!authenticated) return unauthenticated(route)
+      viewerWatching = true
+      return fulfill(route, projectSocial())
+    }
+    if (key === 'DELETE /api/owners/paperboy/projects/spool/watch') {
+      if (!authenticated) return unauthenticated(route)
+      viewerWatching = false
+      return fulfill(route, projectSocial())
+    }
+    if (key === 'GET /api/owners/doodlewind/projects') {
+      return fulfill(route, {
+        owner: doodlewindOwner,
+        projects: [doodlewindProject],
+        sessions: [doodlewindSession],
+        session_count: 1,
+        next_cursor: null,
+      })
+    }
+    if (key === 'GET /api/owners/doodlewind/follow') {
+      return fulfill(route, followSocial())
+    }
+    if (key === 'PUT /api/owners/doodlewind/follow') {
+      if (!authenticated) return unauthenticated(route)
+      viewerFollowing = true
+      return fulfill(route, followSocial())
+    }
+    if (key === 'DELETE /api/owners/doodlewind/follow') {
+      if (!authenticated) return unauthenticated(route)
+      viewerFollowing = false
+      return fulfill(route, followSocial())
+    }
+    if (key === 'GET /api/owners/doodlewind/starred-projects') {
+      return fulfill(route, { projects: [socialProject()], next_cursor: null })
+    }
+    if (key === 'GET /api/owners/doodlewind/followers') {
+      return fulfill(route, { followers: socialPeople.followers, next_cursor: null })
+    }
+    if (key === 'GET /api/owners/doodlewind/following') {
+      return fulfill(route, { following: socialPeople.following, next_cursor: null })
+    }
+    if (key === 'GET /api/me/starred-projects') {
+      if (!authenticated) return unauthenticated(route)
+      return fulfill(route, {
+        projects: viewerStarred ? [socialProject()] : [],
+        next_cursor: null,
+      })
+    }
+    if (key === 'GET /api/me/watching-projects') {
+      if (!authenticated) return unauthenticated(route)
+      return fulfill(route, {
+        projects: viewerWatching ? [socialProject()] : [],
+        next_cursor: null,
+      })
+    }
+
+    unhandled.push(key)
+    await route.fulfill({
+      status: 501,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: `Unhandled social E2E route: ${key}` }),
+    })
+  })
+
+  return {
+    requests,
+    unhandled,
+    state: () => ({ viewerStarred, viewerWatching, viewerFollowing }),
+  }
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -307,6 +570,19 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow.bodyWidth, JSON.stringify(overflow, null, 2)).toBeLessThanOrEqual(
     overflow.viewport + 1,
   )
+}
+
+async function expectMinimumTouchTargets(page: Page, selector: string, minimum = 44) {
+  const targets = page.locator(selector)
+  const count = await targets.count()
+  expect(count, `Expected at least one touch target for ${selector}`).toBeGreaterThan(0)
+  for (let index = 0; index < count; index += 1) {
+    const target = targets.nth(index)
+    if (!(await target.isVisible())) continue
+    const box = await target.boundingBox()
+    expect(box?.width, `${selector} #${index + 1} width`).toBeGreaterThanOrEqual(minimum)
+    expect(box?.height, `${selector} #${index + 1} height`).toBeGreaterThanOrEqual(minimum)
+  }
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
@@ -621,4 +897,213 @@ test('Session feed empty state fits inside a long Team scope without overflow', 
       await capture(page, testInfo, `sessions-long-empty-${viewport.name}`)
     }
   }
+})
+
+for (const viewport of VIEWPORTS) {
+  test(`public Team Project social actions work at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    const api = await installSocialApi(page)
+    await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+
+    await page.goto('/@paperboy/spool')
+    await expect(page.getByRole('heading', { name: 'Spool', exact: true })).toBeVisible()
+    await expect(page.getByText('Team · Paperboy', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: doodlewindSession.title, exact: true }),
+    ).toBeVisible()
+
+    const star = page.getByRole('button', { name: 'Star', exact: true })
+    const watch = page.getByRole('button', { name: /^Watch 7$/ })
+    await expect(star).toHaveAttribute('aria-pressed', 'false')
+    await expect(watch).toHaveAttribute('aria-pressed', 'false')
+
+    await page.getByRole('button', { name: 'View 12 stargazers', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Close stargazers', exact: true }).click()
+
+    await star.click()
+    const starred = page.getByRole('button', { name: 'Star', exact: true })
+    await expect(starred).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      page.getByRole('button', { name: 'View 13 stargazers', exact: true }),
+    ).toBeVisible()
+    expect(api.state().viewerStarred).toBe(true)
+
+    await watch.click()
+    const watching = page.getByRole('button', { name: /^Watch 8$/ })
+    await expect(watching).toHaveAttribute('aria-pressed', 'true')
+    expect(api.state().viewerWatching).toBe(true)
+
+    if (viewport.width <= 768) {
+      await expectMinimumTouchTargets(page, '.project-social-actions .sp-button')
+    }
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `project-paperboy-spool-social-${viewport.name}`)
+
+    await starred.click()
+    await expect(page.getByRole('button', { name: 'Star', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    await watching.click()
+    await expect(page.getByRole('button', { name: /^Watch 7$/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(api.state()).toEqual({
+      viewerStarred: false,
+      viewerWatching: false,
+      viewerFollowing: false,
+    })
+    expect(api.requests).toContain('PUT /api/owners/paperboy/projects/spool/star')
+    expect(api.requests).toContain('DELETE /api/owners/paperboy/projects/spool/star')
+    expect(api.requests).toContain('GET /api/owners/paperboy/projects/spool/stargazers')
+    expect(api.requests).toContain('PUT /api/owners/paperboy/projects/spool/watch')
+    expect(api.requests).toContain('DELETE /api/owners/paperboy/projects/spool/watch')
+    expect(api.unhandled).toEqual([])
+  })
+
+  test(`person Follow and public social lists work at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    const api = await installSocialApi(page)
+    await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+
+    await page.goto('/@doodlewind')
+    await expect(page.getByRole('heading', { name: 'Doodlewind', exact: true })).toBeVisible()
+    await expect(page.locator('.profile-project-header p')).toHaveText('@doodlewind')
+
+    const follow = page.getByRole('button', { name: 'Follow', exact: true })
+    await follow.click()
+    const followingButton = page.getByRole('button', { name: 'Following', exact: true })
+    await expect(followingButton).toBeVisible()
+    expect(api.state().viewerFollowing).toBe(true)
+    await expect(page.getByRole('link', { name: /^Followers 22$/ })).toBeVisible()
+
+    if (viewport.width <= 768) {
+      await expectMinimumTouchTargets(page, '.profile-project-header > .sp-button')
+      await expectMinimumTouchTargets(page, '.profile-social-tabs a')
+    }
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `profile-doodlewind-following-${viewport.name}`)
+
+    await page.getByRole('link', { name: 'Stars', exact: true }).click()
+    await expect(page).toHaveURL(/tab=stars/)
+    await expect(page.getByRole('heading', { name: 'Starred Projects', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Spool', exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `profile-doodlewind-stars-${viewport.name}`)
+
+    await page.getByRole('link', { name: /^Followers 22$/ }).click()
+    await expect(page).toHaveURL(/tab=followers/)
+    await expect(page.getByRole('heading', { name: 'Followers', exact: true })).toBeVisible()
+    await expect(page.getByText('Ada Lovelace', { exact: true })).toBeVisible()
+    await expect(page.getByText('@grace', { exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `profile-doodlewind-followers-${viewport.name}`)
+
+    await page.getByRole('link', { name: /^Following 9$/ }).click()
+    await expect(page).toHaveURL(/tab=following/)
+    await expect(page.getByRole('heading', { name: 'Following', exact: true })).toBeVisible()
+    await expect(page.getByText('Linus Torvalds', { exact: true })).toBeVisible()
+    await expect(page.getByText('@linus', { exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `profile-doodlewind-following-list-${viewport.name}`)
+
+    await page.getByRole('link', { name: 'Overview', exact: true }).click()
+    await expect(page).toHaveURL(/\/@doodlewind(?:\?tab=overview)?$/)
+    await page.getByRole('button', { name: 'Following', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeVisible()
+    expect(api.state().viewerFollowing).toBe(false)
+    expect(api.requests).toContain('PUT /api/owners/doodlewind/follow')
+    expect(api.requests).toContain('DELETE /api/owners/doodlewind/follow')
+    expect(api.requests).toContain('GET /api/owners/doodlewind/starred-projects')
+    expect(api.requests).toContain('GET /api/owners/doodlewind/followers')
+    expect(api.requests).toContain('GET /api/owners/doodlewind/following')
+    expect(api.unhandled).toEqual([])
+  })
+
+  test(`Starred and Watching Project scopes work at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    const api = await installSocialApi(page, {
+      initiallyStarred: true,
+      initiallyWatching: true,
+    })
+    await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+    await page.setViewportSize({ width: viewport.width, height: viewport.height })
+
+    await page.goto('/projects?scope=starred')
+    await expect(page.getByRole('tab', { name: 'Starred', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(page.getByRole('heading', { name: 'Spool', exact: true })).toBeVisible()
+    await expect(page.getByText('@paperboy/spool', { exact: true })).toBeVisible()
+    if (viewport.width <= 768) {
+      await expectMinimumTouchTargets(page, '.projects-scope-tabs .sp-tabs__tab')
+      await expectMinimumTouchTargets(page, '.project-card-main')
+    }
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `projects-starred-${viewport.name}`)
+
+    await page.getByRole('tab', { name: 'Watching', exact: true }).click()
+    await expect(page).toHaveURL(/scope=watching/)
+    await expect(page.getByRole('tab', { name: 'Watching', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(page.getByRole('heading', { name: 'Spool', exact: true })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await capture(page, testInfo, `projects-watching-${viewport.name}`)
+
+    expect(api.requests).toContain('GET /api/me/starred-projects')
+    expect(api.requests).toContain('GET /api/me/watching-projects')
+    expect(api.unhandled).toEqual([])
+  })
+}
+
+test('anonymous Project Star opens sign-in with the exact return path', async ({
+  page,
+}, testInfo) => {
+  const api = await installSocialApi(page, { authenticated: false })
+  await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+  await page.setViewportSize({ width: 451, height: 732 })
+
+  await page.goto('/@paperboy/spool')
+  await page.getByRole('button', { name: 'Star', exact: true }).click()
+  await expect(page).toHaveURL(/\/sign-in\?/)
+  const signInUrl = new URL(page.url())
+  expect(signInUrl.pathname).toBe('/sign-in')
+  expect(signInUrl.searchParams.get('next')).toBe('/@paperboy/spool')
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await capture(page, testInfo, 'project-anonymous-star-sign-in-phone-451')
+
+  expect(api.requests).toContain('PUT /api/owners/paperboy/projects/spool/star')
+  expect(api.unhandled).toEqual([])
+})
+
+test('private Team Project members can Watch without seeing a Star affordance', async ({
+  page,
+}) => {
+  const api = await installSocialApi(page, { starEligible: false })
+  await page.addInitScript(() => localStorage.setItem('spool-theme', 'light'))
+  await page.setViewportSize({ width: 451, height: 732 })
+
+  await page.goto('/@paperboy/spool')
+  await expect(page.getByRole('button', { name: /^Star/ })).toHaveCount(0)
+  const watch = page.getByRole('button', { name: /^Watch 7$/ })
+  await expect(watch).toBeVisible()
+  await watch.click()
+  await expect(page.getByRole('button', { name: /^Watch 8$/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  expect(api.state().viewerWatching).toBe(true)
+  expect(api.unhandled).toEqual([])
 })

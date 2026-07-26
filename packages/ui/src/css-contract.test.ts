@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vite-plus/test'
 
 const cssRoot = resolve(import.meta.dirname, 'css')
 const tokens = readFileSync(resolve(cssRoot, 'tokens.css'), 'utf8')
+const theme = readFileSync(resolve(cssRoot, 'theme.css'), 'utf8')
 const styles = readFileSync(resolve(cssRoot, 'styles.css'), 'utf8')
 
 function readHexToken(source: string, name: string) {
@@ -28,6 +29,26 @@ function contrastRatio(foreground: string, background: string) {
 }
 
 describe('shared UI CSS contract', () => {
+  it('maps runtime values into one Tailwind semantic token namespace', () => {
+    expect(theme).toContain('@theme inline static')
+    expect(theme).toContain('--color-background: var(--sp-bg)')
+    expect(theme).toContain('--color-surface-2: var(--sp-surface-2)')
+    expect(theme).toContain('--color-border-strong: var(--sp-border-strong)')
+    expect(theme).toContain('--color-foreground: var(--sp-text)')
+    expect(theme).toContain('--color-accent-fill: var(--sp-accent-fill)')
+    expect(theme).toContain('--color-on-accent: var(--sp-on-accent)')
+    expect(theme).toContain('--color-status-success: var(--sp-success)')
+    expect(theme).toContain('--color-source-codex: var(--sp-source-codex)')
+    expect(theme).toContain('--text-session-title: var(--sp-text-session-title)')
+    expect(theme).toContain('--text-section-title: var(--sp-text-section-title)')
+    expect(theme).toContain('--spacing-control-button-lg: var(--sp-control-button-lg)')
+    expect(theme).toContain('--radius-card: var(--sp-radius-card)')
+    expect(theme).toContain('--shadow-popover: var(--sp-shadow-popover)')
+    expect(theme).toContain('--transition-duration-hover: var(--sp-motion-hover)')
+    expect(theme).toContain('--transition-duration-reveal: var(--sp-motion-reveal)')
+    expect(theme).not.toMatch(/--(?:color|spacing|radius|shadow)-(?:warm|dark)-/)
+  })
+
   it('owns the canonical compact type and control dimensions', () => {
     expect(tokens).toContain('--sp-text-ui: 13px')
     expect(tokens).toContain('--sp-text-button: 12px')
@@ -35,6 +56,9 @@ describe('shared UI CSS contract', () => {
     expect(tokens).toContain('--sp-text-meta: 11px')
     expect(tokens).toContain('--sp-text-label: 10px')
     expect(tokens).toContain('--sp-text-session-title: 15px')
+    expect(tokens).toContain('--sp-text-reading: 14px')
+    expect(tokens).toContain('--sp-text-summary: 16px')
+    expect(tokens).toContain('--sp-text-section-title: 18px')
     expect(tokens).toContain('--sp-control-button-sm: 28px')
     expect(tokens).toContain('--sp-control-button-md: 32px')
     expect(tokens).toContain('--sp-control-button-lg: 48px')
@@ -44,6 +68,7 @@ describe('shared UI CSS contract', () => {
     expect(tokens).toContain('--sp-control-tab: 36px')
     expect(tokens).toContain('--sp-control-nav: 32px')
     expect(tokens).toContain('--sp-motion-hover: 80ms')
+    expect(tokens).toContain('--sp-motion-reveal: 150ms')
     expect(tokens).toContain('--sp-shadow-popover:')
   })
 
@@ -82,16 +107,26 @@ describe('shared UI CSS contract', () => {
   })
 
   it('keeps primitive dimensions and row spacing tied to package tokens', () => {
-    expect(styles).toContain('height: var(--sp-control-button-sm)')
-    expect(styles).toContain('height: var(--sp-control-button-lg)')
-    expect(styles).toContain('width: var(--sp-control-icon-sm)')
-    expect(styles).toContain('height: var(--sp-control-search)')
-    expect(styles).toContain('height: var(--sp-control-tab)')
-    expect(styles).toContain('min-height: var(--sp-control-nav)')
-    expect(styles).toContain('padding: var(--sp-space-3) var(--sp-space-5)')
-    expect(styles).toContain('border-radius: var(--sp-radius-badge)')
-    expect(styles).toContain('border-radius: var(--sp-radius-control)')
-    expect(styles).toContain('border-radius: var(--sp-radius-input)')
+    expect(styles).toContain('height: var(--spacing-control-button-sm)')
+    expect(styles).toContain('height: var(--spacing-control-button-lg)')
+    expect(styles).toContain('width: var(--spacing-control-icon-sm)')
+    expect(styles).toContain('height: var(--spacing-control-search)')
+    expect(styles).toContain('height: var(--spacing-control-tab)')
+    expect(styles).toContain('min-height: var(--spacing-control-nav)')
+    expect(styles).toContain('padding: var(--spacing-3) var(--spacing-5)')
+    expect(styles).toContain('border-radius: var(--radius-badge)')
+    expect(styles).toContain('border-radius: var(--radius-control)')
+    expect(styles).toContain('border-radius: var(--radius-input)')
+    expect(styles).not.toContain('var(--sp-')
+  })
+
+  it('centers every Avatar layer without inheriting layout margins', () => {
+    expect(styles).toMatch(/\.sp-avatar\s*\{[^}]*display:\s*inline-grid;/)
+    expect(styles).toMatch(/\.sp-avatar\s*\{[^}]*place-items:\s*center;/)
+    expect(styles).toMatch(/\.sp-avatar__fallback\s*\{[^}]*display:\s*grid;/)
+    expect(styles).toMatch(/\.sp-avatar__fallback\s*\{[^}]*place-items:\s*center;/)
+    expect(styles).toMatch(/\.sp-avatar__fallback\s*\{[^}]*margin:\s*0;/)
+    expect(styles).toMatch(/\.sp-avatar img\s*\{[^}]*display:\s*block;/)
   })
 
   it('defines reusable danger, loading, and readable disabled button states', () => {
@@ -101,8 +136,8 @@ describe('shared UI CSS contract', () => {
     expect(styles).toContain('.sp-button--danger')
     expect(styles).toContain("sp-button[data-state='loading']")
     expect(styles).toContain('animation: sp-button-spin')
-    expect(disabledRule).toContain('background: var(--sp-surface)')
-    expect(disabledRule).toContain('color: var(--sp-muted)')
+    expect(disabledRule).toContain('background: var(--color-surface)')
+    expect(disabledRule).toContain('color: var(--color-muted)')
     expect(disabledRule).not.toContain('opacity')
     expect(
       contrastRatio(readHexToken(tokens, '--sp-muted'), readHexToken(tokens, '--sp-surface')),
@@ -119,7 +154,7 @@ describe('shared UI CSS contract', () => {
     expect(styles).toMatch(/\.sp-mobile-menu__trigger\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/)
     expect(styles).toMatch(/\.sp-mobile-menu__panel\s*\{[^}]*position:\s*absolute;/)
     expect(styles).toMatch(
-      /\.sp-mobile-menu__panel\s*\{[^}]*box-shadow:\s*var\(--sp-shadow-popover\);/,
+      /\.sp-mobile-menu__panel\s*\{[^}]*box-shadow:\s*var\(--shadow-popover\);/,
     )
     expect(styles).toMatch(/\.sp-mobile-menu__panel\s*\{[^}]*max-height:\s*calc\(100dvh - 72px\);/)
     expect(styles).toMatch(/\.sp-mobile-menu__panel\s*\{[^}]*overflow-y:\s*auto;/)

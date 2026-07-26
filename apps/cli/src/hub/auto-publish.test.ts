@@ -87,6 +87,10 @@ const TEAM_SUBSCRIPTION: Subscription = {
     remote: TEAM_PROJECT,
   },
 }
+const TEAM_PUBLIC_SUBSCRIPTION: Subscription = {
+  ...TEAM_SUBSCRIPTION,
+  visibility: 'public',
+}
 
 function candidate(overrides: Partial<AutoPublishCandidate> = {}): AutoPublishCandidate {
   return {
@@ -387,6 +391,21 @@ describe('runAutoPublish', () => {
     expect(seen[0]).toMatchObject({ visibility: 'team', teamId: 'team_00000001' })
 
     seen.length = 0
+    await runAutoPublish(
+      ui,
+      engineDeps({
+        publish: publish as never,
+        loadSubscriptions: () => [TEAM_PUBLIC_SUBSCRIPTION],
+      }),
+    )
+    expect(seen[0]).toMatchObject({
+      visibility: 'public',
+      teamId: 'team_00000001',
+      expectedTeamId: null,
+      projectId: TEAM_PROJECT.id,
+    })
+
+    seen.length = 0
     await runAutoPublish(ui, engineDeps({ publish: publish as never }))
     expect(seen[0]).toMatchObject({ visibility: 'public' })
   })
@@ -398,6 +417,14 @@ describe('runAutoPublish', () => {
     expect(publishTarget(SUBSCRIPTION, 'gemini')).toEqual({ visibility: 'link-only' })
     expect(publishTarget(TEAM_SUBSCRIPTION, 'gemini')).toEqual({
       visibility: 'team',
+      teamId: 'team_00000001',
+    })
+    expect(publishTarget(TEAM_PUBLIC_SUBSCRIPTION, 'claude')).toEqual({
+      visibility: 'public',
+      teamId: 'team_00000001',
+    })
+    expect(publishTarget(TEAM_PUBLIC_SUBSCRIPTION, 'gemini')).toEqual({
+      visibility: 'link-only',
       teamId: 'team_00000001',
     })
     expect(publishTarget({ ...SUBSCRIPTION, visibility: 'link-only' }, 'claude')).toEqual({
@@ -468,6 +495,28 @@ describe('runAutoPublish', () => {
     expect(publish).not.toHaveBeenCalled()
     expect(output.join('\n')).toContain('different Hub')
     expect(output.join('\n')).toContain('different signed-in account')
+  })
+
+  it('fails closed when a Team Project subscription loses its durable Team owner', async () => {
+    const { ui, output } = capturingUi()
+    const publish = vi.fn(async () => ({ url: 'https://hub.test/s/x' }))
+    const result = await runAutoPublish(
+      ui,
+      engineDeps({
+        publish,
+        loadSubscriptions: () => [
+          {
+            ...TEAM_PUBLIC_SUBSCRIPTION,
+            teamId: undefined,
+            teamName: undefined,
+          } as Subscription,
+        ],
+      }),
+    )
+
+    expect(result).toMatchObject({ skippedUnbound: 1, published: [] })
+    expect(publish).not.toHaveBeenCalled()
+    expect(output.join('\n')).toContain('Team owner and Project tenant')
   })
 
   it('scopes incremental state by Hub and actor', () => {

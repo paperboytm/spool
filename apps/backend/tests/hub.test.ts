@@ -1073,6 +1073,17 @@ describe('hub head and withdrawal', () => {
       user_id: 'user-b',
       created_at: Date.now(),
     })
+    const projectId = env.state.hub_sessions[0]!.project_id!
+    env.state.project_stars.push({
+      project_id: projectId,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+    env.state.project_watches.push({
+      project_id: projectId,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
 
     const foreign = await withdraw(env, USER_B_TOKEN)
     expect(foreign.status).toBe(403)
@@ -1083,6 +1094,8 @@ describe('hub head and withdrawal', () => {
 
     expect(first.status).toBe(200)
     expect(env.state.hub_session_stars).toHaveLength(0)
+    expect(env.state.project_stars).toHaveLength(0)
+    expect(env.state.project_watches).toHaveLength(0)
     expect(second.status).toBe(200)
     await expect(second.json()).resolves.toEqual({ withdrawn: true })
     expect(env.state.audit).toHaveLength(auditCount)
@@ -1095,6 +1108,17 @@ describe('hub head and withdrawal', () => {
     expect((await uploadAndCommit(env, fixture)).status).toBe(200)
     env.state.hub_session_stars.push({
       sid: SID,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+    const projectId = env.state.hub_sessions[0]!.project_id!
+    env.state.project_stars.push({
+      project_id: projectId,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+    env.state.project_watches.push({
+      project_id: projectId,
       user_id: 'user-b',
       created_at: Date.now(),
     })
@@ -1113,6 +1137,41 @@ describe('hub head and withdrawal', () => {
     expect(changed.status).toBe(200)
     expect(env.state.hub_session_discovery).toHaveLength(0)
     expect(env.state.hub_session_stars).toHaveLength(0)
+    expect(env.state.project_stars).toHaveLength(0)
+    expect(env.state.project_watches).toHaveLength(0)
+  })
+
+  it('keeps Project social state while another live Public Session remains', async () => {
+    const env = envFor()
+    await seedUsers(env)
+    const first = await makeFixture()
+    const second = await makeFixture()
+    const secondSid = 'codex_12345678-abcd-4321-abcd-1234567890ac'
+    expect((await uploadAndCommit(env, first)).status).toBe(200)
+    expect((await uploadAndCommit(env, second, { sid: secondSid })).status).toBe(200)
+    const projectId = env.state.hub_sessions[0]!.project_id!
+    env.state.project_stars.push({
+      project_id: projectId,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+    env.state.project_watches.push({
+      project_id: projectId,
+      user_id: 'user-b',
+      created_at: Date.now(),
+    })
+
+    const changed = await invoke(
+      headPost,
+      jsonPost(`${sessionUrl(SID)}/head`, { ...first.head, visibility: 'link-only' }, USER_A_TOKEN),
+      env,
+      { sid: SID },
+    )
+
+    expect(changed.status).toBe(200)
+    expect(env.state.hub_session_discovery.map((row) => row.sid)).toEqual([secondSid])
+    expect(env.state.project_stars).toHaveLength(1)
+    expect(env.state.project_watches).toHaveLength(1)
   })
 })
 
@@ -1787,6 +1846,46 @@ describe('Team-only Hub isolation', () => {
     return env
   }
 
+  it('clears Stars and outsider Watches but keeps member Watches after the final Public Session', async () => {
+    const env = await teamEnv()
+    const fixture = await makeFixture()
+    expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
+    expect(
+      (
+        await invoke(
+          headPost,
+          jsonPost(
+            `${sessionUrl(SID)}/head`,
+            { ...fixture.head, visibility: 'public', teamId: TEAM_ID },
+            USER_A_TOKEN,
+          ),
+          env,
+          { sid: SID },
+        )
+      ).status,
+    ).toBe(200)
+    const projectId = env.state.hub_sessions[0]!.project_id!
+    env.state.project_stars.push(
+      { project_id: projectId, user_id: 'user-b', created_at: 1 },
+      { project_id: projectId, user_id: 'user-c', created_at: 2 },
+    )
+    env.state.project_watches.push(
+      { project_id: projectId, user_id: 'user-b', created_at: 1 },
+      { project_id: projectId, user_id: 'user-c', created_at: 2 },
+    )
+
+    const changed = await changeVisibility(env, {
+      visibility: 'team',
+      team_id: TEAM_ID,
+    })
+
+    expect(changed.status).toBe(200)
+    expect(env.state.project_stars).toEqual([])
+    expect(env.state.project_watches).toEqual([
+      expect.objectContaining({ project_id: projectId, user_id: 'user-b' }),
+    ])
+  })
+
   it('requires an explicit target Project and source Project expectation for ownership transfer', async () => {
     const env = await teamEnv()
     const fixture = await makeFixture()
@@ -1925,7 +2024,7 @@ describe('Team-only Hub isolation', () => {
     expect(removedMember.status).toBe(404)
   })
 
-  it('keeps Team Project metadata member-only on Public and Link-only reads', async () => {
+  it('projects Public Team Sessions while keeping Link-only Team Project context private', async () => {
     const env = await teamEnv()
     const fixture = await makeFixture()
     expect((await upload(env, USER_A_TOKEN, fixture.entries)).status).toBe(200)
@@ -1949,7 +2048,10 @@ describe('Team-only Hub isolation', () => {
     await expect(publicMeta.json()).resolves.toMatchObject({
       visibility: 'public',
       team: { id: TEAM_ID, name: 'Launch Team' },
-      project: null,
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
     })
 
     const outsiderMeta = await invoke(
@@ -1962,7 +2064,10 @@ describe('Team-only Hub isolation', () => {
     expect(outsiderMeta.headers.get('cache-control')).toBe('private, no-store')
     await expect(outsiderMeta.json()).resolves.toMatchObject({
       visibility: 'public',
-      project: null,
+      project: {
+        slug: 'sessions',
+        owner: { kind: 'team', id: TEAM_ID },
+      },
     })
 
     const memberMeta = await invoke(
