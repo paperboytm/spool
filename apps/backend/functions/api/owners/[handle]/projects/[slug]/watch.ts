@@ -9,7 +9,7 @@ import {
   socialOk,
 } from '../../../../../../src/social/limits'
 import {
-  getProjectSocialState,
+  getProjectSocialSnapshot,
   resolveProjectSocialTarget,
   unwatchProject,
   watchProject,
@@ -24,8 +24,9 @@ export const onRequestPut: PagesFunction<Env, Params> = async (ctx) => {
     const target = await requireTarget(ctx, user.id)
     await requireSocialMutationRate(ctx.env.RATE, user.id, target.projectId, 'project-watch')
     await watchProject(ctx.env.DB, target, user.id)
-    return socialOk(await getProjectSocialState(ctx.env.DB, target, user.id), {
-      private: !target.isPublic,
+    const snapshot = await getProjectSocialSnapshot(ctx.env.DB, target, user.id)
+    return socialOk(snapshot.state, {
+      private: !snapshot.isPublic,
     })
   } catch (error) {
     return socialError(error)
@@ -38,8 +39,9 @@ export const onRequestDelete: PagesFunction<Env, Params> = async (ctx) => {
     const target = await requireTarget(ctx, user.id)
     await requireSocialMutationRate(ctx.env.RATE, user.id, target.projectId, 'project-watch')
     await unwatchProject(ctx.env.DB, target, user.id)
-    return socialOk(await getProjectSocialState(ctx.env.DB, target, user.id), {
-      private: !target.isPublic,
+    const snapshot = await getProjectSocialSnapshot(ctx.env.DB, target, user.id)
+    return socialOk(snapshot.state, {
+      private: !snapshot.isPublic,
     })
   } catch (error) {
     return socialError(error)

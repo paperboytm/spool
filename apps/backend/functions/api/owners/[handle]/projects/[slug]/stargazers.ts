@@ -35,10 +35,7 @@ export const onRequestGet: PagesFunction<Env, Params> = async (ctx) => {
       target,
       await parseSocialListOptions(ctx.request, ['project-stargazers', target.projectId]),
     )
-    return socialOk(
-      { stargazers: page.rows, next_cursor: page.nextCursor },
-      { private: !target.isPublic },
-    )
+    return socialOk({ stargazers: page.rows, next_cursor: page.nextCursor })
   } catch (error) {
     return socialError(error)
   }

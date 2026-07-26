@@ -1,4 +1,4 @@
-import type { KVNamespace } from '@cloudflare/workers-types'
+import type { D1Database, KVNamespace } from '@cloudflare/workers-types'
 import { describe, expect, it } from 'vite-plus/test'
 
 import {
@@ -27,7 +27,10 @@ import {
   PROJECT_CREATE_RATE,
   PROJECT_LIST_RATE,
 } from '../src/projects/limits'
-import { prepareAuthorizedDefaultProjectInsert } from '../src/projects/store'
+import {
+  listPublicProjectSessions,
+  prepareAuthorizedDefaultProjectInsert,
+} from '../src/projects/store'
 import { invoke } from './_helpers/ctx'
 import { emptyState, makeDb, makeKv, makeR2 } from './_helpers/fakes'
 
@@ -990,6 +993,38 @@ describe('Projects API contract', () => {
         },
       ],
     })
+  })
+
+  it('404s when the final Project snapshot no longer has a live Team projection', async () => {
+    const calls: Array<{ params: unknown[]; sql: string }> = []
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...params: unknown[]) {
+            calls.push({ params, sql })
+            expect(sql.match(/\?/g)?.length ?? 0).toBe(params.length)
+            return {
+              async all() {
+                return { results: [], success: true, meta: {} }
+              },
+            }
+          },
+        }
+      },
+    } as unknown as D1Database
+
+    await expect(
+      listPublicProjectSessions(db, 'paperboy', 'react-vapor', {
+        after: null,
+        fingerprint: 'snapshot',
+        limit: 20,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.params.slice(0, 2)).toEqual(['paperboy', 'react-vapor'])
+    expect(calls[0]?.sql).toContain('authorized_project AS')
+    expect(calls[0]?.sql).toContain('public_session_count>0')
+    expect(calls[0]?.sql).toContain('LEFT JOIN page ON TRUE')
   })
 
   it('returns public personal Projects and Sessions while only the author can manage them', async () => {

@@ -617,29 +617,6 @@ export function makeDb(state: FakeDbState = emptyState()): {
             ).length,
           } as T
         }
-        if (sql.includes('/* projects:count-public-sessions */')) {
-          const [projectId, ownerUserId, ownerTeamId, personal, team] = params as [
-            string,
-            string | null,
-            string | null,
-            number,
-            number,
-          ]
-          return {
-            count: state.hub_sessions.filter(
-              (row) =>
-                row.project_id === projectId &&
-                row.visibility === 'unlisted' &&
-                row.withdrawn_at === null &&
-                state.hub_session_discovery.some((projection) => projection.sid === row.sid) &&
-                ((personal === 1 &&
-                  ownerUserId !== null &&
-                  row.owner_user_id === ownerUserId &&
-                  (row.team_id ?? null) === null) ||
-                  (team === 1 && ownerTeamId !== null && row.team_id === ownerTeamId)),
-            ).length,
-          } as T
-        }
         if (sql.includes('SELECT id FROM projects') && sql.includes("(id=? OR slug='sessions')")) {
           const [ownerUserId, ownerTeamId, preferredId] = params as [
             string | null,
@@ -3777,12 +3754,126 @@ export function makeDb(state: FakeDbState = emptyState()): {
           )
           return { results: projects.slice(0, limit) as T[] }
         }
+        if (sql.includes('/* projects:list-public-sessions */')) {
+          const [ownerHandle, projectSlug, hasAfter, afterSortAt, equalSortAt, afterSid, limit] =
+            params as [string, string, number, number, number, string, number]
+          const handle = state.handles.find(
+            (candidate) => candidate.handle === ownerHandle && candidate.released_at === null,
+          )
+          const project = state.projects.find(
+            (candidate) =>
+              candidate.slug === projectSlug &&
+              candidate.archived_at === null &&
+              candidate.owner_user_id === (handle?.user_id ?? null) &&
+              candidate.owner_team_id === (handle?.team_id ?? null),
+          )
+          const ownerUser =
+            project?.owner_user_id == null
+              ? null
+              : (state.users.find(
+                  (candidate) =>
+                    candidate.id === project.owner_user_id &&
+                    candidate.deleted_at === null &&
+                    candidate.deletion_pending_until === null,
+                ) ?? null)
+          const ownerTeam =
+            project?.owner_team_id == null
+              ? null
+              : (state.teams.find(
+                  (candidate) =>
+                    candidate.id === project.owner_team_id &&
+                    candidate.archived_at === null &&
+                    (candidate.deletion_pending_until ?? null) === null,
+                ) ?? null)
+          if (!project || (!ownerUser && !ownerTeam)) return { results: [] }
+          const publicSessions = state.hub_sessions
+            .filter((session) => {
+              if (session.project_id !== project.id || session.withdrawn_at !== null) return false
+              if (
+                session.visibility !== 'unlisted' ||
+                !state.hub_session_discovery.some((projection) => projection.sid === session.sid)
+              ) {
+                return false
+              }
+              return project.owner_user_id !== null
+                ? session.owner_user_id === project.owner_user_id &&
+                    (session.team_id ?? null) === null
+                : session.team_id === project.owner_team_id
+            })
+            .map((session) => {
+              const publishedAt =
+                state.hub_session_discovery.find((projection) => projection.sid === session.sid)
+                  ?.published_at ?? 0
+              return {
+                ...session,
+                ...hydratedManagedSessionFields(session),
+                team_name:
+                  session.team_id == null
+                    ? null
+                    : (state.teams.find((team) => team.id === session.team_id)?.name ?? null),
+                star_count: state.hub_session_stars.filter((star) => star.sid === session.sid)
+                  .length,
+                project_sort_at: publishedAt,
+              }
+            })
+          if (project.owner_team_id !== null && publicSessions.length === 0) {
+            return { results: [] }
+          }
+          const snapshot = {
+            snapshot_project_id: project.id,
+            snapshot_owner_user_id: project.owner_user_id,
+            snapshot_owner_team_id: project.owner_team_id,
+            snapshot_project_slug: project.slug,
+            snapshot_project_name: project.name,
+            snapshot_project_description: project.description,
+            snapshot_project_github_url: project.github_url,
+            snapshot_project_created_by_user_id: project.created_by_user_id,
+            snapshot_project_created_at: project.created_at,
+            snapshot_project_updated_at: project.updated_at,
+            snapshot_project_archived_at: project.archived_at,
+            snapshot_owner_handle: handle?.handle ?? ownerHandle,
+            snapshot_owner_email: ownerUser?.email ?? null,
+            snapshot_owner_name: ownerUser?.name ?? null,
+            snapshot_owner_display_name: ownerUser?.display_name ?? null,
+            snapshot_owner_avatar_url: ownerUser?.avatar_url ?? null,
+            snapshot_owner_custom_avatar_id: ownerUser?.custom_avatar_id ?? null,
+            snapshot_owner_avatar_visible: ownerUser?.avatar_visible ?? 1,
+            snapshot_team_name: ownerTeam?.name ?? null,
+            public_session_count: publicSessions.length,
+            snapshot_star_count: state.project_stars.filter(
+              (star) =>
+                star.project_id === project.id &&
+                state.users.some(
+                  (user) =>
+                    user.id === star.user_id &&
+                    user.deleted_at === null &&
+                    user.deletion_pending_until === null,
+                ),
+            ).length,
+          }
+          const page = publicSessions
+            .filter(
+              (session) =>
+                hasAfter === 0 ||
+                session.project_sort_at < afterSortAt ||
+                (session.project_sort_at === equalSortAt && session.sid > afterSid),
+            )
+            .sort(
+              (left, right) =>
+                right.project_sort_at - left.project_sort_at || left.sid.localeCompare(right.sid),
+            )
+            .slice(0, limit)
+          return {
+            results: (page.length === 0
+              ? [{ ...snapshot, sid: null }]
+              : page.map((session) => ({ ...snapshot, ...session }))) as T[],
+          }
+        }
         if (
           sql.includes('/* projects:list-sessions-authorized */') ||
-          sql.includes('/* projects:list-public-sessions */') ||
           sql.includes('/* projects:list-public-owner-sessions */')
         ) {
-          const publicProject = sql.includes('/* projects:list-public-sessions */')
+          const publicProject = false
           const publicOwner = sql.includes('/* projects:list-public-owner-sessions */')
           const projectId = publicOwner ? null : (params[0] as string)
           const ownerUserId = publicOwner

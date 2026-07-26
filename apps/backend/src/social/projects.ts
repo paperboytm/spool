@@ -17,9 +17,18 @@ const LIVE_PROJECT_SESSION = `EXISTS (
     AND live_session.visibility='unlisted'
     AND live_session.withdrawn_at IS NULL
     AND (
-      (live_session.team_id IS NULL AND live_author.deleted_at IS NULL)
+      (
+        p.owner_user_id IS NOT NULL
+        AND live_session.team_id IS NULL
+        AND live_session.owner_user_id=p.owner_user_id
+        AND live_author.deleted_at IS NULL
+      )
       OR
-      (live_session.team_id IS NOT NULL AND live_team.id IS NOT NULL)
+      (
+        p.owner_team_id IS NOT NULL
+        AND live_session.team_id=p.owner_team_id
+        AND live_team.id IS NOT NULL
+      )
     )
   LIMIT 1
 )`
@@ -117,12 +126,28 @@ type ProjectTargetRow = {
 }
 
 type ProjectSocialRow = {
+  public_target: number
+  live_public: number
+  viewer_authenticated: number
   star_count: number
   watcher_count: number
   viewer_starred: number
   viewer_watching: number
   can_star: number
   can_watch: number
+}
+
+type ProjectStargazerRow = {
+  authorized_project_id: string
+  social_id: string | null
+  social_created_at: number | null
+  handle: string | null
+  email: string | null
+  name: string | null
+  display_name: string | null
+  avatar_url: string | null
+  custom_avatar_id: string | null
+  avatar_visible: number | null
 }
 
 type IdentityRow = {
@@ -217,11 +242,60 @@ export async function getProjectSocialState(
   target: ProjectSocialTarget,
   viewerUserId: string | null,
 ): Promise<ProjectSocialState> {
+  return (await getProjectSocialSnapshot(db, target, viewerUserId)).state
+}
+
+export type ProjectSocialSnapshot = {
+  isPublic: boolean
+  state: ProjectSocialState
+}
+
+/**
+ * Revalidates the canonical route, live Public projection, current viewer and
+ * Team membership in the same SQLite statement that computes the response.
+ * The earlier resolver result is routing context, not an authorization cache.
+ */
+export async function getProjectSocialSnapshot(
+  db: D1Database,
+  target: ProjectSocialTarget,
+  viewerUserId: string | null,
+): Promise<ProjectSocialSnapshot> {
   const row = await db
     .prepare(
-      `/* social:project-state */
+      `/* social:project-state-snapshot */
+       WITH viewer AS (
+         SELECT id
+         FROM users
+         WHERE id=? AND deleted_at IS NULL AND deletion_pending_until IS NULL
+       ),
+       project_snapshot AS (
+         SELECT p.id,p.owner_user_id,p.owner_team_id,
+           CASE WHEN ${LIVE_PROJECT_SESSION} THEN 1 ELSE 0 END AS live_public,
+           CASE WHEN p.owner_team_id IS NOT NULL AND EXISTS (
+             SELECT 1
+             FROM team_memberships member
+             JOIN viewer ON viewer.id=member.user_id
+             WHERE member.team_id=p.owner_team_id
+           ) THEN 1 ELSE 0 END AS viewer_member
+         FROM projects p
+         JOIN handles route_handle
+           ON route_handle.user_id IS p.owner_user_id
+           AND route_handle.team_id IS p.owner_team_id
+         WHERE p.id=? AND route_handle.handle=? AND route_handle.released_at IS NULL
+           AND p.slug=? AND p.archived_at IS NULL
+           AND ${ACTIVE_PROJECT_OWNER}
+       ),
+       authorized_project AS (
+         SELECT *
+         FROM project_snapshot
+         WHERE owner_user_id IS NOT NULL OR live_public=1 OR viewer_member=1
+       )
        SELECT
-         CASE WHEN ?=1 THEN (
+         CASE WHEN p.owner_user_id IS NOT NULL OR p.live_public=1
+           THEN 1 ELSE 0 END AS public_target,
+         p.live_public,
+         EXISTS (SELECT 1 FROM viewer) AS viewer_authenticated,
+         CASE WHEN p.live_public=1 THEN (
            SELECT COUNT(*)
            FROM project_stars relation
            JOIN users actor ON actor.id=relation.user_id
@@ -230,7 +304,7 @@ export async function getProjectSocialState(
            WHERE relation.project_id=p.id
          ) ELSE 0 END AS star_count,
          CASE
-           WHEN ?=1 THEN (
+           WHEN p.live_public=1 THEN (
              SELECT COUNT(*)
              FROM project_watches relation
              JOIN users actor ON actor.id=relation.user_id
@@ -250,65 +324,45 @@ export async function getProjectSocialState(
            )
            ELSE 0
          END AS watcher_count,
-         CASE WHEN ?=1 AND ? IS NOT NULL THEN EXISTS (
+         CASE WHEN p.live_public=1 AND EXISTS (SELECT 1 FROM viewer) THEN EXISTS (
            SELECT 1 FROM project_stars viewer_star
-           WHERE viewer_star.project_id=p.id AND viewer_star.user_id=?
+           WHERE viewer_star.project_id=p.id
+             AND viewer_star.user_id=(SELECT id FROM viewer)
          ) ELSE 0 END AS viewer_starred,
          CASE
-           WHEN ? IS NULL THEN 0
-           WHEN ?=1 OR (
-             p.owner_team_id IS NOT NULL AND EXISTS (
-               SELECT 1 FROM team_memberships member
-               WHERE member.team_id=p.owner_team_id AND member.user_id=?
-             )
-           ) THEN EXISTS (
+           WHEN NOT EXISTS (SELECT 1 FROM viewer) THEN 0
+           WHEN p.live_public=1 OR p.viewer_member=1 THEN EXISTS (
              SELECT 1 FROM project_watches viewer_watch
-             WHERE viewer_watch.project_id=p.id AND viewer_watch.user_id=?
+             WHERE viewer_watch.project_id=p.id
+               AND viewer_watch.user_id=(SELECT id FROM viewer)
            )
            ELSE 0
          END AS viewer_watching,
-         CASE WHEN ? IS NOT NULL AND ?=1 THEN 1 ELSE 0 END AS can_star,
+         CASE WHEN EXISTS (SELECT 1 FROM viewer) AND p.live_public=1
+           THEN 1 ELSE 0 END AS can_star,
          CASE
-           WHEN ? IS NULL THEN 0
-           WHEN ?=1 THEN 1
-           WHEN p.owner_team_id IS NOT NULL AND EXISTS (
-             SELECT 1 FROM team_memberships member
-             WHERE member.team_id=p.owner_team_id AND member.user_id=?
-           ) THEN 1
+           WHEN NOT EXISTS (SELECT 1 FROM viewer) THEN 0
+           WHEN p.live_public=1 OR p.viewer_member=1 THEN 1
            ELSE 0
          END AS can_watch
-       FROM projects p
-       WHERE p.id=? AND p.archived_at IS NULL AND ${ACTIVE_PROJECT_OWNER}`,
+       FROM authorized_project p`,
     )
-    .bind(
-      target.hasLivePublicSession ? 1 : 0,
-      target.hasLivePublicSession ? 1 : 0,
-      target.hasLivePublicSession ? 1 : 0,
-      viewerUserId,
-      viewerUserId,
-      viewerUserId,
-      target.hasLivePublicSession ? 1 : 0,
-      viewerUserId,
-      viewerUserId,
-      viewerUserId,
-      target.hasLivePublicSession ? 1 : 0,
-      viewerUserId,
-      target.hasLivePublicSession ? 1 : 0,
-      viewerUserId,
-      target.projectId,
-    )
+    .bind(viewerUserId, target.projectId, target.ownerHandle, target.slug)
     .first<ProjectSocialRow>()
-  if (!row || (!target.isPublic && row.can_watch !== 1)) throw new ApiError('NOT_FOUND')
+  if (!row) throw new ApiError('NOT_FOUND')
   return {
-    version: 1,
-    starCount: Math.max(0, Number(row.star_count)),
-    watcherCount: Math.max(0, Number(row.watcher_count)),
-    viewerStarred: row.viewer_starred === 1,
-    viewerWatching: row.viewer_watching === 1,
-    viewerAuthenticated: viewerUserId !== null,
-    starEligible: target.hasLivePublicSession,
-    canStar: row.can_star === 1,
-    canWatch: row.can_watch === 1,
+    isPublic: row.public_target === 1,
+    state: {
+      version: 1,
+      starCount: Math.max(0, Number(row.star_count)),
+      watcherCount: Math.max(0, Number(row.watcher_count)),
+      viewerStarred: row.viewer_starred === 1,
+      viewerWatching: row.viewer_watching === 1,
+      viewerAuthenticated: row.viewer_authenticated === 1,
+      starEligible: row.live_public === 1,
+      canStar: row.can_star === 1,
+      canWatch: row.can_watch === 1,
+    },
   }
 }
 
@@ -351,46 +405,64 @@ export async function listProjectStargazers(
   target: ProjectSocialTarget,
   options: SocialListOptions,
 ): Promise<SocialListPage<SocialIdentity>> {
-  if (!target.hasLivePublicSession) throw new ApiError('NOT_FOUND')
   const rows = await db
     .prepare(
       `/* social:list-project-stargazers */
-       SELECT actor.id AS social_id,relation.created_at AS social_created_at,
-         handle.handle,actor.email,actor.name,actor.display_name,actor.avatar_url,
-         actor.custom_avatar_id,COALESCE(actor.avatar_visible,1) AS avatar_visible
-       FROM project_stars relation
-       JOIN users actor ON actor.id=relation.user_id
-       JOIN handles handle ON handle.user_id=actor.id
-         AND handle.team_id IS NULL AND handle.released_at IS NULL
-       WHERE relation.project_id=?
-         AND actor.deleted_at IS NULL
-         AND actor.deletion_pending_until IS NULL
-         AND (
-           ?=1 OR EXISTS (
-             SELECT 1 FROM team_memberships member
-             WHERE member.team_id=? AND member.user_id=actor.id
+       WITH authorized_project AS (
+         SELECT p.id
+         FROM projects p
+         JOIN handles route_handle
+           ON route_handle.user_id IS p.owner_user_id
+           AND route_handle.team_id IS p.owner_team_id
+         WHERE p.id=? AND route_handle.handle=? AND route_handle.released_at IS NULL
+           AND p.slug=? AND p.archived_at IS NULL
+           AND ${ACTIVE_PROJECT_OWNER}
+           AND ${LIVE_PROJECT_SESSION}
+       ),
+       page AS (
+         SELECT actor.id AS social_id,relation.created_at AS social_created_at,
+           handle.handle,actor.email,actor.name,actor.display_name,actor.avatar_url,
+           actor.custom_avatar_id,COALESCE(actor.avatar_visible,1) AS avatar_visible
+         FROM authorized_project project
+         JOIN project_stars relation ON relation.project_id=project.id
+         JOIN users actor ON actor.id=relation.user_id
+         JOIN handles handle ON handle.user_id=actor.id
+           AND handle.team_id IS NULL AND handle.released_at IS NULL
+         WHERE actor.deleted_at IS NULL
+           AND actor.deletion_pending_until IS NULL
+           AND (
+             ?=0 OR relation.created_at<? OR
+             (relation.created_at=? AND actor.id>?)
            )
-         )
-         AND (
-           ?=0 OR relation.created_at<? OR
-           (relation.created_at=? AND actor.id>?)
-         )
-       ORDER BY relation.created_at DESC,actor.id ASC
-       LIMIT ?`,
+         ORDER BY relation.created_at DESC,actor.id ASC
+         LIMIT ?
+       )
+       SELECT project.id AS authorized_project_id,page.*
+       FROM authorized_project project
+       LEFT JOIN page ON TRUE
+       ORDER BY page.social_created_at DESC,page.social_id ASC`,
     )
     .bind(
       target.projectId,
-      target.isPublic ? 1 : 0,
-      target.ownerTeamId,
+      target.ownerHandle,
+      target.slug,
       options.after === null ? 0 : 1,
       options.after?.createdAt ?? 0,
       options.after?.createdAt ?? 0,
       options.after?.id ?? '',
       options.limit + 1,
     )
-    .all<IdentityRow>()
+    .all<ProjectStargazerRow>()
+  if (rows.results.length === 0) throw new ApiError('NOT_FOUND')
+  const stargazers = rows.results.filter(
+    (row): row is ProjectStargazerRow & IdentityRow =>
+      typeof row.social_id === 'string' &&
+      typeof row.social_created_at === 'number' &&
+      typeof row.handle === 'string' &&
+      typeof row.email === 'string',
+  )
   const page = finishSocialListPage(
-    rows.results.map((row) => ({
+    stargazers.map((row) => ({
       social_id: row.social_id,
       social_created_at: row.social_created_at,
       id: row.social_id,

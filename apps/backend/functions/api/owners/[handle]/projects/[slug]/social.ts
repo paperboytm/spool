@@ -6,7 +6,7 @@ import { requireOwnerHandle, requireProjectSlug } from '../../../../../../src/pr
 import { clientIp } from '../../../../../../src/request'
 import { requireSocialListRate, socialError, socialOk } from '../../../../../../src/social/limits'
 import {
-  getProjectSocialState,
+  getProjectSocialSnapshot,
   resolveProjectSocialTarget,
 } from '../../../../../../src/social/projects'
 
@@ -25,8 +25,9 @@ export const onRequestGet: PagesFunction<Env, Params> = async (ctx) => {
     )
     const target = await resolveProjectSocialTarget(ctx.env.DB, handle, slug, viewer?.id ?? null)
     if (!target) throw new ApiError('NOT_FOUND')
-    return socialOk(await getProjectSocialState(ctx.env.DB, target, viewer?.id ?? null), {
-      private: !target.isPublic,
+    const snapshot = await getProjectSocialSnapshot(ctx.env.DB, target, viewer?.id ?? null)
+    return socialOk(snapshot.state, {
+      private: !snapshot.isPublic,
     })
   } catch (error) {
     return socialError(error)

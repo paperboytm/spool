@@ -113,6 +113,9 @@ describe('social graph core', () => {
     const { db } = scriptedDb({
       first: [
         {
+          public_target: 0,
+          live_public: 0,
+          viewer_authenticated: 1,
           star_count: 0,
           watcher_count: 1,
           viewer_starred: 0,
@@ -149,24 +152,70 @@ describe('social graph core', () => {
     })
   })
 
-  it('does not expose stargazers for a Project without a live Public Session', async () => {
-    const { calls, db } = scriptedDb({})
+  it('revalidates a stale public target before returning social state', async () => {
+    const { calls, db } = scriptedDb({ first: [null] })
+    await expect(
+      getProjectSocialState(
+        db,
+        {
+          projectId: 'project-public',
+          ownerUserId: null,
+          ownerTeamId: 'team-paperboy',
+          ownerHandle: 'paperboy',
+          slug: 'public',
+          isPublic: true,
+          hasLivePublicSession: true,
+        },
+        null,
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.params).toEqual([null, 'project-public', 'paperboy', 'public'])
+    expect(calls[0]?.sql).toContain('JOIN hub_session_discovery live_projection')
+    expect(calls[0]?.sql).toContain('route_handle.handle=?')
+  })
+
+  it('does not expose stargazers after the final Public Session disappears', async () => {
+    const { calls, db } = scriptedDb({ all: [[]] })
     await expect(
       listProjectStargazers(
         db,
         {
-          projectId: 'project-private',
+          projectId: 'project-public',
           ownerUserId: null,
           ownerTeamId: 'team-paperboy',
           ownerHandle: 'paperboy',
-          slug: 'private',
-          isPublic: false,
-          hasLivePublicSession: false,
+          slug: 'public',
+          isPublic: true,
+          hasLivePublicSession: true,
         },
         { after: null, fingerprint: 'scope', limit: 30 },
       ),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
-    expect(calls).toEqual([])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.params.slice(0, 3)).toEqual(['project-public', 'paperboy', 'public'])
+    expect(calls[0]?.sql).toContain('JOIN hub_session_discovery live_projection')
+  })
+
+  it('distinguishes a public Project with zero stargazers from an unavailable Project', async () => {
+    const { db } = scriptedDb({
+      all: [[{ authorized_project_id: 'project-public' }]],
+    })
+    await expect(
+      listProjectStargazers(
+        db,
+        {
+          projectId: 'project-public',
+          ownerUserId: null,
+          ownerTeamId: 'team-paperboy',
+          ownerHandle: 'paperboy',
+          slug: 'public',
+          isPublic: true,
+          hasLivePublicSession: true,
+        },
+        { after: null, fingerprint: 'scope', limit: 30 },
+      ),
+    ).resolves.toEqual({ rows: [], nextCursor: null })
   })
 
   it('requires a live Public Session for Star while allowing a current private Team Watch', async () => {

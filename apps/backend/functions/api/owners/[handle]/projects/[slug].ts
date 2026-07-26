@@ -1,15 +1,12 @@
 import type { D1Database, KVNamespace, PagesFunction } from '@cloudflare/workers-types'
 
 import { optionalUser } from '../../../../../src/auth/require'
-import { ApiError, jsonError, jsonOk } from '../../../../../src/errors'
+import { jsonError, jsonOk } from '../../../../../src/errors'
 import { serializeManagedSession } from '../../../../../src/hub/management'
 import {
-  countPublicProjectSessions,
-  getProjectBySlugForOwner,
   listPublicProjectSessions,
   parseProjectSessionPageOptions,
-  resolveHandleOwner,
-  serializeProject,
+  serializeProjectWithOwner,
 } from '../../../../../src/projects/store'
 import { requireOwnerHandle, requireProjectSlug } from '../../../../../src/projects/validators'
 
@@ -21,26 +18,13 @@ export const onRequestGet: PagesFunction<Env, Params> = async (ctx) => {
     const handle = requireOwnerHandle(ctx.params.handle)
     const slug = requireProjectSlug(ctx.params.slug)
     const viewer = await optionalUser(ctx.request, ctx.env)
-    const owner = await resolveHandleOwner(ctx.env.DB, handle)
-    if (!owner) throw new ApiError('NOT_FOUND')
-
-    const project = await getProjectBySlugForOwner(ctx.env.DB, owner, slug)
-    if (!project) throw new ApiError('NOT_FOUND')
-    const publicCount = await countPublicProjectSessions(ctx.env.DB, project.id, owner)
-    // A Team namespace becomes public only through a live Public Session.
-    // Private Team Projects stay exclusively on /api/teams/:teamId/projects.
-    if (owner.kind === 'team' && publicCount === 0) throw new ApiError('NOT_FOUND')
     const page = await listPublicProjectSessions(
       ctx.env.DB,
-      project.id,
-      owner,
-      await parseProjectSessionPageOptions(ctx.request, [
-        'owner-public-project',
-        owner.kind,
-        owner.id,
-        project.id,
-      ]),
+      handle,
+      slug,
+      await parseProjectSessionPageOptions(ctx.request, ['owner-public-project', handle, slug]),
     )
+    const { owner, project } = page
     const canManage =
       owner.kind === 'user'
         ? viewer?.id === owner.id
@@ -54,14 +38,7 @@ export const onRequestGet: PagesFunction<Env, Params> = async (ctx) => {
     return jsonOk(
       {
         owner,
-        project: await serializeProject(
-          ctx.env.DB,
-          {
-            ...project,
-            session_count: publicCount,
-          },
-          { canManage },
-        ),
+        project: serializeProjectWithOwner(project, owner, { canManage }),
         sessions: await Promise.all(
           page.rows.map((session) => serializeManagedSession(ctx.env.DB, session, false)),
         ),
