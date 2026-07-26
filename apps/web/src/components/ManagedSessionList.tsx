@@ -1,6 +1,15 @@
 import { isDiscoverySessionSid } from '@spool-lab/session-kit'
-import { Badge, Button, IconButton } from '@spool-lab/ui'
-import { CircleOff, Globe2, Link2, MoreHorizontal, Star, Users } from 'lucide-react'
+import { Badge, Button, ButtonLink, IconButton } from '@spool-lab/ui'
+import {
+  CircleOff,
+  FolderKanban,
+  Globe2,
+  Link2,
+  LoaderCircle,
+  MoreHorizontal,
+  Star,
+  Users,
+} from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import {
@@ -12,6 +21,11 @@ import {
 } from '../lib/hub-management-api'
 import { sessionLanguageTag, useSessionLanguage } from '../lib/language'
 import {
+  fetchAllTeamProjects,
+  type ProjectApiFailure,
+  type ProjectSummary,
+} from '../lib/project-api'
+import {
   formatSessionCost,
   resolveLocalizedSessionSummary,
   resolveLocalizedTitle,
@@ -22,6 +36,11 @@ import { SessionFeedRow, SessionSourceBadge } from './SessionFeedRow'
 type VisibilityChoice =
   | { visibility: Exclude<ManagedSessionVisibility, 'team'> }
   | { visibility: 'team'; teamId: string; teamName: string }
+
+export type TeamProjectTransferState =
+  | { kind: 'loading'; teamId: string; teamName: string }
+  | { kind: 'error'; teamId: string; teamName: string; message: string }
+  | { kind: 'ready'; teamId: string; teamName: string; projects: ProjectSummary[] }
 
 function currentChoice(session: ManagedSession): string {
   return session.visibility === 'team' && session.team_id
@@ -53,7 +72,11 @@ function compactNumber(value: number): string {
   )
 }
 
-export function visibilityConfirmation(session: ManagedSession, choice: VisibilityChoice): string {
+export function visibilityConfirmation(
+  session: ManagedSession,
+  choice: VisibilityChoice,
+  projectName?: string,
+): string {
   const title = session.title || 'this Session'
 
   if (choice.visibility === 'team') {
@@ -62,7 +85,10 @@ export function visibilityConfirmation(session: ManagedSession, choice: Visibili
         session.visibility === 'public'
           ? ' It will be removed from Explore, Profiles, public search, RSS, and engagement rankings.'
           : ''
-      return `Move “${title}” to Team · ${choice.teamName}? This transfers ownership to the Team.${discoveryImpact} Only current members can read it, and the Team keeps the Session if you later leave.`
+      const destination = projectName
+        ? `Project · ${projectName} in Team · ${choice.teamName}`
+        : `Team · ${choice.teamName}`
+      return `Move “${title}” to ${destination}? This transfers ownership to the Team.${discoveryImpact} Only current members can read it, and the Team keeps the Session if you later leave.`
     }
     return `Make “${title}” Team-only in ${choice.teamName}? Existing Public or Link-only access ends immediately; only current members can read it. The Session remains owned by the Team.`
   }
@@ -101,6 +127,19 @@ function failureMessage(result: HubManagementFailure): string {
   if (result.kind === 'invalid') return result.detail ?? 'That visibility is not available.'
   if (result.kind === 'rate-limited') return 'Too many changes. Wait a moment and try again.'
   return 'Could not change visibility. Try again.'
+}
+
+function projectFailureMessage(result: ProjectApiFailure): string {
+  if (result.kind === 'forbidden' || result.kind === 'not-found') {
+    return 'This Team is unavailable or you no longer have access.'
+  }
+  if (result.kind === 'rate-limited') {
+    return 'Too many Project requests. Wait a moment and try again.'
+  }
+  if (result.kind === 'conflict' || result.kind === 'invalid') {
+    return result.detail ?? 'The Team Project list changed. Try again.'
+  }
+  return 'Could not load Team Projects. Try again.'
 }
 
 export function withdrawalFailureMessage(result: HubManagementFailure): string {
@@ -187,6 +226,105 @@ export function ManagedSessionList({
   )
 }
 
+export function TeamProjectTransferFields({
+  state,
+  selectedProjectId,
+  busy,
+  onProjectChange,
+  onRetry,
+  onTransfer,
+}: {
+  state: TeamProjectTransferState
+  selectedProjectId: string
+  busy: boolean
+  onProjectChange: (projectId: string) => void
+  onRetry: () => void
+  onTransfer: () => void
+}) {
+  if (state.kind === 'loading') {
+    return (
+      <p className="managed-session-project-state" role="status" aria-live="polite">
+        <LoaderCircle
+          className="managed-session-project-spinner"
+          size={14}
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
+        Loading Projects for Team · {state.teamName}…
+      </p>
+    )
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <div className="managed-session-project-state">
+        <p className="managed-session-project-error" role="alert">
+          {state.message}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="managed-session-project-action"
+          disabled={busy}
+          onClick={onRetry}
+        >
+          Retry loading Projects
+        </Button>
+      </div>
+    )
+  }
+
+  if (state.projects.length === 0) {
+    return (
+      <div className="managed-session-project-state">
+        <p>Team · {state.teamName} has no Projects. Create one before transferring this Session.</p>
+        <ButtonLink
+          size="sm"
+          variant="outline"
+          className="managed-session-project-action"
+          href={`/projects/new?team=${encodeURIComponent(state.teamId)}`}
+        >
+          Create Team Project
+        </ButtonLink>
+      </div>
+    )
+  }
+
+  return (
+    <div className="managed-session-project-fields">
+      <label className="managed-session-project">
+        <span>Team Project</span>
+        <select
+          value={selectedProjectId}
+          disabled={busy}
+          aria-label={`Project in Team ${state.teamName}`}
+          onChange={(event) => onProjectChange(event.target.value)}
+        >
+          <option value="">Choose a Project</option>
+          {state.projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button
+        type="button"
+        size="sm"
+        variant="accent"
+        className="managed-session-project-action"
+        loading={busy}
+        loadingLabel="Transferring…"
+        disabled={!selectedProjectId}
+        onClick={onTransfer}
+      >
+        Transfer to Team Project
+      </Button>
+    </div>
+  )
+}
+
 function ManagedSessionRow({
   session,
   teams,
@@ -203,7 +341,11 @@ function ManagedSessionRow({
   const [busy, setBusy] = useState<'idle' | 'visibility' | 'withdraw'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [selectedChoice, setSelectedChoice] = useState(() => currentChoice(session))
+  const [projectTransfer, setProjectTransfer] = useState<TeamProjectTransferState | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState('')
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const projectRequestRef = useRef(0)
   const menuId = useId()
   const language = useSessionLanguage()
   const localizedTitle = resolveLocalizedTitle(
@@ -226,13 +368,21 @@ function ManagedSessionRow({
     if (!open) return
     menuRef.current?.querySelector<HTMLElement>('select')?.focus()
 
+    function closeFromDocument() {
+      projectRequestRef.current += 1
+      setSelectedChoice(currentChoice(session))
+      setProjectTransfer(null)
+      setSelectedProjectId('')
+      setOpen(false)
+    }
+
     function closeOnOutsidePointer(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false)
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) closeFromDocument()
     }
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return
-      setOpen(false)
+      closeFromDocument()
       requestAnimationFrame(() => {
         menuRef.current?.querySelector<HTMLButtonElement>('.managed-session-menu-trigger')?.focus()
       })
@@ -244,35 +394,133 @@ function ManagedSessionRow({
       document.removeEventListener('mousedown', closeOnOutsidePointer)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [open])
+  }, [open, session])
 
-  async function changeVisibility(value: string) {
-    const choice = parseChoice(value, teams)
-    if (!choice || value === currentChoice(session) || busy !== 'idle') return
-    if (!window.confirm(visibilityConfirmation(localizedSession, choice))) return
+  function resetTransfer() {
+    projectRequestRef.current += 1
+    setSelectedChoice(currentChoice(session))
+    setProjectTransfer(null)
+    setSelectedProjectId('')
+  }
 
-    setBusy('visibility')
+  function closeMenu() {
+    resetTransfer()
+    setOpen(false)
+  }
+
+  function redirectToSignIn() {
+    const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`)
+  }
+
+  async function loadTeamProjects(choice: Extract<VisibilityChoice, { visibility: 'team' }>) {
+    const requestId = projectRequestRef.current + 1
+    projectRequestRef.current = requestId
+    setSelectedChoice(`team:${choice.teamId}`)
+    setSelectedProjectId('')
+    setProjectTransfer({
+      kind: 'loading',
+      teamId: choice.teamId,
+      teamName: choice.teamName,
+    })
     setError(null)
-    const result = await updateManagedSessionVisibility(
-      session.sid,
-      choice.visibility,
-      choice.visibility === 'team' ? choice.teamId : undefined,
-    )
-    setBusy('idle')
+
+    const result = await fetchAllTeamProjects(choice.teamId)
+    if (projectRequestRef.current !== requestId) return
     if (result.kind === 'unauthenticated') {
-      const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`)
+      redirectToSignIn()
       return
     }
     if (result.kind !== 'ok') {
+      setProjectTransfer({
+        kind: 'error',
+        teamId: choice.teamId,
+        teamName: choice.teamName,
+        message: projectFailureMessage(result),
+      })
+      return
+    }
+    setProjectTransfer({
+      kind: 'ready',
+      teamId: choice.teamId,
+      teamName: choice.teamName,
+      projects: result.data.projects,
+    })
+  }
+
+  async function changeVisibility(
+    choice: VisibilityChoice,
+    project?: { id: string; name: string },
+  ) {
+    const value = choice.visibility === 'team' ? `team:${choice.teamId}` : choice.visibility
+    if (value === currentChoice(session) || busy !== 'idle') return
+    if (!window.confirm(visibilityConfirmation(localizedSession, choice, project?.name))) {
+      resetTransfer()
+      return
+    }
+
+    setBusy('visibility')
+    setError(null)
+    const result = await updateManagedSessionVisibility(session.sid, choice.visibility, {
+      ...(choice.visibility === 'team' ? { teamId: choice.teamId } : {}),
+      ...(project ? { projectId: project.id } : {}),
+      ...(session.project ? { expectedProjectId: session.project.id } : {}),
+    })
+    setBusy('idle')
+    if (result.kind === 'unauthenticated') {
+      redirectToSignIn()
+      return
+    }
+    if (result.kind !== 'ok') {
+      setSelectedChoice(currentChoice(session))
       setError(failureMessage(result))
       return
     }
-    setOpen(false)
+    closeMenu()
     requestAnimationFrame(() => {
       menuRef.current?.querySelector<HTMLButtonElement>('.managed-session-menu-trigger')?.focus()
     })
     onSessionChanged(result.data.session)
+  }
+
+  function chooseVisibility(value: string) {
+    const choice = parseChoice(value, teams)
+    if (!choice || busy !== 'idle') return
+    if (value === currentChoice(session)) {
+      resetTransfer()
+      return
+    }
+    if (choice.visibility === 'team' && session.team_id === null) {
+      void loadTeamProjects(choice)
+      return
+    }
+    setSelectedChoice(value)
+    setProjectTransfer(null)
+    setSelectedProjectId('')
+    void changeVisibility(choice)
+  }
+
+  function transferToTeamProject() {
+    if (busy !== 'idle' || projectTransfer?.kind !== 'ready' || selectedProjectId.length === 0) {
+      return
+    }
+    if (!session.project) {
+      setError('Project details are unavailable. Reload this page before transferring.')
+      return
+    }
+    const project = projectTransfer.projects.find((candidate) => candidate.id === selectedProjectId)
+    if (!project) {
+      setError('Choose an available Team Project.')
+      return
+    }
+    void changeVisibility(
+      {
+        visibility: 'team',
+        teamId: projectTransfer.teamId,
+        teamName: projectTransfer.teamName,
+      },
+      project,
+    )
   }
 
   async function withdraw() {
@@ -299,8 +547,7 @@ function ManagedSessionRow({
     const result = await withdrawManagedSession(session.sid)
     setBusy('idle')
     if (result.kind === 'unauthenticated') {
-      const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      window.location.assign(`/sign-in?next=${encodeURIComponent(next)}`)
+      redirectToSignIn()
       return
     }
     if (result.kind === 'gone') {
@@ -320,7 +567,7 @@ function ManagedSessionRow({
       ref={menuRef}
       className="managed-session-menu"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false)
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closeMenu()
       }}
     >
       <IconButton
@@ -333,7 +580,12 @@ function ManagedSessionRow({
         aria-controls={menuId}
         onClick={() => {
           setError(null)
-          setOpen((current) => !current)
+          if (open) {
+            closeMenu()
+            return
+          }
+          resetTransfer()
+          setOpen(true)
         }}
       >
         <MoreHorizontal size={15} strokeWidth={1.8} aria-hidden="true" />
@@ -349,10 +601,10 @@ function ManagedSessionRow({
           <label className="managed-session-visibility">
             <span>{busy === 'visibility' ? 'Updating…' : 'Visibility'}</span>
             <select
-              value={currentChoice(session)}
+              value={selectedChoice}
               disabled={busy !== 'idle'}
               aria-label={`Visibility for ${title}`}
-              onChange={(event) => void changeVisibility(event.target.value)}
+              onChange={(event) => chooseVisibility(event.target.value)}
             >
               {canPublishManagedSession(session) ? <option value="public">Public</option> : null}
               <option value="link-only">Link-only</option>
@@ -363,6 +615,25 @@ function ManagedSessionRow({
               ))}
             </select>
           </label>
+          {projectTransfer ? (
+            <TeamProjectTransferFields
+              state={projectTransfer}
+              selectedProjectId={selectedProjectId}
+              busy={busy === 'visibility'}
+              onProjectChange={(projectId) => {
+                setError(null)
+                setSelectedProjectId(projectId)
+              }}
+              onRetry={() => {
+                void loadTeamProjects({
+                  visibility: 'team',
+                  teamId: projectTransfer.teamId,
+                  teamName: projectTransfer.teamName,
+                })
+              }}
+              onTransfer={transferToTeamProject}
+            />
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -408,6 +679,16 @@ function ManagedSessionRow({
         timestampVerb="updated"
         metadata={
           <div className="session-feed-row-meta">
+            {session.project ? (
+              <a
+                className="session-feed-project"
+                href={`/@${encodeURIComponent(session.project.owner.handle)}/${encodeURIComponent(session.project.slug)}`}
+                title={`Project · @${session.project.owner.handle}/${session.project.slug}`}
+              >
+                <FolderKanban size={13} strokeWidth={1.7} aria-hidden="true" />
+                {session.project.name}
+              </a>
+            ) : null}
             <SessionSourceBadge provider={session.provider} />
             {costLabel ? (
               <span

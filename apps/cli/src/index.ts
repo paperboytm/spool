@@ -9,6 +9,7 @@ import { handleDefaultCommand } from './commands/default.js'
 import { doctorCommand } from './commands/doctor.js'
 import { loginCommand } from './commands/login.js'
 import { logoutCommand } from './commands/logout.js'
+import { projectsCommand } from './commands/projects.js'
 import { resumeCommand } from './commands/resume.js'
 import { sessionsCommand } from './commands/sessions.js'
 import { shareCommand } from './commands/share.js'
@@ -32,12 +33,14 @@ program
   })
 
 // The everyday set stays small: configure trust once (login, subscribe),
-// keep the daemon running, and handle exceptions explicitly (share,
-// visibility, withdraw, resume). Browsing lives under `spool sessions`.
+// bind local work to Teams and Projects, keep the daemon running, and handle
+// exceptions explicitly (share, visibility, withdraw, resume). Browsing lives
+// under `spool sessions`.
 program.addCommand(subscribeCommand)
 program.addCommand(unsubscribeCommand)
 program.addCommand(subscriptionsCommand)
 program.addCommand(teamsCommand)
+program.addCommand(projectsCommand)
 program.addCommand(daemonCommand)
 program.addCommand(shareCommand)
 program.addCommand(visibilityCommand)

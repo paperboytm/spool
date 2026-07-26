@@ -10,6 +10,7 @@ import {
 import {
   ChevronDown,
   Compass,
+  FolderKanban,
   Library,
   Moon,
   Plus,
@@ -28,9 +29,8 @@ import { readCachedMe } from '../lib/me-cache'
 import { fetchTeams, TEAM_SUMMARY_CHANGED, type TeamSummary } from '../lib/team-api'
 import { readThemeAttr, writeThemeAttr } from '../lib/theme'
 import { AccountMenu } from './AccountMenu'
-import { SessionLanguageToggle } from './SessionLanguageToggle'
 
-export type WorkspaceDestination = 'feed' | 'library' | 'teams'
+export type WorkspaceDestination = 'feed' | 'projects' | 'library' | 'teams'
 
 interface WorkspaceFrameProps {
   active: WorkspaceDestination
@@ -47,6 +47,7 @@ const PRIMARY_DESTINATIONS: ReadonlyArray<{
   icon: typeof Compass
 }> = [
   { id: 'feed', href: '/sessions', label: 'Sessions', icon: Compass },
+  { id: 'projects', href: '/projects', label: 'Projects', icon: FolderKanban },
   { id: 'library', href: '/my-sessions', label: 'My Sessions', icon: Library },
 ]
 
@@ -306,12 +307,7 @@ function WorkspaceSidebar({
       />
       <div className="workspace-sidebar-footer">
         <UtilityLinks identity={identity} />
-        <div
-          className="workspace-sidebar-preferences"
-          role="group"
-          aria-label="Reading preferences"
-        >
-          <SessionLanguageToggle className="workspace-language-toggle" />
+        <div className="workspace-sidebar-preferences" role="group" aria-label="Appearance">
           <WorkspaceThemeToggle className="workspace-theme-toggle" />
         </div>
       </div>
@@ -365,7 +361,6 @@ export function WorkspaceMobileHeader({
               Publish
             </ButtonLink>
             <WorkspaceThemeToggle className="workspace-mobile-theme" showLabel />
-            <SessionLanguageToggle className="workspace-mobile-language" showLabel />
             <div className="workspace-mobile-menu-resources">
               <a href="/docs/installation">Docs</a>
               <a href="/terms">Terms</a>

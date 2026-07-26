@@ -275,6 +275,7 @@ describe('cli entry point', () => {
     expect(out).toContain('Usage: spool')
     expect(out).toContain('subscribe')
     expect(out).toContain('teams')
+    expect(out).toContain('projects')
     expect(out).toContain('daemon')
     expect(out).toContain('sessions')
     expect(out).toContain('visibility')
@@ -284,7 +285,6 @@ describe('cli entry point', () => {
     expect(out).toContain('withdraw')
     expect(out).toContain('Usage: spool [options] [command]')
     // Deprecated top-level commands must not resurface.
-    expect(out).not.toContain('projects')
     expect(out).not.toContain('pinned')
   })
 
@@ -582,19 +582,16 @@ describe('subscriptions', () => {
     }
   })
 
-  it('subscribe --link-only --yes records and unsubscribe removes', () => {
+  it('subscribe --link-only --yes still fails closed without login and a Project', () => {
     const home = mkdtempSync(join(tmpdir(), 'spool-cli-home-'))
     const project = mkdtempSync(join(tmpdir(), 'spool-cli-project-'))
     try {
-      const out = run(['subscribe', project, '--link-only', '--yes'], { HOME: home })
-      expect(out).toContain('Subscribed')
+      const out = runFail(['subscribe', project, '--link-only', '--yes'], { HOME: home })
+      expect(out).toContain('Not logged in')
       expect(out).toContain('Link-only')
 
       const listed = run(['subscriptions'], { HOME: home })
-      expect(listed).toContain('Link-only')
-
-      const removed = run(['unsubscribe', project], { HOME: home })
-      expect(removed).toContain('Unsubscribed')
+      expect(listed).toContain('No subscribed directories')
     } finally {
       rmSync(home, { recursive: true, force: true })
       rmSync(project, { recursive: true, force: true })

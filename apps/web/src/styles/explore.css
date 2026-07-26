@@ -58,13 +58,34 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.sessions-content-toolbar + .sessions-scope-panel .explore-center-header {
+  top: 52px;
+}
+
+.sessions-content-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 41;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 52px;
+  align-items: end;
+  gap: var(--sp-space-3);
+  padding: 0 var(--sp-space-4);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .sessions-scope-tabs {
   display: flex;
   gap: var(--sp-space-1);
-  padding: var(--sp-space-3) var(--sp-space-4) 0;
+  min-width: 0;
+  padding-top: var(--sp-space-2);
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scroll-padding-inline: var(--sp-space-4);
+  scroll-padding-inline: var(--sp-space-2);
 }
 
 .sessions-scope-tabs .sp-tabs__tab {
@@ -82,6 +103,20 @@ body {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sessions-scope-static {
+  display: inline-flex;
+  min-height: var(--sp-control-tab);
+  align-items: center;
+  align-self: end;
+  color: var(--text);
+  font-size: var(--sp-text-ui);
+  font-weight: 600;
+}
+
+.sessions-toolbar-language {
+  align-self: center;
 }
 
 .sessions-scope-state {
@@ -148,6 +183,17 @@ body {
     top: 56px;
   }
 
+  .sessions-content-toolbar {
+    top: 56px;
+    min-height: 52px;
+    gap: var(--sp-space-2);
+    padding: 0 var(--sp-space-3);
+  }
+
+  .sessions-content-toolbar + .sessions-scope-panel .explore-center-header {
+    top: 108px;
+  }
+
   .explore-search {
     margin: var(--sp-space-2) var(--sp-space-3);
   }
@@ -155,6 +201,10 @@ body {
   .explore-search-field,
   .sessions-scope-tabs .sp-tabs__tab,
   .explore-tabs .sp-tabs__tab {
+    min-height: 44px;
+  }
+
+  .sessions-toolbar-language {
     min-height: 44px;
   }
 

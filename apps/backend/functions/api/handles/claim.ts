@@ -37,14 +37,17 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
     if (!v.ok) throw new ApiError('UNPROCESSABLE', v.reason)
 
     const [existing, prior] = await Promise.all([
-      ctx.env.DB.prepare('SELECT user_id FROM handles WHERE handle=? AND released_at IS NULL')
+      ctx.env.DB.prepare('SELECT user_id, team_id, released_at FROM handles WHERE handle=?')
         .bind(v.handle)
-        .first<{ user_id: string }>(),
+        .first<{ user_id: string | null; team_id: string | null; released_at: number | null }>(),
       ctx.env.DB.prepare('SELECT handle FROM handles WHERE user_id=? AND released_at IS NULL')
         .bind(user.id)
         .first<{ handle: string }>(),
     ])
-    if (existing && existing.user_id !== user.id) {
+    if (
+      existing &&
+      (existing.user_id !== user.id || existing.team_id !== null || existing.released_at !== null)
+    ) {
       throw new ApiError('CONFLICT', 'handle taken')
     }
     if (prior && prior.handle !== v.handle) {
@@ -57,7 +60,7 @@ export const onRequestPost: PagesFunction<Env> = async (ctx) => {
       // of letting jsonError surface it as 500 INTERNAL.
       try {
         await ctx.env.DB.prepare(
-          'INSERT INTO handles (handle, user_id, claimed_at) VALUES (?, ?, ?)',
+          'INSERT INTO handles (handle, user_id, team_id, claimed_at) VALUES (?, ?, NULL, ?)',
         )
           .bind(v.handle, user.id, Date.now())
           .run()

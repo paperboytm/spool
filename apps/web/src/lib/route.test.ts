@@ -50,6 +50,16 @@ describe('routeFor', () => {
     expect(routeFor('/@Alice')).toEqual({ kind: 'profile', handle: 'alice' })
   })
 
+  it('matches canonical owner/project paths and normalizes their identity', () => {
+    expect(routeFor('/@Evan/React-Vapor')).toEqual({
+      kind: 'project',
+      handle: 'evan',
+      slug: 'react-vapor',
+    })
+    expect(routeFor('/@evan/react_vapor').kind).toBe('tombstone')
+    expect(routeFor('/@evan/react-vapor/extra').kind).toBe('tombstone')
+  })
+
   it('rejects invalid handles (too short)', () => {
     expect(routeFor('/@ab').kind).toBe('tombstone')
   })

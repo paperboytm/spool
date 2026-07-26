@@ -3,7 +3,12 @@
 // desktop indexer wraps), so what you read on spool.new is what you'd see
 // opening the session in the app.
 
-import { parseSessionText, type ParsedMessage, type SessionProvider } from '@spool-lab/session-kit'
+import {
+  parseSessionText,
+  sessionRecordData,
+  type ParsedMessage,
+  type SessionProvider,
+} from '@spool-lab/session-kit'
 import type { ConversationMessage } from '@spool-lab/session-view'
 
 import type { HubRecordLine } from './hub-api'
@@ -19,7 +24,7 @@ export function parseHubConversation(
   provider: SessionProvider,
   records: readonly HubRecordLine[],
 ): ParsedConversation {
-  const lines = records.map((record) => record.data)
+  const lines = records.map((record) => sessionRecordData(record))
   const result = parseSessionText(provider, lines.join('\n'), 'hub')
 
   if (result.kind !== 'parsed') {
@@ -69,7 +74,10 @@ function mapRecordsToMessages(
   for (const record of records) {
     let target: number | undefined
     try {
-      const parsed = JSON.parse(record.data) as { uuid?: unknown; timestamp?: unknown }
+      const parsed = JSON.parse(sessionRecordData(record)) as {
+        uuid?: unknown
+        timestamp?: unknown
+      }
       if (typeof parsed.uuid === 'string') target = byUuid.get(parsed.uuid)
       if (target === undefined && typeof parsed.timestamp === 'string') {
         target = byTimestamp.get(parsed.timestamp)

@@ -2,11 +2,16 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { runMigrations } from '@spool-lab/core'
+import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import type { Subscription } from '../subscriptions.js'
 import { createTextUi } from '../ui.js'
 import {
+  autoPublishStateKey,
+  listCandidatesFromIndex,
+  mostSpecificMatchingSubscription,
   publishTarget,
   runAutoPublish,
   type AutoPublishCandidate,
@@ -43,7 +48,44 @@ const LOGGED_IN_ENV = { SPOOL_HUB_URL: 'https://hub.test', SPOOL_HUB_TOKEN: 'tes
 const SUBSCRIPTION: Subscription = {
   path: '/repos/spool',
   visibility: 'public',
+  project: {
+    hubUrl: 'https://hub.test',
+    actorId: 'user_00000001',
+    tenant: { kind: 'user', id: 'user_00000001' },
+    localIdentity: {
+      kind: 'git_remote',
+      key: 'github.com/paperboytm/spool',
+      displayName: 'spool',
+    },
+    remote: {
+      id: 'project_personal01',
+      slug: 'spool',
+      name: 'Spool',
+      description: null,
+      github_url: 'https://github.com/paperboytm/spool',
+      owner: { kind: 'user', id: 'user_00000001', handle: 'evan', name: 'Evan' },
+      can_manage: true,
+    },
+  },
   addedAt: '2026-07-24T00:00:00.000Z',
+}
+const TEAM_PROJECT = {
+  ...SUBSCRIPTION.project!.remote,
+  id: 'project_team000001',
+  slug: 'paperboy',
+  name: 'Paperboy',
+  owner: { kind: 'team' as const, id: 'team_00000001', handle: 'paperboy', name: 'Paperboy' },
+}
+const TEAM_SUBSCRIPTION: Subscription = {
+  ...SUBSCRIPTION,
+  visibility: 'team',
+  teamId: 'team_00000001',
+  teamName: 'Paperboy',
+  project: {
+    ...SUBSCRIPTION.project!,
+    tenant: { kind: 'team', id: 'team_00000001' },
+    remote: TEAM_PROJECT,
+  },
 }
 
 function candidate(overrides: Partial<AutoPublishCandidate> = {}): AutoPublishCandidate {
@@ -52,6 +94,11 @@ function candidate(overrides: Partial<AutoPublishCandidate> = {}): AutoPublishCa
     sessionUuid: 'abc12345',
     filePath: '/repos/spool/session.jsonl',
     cwd: '/repos/spool/src',
+    localIdentity: {
+      kind: 'git_remote',
+      key: 'github.com/paperboytm/spool',
+      displayName: 'spool',
+    },
     jsonl: '{"type":"message"}',
     ...overrides,
   }
@@ -83,10 +130,14 @@ function engineDeps(
     fetch: async () => new Response('not found', { status: 404 }),
     match: { resolvers: [], listWorktrees: () => [] },
     loadSubscriptions: () => [SUBSCRIPTION],
+    listProjects: async () => ({
+      actor: { id: 'user_00000001' },
+      projects: [SUBSCRIPTION.project!.remote, TEAM_PROJECT],
+    }),
     listCandidates: () => [candidate()],
     prepare: async () => fakePrepared(['{"type":"message"}']),
     publish: async () => ({ url: 'https://hub.test/s/claude_abc12345' }),
-    loadState: () => ({ version: 1, sessions: {} }),
+    loadState: () => ({ version: 2, sessions: {} }),
     saveState: (state) => savedStates.push(state),
     savedStates,
     ...overrides,
@@ -94,6 +145,59 @@ function engineDeps(
 }
 
 describe('runAutoPublish', () => {
+  it('queries candidates through the migrated SQLite schema used in production', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      db.prepare(
+        `INSERT INTO projects
+          (source_id, slug, display_path, display_name, identity_kind, identity_key)
+         VALUES (
+           (SELECT id FROM sources WHERE name = 'codex'),
+           'spool',
+           '/repos/spool',
+           'Spool',
+           'git_remote',
+           'github.com/paperboytm/spool'
+         )`,
+      ).run()
+      db.prepare(
+        `INSERT INTO sessions
+          (project_id, source_id, session_uuid, file_path, title, started_at, ended_at,
+           message_count, has_tool_use, cwd, raw_file_mtime)
+         VALUES (
+           (SELECT id FROM projects WHERE slug = 'spool'),
+           (SELECT id FROM sources WHERE name = 'codex'),
+           '019f0000-0000-7000-8000-000000000001',
+           '/repos/spool/session.jsonl',
+           'Ship Projects',
+           '2026-07-26T00:00:00.000Z',
+           '2026-07-26T01:00:00.000Z',
+           1,
+           0,
+           '/repos/spool',
+           '2026-07-26T01:00:00.000Z'
+         )`,
+      ).run()
+
+      expect(listCandidatesFromIndex(db)).toEqual([
+        {
+          provider: 'codex',
+          sessionUuid: '019f0000-0000-7000-8000-000000000001',
+          filePath: '/repos/spool/session.jsonl',
+          cwd: '/repos/spool',
+          localIdentity: {
+            kind: 'git_remote',
+            key: 'github.com/paperboytm/spool',
+            displayName: 'Spool',
+          },
+        },
+      ])
+    } finally {
+      db.close()
+    }
+  })
+
   it('returns null when nothing is subscribed', async () => {
     const { ui, output, errors } = capturingUi()
     const result = await runAutoPublish(ui, engineDeps({ loadSubscriptions: () => [] }))
@@ -120,6 +224,7 @@ describe('runAutoPublish', () => {
       published: [{ sid: 'claude_abc12345', url: 'https://hub.test/s/claude_abc12345' }],
       unchanged: 0,
       skippedSecrets: 0,
+      skippedUnbound: 0,
       failed: 0,
     })
     expect(publish).toHaveBeenCalledTimes(1)
@@ -128,8 +233,9 @@ describe('runAutoPublish', () => {
     const state = deps.savedStates[0] as {
       sessions: Record<string, { fingerprint: string; url: string }>
     }
-    expect(state.sessions['claude_abc12345']?.url).toBe('https://hub.test/s/claude_abc12345')
-    expect(state.sessions['claude_abc12345']?.fingerprint).toMatch(/^sha256:/)
+    const key = autoPublishStateKey('https://hub.test', 'user_00000001', 'claude_abc12345')
+    expect(state.sessions[key]?.url).toBe('https://hub.test/s/claude_abc12345')
+    expect(state.sessions[key]?.fingerprint).toMatch(/^sha256:/)
   })
 
   it('skips sessions whose fingerprint has not changed', async () => {
@@ -142,7 +248,7 @@ describe('runAutoPublish', () => {
       .sessions
     const second = await runAutoPublish(
       ui,
-      engineDeps({ publish, loadState: () => ({ version: 1, sessions: recorded }) }),
+      engineDeps({ publish, loadState: () => ({ version: 2, sessions: recorded }) }),
     )
 
     expect(first?.published).toHaveLength(1)
@@ -159,6 +265,63 @@ describe('runAutoPublish', () => {
     )
     expect(result).toMatchObject({ matched: 0, published: [] })
     expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('uses the most specific nested subscription regardless of file order', async () => {
+    const nested: Subscription = {
+      ...SUBSCRIPTION,
+      path: '/repos/spool/packages/vapor',
+      visibility: 'link-only',
+      project: {
+        ...SUBSCRIPTION.project!,
+        localIdentity: {
+          kind: 'git_remote',
+          key: 'github.com/paperboytm/react-vapor',
+          displayName: 'react-vapor',
+        },
+        remote: {
+          ...SUBSCRIPTION.project!.remote,
+          id: 'project_vapor00001',
+          slug: 'react-vapor',
+          name: 'React Vapor',
+        },
+      },
+    }
+    const nestedCandidate = candidate({
+      cwd: '/repos/spool/packages/vapor/src',
+      localIdentity: nested.project!.localIdentity,
+    })
+    expect(
+      mostSpecificMatchingSubscription(nestedCandidate.cwd, [SUBSCRIPTION, nested], {
+        resolvers: [],
+        listWorktrees: () => [],
+      }),
+    ).toBe(nested)
+
+    const seen: unknown[] = []
+    const publish = vi.fn(async (_client: unknown, _prepared: unknown, options: unknown) => {
+      seen.push(options)
+      return { url: 'https://hub.test/s/x' }
+    })
+    const { ui } = capturingUi()
+    const result = await runAutoPublish(
+      ui,
+      engineDeps({
+        loadSubscriptions: () => [SUBSCRIPTION, nested],
+        listProjects: async () => ({
+          actor: { id: 'user_00000001' },
+          projects: [SUBSCRIPTION.project!.remote, nested.project!.remote],
+        }),
+        listCandidates: () => [nestedCandidate],
+        publish: publish as never,
+      }),
+    )
+
+    expect(result).toMatchObject({ matched: 1, published: [{ sid: 'claude_abc12345' }] })
+    expect(seen[0]).toMatchObject({
+      visibility: 'link-only',
+      projectId: nested.project!.remote.id,
+    })
   })
 
   it('never auto-publishes a session with secret findings and warns once per content', async () => {
@@ -179,7 +342,8 @@ describe('runAutoPublish', () => {
         sessions: Record<string, { fingerprint: string; skippedSecrets?: boolean }>
       }
     ).sessions
-    expect(recorded['claude_abc12345']?.skippedSecrets).toBe(true)
+    const key = autoPublishStateKey('https://hub.test', 'user_00000001', 'claude_abc12345')
+    expect(recorded[key]?.skippedSecrets).toBe(true)
 
     // The unchanged transcript does not warn again on the next pass.
     const { ui: secondUi, output: secondOutput } = capturingUi()
@@ -188,7 +352,7 @@ describe('runAutoPublish', () => {
       engineDeps({
         publish,
         prepare: async () => fakePrepared(['{"key":"AKIAQZWSXEDCRFVTGBYH"}']),
-        loadState: () => ({ version: 1, sessions: recorded }),
+        loadState: () => ({ version: 2, sessions: recorded }),
       }),
     )
     expect(second).toMatchObject({ unchanged: 1, skippedSecrets: 0 })
@@ -210,15 +374,14 @@ describe('runAutoPublish', () => {
       }),
     )
     expect(seen[0]).toMatchObject({ visibility: 'link-only' })
+    expect(seen[0]).toMatchObject({ projectId: 'project_personal01' })
 
     seen.length = 0
     await runAutoPublish(
       ui,
       engineDeps({
         publish: publish as never,
-        loadSubscriptions: () => [
-          { ...SUBSCRIPTION, visibility: 'team', teamId: 'team_00000001', teamName: 'Paperboy' },
-        ],
+        loadSubscriptions: () => [TEAM_SUBSCRIPTION],
       }),
     )
     expect(seen[0]).toMatchObject({ visibility: 'team', teamId: 'team_00000001' })
@@ -233,9 +396,10 @@ describe('runAutoPublish', () => {
     // Public subscriptions degrade to Link-only for providers Explore
     // does not support yet, instead of failing every pass.
     expect(publishTarget(SUBSCRIPTION, 'gemini')).toEqual({ visibility: 'link-only' })
-    expect(
-      publishTarget({ ...SUBSCRIPTION, visibility: 'team', teamId: 'team_00000001' }, 'gemini'),
-    ).toEqual({ visibility: 'team', teamId: 'team_00000001' })
+    expect(publishTarget(TEAM_SUBSCRIPTION, 'gemini')).toEqual({
+      visibility: 'team',
+      teamId: 'team_00000001',
+    })
     expect(publishTarget({ ...SUBSCRIPTION, visibility: 'link-only' }, 'claude')).toEqual({
       visibility: 'link-only',
     })
@@ -253,5 +417,66 @@ describe('runAutoPublish', () => {
     )
     expect(result).toMatchObject({ failed: 1, published: [] })
     expect(output.join('\n')).toContain('hub unavailable')
+  })
+
+  it('fails closed for legacy subscriptions without a Project binding', async () => {
+    const { ui, output } = capturingUi()
+    const publish = vi.fn(async () => ({ url: 'https://hub.test/s/x' }))
+    const result = await runAutoPublish(
+      ui,
+      engineDeps({
+        publish,
+        loadSubscriptions: () => [
+          {
+            path: SUBSCRIPTION.path,
+            visibility: 'public',
+            addedAt: SUBSCRIPTION.addedAt,
+          },
+        ],
+      }),
+    )
+    expect(result).toMatchObject({ skippedUnbound: 1, published: [] })
+    expect(publish).not.toHaveBeenCalled()
+    expect(output.join('\n')).toContain('legacy subscription has no Hub Project')
+  })
+
+  it('fails closed when the subscription belongs to another Hub or account', async () => {
+    const { ui, output } = capturingUi()
+    const publish = vi.fn(async () => ({ url: 'https://hub.test/s/x' }))
+    const wrongHub = await runAutoPublish(
+      ui,
+      engineDeps({
+        publish,
+        loadSubscriptions: () => [
+          {
+            ...SUBSCRIPTION,
+            project: { ...SUBSCRIPTION.project!, hubUrl: 'https://other.test' },
+          },
+        ],
+      }),
+    )
+    expect(wrongHub).toMatchObject({ skippedUnbound: 1, published: [] })
+
+    const wrongActor = await runAutoPublish(
+      ui,
+      engineDeps({
+        publish,
+        listProjects: async () => ({ actor: { id: 'user_00000002' }, projects: [] }),
+      }),
+    )
+    expect(wrongActor).toMatchObject({ skippedUnbound: 1, published: [] })
+    expect(publish).not.toHaveBeenCalled()
+    expect(output.join('\n')).toContain('different Hub')
+    expect(output.join('\n')).toContain('different signed-in account')
+  })
+
+  it('scopes incremental state by Hub and actor', () => {
+    const sid = 'claude_abc12345'
+    expect(autoPublishStateKey('https://hub.test', 'user_1', sid)).not.toBe(
+      autoPublishStateKey('https://other.test', 'user_1', sid),
+    )
+    expect(autoPublishStateKey('https://hub.test', 'user_1', sid)).not.toBe(
+      autoPublishStateKey('https://hub.test', 'user_2', sid),
+    )
   })
 })

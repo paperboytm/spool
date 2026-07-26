@@ -14,14 +14,9 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
     const v = validateHandle(handle)
     const headers = { 'cache-control': ccPublicRevalidate(10) }
     if (!v.ok) return jsonOk({ available: false, reason: v.reason }, { headers })
-    // NOTE: `handles.handle` is the table PK, so once a row exists the
-    // value is occupied for INSERT purposes even after `released_at` is
-    // set. This query matches the design intent (released handles are
-    // re-claimable) — when the release flow ships, the claim path must
-    // switch to INSERT … ON CONFLICT(handle) DO UPDATE SET released_at=NULL.
-    const row = await ctx.env.DB.prepare(
-      'SELECT 1 FROM handles WHERE handle=? AND released_at IS NULL',
-    )
+    // Handles are permanent URL tombstones. Account/Team deletion makes the
+    // route inactive but never lets a different owner inherit old links.
+    const row = await ctx.env.DB.prepare('SELECT 1 FROM handles WHERE handle=?')
       .bind(v.handle)
       .first()
     return jsonOk({ available: !row }, { headers })

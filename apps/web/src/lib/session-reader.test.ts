@@ -1,4 +1,8 @@
-import { serializePortableSession, type SessionProvider } from '@spool-lab/session-kit'
+import {
+  backupSessionRecord,
+  serializePortableSession,
+  type SessionProvider,
+} from '@spool-lab/session-kit'
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import {
@@ -326,6 +330,18 @@ describe('hub records → desktop-identical conversation', () => {
     expect(recordToMessageId.get(1)).toBe(1) // edit call → tool message
     expect(recordToMessageId.get(2)).toBe(1) // tool result collapses → nearest previous message
     expect(recordToMessageId.get(3)).toBe(2) // reply
+  })
+
+  it('reads byte-preserving provider backups from the Hub', async () => {
+    const backups = await Promise.all(claudeRecords.map((entry) => backupSessionRecord(entry.data)))
+    const conversation = parseHubConversation(
+      'claude',
+      backups.map((backup, index) => ({ i: index, oid: backup.oid, data: backup.data })),
+    )
+
+    expect(conversation.title).toBe('rename alpha to beta')
+    expect(conversation.messages.at(-1)?.contentText).toBe('Done.')
+    expect(conversation.recordToMessageId.get(3)).toBe(2)
   })
 
   it('parses codex event messages by timestamp mapping', () => {

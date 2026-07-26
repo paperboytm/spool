@@ -23,6 +23,10 @@ export interface HubSessionWriteRequest {
   teamId?: string
   /** Optional optimistic tenant precondition; null means personal/new. */
   expectedTeamId?: string | null
+  /** Required Project association for new hosted Sessions. */
+  projectId?: string
+  /** Optimistic Project precondition; null means the Session is not hosted yet. */
+  expectedProjectId?: string | null
 }
 
 export interface HubPushResponse {
@@ -54,6 +58,40 @@ export interface HubAuthor {
   avatarUrl: string | null
 }
 
+export interface HubProjectOwner {
+  kind: 'user' | 'team'
+  id: string
+  handle: string | null
+  name: string | null
+}
+
+export interface HubProject {
+  id: string
+  slug: string
+  name: string
+  description: string | null
+  github_url: string | null
+  owner: HubProjectOwner
+  can_manage: boolean
+}
+
+export interface HubProjectsResponse {
+  actor: { id: string }
+  projects: HubProject[]
+}
+
+const HUB_PROJECT_LIST_PAGE_SIZE = 100
+const MAX_HUB_PROJECT_LIST_TOTAL = 10_000
+
+export interface HubCreateProjectInput {
+  name: string
+  slug?: string
+  description?: string
+  github_url?: string
+  owner: { kind: 'user' | 'team'; id: string }
+  idempotency_key?: string
+}
+
 export interface HubSessionMeta {
   sid: string
   root: string
@@ -69,6 +107,7 @@ export interface HubSessionMeta {
   visibility?: 'public' | 'link-only' | 'team'
   /** Durable workspace owner, independent of the current disclosure level. */
   team?: { id: string; name: string } | null
+  project?: HubProject | null
   author: HubAuthor
 }
 
@@ -93,6 +132,8 @@ export interface HubCliAuthPollResponse {
 export interface HubTeam {
   id: string
   name: string
+  /** Stable namespace handle; optional only while older Hubs roll forward. */
+  handle?: string | null
   role: 'owner' | 'admin' | 'member'
   permissions: string[]
   member_count: number
@@ -105,6 +146,8 @@ export interface HubManagedSession {
   visibility: 'public' | 'link-only' | 'team'
   team_id: string | null
   team_name: string | null
+  project_id?: string | null
+  project?: HubProject | null
 }
 
 export interface HubRecord {
@@ -196,6 +239,9 @@ export class HubClient {
     return {
       ...meta,
       summaryMd: meta.summaryMd ?? noteMd ?? null,
+      ...(meta.project === undefined
+        ? {}
+        : { project: meta.project === null ? null : normalizeHubProject(meta.project, false) }),
     }
   }
 
@@ -204,18 +250,85 @@ export class HubClient {
     return (await this.getJson<{ teams: HubTeam[] }>('/api/hub/v1/teams')).teams
   }
 
+  /** Projects the authenticated actor may publish into. */
+  async listProjects(): Promise<HubProjectsResponse> {
+    type ProjectPage = Omit<HubProjectsResponse, 'projects'> & {
+      projects?: HubProject[]
+      teams?: Array<{ projects?: HubProject[] }>
+      next_cursor?: string | null
+    }
+    let cursor: string | null = null
+    let actorId: string | null = null
+    const projects: HubProject[] = []
+    const seenCursors = new Set<string>()
+    do {
+      const query = new URLSearchParams({ limit: String(HUB_PROJECT_LIST_PAGE_SIZE) })
+      if (cursor !== null) query.set('cursor', cursor)
+      const response = await this.getJson<ProjectPage>(`/api/hub/v1/projects?${query.toString()}`)
+      if (actorId !== null && actorId !== response.actor.id) {
+        throw new Error('Hub Project pagination changed actor identity')
+      }
+      actorId = response.actor.id
+      // Early Project-enabled Hubs grouped Team Projects separately. Flatten
+      // that read shape for upgrade compatibility; the canonical contract is
+      // one writable `projects` array.
+      projects.push(
+        ...[
+          ...(response.projects ?? []),
+          ...(response.teams ?? []).flatMap((entry) => entry.projects ?? []),
+        ].map((project) => normalizeHubProject(project, true)),
+      )
+      if (projects.length > MAX_HUB_PROJECT_LIST_TOTAL) {
+        throw new Error(
+          `Hub returned more than ${MAX_HUB_PROJECT_LIST_TOTAL} Projects; narrow Team membership before retrying`,
+        )
+      }
+      const next = response.next_cursor ?? null
+      if (next !== null) {
+        if (next.length === 0 || seenCursors.has(next)) {
+          throw new Error('Hub Project pagination returned an invalid or repeated cursor')
+        }
+        seenCursors.add(next)
+      }
+      cursor = next
+    } while (cursor !== null)
+    if (actorId === null) throw new Error('Hub Project list did not identify the actor')
+    return { actor: { id: actorId }, projects }
+  }
+
+  /** Create a personal or Team Project. */
+  async createProject(input: HubCreateProjectInput, idempotencyKey?: string): Promise<HubProject> {
+    const response = await this.postJson<{ project: HubProject }>(
+      '/api/hub/v1/projects',
+      {
+        ...input,
+        ...(idempotencyKey === undefined ? {} : { idempotency_key: idempotencyKey }),
+      },
+      idempotencyKey === undefined ? undefined : { 'Idempotency-Key': idempotencyKey },
+    )
+    return normalizeHubProject(response.project, true)
+  }
+
   /** Change a published Session's disclosure without re-pushing records. */
   async updateSessionVisibility(
     sid: string,
     visibility: 'public' | 'link-only' | 'team',
-    teamId?: string,
+    options: {
+      teamId?: string
+      projectId?: string
+      expectedProjectId?: string | null
+    } = {},
   ): Promise<HubManagedSession> {
     const response = await this.request(`/api/me/sessions/${encodeURIComponent(sid)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         visibility,
-        ...(teamId === undefined ? {} : { team_id: teamId }),
+        ...(options.teamId === undefined ? {} : { team_id: options.teamId }),
+        ...(options.projectId === undefined ? {} : { project_id: options.projectId }),
+        ...(options.expectedProjectId === undefined
+          ? {}
+          : { expected_project_id: options.expectedProjectId }),
       }),
     })
     return (await parseJsonResponse<{ session: HubManagedSession }>(response)).session
@@ -240,10 +353,16 @@ export class HubClient {
     return parseJsonResponse<T>(response)
   }
 
-  async postJson<T>(path: string, body: unknown): Promise<T> {
+  async postJson<T>(
+    path: string,
+    body: unknown,
+    extraHeaders?: Record<string, string>,
+  ): Promise<T> {
+    const headers = new Headers(extraHeaders)
+    headers.set('Content-Type', 'application/json')
     const response = await this.request(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     return parseJsonResponse<T>(response)
@@ -398,4 +517,11 @@ function normalizeHubUrl(value: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function normalizeHubProject(project: HubProject, writableFallback: boolean): HubProject {
+  return {
+    ...project,
+    can_manage: typeof project.can_manage === 'boolean' ? project.can_manage : writableFallback,
+  }
 }

@@ -27,6 +27,9 @@ export type HubSessionRow = {
   /** Resource tenant. NULL means personal; a value means the Team owns the
    *  Session and its object index even when the Team later publishes it. */
   team_id: string | null
+  /** Required grouping inside the resource tenant. Migration 0014 backfills
+   * every legacy row and D1 triggers reject future NULL/mismatched values. */
+  project_id: string
   withdrawn_at: number | null
   created_at: number
   updated_at: number
@@ -60,6 +63,7 @@ export type HubSessionUpsert = {
   spoolFileOid: string | null
   costUsd: number | null
   totalTokens: number | null
+  projectId: string
   now: number
 }
 
@@ -72,9 +76,9 @@ export function prepareHubSessionUpsert(
   // re-publish decision.
   return db
     .prepare(
-      'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens, visibility, withdrawn_at, created_at, updated_at) ' +
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'unlisted',NULL,?,?) " +
-        'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, spool_file_oid=excluded.spool_file_oid, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens, withdrawn_at=NULL, updated_at=excluded.updated_at',
+      'INSERT INTO hub_sessions (sid, owner_user_id, root, record_count, sig, card_json, note_md, lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens, visibility, project_id, withdrawn_at, created_at, updated_at) ' +
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'unlisted',?,NULL,?,?) " +
+        'ON CONFLICT(sid) DO UPDATE SET root=excluded.root, record_count=excluded.record_count, sig=excluded.sig, card_json=excluded.card_json, note_md=excluded.note_md, lineage_json=excluded.lineage_json, view_oid=excluded.view_oid, spool_file_oid=excluded.spool_file_oid, cost_usd=excluded.cost_usd, total_tokens=excluded.total_tokens, project_id=excluded.project_id, withdrawn_at=NULL, updated_at=excluded.updated_at',
     )
     .bind(
       row.sid,
@@ -89,6 +93,7 @@ export function prepareHubSessionUpsert(
       row.spoolFileOid,
       row.costUsd,
       row.totalTokens,
+      row.projectId,
       row.now,
       row.now,
     )
@@ -98,6 +103,7 @@ export type AuthorizedHeadWrite = HubSessionUpsert & {
   actorUserId: string
   /** The tenant observed before doing any R2 or multi-statement preparation. */
   expectedTeamId: string | null
+  expectedProjectId: string | null
   expectedVisibility: string
   expectedWithdrawnAt: number | null
   expectedRoot: string | null
@@ -105,8 +111,10 @@ export type AuthorizedHeadWrite = HubSessionUpsert & {
   expectedPublished: boolean
   /** The durable tenant and storage visibility after this commit. */
   targetTeamId: string | null
+  targetProjectId: string
   targetVisibility: 'unlisted' | 'private'
   changeAccess: boolean
+  changeProject: boolean
   clearWithdrawal: boolean
   requireTeamManager: boolean
 }
@@ -130,9 +138,9 @@ export function prepareAuthorizedHeadInsert(
        INSERT INTO hub_sessions
          (sid, owner_user_id, root, record_count, sig, card_json, note_md,
           lineage_json, view_oid, spool_file_oid, cost_usd, total_tokens,
-          visibility, team_id,
+          visibility, team_id, project_id,
           withdrawn_at, created_at, updated_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?
        WHERE EXISTS (
          SELECT 1 FROM users actor
          WHERE actor.id=? AND actor.deleted_at IS NULL
@@ -147,7 +155,16 @@ export function prepareAuthorizedHeadInsert(
            AND m.user_id=? AND (?=0 OR m.role IN ('owner','admin'))
            AND actor_user.deleted_at IS NULL
            AND actor_user.deletion_pending_until IS NULL
-       ))`,
+       ))
+       AND EXISTS (
+         SELECT 1 FROM projects project
+         WHERE project.id=? AND project.archived_at IS NULL
+           AND (
+             (? IS NULL AND project.owner_user_id=? AND project.owner_team_id IS NULL)
+             OR
+             (? IS NOT NULL AND project.owner_team_id=? AND project.owner_user_id IS NULL)
+           )
+       )`,
     )
     .bind(
       row.sid,
@@ -164,6 +181,7 @@ export function prepareAuthorizedHeadInsert(
       row.totalTokens,
       row.targetVisibility,
       row.targetTeamId,
+      row.targetProjectId,
       row.now,
       row.now,
       row.actorUserId,
@@ -171,6 +189,11 @@ export function prepareAuthorizedHeadInsert(
       row.targetTeamId,
       row.actorUserId,
       manager,
+      row.targetProjectId,
+      row.targetTeamId,
+      row.actorUserId,
+      row.targetTeamId,
+      row.targetTeamId,
     )
 }
 
@@ -186,6 +209,7 @@ export function prepareAuthorizedHeadUpdate(
 ): D1PreparedStatement {
   const manager = row.requireTeamManager ? 1 : 0
   const changeAccess = row.changeAccess ? 1 : 0
+  const changeProject = row.changeProject ? 1 : 0
   const clearWithdrawal = row.clearWithdrawal ? 1 : 0
   const expectedPublished = row.expectedPublished ? 1 : 0
 
@@ -205,6 +229,7 @@ export function prepareAuthorizedHeadUpdate(
            total_tokens=?,
            visibility=CASE WHEN ?=1 THEN ? ELSE visibility END,
            team_id=CASE WHEN ?=1 THEN ? ELSE team_id END,
+           project_id=CASE WHEN ?=1 THEN ? ELSE project_id END,
            withdrawn_at=CASE WHEN ?=1 THEN NULL ELSE withdrawn_at END,
            updated_at=?
        WHERE sid=?
@@ -212,6 +237,7 @@ export function prepareAuthorizedHeadUpdate(
          AND root=?
          AND updated_at=?
          AND team_id IS ?
+         AND project_id=?
          AND visibility=?
          AND withdrawn_at IS ?
          AND (
@@ -237,7 +263,16 @@ export function prepareAuthorizedHeadUpdate(
              AND m.user_id=? AND (?=0 OR m.role IN ('owner','admin'))
              AND actor_user.deleted_at IS NULL
              AND actor_user.deletion_pending_until IS NULL
-         ))`,
+         ))
+         AND EXISTS (
+           SELECT 1 FROM projects project
+           WHERE project.id=? AND project.archived_at IS NULL
+             AND (
+               (? IS NULL AND project.owner_user_id=? AND project.owner_team_id IS NULL)
+               OR
+               (? IS NOT NULL AND project.owner_team_id=? AND project.owner_user_id IS NULL)
+             )
+         )`,
     )
     .bind(
       row.root,
@@ -254,6 +289,8 @@ export function prepareAuthorizedHeadUpdate(
       row.targetVisibility,
       changeAccess,
       row.targetTeamId,
+      changeProject,
+      row.targetProjectId,
       clearWithdrawal,
       row.now,
       row.sid,
@@ -261,6 +298,7 @@ export function prepareAuthorizedHeadUpdate(
       row.expectedRoot,
       row.expectedUpdatedAt,
       row.expectedTeamId,
+      row.expectedProjectId,
       row.expectedVisibility,
       row.expectedWithdrawnAt,
       expectedPublished,
@@ -270,6 +308,11 @@ export function prepareAuthorizedHeadUpdate(
       row.targetTeamId,
       row.actorUserId,
       manager,
+      row.targetProjectId,
+      row.targetTeamId,
+      row.actorUserId,
+      row.targetTeamId,
+      row.targetTeamId,
     )
 }
 
@@ -277,11 +320,13 @@ export type AuthorizedVisibilityUpdate = {
   sid: string
   actorUserId: string
   expectedTeamId: string | null
+  expectedProjectId: string
   expectedVisibility: string
   expectedPublished: boolean
   expectedRoot: string
   expectedUpdatedAt: number
   targetTeamId: string | null
+  targetProjectId: string
   targetVisibility: 'unlisted' | 'private'
   lineageJson: string | null
   requireTargetManager: boolean
@@ -299,9 +344,10 @@ export function prepareAuthorizedVisibilityUpdate(
     .prepare(
       `/* hub:authorized-visibility-update */
        UPDATE hub_sessions AS session
-       SET visibility=?, team_id=?, lineage_json=?, updated_at=?
+       SET visibility=?, team_id=?, project_id=?, lineage_json=?, updated_at=?
        WHERE session.sid=?
          AND session.team_id IS ?
+         AND session.project_id=?
          AND session.visibility=?
          AND session.root=?
          AND session.updated_at=?
@@ -348,15 +394,26 @@ export function prepareAuthorizedVisibilityUpdate(
                AND target_actor.deleted_at IS NULL
                AND target_actor.deletion_pending_until IS NULL
            )
+         )
+         AND EXISTS (
+           SELECT 1 FROM projects project
+           WHERE project.id=? AND project.archived_at IS NULL
+             AND (
+               (? IS NULL AND project.owner_user_id=? AND project.owner_team_id IS NULL)
+               OR
+               (? IS NOT NULL AND project.owner_team_id=? AND project.owner_user_id IS NULL)
+             )
          )`,
     )
     .bind(
       change.targetVisibility,
       change.targetTeamId,
+      change.targetProjectId,
       change.lineageJson,
       change.now,
       change.sid,
       change.expectedTeamId,
+      change.expectedProjectId,
       change.expectedVisibility,
       change.expectedRoot,
       change.expectedUpdatedAt,
@@ -372,6 +429,11 @@ export function prepareAuthorizedVisibilityUpdate(
       change.targetTeamId,
       change.actorUserId,
       requireTargetManager,
+      change.targetProjectId,
+      change.targetTeamId,
+      change.actorUserId,
+      change.targetTeamId,
+      change.targetTeamId,
     )
 }
 

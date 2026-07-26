@@ -261,6 +261,13 @@
   font-size: var(--sp-text-meta);
 }
 
+.workspace-feed-header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-space-3);
+}
+
 @media (max-width: 768px) {
   .workspace-shell {
     display: block;

@@ -1,8 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vite-plus/test'
 
+import type { ProjectSummary } from '../lib/project-api'
 import type { TeamInvitation, TeamMember } from '../lib/team-api'
 import {
+  appendUniqueProjects,
   createTeamInvitationIntent,
   memberRemovalConfirmation,
   memberRoleConfirmation,
@@ -11,6 +13,24 @@ import {
   TeamMemberActions,
   TeamTabs,
 } from './Team'
+
+const project = {
+  id: 'project_1',
+  slug: 'spool',
+  name: 'Spool',
+  description: null,
+  github_url: null,
+  owner: {
+    kind: 'team' as const,
+    id: 'team_1',
+    handle: 'paperboy',
+    name: 'Paperboy',
+  },
+  session_count: 1,
+  updated_at: 1,
+  archived_at: null,
+  can_manage: true,
+} satisfies ProjectSummary
 
 function member(overrides: Partial<TeamMember> = {}): TeamMember {
   return {
@@ -30,8 +50,20 @@ describe('TeamTabs', () => {
 
     expect(html).toContain('aria-label="Team sections"')
     expect(html).toContain('aria-controls="team-panel-members"')
+    expect(html).toContain('aria-controls="team-panel-projects"')
     expect(html).toMatch(/aria-controls="team-panel-members" aria-selected="true"/)
     expect(html).toContain('aria-controls="team-panel-sessions" aria-selected="false"')
+  })
+})
+
+describe('Team Projects pagination', () => {
+  it('preserves the loaded list while de-duplicating cursor overlap', () => {
+    expect(
+      appendUniqueProjects(
+        [project],
+        [project, { ...project, id: 'project_2', slug: 'react-vapor', name: 'React Vapor' }],
+      ).map((value) => value.id),
+    ).toEqual(['project_1', 'project_2'])
   })
 })
 

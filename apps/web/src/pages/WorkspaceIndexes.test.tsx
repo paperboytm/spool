@@ -15,6 +15,10 @@ describe('workspace index pages', () => {
     expect(html).not.toContain('Your library')
     expect(html).not.toContain('Manage who can read each uploaded Session')
     expect(html).toContain('aria-label="My Sessions"')
+    expect(html).toContain('aria-label="Session language"')
+    expect(html.indexOf('aria-label="Session language"')).toBeLessThan(
+      html.indexOf('aria-label="Your Sessions"'),
+    )
   })
 
   it('uses /teams as creation instead of a second Team index', () => {

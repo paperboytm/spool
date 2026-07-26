@@ -1,4 +1,12 @@
-export { splitRecords, canonicalizeRecord } from './records.js'
+export {
+  PORTABLE_SESSION_BACKUP_VERSION,
+  backupSessionRecord,
+  canonicalizeRecord,
+  restoreSessionRecord,
+  sessionRecordData,
+  splitRecords,
+} from './records.js'
+export type { PortableSessionBackupV1 } from './records.js'
 export {
   parseClaudeSessionText,
   parseCodexSessionLines,
@@ -37,6 +45,7 @@ export type {
   DiscoveryEngagementResponse,
   DiscoveryEvidence,
   DiscoveryLineage,
+  DiscoveryProject,
   DiscoverySessionItem,
   DiscoverySessionSocialResponse,
   DiscoverySessionsResponse,

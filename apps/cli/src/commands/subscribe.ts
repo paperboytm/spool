@@ -1,8 +1,15 @@
-import { formatCliCommand } from '@spool-lab/core'
+import {
+  formatCliCommand,
+  getDB,
+  resolveLocalProjectIdentity,
+  type ProjectIdentity,
+} from '@spool-lab/core'
 import { Command } from 'commander'
 
-import { HubClient, type HubFetch, type HubTeam } from '../hub/client.js'
+import { HubClient, type HubFetch, type HubProjectsResponse, type HubTeam } from '../hub/client.js'
 import { loadHubCredentials, type HubCredentialOptions } from '../hub/credentials.js'
+import { persistResolvedProject, resolveHubProject } from '../hub/project-resolution.js'
+import { resolveTeamReference } from '../hub/team-resolution.js'
 import {
   addSubscription,
   canonicalSubscriptionPath,
@@ -23,6 +30,8 @@ export interface SubscribeCommandOptions {
   linkOnly?: boolean
   public?: boolean
   yes?: boolean
+  project?: string
+  createProject?: string
 }
 
 export interface SubscribeCommandDependencies extends HubCredentialOptions {
@@ -31,6 +40,8 @@ export interface SubscribeCommandDependencies extends HubCredentialOptions {
   fetch?: HubFetch
   listTeams?: () => Promise<HubTeam[]>
   now?: () => string
+  resolveLocalIdentity?: (path: string) => ProjectIdentity
+  listProjects?: () => Promise<HubProjectsResponse>
 }
 
 interface VisibilityTarget {
@@ -55,6 +66,10 @@ export async function handleSubscribeCommand(
       ui.error('Pick exactly one of `--team`, `--link-only`, or `--public`.')
       return 1
     }
+    if (options.project !== undefined && options.createProject !== undefined) {
+      ui.error('`--project` and `--create-project` cannot be used together.')
+      return 1
+    }
 
     const path = canonicalSubscriptionPath(directory ?? cwd, cwd)
     const target = await resolveVisibilityTarget(ui, options, dependencies)
@@ -75,14 +90,57 @@ export async function handleSubscribeCommand(
       ui.info(disclosureCopy(target))
     }
 
+    const credentialOptions = pickCredentialOptions(dependencies)
+    const credentials = loadHubCredentials(credentialOptions)
+    if (!credentials.token) {
+      ui.error(`Not logged in. Run \`${formatCliCommand('login')}\` first.`)
+      return 1
+    }
+    const client = new HubClient({
+      hubUrl: credentials.hubUrl,
+      token: credentials.token,
+      ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
+    })
+    const localIdentity =
+      dependencies.resolveLocalIdentity?.(path) ?? resolveLocalProjectIdentity(getDB(true), path)
+    const resolvedProject = await resolveHubProject({
+      client,
+      ui,
+      hubUrl: credentials.hubUrl,
+      localIdentity,
+      tenant:
+        target.visibility === 'team' && target.teamId
+          ? { kind: 'team', id: target.teamId }
+          : { kind: 'personal' },
+      ...(options.project === undefined ? {} : { projectRef: options.project }),
+      ...(options.createProject === undefined ? {} : { createProjectName: options.createProject }),
+      ...(dependencies.listProjects === undefined
+        ? {}
+        : { listResponse: await dependencies.listProjects() }),
+      ...credentialOptions,
+    })
+    if (!resolvedProject) return 1
+
     const subscription: Subscription = {
       path,
       visibility: target.visibility,
       ...(target.teamId === undefined ? {} : { teamId: target.teamId }),
       ...(target.teamName === undefined ? {} : { teamName: target.teamName }),
+      project: {
+        hubUrl: resolvedProject.hubUrl,
+        actorId: resolvedProject.actorId,
+        tenant: resolvedProject.tenant,
+        localIdentity: {
+          kind: localIdentity.kind,
+          key: localIdentity.key,
+          displayName: localIdentity.displayName,
+        },
+        remote: resolvedProject.project,
+      },
       addedAt: (dependencies.now ?? (() => new Date().toISOString()))(),
     }
-    const { added } = addSubscription(subscription, pickCredentialOptions(dependencies))
+    const { added } = addSubscription(subscription, credentialOptions)
+    persistResolvedProject(resolvedProject, credentialOptions)
     ui.success(added ? `Subscribed ${path}` : `Already subscribed: ${path} (settings updated)`)
     ui.outro(
       `Run \`${formatCliCommand('daemon start')}\` to keep subscribed sessions continuously published.`,
@@ -109,7 +167,7 @@ async function resolveVisibilityTarget(
   if (options.team !== undefined) {
     const teams = await listTeams()
     const wanted = options.team.trim()
-    const team = teams.find((entry) => entry.id === wanted || entry.name === wanted)
+    const team = resolveTeamReference(teams, wanted)
     if (!team) {
       ui.error(
         teams.length === 0
@@ -240,27 +298,39 @@ export function handleSubscriptionsCommand(dependencies: SubscribeCommandDepende
 }
 
 export function subscriptionLabel(subscription: Subscription): string {
+  const project = subscription.project
+    ? ` · Project ${subscription.project.remote.name}`
+    : ' · Project not configured'
   switch (subscription.visibility) {
     case 'team':
-      return `Team · ${subscription.teamName ?? subscription.teamId ?? 'unknown'}`
+      return `Team · ${subscription.teamName ?? subscription.teamId ?? 'unknown'}${project}`
     case 'link-only':
-      return 'Link-only'
+      return `Link-only${project}`
     case 'public':
-      return 'Public'
+      return `Public${project}`
   }
 }
 
 export const subscribeCommand = new Command('subscribe')
   .description('Auto-publish sessions from a directory and its worktrees')
   .argument('[dir]', 'Directory to subscribe; defaults to the current directory')
-  .option('--team <name-or-id>', 'Publish subscribed sessions to this Team')
+  .option('--team <handle-name-or-id>', 'Publish subscribed sessions to this Team')
   .option('--link-only', 'Publish subscribed sessions as Link-only')
   .option('--public', 'Publish subscribed sessions as Public (explicit opt-in)')
+  .option('--project <id-or-owner-slug>', 'Bind to this Hub Project')
+  .option('--create-project <name>', 'Create and bind a Hub Project')
   .option('--yes', 'Skip the one-time visibility confirmation')
   .action(
     async (
       dir: string | undefined,
-      opts: { team?: string; linkOnly?: boolean; public?: boolean; yes?: boolean },
+      opts: {
+        team?: string
+        linkOnly?: boolean
+        public?: boolean
+        yes?: boolean
+        project?: string
+        createProject?: string
+      },
     ) => {
       const exitCode = await handleSubscribeCommand(
         dir,
@@ -269,6 +339,8 @@ export const subscribeCommand = new Command('subscribe')
           ...(opts.linkOnly === undefined ? {} : { linkOnly: opts.linkOnly }),
           ...(opts.public === undefined ? {} : { public: opts.public }),
           ...(opts.yes === undefined ? {} : { yes: opts.yes }),
+          ...(opts.project === undefined ? {} : { project: opts.project }),
+          ...(opts.createProject === undefined ? {} : { createProject: opts.createProject }),
         },
         { ui: createClackUi() },
       )

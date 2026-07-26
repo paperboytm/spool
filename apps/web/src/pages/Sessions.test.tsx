@@ -51,12 +51,16 @@ describe('SessionsPage', () => {
       <SessionsPage search={{ sort: 'recommended' }} onSearchChange={() => {}} />,
     )
 
-    for (const label of ['Sessions', 'My Sessions', 'Teams']) {
+    for (const label of ['Sessions', 'Projects', 'My Sessions', 'Teams']) {
       expect(html).toContain(`aria-label="${label}"`)
     }
     expect(html).toContain('id="explore-results"')
     expect(html).toContain('href="/sessions"')
     expect(html).not.toContain('href="/explore')
+    expect(html).toContain('aria-label="Session language"')
+    expect(html.indexOf('aria-label="Session language"')).toBeLessThan(
+      html.indexOf('id="explore-results"'),
+    )
   })
 
   it('hides the scope switcher until membership is confirmed by the server', () => {

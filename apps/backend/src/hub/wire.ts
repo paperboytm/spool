@@ -10,6 +10,7 @@ import { ApiError } from '../errors'
 export const OID_RE = /^[0-9a-f]{64}$/
 export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
 export const TEAM_ID_RE = /^[0-9A-Za-z_-]{8,128}$/
+export const PROJECT_ID_RE = /^project_[0-9A-Za-z_-]{8,192}$/
 
 export const MAX_MANIFEST = 100_000
 export const MAX_SUMMARY_BYTES = 64 * 1024
@@ -52,6 +53,14 @@ export const HeadBody = z
     // Optional optimistic tenant precondition. Explicit null means the caller
     // observed a personal/new Session; omission keeps older clients working.
     expectedTeamId: z.string().regex(TEAM_ID_RE).nullable().optional(),
+    // Project is an independent grouping inside the durable tenant. Older
+    // clients omit it and are assigned to the tenant's deterministic default;
+    // explicit null requests that same default without ever persisting NULL.
+    projectId: z.string().regex(PROJECT_ID_RE).nullable().optional(),
+    // Optional optimistic Project precondition. A client moving an existing
+    // Session must send the Project it reviewed so a concurrent move fails
+    // closed instead of being overwritten by a later head commit.
+    expectedProjectId: z.string().regex(PROJECT_ID_RE).nullable().optional(),
   })
   .superRefine((body, context) => {
     if (body.summaryMd === undefined && body.noteMd === undefined) {

@@ -23,6 +23,13 @@ export interface DiscoveryLineage {
   sourceSid: string
 }
 
+/** Public, non-tenant Project identity attached to a personal Public Session. */
+export interface DiscoveryProject {
+  id: string
+  slug: string
+  name: string
+}
+
 export interface DiscoverySessionItem {
   sid: string
   title: string
@@ -38,6 +45,11 @@ export interface DiscoverySessionItem {
   starCount?: number
   agent: SessionProvider
   author: DiscoveryAuthor
+  /**
+   * Personal Project grouping for this Public Session. Team-owned Projects
+   * remain private and are deliberately represented as null.
+   */
+  project?: DiscoveryProject | null
   evidence: DiscoveryEvidence
   lineage: DiscoveryLineage | null
   publishedAt: number

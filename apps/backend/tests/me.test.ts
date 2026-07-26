@@ -60,9 +60,8 @@ function envFor(state?: FakeDbState) {
     DB: db,
     SESSIONS: makeKv(),
     RATE: makeKv(),
-    // Handle claim/check are gated off at launch (profiles cut from
-    // scope). Behavior tests run with the gate open; the gated-off
-    // 404s have their own cases below.
+    // Owner routes are enabled by default. Behavior tests keep the explicit
+    // value for readability; emergency-off 404s have their own cases below.
     PROFILES_ENABLED: '1',
     state: s,
   }
@@ -137,8 +136,8 @@ describe('requireUser', () => {
 })
 
 describe('GET /api/handles/check', () => {
-  it('404 when PROFILES_ENABLED is not set (launch default)', async () => {
-    const env = { ...envFor(), PROFILES_ENABLED: '' }
+  it('404 when the emergency PROFILES_ENABLED off switch is set', async () => {
+    const env = { ...envFor(), PROFILES_ENABLED: '0' }
     const req = new Request('https://x/api/handles/check?h=alice')
     const res = await invoke(checkHandleGet, req, env)
     expect(res.status).toBe(404)
@@ -184,8 +183,8 @@ describe('GET /api/handles/check', () => {
 })
 
 describe('POST /api/handles/claim', () => {
-  it('404 when PROFILES_ENABLED is not set (launch default), even signed in', async () => {
-    const env = { ...envFor(), PROFILES_ENABLED: '' }
+  it('404 when the emergency PROFILES_ENABLED off switch is set, even signed in', async () => {
+    const env = { ...envFor(), PROFILES_ENABLED: '0' }
     seedUser(env.state)
     await seedSession(env.SESSIONS, TOKEN, 'user-1')
     const req = authedReq('https://x/api/handles/claim', {

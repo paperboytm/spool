@@ -1,3 +1,4 @@
+import { sessionRecordData } from './records.js'
 import type {
   EditEvent,
   EditTool,
@@ -61,7 +62,7 @@ function normalizeArguments(
 }
 
 function parseRecord(record: SessionRecord): UnknownRecord | null {
-  const data = typeof record === 'string' ? record : record.data
+  const data = sessionRecordData(record)
   try {
     const parsed = JSON.parse(data) as unknown
     return isObject(parsed) ? parsed : null

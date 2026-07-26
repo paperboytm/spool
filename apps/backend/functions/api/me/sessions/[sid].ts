@@ -1,4 +1,4 @@
-import type { PagesFunction } from '@cloudflare/workers-types'
+import type { D1PreparedStatement, PagesFunction } from '@cloudflare/workers-types'
 import { isDiscoverySessionSid } from '@spool-lab/session-kit'
 import { z } from 'zod'
 
@@ -28,13 +28,22 @@ import {
   presentTeamOids,
   teamStorageBytes,
 } from '../../../../src/hub/store'
-import { requireSid, TEAM_ID_RE, TEAM_QUOTA_BYTES } from '../../../../src/hub/wire'
+import { PROJECT_ID_RE, requireSid, TEAM_ID_RE, TEAM_QUOTA_BYTES } from '../../../../src/hub/wire'
+import {
+  activeProjectForTenant,
+  ensureProjectTenantHandle,
+  prepareAuthorizedDefaultProjectInsert,
+  resolveDefaultProject,
+} from '../../../../src/projects/store'
+import type { ProjectTenant } from '../../../../src/projects/types'
 import { checkRate } from '../../../../src/rate-limit'
 
 const VisibilityBody = z
   .object({
     visibility: z.enum(['public', 'link-only', 'team']),
     team_id: z.string().regex(TEAM_ID_RE).nullable().optional(),
+    project_id: z.string().regex(PROJECT_ID_RE).nullable().optional(),
+    expected_project_id: z.string().regex(PROJECT_ID_RE).nullable().optional(),
   })
   .strict()
 
@@ -80,6 +89,48 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
         targetRole = await activeTeamRole(ctx.env.DB, targetTeamId, user.id)
         if (targetRole === null) throw new ApiError('NOT_FOUND')
       }
+    }
+    const isPersonalToTeamTransfer = session.team_id === null && targetTeamId !== null
+    if (
+      isPersonalToTeamTransfer &&
+      (typeof body.data.project_id !== 'string' ||
+        typeof body.data.expected_project_id !== 'string')
+    ) {
+      throw new ApiError(
+        'UNPROCESSABLE',
+        'Moving a Session to a Team requires project_id and expected_project_id',
+      )
+    }
+    if (
+      body.data.expected_project_id !== undefined &&
+      session.project_id !== body.data.expected_project_id
+    ) {
+      throw new ApiError('CONFLICT', 'Session Project changed; review the current Project')
+    }
+    const targetTenant: ProjectTenant =
+      targetTeamId === null
+        ? { userId: user.id, teamId: null }
+        : { userId: null, teamId: targetTeamId }
+    let targetProjectId: string
+    let projectNeedsInsert = false
+    if (
+      body.data.project_id === undefined &&
+      session.team_id === targetTeamId &&
+      typeof session.project_id === 'string'
+    ) {
+      targetProjectId = session.project_id
+      if (!(await activeProjectForTenant(ctx.env.DB, targetProjectId, targetTenant))) {
+        throw new ApiError('CONFLICT', 'Session Project is archived or unavailable')
+      }
+    } else if (typeof body.data.project_id === 'string') {
+      targetProjectId = body.data.project_id
+      if (!(await activeProjectForTenant(ctx.env.DB, targetProjectId, targetTenant))) {
+        throw new ApiError('NOT_FOUND')
+      }
+    } else {
+      const fallback = await resolveDefaultProject(ctx.env.DB, targetTenant)
+      targetProjectId = fallback.projectId
+      projectNeedsInsert = fallback.needsInsert
     }
     const requireTargetManager =
       targetTeamId !== null && (session.team_id !== null || body.data.visibility !== 'team')
@@ -141,22 +192,40 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
     )
     const targetVisibility: 'private' | 'unlisted' =
       body.data.visibility === 'team' ? 'private' : 'unlisted'
-    const statements = [
+    const statements: D1PreparedStatement[] = []
+    if (projectNeedsInsert) {
+      await ensureProjectTenantHandle(ctx.env.DB, {
+        actorUserId: user.id,
+        tenant: targetTenant,
+        now,
+      })
+      statements.push(
+        prepareAuthorizedDefaultProjectInsert(ctx.env.DB, {
+          actorUserId: user.id,
+          tenant: targetTenant,
+          now,
+        }),
+      )
+    }
+    const visibilityUpdateIndex = statements.length
+    statements.push(
       prepareAuthorizedVisibilityUpdate(ctx.env.DB, {
         sid,
         actorUserId: user.id,
         expectedTeamId: session.team_id,
+        expectedProjectId: session.project_id,
         expectedVisibility: session.visibility,
         expectedPublished: wasPublic,
         expectedRoot: session.root,
         expectedUpdatedAt: session.updated_at,
         targetTeamId,
+        targetProjectId,
         targetVisibility,
         lineageJson: safeLineageJson,
         requireTargetManager,
         now,
       }),
-    ]
+    )
     if (targetTeamId && aliasOids.length > 0) {
       statements.push(
         ...prepareAuthorizedPersonalObjectAliases(ctx.env.DB, {
@@ -230,12 +299,18 @@ export const onRequestPatch: PagesFunction<HubEnv, 'sid'> = async (ctx) => {
       }
       throw error
     }
-    if ((results[0]?.meta.changes ?? 0) === 0) throw new ApiError('NOT_FOUND')
+    if ((results[visibilityUpdateIndex]?.meta.changes ?? 0) === 0) {
+      throw new ApiError('NOT_FOUND')
+    }
     auditAfterCommit(ctx, {
       user_id: user.id,
       action: 'hub-visibility',
       target_id: sid,
-      details: { visibility: body.data.visibility, team_id: targetTeamId },
+      details: {
+        visibility: body.data.visibility,
+        team_id: targetTeamId,
+        project_id: targetProjectId,
+      },
     })
 
     const changed = await getHubSession(ctx.env.DB, sid)

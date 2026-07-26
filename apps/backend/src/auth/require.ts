@@ -7,6 +7,19 @@ import { loadSession } from './session'
 
 export type RequireUserOpts = { allowPendingDeletion?: boolean }
 
+export async function optionalUser(
+  req: Request,
+  env: { SESSIONS: KVNamespace; DB: D1Database },
+): Promise<UserRow | null> {
+  const bearer = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
+  const token = bearer ?? readCookie(req, COOKIE_NAME)
+  if (!token) return null
+  const sess = await loadSession(env.SESSIONS, token)
+  if (!sess) return null
+  const user = await getUserById(env.DB, sess.user_id)
+  return user && user.deletion_pending_until === null ? user : null
+}
+
 export async function requireUser(
   req: Request,
   env: { SESSIONS: KVNamespace; DB: D1Database },

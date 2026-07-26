@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ApiError } from '../errors'
+import { validateHandle } from '../handles'
 
 const TeamName = z
   .string()
@@ -9,9 +10,22 @@ const TeamName = z
   .transform((value) => value.trim())
   .pipe(z.string().min(1).max(80))
 const InvitableRole = z.enum(['admin', 'member'])
+const TeamHandle = z.string().transform((value, context) => {
+  const parsed = validateHandle(value)
+  if (!parsed.ok) {
+    context.addIssue({ code: 'custom', message: parsed.reason })
+    return z.NEVER
+  }
+  return parsed.handle
+})
 
-const CreateTeamBody = z.object({ name: TeamName }).strict()
-const UpdateTeamBody = z.object({ name: TeamName }).strict()
+const CreateTeamBody = z.object({ name: TeamName, handle: TeamHandle.optional() }).strict()
+const UpdateTeamBody = z
+  .object({ name: TeamName.optional(), handle: TeamHandle.optional() })
+  .strict()
+  .refine((value) => (value.name === undefined) !== (value.handle === undefined), {
+    message: 'provide exactly one of name or handle',
+  })
 const InviteBody = z.object({ email: z.email().trim().max(254), role: InvitableRole }).strict()
 const UpdateMemberBody = z.object({ role: z.enum(['owner', 'admin', 'member']) }).strict()
 

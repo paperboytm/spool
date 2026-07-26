@@ -48,13 +48,14 @@ Record the one-time decision that Sessions from a directory — including its gi
 
 ```bash
 spool subscribe                        # current directory, interactive disclosure choice
-spool subscribe <dir> --team <name-or-id>  # Team · {name}: current members only
+spool subscribe <dir> --team <handle|name|id> # Team · {name}: current members only
 spool subscribe <dir> --link-only      # anyone with the URL
 spool subscribe <dir> --public         # explicit opt-in to Explore and search
-spool subscribe <dir> --link-only --yes  # non-interactive
+spool subscribe <dir> --link-only --project evan/spool --yes
+spool subscribe <dir> --public --create-project "My Project"
 ```
 
-The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public. There is no implicit default and Public is never preselected; interactive runs list your Teams first. Non-interactive callers must pass exactly one disclosure flag.
+The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public. There is no implicit default and Public is never preselected; interactive runs list your Teams first. Every hosted Session also belongs to one Project in the same personal or Team tenant. Interactive runs can select or create that Project. Non-interactive callers must pass exactly one disclosure flag plus `--project <id|owner/slug>` or `--create-project <name>` unless a matching binding already exists. `--yes` never chooses a Project.
 
 Sessions with likely sensitive values are never auto-published: they are skipped with a warning and left for an explicit `spool share`.
 
@@ -72,7 +73,23 @@ spool teams
 spool teams --json
 ```
 
-Every `--team` option (`spool subscribe`, `spool visibility`) accepts a Team name as printed here; the id is only needed when two Teams share a name.
+Every `--team` option (`spool share`, `spool subscribe`, `spool visibility`) accepts a stable Team handle, an id, or a unique Team name. When names collide, Spool fails closed and asks for a handle or id.
+
+## `spool projects`
+
+List writable personal and Team Projects, or bind the current local Project identity:
+
+```bash
+spool projects list
+spool projects list --team @paperboy
+spool projects list --json
+spool projects bind [dir] --project <id|owner/slug>
+spool projects move <sid|url> --project <id|owner/slug>
+```
+
+Bindings are isolated by Hub, signed-in account, tenant, and local Project identity. They live in `~/.spool/project-bindings.json` with mode `0600`.
+
+`projects move` is the explicit management path for an already-hosted Session. The target must be owned by the same user or Team as the current Project, and the current Project id is sent as an optimistic precondition. The move changes no records, visibility, authorship, stars, or verified-fork lineage. Use `spool visibility … team` when the tenant itself must change.
 
 ## `spool daemon`
 
@@ -90,7 +107,7 @@ spool daemon run      # the same loop in the foreground
 
 Create a durable Shared Session URL. Claude Code and Codex CLI Sessions are Public in Explore and search by default; providers not yet supported by Explore remain Link-only. Spool checks the selected records for likely sensitive values before upload and asks for confirmation before disclosure. Non-interactive callers must pass `--visibility-confirmed`, which acknowledges visibility without bypassing sensitive-data findings.
 
-The CLI reports this initial Public or Link-only result. Use `spool visibility` or [your account page](/me) to move a Session to `Team · name` afterward: that makes the hosted asset Team-owned and limits reading to current members until a Team Owner or Admin changes its visibility.
+The CLI reports the exact initial Public, Link-only, or Team result. A direct Team share writes Team ownership and its Team Project on the first Hub head, so it never creates an intermediate Public Session. Use `spool visibility` or [your account page](/me) only when moving an already-hosted Session later.
 
 ```bash
 spool share                        # latest Session in the current directory
@@ -98,6 +115,9 @@ spool share <uuid>                 # specific Session; UUID prefixes work
 spool share <uuid>@12              # first 12 records only
 spool share --no-agent-summary     # skip the local Agent offer
 spool share --spool-file x.spool   # attach a curated document
+spool share --project evan/spool   # select an existing Hub Project
+spool share --create-project Spool # create and bind a Hub Project
+spool share --team paperboy --project paperboy/react-vapor # Team-only immediately
 spool share --visibility-confirmed # acknowledge visibility without a TTY
 spool share --yes                  # skip all confirmations, including secret findings
 ```
@@ -108,7 +128,9 @@ In an interactive terminal, omit Summary options. After the Session URL is live,
 
 `--summary <markdown>` is an advanced manual or automation input. It uploads exactly the Markdown supplied by the caller after the Session is shared; it does not generate a Summary.
 
-`--yes` is intended for controlled automation. It accepts visibility and sensitive-data findings; it does not remove sensitive values.
+For an explicit Session id, Spool uses the Project identity joined to that Session in the local index; it never substitutes the invocation directory. A first interactive Share selects or creates a Hub Project. Non-interactive Share fails closed without an explicit Project flag or existing binding. Re-sharing preserves the Session's existing remote Project.
+
+`--yes` is intended for controlled automation. It accepts visibility and sensitive-data findings; it does not remove sensitive values and never chooses a Project.
 
 ## `spool visibility`
 
@@ -117,10 +139,11 @@ Change a published Session’s disclosure without re-uploading records. Disclosu
 ```bash
 spool visibility <sid|url> public                 # Team → Public keeps Team ownership
 spool visibility <sid|url> link-only
-spool visibility <sid|url> team --team <name-or-id>
+spool visibility <sid|url> team --team <handle|name|id> --project <id|owner/slug>
+spool visibility <sid|url> team --team <handle|name|id> --create-project <name>
 ```
 
-Changing a Team-owned Session requires a Team Owner or Admin role. Moving a personal Session into a Team transfers ownership of the hosted asset to the Team. Public → Team removes all public discovery projections before the change is reported complete.
+Changing a Team-owned Session requires a Team Owner or Admin role. Moving a personal Session into a Team transfers ownership of the hosted asset to the Team and atomically selects a Project owned by that Team. Public → Team removes all public discovery projections before the change is reported complete.
 
 ## `spool withdraw`
 

@@ -1,5 +1,5 @@
 import { Avatar } from '@spool-lab/ui'
-import { Library, LogOut, Moon, Sun, UserRound, Users } from 'lucide-react'
+import { FolderKanban, Library, LogOut, Moon, Sun, UserRound, Users } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import { signOut } from '../lib/api'
@@ -165,6 +165,15 @@ export function AccountMenu({
           <a role="menuitem" tabIndex={-1} className="account-menu-item" href="/my-sessions">
             <Library size={14} strokeWidth={1.7} aria-hidden="true" />
             My Sessions
+          </a>
+          <a
+            role="menuitem"
+            tabIndex={-1}
+            className="account-menu-item"
+            href="/projects?scope=mine"
+          >
+            <FolderKanban size={14} strokeWidth={1.7} aria-hidden="true" />
+            My Projects
           </a>
           <a
             role="menuitem"

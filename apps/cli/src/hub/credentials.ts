@@ -117,7 +117,7 @@ function stripTrailingSlashes(value: string): string {
   return value.slice(0, end)
 }
 
-function normalizeHubUrl(value: string): string {
+export function normalizeHubUrl(value: string): string {
   const normalized = stripTrailingSlashes(requireNonEmpty(value, 'Hub URL'))
   try {
     const url = new URL(normalized)

@@ -2,6 +2,7 @@ import { Tabs } from '@spool-lab/ui'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { ManagedSessionsSection } from '../components/ManagedSessionsSection'
+import { SessionLanguageToggle } from '../components/SessionLanguageToggle'
 import { WorkspaceFrame } from '../components/WorkspaceFrame'
 import { type SessionsSearchState } from '../lib/discovery'
 import { fetchTeams, type TeamSummary } from '../lib/team-api'
@@ -204,7 +205,18 @@ export function SessionsPage({ search, onSearchChange }: SessionsPageProps) {
 
   return (
     <WorkspaceFrame active="feed" rootClassName="explore-root" mainClassName="explore-center">
-      <ScopeTabs search={activeSearch} membership={membership} onSearchChange={onSearchChange} />
+      <div className="sessions-content-toolbar">
+        {membership.kind === 'ready' ? (
+          <ScopeTabs
+            search={activeSearch}
+            membership={membership}
+            onSearchChange={onSearchChange}
+          />
+        ) : (
+          <span className="sessions-scope-static">Public</span>
+        )}
+        <SessionLanguageToggle className="sessions-toolbar-language" />
+      </div>
       {scope === 'public' ? (
         <ScopePanel value="public" labelled={hasScopeTabs}>
           <PublicFeed search={activeSearch} onSearchChange={onSearchChange} />

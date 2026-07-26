@@ -38,6 +38,7 @@ const TEAMS: HubTeam[] = [
   {
     id: 'team_00000001',
     name: 'Paperboy',
+    handle: 'paperboy',
     role: 'owner',
     permissions: [],
     member_count: 3,
@@ -46,6 +47,7 @@ const TEAMS: HubTeam[] = [
   {
     id: 'team_00000002',
     name: 'Weekend Hacks',
+    handle: 'weekend-hacks',
     role: 'member',
     permissions: [],
     member_count: 1,
@@ -60,7 +62,7 @@ describe('teams command', () => {
     expect(errors.join('\n')).toContain('Not logged in')
   })
 
-  it('lists teams with role and member count, and hints at name usage', async () => {
+  it('lists teams with stable handles, role, and member count', async () => {
     const { ui, output } = capturingUi()
     expect(
       await handleTeamsCommand(
@@ -69,9 +71,10 @@ describe('teams command', () => {
       ),
     ).toBe(0)
     const text = output.join('\n')
-    expect(text).toContain('Team · Paperboy  (owner, 3 members)')
-    expect(text).toContain('Team · Weekend Hacks  (member, 1 member)')
-    expect(text).toContain('subscribe --team <name>')
+    expect(text).toContain('Team · Paperboy  @paperboy  (owner, 3 members)')
+    expect(text).toContain('Team · Weekend Hacks  @weekend-hacks  (member, 1 member)')
+    expect(text).toContain('subscribe --team <handle>')
+    expect(text).toContain('share --team <handle>')
   })
 
   it('reports an empty membership', async () => {

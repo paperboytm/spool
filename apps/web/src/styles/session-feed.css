@@ -80,6 +80,31 @@
   gap: var(--sp-space-1-5);
 }
 
+.session-feed-project {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 240px;
+  align-items: center;
+  gap: var(--sp-space-1-5);
+  overflow: hidden;
+  color: var(--sp-muted);
+  font-family: var(--sp-font-mono);
+  font-size: var(--sp-text-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-feed-project:hover,
+.session-feed-project:focus-visible {
+  color: var(--sp-accent);
+  text-decoration: underline;
+  text-underline-offset: var(--sp-space-0-5);
+}
+
+.session-feed-project svg {
+  flex: none;
+}
+
 .session-feed-row-meta .session-source {
   color: var(--sp-text);
 }
@@ -293,7 +318,8 @@
   box-shadow: var(--sp-shadow-popover);
 }
 
-.managed-session-visibility {
+.managed-session-visibility,
+.managed-session-project {
   display: grid;
   min-width: 0;
   gap: var(--sp-space-1);
@@ -304,7 +330,8 @@
   text-transform: uppercase;
 }
 
-.managed-session-visibility select {
+.managed-session-visibility select,
+.managed-session-project select {
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -321,9 +348,61 @@
   text-transform: none;
 }
 
-.managed-session-visibility select:focus {
+.managed-session-visibility select:focus,
+.managed-session-project select:focus {
   border-color: var(--sp-accent);
   box-shadow: var(--sp-focus-ring);
+}
+
+.managed-session-visibility select:disabled,
+.managed-session-project select:disabled {
+  border-color: var(--sp-border);
+  background: var(--sp-surface);
+  color: var(--sp-faint);
+  cursor: wait;
+}
+
+.managed-session-project-fields,
+.managed-session-project-state {
+  display: grid;
+  min-width: 0;
+  gap: var(--sp-space-2);
+}
+
+.managed-session-project-state {
+  padding: var(--sp-space-1) 0;
+  color: var(--sp-muted);
+  font-size: var(--sp-text-ui);
+  line-height: var(--sp-space-5);
+}
+
+.managed-session-project-state[role='status'] {
+  display: flex;
+  align-items: center;
+}
+
+.managed-session-project-state p {
+  margin: 0;
+}
+
+.managed-session-project-error {
+  color: var(--sp-error);
+}
+
+.managed-session-project-spinner {
+  flex: none;
+  animation: managed-session-spin 800ms linear infinite;
+}
+
+.managed-session-project-action.sp-button {
+  width: 100%;
+  min-height: 44px;
+}
+
+@keyframes managed-session-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .managed-session-withdraw.sp-button {
@@ -413,6 +492,10 @@
   .session-feed-lineage {
     min-height: 44px;
   }
+
+  .session-feed-project {
+    min-height: 44px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -424,9 +507,19 @@
 }
 
 @media (hover: none), (pointer: coarse) {
+  .session-feed-project {
+    min-height: 44px;
+  }
+
   .managed-session-menu-trigger {
     min-width: 44px;
     min-height: 44px;
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .managed-session-project-spinner {
+    animation: none;
   }
 }

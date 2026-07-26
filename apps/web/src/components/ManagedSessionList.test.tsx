@@ -6,6 +6,7 @@ import {
   canManageSession,
   canPublishManagedSession,
   ManagedSessionList,
+  TeamProjectTransferFields,
   visibilityConfirmation,
   withoutManagedSession,
   withdrawalConfirmation,
@@ -26,6 +27,17 @@ const session: ManagedSession = {
   visibility: 'public',
   team_id: null,
   team_name: null,
+  project: {
+    id: 'project_1',
+    slug: 'team-workspaces',
+    name: 'Team Workspaces',
+    owner: {
+      kind: 'user',
+      id: 'user_1',
+      handle: 'alice',
+      name: 'Alice',
+    },
+  },
   can_manage_visibility: true,
   author: { handle: 'alice', display_name: 'Alice', avatar_url: null },
 }
@@ -47,6 +59,8 @@ describe('ManagedSessionList', () => {
 
     expect(html).toContain('session-feed-row')
     expect(html).toContain('@alice')
+    expect(html).toContain('href="/@alice/team-workspaces"')
+    expect(html).toContain('Team Workspaces')
     expect(html).toContain('Codex CLI')
     expect(html).toContain('$1.25 · 800K tokens')
     expect(html).toContain('3 stars')
@@ -221,6 +235,91 @@ describe('ManagedSessionList', () => {
     expect(html).not.toContain('3 stars')
     expect(html).not.toContain('<select')
   })
+
+  it('renders an accessible Team Project transfer choice without a hidden default', () => {
+    const html = renderToStaticMarkup(
+      <TeamProjectTransferFields
+        state={{
+          kind: 'ready',
+          teamId: 'team_1',
+          teamName: 'Paperboy',
+          projects: [
+            {
+              id: 'project_2',
+              slug: 'react-vapor',
+              name: 'React Vapor',
+              description: null,
+              github_url: null,
+              owner: {
+                kind: 'team',
+                id: 'team_1',
+                handle: 'paperboy',
+                name: 'Paperboy',
+              },
+              session_count: 1,
+              updated_at: 2,
+              archived_at: null,
+              can_manage: true,
+            },
+          ],
+        }}
+        selectedProjectId=""
+        busy={false}
+        onProjectChange={() => undefined}
+        onRetry={() => undefined}
+        onTransfer={() => undefined}
+      />,
+    )
+
+    expect(html).toContain('Team Project')
+    expect(html).toContain('aria-label="Project in Team Paperboy"')
+    expect(html).toContain('<option value="" selected="">Choose a Project</option>')
+    expect(html).toContain('React Vapor')
+    expect(html).toContain('Transfer to Team Project')
+    expect(html).toContain('disabled=""')
+  })
+
+  it('explains Team Project loading, failure, and empty states', () => {
+    const common = {
+      selectedProjectId: '',
+      busy: false,
+      onProjectChange: () => undefined,
+      onRetry: () => undefined,
+      onTransfer: () => undefined,
+    }
+    const loading = renderToStaticMarkup(
+      <TeamProjectTransferFields
+        {...common}
+        state={{ kind: 'loading', teamId: 'team_1', teamName: 'Paperboy' }}
+      />,
+    )
+    expect(loading).toContain('role="status"')
+    expect(loading).toContain('Loading Projects for Team · Paperboy')
+
+    const failure = renderToStaticMarkup(
+      <TeamProjectTransferFields
+        {...common}
+        state={{
+          kind: 'error',
+          teamId: 'team_1',
+          teamName: 'Paperboy',
+          message: 'Could not load Team Projects. Try again.',
+        }}
+      />,
+    )
+    expect(failure).toContain('role="alert"')
+    expect(failure).toContain('Retry loading Projects')
+
+    const empty = renderToStaticMarkup(
+      <TeamProjectTransferFields
+        {...common}
+        state={{ kind: 'ready', teamId: 'team/a', teamName: 'Paperboy', projects: [] }}
+      />,
+    )
+    expect(empty).toContain('has no Projects')
+    expect(empty).toContain('Create Team Project')
+    expect(empty).toContain('/projects/new?team=team%2Fa')
+  })
 })
 
 describe('withdrawalConfirmation', () => {
@@ -270,13 +369,18 @@ describe('withoutManagedSession', () => {
 
 describe('visibilityConfirmation', () => {
   it('states ownership transfer and durable Team retention', () => {
-    const message = visibilityConfirmation(session, {
-      visibility: 'team',
-      teamId: 'team_1',
-      teamName: 'Paperboy',
-    })
+    const message = visibilityConfirmation(
+      session,
+      {
+        visibility: 'team',
+        teamId: 'team_1',
+        teamName: 'Paperboy',
+      },
+      'React Vapor',
+    )
 
     expect(message).toContain('transfers ownership')
+    expect(message).toContain('Project · React Vapor in Team · Paperboy')
     expect(message).toContain('removed from Explore')
     expect(message).toContain('keeps the Session if you later leave')
   })

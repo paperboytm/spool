@@ -16,6 +16,10 @@ interface PublishPreparedShareBaseOptions {
   onUploadProgress?: (uploaded: number, total: number) => void
   /** Fail if durable Team ownership changed after the caller reviewed it. */
   expectedTeamId?: string | null
+  /** Every hosted Session belongs to one explicit Hub Project. */
+  projectId: string
+  /** Fail if an existing Session moved Projects after the caller read it. */
+  expectedProjectId?: string | null
 }
 
 type PublishPreparedShareTarget =
@@ -59,6 +63,8 @@ export async function publishPreparedShare(
         : { visibility: options.visibility }
   const ownershipExpectation =
     options.expectedTeamId === undefined ? {} : { expectedTeamId: options.expectedTeamId }
+  const projectExpectation =
+    options.expectedProjectId === undefined ? {} : { expectedProjectId: options.expectedProjectId }
   const head: HubSessionWriteRequest = {
     root: prepared.root,
     count: prepared.count,
@@ -69,8 +75,10 @@ export async function publishPreparedShare(
     lineageJson: prepared.lineageJson,
     viewOid: prepared.viewOid,
     spoolFileOid: spoolFile?.oid ?? null,
+    projectId: options.projectId,
     ...target,
     ...ownershipExpectation,
+    ...projectExpectation,
   }
 
   const { missing } = await client.pushSession(prepared.sid, head)

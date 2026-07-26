@@ -8,6 +8,18 @@ export interface ManagedSessionAuthor {
   avatar_url: string | null
 }
 
+export interface ManagedSessionProject {
+  id: string
+  slug: string
+  name: string
+  owner: {
+    kind: 'user' | 'team'
+    id: string
+    handle: string
+    name: string
+  }
+}
+
 export interface ManagedSession {
   sid: string
   title: string
@@ -18,16 +30,22 @@ export interface ManagedSession {
   star_count?: number
   provider: string
   created_at: number
+  /** Discovery publication time. Null for Link-only and Team-only Sessions. */
+  published_at?: number | null
   updated_at: number
   visibility: ManagedSessionVisibility
   team_id: string | null
   team_name: string | null
+  /** Required by current Hub responses; optional only during a rolling upgrade. */
+  project?: ManagedSessionProject
   can_manage_visibility: boolean
   author: ManagedSessionAuthor
 }
 
 export interface ManagedSessionPage {
   sessions: ManagedSession[]
+  /** Total Sessions in the scope, independent of the current page. */
+  session_count?: number
   next_cursor: string | null
 }
 
@@ -108,13 +126,19 @@ export function appendUniqueManagedSessions(
 export function updateManagedSessionVisibility(
   sid: string,
   visibility: ManagedSessionVisibility,
-  teamId?: string,
+  options: {
+    teamId?: string
+    projectId?: string
+    expectedProjectId?: string
+  } = {},
 ): Promise<HubManagementResult<{ session: ManagedSession }>> {
   return requestJson(`/api/me/sessions/${encodeURIComponent(sid)}`, {
     method: 'PATCH',
     body: JSON.stringify({
       visibility,
-      ...(visibility === 'team' && teamId ? { team_id: teamId } : {}),
+      ...(visibility === 'team' && options.teamId ? { team_id: options.teamId } : {}),
+      ...(options.projectId ? { project_id: options.projectId } : {}),
+      ...(options.expectedProjectId ? { expected_project_id: options.expectedProjectId } : {}),
     }),
   })
 }

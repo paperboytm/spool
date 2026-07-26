@@ -2,6 +2,8 @@ import type { D1Database, KVNamespace, R2Bucket } from '@cloudflare/workers-type
 import { sequenceRoot } from '@spool-lab/session-kit'
 
 import { ApiError } from '../errors'
+import { activeProjectForTenant, resolveDefaultProject } from '../projects/store'
+import type { ProjectTenant } from '../projects/types'
 import { requireHubUser } from './auth'
 import { getHubSession, presentOids, presentTeamOids, type HubSessionRow } from './store'
 import type { HeadBodyT } from './wire'
@@ -32,6 +34,8 @@ export async function validateHead(
   aliasOids: string[]
   teamId: string | null
   teamRole: TeamRole | null
+  projectId: string
+  projectNeedsInsert: boolean
 }> {
   const existing = await getHubSession(db, sid)
   const requestedTeamId = body.teamId ?? null
@@ -58,6 +62,48 @@ export async function validateHead(
     throw new ApiError('CONFLICT', 'a Team-owned Session cannot move to another Team')
   }
 
+  if (
+    body.expectedProjectId !== undefined &&
+    (existing?.project_id ?? null) !== body.expectedProjectId
+  ) {
+    throw new ApiError('CONFLICT', 'Session Project changed; review the current Project')
+  }
+
+  const tenant: ProjectTenant =
+    teamId === null ? { userId, teamId: null } : { userId: null, teamId }
+  let projectId: string
+  let projectNeedsInsert = false
+  const preservesExistingProject =
+    existing !== null &&
+    body.projectId === undefined &&
+    existing.team_id === teamId &&
+    typeof existing.project_id === 'string'
+  if (preservesExistingProject) {
+    projectId = existing.project_id
+    if (!(await activeProjectForTenant(db, projectId, tenant))) {
+      throw new ApiError('CONFLICT', 'Session Project is archived or unavailable')
+    }
+  } else if (typeof body.projectId === 'string') {
+    projectId = body.projectId
+    if (!(await activeProjectForTenant(db, projectId, tenant))) {
+      throw new ApiError('NOT_FOUND')
+    }
+  } else {
+    const fallback = await resolveDefaultProject(db, tenant)
+    projectId = fallback.projectId
+    projectNeedsInsert = fallback.needsInsert
+  }
+  const projectChanged = existing !== null && existing.project_id !== projectId
+  if (
+    projectChanged &&
+    existing !== null &&
+    existing.team_id !== null &&
+    teamRole !== 'owner' &&
+    teamRole !== 'admin'
+  ) {
+    throw new ApiError('FORBIDDEN')
+  }
+
   const root = await sequenceRoot(body.manifest)
   if (root !== body.root) {
     throw new ApiError('UNPROCESSABLE', 'manifest does not fold to root')
@@ -77,6 +123,8 @@ export async function validateHead(
       aliasOids: [],
       teamId: null,
       teamRole: null,
+      projectId,
+      projectNeedsInsert,
     }
   }
 
@@ -91,6 +139,8 @@ export async function validateHead(
     aliasOids: notInTeam.filter((oid) => personalPresent.has(oid)),
     teamId,
     teamRole,
+    projectId,
+    projectNeedsInsert,
   }
 }
 

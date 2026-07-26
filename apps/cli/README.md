@@ -30,18 +30,21 @@ spool logout
 ## Continuous Publishing
 
 ```bash
-spool subscribe [dir] --team <name-or-id>   # Team · {name}: current members only
+spool subscribe [dir] --team <handle|name|id> # Team · {name}: current members only
 spool subscribe [dir] --link-only           # anyone with the URL
 spool subscribe [dir] --public              # explicit opt-in to Explore/search
 spool unsubscribe [dir]
 spool subscriptions
 spool teams                                 # list the Teams you belong to
+spool projects list                         # list writable personal and Team Projects
+spool projects bind [dir] --project <id|owner/slug>
+spool projects move <sid|url> --project <id|owner/slug>
 spool daemon start|stop|status|logs|run
 ```
 
-`--team` accepts a Team name (or id when two Teams share a name); `spool teams` shows exactly the names to use.
+`--team` accepts a stable Team handle, an id, or a unique Team name. When names collide, Spool fails closed and asks for a handle or id.
 
-Subscribing a directory is the one-time disclosure decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public; **there is no implicit default and Public is never preselected**. Interactive `spool subscribe` offers your Teams first.
+Subscribing a directory is the one-time disclosure and Project decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public; **there is no implicit default and Public is never preselected**. Every hosted Session also belongs to one personal or Team Project. Interactive `spool subscribe` offers a Project or can create one. Automation must pass `--project <id|owner/slug>` or `--create-project <name>` unless an account-, tenant-, Hub-, and local-Project-specific binding already exists; `--yes` never chooses a Project.
 
 `spool daemon start` registers the watcher with launchd (macOS) or a systemd user unit (Linux) so it runs at login and restarts on failure. `spool daemon run` is the same loop in the foreground.
 
@@ -64,11 +67,18 @@ Useful publishing options:
 spool share <uuid>@12              # first 12 records
 spool share --no-agent-summary     # skip local Agent generation
 spool share --spool-file x.spool   # attach a curated document
+spool share --project evan/spool   # bind this local Project to an existing Hub Project
+spool share --create-project Spool # create and bind a Project
+spool share --team paperboy --project paperboy/react-vapor # Team-only from the first upload
 spool share --visibility-confirmed # acknowledge visibility without a TTY
 spool share --yes                  # skip all confirmations, including secret findings
 ```
 
-For the normal interactive flow, omit Summary options. After the Session URL is live, Spool can ask a detected local Agent to draft the optional Summary. `--summary <markdown>` is an advanced manual or automation input: it uploads exactly the Markdown supplied by the caller and does not generate a Summary.
+For the normal interactive flow, omit Summary options. Spool resolves the exact local Project joined to the selected Session—even when the command is run from another directory—and asks for a Hub Project the first time. Re-sharing keeps the Session's existing remote Project. After the Session URL is live, Spool can ask a detected local Agent to draft the optional Summary. `--summary <markdown>` is an advanced manual or automation input: it uploads exactly the Markdown supplied by the caller and does not generate a Summary.
+
+`--team <handle|name|id>` is the direct one-off Team path. It requires a Team-owned Project (explicitly or through an existing Team binding), names the Team and ownership transfer in the confirmation, shows the selected Project before upload, and writes `Team · {name}` on the first Hub head—there is no intermediate Public Session.
+
+Move an already-hosted Session between Projects owned by the same user or Team with `spool projects move <sid|url> --project <id|owner/slug>`. The command sends the current Project as an optimistic precondition and never changes records, visibility, authorship, stars, or verified-fork lineage. Use `spool visibility … team` instead when the tenant itself must change.
 
 For Claude Code and Codex CLI shares, Resume verifies the shared records, writes a new provider-native Session, preserves the source relationship, and launches the agent. Use `--workspace <dir>` to choose the project or `--no-exec` to prepare without launching.
 
@@ -77,7 +87,8 @@ For Claude Code and Codex CLI shares, Resume verifies the shared records, writes
 ```bash
 spool visibility <sid|url> public            # Team → Public keeps Team ownership
 spool visibility <sid|url> link-only
-spool visibility <sid|url> team --team <name-or-id>
+spool visibility <sid|url> team --team <handle|name|id> --project <id|owner/slug>
+spool visibility <sid|url> team --team <handle|name|id> --create-project <name>
 ```
 
 Disclosure changes are named, confirmed actions and never re-upload records. Changing a Team-owned Session requires a Team Owner or Admin role; moving a personal Session into a Team transfers ownership to the Team. The same control exists on spool.new under your account's Sessions list.
@@ -115,6 +126,7 @@ The CLI uses `~/.spool/` by default:
 - `spool.db` — local Session metadata, messages, search, and state
 - `hub-credentials.json` — revocable Hub credential from `spool login`
 - `subscriptions.json` — directories subscribed for continuous publishing
+- `project-bindings.json` — `0600` local-to-Hub Project bindings scoped by Hub, account, and tenant
 - `auto-publish-state.json` — per-Session fingerprints that keep auto-publish incremental
 - `daemon.json` / `daemon.log` — daemon heartbeat and log
 

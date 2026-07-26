@@ -30,8 +30,35 @@ function SessionsRoute() {
     <SessionsPage
       search={search}
       onSearchChange={(next: SessionsSearchState) => {
+        if (requiresPrivateDocumentReload(search, next)) {
+          window.location.assign(sessionsSearchHref(next))
+          return
+        }
         void navigate({ search: next })
       }}
     />
   )
+}
+
+export function requiresPrivateDocumentReload(
+  current: SessionsSearchState,
+  next: SessionsSearchState,
+): boolean {
+  return !isPrivateSessionsScope(current) && isPrivateSessionsScope(next)
+}
+
+export function sessionsSearchHref(search: SessionsSearchState): string {
+  const params = new URLSearchParams()
+  params.set('sort', search.sort)
+  if (search.scope === 'mine') {
+    params.set('scope', 'mine')
+  } else if (search.scope === 'team' && search.team) {
+    params.set('scope', 'team')
+    params.set('team', search.team)
+  }
+  return `/sessions?${params.toString()}`
+}
+
+function isPrivateSessionsScope(search: SessionsSearchState): boolean {
+  return search.scope === 'mine' || search.scope === 'team'
 }

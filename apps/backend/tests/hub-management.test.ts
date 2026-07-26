@@ -24,6 +24,7 @@ const TEAM_SESSION: HubSessionRow = {
   total_tokens: null,
   visibility: 'private',
   team_id: 'team_1',
+  project_id: 'project_11111111',
   withdrawn_at: null,
   created_at: 1,
   updated_at: 2,
@@ -40,6 +41,24 @@ function mockDatabase(feedRows: unknown[]) {
         return {
           all: vi.fn(async () => ({ results: feedRows })),
           first: vi.fn(async () => {
+            if (sql.includes('SELECT * FROM projects')) {
+              return {
+                id: TEAM_SESSION.project_id,
+                owner_user_id: null,
+                owner_team_id: 'team_1',
+                slug: 'paperboy',
+                name: 'Paperboy',
+                description: 'Paperboy product work.',
+                github_url: null,
+                created_by_user_id: 'author_1',
+                created_at: 1,
+                updated_at: 2,
+                archived_at: null,
+              }
+            }
+            if (sql.includes('SELECT t.name')) {
+              return { name: 'Paperboy', handle: 'paperboy' }
+            }
             if (sql.includes('SELECT name, avatar_url')) {
               return {
                 name: 'Author',
@@ -73,6 +92,8 @@ describe('Team Session management feed', () => {
     expect(sql).toContain('t.archived_at IS NULL')
     expect(sql).toContain('t.deletion_pending_until IS NULL')
     expect(sql).toContain('ON s.team_id=current_team.id AND s.withdrawn_at IS NULL')
+    expect(sql).toContain('counted.team_id=current_team.id')
+    expect(sql).toContain('counted.withdrawn_at IS NULL')
     expect(sql).toContain(
       '(SELECT COUNT(*) FROM hub_session_stars star WHERE star.sid=s.sid) AS star_count',
     )
@@ -86,6 +107,7 @@ describe('Team Session management feed', () => {
 
     await expect(listTeamHubSessions(authorized.db, 'team_1', 'user_1')).resolves.toEqual({
       sessions: [],
+      session_count: 0,
       next_cursor: null,
     })
   })
@@ -159,11 +181,63 @@ describe('Team Session management feed', () => {
     })
   })
 
+  it('hydrates author and Project metadata in the feed query without per-row lookups', async () => {
+    const authorized = mockDatabase([
+      {
+        ...TEAM_SESSION,
+        team_name: 'Paperboy',
+        team_role: 'owner',
+        star_count: 3,
+        managed_published: 0,
+        managed_published_at: null,
+        managed_author_handle: 'author',
+        managed_author_name: 'Author',
+        managed_author_display_name: 'Author',
+        managed_author_avatar_url: null,
+        managed_author_custom_avatar_id: null,
+        managed_author_avatar_visible: 1,
+        managed_project_slug: 'paperboy',
+        managed_project_name: 'Paperboy',
+        managed_project_owner_user_id: null,
+        managed_project_owner_team_id: 'team_1',
+        managed_project_owner_handle: 'paperboy',
+        managed_project_owner_name: 'Paperboy',
+        managed_project_owner_avatar_url: null,
+        managed_project_owner_custom_avatar_id: null,
+        managed_project_owner_avatar_visible: 1,
+      },
+    ])
+
+    const page = await listTeamHubSessions(authorized.db, 'team_1', 'user_1')
+
+    expect(authorized.sqlLog).toHaveLength(1)
+    expect(authorized.sqlLog[0]).toContain('JOIN projects managed_project')
+    expect(authorized.sqlLog[0]).toContain('managed_project_owner_handle.handle')
+    expect(page?.sessions[0]).toMatchObject({
+      author: { handle: 'author', display_name: 'Author' },
+      project: {
+        id: TEAM_SESSION.project_id,
+        slug: 'paperboy',
+        name: 'Paperboy',
+        owner: {
+          kind: 'team',
+          id: 'team_1',
+          handle: 'paperboy',
+          name: 'Paperboy',
+          avatar_url: null,
+        },
+      },
+    })
+    expect(page?.sessions[0]?.project).not.toHaveProperty('session_count')
+    expect(page?.sessions[0]?.project).not.toHaveProperty('can_manage')
+  })
+
   it('hides Sessions from archived or deletion-pending Teams in the owner feed', async () => {
     const owner = mockDatabase([])
 
     await expect(listOwnerHubSessions(owner.db, 'user_1')).resolves.toEqual({
       sessions: [],
+      session_count: 0,
       next_cursor: null,
     })
 
@@ -198,7 +272,7 @@ describe('Team Session management feed', () => {
         cursor: firstPage.next_cursor,
         limit: 1,
       }),
-    ).resolves.toEqual({ sessions: [], next_cursor: null })
+    ).resolves.toEqual({ sessions: [], session_count: 0, next_cursor: null })
     expect(next.bindLog[0]).toEqual(['user_1', 1, 20, 20, firstSid, 2])
   })
 
@@ -249,7 +323,22 @@ describe('Team Session management feed', () => {
         cursor: page?.next_cursor ?? null,
         limit: 1,
       }),
-    ).resolves.toEqual({ sessions: [], next_cursor: null })
+    ).resolves.toEqual({ sessions: [], session_count: 0, next_cursor: null })
+  })
+
+  it('returns the total Team Session count independently of the current page', async () => {
+    const feed = mockDatabase([
+      {
+        ...TEAM_SESSION,
+        team_name: 'Paperboy',
+        team_role: 'member',
+        session_count: 2_726,
+      },
+    ])
+
+    await expect(
+      listTeamHubSessions(feed.db, 'team_1', 'user_1', { cursor: null, limit: 1 }),
+    ).resolves.toMatchObject({ session_count: 2_726 })
   })
 
   it('validates page size and duplicate query parameters', () => {
