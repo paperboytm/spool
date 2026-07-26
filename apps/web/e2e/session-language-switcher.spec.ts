@@ -401,9 +401,11 @@ test('keeps the language control reachable and overflow-safe at 320px', async ({
   await page.goto(`/session/${SID}`)
   await expectEnglishSession(page)
 
-  await page.getByRole('button', { name: 'Open navigation' }).click()
-  const navigation = page.getByRole('navigation', { name: 'Mobile navigation' })
-  const languageGroup = navigation.getByRole('group', { name: 'Session language' })
+  const displayPreferences = page.locator(
+    '.session-language-toolbar[aria-label="Session display preferences"]',
+  )
+  const languageGroup = displayPreferences.getByRole('group', { name: 'Session language' })
+  await expect(displayPreferences).toBeVisible()
   await expect(languageGroup).toBeVisible()
   for (const name of ['Show Sessions in English', '用中文显示 Session']) {
     const box = await languageGroup.getByRole('button', { name }).boundingBox()
@@ -411,7 +413,7 @@ test('keeps the language control reachable and overflow-safe at 320px', async ({
     expect(box?.height).toBeGreaterThanOrEqual(44)
   }
   await page.screenshot({
-    path: testInfo.outputPath('session-language-menu-320.png'),
+    path: testInfo.outputPath('session-language-toolbar-320.png'),
     fullPage: true,
     animations: 'disabled',
   })
@@ -419,10 +421,15 @@ test('keeps the language control reachable and overflow-safe at 320px', async ({
   await languageGroup.getByRole('button', { name: '用中文显示 Session' }).click()
   await expectChineseSession(page)
   await page.screenshot({
-    path: testInfo.outputPath('session-language-menu-zh-320.png'),
+    path: testInfo.outputPath('session-language-toolbar-zh-320.png'),
     fullPage: true,
     animations: 'disabled',
   })
+
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  const navigation = page.getByRole('navigation', { name: 'Mobile navigation' })
+  await expect(navigation).toBeVisible()
+  await expect(navigation.getByRole('group', { name: 'Session language' })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expectNoHorizontalOverflow(page)
   expect(recordRequests).toEqual([])
