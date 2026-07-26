@@ -214,7 +214,12 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
 }
 
 function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem & {
-  project: { id: string; slug: string; name: string } | null
+  project: {
+    id: string
+    slug: string
+    name: string
+    owner?: { kind: 'user' | 'team'; handle: string }
+  } | null
 } {
   const avatarVisible = row.avatar_visible === 1
   const avatarUrl = !avatarVisible
@@ -255,6 +260,14 @@ function toDiscoveryItem(row: DiscoveryCandidateRow): DiscoverySessionItem & {
             id: row.project_id,
             slug: row.project_slug,
             name: row.project_name,
+            ...(row.project_owner_kind === null || row.project_owner_handle === null
+              ? {}
+              : {
+                  owner: {
+                    kind: row.project_owner_kind,
+                    handle: row.project_owner_handle,
+                  },
+                }),
           },
     evidence: {
       records: row.record_count,

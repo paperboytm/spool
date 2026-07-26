@@ -20,7 +20,8 @@ export interface Subscription {
   /** Absolute, symlink-resolved directory path. */
   path: string
   visibility: SubscriptionVisibility
-  /** Required when visibility is 'team'. */
+  /** Durable Team owner, independent of whether the Session is Team-only,
+   *  Link-only, or Public. Required when visibility is `team`. */
   teamId?: string
   /** Display-only; the id is authoritative. */
   teamName?: string
@@ -40,7 +41,7 @@ export interface Subscription {
 }
 
 interface SubscriptionsFile {
-  version: 3
+  version: 4
   subscriptions: Subscription[]
 }
 
@@ -73,11 +74,13 @@ export function loadSubscriptions(options: HubCredentialOptions = {}): Subscript
     parsed['version'] !== undefined &&
     parsed['version'] !== 1 &&
     parsed['version'] !== 2 &&
-    parsed['version'] !== 3
+    parsed['version'] !== 3 &&
+    parsed['version'] !== 4
   ) {
     throw new Error(`Invalid subscriptions file at ${path}: unsupported version`)
   }
-  const version = parsed['version'] === 3 ? 3 : parsed['version'] === 2 ? 2 : 1
+  const version =
+    parsed['version'] === 4 ? 4 : parsed['version'] === 3 ? 3 : parsed['version'] === 2 ? 2 : 1
   return parsed['subscriptions'].map((value, index) =>
     parseSubscription(value, index, path, version),
   )
@@ -88,7 +91,7 @@ export function saveSubscriptions(
   options: HubCredentialOptions = {},
 ): string {
   const path = subscriptionsPath(options)
-  const stored: SubscriptionsFile = { version: 3, subscriptions: [...subscriptions] }
+  const stored: SubscriptionsFile = { version: 4, subscriptions: [...subscriptions] }
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   writeFileSync(path, `${JSON.stringify(stored, null, 2)}\n`, {
     encoding: 'utf8',
@@ -157,7 +160,7 @@ function parseSubscription(
   value: unknown,
   index: number,
   path: string,
-  version: 1 | 2 | 3,
+  version: 1 | 2 | 3 | 4,
 ): Subscription {
   if (!isRecord(value) || typeof value['path'] !== 'string' || value['path'].trim() === '') {
     throw new Error(`Invalid subscriptions file at ${path}: entry ${index} has no path`)
@@ -166,24 +169,47 @@ function parseSubscription(
   // safest disclosure rather than the widest.
   const teamId =
     typeof value['teamId'] === 'string' && value['teamId'] ? value['teamId'] : undefined
-  const visibility: SubscriptionVisibility =
+  const requestedVisibility: SubscriptionVisibility =
     value['visibility'] === 'public'
       ? 'public'
-      : value['visibility'] === 'team' && teamId !== undefined
+      : value['visibility'] === 'team'
         ? 'team'
         : 'link-only'
   const teamName =
     typeof value['teamName'] === 'string' && value['teamName'] ? value['teamName'] : undefined
   const addedAt = typeof value['addedAt'] === 'string' ? value['addedAt'] : ''
   const project =
-    version === 3 && value['project'] !== undefined
+    version >= 3 && value['project'] !== undefined
       ? parseSubscriptionProject(value['project'], index, path)
       : undefined
+  const projectTeamId = project?.tenant.kind === 'team' ? project.tenant.id : undefined
+  if (version === 4 && project?.tenant.kind === 'user' && teamId !== undefined) {
+    throw new Error(
+      `Invalid subscriptions file at ${path}: entry ${index} has a personal Project with a Team owner`,
+    )
+  }
+  if (
+    version === 4 &&
+    projectTeamId !== undefined &&
+    teamId !== undefined &&
+    projectTeamId !== teamId
+  ) {
+    throw new Error(
+      `Invalid subscriptions file at ${path}: entry ${index} has mismatched Team ownership`,
+    )
+  }
+  // v1-v3 only stored Team ownership for Team-only subscriptions. v4 carries
+  // the Project owner separately so Public and Link-only Team Projects remain
+  // correctly attributed during background publishing.
+  const ownerTeamId =
+    version === 4 ? (projectTeamId ?? teamId) : requestedVisibility === 'team' ? teamId : undefined
+  const visibility: SubscriptionVisibility =
+    requestedVisibility === 'team' && ownerTeamId === undefined ? 'link-only' : requestedVisibility
   return {
     path: value['path'],
     visibility,
-    ...(visibility === 'team' && teamId !== undefined ? { teamId } : {}),
-    ...(visibility === 'team' && teamName !== undefined ? { teamName } : {}),
+    ...(ownerTeamId === undefined ? {} : { teamId: ownerTeamId }),
+    ...(ownerTeamId === undefined || teamName === undefined ? {} : { teamName }),
     ...(project === undefined ? {} : { project }),
     addedAt,
   }

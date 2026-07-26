@@ -87,6 +87,7 @@ function makeHub() {
   const objects = new Map<string, string>()
   const sessions = new Map<string, StoredHead>()
   const writes: Array<{ action: 'push' | 'head'; sid: string; body: StoredHead }> = []
+  const projectCreates: Array<{ name: string; owner: { kind: 'user' | 'team'; id: string } }> = []
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -104,6 +105,27 @@ function makeHub() {
 
     if (method === 'GET' && path === '/api/hub/v1/projects') {
       return json({ actor: { id: ACTOR_ID }, projects: [HUB_PROJECT, TEAM_PROJECT] })
+    }
+
+    if (method === 'POST' && path === '/api/hub/v1/projects') {
+      const body = JSON.parse(String(init?.body)) as {
+        name: string
+        owner: { kind: 'user' | 'team'; id: string }
+      }
+      projectCreates.push(body)
+      const owner =
+        body.owner.kind === 'team'
+          ? { kind: 'team' as const, id: body.owner.id, handle: 'paperboy', name: 'Paperboy' }
+          : { kind: 'user' as const, id: body.owner.id, handle: 'author', name: 'Author' }
+      return json({
+        project: {
+          ...HUB_PROJECT,
+          id: `project_created${String(projectCreates.length).padStart(4, '0')}`,
+          slug: body.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'),
+          name: body.name,
+          owner,
+        },
+      })
     }
 
     if (method === 'GET' && path === '/api/hub/v1/teams') {
@@ -214,7 +236,7 @@ function makeHub() {
     return json({ error: 'NOT_FOUND', detail: `unhandled ${method} ${path}` }, 404)
   }
 
-  return { fetchImpl, objects, sessions, writes }
+  return { fetchImpl, objects, sessions, writes, projectCreates }
 }
 
 function writeFixtureSession(workspaceRoot: string): string {
@@ -282,6 +304,7 @@ function interactiveUi(
   options: {
     confirm?: boolean | null | ((message: string) => boolean | null)
     selected?: 'claude' | 'codex'
+    projectChoice?: 'create'
     events?: string[]
   } = {},
 ): CliUi {
@@ -312,6 +335,9 @@ function interactiveUi(
     },
     select: async ({ message, choices }) => {
       events.push(`select:${message}`)
+      if (options.projectChoice === 'create' && message.startsWith('Which Hub Project')) {
+        return choices.find((choice) => choice.label.startsWith('Create Project'))?.value ?? null
+      }
       const wanted = options.selected ?? 'claude'
       return choices.find((choice) => choice.value === wanted)?.value ?? choices[0]?.value ?? null
     },
@@ -328,6 +354,7 @@ function shareDeps(
   workspaceRoot: string,
   filePath: string,
   home: string,
+  options: { bindProject?: boolean } = {},
 ) {
   const logs: string[] = []
   const errors: string[] = []
@@ -336,16 +363,18 @@ function shareDeps(
     key: 'github.com/paperboytm/spool',
     displayName: 'spool',
   }
-  upsertProjectBinding(
-    {
-      hubUrl: HUB_URL,
-      actorId: ACTOR_ID,
-      tenant: { kind: 'user', id: ACTOR_ID },
-      localIdentity: projectIdentity,
-      project: HUB_PROJECT,
-    },
-    { homeDir: home },
-  )
+  if (options.bindProject !== false) {
+    upsertProjectBinding(
+      {
+        hubUrl: HUB_URL,
+        actorId: ACTOR_ID,
+        tenant: { kind: 'user', id: ACTOR_ID },
+        localIdentity: projectIdentity,
+        project: HUB_PROJECT,
+      },
+      { homeDir: home },
+    )
+  }
   return {
     logs,
     errors,
@@ -500,11 +529,11 @@ describe('spool share local Agent Summary flow', () => {
     expect(copied).toBe(url)
     expect(events).toContain(`note:Public Session URL:${url}`)
     expect(events).toContain(
-      'confirm:Publish this Session as Public? It can appear in Explore and search.:yes',
+      'confirm:Publish this Session as Public in Project Spool? It can appear in Explore and search.:yes',
     )
     expect(
       events.indexOf(
-        'confirm:Publish this Session as Public? It can appear in Explore and search.:yes',
+        'confirm:Publish this Session as Public in Project Spool? It can appear in Explore and search.:yes',
       ),
     ).toBeLessThan(events.indexOf('spinner:start:Uploading session'))
     expect(events).toContain('success:Session published. Link copied to clipboard.')
@@ -694,6 +723,119 @@ describe('spool share local Agent Summary flow', () => {
     expect(share.logs.join('\n')).toContain('Only current members')
   })
 
+  it('publishes a Team-owned Project as Public when explicitly requested', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-team-public-share-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-team-public-share-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {
+        agentSummary: false,
+        team: '@paperboy',
+        public: true,
+        project: 'paperboy/react-vapor',
+        visibilityConfirmed: true,
+        yes: true,
+      },
+      share.deps,
+    )
+
+    expect(exit).toBe(0)
+    const writes = hub.writes.filter((write) => write.sid === `claude_${SESSION_UUID}`)
+    expect(writes).not.toHaveLength(0)
+    expect(writes.every((write) => write.body.visibility === 'public')).toBe(true)
+    expect(writes.every((write) => write.body.teamId === TEAM_ID)).toBe(true)
+    expect(writes.every((write) => write.body.projectId === TEAM_PROJECT.id)).toBe(true)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'public',
+      teamId: TEAM_ID,
+      projectId: TEAM_PROJECT.id,
+    })
+    expect(share.logs.join('\n')).toContain('Team · Paperboy owns the hosted Session')
+  })
+
+  it('derives Team ownership from --project without requiring --team', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-project-owner-share-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-project-owner-share-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {
+        agentSummary: false,
+        public: true,
+        project: 'paperboy/react-vapor',
+        visibilityConfirmed: true,
+        yes: true,
+      },
+      share.deps,
+    )
+
+    expect(exit).toBe(0)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'public',
+      teamId: TEAM_ID,
+      projectId: TEAM_PROJECT.id,
+    })
+  })
+
+  it('keeps Team ownership for an explicit Link-only share', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-team-link-share-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-team-link-share-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {
+        agentSummary: false,
+        linkOnly: true,
+        project: 'paperboy/react-vapor',
+        visibilityConfirmed: true,
+        yes: true,
+      },
+      share.deps,
+    )
+
+    expect(exit).toBe(0)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)).toMatchObject({
+      visibility: 'link-only',
+      teamId: TEAM_ID,
+      projectId: TEAM_PROJECT.id,
+    })
+  })
+
+  it('rejects a Project whose owner conflicts with --team', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-team-project-mismatch-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-team-project-mismatch-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+
+    const exit = await handleShareCommand(
+      undefined,
+      {
+        agentSummary: false,
+        team: '@paperboy',
+        public: true,
+        project: HUB_PROJECT.id,
+        visibilityConfirmed: true,
+        yes: true,
+      },
+      share.deps,
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.size).toBe(0)
+    expect(share.errors.join('\n')).toContain('different owner')
+  })
+
   it('still asks an interactive Team share to select a Project when --yes is set', async () => {
     const hub = makeHub()
     const workspace = mkdtempSync(join(tmpdir(), 'spool-team-project-select-'))
@@ -750,6 +892,55 @@ describe('spool share local Agent Summary flow', () => {
     expect(exit).toBe(1)
     expect(hub.sessions.size).toBe(0)
     expect(hub.writes).toEqual([])
+  })
+
+  it('offers interactive Project creation but does not write when disclosure is declined', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-project-create-declined-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-project-create-declined-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home, { bindProject: false })
+    const events: string[] = []
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false },
+      {
+        ...share.deps,
+        ui: interactiveUi({ projectChoice: 'create', confirm: false, events }),
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(events.join('\n')).toContain('select:Which Hub Project should "spool" publish to?')
+    expect(hub.projectCreates).toEqual([])
+    expect(hub.sessions.size).toBe(0)
+    expect(hub.writes).toEqual([])
+  })
+
+  it('creates the selected Project only after disclosure is accepted, then publishes to it', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-project-create-accepted-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-project-create-accepted-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home, { bindProject: false })
+
+    const exit = await handleShareCommand(
+      undefined,
+      { agentSummary: false },
+      {
+        ...share.deps,
+        ui: interactiveUi({ projectChoice: 'create', confirm: true }),
+      },
+    )
+
+    expect(exit).toBe(0)
+    expect(hub.projectCreates).toHaveLength(1)
+    expect(hub.projectCreates[0]).toMatchObject({
+      name: 'spool',
+      owner: { kind: 'user', id: ACTOR_ID },
+    })
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.projectId).toBe('project_created0001')
   })
 
   it('preserves an existing Summary when the user declines regeneration', async () => {

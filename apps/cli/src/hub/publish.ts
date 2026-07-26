@@ -24,12 +24,17 @@ interface PublishPreparedShareBaseOptions {
 
 type PublishPreparedShareTarget =
   | {
-      /** Explicit personal disclosure, or omit for the provider-aware default. */
-      visibility?: 'public' | 'link-only'
+      /** Omitted target keeps the Hub's provider-aware personal default. */
+      visibility?: undefined
       teamId?: never
     }
   | {
-      /** Team is always an explicit tenant target; its id cannot accompany Public/Link-only. */
+      /** Public/Link-only disclosure may still live in a Team-owned Project. */
+      visibility: 'public' | 'link-only'
+      teamId?: string
+    }
+  | {
+      /** Team-only disclosure always requires a durable Team owner. */
       visibility: 'team'
       teamId: string
     }
@@ -50,17 +55,18 @@ export async function publishPreparedShare(
   prepared: PreparedShare,
   options: PublishPreparedShareOptions,
 ): Promise<HubHeadResponse> {
-  if (options.visibility === 'team' ? !options.teamId : options.teamId !== undefined) {
-    throw new Error('Team publishing requires visibility "team" and a Team id together')
+  if (options.visibility === 'team' && !options.teamId) {
+    throw new Error('Team-only publishing requires a Team id')
+  }
+  if (options.visibility === undefined && options.teamId !== undefined) {
+    throw new Error('Team-owned publishing requires an explicit visibility')
   }
   const spoolFile = options.spoolFile ?? null
   const summary = options.summary?.trim() ? options.summary : null
-  const target =
-    options.visibility === 'team'
-      ? { visibility: options.visibility, teamId: options.teamId }
-      : options.visibility === undefined
-        ? {}
-        : { visibility: options.visibility }
+  const target = {
+    ...(options.visibility === undefined ? {} : { visibility: options.visibility }),
+    ...(options.teamId === undefined ? {} : { teamId: options.teamId }),
+  }
   const ownershipExpectation =
     options.expectedTeamId === undefined ? {} : { expectedTeamId: options.expectedTeamId }
   const projectExpectation =

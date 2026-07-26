@@ -79,7 +79,7 @@ describe('subscriptions store', () => {
     expect(() => loadSubscriptions({ homeDir: home })).toThrow(/entry 0 has no path/)
   })
 
-  it('stores Project bindings as v3 and fails closed for legacy v2 bindings', () => {
+  it('stores Project bindings as v4 and fails closed for legacy v2 bindings', () => {
     const home = tempDir('spool-subs-')
     const project = {
       hubUrl: 'https://hub.test',
@@ -107,7 +107,7 @@ describe('subscriptions store', () => {
       addedAt: '2026-07-26T00:00:00.000Z',
     }
     const path = saveSubscriptions([entry], { homeDir: home })
-    expect(JSON.parse(readFileSync(path, 'utf8')).version).toBe(3)
+    expect(JSON.parse(readFileSync(path, 'utf8')).version).toBe(4)
     expect(loadSubscriptions({ homeDir: home })).toEqual([entry])
 
     writeFileSync(
@@ -124,6 +124,94 @@ describe('subscriptions store', () => {
         addedAt: entry.addedAt,
       },
     ])
+  })
+
+  it('keeps Team ownership for Public and Link-only Project subscriptions', () => {
+    const home = tempDir('spool-subs-')
+    const project = {
+      hubUrl: 'https://hub.test',
+      actorId: 'user_1',
+      tenant: { kind: 'team' as const, id: 'team_1' },
+      localIdentity: {
+        kind: 'git_remote' as const,
+        key: 'github.com/paperboytm/spool',
+        displayName: 'spool',
+      },
+      remote: {
+        id: 'project_1',
+        slug: 'spool',
+        name: 'Spool',
+        description: null,
+        github_url: null,
+        owner: { kind: 'team' as const, id: 'team_1', handle: 'paperboy', name: 'Paperboy' },
+        can_manage: true,
+      },
+    }
+    const entries = [
+      {
+        path: '/repos/spool',
+        visibility: 'public' as const,
+        teamId: 'team_1',
+        teamName: 'Paperboy',
+        project,
+        addedAt: '2026-07-26T00:00:00.000Z',
+      },
+      {
+        path: '/repos/private',
+        visibility: 'link-only' as const,
+        teamId: 'team_1',
+        teamName: 'Paperboy',
+        project,
+        addedAt: '2026-07-26T00:00:00.000Z',
+      },
+    ]
+    saveSubscriptions(entries, { homeDir: home })
+    expect(loadSubscriptions({ homeDir: home })).toEqual(entries)
+  })
+
+  it('rejects mismatched Team ownership in v4 files', () => {
+    const home = tempDir('spool-subs-')
+    mkdirSync(join(home, '.spool'), { recursive: true })
+    const path = join(home, '.spool', 'subscriptions.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 4,
+        subscriptions: [
+          {
+            path: '/repos/spool',
+            visibility: 'public',
+            teamId: 'team_wrong',
+            project: {
+              hubUrl: 'https://hub.test',
+              actorId: 'user_1',
+              tenant: { kind: 'team', id: 'team_1' },
+              localIdentity: {
+                kind: 'git_remote',
+                key: 'github.com/paperboytm/spool',
+                displayName: 'spool',
+              },
+              remote: {
+                id: 'project_1',
+                slug: 'spool',
+                name: 'Spool',
+                description: null,
+                github_url: null,
+                owner: {
+                  kind: 'team',
+                  id: 'team_1',
+                  handle: 'paperboy',
+                  name: 'Paperboy',
+                },
+                can_manage: true,
+              },
+            },
+            addedAt: '2026-07-26T00:00:00.000Z',
+          },
+        ],
+      }),
+    )
+    expect(() => loadSubscriptions({ homeDir: home })).toThrow(/mismatched Team ownership/)
   })
 
   it('canonicalizes relative inputs and rejects files', () => {

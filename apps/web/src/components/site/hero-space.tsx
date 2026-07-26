@@ -73,20 +73,20 @@ function hexIntOf(c: Rgb): number {
 function readPalette(el: Element) {
   const css = getComputedStyle(el)
   const read = (name: string, fallback: Rgb) => parseCssColor(css.getPropertyValue(name), fallback)
-  const accent = read('--accent', { r: 19, g: 135, b: 255 })
-  const bgc = read('--bg', VOID_BLACK)
+  const accent = read('--color-accent', { r: 19, g: 135, b: 255 })
+  const bgc = read('--color-background', VOID_BLACK)
   const dark = bgc.r + bgc.g + bgc.b < 3 * 128
   return {
     accent,
-    claude: read('--src-claude', { r: 232, g: 154, b: 124 }),
-    codex: read('--src-codex', { r: 124, g: 201, b: 162 }),
-    gemini: read('--src-gemini', { r: 138, g: 176, b: 229 }),
+    claude: read('--color-source-claude', { r: 232, g: 154, b: 124 }),
+    codex: read('--color-source-codex', { r: 124, g: 201, b: 162 }),
+    gemini: read('--color-source-gemini', { r: 138, g: 176, b: 229 }),
     /* Scene neutrals follow the active design system. */
-    bg: read('--bg', VOID_BLACK),
-    surface: read('--surface', { r: 9, g: 9, b: 9 }),
-    border: read('--border', { r: 31, g: 31, b: 31 }),
-    border2: read('--border2', { r: 46, g: 46, b: 46 }),
-    muted: read('--muted', { r: 166, g: 166, b: 166 }),
+    bg: read('--color-background', VOID_BLACK),
+    surface: read('--color-surface', { r: 9, g: 9, b: 9 }),
+    border: read('--color-border', { r: 31, g: 31, b: 31 }),
+    border2: read('--color-border-strong', { r: 46, g: 46, b: 46 }),
+    muted: read('--color-muted', { r: 166, g: 166, b: 166 }),
     /* Derived tints: toward white on dark themes; saturated and deep on
      * light so particles read as ink, not haze. */
     bright: mixRgb(accent, dark ? WHITE : { r: 0, g: 40, b: 110 }, dark ? 0.3 : 0.2),

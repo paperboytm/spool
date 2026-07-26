@@ -25,6 +25,8 @@ export type DiscoveryCandidateRow = {
   project_id: string | null
   project_slug: string | null
   project_name: string | null
+  project_owner_kind: 'user' | 'team' | null
+  project_owner_handle: string | null
   handle: string | null
   name: string | null
   display_name: string | null
@@ -253,9 +255,12 @@ export async function listDiscoveryPage(
            d.updated_at,
            s.record_count,
            s.owner_user_id,
-           CASE WHEN s.team_id IS NULL THEN project.id ELSE NULL END AS project_id,
-           CASE WHEN s.team_id IS NULL THEN project.slug ELSE NULL END AS project_slug,
-           CASE WHEN s.team_id IS NULL THEN project.name ELSE NULL END AS project_name,
+           project.id AS project_id,
+           project.slug AS project_slug,
+           project.name AS project_name,
+           CASE WHEN project.owner_team_id IS NULL THEN 'user' ELSE 'team' END
+             AS project_owner_kind,
+           project_owner_handle.handle AS project_owner_handle,
            CASE WHEN u.deleted_at IS NULL THEN h.handle ELSE NULL END AS handle,
            CASE WHEN u.deleted_at IS NULL THEN u.name ELSE NULL END AS name,
            CASE WHEN u.deleted_at IS NULL THEN u.display_name ELSE NULL END AS display_name,
@@ -276,6 +281,13 @@ export async function listDiscoveryPage(
          FROM hub_session_discovery d
          JOIN hub_sessions s ON s.sid = d.sid
          JOIN projects project ON project.id=s.project_id
+         JOIN handles project_owner_handle ON project_owner_handle.handle=(
+           SELECT MIN(candidate.handle)
+           FROM handles candidate
+           WHERE candidate.released_at IS NULL
+             AND candidate.user_id IS project.owner_user_id
+             AND candidate.team_id IS project.owner_team_id
+         )
          JOIN users u ON u.id = s.owner_user_id
          LEFT JOIN teams owning_team ON owning_team.id=s.team_id
            AND owning_team.archived_at IS NULL
@@ -345,6 +357,8 @@ export async function listDiscoveryPage(
          d.project_id,
          d.project_slug,
          d.project_name,
+         d.project_owner_kind,
+         d.project_owner_handle,
          d.handle,
          d.name,
          d.display_name,

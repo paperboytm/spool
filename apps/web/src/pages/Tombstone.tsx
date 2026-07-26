@@ -44,23 +44,15 @@ export function Tombstone({ reason, at }: Props) {
     <Page>
       <Header />
       <main className="sw-main center">
-        <div className="sw-card tight" style={{ maxWidth: 560 }}>
-          <div className="sw-rule" style={{ marginBottom: 22 }}>
+        <div className="sw-card tight max-w-[560px]">
+          <div className="sw-rule mb-5">
             <span className={`tag ${c.tone}`}>{c.eyebrow}</span>
             <span className="line" />
           </div>
           <h1 className="sw-title">{c.title}</h1>
           <p className="sw-lede">{c.body}</p>
           {c.metaLabel && when && (
-            <p
-              className="sw-mono"
-              style={{
-                marginTop: 14,
-                fontSize: 11.5,
-                color: 'var(--muted)',
-                letterSpacing: '0.03em',
-              }}
-            >
+            <p className="sw-mono text-meta text-muted mt-3 tracking-[0.03em]">
               {c.metaLabel} on {when}.
             </p>
           )}

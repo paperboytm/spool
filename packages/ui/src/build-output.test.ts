@@ -17,8 +17,15 @@ describe('package build output', () => {
         cwd: PACKAGE_ROOT,
       })
 
-      expect(readFileSync(join(outDir, 'styles.css'), 'utf8')).toContain("@import './tokens.css'")
+      const stylesheet = readFileSync(join(outDir, 'styles.css'), 'utf8')
+      expect(stylesheet).toContain("@import './tokens.css'")
+      expect(stylesheet).toContain("@import './theme.css'")
+      expect(stylesheet).not.toContain('var(--sp-')
       expect(readFileSync(join(outDir, 'tokens.css'), 'utf8')).toContain('--sp-accent: #1387ff')
+      expect(readFileSync(join(outDir, 'theme.css'), 'utf8')).toContain('@theme inline static')
+      expect(readFileSync(join(outDir, 'theme.css'), 'utf8')).toContain(
+        '--color-background: var(--sp-bg)',
+      )
     } finally {
       rmSync(outDir, { recursive: true, force: true })
     }

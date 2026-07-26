@@ -26,18 +26,17 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
     const sid = requireSid(ctx.params['sid'])
     const session = await requireReadableSession(ctx.request, ctx.env, sid)
     const teamOnly = isTeamOnlySession(session)
+    const published = teamOnly ? false : await isPublishedToDiscovery(ctx.env.DB, sid)
     const optionalReader =
       session.team_id !== null && !teamOnly ? await optionalHubUser(ctx.request, ctx.env) : null
     const isCurrentTeamMember =
       session.team_id !== null &&
       optionalReader !== null &&
       (await activeTeamRole(ctx.env.DB, session.team_id, optionalReader.id)) !== null
-    // Team Projects are private tenant metadata. A Team-owned Session may be
-    // deliberately disclosed as Public or Link-only, but that never turns its
-    // Project, owner handle, or aggregate Session count into a public
-    // projection. Authenticated current members retain that context for CLI
-    // re-share and Team workspace management.
-    const exposeProject = session.team_id === null || teamOnly || isCurrentTeamMember
+    // A public Team-owned Session creates the Project's deliberately bounded
+    // public projection. Team-only and Link-only Sessions never do so by
+    // themselves; current members retain full tenant context.
+    const exposeProject = session.team_id === null || teamOnly || published || isCurrentTeamMember
     const [author, projectRow] = await Promise.all([
       getHubAuthor(ctx.env.DB, session.owner_user_id),
       exposeProject
@@ -50,7 +49,6 @@ export const onRequestGet: PagesFunction<HubEnv> = async (ctx) => {
           .bind(session.team_id)
           .first<{ id: string; name: string }>()
       : null
-    const published = teamOnly ? false : await isPublishedToDiscovery(ctx.env.DB, sid)
     const summaryMd = session.note_md
     const guidance = await getSessionGuidance(ctx.env.DB, session)
     const lineageJson = await filterLineageForAudience(

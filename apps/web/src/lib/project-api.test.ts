@@ -6,8 +6,14 @@ import {
   fetchAllTeamProjects,
   fetchOwnerProject,
   fetchOwnerProjects,
+  fetchProjectSocial,
+  fetchProjectStargazers,
   fetchPublicProjects,
   fetchTeamProjects,
+  fetchUserFollow,
+  setProjectStar,
+  setProjectWatch,
+  setUserFollow,
   updateProject,
 } from './project-api'
 
@@ -150,5 +156,56 @@ describe('Project API client', () => {
       kind: 'invalid',
       detail: 'invalid github url',
     })
+  })
+
+  it('uses canonical social endpoints and idempotent PUT/DELETE mutations', async () => {
+    respond(200, { version: 1, starCount: 2 })
+    await fetchProjectSocial('paperboy/team', 'spool project')
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/paperboy%2Fteam/projects/spool%20project/social',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+
+    respond(200, { stargazers: [], next_cursor: null })
+    await fetchProjectStargazers('paperboy/team', 'spool project', 'next/value')
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/paperboy%2Fteam/projects/spool%20project/stargazers?cursor=next%2Fvalue',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+
+    respond(200, { version: 1, starCount: 3 })
+    await setProjectStar('paperboy', 'spool', true)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/paperboy/projects/spool/star',
+      expect.objectContaining({ method: 'PUT' }),
+    )
+
+    respond(200, { version: 1, starCount: 2 })
+    await setProjectStar('paperboy', 'spool', false)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/paperboy/projects/spool/star',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+
+    respond(200, { version: 1, watcherCount: 1 })
+    await setProjectWatch('paperboy', 'spool', true)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/paperboy/projects/spool/watch',
+      expect.objectContaining({ method: 'PUT' }),
+    )
+
+    respond(200, { version: 1, followerCount: 4 })
+    await fetchUserFollow('doodlewind')
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/doodlewind/follow',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+
+    respond(200, { version: 1, viewerFollowing: true })
+    await setUserFollow('doodlewind', true)
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/owners/doodlewind/follow',
+      expect.objectContaining({ method: 'PUT' }),
+    )
   })
 })

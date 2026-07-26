@@ -9,6 +9,8 @@ import {
   prepareAuthorizedDiscoveryProjectionDelete,
   prepareAuthorizedDiscoveryProjectionUpsert,
   prepareAuthorizedEngagementDelete,
+  prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic,
+  prepareAuthorizedProjectStarsDeleteWhenNotPublic,
   prepareAuthorizedTargetStarsDelete,
   readDiscoveryView,
 } from '../../../../../../src/discovery/projection'
@@ -287,6 +289,23 @@ export const onRequestPost: PagesFunction<HubEnv> = async (ctx) => {
         prepareAuthorizedEngagementDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedTargetStarsDelete(ctx.env.DB, projectionGate),
         prepareAuthorizedDiscoveryProjectionDelete(ctx.env.DB, projectionGate),
+      )
+    }
+    if (existing && (wasPublic || projectChanged)) {
+      // A visibility change or Project move can remove the old Project's final
+      // Public Session. Run after the projection mutation so Public→Link-only
+      // is observed correctly; keep current-member private Team Watches.
+      statements.push(
+        prepareAuthorizedProjectStarsDeleteWhenNotPublic(
+          ctx.env.DB,
+          existing.project_id,
+          projectionGate,
+        ),
+        prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic(
+          ctx.env.DB,
+          existing.project_id,
+          projectionGate,
+        ),
       )
     }
 

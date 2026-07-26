@@ -437,9 +437,7 @@ describe('SessionWorkbench', () => {
     const html = renderWorkbench()
 
     expect(html.match(/id="workspace-title"/g)).toHaveLength(1)
-    expect(html).not.toContain(
-      '<div class="border-t border-[var(--border)]"><h2 id="workspace-title"',
-    )
+    expect(html).not.toContain('<div class="border-t border-border"><h2 id="workspace-title"')
     expect(html).not.toContain('>Metadata<')
     expect(html).not.toContain('>Files<')
     expect(html).not.toContain('apps/web/src/session.tsx')
@@ -448,7 +446,8 @@ describe('SessionWorkbench', () => {
   it('keeps prompt markers uniform at rest and expands them on interaction', () => {
     const html = renderWorkbench()
 
-    expect(html).toContain('w-4 bg-[var(--border-strong)]')
+    expect(html).toContain('bg-border-strong')
+    expect(html).toContain('w-4')
     expect(html).toContain('group-hover:w-6')
     expect(html).toContain('transition-[width,background-color]')
   })

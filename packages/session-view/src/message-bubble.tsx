@@ -42,7 +42,7 @@ function MessageBubble({
   if (isSystem) {
     return (
       <div className="px-6 py-2">
-        <div className="rounded bg-neutral-100 px-3 py-2 text-xs text-neutral-500 italic dark:bg-neutral-800/60 dark:text-neutral-400">
+        <div className="rounded-badge bg-surface text-button text-muted px-3 py-2 italic">
           <MarkdownContent {...markdownProps} />
         </div>
       </div>
@@ -51,19 +51,19 @@ function MessageBubble({
 
   if (isToolUseOnly) {
     return (
-      <div className="flex items-center gap-2 px-6 py-0.5">
+      <div className="py-half flex items-center gap-2 px-6">
         {showAvatar ? (
-          <div className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-neutral-700 text-[9px] font-bold text-white dark:bg-neutral-300 dark:text-neutral-900">
+          <div className="bg-muted text-background rounded-pill text-label flex h-5 w-5 flex-none items-center justify-center font-bold">
             A
           </div>
         ) : (
           <div className="h-5 w-5 flex-none" aria-hidden />
         )}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-neutral-400">
+        <div className="text-faint text-label flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
           {message.toolNames.map((name) => (
             <span
               key={name}
-              className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-500 dark:bg-neutral-800"
+              className="rounded-badge bg-surface py-half text-muted px-1.5 font-mono"
             >
               {name}
             </span>
@@ -79,16 +79,14 @@ function MessageBubble({
       <div className="flex items-start gap-2">
         {showAvatar ? (
           <div
-            className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full text-[9px] font-bold ${
-              isUser
-                ? 'bg-accent dark:bg-accent-dark text-white dark:text-neutral-950'
-                : 'bg-neutral-700 text-white dark:bg-neutral-300 dark:text-neutral-900'
+            className={`mt-half rounded-pill text-label flex h-5 w-5 flex-none items-center justify-center font-bold ${
+              isUser ? 'bg-accent-fill text-on-accent' : 'bg-muted text-background'
             }`}
           >
             {isUser ? 'U' : 'A'}
           </div>
         ) : (
-          <div className="mt-0.5 h-5 w-5 flex-none" aria-hidden />
+          <div className="mt-half h-5 w-5 flex-none" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
           {message.toolNames.length > 0 && (
@@ -96,7 +94,7 @@ function MessageBubble({
               {message.toolNames.map((name) => (
                 <span
                   key={name}
-                  className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500 dark:bg-neutral-800"
+                  className="rounded-badge bg-surface py-half text-label text-muted px-1.5 font-mono"
                 >
                   {name}
                 </span>
@@ -104,7 +102,7 @@ function MessageBubble({
             </div>
           )}
           <MarkdownContent {...markdownProps} />
-          <p className="mt-1 text-[10px] text-neutral-400">{formatTime(message.timestamp)}</p>
+          <p className="text-label text-faint mt-1">{formatTime(message.timestamp)}</p>
         </div>
       </div>
     </div>

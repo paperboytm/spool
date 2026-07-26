@@ -179,6 +179,12 @@ type ProjectCreationRequestRow = {
   created_at: number
 }
 
+type ProjectSocialRelationRow = {
+  project_id: string
+  user_id: string
+  created_at: number
+}
+
 type ApiTokenRow = {
   id: string
   user_id: string
@@ -277,6 +283,8 @@ export type FakeDbState = {
   team_memberships: TeamMembershipRow[]
   projects: ProjectRow[]
   project_creation_requests: ProjectCreationRequestRow[]
+  project_stars: ProjectSocialRelationRow[]
+  project_watches: ProjectSocialRelationRow[]
   workos_cleanup_outbox: WorkosCleanupOutboxRow[]
   api_tokens: ApiTokenRow[]
   hub_session_discovery: HubSessionDiscoveryRow[]
@@ -302,6 +310,8 @@ export function emptyState(): FakeDbState {
     team_memberships: [],
     projects: [],
     project_creation_requests: [],
+    project_stars: [],
+    project_watches: [],
     workos_cleanup_outbox: [],
     api_tokens: [],
     hub_session_discovery: [],
@@ -422,6 +432,12 @@ export function makeDb(state: FakeDbState = emptyState()): {
         row.id === session.team_id &&
         row.archived_at === null &&
         (row.deletion_pending_until ?? null) === null,
+    )
+  }
+
+  function isLivePublicProject(projectId: string): boolean {
+    return state.hub_sessions.some(
+      (session) => session.project_id === projectId && isLivePublicSession(session.sid),
     )
   }
 
@@ -601,6 +617,29 @@ export function makeDb(state: FakeDbState = emptyState()): {
             ).length,
           } as T
         }
+        if (sql.includes('/* projects:count-public-sessions */')) {
+          const [projectId, ownerUserId, ownerTeamId, personal, team] = params as [
+            string,
+            string | null,
+            string | null,
+            number,
+            number,
+          ]
+          return {
+            count: state.hub_sessions.filter(
+              (row) =>
+                row.project_id === projectId &&
+                row.visibility === 'unlisted' &&
+                row.withdrawn_at === null &&
+                state.hub_session_discovery.some((projection) => projection.sid === row.sid) &&
+                ((personal === 1 &&
+                  ownerUserId !== null &&
+                  row.owner_user_id === ownerUserId &&
+                  (row.team_id ?? null) === null) ||
+                  (team === 1 && ownerTeamId !== null && row.team_id === ownerTeamId)),
+            ).length,
+          } as T
+        }
         if (sql.includes('SELECT id FROM projects') && sql.includes("(id=? OR slug='sessions')")) {
           const [ownerUserId, ownerTeamId, preferredId] = params as [
             string | null,
@@ -693,6 +732,21 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 row.archived_at === null,
             ) as T) ?? null
           )
+        }
+        if (
+          /^SELECT 1 FROM team_memberships\s+WHERE team_id=\? AND user_id=\? AND role IN \('owner','admin'\)$/i.test(
+            sql,
+          )
+        ) {
+          const [teamId, userId] = params as [string, string]
+          return state.team_memberships.some(
+            (row) =>
+              row.team_id === teamId &&
+              row.user_id === userId &&
+              (row.role === 'owner' || row.role === 'admin'),
+          )
+            ? ({ '1': 1 } as T)
+            : null
         }
         if (
           /^SELECT project_id, request_hash\s+FROM project_creation_requests\s+WHERE actor_user_id=\? AND owner_scope=\? AND idempotency_key=\?$/i.test(
@@ -1495,6 +1549,43 @@ export function makeDb(state: FakeDbState = emptyState()): {
           return {
             success: true,
             meta: { changes: before - state.hub_session_stars.length },
+          }
+        }
+        if (sql.includes('/* discovery:authorized-delete-project-stars-when-not-public */')) {
+          const [projectId] = params as [string]
+          if (!authorizedProjectionGateAllows(params, 2) || isLivePublicProject(projectId)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const before = state.project_stars.length
+          state.project_stars = state.project_stars.filter(
+            (relation) => relation.project_id !== projectId,
+          )
+          return {
+            success: true,
+            meta: { changes: before - state.project_stars.length },
+          }
+        }
+        if (
+          sql.includes('/* discovery:authorized-delete-project-outsider-watches-when-not-public */')
+        ) {
+          const [projectId] = params as [string]
+          if (!authorizedProjectionGateAllows(params, 2) || isLivePublicProject(projectId)) {
+            return { success: true, meta: { changes: 0 } }
+          }
+          const project = state.projects.find(
+            (candidate) => candidate.id === projectId && candidate.archived_at === null,
+          )
+          const before = state.project_watches.length
+          state.project_watches = state.project_watches.filter((relation) => {
+            if (relation.project_id !== projectId) return true
+            if (project?.owner_team_id === null || project?.owner_team_id === undefined) {
+              return false
+            }
+            return activeTeamRoleFor(project.owner_team_id, relation.user_id) !== null
+          })
+          return {
+            success: true,
+            meta: { changes: before - state.project_watches.length },
           }
         }
         if (sql.includes('/* discovery:authorized-delete-projection */')) {
@@ -3439,6 +3530,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   session_count: state.hub_sessions.filter(
                     (session) => session.project_id === project.id && session.withdrawn_at === null,
                   ).length,
+                  star_count: 0,
                   owner_handle: handle.handle,
                   owner_name:
                     ownerTeam?.name ??
@@ -3502,6 +3594,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   session_count: state.hub_sessions.filter(
                     (session) => session.project_id === project.id && session.withdrawn_at === null,
                   ).length,
+                  star_count: 0,
                 }))
                 .sort(
                   (left, right) =>
@@ -3534,6 +3627,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
               session_count: state.hub_sessions.filter(
                 (session) => session.project_id === project.id && session.withdrawn_at === null,
               ).length,
+              star_count: 0,
             }))
             .sort(
               (left, right) =>
@@ -3560,29 +3654,42 @@ export function makeDb(state: FakeDbState = emptyState()): {
           ]
           const items = state.projects
             .flatMap((project) => {
-              if (
-                project.owner_user_id === null ||
-                project.owner_team_id !== null ||
-                project.archived_at !== null
-              ) {
-                return []
-              }
-              const user = state.users.find(
-                (candidate) =>
-                  candidate.id === project.owner_user_id && candidate.deleted_at === null,
-              )
+              if (project.archived_at !== null) return []
+              const user =
+                project.owner_user_id === null
+                  ? null
+                  : state.users.find(
+                      (candidate) =>
+                        candidate.id === project.owner_user_id &&
+                        candidate.deleted_at === null &&
+                        candidate.deletion_pending_until === null,
+                    )
+              const team =
+                project.owner_team_id === null
+                  ? null
+                  : state.teams.find(
+                      (candidate) =>
+                        candidate.id === project.owner_team_id &&
+                        candidate.archived_at === null &&
+                        (candidate.deletion_pending_until ?? null) === null,
+                    )
               const handle = state.handles.find(
                 (candidate) =>
-                  candidate.user_id === project.owner_user_id && candidate.released_at === null,
+                  candidate.user_id === project.owner_user_id &&
+                  (candidate.team_id ?? null) === project.owner_team_id &&
+                  candidate.released_at === null,
               )
-              if (!user || !handle) return []
+              if ((!user && !team) || !handle) return []
               const published = state.hub_sessions.flatMap((session) => {
                 const projection = state.hub_session_discovery.find(
                   (candidate) => candidate.sid === session.sid,
                 )
                 return session.project_id === project.id &&
-                  session.owner_user_id === project.owner_user_id &&
-                  (session.team_id ?? null) === null &&
+                  ((project.owner_user_id !== null &&
+                    session.owner_user_id === project.owner_user_id &&
+                    (session.team_id ?? null) === null) ||
+                    (project.owner_team_id !== null &&
+                      session.team_id === project.owner_team_id)) &&
                   session.visibility === 'unlisted' &&
                   session.withdrawn_at === null &&
                   projection
@@ -3595,13 +3702,14 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   ...project,
                   session_count: published.length,
                   last_session_at: Math.max(...published.map((row) => row.published_at)),
+                  star_count: 0,
                   owner_handle: handle.handle,
-                  owner_email: user.email,
-                  owner_name: user.name,
-                  owner_display_name: user.display_name ?? null,
-                  owner_avatar_url: user.avatar_url,
-                  owner_custom_avatar_id: user.custom_avatar_id ?? null,
-                  owner_avatar_visible: user.avatar_visible ?? 1,
+                  owner_email: user?.email ?? null,
+                  owner_name: team?.name ?? user?.name ?? null,
+                  owner_display_name: user?.display_name ?? null,
+                  owner_avatar_url: user?.avatar_url ?? null,
+                  owner_custom_avatar_id: user?.custom_avatar_id ?? null,
+                  owner_avatar_visible: user?.avatar_visible ?? 1,
                 },
               ]
             })
@@ -3622,11 +3730,17 @@ export function makeDb(state: FakeDbState = emptyState()): {
           sql.includes('SELECT p.*, COUNT(d.sid) AS session_count') &&
           sql.includes('JOIN hub_session_discovery d')
         ) {
-          const [userId, limit] = params as [string, number]
+          const [ownerUserId, ownerTeamId, personal, team, limit] = params as [
+            string | null,
+            string | null,
+            number,
+            number,
+            number,
+          ]
           const projects = state.projects.flatMap((project) => {
             if (
-              project.owner_user_id !== userId ||
-              project.owner_team_id !== null ||
+              project.owner_user_id !== ownerUserId ||
+              project.owner_team_id !== ownerTeamId ||
               project.archived_at !== null
             ) {
               return []
@@ -3636,7 +3750,10 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 (candidate) => candidate.sid === session.sid,
               )
               return session.project_id === project.id &&
-                (session.team_id ?? null) === null &&
+                ((personal === 1 &&
+                  session.owner_user_id === ownerUserId &&
+                  (session.team_id ?? null) === null) ||
+                  (team === 1 && session.team_id === ownerTeamId)) &&
                 session.visibility === 'unlisted' &&
                 session.withdrawn_at === null &&
                 projection
@@ -3649,6 +3766,7 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   {
                     ...project,
                     session_count: projections.length,
+                    star_count: 0,
                     last_session_at: Math.max(...projections.map((row) => row.published_at)),
                   },
                 ]
@@ -3666,12 +3784,22 @@ export function makeDb(state: FakeDbState = emptyState()): {
         ) {
           const publicProject = sql.includes('/* projects:list-public-sessions */')
           const publicOwner = sql.includes('/* projects:list-public-owner-sessions */')
-          const [firstParam, secondParam] = params as [string, string | null]
-          const projectId = publicOwner ? null : firstParam
-          const ownerUserId = publicOwner ? firstParam : publicProject ? secondParam : null
+          const projectId = publicOwner ? null : (params[0] as string)
+          const ownerUserId = publicOwner
+            ? (params[0] as string | null)
+            : publicProject
+              ? (params[1] as string | null)
+              : null
+          const ownerTeamId = publicOwner
+            ? (params[1] as string | null)
+            : publicProject
+              ? (params[2] as string | null)
+              : null
+          const personal = publicOwner ? Number(params[2]) : publicProject ? Number(params[3]) : 0
+          const team = publicOwner ? Number(params[3]) : publicProject ? Number(params[4]) : 0
           const teamId = !publicProject && !publicOwner ? (params[2] as string | null) : null
           const actorUserId = !publicProject && !publicOwner ? (params[4] as string) : null
-          const cursorOffset = publicOwner ? 1 : publicProject ? 2 : 8
+          const cursorOffset = publicOwner ? 4 : publicProject ? 5 : 8
           const hasAfter = Number(params[cursorOffset] ?? 0)
           const afterSortAt = Number(params[cursorOffset + 1] ?? 0)
           const equalSortAt = Number(params[cursorOffset + 2] ?? 0)
@@ -3683,8 +3811,11 @@ export function makeDb(state: FakeDbState = emptyState()): {
               if (session.withdrawn_at !== null) return false
               if (publicProject || publicOwner) {
                 return (
-                  session.owner_user_id === ownerUserId &&
-                  (session.team_id ?? null) === null &&
+                  ((personal === 1 &&
+                    ownerUserId !== null &&
+                    session.owner_user_id === ownerUserId &&
+                    (session.team_id ?? null) === null) ||
+                    (team === 1 && ownerTeamId !== null && session.team_id === ownerTeamId)) &&
                   session.visibility === 'unlisted' &&
                   state.hub_session_discovery.some((projection) => projection.sid === session.sid)
                 )
@@ -3907,15 +4038,27 @@ export function makeDb(state: FakeDbState = emptyState()): {
                 )
                 return sourceTeam ? discovery.lineage_source_sid : null
               })()
-              const publicProject =
-                session.team_id == null && session.project_id
-                  ? state.projects.find(
-                      (project) =>
-                        project.id === session.project_id &&
+              const publicProject = session.project_id
+                ? state.projects.find(
+                    (project) =>
+                      project.id === session.project_id &&
+                      ((session.team_id == null &&
                         project.owner_user_id === session.owner_user_id &&
-                        project.owner_team_id === null,
-                    )
-                  : null
+                        project.owner_team_id === null) ||
+                        (session.team_id != null &&
+                          project.owner_user_id === null &&
+                          project.owner_team_id === session.team_id)),
+                  )
+                : null
+              const projectOwnerHandle =
+                publicProject == null
+                  ? null
+                  : (state.handles.find(
+                      (candidate) =>
+                        candidate.released_at === null &&
+                        candidate.user_id === publicProject.owner_user_id &&
+                        (candidate.team_id ?? null) === publicProject.owner_team_id,
+                    )?.handle ?? null)
               return [
                 {
                   ...discovery,
@@ -3925,6 +4068,13 @@ export function makeDb(state: FakeDbState = emptyState()): {
                   project_id: publicProject?.id ?? null,
                   project_slug: publicProject?.slug ?? null,
                   project_name: publicProject?.name ?? null,
+                  project_owner_kind:
+                    publicProject == null
+                      ? null
+                      : publicProject.owner_team_id === null
+                        ? 'user'
+                        : 'team',
+                  project_owner_handle: projectOwnerHandle,
                   handle,
                   name: identityLive ? user.name : null,
                   display_name: identityLive ? (user.display_name ?? null) : null,

@@ -33,6 +33,8 @@ export type ProjectResponse = {
   updated_at: number
   archived_at: number | null
   session_count: number
+  /** Live public Project stars. */
+  star_count: number
   /** Whether the current actor may change or archive this Project. */
   can_manage: boolean
 }

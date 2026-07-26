@@ -1,424 +1,414 @@
-/* Docs layout — warm, spool-native. Replaces Starlight. */
+@layer components {
+  /* Docs layout — warm, spool-native. Replaces Starlight. */
 
-.docs {
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 48px;
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 96px 24px 80px;
-}
-
-.docs-sidebar {
-  position: sticky;
-  top: 80px;
-  align-self: start;
-  max-height: calc(100vh - 96px);
-  overflow-y: auto;
-  padding-right: 8px;
-}
-
-.docs-sidebar .group {
-  margin-bottom: 20px;
-}
-
-.docs-sidebar .group-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin: 0 0 8px 10px;
-  font-family: 'Geist Mono', monospace;
-}
-
-.docs-sidebar a {
-  display: block;
-  padding: 5px 10px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--muted);
-  text-decoration: none;
-  border-radius: 6px;
-  transition:
-    background 80ms,
-    color 80ms;
-  line-height: 1.4;
-}
-
-.docs-sidebar a:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
-.docs-sidebar a.active {
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.docs-main {
-  min-width: 0;
-  max-width: 680px;
-}
-
-.docs-main h1 {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  margin-bottom: 8px;
-  color: var(--text);
-}
-
-.docs-description {
-  font-size: 15px;
-  color: var(--muted);
-  line-height: 1.6;
-  margin-bottom: 40px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-/* ── Markdown content — scoped to .void-md content container ── */
-.void-md {
-  --vmd-font-body: 'Geist Variable', 'Geist', -apple-system, sans-serif;
-  --vmd-font-mono: 'Geist Mono', ui-monospace, monospace;
-  --vmd-text: var(--text);
-  --vmd-text-muted: var(--muted);
-  --vmd-link: var(--accent);
-  --vmd-link-hover: var(--accent);
-  --vmd-border: var(--border);
-  --vmd-bg-soft: var(--surface);
-  --vmd-line-height: 1.7;
-}
-
-.void-md h2 {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 44px 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-}
-
-.void-md h3 {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 28px 0 10px;
-  color: var(--text);
-}
-
-.void-md h4 {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 20px 0 8px;
-  color: var(--text);
-}
-
-.void-md p {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text);
-  margin-bottom: 16px;
-}
-
-.void-md a {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  transition: border-color 80ms;
-}
-
-.void-md a:hover {
-  border-bottom-color: var(--accent);
-}
-
-.void-md ul,
-.void-md ol {
-  margin: 0 0 16px 24px;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text);
-}
-
-.void-md li {
-  margin-bottom: 6px;
-}
-
-.void-md li code,
-.void-md p code,
-.void-md td code,
-.void-md th code {
-  font-family: 'Geist Mono', monospace;
-  font-size: 13px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  color: var(--text);
-}
-
-.void-md .md-code-block {
-  position: relative;
-  background: var(--surface) !important;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  margin: 16px 0 24px;
-  overflow: hidden;
-}
-
-.void-md pre {
-  margin: 0;
-  padding: 16px 96px 16px 16px;
-  overflow-x: auto;
-  font-size: var(--sp-text-command);
-  line-height: 1.6;
-}
-
-.void-md pre code {
-  font-family: 'Geist Mono', monospace;
-  background: transparent !important;
-  border: none;
-  padding: 0;
-  font-size: inherit;
-}
-
-.void-md .md-code-copy {
-  position: absolute;
-  z-index: 1;
-  top: 8px;
-  right: 8px;
-  display: inline-flex;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--border2);
-  border-radius: 6px;
-  padding: 0 8px;
-  background: var(--bg);
-  color: var(--muted);
-  font-family: 'Geist Variable', 'Geist', sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    border-color 80ms,
-    color 80ms,
-    background 80ms;
-}
-
-.void-md .md-code-copy:hover,
-.void-md .md-code-copy:focus-visible,
-.void-md .md-code-copy.is-copied {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.void-md .md-code-copy:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-focus-ring);
-}
-
-.void-md .md-code-copy.is-copy-failed {
-  border-color: var(--sp-error);
-  color: var(--sp-error);
-}
-
-.void-md blockquote {
-  border-left: 3px solid var(--accent);
-  background: var(--accent-bg);
-  padding: 12px 18px;
-  margin: 16px 0;
-  border-radius: 0 6px 6px 0;
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.void-md blockquote p {
-  margin-bottom: 0;
-}
-
-.void-md table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 16px 0 24px;
-  font-size: 13px;
-}
-
-.void-md table th {
-  text-align: left;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-weight: 600;
-  color: var(--text);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
-
-.void-md table td {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  color: var(--text);
-  vertical-align: top;
-  line-height: 1.55;
-}
-
-.void-md hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 32px 0;
-}
-
-/* ── Admonition containers (:::info etc.) ── */
-.void-md .custom-block {
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin: 18px 0;
-  font-size: 13.5px;
-  line-height: 1.6;
-  border-left: 3px solid;
-  background: var(--surface);
-}
-
-.void-md .custom-block.info {
-  border-left-color: var(--accent);
-  background: var(--accent-bg);
-}
-
-.void-md .custom-block.tip {
-  border-left-color: #4ade80;
-  background: var(--surface);
-}
-
-.void-md .custom-block.warning {
-  border-left-color: #fbbf24;
-  background: var(--surface);
-}
-
-.void-md .custom-block.danger {
-  border-left-color: #f87171;
-  background: var(--surface);
-}
-
-.void-md .custom-block-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.void-md .custom-block p:last-child {
-  margin-bottom: 0;
-}
-
-/* ── GitHub alerts ── */
-.void-md .markdown-alert {
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin: 18px 0;
-  font-size: 13.5px;
-  line-height: 1.6;
-  border-left: 3px solid var(--accent);
-  background: var(--accent-bg);
-}
-
-.void-md .markdown-alert-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-/* ── Prev / next ── */
-.docs-pager {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 56px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
-}
-
-.docs-pager a {
-  display: block;
-  padding: 14px 18px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  text-decoration: none;
-  transition:
-    border-color 80ms,
-    background 80ms;
-  background: var(--surface);
-}
-
-.docs-pager a:hover {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-
-.docs-pager .pager-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
-  font-family: 'Geist Mono', monospace;
-}
-
-.docs-pager .pager-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.docs-pager .next {
-  text-align: right;
-}
-
-.docs-pager .placeholder {
-  opacity: 0;
-  pointer-events: none;
-}
-
-@media (max-width: 860px) {
   .docs {
-    grid-template-columns: 1fr;
-    padding: 80px 20px 64px;
-    gap: 24px;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 48px;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 96px 24px 80px;
   }
+
   .docs-sidebar {
-    position: static;
-    max-height: none;
-    order: 2;
-    border-top: 1px solid var(--border);
-    padding-top: 24px;
+    position: sticky;
+    top: 80px;
+    align-self: start;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    padding-right: 8px;
   }
+
+  .docs-sidebar .group {
+    margin-bottom: 20px;
+  }
+
+  .docs-sidebar .group-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    margin: 0 0 8px 10px;
+    font-family: 'Geist Mono', monospace;
+  }
+
+  .docs-sidebar a {
+    display: block;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--color-muted);
+    text-decoration: none;
+    border-radius: 6px;
+    transition:
+      background 80ms,
+      color 80ms;
+    line-height: 1.4;
+  }
+
+  .docs-sidebar a:hover {
+    background: var(--color-surface);
+    color: var(--color-foreground);
+  }
+
+  .docs-sidebar a.active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+
   .docs-main {
-    order: 1;
+    min-width: 0;
+    max-width: 680px;
   }
-  .docs-pager {
-    grid-template-columns: 1fr;
+
+  .docs-main h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    margin-bottom: 8px;
+    color: var(--color-foreground);
   }
-  .docs-pager .next {
-    text-align: left;
+
+  .docs-description {
+    font-size: 15px;
+    color: var(--color-muted);
+    line-height: 1.6;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--color-border);
   }
-  .void-md .md-code-copy {
-    min-height: 44px;
-    padding: 0 12px;
+
+  /* ── Markdown content — scoped to .void-md content container ── */
+  .void-md h2 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 44px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-foreground);
   }
+
+  .void-md h3 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 28px 0 10px;
+    color: var(--color-foreground);
+  }
+
+  .void-md h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 20px 0 8px;
+    color: var(--color-foreground);
+  }
+
+  .void-md p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--color-foreground);
+    margin-bottom: 16px;
+  }
+
+  .void-md a {
+    color: var(--color-accent);
+    text-decoration: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+    transition: border-color 80ms;
+  }
+
+  .void-md a:hover {
+    border-bottom-color: var(--color-accent);
+  }
+
+  .void-md ul,
+  .void-md ol {
+    margin: 0 0 16px 24px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--color-foreground);
+  }
+
+  .void-md li {
+    margin-bottom: 6px;
+  }
+
+  .void-md li code,
+  .void-md p code,
+  .void-md td code,
+  .void-md th code {
+    font-family: 'Geist Mono', monospace;
+    font-size: 13px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--color-foreground);
+  }
+
+  .void-md .md-code-block {
+    position: relative;
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin: 16px 0 24px;
+    overflow: hidden;
+  }
+
   .void-md pre {
-    padding-right: 96px;
+    margin: 0;
+    padding: 16px 96px 16px 16px;
+    overflow-x: auto;
+    font-size: var(--text-command);
+    line-height: 1.6;
+  }
+
+  .void-md pre code {
+    font-family: 'Geist Mono', monospace;
+    background: transparent !important;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .void-md .md-code-copy {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    padding: 0 8px;
+    background: var(--color-background);
+    color: var(--color-muted);
+    font-family: 'Geist Variable', 'Geist', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      border-color 80ms,
+      color 80ms,
+      background 80ms;
+  }
+
+  .void-md .md-code-copy:hover,
+  .void-md .md-code-copy:focus-visible,
+  .void-md .md-code-copy.is-copied {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .void-md .md-code-copy:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus-ring);
+  }
+
+  .void-md .md-code-copy.is-copy-failed {
+    border-color: var(--color-status-error);
+    color: var(--color-status-error);
+  }
+
+  .void-md blockquote {
+    border-left: 3px solid var(--color-accent);
+    background: var(--color-accent-soft);
+    padding: 12px 18px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+    color: var(--color-foreground);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .void-md blockquote p {
+    margin-bottom: 0;
+  }
+
+  .void-md table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+
+  .void-md table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-weight: 600;
+    color: var(--color-foreground);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .void-md table td {
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    color: var(--color-foreground);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+
+  .void-md hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 32px 0;
+  }
+
+  /* ── Admonition containers (:::info etc.) ── */
+  .void-md .custom-block {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 13.5px;
+    line-height: 1.6;
+    border-left: 3px solid;
+    background: var(--color-surface);
+  }
+
+  .void-md .custom-block.info {
+    border-left-color: var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+
+  .void-md .custom-block.tip {
+    border-left-color: var(--color-status-success);
+    background: var(--color-surface);
+  }
+
+  .void-md .custom-block.warning {
+    border-left-color: var(--color-status-warning);
+    background: var(--color-surface);
+  }
+
+  .void-md .custom-block.danger {
+    border-left-color: var(--color-status-error);
+    background: var(--color-surface);
+  }
+
+  .void-md .custom-block-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  .void-md .custom-block p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ── GitHub alerts ── */
+  .void-md .markdown-alert {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 13.5px;
+    line-height: 1.6;
+    border-left: 3px solid var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+
+  .void-md .markdown-alert-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  /* ── Prev / next ── */
+  .docs-pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .docs-pager a {
+    display: block;
+    padding: 14px 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    text-decoration: none;
+    transition:
+      border-color 80ms,
+      background 80ms;
+    background: var(--color-surface);
+  }
+
+  .docs-pager a:hover {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+
+  .docs-pager .pager-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    margin-bottom: 4px;
+    font-family: 'Geist Mono', monospace;
+  }
+
+  .docs-pager .pager-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-foreground);
+  }
+
+  .docs-pager .next {
+    text-align: right;
+  }
+
+  .docs-pager .placeholder {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (max-width: 860px) {
+    .docs {
+      grid-template-columns: 1fr;
+      padding: 80px 20px 64px;
+      gap: 24px;
+    }
+    .docs-sidebar {
+      position: static;
+      max-height: none;
+      order: 2;
+      border-top: 1px solid var(--color-border);
+      padding-top: 24px;
+    }
+    .docs-main {
+      order: 1;
+    }
+    .docs-pager {
+      grid-template-columns: 1fr;
+    }
+    .docs-pager .next {
+      text-align: left;
+    }
+    .void-md .md-code-copy {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+    .void-md pre {
+      padding-right: 96px;
+    }
   }
 }

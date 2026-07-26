@@ -8,23 +8,23 @@ const REPO_URL = 'https://github.com/spool-lab/spool-daemon'
 
 // ─── Tray cells (hero specimen, 8 cells × 2 cols) ──────────────────────
 const TRAY_CELLS = [
-  { name: 'GitHub Stars', color: 'var(--src-github)', meta: '1,214 · synced 2m' },
-  { name: 'X Bookmarks', color: 'var(--src-twitter)', meta: '891 · synced 12m' },
-  { name: 'Reddit Saved', color: 'var(--src-reddit)', meta: '203 · synced 1h' },
-  { name: 'Hacker News', color: 'var(--src-hn)', meta: '76 · synced 8m' },
-  { name: 'Xiaohongshu', color: 'var(--src-xhs)', meta: '42 · synced 1h' },
-  { name: 'YouTube Likes', color: 'var(--src-youtube)', meta: '64 · synced 3h' },
-  { name: 'Reddit Upvoted', color: 'var(--src-reddit)', meta: '418 · synced 1h' },
+  { name: 'GitHub Stars', color: 'var(--color-connector-github)', meta: '1,214 · synced 2m' },
+  { name: 'X Bookmarks', color: 'var(--color-connector-twitter)', meta: '891 · synced 12m' },
+  { name: 'Reddit Saved', color: 'var(--color-connector-reddit)', meta: '203 · synced 1h' },
+  { name: 'Hacker News', color: 'var(--color-connector-hn)', meta: '76 · synced 8m' },
+  { name: 'Xiaohongshu', color: 'var(--color-connector-xhs)', meta: '42 · synced 1h' },
+  { name: 'YouTube Likes', color: 'var(--color-connector-youtube)', meta: '64 · synced 3h' },
+  { name: 'Reddit Upvoted', color: 'var(--color-connector-reddit)', meta: '418 · synced 1h' },
   { name: 'Typeless Voice', color: '#3A3A3A', meta: '128 · live' },
 ]
 
 const TICKER_DAEMON = [
-  { name: 'GitHub', color: 'var(--src-github)', count: '1.2k' },
-  { name: 'Twitter / X', color: 'var(--src-twitter)', count: '891' },
-  { name: 'Reddit', color: 'var(--src-reddit)', count: '203' },
-  { name: 'Hacker News', color: 'var(--src-hn)', count: '76' },
-  { name: 'Xiaohongshu', color: 'var(--src-xhs)', count: '42' },
-  { name: 'YouTube', color: 'var(--src-youtube)', count: '64' },
+  { name: 'GitHub', color: 'var(--color-connector-github)', count: '1.2k' },
+  { name: 'Twitter / X', color: 'var(--color-connector-twitter)', count: '891' },
+  { name: 'Reddit', color: 'var(--color-connector-reddit)', count: '203' },
+  { name: 'Hacker News', color: 'var(--color-connector-hn)', count: '76' },
+  { name: 'Xiaohongshu', color: 'var(--color-connector-xhs)', count: '42' },
+  { name: 'YouTube', color: 'var(--color-connector-youtube)', count: '64' },
 ]
 
 // ─── Registry → connector cards (rich cards, dedupe by package name) ──
@@ -385,13 +385,8 @@ function DaemonTicker() {
           <span className="ticker-item" key={i}>
             <span className="ico">
               <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: item.color,
-                  display: 'inline-block',
-                }}
+                className="rounded-pill inline-block h-2 w-2"
+                style={{ background: item.color }}
               />
             </span>
             {item.name}
@@ -563,10 +558,7 @@ export default function DaemonPage() {
               <span className="dotsep" />
               <span>Linux · x86_64</span>
               <span className="dotsep" />
-              <a
-                href="/"
-                style={{ color: 'var(--muted)', borderBottom: '1px dotted var(--border2)' }}
-              >
+              <a href="/" className="border-border-strong text-muted border-b border-dotted">
                 Spool →
               </a>
             </div>
@@ -730,16 +722,7 @@ export default function DaemonPage() {
               </h2>
               <p className="s-sub">
                 Implement the{' '}
-                <code
-                  style={{
-                    fontFamily: "'Geist Mono'",
-                    fontSize: 13,
-                    background: 'var(--accent-weak)',
-                    color: 'var(--accent)',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                  }}
-                >
+                <code className="rounded-badge bg-accent-weak px-1_5 py-half text-ui text-accent font-mono">
                   Connector
                 </code>{' '}
                 interface and publish to npm. The daemon handles scheduling, retries, rate-limit
@@ -830,7 +813,7 @@ export default function DaemonPage() {
         </section>
 
         {/* Final CTA */}
-        <section className="sect final" style={{ borderBottom: 'none' }}>
+        <section className="sect final border-b-0">
           <div className="big">
             Captures, quietly
             <br />

@@ -77,7 +77,7 @@ export function ResumeMenu({ sid, providerLabel }: { sid: string; providerLabel:
           id={panelId}
           role="dialog"
           aria-label="Resume this Session locally"
-          className="absolute top-[calc(100%+8px)] left-0 z-40 w-[min(480px,calc(100vw-32px))] rounded-[10px] border border-[var(--border)] bg-[var(--bg)] p-3 shadow-[var(--sp-shadow-popover)]"
+          className="rounded-card border-border bg-background shadow-popover absolute top-[calc(100%+8px)] left-0 z-40 w-[min(480px,calc(100vw-32px))] border p-3"
         >
           <ResumeOptionsPanel sid={sid} />
         </div>
@@ -130,13 +130,11 @@ export function ResumeOptionsPanel({ sid }: { sid: string }) {
         aria-labelledby={`${tabPrefix}-${selected.id}`}
         className="resume-command-panel"
       >
-        <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
-          {selected.description}
-        </p>
+        <p className="text-meta text-muted mt-2 mb-0 leading-4">{selected.description}</p>
 
         <div className="mt-2 flex min-w-0 gap-2" aria-label="Resume command">
           <code
-            className="resume-command-code flex h-8 min-w-0 flex-1 items-center overflow-x-auto rounded-md border border-[var(--border-strong)] bg-[var(--card)] px-3 font-mono text-[12px] whitespace-nowrap text-[var(--text)]"
+            className="resume-command-code rounded-control border-border-strong bg-background text-button text-foreground flex h-8 min-w-0 flex-1 items-center overflow-x-auto border px-3 font-mono whitespace-nowrap"
             title={selected.command}
           >
             {selected.command}
@@ -169,10 +167,10 @@ export function ResumeOptionsPanel({ sid }: { sid: string }) {
           </Button>
         </div>
 
-        <p className="mt-2 mb-0 text-[11px] leading-4 text-[var(--muted)]">
+        <p className="text-meta text-muted mt-2 mb-0 leading-4">
           Resume creates a new local Session. This published source stays unchanged.
           {copyFailed && (
-            <span className="ml-2 text-[var(--error)]">
+            <span className="text-status-error ml-2">
               Copy failed — select the command manually.
             </span>
           )}

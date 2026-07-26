@@ -198,6 +198,7 @@ describe('content primitives', () => {
   it('renders badge variants and avatar image fallbacks', () => {
     const badge = renderToStaticMarkup(<Badge variant="source-codex">Codex</Badge>)
     const fallback = renderToStaticMarkup(<Avatar name="Ada Lovelace" alt="Ada" />)
+    const emojiFallback = renderToStaticMarkup(<Avatar name="🧑 Builder" />)
     const image = renderToStaticMarkup(
       <Avatar src="https://example.test/ada.png" name="Ada Lovelace" alt="Ada" />,
     )
@@ -206,6 +207,7 @@ describe('content primitives', () => {
     expect(fallback).toContain('sp-avatar__fallback')
     expect(fallback).toContain('>AL</span>')
     expect(fallback).toContain('role="img"')
+    expect(emojiFallback).toContain('>🧑B</span>')
     expect(image).toContain('<img')
     expect(image).toContain('referrerPolicy="no-referrer"')
   })

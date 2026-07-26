@@ -261,7 +261,221 @@ describe('subscribe command', () => {
     expect(loadSubscriptions({ homeDir: home })[0]?.visibility).toBe('public')
 
     expect(handleSubscriptionsCommand({ ui, homeDir: home })).toBe(0)
-    expect(output.join('\n')).toContain(`${project}  (Public · Project Spool)`)
+    expect(output.join('\n')).toContain(`${project}  (Public · Project evan/spool)`)
+  })
+
+  it('combines Team ownership with Public disclosure', async () => {
+    const home = tempDir('spool-subscribe-home-')
+    const project = tempDir('spool-subscribe-project-')
+    const { ui, output } = capturingUi()
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        {
+          team: '@paperboy',
+          public: true,
+          project: 'paperboy/paperboy',
+          yes: true,
+        },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          listTeams: async () => TEAMS,
+          ...projectDeps(project, [PERSONAL_PROJECT, TEAM_PROJECT]),
+        },
+      ),
+    ).toBe(0)
+    expect(loadSubscriptions({ homeDir: home })[0]).toMatchObject({
+      visibility: 'public',
+      teamId: 'team_00000001',
+      teamName: 'Paperboy',
+      project: {
+        tenant: { kind: 'team', id: 'team_00000001' },
+        remote: { id: TEAM_PROJECT.id },
+      },
+    })
+    expect(output.join('\n')).toContain('Public')
+    expect(output.join('\n')).toContain('owned by Team · Paperboy')
+  })
+
+  it('derives a Team owner from an explicit owner/slug Project reference', async () => {
+    const home = tempDir('spool-subscribe-home-')
+    const project = tempDir('spool-subscribe-project-')
+    const { ui } = capturingUi()
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { public: true, project: 'paperboy/paperboy', yes: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          ...projectDeps(project, [PERSONAL_PROJECT, TEAM_PROJECT]),
+        },
+      ),
+    ).toBe(0)
+    expect(loadSubscriptions({ homeDir: home })[0]).toMatchObject({
+      visibility: 'public',
+      teamId: 'team_00000001',
+      project: { tenant: { kind: 'team', id: 'team_00000001' } },
+    })
+  })
+
+  it('selects Project ownership before independently choosing visibility', async () => {
+    const home = tempDir('spool-subscribe-home-')
+    const project = tempDir('spool-subscribe-project-')
+    const messages: string[] = []
+    const projectLabels: string[] = []
+    const baseUi = createTextUi()
+    const ui = {
+      ...baseUi,
+      interactive: true,
+      select: async ({
+        message,
+        choices,
+      }: {
+        message: string
+        choices: Array<{ value: string; label: string }>
+      }) => {
+        messages.push(message)
+        if (message.startsWith('Which Hub Project')) {
+          projectLabels.push(...choices.map((choice) => choice.label))
+          return TEAM_PROJECT.id
+        }
+        return 'public'
+      },
+      confirm: async () => true,
+    }
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        {},
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          ...projectDeps(project, [PERSONAL_PROJECT, TEAM_PROJECT]),
+        },
+      ),
+    ).toBe(0)
+    expect(projectLabels).toEqual(['evan/spool', 'paperboy/paperboy', 'Create Project “spool”'])
+    expect(messages).toEqual([
+      'Which Hub Project should "spool" publish to?',
+      'How should auto-published Sessions be shared?',
+    ])
+    expect(loadSubscriptions({ homeDir: home })[0]).toMatchObject({
+      visibility: 'public',
+      teamId: 'team_00000001',
+    })
+  })
+
+  it('defers an interactive Project creation until the subscription is confirmed', async () => {
+    const home = tempDir('spool-subscribe-create-deferred-home-')
+    const project = tempDir('spool-subscribe-create-deferred-project-')
+    let createCalls = 0
+    const baseUi = createTextUi()
+    const ui = {
+      ...baseUi,
+      interactive: true,
+      select: async ({ choices }: { choices: Array<{ value: string; label: string }> }) =>
+        choices.find((choice) => choice.label.startsWith('Create Project'))?.value ?? null,
+      confirm: async () => false,
+    }
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { public: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          ...projectDeps(project, []),
+          fetch: async () => {
+            createCalls += 1
+            throw new Error('Project creation must remain deferred')
+          },
+        },
+      ),
+    ).toBe(1)
+    expect(createCalls).toBe(0)
+    expect(loadSubscriptions({ homeDir: home })).toEqual([])
+  })
+
+  it('creates an interactively selected Project after confirmation and subscribes to it', async () => {
+    const home = tempDir('spool-subscribe-create-confirmed-home-')
+    const project = tempDir('spool-subscribe-create-confirmed-project-')
+    let createCalls = 0
+    const createdProject = {
+      ...PERSONAL_PROJECT,
+      id: 'project_created01',
+      name: 'spool',
+      slug: 'spool',
+    }
+    const baseUi = createTextUi()
+    const ui = {
+      ...baseUi,
+      interactive: true,
+      select: async ({ choices }: { choices: Array<{ value: string; label: string }> }) =>
+        choices.find((choice) => choice.label.startsWith('Create Project'))?.value ?? null,
+      confirm: async () => true,
+    }
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { public: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          ...projectDeps(project, []),
+          fetch: async (input, init) => {
+            expect(new URL(String(input)).pathname).toBe('/api/hub/v1/projects')
+            expect(init?.method).toBe('POST')
+            createCalls += 1
+            return new Response(JSON.stringify({ project: createdProject }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            })
+          },
+        },
+      ),
+    ).toBe(0)
+    expect(createCalls).toBe(1)
+    expect(loadSubscriptions({ homeDir: home })[0]).toMatchObject({
+      visibility: 'public',
+      project: {
+        tenant: { kind: 'user', id: 'user_00000001' },
+        remote: { id: createdProject.id },
+      },
+    })
+  })
+
+  it('rejects a Project whose owner conflicts with --team', async () => {
+    const home = tempDir('spool-subscribe-home-')
+    const project = tempDir('spool-subscribe-project-')
+    const { ui, errors } = capturingUi()
+
+    expect(
+      await handleSubscribeCommand(
+        project,
+        { team: 'paperboy', public: true, project: PERSONAL_PROJECT.id, yes: true },
+        {
+          ui,
+          homeDir: home,
+          cwd: project,
+          listTeams: async () => TEAMS,
+          ...projectDeps(project, [PERSONAL_PROJECT, TEAM_PROJECT]),
+        },
+      ),
+    ).toBe(1)
+    expect(errors.join('\n')).toContain('different owner')
+    expect(loadSubscriptions({ homeDir: home })).toEqual([])
   })
 
   it('unsubscribes by path and reports unknown directories', async () => {

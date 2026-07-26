@@ -35,6 +35,10 @@
     "./tokens.css": {
       "development": "./src/css/tokens.css",
       "default": "./dist/tokens.css"
+    },
+    "./theme.css": {
+      "development": "./src/css/theme.css",
+      "default": "./dist/theme.css"
     }
   },
   "scripts": {

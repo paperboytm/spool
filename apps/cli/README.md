@@ -30,9 +30,10 @@ spool logout
 ## Continuous Publishing
 
 ```bash
-spool subscribe [dir] --team <handle|name|id> # Team · {name}: current members only
-spool subscribe [dir] --link-only           # anyone with the URL
-spool subscribe [dir] --public              # explicit opt-in to Explore/search
+spool subscribe [dir] --team paperboy --project paperboy/spool # Team-only
+spool subscribe [dir] --project paperboy/spool --public         # Team-owned, Public
+spool subscribe [dir] --team paperboy --link-only --project paperboy/spool
+spool subscribe [dir] --project doodlewind/spool --link-only    # personal, URL-only
 spool unsubscribe [dir]
 spool subscriptions
 spool teams                                 # list the Teams you belong to
@@ -42,9 +43,11 @@ spool projects move <sid|url> --project <id|owner/slug>
 spool daemon start|stop|status|logs|run
 ```
 
-`--team` accepts a stable Team handle, an id, or a unique Team name. When names collide, Spool fails closed and asks for a handle or id.
+`--team` accepts a stable Team handle, an id, or a unique Team name. When names collide, Spool fails closed and asks for a handle or id. It constrains Project ownership; used alone it preserves the compatible Team-only behavior. Add `--public` or `--link-only` to choose a broader disclosure without changing the Team owner.
 
-Subscribing a directory is the one-time disclosure and Project decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. The disclosure target is always an explicit choice among `Team · {name}`, Link-only, and Public; **there is no implicit default and Public is never preselected**. Every hosted Session also belongs to one personal or Team Project. Interactive `spool subscribe` offers a Project or can create one. Automation must pass `--project <id|owner/slug>` or `--create-project <name>` unless an account-, tenant-, Hub-, and local-Project-specific binding already exists; `--yes` never chooses a Project.
+Subscribing a directory is the one-time owner, Project, and disclosure decision: from then on, the daemon publishes new and updated Sessions recorded in that directory — including its git worktrees and worktrees managed by tools like superset or orca — without prompting. Every hosted Session belongs to one personal or Team Project, and that Project determines the durable owner. Visibility is a separate choice: Team-only, Link-only, or Public. A Team-owned Project can therefore publish Public or Link-only Sessions while the Team keeps ownership.
+
+Interactive `spool subscribe` lists all writable personal and Team Projects as `owner/slug`, then confirms visibility independently; Public is never preselected or silently inferred. An explicit `--project paperboy/spool` derives Team ownership, while `--team paperboy` filters the selector and rejects a Project owned by anyone else. Automation must pass `--project <id|owner/slug>` or `--create-project <name>` unless an account-, tenant-, Hub-, and local-Project-specific binding already exists; `--yes` never chooses a Project or widens visibility.
 
 `spool daemon start` registers the watcher with launchd (macOS) or a systemd user unit (Linux) so it runs at login and restarts on failure. `spool daemon run` is the same loop in the foreground.
 
@@ -67,16 +70,18 @@ Useful publishing options:
 spool share <uuid>@12              # first 12 records
 spool share --no-agent-summary     # skip local Agent generation
 spool share --spool-file x.spool   # attach a curated document
-spool share --project evan/spool   # bind this local Project to an existing Hub Project
+spool share --project doodlewind/spool # bind this local Project to an existing Hub Project
 spool share --create-project Spool # create and bind a Project
 spool share --team paperboy --project paperboy/react-vapor # Team-only from the first upload
+spool share --project paperboy/react-vapor --public         # Team-owned and Public
+spool share --team paperboy --project paperboy/react-vapor --link-only
 spool share --visibility-confirmed # acknowledge visibility without a TTY
 spool share --yes                  # skip all confirmations, including secret findings
 ```
 
 For the normal interactive flow, omit Summary options. Spool resolves the exact local Project joined to the selected Session—even when the command is run from another directory—and asks for a Hub Project the first time. Re-sharing keeps the Session's existing remote Project. After the Session URL is live, Spool can ask a detected local Agent to draft the optional Summary. `--summary <markdown>` is an advanced manual or automation input: it uploads exactly the Markdown supplied by the caller and does not generate a Summary.
 
-`--team <handle|name|id>` is the direct one-off Team path. It requires a Team-owned Project (explicitly or through an existing Team binding), names the Team and ownership transfer in the confirmation, shows the selected Project before upload, and writes `Team · {name}` on the first Hub head—there is no intermediate Public Session.
+`--team <handle|name|id>` is the direct one-off Team ownership path. It requires a Team-owned Project (explicitly or through an existing Team binding), names the Team and ownership in the confirmation, and defaults to Team-only—there is no intermediate Public Session. Combine it with `--public` or `--link-only` to change disclosure while keeping Team ownership. Supplying an explicit `owner/slug` Project derives its owner even without `--team`; when both are supplied, they must match.
 
 Move an already-hosted Session between Projects owned by the same user or Team with `spool projects move <sid|url> --project <id|owner/slug>`. The command sends the current Project as an optimistic precondition and never changes records, visibility, authorship, stars, or verified-fork lineage. Use `spool visibility … team` instead when the tenant itself must change.
 

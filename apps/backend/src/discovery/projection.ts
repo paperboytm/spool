@@ -359,6 +359,79 @@ export function prepareAuthorizedTargetStarsDelete(
     .bind(gate.sid, ...authorizedProjectionGateValues(gate))
 }
 
+const PROJECT_HAS_LIVE_PUBLIC_SESSION = `
+  EXISTS (
+    SELECT 1
+    FROM hub_sessions live_session
+    JOIN hub_session_discovery live_projection
+      ON live_projection.sid=live_session.sid
+    JOIN users live_author ON live_author.id=live_session.owner_user_id
+    LEFT JOIN teams live_team ON live_team.id=live_session.team_id
+      AND live_team.archived_at IS NULL
+      AND live_team.deletion_pending_until IS NULL
+    WHERE live_session.project_id=?
+      AND live_session.visibility='unlisted'
+      AND live_session.withdrawn_at IS NULL
+      AND (
+        (live_session.team_id IS NULL AND live_author.deleted_at IS NULL)
+        OR (live_session.team_id IS NOT NULL AND live_team.id IS NOT NULL)
+      )
+    LIMIT 1
+  )`
+
+/** Project Stars exist only while the Project has a live Public Session. The
+ * Session gate couples this cleanup to the same authorized D1 mutation that
+ * removed or moved the old public projection. */
+export function prepareAuthorizedProjectStarsDeleteWhenNotPublic(
+  db: D1Database,
+  projectId: string,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-delete-project-stars-when-not-public */
+       DELETE FROM project_stars
+       WHERE project_id=?
+         AND NOT ${PROJECT_HAS_LIVE_PUBLIC_SESSION}
+         AND ${AUTHORIZED_SESSION_PROJECTION_GATE}`,
+    )
+    .bind(projectId, projectId, ...authorizedProjectionGateValues(gate))
+}
+
+/** Once a Project loses its final Public Session, only a current member may
+ * keep a private Team Project Watch. Personal Project Watches and former or
+ * outside Team watchers are removed in the same disclosure transaction. */
+export function prepareAuthorizedProjectOutsiderWatchesDeleteWhenNotPublic(
+  db: D1Database,
+  projectId: string,
+  gate: AuthorizedProjectionGate,
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `/* discovery:authorized-delete-project-outsider-watches-when-not-public */
+       DELETE FROM project_watches
+       WHERE project_id=?
+         AND NOT ${PROJECT_HAS_LIVE_PUBLIC_SESSION}
+         AND NOT EXISTS (
+           SELECT 1
+           FROM projects watched_project
+           JOIN teams watched_team ON watched_team.id=watched_project.owner_team_id
+             AND watched_team.archived_at IS NULL
+             AND watched_team.deletion_pending_until IS NULL
+           JOIN team_memberships watched_member
+             ON watched_member.team_id=watched_team.id
+             AND watched_member.user_id=project_watches.user_id
+           JOIN users watched_user ON watched_user.id=watched_member.user_id
+             AND watched_user.deleted_at IS NULL
+             AND watched_user.deletion_pending_until IS NULL
+           WHERE watched_project.id=project_watches.project_id
+             AND watched_project.archived_at IS NULL
+         )
+         AND ${AUTHORIZED_SESSION_PROJECTION_GATE}`,
+    )
+    .bind(projectId, projectId, ...authorizedProjectionGateValues(gate))
+}
+
 export async function isPublishedToDiscovery(db: D1Database, sid: string): Promise<boolean> {
   const row = await db
     .prepare('/* discovery:is-published */ SELECT 1 FROM hub_session_discovery WHERE sid = ?')

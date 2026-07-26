@@ -19,6 +19,7 @@ function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
       name: 'Evan',
     },
     session_count: 2,
+    star_count: 7,
     updated_at: 1,
     archived_at: null,
     can_manage: true,
@@ -37,12 +38,13 @@ describe('ProjectCard', () => {
     expect(html).toContain('@evan')
     expect(html).toContain('react-vapor')
     expect(html).toContain('2 Sessions')
+    expect(html).toContain('7')
     expect(html).toContain('href="https://github.com/paperboytm/react-vapor"')
     expect(html).toContain('href="/projects/project_1/edit"')
     expect(html).not.toContain('>Team</')
   })
 
-  it('marks Team Projects as private tenant content', () => {
+  it('marks the Team owner namespace without implying the public Project is private', () => {
     const html = renderToStaticMarkup(
       <ProjectCard
         project={project({

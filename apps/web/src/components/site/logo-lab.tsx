@@ -113,14 +113,14 @@ export default function LogoLab() {
       <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
         Spool mark — 候选方案
       </h1>
-      <p style={{ color: 'var(--muted)', margin: '8px 0 40px', fontSize: 14 }}>
+      <p style={{ color: 'var(--color-muted)', margin: '8px 0 40px', fontSize: 14 }}>
         一条线斜着一圈圈绕着圆柱。每个方案给出 96 / 48 / 24 / 16px、字标组合、以及页头实境预览。
       </p>
 
       {VARIANTS.map((v) => (
         <section key={v.key} style={{ marginBottom: 48 }}>
           <h2 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 4px' }}>{v.name}</h2>
-          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '0 0 16px' }}>{v.note}</p>
+          <p style={{ color: 'var(--color-muted)', fontSize: 13, margin: '0 0 16px' }}>{v.note}</p>
 
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {THEMES.map((t) => (

@@ -104,7 +104,7 @@ export function GoalTrail() {
         >
           <defs>
             <pattern id="gtmDots" width="22" height="22" patternUnits="userSpaceOnUse">
-              <circle cx="1.5" cy="1.5" r="1.1" fill="var(--border)" />
+              <circle cx="1.5" cy="1.5" r="1.1" fill="var(--color-border)" />
             </pattern>
           </defs>
           <rect width="520" height="264" fill="url(#gtmDots)" opacity="0.6" />

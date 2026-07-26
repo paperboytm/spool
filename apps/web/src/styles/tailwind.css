@@ -1,0 +1,15 @@
+/*
+ * One Tailwind v4 pipeline for every production Web route.
+ *
+ * The shared UI package owns runtime values and the semantic Tailwind theme
+ * namespace. Route styles live in Tailwind's component layer and consume
+ * only that namespace; session-view utilities are compiled in this same
+ * pass so route transitions never load a competing utility bundle.
+ */
+@import 'tailwindcss/theme.css' layer(theme);
+@import '@spool-lab/ui/styles.css';
+@import 'tailwindcss/utilities.css' important;
+
+@source "../";
+@source "../../../../packages/ui/src";
+@source "../../../../packages/session-view/src";

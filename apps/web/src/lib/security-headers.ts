@@ -81,7 +81,12 @@ function requestUrl(target: RequestTarget): URL {
 function isPrivateCollectionScope(url: URL, path: string): boolean {
   return (
     (path === '/sessions' || path === '/projects') &&
-    url.searchParams.getAll('scope').some((scope) => scope === 'mine' || scope === 'team')
+    url.searchParams
+      .getAll('scope')
+      .some(
+        (scope) =>
+          scope === 'mine' || scope === 'team' || scope === 'starred' || scope === 'watching',
+      )
   )
 }
 

@@ -289,8 +289,8 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
 
   if (messages.length === 0) {
     return (
-      <div className="text-warm-faint dark:text-dark-muted flex flex-1 items-center justify-center">
-        <p className="text-sm">No messages to display.</p>
+      <div className="text-faint flex flex-1 items-center justify-center">
+        <p className="text-reading">No messages to display.</p>
       </div>
     )
   }
@@ -304,11 +304,11 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
           data-day={row.isoDay}
           className="flex items-center gap-3 px-6 pt-5 pb-2 select-none"
         >
-          <span className="bg-warm-border dark:bg-dark-border h-px flex-1" />
-          <span className="text-warm-faint dark:text-dark-muted text-[10px] font-semibold tracking-[0.08em] uppercase">
+          <span className="bg-border h-px flex-1" />
+          <span className="text-label text-faint font-semibold tracking-[0.08em] uppercase">
             {row.label}
           </span>
-          <span className="bg-warm-border dark:bg-dark-border h-px flex-1" />
+          <span className="bg-border h-px flex-1" />
         </div>
       )
     }
@@ -331,34 +331,34 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
                 return next
               })
             }}
-            className="border-warm-border dark:border-dark-border bg-warm-surface/70 dark:bg-dark-surface/70 hover:bg-warm-surface2 dark:hover:bg-dark-surface2 flex w-full min-w-0 items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors"
+            className="rounded-control border-border bg-surface/70 duration-hover hover:bg-surface-2 flex w-full min-w-0 items-center gap-2 border px-3 py-2 text-left transition-colors"
           >
             {expanded ? (
               <ChevronDown
                 size={14}
                 strokeWidth={1.8}
-                className="text-warm-faint dark:text-dark-muted flex-none"
+                className="text-faint flex-none"
                 aria-hidden
               />
             ) : (
               <ChevronRight
                 size={14}
                 strokeWidth={1.8}
-                className="text-warm-faint dark:text-dark-muted flex-none"
+                className="text-faint flex-none"
                 aria-hidden
               />
             )}
-            <span className="text-warm-muted dark:text-dark-muted min-w-0 flex-1 truncate text-xs font-medium">
+            <span className="text-button text-muted min-w-0 flex-1 truncate font-medium">
               {row.label}
             </span>
-            <span className="text-warm-faint dark:text-dark-muted flex-none font-mono text-[10px]">
+            <span className="text-label text-faint flex-none font-mono">
               {labels.messagesCount(row.messages.length)}
               {rowTime ? ` · ${rowTime}` : ''}
             </span>
           </button>
 
           {expanded && (
-            <div className="border-warm-border dark:border-dark-border mt-2 ml-2 border-l">
+            <div className="border-border mt-2 ml-2 border-l">
               {row.messages.map((message, messageIndex) => {
                 const matchState = showFindBar ? messageFindRanges.get(message.id) : undefined
                 const containsActive =
@@ -373,8 +373,8 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
                     data-message-id={message.id}
                     {...(isTarget ? { 'data-testid': 'target-message' } : {})}
                     {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
-                    className={`transition-colors duration-700 ${
-                      isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
+                    className={`duration-highlight transition-colors ${
+                      isTarget && showTargetHighlight ? 'bg-accent/10' : ''
                     }`}
                   >
                     <MessageBubble
@@ -409,8 +409,8 @@ const MessageList = forwardRef<MessageListHandle, Props>(function MessageList(
         data-message-id={msg.id}
         {...(isTarget ? { 'data-testid': 'target-message' } : {})}
         {...(isTarget && showTargetHighlight ? { 'data-highlighted': '1' } : {})}
-        className={`transition-colors duration-700 ${
-          isTarget && showTargetHighlight ? 'bg-accent/10 dark:bg-accent-dark/10' : ''
+        className={`duration-highlight transition-colors ${
+          isTarget && showTargetHighlight ? 'bg-accent/10' : ''
         }`}
       >
         <MessageBubble
@@ -571,7 +571,7 @@ function MessageScrollbar({
     >
       <div
         data-testid="message-scrollbar-thumb"
-        className="absolute right-0.5 w-2 rounded-full bg-[var(--spool-scrollbar-thumb)] hover:bg-[var(--spool-scrollbar-thumb-hover)]"
+        className="right-half rounded-pill bg-scrollbar-thumb hover:bg-scrollbar-thumb-hover absolute w-2"
         style={{ height: thumbHeight, transform: `translateY(${thumbTop}px)` }}
         onPointerDown={(event) => {
           event.preventDefault()

@@ -1,5 +1,5 @@
 import { Badge } from '@spool-lab/ui'
-import { ExternalLink, FolderKanban, LockKeyhole } from 'lucide-react'
+import { ExternalLink, FolderKanban, Star, Users } from 'lucide-react'
 
 import type { ProjectSummary } from '../lib/project-api'
 
@@ -23,7 +23,7 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
             <h2>{project.name}</h2>
             {teamOwned ? (
               <Badge className="project-card-visibility">
-                <LockKeyhole size={11} strokeWidth={1.8} aria-hidden="true" />
+                <Users size={11} strokeWidth={1.8} aria-hidden="true" />
                 Team
               </Badge>
             ) : null}
@@ -34,6 +34,9 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           <p>{project.description || 'A home for related agent Sessions.'}</p>
           <span className="project-card-meta">
             {project.session_count} {project.session_count === 1 ? 'Session' : 'Sessions'}
+            <span aria-hidden="true"> · </span>
+            <Star size={12} strokeWidth={1.7} aria-hidden="true" />
+            {project.star_count ?? 0}
           </span>
         </div>
       </a>

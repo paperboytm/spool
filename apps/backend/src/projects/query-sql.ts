@@ -11,6 +11,11 @@ WITH actor AS (
 SELECT p.*,
   (SELECT COUNT(*) FROM hub_sessions s
    WHERE s.project_id=p.id AND s.withdrawn_at IS NULL) AS session_count,
+  (SELECT COUNT(*) FROM project_stars relation
+   JOIN users star_user ON star_user.id=relation.user_id
+     AND star_user.deleted_at IS NULL
+     AND star_user.deletion_pending_until IS NULL
+   WHERE relation.project_id=p.id) AS star_count,
   owner_handle.handle AS owner_handle,
   CASE
     WHEN p.owner_team_id IS NOT NULL THEN owner_team.name
