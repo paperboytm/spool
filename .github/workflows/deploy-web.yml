@@ -196,9 +196,11 @@ jobs:
       - name: Build web router
         run: pnpm --filter @spool/web run build
 
-      # Apply every committed D1 migration before publishing code that may
-      # depend on the new schema. A failed migration stops the job, leaving
-      # the currently deployed backend and router untouched.
+      # Apply every committed D1 migration through D1's atomic import endpoint
+      # before publishing code that may depend on the new schema. The standard
+      # /query migration path cannot reliably ingest trigger-heavy migrations.
+      # A failed import rolls the database back and stops the deployment,
+      # leaving the currently deployed backend and router untouched.
       - name: Apply staging D1 migrations
         if: env.DEPLOY_TARGET == 'staging'
         env:

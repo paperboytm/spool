@@ -22,8 +22,8 @@
     "deploy:prod": "node scripts/deploy-pages.mjs production",
     "deploy:staging": "node scripts/deploy-pages.mjs staging",
     "d1:migrate:local": "wrangler d1 migrations apply spool-share-db --local --config wrangler.toml",
-    "d1:migrate:prod": "wrangler d1 migrations apply spool-share-db --remote --config wrangler.prod.toml",
-    "d1:migrate:staging": "wrangler d1 migrations apply spool-share-db-staging --remote --config wrangler.staging.toml",
+    "d1:migrate:prod": "node scripts/d1-migrate-remote.mjs --database spool-share-db --config wrangler.prod.toml",
+    "d1:migrate:staging": "node scripts/d1-migrate-remote.mjs --database spool-share-db-staging --config wrangler.staging.toml",
     "schema:smoke": "node scripts/schema-smoke.mjs",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
