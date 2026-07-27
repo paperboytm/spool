@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test'
 
 import { costForUsage } from './pricing.js'
-import { parseSummaryFrontMatter } from './summary.js'
+import { parseSummaryFrontMatter, repairOverlongSummaryTitles } from './summary.js'
 
 describe('parseSummaryFrontMatter', () => {
   it('parses bilingual titles and strips the block from the body', () => {
@@ -103,6 +103,96 @@ describe('parseSummaryFrontMatter', () => {
     const parsed = parseSummaryFrontMatter(source)
     expect(parsed.summaries).toBeNull()
     expect(parsed.body).toBe(source)
+  })
+})
+
+describe('repairOverlongSummaryTitles', () => {
+  it('shortens English and Chinese titles without changing the bodies', () => {
+    const source = [
+      '---',
+      'title: Rename alpha to beta',
+      'title_zh: 将 alpha 重命名为 beta',
+      '---',
+      '',
+      '<!-- spool:summary:en -->',
+      'The demo now uses the requested beta name.',
+      '<!-- /spool:summary -->',
+      '',
+      '<!-- spool:summary:zh -->',
+      '演示项目现在使用要求的 beta 名称。',
+      '<!-- /spool:summary -->',
+    ].join('\n')
+    const longEnglish =
+      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add regression coverage for the backoff'
+
+    const repairedEnglish = repairOverlongSummaryTitles(
+      source.replace('title: Rename alpha to beta', `title: ${longEnglish}`),
+    )
+
+    expect(repairedEnglish.shortened).toEqual(['title'])
+    expect(repairedEnglish.sourceTitles?.en).toBe(longEnglish)
+    expect(parseSummaryFrontMatter(repairedEnglish.summary).titles?.en).toBe(
+      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add…',
+    )
+    expect(repairedEnglish.summary.slice(repairedEnglish.summary.indexOf('\n---\n'))).toBe(
+      source.slice(source.indexOf('\n---\n')),
+    )
+
+    const longChinese = '修'.repeat(120)
+    const repairedChinese = repairOverlongSummaryTitles(
+      source.replace('title_zh: 将 alpha 重命名为 beta', `title_zh: ${longChinese}`),
+    )
+    expect(repairedChinese.shortened).toEqual(['title_zh'])
+    expect(parseSummaryFrontMatter(repairedChinese.summary).titles?.zh).toBe(`${'修'.repeat(95)}…`)
+
+    expect(repairOverlongSummaryTitles(source)).toEqual({
+      summary: source,
+      shortened: [],
+      sourceTitles: { en: 'Rename alpha to beta', zh: '将 alpha 重命名为 beta' },
+    })
+    const legacy = '# Legacy summary\n\nA single-language body.'
+    expect(repairOverlongSummaryTitles(legacy)).toEqual({
+      summary: legacy,
+      shortened: [],
+      sourceTitles: null,
+    })
+  })
+
+  it('measures the word-boundary floor in Unicode codepoints', () => {
+    const source = [
+      '---',
+      `title: ${'😀'.repeat(30)} ${'a'.repeat(70)}`,
+      'title_zh: 中文标题',
+      '---',
+      'Body.',
+    ].join('\n')
+
+    const repaired = repairOverlongSummaryTitles(source)
+
+    expect(parseSummaryFrontMatter(repaired.summary).titles?.en).toBe(
+      `${'😀'.repeat(30)} ${'a'.repeat(64)}…`,
+    )
+  })
+
+  it('preserves mixed LF and CRLF outside repaired title lines', () => {
+    const source = [
+      '---\r\n',
+      `title: ${'a'.repeat(120)}\n`,
+      'title_zh: 中文标题\r\n',
+      '---\n',
+      '\r\n',
+      '<!-- spool:summary:en -->\r\n',
+      'English body.\n',
+      '<!-- /spool:summary -->\r\n',
+      '\n',
+      '<!-- spool:summary:zh -->\r\n',
+      '中文正文。\n',
+      '<!-- /spool:summary -->',
+    ].join('')
+
+    const repaired = repairOverlongSummaryTitles(source)
+
+    expect(repaired.summary).toBe(source.replace('a'.repeat(120), `${'a'.repeat(95)}…`))
   })
 })
 

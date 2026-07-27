@@ -11,7 +11,11 @@ import {
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 
-import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
+import {
+  parseSummaryFrontMatter,
+  sequenceRoot,
+  serializePortableSession,
+} from '@spool-lab/session-kit'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
@@ -619,6 +623,139 @@ describe('spool share local Agent Summary flow', () => {
       events.findIndex((event) => event.startsWith('confirm:Generate a Summary')),
     )
     expect(events).toContain('select:Which local Agent should generate the Summary?')
+  })
+
+  it('uploads a Summary whose only defect is an overlong title', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-long-title-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-long-title-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const overlong = `Rename alpha to beta across the demo workspace ${'and every downstream caller '.repeat(4)}`
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () =>
+          BILINGUAL_SUMMARY.replace('title: Rename alpha to beta', `title: ${overlong}`),
+      },
+    )
+
+    expect(exit).toBe(0)
+    const stored = hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd as string
+    const titles = parseSummaryFrontMatter(stored).titles
+    expect(Array.from(titles?.en ?? '').length).toBeLessThanOrEqual(96)
+    expect(titles?.en).toMatch(/^Rename alpha to beta across the demo workspace .*…$/)
+    expect(titles?.zh).toBe('将 alpha 重命名为 beta')
+    expect(stored).toContain('The demo now uses the requested beta name.')
+    expect(events).toContain('info:Shortened `title` to the 96-character Session title limit.')
+    expect(events.some((event) => event.startsWith('spinner:error:'))).toBe(false)
+  })
+
+  it('rejects an Agent Summary that exceeded 64 KiB before title repair', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-too-large-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-too-large-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const generated = BILINGUAL_SUMMARY.replace(
+      'title: Rename alpha to beta',
+      `title: ${'a'.repeat(64 * 1024)}`,
+    )
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () => generated,
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+    expect(events).toContain(
+      'error:Claude Code returned an invalid bilingual Summary: the UTF-8 document exceeds 64 KiB',
+    )
+  })
+
+  it('rejects a repeated first H1 even when its overlong title is repaired', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-long-title-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-long-title-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const overlong = `Rename alpha to beta across the demo workspace ${'and every downstream caller '.repeat(4)}`
+    const generated = BILINGUAL_SUMMARY.replace(
+      'title: Rename alpha to beta',
+      `title: ${overlong}`,
+    ).replace('<!-- spool:summary:en -->\n', `<!-- spool:summary:en -->\n# ${overlong}\n\n`)
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () => generated,
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+    expect(events).toContain(
+      'error:Claude Code returned an invalid bilingual Summary: Summary bodies must not repeat the Session title as their first H1',
+    )
+  })
+
+  it('rejects a first H1 that repeats the repaired Session title', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-repaired-title-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-repaired-title-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const overlong = 'a'.repeat(120)
+    const repairedTitle = `${'a'.repeat(95)}…`
+    const generated = BILINGUAL_SUMMARY.replace(
+      'title: Rename alpha to beta',
+      `title: ${overlong}`,
+    ).replace('<!-- spool:summary:en -->\n', `<!-- spool:summary:en -->\n# ${repairedTitle}\n\n`)
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () => generated,
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+    expect(events).toContain(
+      'error:Claude Code returned an invalid bilingual Summary: Summary bodies must not repeat the Session title as their first H1',
+    )
   })
 
   it('does not prompt or invoke an Agent when non-interactive visibility is acknowledged', async () => {

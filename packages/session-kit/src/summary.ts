@@ -22,7 +22,26 @@ export interface ParsedSummary {
   titleOverflow?: boolean
 }
 
-const MAX_TITLE_CHARS = 96
+export const SUMMARY_TITLE_CHAR_LIMIT = 96
+export type SummaryTitleKey = 'title' | 'title_zh'
+
+export interface SummaryTitleRepair {
+  summary: string
+  shortened: SummaryTitleKey[]
+  /** Normalized, unbounded titles from the source document. */
+  sourceTitles: SessionTitles | null
+}
+
+interface SummarySourceLine {
+  content: string
+  ending: string
+}
+
+interface LeadingSummaryFrontMatter {
+  lines: SummarySourceLine[]
+  closing: number
+}
+
 const SUMMARY_SECTION_START_RE = /^<!--\s*spool:summary:(en|zh)\s*-->$/
 const SUMMARY_SECTION_END = '<!-- /spool:summary -->'
 
@@ -43,38 +62,92 @@ const SUMMARY_SECTION_END = '<!-- /spool:summary -->'
  */
 export function parseSummaryFrontMatter(summaryMd: string | null | undefined): ParsedSummary {
   const source = summaryMd ?? ''
-  const lines = source.split(/\r?\n/)
-  if (lines[0]?.trim() !== '---') return withParsedSummaries(null, source, false)
-
-  let closing = -1
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i]!.trim() === '---') {
-      closing = i
-      break
-    }
-  }
-  if (closing === -1) return withParsedSummaries(null, source, false)
+  const frontMatter = leadingSummaryFrontMatter(source)
+  if (!frontMatter) return withParsedSummaries(null, source, false)
 
   const titles: SessionTitles = {}
   let titleOverflow = false
-  for (const line of lines.slice(1, closing)) {
-    const match = /^([A-Za-z0-9_-]+)\s*:\s*(.*)$/.exec(line.trim())
-    if (!match) continue
-    const locale = match[1] === 'title' ? 'en' : match[1] === 'title_zh' ? 'zh' : null
-    if (locale === null) continue
-    const normalized = normalizeTitle(match[2]!)
-    if (Array.from(normalized).length > MAX_TITLE_CHARS) titleOverflow = true
-    const value = boundTitle(normalized)
+  for (const line of frontMatter.lines.slice(1, frontMatter.closing)) {
+    const title = parseSummaryTitleLine(line.content)
+    if (!title) continue
+    const locale = title.key === 'title' ? 'en' : 'zh'
+    if (Array.from(title.value).length > SUMMARY_TITLE_CHAR_LIMIT) titleOverflow = true
+    const value = boundTitle(title.value)
     if (!value) continue
     titles[locale] = value
   }
 
-  const body = lines
-    .slice(closing + 1)
+  const body = frontMatter.lines
+    .slice(frontMatter.closing + 1)
+    .map((line) => line.content)
     .join('\n')
     .replace(/^\s*\n/, '')
 
   return withParsedSummaries(titles.en || titles.zh ? titles : null, body, titleOverflow)
+}
+
+/**
+ * Shorten only overlong leading front-matter titles while preserving every
+ * other source byte, including mixed LF/CRLF line endings and both bodies.
+ */
+export function repairOverlongSummaryTitles(summary: string): SummaryTitleRepair {
+  const frontMatter = leadingSummaryFrontMatter(summary)
+  if (!frontMatter) return { summary, shortened: [], sourceTitles: null }
+
+  const shortened: SummaryTitleKey[] = []
+  const sourceTitles: SessionTitles = {}
+  for (const line of frontMatter.lines.slice(1, frontMatter.closing)) {
+    const title = parseSummaryTitleLine(line.content)
+    if (!title) continue
+    sourceTitles[title.key === 'title' ? 'en' : 'zh'] = title.value
+    if (Array.from(title.value).length <= SUMMARY_TITLE_CHAR_LIMIT) continue
+    line.content = `${title.key}: ${shortenSummaryTitle(title.value)}`
+    shortened.push(title.key)
+  }
+
+  return {
+    summary:
+      shortened.length === 0
+        ? summary
+        : frontMatter.lines.map((line) => `${line.content}${line.ending}`).join(''),
+    shortened,
+    sourceTitles: sourceTitles.en || sourceTitles.zh ? sourceTitles : null,
+  }
+}
+
+function leadingSummaryFrontMatter(source: string): LeadingSummaryFrontMatter | null {
+  const lines = splitSummarySourceLines(source)
+  if (lines[0]?.content.trim() !== '---') return null
+  const closing = lines.findIndex((line, index) => index > 0 && line.content.trim() === '---')
+  return closing === -1 ? null : { lines, closing }
+}
+
+function splitSummarySourceLines(source: string): SummarySourceLine[] {
+  const lines: SummarySourceLine[] = []
+  let start = 0
+  while (start <= source.length) {
+    const newline = source.indexOf('\n', start)
+    if (newline === -1) {
+      lines.push({ content: source.slice(start), ending: '' })
+      break
+    }
+    const contentEnd = newline > start && source[newline - 1] === '\r' ? newline - 1 : newline
+    lines.push({
+      content: source.slice(start, contentEnd),
+      ending: source.slice(contentEnd, newline + 1),
+    })
+    start = newline + 1
+  }
+  return lines
+}
+
+function parseSummaryTitleLine(line: string): { key: SummaryTitleKey; value: string } | null {
+  const trimmed = line.trim()
+  const separator = trimmed.indexOf(':')
+  if (separator === -1) return null
+  const candidate = trimmed.slice(0, separator).trimEnd()
+  if (candidate !== 'title' && candidate !== 'title_zh') return null
+  return { key: candidate, value: normalizeTitle(trimmed.slice(separator + 1)) }
 }
 
 /**
@@ -143,5 +216,13 @@ function normalizeTitle(raw: string): string {
 }
 
 function boundTitle(value: string): string {
-  return Array.from(value).slice(0, MAX_TITLE_CHARS).join('')
+  return Array.from(value).slice(0, SUMMARY_TITLE_CHAR_LIMIT).join('')
+}
+
+function shortenSummaryTitle(value: string): string {
+  const budget = SUMMARY_TITLE_CHAR_LIMIT - 1
+  const clipped = Array.from(value).slice(0, budget)
+  const lastSpace = clipped.lastIndexOf(' ')
+  const bounded = lastSpace >= Math.floor(budget / 2) ? clipped.slice(0, lastSpace) : clipped
+  return `${bounded.join('').replace(/[\s\p{P}]+$/u, '')}…`
 }

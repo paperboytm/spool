@@ -95,7 +95,17 @@ export {
   isSessionProvider,
 } from './types.js'
 
-export { parseSummaryFrontMatter } from './summary.js'
-export type { ParsedSummary, SessionSummaries, SessionTitles } from './summary.js'
+export {
+  parseSummaryFrontMatter,
+  repairOverlongSummaryTitles,
+  SUMMARY_TITLE_CHAR_LIMIT,
+} from './summary.js'
+export type {
+  ParsedSummary,
+  SessionSummaries,
+  SessionTitles,
+  SummaryTitleKey,
+  SummaryTitleRepair,
+} from './summary.js'
 export { costForUsage, MODEL_PRICING } from './pricing.js'
 export type { ModelPricing, SessionCost } from './pricing.js'
