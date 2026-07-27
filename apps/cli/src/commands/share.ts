@@ -16,9 +16,12 @@ import {
   isResumableSessionProvider,
   parseSummaryFrontMatter,
   parseSessionText,
+  repairOverlongSummaryTitles,
   sessionRecordData,
   SESSION_PROVIDERS,
+  SUMMARY_TITLE_CHAR_LIMIT,
   type SessionProvider,
+  type SessionTitles,
 } from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
@@ -422,8 +425,12 @@ export async function handleShareCommand(
         buildPreparedSummaryPrompt(target, prepared)
       const generated = (await summarize(agent, prompt)).trim()
       if (!generated) throw new Error(`${agent.name} returned an empty Summary.`)
-      const { summary, shortened } = repairOverlongSummaryTitles(generated)
-      const invalidSummary = bilingualSummaryValidationError(summary)
+      const oversizedSummary = summaryDocumentSizeValidationError(generated)
+      if (oversizedSummary) {
+        throw new Error(`${agent.name} returned an invalid bilingual Summary: ${oversizedSummary}`)
+      }
+      const { summary, shortened, sourceTitles } = repairOverlongSummaryTitles(generated)
+      const invalidSummary = bilingualSummaryValidationError(summary, sourceTitles)
       if (invalidSummary) {
         throw new Error(`${agent.name} returned an invalid bilingual Summary: ${invalidSummary}`)
       }
@@ -463,69 +470,12 @@ export async function handleShareCommand(
   }
 }
 
-export const SUMMARY_TITLE_CHAR_LIMIT = 96
-const SUMMARY_TITLE_KEYS = ['title', 'title_zh'] as const
-type SummaryTitleKey = (typeof SUMMARY_TITLE_KEYS)[number]
-
-/**
- * An overlong front-matter title is the one Summary defect worth repairing
- * instead of rejecting: every reader already bounds titles to
- * `SUMMARY_TITLE_CHAR_LIMIT` characters, so shortening here removes nothing a
- * reader would have seen, while a rejection discards a whole local-Agent
- * generation — minutes of provider usage — over the tail of one line.
- * Structural defects stay hard failures; only the front-matter is rewritten.
- */
-export function repairOverlongSummaryTitles(summary: string): {
-  summary: string
-  shortened: SummaryTitleKey[]
-} {
-  const lines = summary.split(/\r?\n/)
-  if (lines[0]?.trim() !== '---') return { summary, shortened: [] }
-  const closing = lines.findIndex((line, index) => index > 0 && line.trim() === '---')
-  if (closing === -1) return { summary, shortened: [] }
-
-  const shortened: SummaryTitleKey[] = []
-  for (let index = 1; index < closing; index++) {
-    const match = /^([A-Za-z0-9_-]+)\s*:\s*(.*)$/.exec(lines[index]!.trim())
-    if (!match) continue
-    const key = SUMMARY_TITLE_KEYS.find((candidate) => candidate === match[1])
-    if (!key) continue
-    const value = normalizeSummaryTitle(match[2]!)
-    if (Array.from(value).length <= SUMMARY_TITLE_CHAR_LIMIT) continue
-    lines[index] = `${key}: ${shortenSummaryTitle(value)}`
-    shortened.push(key)
-  }
-
-  return shortened.length === 0 ? { summary, shortened } : { summary: lines.join('\n'), shortened }
-}
-
-/** Mirrors the parser: drop wrapping quotes and collapse runs of whitespace. */
-function normalizeSummaryTitle(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-/**
- * Cut back to a word boundary when the title has one, so a shortened English
- * title does not end mid-word. Scripts written without spaces (the usual
- * `title_zh` case) fall back to a codepoint slice. The ellipsis keeps the
- * result honest about being cut.
- */
-function shortenSummaryTitle(value: string): string {
-  const budget = SUMMARY_TITLE_CHAR_LIMIT - 1
-  const clipped = Array.from(value).slice(0, budget).join('')
-  const lastSpace = clipped.lastIndexOf(' ')
-  const bounded = lastSpace >= Math.floor(budget / 2) ? clipped.slice(0, lastSpace) : clipped
-  return `${bounded.replace(/[\s\p{P}]+$/u, '')}…`
-}
-
-export function bilingualSummaryValidationError(summary: string): string | null {
-  if (Buffer.byteLength(summary, 'utf8') > 64 * 1024) {
-    return 'the UTF-8 document exceeds 64 KiB'
-  }
+export function bilingualSummaryValidationError(
+  summary: string,
+  sourceTitles?: SessionTitles | null,
+): string | null {
+  const oversizedSummary = summaryDocumentSizeValidationError(summary)
+  if (oversizedSummary) return oversizedSummary
   const parsed = parseSummaryFrontMatter(summary)
   if (parsed.titleOverflow) {
     return `\`title\` and \`title_zh\` must each be at most ${SUMMARY_TITLE_CHAR_LIMIT} characters`
@@ -536,13 +486,18 @@ export function bilingualSummaryValidationError(summary: string): string | null 
   if (!parsed.summaries?.en || !parsed.summaries.zh) {
     return 'both English and Simplified Chinese bodies must use the required Summary delimiters'
   }
+  const headingTitles = sourceTitles ?? parsed.titles
   if (
-    repeatsTitleAsFirstHeading(parsed.summaries.en, parsed.titles.en) ||
-    repeatsTitleAsFirstHeading(parsed.summaries.zh, parsed.titles.zh)
+    (headingTitles?.en && repeatsTitleAsFirstHeading(parsed.summaries.en, headingTitles.en)) ||
+    (headingTitles?.zh && repeatsTitleAsFirstHeading(parsed.summaries.zh, headingTitles.zh))
   ) {
     return 'Summary bodies must not repeat the Session title as their first H1'
   }
   return null
+}
+
+function summaryDocumentSizeValidationError(summary: string): string | null {
+  return Buffer.byteLength(summary, 'utf8') > 64 * 1024 ? 'the UTF-8 document exceeds 64 KiB' : null
 }
 
 function repeatsTitleAsFirstHeading(markdown: string, title: string): boolean {
