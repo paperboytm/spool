@@ -11,7 +11,11 @@ import {
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 
-import { sequenceRoot, serializePortableSession } from '@spool-lab/session-kit'
+import {
+  parseSummaryFrontMatter,
+  sequenceRoot,
+  serializePortableSession,
+} from '@spool-lab/session-kit'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vite-plus/test'
 
@@ -24,6 +28,7 @@ import {
   bilingualSummaryValidationError,
   handleShareCommand,
   latestSessionUuidFor,
+  repairOverlongSummaryTitles,
 } from './share.js'
 
 // Command-level round trip against an in-memory hub that implements the
@@ -414,6 +419,45 @@ describe('spool share local Agent Summary flow', () => {
     ).toMatch(/must not repeat the Session title/)
   })
 
+  it('shortens overlong front-matter titles instead of discarding the Summary', () => {
+    const longEnglish =
+      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add regression coverage for the backoff'
+    const repairedEnglish = repairOverlongSummaryTitles(
+      BILINGUAL_SUMMARY.replace('title: Rename alpha to beta', `title: ${longEnglish}`),
+    )
+    expect(repairedEnglish.shortened).toEqual(['title'])
+    expect(bilingualSummaryValidationError(repairedEnglish.summary)).toBeNull()
+    const englishTitle = parseSummaryFrontMatter(repairedEnglish.summary).titles?.en as string
+    expect(Array.from(englishTitle).length).toBeLessThanOrEqual(96)
+    expect(englishTitle).toBe(
+      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add…',
+    )
+    // Only the front-matter is rewritten; both bodies survive byte for byte.
+    expect(repairedEnglish.summary.slice(repairedEnglish.summary.indexOf('\n---\n'))).toBe(
+      BILINGUAL_SUMMARY.slice(BILINGUAL_SUMMARY.indexOf('\n---\n')),
+    )
+
+    // Simplified Chinese has no spaces to cut back to, so it slices by codepoint.
+    const longChinese = '修'.repeat(120)
+    const repairedChinese = repairOverlongSummaryTitles(
+      BILINGUAL_SUMMARY.replace('title_zh: 将 alpha 重命名为 beta', `title_zh: ${longChinese}`),
+    )
+    expect(repairedChinese.shortened).toEqual(['title_zh'])
+    expect(bilingualSummaryValidationError(repairedChinese.summary)).toBeNull()
+    expect(parseSummaryFrontMatter(repairedChinese.summary).titles?.zh).toBe(`${'修'.repeat(95)}…`)
+
+    // A conforming Summary is returned untouched.
+    expect(repairOverlongSummaryTitles(BILINGUAL_SUMMARY)).toEqual({
+      summary: BILINGUAL_SUMMARY,
+      shortened: [],
+    })
+    const noFrontMatter = '# Legacy summary\n\nA single-language body.'
+    expect(repairOverlongSummaryTitles(noFrontMatter)).toEqual({
+      summary: noFrontMatter,
+      shortened: [],
+    })
+  })
+
   it('checks long closing heading sequences without regex backtracking', () => {
     const repeatedHeading = `# Rename alpha to beta${' '.repeat(32 * 1024)}###`
     expect(
@@ -619,6 +663,40 @@ describe('spool share local Agent Summary flow', () => {
       events.findIndex((event) => event.startsWith('confirm:Generate a Summary')),
     )
     expect(events).toContain('select:Which local Agent should generate the Summary?')
+  })
+
+  it('uploads a Summary whose only defect is an overlong title', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-long-title-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-long-title-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const overlong = `Rename alpha to beta across the demo workspace ${'and every downstream caller '.repeat(4)}`
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () =>
+          BILINGUAL_SUMMARY.replace('title: Rename alpha to beta', `title: ${overlong}`),
+      },
+    )
+
+    expect(exit).toBe(0)
+    const stored = hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd as string
+    const titles = parseSummaryFrontMatter(stored).titles
+    expect(Array.from(titles?.en ?? '').length).toBeLessThanOrEqual(96)
+    expect(titles?.en).toMatch(/^Rename alpha to beta across the demo workspace .*…$/)
+    expect(titles?.zh).toBe('将 alpha 重命名为 beta')
+    expect(stored).toContain('The demo now uses the requested beta name.')
+    expect(events).toContain('info:Shortened `title` to the 96-character Session title limit.')
+    expect(events.some((event) => event.startsWith('spinner:error:'))).toBe(false)
   })
 
   it('does not prompt or invoke an Agent when non-interactive visibility is acknowledged', async () => {
