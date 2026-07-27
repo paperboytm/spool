@@ -21,7 +21,7 @@ import {
   SESSION_PROVIDERS,
   SUMMARY_TITLE_CHAR_LIMIT,
   type SessionProvider,
-  type SessionTitles,
+  type SummaryTitleRepair,
 } from '@spool-lab/session-kit'
 import { Command } from 'commander'
 
@@ -429,11 +429,12 @@ export async function handleShareCommand(
       if (oversizedSummary) {
         throw new Error(`${agent.name} returned an invalid bilingual Summary: ${oversizedSummary}`)
       }
-      const { summary, shortened, sourceTitles } = repairOverlongSummaryTitles(generated)
-      const invalidSummary = bilingualSummaryValidationError(summary, sourceTitles)
+      const repaired = repairOverlongSummaryTitles(generated)
+      const invalidSummary = repairedBilingualSummaryValidationError(repaired)
       if (invalidSummary) {
         throw new Error(`${agent.name} returned an invalid bilingual Summary: ${invalidSummary}`)
       }
+      const { summary, shortened } = repaired
       generation.message('Uploading generated Summary')
       await publishPreparedShare(client, prepared, {
         card,
@@ -470,10 +471,10 @@ export async function handleShareCommand(
   }
 }
 
-export function bilingualSummaryValidationError(
-  summary: string,
-  sourceTitles?: SessionTitles | null,
-): string | null {
+const SUMMARY_REPEATED_TITLE_HEADING_ERROR =
+  'Summary bodies must not repeat the Session title as their first H1'
+
+export function bilingualSummaryValidationError(summary: string): string | null {
   const oversizedSummary = summaryDocumentSizeValidationError(summary)
   if (oversizedSummary) return oversizedSummary
   const parsed = parseSummaryFrontMatter(summary)
@@ -486,12 +487,27 @@ export function bilingualSummaryValidationError(
   if (!parsed.summaries?.en || !parsed.summaries.zh) {
     return 'both English and Simplified Chinese bodies must use the required Summary delimiters'
   }
-  const headingTitles = sourceTitles ?? parsed.titles
   if (
-    (headingTitles?.en && repeatsTitleAsFirstHeading(parsed.summaries.en, headingTitles.en)) ||
-    (headingTitles?.zh && repeatsTitleAsFirstHeading(parsed.summaries.zh, headingTitles.zh))
+    repeatsTitleAsFirstHeading(parsed.summaries.en, parsed.titles.en) ||
+    repeatsTitleAsFirstHeading(parsed.summaries.zh, parsed.titles.zh)
   ) {
-    return 'Summary bodies must not repeat the Session title as their first H1'
+    return SUMMARY_REPEATED_TITLE_HEADING_ERROR
+  }
+  return null
+}
+
+function repairedBilingualSummaryValidationError(repaired: SummaryTitleRepair): string | null {
+  const invalidSummary = bilingualSummaryValidationError(repaired.summary)
+  if (invalidSummary || !repaired.sourceTitles) return invalidSummary
+  const parsed = parseSummaryFrontMatter(repaired.summary)
+  if (!parsed.summaries?.en || !parsed.summaries.zh) return null
+  if (
+    (repaired.sourceTitles.en &&
+      repeatsTitleAsFirstHeading(parsed.summaries.en, repaired.sourceTitles.en)) ||
+    (repaired.sourceTitles.zh &&
+      repeatsTitleAsFirstHeading(parsed.summaries.zh, repaired.sourceTitles.zh))
+  ) {
+    return SUMMARY_REPEATED_TITLE_HEADING_ERROR
   }
   return null
 }

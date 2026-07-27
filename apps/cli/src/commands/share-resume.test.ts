@@ -13,7 +13,6 @@ import { join, sep } from 'node:path'
 
 import {
   parseSummaryFrontMatter,
-  repairOverlongSummaryTitles,
   sequenceRoot,
   serializePortableSession,
 } from '@spool-lab/session-kit'
@@ -419,68 +418,6 @@ describe('spool share local Agent Summary flow', () => {
     ).toMatch(/must not repeat the Session title/)
   })
 
-  it('shortens overlong front-matter titles instead of discarding the Summary', () => {
-    const longEnglish =
-      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add regression coverage for the backoff'
-    const repairedEnglish = repairOverlongSummaryTitles(
-      BILINGUAL_SUMMARY.replace('title: Rename alpha to beta', `title: ${longEnglish}`),
-    )
-    expect(repairedEnglish.shortened).toEqual(['title'])
-    expect(bilingualSummaryValidationError(repairedEnglish.summary)).toBeNull()
-    const englishTitle = parseSummaryFrontMatter(repairedEnglish.summary).titles?.en as string
-    expect(Array.from(englishTitle).length).toBeLessThanOrEqual(96)
-    expect(englishTitle).toBe(
-      'Fix the daemon reconnect loop that keeps retrying after macOS sleep and wake, and add…',
-    )
-    // Only the front-matter is rewritten; both bodies survive byte for byte.
-    expect(repairedEnglish.summary.slice(repairedEnglish.summary.indexOf('\n---\n'))).toBe(
-      BILINGUAL_SUMMARY.slice(BILINGUAL_SUMMARY.indexOf('\n---\n')),
-    )
-
-    // Simplified Chinese has no spaces to cut back to, so it slices by codepoint.
-    const longChinese = '修'.repeat(120)
-    const repairedChinese = repairOverlongSummaryTitles(
-      BILINGUAL_SUMMARY.replace('title_zh: 将 alpha 重命名为 beta', `title_zh: ${longChinese}`),
-    )
-    expect(repairedChinese.shortened).toEqual(['title_zh'])
-    expect(bilingualSummaryValidationError(repairedChinese.summary)).toBeNull()
-    expect(parseSummaryFrontMatter(repairedChinese.summary).titles?.zh).toBe(`${'修'.repeat(95)}…`)
-
-    // A conforming Summary is returned untouched.
-    expect(repairOverlongSummaryTitles(BILINGUAL_SUMMARY)).toEqual({
-      summary: BILINGUAL_SUMMARY,
-      shortened: [],
-      sourceTitles: {
-        en: 'Rename alpha to beta',
-        zh: '将 alpha 重命名为 beta',
-      },
-    })
-    const noFrontMatter = '# Legacy summary\n\nA single-language body.'
-    expect(repairOverlongSummaryTitles(noFrontMatter)).toEqual({
-      summary: noFrontMatter,
-      shortened: [],
-      sourceTitles: null,
-    })
-  })
-
-  it('preserves Summary body bytes when shortening a CRLF front-matter title', () => {
-    const body = [
-      '',
-      '<!-- spool:summary:en -->',
-      'English body.',
-      '<!-- /spool:summary -->',
-      '',
-      '<!-- spool:summary:zh -->',
-      '中文正文。',
-      '<!-- /spool:summary -->',
-    ].join('\r\n')
-    const source = `---\r\ntitle: ${'a'.repeat(120)}\r\ntitle_zh: 中文标题\r\n---\r\n${body}`
-
-    const repaired = repairOverlongSummaryTitles(source)
-
-    expect(repaired.summary.slice(repaired.summary.indexOf('\r\n---\r\n') + 7)).toBe(body)
-  })
-
   it('checks long closing heading sequences without regex backtracking', () => {
     const repeatedHeading = `# Rename alpha to beta${' '.repeat(32 * 1024)}###`
     expect(
@@ -766,6 +703,40 @@ describe('spool share local Agent Summary flow', () => {
       'title: Rename alpha to beta',
       `title: ${overlong}`,
     ).replace('<!-- spool:summary:en -->\n', `<!-- spool:summary:en -->\n# ${overlong}\n\n`)
+
+    const exit = await handleShareCommand(
+      `${SESSION_UUID}@2`,
+      {},
+      {
+        ...share.deps,
+        ui: interactiveUi({ selected: 'claude', events }),
+        detectSummaryAgents: async () => [
+          { id: 'claude', name: 'Claude Code', path: '/bin/claude' },
+        ],
+        generateSummary: async () => generated,
+      },
+    )
+
+    expect(exit).toBe(1)
+    expect(hub.sessions.get(`claude_${SESSION_UUID}`)?.summaryMd).toBeNull()
+    expect(events).toContain(
+      'error:Claude Code returned an invalid bilingual Summary: Summary bodies must not repeat the Session title as their first H1',
+    )
+  })
+
+  it('rejects a first H1 that repeats the repaired Session title', async () => {
+    const hub = makeHub()
+    const workspace = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-repaired-title-'))
+    const home = mkdtempSync(join(tmpdir(), 'spool-summary-repeated-repaired-title-home-'))
+    const filePath = writeFixtureSession(workspace)
+    const share = shareDeps(hub, workspace, filePath, home)
+    const events: string[] = []
+    const overlong = 'a'.repeat(120)
+    const repairedTitle = `${'a'.repeat(95)}…`
+    const generated = BILINGUAL_SUMMARY.replace(
+      'title: Rename alpha to beta',
+      `title: ${overlong}`,
+    ).replace('<!-- spool:summary:en -->\n', `<!-- spool:summary:en -->\n# ${repairedTitle}\n\n`)
 
     const exit = await handleShareCommand(
       `${SESSION_UUID}@2`,

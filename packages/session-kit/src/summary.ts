@@ -221,8 +221,8 @@ function boundTitle(value: string): string {
 
 function shortenSummaryTitle(value: string): string {
   const budget = SUMMARY_TITLE_CHAR_LIMIT - 1
-  const clipped = Array.from(value).slice(0, budget).join('')
+  const clipped = Array.from(value).slice(0, budget)
   const lastSpace = clipped.lastIndexOf(' ')
   const bounded = lastSpace >= Math.floor(budget / 2) ? clipped.slice(0, lastSpace) : clipped
-  return `${bounded.replace(/[\s\p{P}]+$/u, '')}…`
+  return `${bounded.join('').replace(/[\s\p{P}]+$/u, '')}…`
 }
