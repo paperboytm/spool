@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+    groups:
+      # Keep routine version churn to one reviewable lockfile diff. Minor and
+      # major upgrades stay manual so runtime migrations keep their own tests.
+      routine-patches:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "better-sqlite3"
+        update-types:
+          - patch
+    ignore:
+      # Security alerts remain available even when version-update PRs are
+      # intentionally suppressed. Review minor and major upgrades manually.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+
+      # better-sqlite3 is pinned exactly because the workspace alternates one
+      # installed binary between the Node and Electron ABIs.
+      - dependency-name: better-sqlite3

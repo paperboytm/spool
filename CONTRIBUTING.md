@@ -118,6 +118,14 @@ pnpm --filter @spool/web exec playwright install chromium
 pnpm test:e2e
 ```
 
+## Dependency maintenance
+
+Dependabot deliberately opens one grouped patch update each month. Minor and major upgrades are manual so framework and runtime migrations do not share a lockfile diff with routine maintenance. One dependency is also manual at every version:
+
+- `better-sqlite3`, which must be validated against both the Node and Electron ABIs
+
+Review grouped ACP patches as a coordinated lockfile change: the Codex extension publishes exact-version platform binaries, while the ACP SDK and Claude extension have independent version lines. For Electron or native-module changes, run the full verification matrix above plus the packaged smoke, code-signing check, and package-size report. Dependabot security alerts remain enabled separately from version updates.
+
 ## What to work on
 
 - Check [Issues](https://github.com/spool-lab/spool/issues) for bugs and feature requests
