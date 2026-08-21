@@ -28,7 +28,7 @@ export const SLUG_RE = /^[A-Za-z0-9_-]{21}$/
 // v2 hub session ids: '<provider>_<provider-session-uuid>'. Mirrors the
 // backend's SID_RE in apps/backend/src/hub/wire.ts. Exported for the
 // /session/$sid route loader.
-export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
+export const SID_RE = /^(claude|codex|gemini|opencode|pi|zcode)_[0-9A-Za-z_-]{8,128}$/
 
 // Mirror of the server-side validator in apps/backend/src/handles.ts.
 // We check on the client too so `/@bogus!!` falls through to tombstone

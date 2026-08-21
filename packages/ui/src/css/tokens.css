@@ -37,6 +37,7 @@
   --sp-source-gemini: #5887d0;
   --sp-source-opencode: #8a6f3d;
   --sp-source-pi: #a55a7a;
+  --sp-source-zcode: #2a7a8c;
   --sp-connector-github: #555555;
   --sp-connector-twitter: #3a3a3a;
   --sp-connector-youtube: #b22222;
@@ -124,6 +125,7 @@ html[data-theme='dark'] {
   --sp-source-gemini: #8ab0e5;
   --sp-source-opencode: #c9a761;
   --sp-source-pi: #d88aaa;
+  --sp-source-zcode: #5fb8c9;
   --sp-connector-github: #999990;
   --sp-connector-twitter: #888880;
   --sp-connector-youtube: #d44444;

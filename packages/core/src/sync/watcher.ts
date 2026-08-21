@@ -2,6 +2,7 @@ import { watch as fsWatch, statSync, type FSWatcher } from 'node:fs'
 import { resolve as resolvePath } from 'node:path'
 
 import { normalizeOpenCodeWatchPath } from '../parsers/opencode.js'
+import { normalizeZCodeWatchPath } from '../parsers/zcode.js'
 import type { SessionSource } from '../types.js'
 import { detectSessionSource, getSessionRoots } from './source-paths.js'
 import type { Syncer } from './syncer.js'
@@ -53,6 +54,7 @@ export class SpoolWatcher {
     gemini: [],
     opencode: [],
     pi: [],
+    zcode: [],
   }
   private stopped = false
   private readonly stabilityMs: number
@@ -78,6 +80,7 @@ export class SpoolWatcher {
       gemini: getSessionRoots('gemini'),
       opencode: getSessionRoots('opencode'),
       pi: getSessionRoots('pi'),
+      zcode: getSessionRoots('zcode'),
     }
     const roots = [
       ...this.sourceRoots.claude,
@@ -85,6 +88,7 @@ export class SpoolWatcher {
       ...this.sourceRoots.gemini,
       ...this.sourceRoots.opencode,
       ...this.sourceRoots.pi,
+      ...this.sourceRoots.zcode,
     ]
     for (const root of roots) this.watchRoot(root)
   }
@@ -132,7 +136,9 @@ export class SpoolWatcher {
       // OpenCode commits land in opencode.db-wal; map sidecar writes to the main
       // DB so they aren't filtered out and trigger a re-index. Stability polling
       // then debounces on the (static) main file, settling once writes pause.
-      const abs = normalizeOpenCodeWatchPath(resolvePath(root, filename.toString()))
+      const abs = normalizeZCodeWatchPath(
+        normalizeOpenCodeWatchPath(resolvePath(root, filename.toString())),
+      )
       this.schedulePoll(abs)
     })
 

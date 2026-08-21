@@ -8,7 +8,7 @@ import { ApiError } from '../errors'
 // legitimate sessions.
 
 export const OID_RE = /^[0-9a-f]{64}$/
-export const SID_RE = /^(claude|codex|gemini|opencode|pi)_[0-9A-Za-z_-]{8,128}$/
+export const SID_RE = /^(claude|codex|gemini|opencode|pi|zcode)_[0-9A-Za-z_-]{8,128}$/
 export const TEAM_ID_RE = /^[0-9A-Za-z_-]{8,128}$/
 export const PROJECT_ID_RE = /^project_[0-9A-Za-z_-]{8,192}$/
 

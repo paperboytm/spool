@@ -39,6 +39,7 @@ function makeTempRoots() {
   vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'gemini'))
   vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeRoot)
   vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'pi'))
+  vi.stubEnv('SPOOL_ZCODE_DIR', join(baseDir, 'zcode'))
   return { baseDir, claudeRoot, codexRoot, geminiRoot, opencodeRoot }
 }
 
@@ -254,6 +255,7 @@ describe('SpoolWatcher', () => {
       join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-o'),
     )
     vi.stubEnv('SPOOL_PI_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-p'))
+    vi.stubEnv('SPOOL_ZCODE_DIR', join(tmpdir(), 'spool-watcher-nonexistent-' + Date.now() + '-z'))
     const { syncer } = makeStubSyncer()
     const w = new SpoolWatcher(syncer, FAST)
     runningWatchers.push(w)

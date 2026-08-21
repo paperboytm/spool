@@ -107,7 +107,7 @@ export const daemonChecks: Check[] = [
         return {
           ...base,
           severity: 'ok',
-          message: `${status.totalSessions} sessions indexed (claude ${status.claudeSessions}, codex ${status.codexSessions}, gemini ${status.geminiSessions}, opencode ${status.opencodeSessions}, pi ${status.piSessions}); last synced ${synced}`,
+          message: `${status.totalSessions} sessions indexed (claude ${status.claudeSessions}, codex ${status.codexSessions}, gemini ${status.geminiSessions}, opencode ${status.opencodeSessions}, pi ${status.piSessions}, zcode ${status.zcodeSessions}); last synced ${synced}`,
           details: {
             totalSessions: status.totalSessions,
             lastSyncedAt: status.lastSyncedAt,

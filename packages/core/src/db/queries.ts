@@ -466,7 +466,7 @@ export function getSessionWithMessages(
            timestamp, is_sidechain AS isSidechain, tool_names AS toolNames, seq
     FROM messages
     WHERE session_id = ?
-      AND (is_sidechain = 0 OR parent_uuid LIKE 'opencode-subagent:%')
+      AND (is_sidechain = 0 OR parent_uuid LIKE 'opencode-subagent:%' OR parent_uuid LIKE 'zcode-subagent:%')
     ORDER BY seq
   `)
     .all(session.id) as Array<Record<string, unknown>>
@@ -1296,6 +1296,7 @@ export function getStatus(db: Database.Database): StatusInfo {
   const geminiRow = counts.find((r) => r.name === 'gemini')
   const opencodeRow = counts.find((r) => r.name === 'opencode')
   const piRow = counts.find((r) => r.name === 'pi')
+  const zcodeRow = counts.find((r) => r.name === 'zcode')
 
   return {
     dbPath: DB_PATH,
@@ -1305,6 +1306,7 @@ export function getStatus(db: Database.Database): StatusInfo {
     geminiSessions: geminiRow?.cnt ?? 0,
     opencodeSessions: opencodeRow?.cnt ?? 0,
     piSessions: piRow?.cnt ?? 0,
+    zcodeSessions: zcodeRow?.cnt ?? 0,
     lastSyncedAt: lastSync?.last ?? null,
     dbSizeBytes: getDBSize(),
   }

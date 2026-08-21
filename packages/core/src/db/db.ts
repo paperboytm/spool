@@ -87,7 +87,8 @@ export function runMigrations(db: Database.Database): void {
       ('codex',  '~/.codex/sessions'),
       ('gemini', '~/.gemini/tmp'),
       ('opencode', '~/.local/share/opencode/opencode.db'),
-      ('pi', '~/.pi/agent/sessions');
+      ('pi', '~/.pi/agent/sessions'),
+      ('zcode', '~/.zcode/cli/db/db.sqlite');
 
     CREATE TABLE IF NOT EXISTS projects (
       id           INTEGER PRIMARY KEY,

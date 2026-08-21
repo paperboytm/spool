@@ -31,7 +31,7 @@ Ask the agent to “share this session to Spool.” The skill:
 4. runs `spool share --visibility-confirmed` without bypassing sensitive-data findings;
 5. returns the durable URL.
 
-Claude Code and Codex CLI Sessions are Public by default. Gemini CLI, OpenCode, and Pi Sessions use Link-only URLs until Explore supports them.
+Claude Code and Codex CLI Sessions are Public by default. Gemini CLI, OpenCode, Pi, and ZCode Sessions use Link-only URLs until Explore supports them.
 
 ## Continue a Spool Session
 

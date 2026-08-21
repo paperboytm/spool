@@ -14,6 +14,7 @@ Spool prepares Sessions from supported coding agents so an author can choose wha
 | Gemini CLI  | Yes               | Yes       | Not yet       | `~/.gemini/tmp/*/chats/`              |
 | OpenCode    | Yes               | Yes       | Not yet       | `~/.local/share/opencode/opencode.db` |
 | Pi          | Yes               | Yes       | Not yet       | `~/.pi/agent/sessions/`               |
+| ZCode       | Yes               | Yes       | Not yet       | `~/.zcode/cli/db/db.sqlite`           |
 
 Claude Code and Codex profile directories are also detected:
 

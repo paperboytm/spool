@@ -296,6 +296,7 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
     vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
     vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'missing-pi'))
+    vi.stubEnv('SPOOL_ZCODE_DIR', join(baseDir, 'missing-zcode'))
 
     const dbPath = join(opencodeDir, 'opencode.db')
     const openCodeDb = new Database(dbPath)
@@ -353,6 +354,7 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
     vi.stubEnv('SPOOL_OPENCODE_DIR', join(baseDir, 'missing-opencode'))
     vi.stubEnv('SPOOL_PI_DIR', piRoot)
+    vi.stubEnv('SPOOL_ZCODE_DIR', join(baseDir, 'missing-zcode'))
 
     const sessionUuid = 'f41a7803-b075-4b88-8d74-f46a3a06f67d'
     const filePath = join(slugDir, `2026-04-02T09-05-13-662Z_${sessionUuid}.jsonl`)
@@ -425,6 +427,101 @@ describe('Syncer', () => {
     ])
   })
 
+  it('indexes ZCode sessions from the CLI database and folds subagent children', async () => {
+    const baseDir = makeTempDir('spool-syncer-zcode-')
+    const zcodeDir = join(baseDir, 'zcode')
+    const spoolDataDir = join(baseDir, 'spool-data')
+    mkdirSync(zcodeDir, { recursive: true })
+
+    vi.stubEnv('SPOOL_DATA_DIR', spoolDataDir)
+    vi.stubEnv('SPOOL_CLAUDE_DIR', join(baseDir, 'missing-claude'))
+    vi.stubEnv('SPOOL_CODEX_DIR', join(baseDir, 'missing-codex'))
+    vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
+    vi.stubEnv('SPOOL_OPENCODE_DIR', join(baseDir, 'missing-opencode'))
+    vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'missing-pi'))
+    vi.stubEnv('SPOOL_ZCODE_DIR', zcodeDir)
+
+    const dbPath = join(zcodeDir, 'db.sqlite')
+    const zcodeDb = new Database(dbPath)
+    openDbs.push(zcodeDb)
+    createZCodeSchema(zcodeDb)
+    seedZCodeSession(zcodeDb, {
+      id: 'sess_zcode_1',
+      directory: '/tmp/zcode-project',
+      title: 'Investigate session indexing',
+      userText: 'Find the ZCode session store',
+      assistantText: 'The session data lives in a SQLite database.',
+    })
+    seedZCodeSession(zcodeDb, {
+      id: 'sess_zcode_sub',
+      parentId: 'sess_zcode_1',
+      taskType: 'subagent_child',
+      directory: '/tmp/zcode-project',
+      title: 'Explore store layout',
+      userText: 'ZCODE_CHILD_ONLY_NEEDLE',
+      assistantText: 'Child-only subagent answer',
+    })
+    seedZCodeSession(zcodeDb, {
+      id: 'sess_zcode_fork',
+      parentId: 'sess_zcode_1',
+      taskType: 'fork',
+      directory: '/tmp/zcode-project',
+      title: 'Branch an alternate approach',
+      userText: 'ZCODE_FORK_BRANCH_PROMPT',
+      assistantText: 'Fork branches index standalone.',
+    })
+
+    const { getDB, Syncer, searchFragments, getSessionWithMessages } = await loadCoreModules()
+    const db = getDB()
+    openDbs.push(db)
+    const syncer = new Syncer(db)
+
+    // Two standalone roots (parent + fork); the subagent folds into the parent.
+    expect(syncer.syncAll()).toMatchObject({ added: 2, updated: 0, errors: 0 })
+    expect(searchFragments(db, 'ZCode session store', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'zcode',
+        sessionUuid: 'sess_zcode_1',
+        project: '/tmp/zcode-project',
+      }),
+    ])
+    // Folded sidechain content is reachable from the session view but (like
+    // every other source) stays out of the fragment index, which is
+    // non-sidechain only.
+    expect(searchFragments(db, 'ZCODE_CHILD_ONLY_NEEDLE', { limit: 5 })).toEqual([])
+    const loaded = getSessionWithMessages(db, 'sess_zcode_1')
+    expect(loaded?.messages.some((m) => m.contentText.includes('ZCODE_CHILD_ONLY_NEEDLE'))).toBe(
+      true,
+    )
+    const foldedHeader = loaded?.messages.find((m) => m.msgUuid === 'sess_zcode_sub:header')
+    expect(foldedHeader).toMatchObject({
+      parentUuid: 'zcode-subagent:sess_zcode_sub',
+      isSidechain: true,
+    })
+    expect(searchFragments(db, 'ZCODE_FORK_BRANCH_PROMPT', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'zcode',
+        sessionUuid: 'sess_zcode_fork',
+      }),
+    ])
+
+    seedZCodeSession(zcodeDb, {
+      id: 'sess_zcode_2',
+      directory: '/tmp/zcode-project',
+      title: 'Revisit indexing',
+      userText: 'Check the idempotent re-sync behavior',
+      assistantText: 'New sessions land without duplicating existing rows.',
+    })
+
+    expect(syncer.syncFile(dbPath, 'zcode')).toBe('updated')
+    expect(searchFragments(db, 'idempotent re-sync', { limit: 5 })).toEqual([
+      expect.objectContaining({
+        source: 'zcode',
+        sessionUuid: 'sess_zcode_2',
+      }),
+    ])
+  })
+
   it('folds OpenCode subagent sessions into the parent and removes stale standalone child rows', async () => {
     const baseDir = makeTempDir('spool-syncer-opencode-subagents-')
     const opencodeDir = join(baseDir, 'opencode')
@@ -437,6 +534,7 @@ describe('Syncer', () => {
     vi.stubEnv('SPOOL_GEMINI_DIR', join(baseDir, 'missing-gemini'))
     vi.stubEnv('SPOOL_OPENCODE_DIR', opencodeDir)
     vi.stubEnv('SPOOL_PI_DIR', join(baseDir, 'missing-pi'))
+    vi.stubEnv('SPOOL_ZCODE_DIR', join(baseDir, 'missing-zcode'))
 
     const dbPath = join(opencodeDir, 'opencode.db')
     const openCodeDb = new Database(dbPath)
@@ -1320,6 +1418,116 @@ function seedOpenCodeSession(
     created + 2000,
     created + 2000,
     JSON.stringify({ role: 'assistant' }),
+  )
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    `${input.id}_assistant_text`,
+    `${input.id}_assistant`,
+    input.id,
+    created + 2000,
+    created + 2000,
+    JSON.stringify({ type: 'text', text: input.assistantText }),
+  )
+}
+
+function createZCodeSchema(db: Database.Database): void {
+  // Mirrors the ZCode session store: same core columns as the OpenCode shape
+  // but no model/agent columns, and a task_type column distinguishing
+  // interactive sessions from subagent children, forks, and side chats.
+  db.exec(`
+    CREATE TABLE session (
+      id text PRIMARY KEY,
+      project_id text NOT NULL,
+      parent_id text,
+      slug text NOT NULL,
+      directory text NOT NULL,
+      title text NOT NULL,
+      version text NOT NULL,
+      task_type text NOT NULL DEFAULT 'interactive',
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      time_archived integer
+    );
+
+    CREATE TABLE message (
+      id text PRIMARY KEY,
+      session_id text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      data text NOT NULL
+    );
+
+    CREATE TABLE part (
+      id text PRIMARY KEY,
+      message_id text NOT NULL,
+      session_id text NOT NULL,
+      time_created integer NOT NULL,
+      time_updated integer NOT NULL,
+      data text NOT NULL
+    );
+  `)
+}
+
+function seedZCodeSession(
+  db: Database.Database,
+  input: {
+    id: string
+    directory: string
+    title: string
+    userText: string
+    assistantText: string
+    parentId?: string | null
+    taskType?: string
+  },
+): void {
+  const created = Date.UTC(2026, 4, 19, 1, 0, 0) + Number(input.id.replace(/\D/g, '') || 0) * 1000
+  db.prepare(`
+    INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, task_type, time_created, time_updated)
+    VALUES (?, 'proj_1', ?, ?, ?, ?, '1.0.0', ?, ?, ?)
+  `).run(
+    input.id,
+    input.parentId ?? null,
+    input.id,
+    input.directory,
+    input.title,
+    input.taskType ?? 'interactive',
+    created,
+    created + 3000,
+  )
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    `${input.id}_user`,
+    input.id,
+    created + 1000,
+    created + 1000,
+    JSON.stringify({ role: 'user', model: { providerID: 'acme', modelID: 'agent-fast' } }),
+  )
+  db.prepare(`
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    `${input.id}_user_text`,
+    `${input.id}_user`,
+    input.id,
+    created + 1000,
+    created + 1000,
+    JSON.stringify({ type: 'text', text: input.userText }),
+  )
+
+  db.prepare(`
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    `${input.id}_assistant`,
+    input.id,
+    created + 2000,
+    created + 2000,
+    JSON.stringify({ role: 'assistant', modelID: 'agent-fast', providerID: 'acme' }),
   )
   db.prepare(`
     INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)

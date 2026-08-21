@@ -449,6 +449,7 @@ export type BadgeVariant =
   | 'source-gemini'
   | 'source-opencode'
   | 'source-pi'
+  | 'source-zcode'
   | 'success'
   | 'warning'
   | 'error'

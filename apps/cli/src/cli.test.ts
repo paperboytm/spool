@@ -22,6 +22,7 @@ const ISOLATED_ENV = {
   SPOOL_GEMINI_DIR: '/nonexistent/gemini',
   SPOOL_OPENCODE_DIR: '/nonexistent/opencode',
   SPOOL_PI_DIR: '/nonexistent/pi',
+  SPOOL_ZCODE_DIR: '/nonexistent/zcode',
 }
 
 function run(args: string[], env?: Record<string, string>, cwd?: string): string {
