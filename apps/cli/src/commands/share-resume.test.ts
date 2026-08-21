@@ -1142,7 +1142,7 @@ describe('spool share local Agent Summary flow', () => {
 })
 
 describe('spool share → spool resume round trip', () => {
-  it.each(['gemini', 'opencode', 'pi'] as const)(
+  it.each(['gemini', 'opencode', 'pi', 'zcode'] as const)(
     'shares indexed %s sessions through portable records',
     async (provider) => {
       const hub = makeHub()

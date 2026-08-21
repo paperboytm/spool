@@ -130,6 +130,10 @@
     color: var(--color-source-pi);
   }
 
+  .session-source.is-zcode svg {
+    color: var(--color-source-zcode);
+  }
+
   .session-feed-cost {
     color: var(--color-muted);
     font-family: var(--font-mono);

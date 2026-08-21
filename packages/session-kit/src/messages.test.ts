@@ -295,7 +295,7 @@ describe('parseClaudeSessionText — slash-command record stripping', () => {
 })
 
 describe('portable shared sessions', () => {
-  it.each(['gemini', 'opencode', 'pi'] as const)(
+  it.each(['gemini', 'opencode', 'pi', 'zcode'] as const)(
     'round-trips indexed %s messages without pretending they are Claude or Codex records',
     (source) => {
       const raw = serializePortableSession({

@@ -88,6 +88,30 @@ describe('getSessionRoots', () => {
 
     expect(getSessionRoots('opencode')).toEqual([opencodeDir])
   })
+
+  test('should normalize ZCode home, database directory, and database file paths', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-zcode-source-paths-'))
+    const zcodeDir = join(baseDir, '.zcode', 'cli', 'db')
+    tempDirs.push(baseDir)
+
+    mkdirSync(zcodeDir, { recursive: true })
+    writeFileSync(join(zcodeDir, 'db.sqlite'), '')
+
+    // Home-style override nests into .zcode/cli/db when present.
+    vi.stubEnv('SPOOL_ZCODE_DIR', baseDir)
+    expect(getSessionRoots('zcode')).toEqual([zcodeDir])
+
+    vi.stubEnv('SPOOL_ZCODE_DIR', zcodeDir)
+    expect(getSessionRoots('zcode')).toEqual([zcodeDir])
+
+    vi.stubEnv('SPOOL_ZCODE_DIR', join(zcodeDir, 'db.sqlite'))
+    expect(getSessionRoots('zcode')).toEqual([zcodeDir])
+
+    // ZCODE_HOME points at the .zcode directory itself.
+    vi.unstubAllEnvs()
+    vi.stubEnv('ZCODE_HOME', join(baseDir, '.zcode'))
+    expect(getSessionRoots('zcode')).toEqual([zcodeDir])
+  })
 })
 
 describe('detectSessionSource', () => {
@@ -127,6 +151,27 @@ describe('detectSessionSource', () => {
     expect(
       detectSessionSource(join(baseDir, 'other', 'session.jsonl'), sourceRoots),
     ).toBeUndefined()
+  })
+
+  test('should classify ZCode database files inside the root only', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'spool-zcode-detect-'))
+    tempDirs.push(baseDir)
+
+    const zcodeRoot = join(baseDir, 'zcode', 'cli', 'db')
+    mkdirSync(zcodeRoot, { recursive: true })
+
+    const sourceRoots = {
+      claude: [join(baseDir, 'claude-empty')],
+      codex: [join(baseDir, 'codex-empty')],
+      gemini: [join(baseDir, 'gemini-empty')],
+      opencode: [join(baseDir, 'opencode-empty')],
+      pi: [join(baseDir, 'pi-empty')],
+      zcode: [zcodeRoot],
+    } as const
+
+    expect(detectSessionSource(join(zcodeRoot, 'db.sqlite'), sourceRoots)).toBe('zcode')
+    expect(detectSessionSource(join(zcodeRoot, 'db.sqlite-wal'), sourceRoots)).toBeUndefined()
+    expect(detectSessionSource(join(baseDir, 'other', 'db.sqlite'), sourceRoots)).toBeUndefined()
   })
 
   test('rejects nested Claude files (subagent scratchpads) below the slug directory', () => {

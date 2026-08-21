@@ -32,6 +32,7 @@ SPOOL_DATA_DIR=/some/path spool
 | Gemini CLI           | `~/.gemini/tmp/*/chats/`              |
 | OpenCode             | `~/.local/share/opencode/opencode.db` |
 | Pi                   | `~/.pi/agent/sessions/`               |
+| ZCode                | `~/.zcode/cli/db/db.sqlite`           |
 
 These source locations are built in.
 

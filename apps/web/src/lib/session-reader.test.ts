@@ -362,7 +362,7 @@ describe('hub records → desktop-identical conversation', () => {
     expect(conversation.recordToMessageId.get(1)).toBe(1)
   })
 
-  it.each(['gemini', 'opencode', 'pi'] as const)(
+  it.each(['gemini', 'opencode', 'pi', 'zcode'] as const)(
     'parses portable %s records under their real provider identity',
     (provider: SessionProvider) => {
       const lines = serializePortableSession({

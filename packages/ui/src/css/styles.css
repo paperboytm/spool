@@ -535,6 +535,11 @@
     color: var(--color-source-pi);
   }
 
+  .sp-badge--source-zcode {
+    border-color: var(--color-source-zcode);
+    color: var(--color-source-zcode);
+  }
+
   .sp-badge--success {
     border-color: var(--color-status-success);
     color: var(--color-status-success);

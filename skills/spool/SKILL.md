@@ -33,7 +33,7 @@ Session. This skill uses explicit commands because its non-interactive Share pas
 
 ## Share flow
 
-**claude**, **codex**, **gemini**, **opencode**, and **pi** sessions can be shared. Sharing sends native Claude/Codex records or the other sources' provider-neutral indexed conversation to the Hub. The CLI states the resulting visibility before upload and then prints the durable URL.
+**claude**, **codex**, **gemini**, **opencode**, **pi**, and **zcode** sessions can be shared. Sharing sends native Claude/Codex records or the other sources' provider-neutral indexed conversation to the Hub. The CLI states the resulting visibility before upload and then prints the durable URL.
 
 1. Run bare `spool` (or rely on a running `spool daemon`) so the session and its newest turns are indexed.
 2. Pick the target:
@@ -89,7 +89,7 @@ The goal is **cited recall**: your reply answers the question and names the sess
 spool sessions search "<query>" --json -n 5
 ```
 
-- `-s claude|codex|gemini|opencode|pi` filters by agent, `--since 7d` by time.
+- `-s claude|codex|gemini|opencode|pi|zcode` filters by agent, `--since 7d` by time.
 - When the user names a project, scope to it instead: `spool sessions list -p <path>` lists sessions for a project path.
 - Zero hits → run bare `spool` once (the newest sessions may not be indexed yet) and retry with broader terms.
 
@@ -110,7 +110,7 @@ For local Gemini, OpenCode, and Pi sessions, use the full transcript: record-lev
 
 ### 3. Use it
 
-Fold what you found into your reply as ordinary context, citing the source per claim — `[codex · 7/15 · parallel-world]`. When the user wants to _continue_ a local session rather than read it, use the native command shown by human-formatted search output: `claude -r <uuid>`, `codex resume <uuid>`, or `pi --session <uuid>`. JSON search output does not add that command, and the CLI currently prints no resume hint for Gemini or OpenCode.
+Fold what you found into your reply as ordinary context, citing the source per claim — `[codex · 7/15 · parallel-world]`. When the user wants to _continue_ a local session rather than read it, use the native command shown by human-formatted search output: `claude -r <uuid>`, `codex resume <uuid>`, or `pi --session <uuid>`. JSON search output does not add that command, and the CLI currently prints no resume hint for Gemini, OpenCode, or ZCode.
 
 ## Command reference
 

@@ -50,6 +50,7 @@
   --color-source-gemini: var(--sp-source-gemini);
   --color-source-opencode: var(--sp-source-opencode);
   --color-source-pi: var(--sp-source-pi);
+  --color-source-zcode: var(--sp-source-zcode);
   --color-connector-github: var(--sp-connector-github);
   --color-connector-twitter: var(--sp-connector-twitter);
   --color-connector-youtube: var(--sp-connector-youtube);

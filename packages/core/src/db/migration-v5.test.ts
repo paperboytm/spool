@@ -187,6 +187,7 @@ describe('migration v5 (connector subsystem removal)', () => {
       'gemini',
       'opencode',
       'pi',
+      'zcode',
     ])
 
     // After v7: stars dropped, session star preserved as pin, capture star gone

@@ -126,7 +126,7 @@ spool share --visibility-confirmed # acknowledge visibility without a TTY
 spool share --yes                  # skip all confirmations, including secret findings
 ```
 
-Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi Sessions can be shared through the Hub. Claude and Codex preserve their native records; the other sources share the provider-neutral conversation prepared in the local index.
+Claude Code, Codex CLI, Gemini CLI, OpenCode, Pi, and ZCode Sessions can be shared through the Hub. Claude and Codex preserve their native records; the other sources share the provider-neutral conversation prepared in the local index.
 
 In an interactive terminal, omit Summary options. After the Session URL is live, Spool can detect a local Claude Code or Codex CLI installation and ask it to draft the Summary using the author’s own local Agent configuration.
 
@@ -170,7 +170,7 @@ spool resume <url> --workspace <dir>  # choose the workspace root
 spool resume <url> --no-exec          # prepare without launching the agent
 ```
 
-Native Resume currently supports Claude Code and Codex CLI shares. Gemini CLI, OpenCode, and Pi shares remain readable but are not offered as resumable.
+Native Resume currently supports Claude Code and Codex CLI shares. Gemini CLI, OpenCode, Pi, and ZCode shares remain readable but are not offered as resumable.
 
 Resume never modifies the source Shared Session.
 

@@ -29,6 +29,15 @@ import {
   parseOpenCodeSessionFilePath,
 } from '../parsers/opencode.js'
 import { decodePiSessionDirSlug, loadPiSession, PI_INDEX_VERSION } from '../parsers/pi.js'
+import {
+  getZCodeSessionIndexedMtime,
+  isZCodeDatabaseFile,
+  listZCodeSessionFilePaths,
+  loadZCodeSession,
+  parseZCodeSessionFilePath,
+  ZCODE_DB_NAME,
+  ZCODE_INDEX_VERSION,
+} from '../parsers/zcode.js'
 import { realFs } from '../projects/fs.js'
 import { computeIdentity } from '../projects/identity.js'
 import type { SessionSource } from '../types.js'
@@ -83,7 +92,7 @@ export class Syncer {
     const seenPaths = new Set<string>()
     const files: Array<{ path: string; source: SessionSource }> = []
 
-    for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
+    for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi', 'zcode'] as const) {
       for (const dir of getSessionRoots(source)) {
         try {
           addUniqueFiles(files, seenPaths, collectSessionFiles(dir, source))
@@ -94,6 +103,7 @@ export class Syncer {
     }
 
     cleanupStaleOpenCodeSessions(this.db, files)
+    cleanupStaleZCodeSessions(this.db, files)
 
     const knownMtimes = getAllSessionMtimes(this.db)
     this.codexTitleIndex = loadCodexSessionIndex()
@@ -277,6 +287,9 @@ export class Syncer {
       if (source === 'opencode' && isOpenCodeDatabaseFile(filePath)) {
         return this.syncOpenCodeDatabase(filePath, knownMtimes, options)
       }
+      if (source === 'zcode' && isZCodeDatabaseFile(filePath)) {
+        return this.syncZCodeDatabase(filePath, knownMtimes, options)
+      }
 
       const mtime = precomputedMtime ?? getIndexedMtime(filePath, source)
       const existingMtime = knownMtimes
@@ -309,7 +322,9 @@ export class Syncer {
               ? loadGeminiSession(filePath)
               : source === 'pi'
                 ? loadPiSession(filePath)
-                : loadOpenCodeSession(filePath)
+                : source === 'zcode'
+                  ? loadZCodeSession(filePath)
+                  : loadOpenCodeSession(filePath)
 
       if (parseResult.kind !== 'parsed') {
         // The "filtered" path normally removes a session whose source
@@ -528,6 +543,55 @@ export class Syncer {
     if (hadError) return 'error'
     return 'skipped'
   }
+
+  private syncZCodeDatabase(
+    dbPath: string,
+    knownMtimes?: Map<string, string>,
+    options?: SyncFileOptions,
+  ): 'added' | 'updated' | 'skipped' | 'error' {
+    let changed = false
+    let hadError = false
+
+    let sessionPaths: string[]
+    try {
+      sessionPaths = listZCodeSessionFilePaths(dbPath)
+    } catch (err) {
+      try {
+        const sourceRow = this.db.prepare('SELECT id FROM sources WHERE name = ?').get('zcode') as
+          | { id: number }
+          | undefined
+        if (sourceRow) {
+          this.db
+            .prepare(`
+            INSERT INTO sync_log (source_id, file_path, status, message)
+            VALUES (?, ?, 'error', ?)
+          `)
+            .run(sourceRow.id, dbPath, String(err))
+        }
+      } catch {
+        /* ignore log errors */
+      }
+      return 'error'
+    }
+
+    for (const sessionPath of sessionPaths) {
+      const result = this.syncFile(sessionPath, 'zcode', knownMtimes, undefined, options)
+      if (result === 'added' || result === 'updated') changed = true
+      else if (result === 'error') hadError = true
+    }
+
+    const activePaths = new Set(sessionPaths)
+    const stalePaths = listIndexedZCodeSessionPaths(this.db)
+      .filter((path) => parseZCodeSessionFilePath(path)?.dbPath === dbPath)
+      .filter((path) => !activePaths.has(path))
+    for (const stalePath of stalePaths) {
+      if (deleteSessionByFilePath(this.db, stalePath)) changed = true
+    }
+
+    if (changed) return 'updated'
+    if (hadError) return 'error'
+    return 'skipped'
+  }
 }
 
 function cleanupStaleOpenCodeSessions(
@@ -566,6 +630,42 @@ function listIndexedOpenCodeSessionPaths(db: Database.Database): string[] {
   return rows.map((row) => row.filePath)
 }
 
+function cleanupStaleZCodeSessions(
+  db: Database.Database,
+  files: Array<{ path: string; source: SessionSource }>,
+): void {
+  const activePathsByDb = new Map<string, Set<string>>()
+  for (const file of files) {
+    if (file.source !== 'zcode') continue
+    const parsed = parseZCodeSessionFilePath(file.path)
+    if (!parsed) continue
+    const paths = activePathsByDb.get(parsed.dbPath) ?? new Set<string>()
+    paths.add(file.path)
+    activePathsByDb.set(parsed.dbPath, paths)
+  }
+  if (activePathsByDb.size === 0) return
+
+  for (const indexedPath of listIndexedZCodeSessionPaths(db)) {
+    const parsed = parseZCodeSessionFilePath(indexedPath)
+    if (!parsed) continue
+    const activePaths = activePathsByDb.get(parsed.dbPath)
+    if (!activePaths || activePaths.has(indexedPath)) continue
+    deleteSessionByFilePath(db, indexedPath)
+  }
+}
+
+function listIndexedZCodeSessionPaths(db: Database.Database): string[] {
+  const rows = db
+    .prepare(`
+    SELECT s.file_path AS filePath
+    FROM sessions s
+    JOIN sources src ON src.id = s.source_id
+    WHERE src.name = 'zcode'
+  `)
+    .all() as Array<{ filePath: string }>
+  return rows.map((row) => row.filePath)
+}
+
 function addUniqueFiles(
   files: Array<{ path: string; source: SessionSource }>,
   seenPaths: Set<string>,
@@ -584,6 +684,7 @@ function getMtime(filePath: string): string {
 
 function getIndexedMtime(filePath: string, source: SessionSource): string {
   if (source === 'opencode') return getOpenCodeSessionIndexedMtime(filePath)
+  if (source === 'zcode') return getZCodeSessionIndexedMtime(filePath)
   return `${getMtime(filePath)}::${getIndexVersion(source)}`
 }
 
@@ -594,6 +695,7 @@ function getIndexVersion(source: SessionSource): string {
   if (source === 'gemini') return 'gemini-v2-session-search-fts'
   if (source === 'opencode') return OPENCODE_INDEX_VERSION
   if (source === 'pi') return PI_INDEX_VERSION
+  if (source === 'zcode') return ZCODE_INDEX_VERSION
   return 'claude-v3-session-search-fts'
 }
 
@@ -605,6 +707,11 @@ function collectSessionFiles(
     const dbPath = join(dir, 'opencode.db')
     if (!existsSync(dbPath)) return []
     return listOpenCodeSessionFilePaths(dbPath).map((path) => ({ path, source }))
+  }
+  if (source === 'zcode') {
+    const dbPath = join(dir, ZCODE_DB_NAME)
+    if (!existsSync(dbPath)) return []
+    return listZCodeSessionFilePaths(dbPath).map((path) => ({ path, source }))
   }
 
   const results: Array<{ path: string; source: SessionSource }> = []
@@ -691,6 +798,14 @@ function resolveProject(
     const displayPath = cwd || home
     const parts = displayPath.split('/').filter(Boolean)
     const displayName = parts[parts.length - 1] ?? 'opencode'
+    const slug = displayPath.replace(/^\//, '').replace(/\//g, '-') || 'default'
+    return { slug, displayPath, displayName }
+  } else if (source === 'zcode') {
+    // ZCode sessions record their working directory per row; group by cwd like
+    // the other SQLite-backed source.
+    const displayPath = cwd || home
+    const parts = displayPath.split('/').filter(Boolean)
+    const displayName = parts[parts.length - 1] ?? 'zcode'
     const slug = displayPath.replace(/^\//, '').replace(/\//g, '-') || 'default'
     return { slug, displayPath, displayName }
   } else if (source === 'pi') {

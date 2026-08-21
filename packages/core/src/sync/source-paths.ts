@@ -3,9 +3,13 @@ import { homedir } from 'node:os'
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { OPENCODE_DB_NAME, isOpenCodeDatabaseFile } from '../parsers/opencode.js'
+import { ZCODE_DB_NAME, isZCodeDatabaseFile } from '../parsers/zcode.js'
 import type { SessionSource } from '../types.js'
 
-const SOURCE_DIR_NAMES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
+const SOURCE_DIR_NAMES: Record<
+  Exclude<SessionSource, 'gemini' | 'opencode' | 'pi' | 'zcode'>,
+  string
+> = {
   claude: 'projects',
   codex: 'sessions',
 }
@@ -16,14 +20,21 @@ const SOURCE_ENV_VARS: Record<SessionSource, string> = {
   gemini: 'SPOOL_GEMINI_DIR',
   opencode: 'SPOOL_OPENCODE_DIR',
   pi: 'SPOOL_PI_DIR',
+  zcode: 'SPOOL_ZCODE_DIR',
 }
 
-const SOURCE_DEFAULT_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
+const SOURCE_DEFAULT_BASES: Record<
+  Exclude<SessionSource, 'gemini' | 'opencode' | 'pi' | 'zcode'>,
+  string
+> = {
   claude: '.claude',
   codex: '.codex',
 }
 
-const SOURCE_PROFILE_BASES: Record<Exclude<SessionSource, 'gemini' | 'opencode' | 'pi'>, string> = {
+const SOURCE_PROFILE_BASES: Record<
+  Exclude<SessionSource, 'gemini' | 'opencode' | 'pi' | 'zcode'>,
+  string
+> = {
   claude: '.claude-profiles',
   codex: '.codex-profiles',
 }
@@ -42,6 +53,10 @@ export function getSessionRoots(source: SessionSource): string[] {
 
   if (source === 'opencode') {
     return dedupePaths([normalizeSourceRoot('opencode', getOpenCodeBaseDir())])
+  }
+
+  if (source === 'zcode') {
+    return dedupePaths([normalizeSourceRoot('zcode', getZCodeBaseDir())])
   }
 
   if (source === 'pi') {
@@ -76,9 +91,10 @@ export function detectSessionSource(
     gemini: getSessionRoots('gemini'),
     opencode: getSessionRoots('opencode'),
     pi: getSessionRoots('pi'),
+    zcode: getSessionRoots('zcode'),
   },
 ): SessionSource | undefined {
-  for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi'] as const) {
+  for (const source of ['claude', 'codex', 'gemini', 'opencode', 'pi', 'zcode'] as const) {
     if (sourceRoots[source]?.some((root) => isSessionFileForSource(source, filePath, root))) {
       return source
     }
@@ -96,7 +112,8 @@ export function getSessionWatchPatterns(
       join(root, '**', 'session-*.jsonl'),
     ])
   }
-  const pattern = source === 'opencode' ? OPENCODE_DB_NAME : '*.jsonl'
+  const pattern =
+    source === 'opencode' ? OPENCODE_DB_NAME : source === 'zcode' ? ZCODE_DB_NAME : '*.jsonl'
   return roots.map((root) => join(root, '**', pattern))
 }
 
@@ -128,6 +145,15 @@ function normalizeSourceRoot(source: SessionSource, filePath: string): string {
     if (existsSync(join(resolvedPath, OPENCODE_DB_NAME))) return resolvedPath
     if (existsSync(join(resolvedPath, '.local', 'share', 'opencode', OPENCODE_DB_NAME))) {
       return join(resolvedPath, '.local', 'share', 'opencode')
+    }
+    return resolvedPath
+  }
+
+  if (source === 'zcode') {
+    if (basename(resolvedPath) === ZCODE_DB_NAME) return dirname(resolvedPath)
+    if (existsSync(join(resolvedPath, ZCODE_DB_NAME))) return resolvedPath
+    if (existsSync(join(resolvedPath, '.zcode', 'cli', 'db', ZCODE_DB_NAME))) {
+      return join(resolvedPath, '.zcode', 'cli', 'db')
     }
     return resolvedPath
   }
@@ -174,6 +200,13 @@ function getOpenCodeBaseDir(): string {
   return join(homedir(), '.local', 'share', 'opencode')
 }
 
+function getZCodeBaseDir(): string {
+  const configuredHome = process.env['ZCODE_HOME']?.trim()
+  if (configuredHome) return join(resolve(expandHome(configuredHome)), 'cli', 'db')
+
+  return join(homedir(), '.zcode', 'cli', 'db')
+}
+
 export function isSessionFileForSource(
   source: SessionSource,
   filePath: string,
@@ -193,6 +226,9 @@ export function isSessionFileForSource(
   }
   if (source === 'opencode') {
     return isOpenCodeDatabaseFile(filePath)
+  }
+  if (source === 'zcode') {
+    return isZCodeDatabaseFile(filePath)
   }
   if (!filePath.endsWith('.jsonl')) return false
   if (source === 'claude' || source === 'pi') {
